@@ -1,0 +1,128 @@
+use syn::Attribute;
+use syn::Expr;
+use syn::Lit;
+use syn::Meta;
+use syn::Path;
+use syn::Token;
+use syn::punctuated::Punctuated;
+
+use crate::error::AttributeError;
+use crate::path_text::format_path;
+
+struct NamedArgument {
+    name: String,
+    value: Expr,
+}
+
+pub struct AttributeArgs {
+    attribute_path: String,
+    named: Vec<NamedArgument>,
+    positional: Vec<Expr>,
+}
+
+impl AttributeArgs {
+    pub(crate) fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeError> {
+        let attribute_path = format_path(attribute.path());
+
+        match &attribute.meta {
+            Meta::Path(_) => Ok(Self {
+                attribute_path,
+                named: Vec::new(),
+                positional: Vec::new(),
+            }),
+            Meta::NameValue(meta_name_value) => Ok(Self {
+                named: vec![NamedArgument {
+                    name: format_path(&meta_name_value.path),
+                    value: meta_name_value.value.clone(),
+                }],
+                attribute_path,
+                positional: Vec::new(),
+            }),
+            Meta::List(meta_list) => {
+                let parser = Punctuated::<Expr, Token![,]>::parse_terminated;
+                let expressions = match meta_list.parse_args_with(parser) {
+                    Ok(expressions) => expressions,
+                    Err(source) => {
+                        return Err(AttributeError::AttributeArguments {
+                            attribute_path,
+                            source,
+                        });
+                    }
+                };
+
+                let mut named = Vec::new();
+                let mut positional = Vec::new();
+
+                for expression in expressions {
+                    match named_argument(&expression) {
+                        Some(found) => named.push(found),
+                        None => positional.push(expression),
+                    }
+                }
+
+                Ok(Self {
+                    attribute_path,
+                    named,
+                    positional,
+                })
+            }
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.named.is_empty() && self.positional.is_empty()
+    }
+
+    pub fn named(&self, key: &str) -> Option<&Expr> {
+        self.named
+            .iter()
+            .find(|argument| argument.name == key)
+            .map(|argument| &argument.value)
+    }
+
+    pub fn positional(&self, index: usize) -> Option<&Expr> {
+        self.positional.get(index)
+    }
+
+    pub fn string(&self, key: &str) -> Result<Option<String>, AttributeError> {
+        match self.named(key) {
+            None => Ok(None),
+            Some(Expr::Lit(expression)) => match &expression.lit {
+                Lit::Str(literal) => Ok(Some(literal.value())),
+                _ => Err(self.unexpected_argument(key, "string literal")),
+            },
+            Some(_) => Err(self.unexpected_argument(key, "string literal")),
+        }
+    }
+
+    pub fn path(&self, key: &str) -> Result<Option<Path>, AttributeError> {
+        match self.named(key) {
+            None => Ok(None),
+            Some(Expr::Path(expression)) => Ok(Some(expression.path.clone())),
+            Some(_) => Err(self.unexpected_argument(key, "path")),
+        }
+    }
+
+    fn unexpected_argument(&self, key: &str, expected: &str) -> AttributeError {
+        AttributeError::UnexpectedArgument {
+            attribute_path: self.attribute_path.clone(),
+            key: key.to_string(),
+            expected: expected.to_string(),
+        }
+    }
+}
+
+fn named_argument(expression: &Expr) -> Option<NamedArgument> {
+    let Expr::Assign(assign) = expression else {
+        return None;
+    };
+    let Expr::Path(left) = assign.left.as_ref() else {
+        return None;
+    };
+    let name = left.path.get_ident()?;
+
+    Some(NamedArgument {
+        name: name.to_string(),
+        value: assign.right.as_ref().clone(),
+    })
+}

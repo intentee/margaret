@@ -1,0 +1,10 @@
+[workspace]
+resolver = "3"
+members = ["margaret_attributes"]
+
+[workspace.dependencies]
+syn = { version = "=2.0.118", features = ["full", "extra-traits"] }
+thiserror = "=2.0.18"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

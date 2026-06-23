@@ -1,0 +1,2 @@
+#[singleton]
+struct DeeplyNested;

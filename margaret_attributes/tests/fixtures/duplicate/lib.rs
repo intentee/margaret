@@ -1,0 +1,3 @@
+struct Duplicated;
+
+fn Duplicated() {}

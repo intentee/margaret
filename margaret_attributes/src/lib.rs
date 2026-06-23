@@ -1,0 +1,23 @@
+mod attribute_args;
+mod attribute_index;
+mod attribute_query;
+mod attribute_selector;
+mod canonical_path;
+mod error;
+mod indexed_item;
+mod item_kind;
+mod matched_attribute;
+mod module_walker;
+mod path_text;
+mod selected_item;
+
+pub use crate::attribute_args::AttributeArgs;
+pub use crate::attribute_index::AttributeIndex;
+pub use crate::attribute_query::AttributeQuery;
+pub use crate::attribute_selector::AttributeSelector;
+pub use crate::canonical_path::CanonicalPath;
+pub use crate::error::AttributeError;
+pub use crate::indexed_item::IndexedItem;
+pub use crate::item_kind::ItemKind;
+pub use crate::matched_attribute::MatchedAttribute;
+pub use crate::selected_item::SelectedItem;

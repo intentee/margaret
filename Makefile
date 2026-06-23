@@ -1,0 +1,28 @@
+COVERAGE_PACKAGES := -p margaret_attributes
+
+node_modules: package.json
+	npm install
+	touch node_modules
+
+.PHONY: clippy
+clippy:
+	cargo clippy --workspace --all-targets -- -D warnings
+
+.PHONY: coverage
+coverage: node_modules
+	cargo llvm-cov clean --workspace
+	cargo llvm-cov nextest $(COVERAGE_PACKAGES) --no-report
+	cargo llvm-cov report --json --output-path target/llvm-cov.json
+	cargo llvm-cov report --lcov --output-path target/lcov.info
+	cargo llvm-cov report
+	npx rust-coverage-check target/llvm-cov.json \
+		--workspace-root $(CURDIR) \
+		--gated margaret_attributes=100
+
+.PHONY: fmt
+fmt:
+	cargo fmt
+
+.PHONY: test
+test:
+	cargo nextest run --workspace

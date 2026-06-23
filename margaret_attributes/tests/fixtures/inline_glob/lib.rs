@@ -1,0 +1,3 @@
+mod inner {
+    use other::*;
+}
