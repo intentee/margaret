@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use crate::console_argument::ConsoleArgument;
 use crate::console_command::ConsoleCommand;
 
 pub(crate) fn render(commands: &[ConsoleCommand], has_http: bool) -> String {
@@ -61,7 +62,6 @@ pub(crate) fn render(commands: &[ConsoleCommand], has_http: bool) -> String {
             }
         }
     };
-
     let file =
         syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
 
@@ -70,22 +70,58 @@ pub(crate) fn render(commands: &[ConsoleCommand], has_http: bool) -> String {
 
 fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
     let name = &command.name;
-    let field = &command.field;
     let about = match &command.description {
         Some(description) => quote! { .about(#description) },
         None => quote! {},
     };
+    let arguments = command.arguments.iter().map(argument_registration);
 
     quote! {
-        .subcommand(clap::Command::new(#name)#about.args(container.#field.arguments()))
+        .subcommand(clap::Command::new(#name)#about #(#arguments)*)
+    }
+}
+
+fn argument_registration(argument: &ConsoleArgument) -> TokenStream {
+    let ConsoleArgument {
+        cli_name,
+        value_type,
+    } = argument;
+
+    quote! {
+        .arg(
+            clap::Arg::new(#cli_name)
+                .long(#cli_name)
+                .required(true)
+                .value_parser(clap::value_parser!(#value_type)),
+        )
     }
 }
 
 fn command_arm(command: &ConsoleCommand) -> TokenStream {
     let name = &command.name;
-    let field = &command.field;
+    let accessor = &command.accessor;
+    let matches_binding = if command.arguments.is_empty() {
+        quote! { _matches }
+    } else {
+        quote! { matches }
+    };
+    let values = command.arguments.iter().map(argument_value);
 
     quote! {
-        Some((#name, matches)) => container.#field.run(matches).await,
+        Some((#name, #matches_binding)) => container.#accessor(#(#values),*).run().await,
+    }
+}
+
+fn argument_value(argument: &ConsoleArgument) -> TokenStream {
+    let ConsoleArgument {
+        cli_name,
+        value_type,
+    } = argument;
+
+    quote! {
+        matches
+            .get_one::<#value_type>(#cli_name)
+            .expect("a required console argument is present")
+            .clone()
     }
 }

@@ -8,7 +8,7 @@ use margaret_container::generate_container_source;
 fn propagates_malformed_singleton_arguments() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/malformed_singleton_args");
-    let error = generate_container_source("malformed_singleton_args", &directory)
+    let error = generate_container_source("malformed_singleton_args", &directory, &[])
         .err()
         .expect("malformed #[singleton] arguments must surface through container generation");
 

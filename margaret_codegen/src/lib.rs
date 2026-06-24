@@ -28,8 +28,9 @@ pub fn build(manifest_directory: impl AsRef<Path>) -> Result<(), CodegenError> {
     }
 
     let index = AttributeIndex::from_crate_root("crate", &source_directory)?;
+    let input_selectors = margaret_console_codegen::input_selectors();
 
-    margaret_container::render_container(&index)?
+    margaret_container::render_container(&index, &input_selectors)?
         .write_if_changed(&container_path)
         .expect("the generated container is written");
 

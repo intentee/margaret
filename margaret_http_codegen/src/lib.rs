@@ -104,13 +104,15 @@ struct Tracer;
         assert!(source.contains("usesuper::container::Container"));
         assert!(source.contains("margaret_http::method::Method::Get"));
         assert!(source.contains(
-            "\"/open\",margaret_http::responder_handler::responder_handler(container.open.clone())"
+            "\"/open\",margaret_http::responder_handler::responder_handler(container.open())"
         ));
-        assert!(source.contains("container.guard.clone(),crate::action::Action::Read"));
-        assert!(source.contains("container.tracer.clone(),()"));
-        assert!(source.contains(
-            "margaret_http::responder_handler::responder_handler(container.resource.clone()"
-        ));
+        assert!(source.contains("container.guard(),crate::action::Action::Read"));
+        assert!(source.contains("container.tracer(),()"));
+        assert!(
+            source.contains(
+                "margaret_http::responder_handler::responder_handler(container.resource()"
+            )
+        );
 
         let guard = source.find("container.guard").expect("the guard is wired");
         let tracer = source

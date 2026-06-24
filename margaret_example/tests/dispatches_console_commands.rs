@@ -12,7 +12,11 @@ async fn dispatches_console_commands() {
     );
 
     assert_eq!(
-        run(&container, ["app", "serve", "--addr", "this is not an address"]).await,
+        run(
+            &container,
+            ["app", "serve", "--addr", "this is not an address"]
+        )
+        .await,
         CommandOutcome::Failed
     );
 

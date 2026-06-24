@@ -89,4 +89,12 @@ pub enum ContainerError {
 
     #[error("dependency cycle detected: {path}")]
     DependencyCycle { path: String },
+
+    #[error(
+        "parameter '{parameter}' of deferred singleton '{singleton}' is a collection dependency, which is not supported for deferred construction"
+    )]
+    DeferredCollectionDependencyUnsupported {
+        singleton: String,
+        parameter: String,
+    },
 }

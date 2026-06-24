@@ -35,7 +35,7 @@ pub(crate) fn render(routes: &[HttpRoute]) -> String {
 fn onion(route: &HttpRoute) -> TokenStream {
     let responder = &route.responder_field;
     let mut handler = quote! {
-        margaret_http::responder_handler::responder_handler(container.#responder.clone())
+        margaret_http::responder_handler::responder_handler(container.#responder())
     };
 
     for application in &route.layers {
@@ -43,7 +43,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
         let marker = &application.marker_value;
 
         handler = quote! {
-            margaret_http::layer::layer(container.#middleware.clone(), #marker, #handler)
+            margaret_http::layer::layer(container.#middleware(), #marker, #handler)
         };
     }
 

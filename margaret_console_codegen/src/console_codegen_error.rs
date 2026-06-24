@@ -14,4 +14,22 @@ pub enum ConsoleCodegenError {
 
     #[error("console command '{command}' is missing the 'name' argument")]
     MissingCommandName { command: String },
+
+    #[error("console command '{command}' has no #[constructor] method")]
+    MissingCommandConstructor { command: String },
+
+    #[error(
+        "console argument '{parameter}' of console command '{command}' is missing the 'name' argument"
+    )]
+    MissingConsoleArgumentName { command: String, parameter: String },
+
+    #[error(
+        "console argument '{parameter}' of console command '{command}' is missing the 'required' argument"
+    )]
+    MissingConsoleArgumentRequired { command: String, parameter: String },
+
+    #[error(
+        "console argument '{parameter}' of console command '{command}' declares 'required = false', but optional console arguments are not supported yet"
+    )]
+    ConsoleArgumentOptionalUnsupported { command: String, parameter: String },
 }

@@ -22,7 +22,7 @@ impl AttributeSelector {
         Self { path }
     }
 
-    pub(crate) fn matches(&self, attribute_path: &Path) -> bool {
+    pub fn matches(&self, attribute_path: &Path) -> bool {
         let selector_length = self.path.segments.len();
         let attribute_length = attribute_path.segments.len();
 

@@ -7,7 +7,7 @@ use margaret_container::generate_container_source;
 fn reports_ambiguous_constructor() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ambiguous_constructor");
-    let error = generate_container_source("ambiguous_constructor", &directory)
+    let error = generate_container_source("ambiguous_constructor", &directory, &[])
         .err()
         .expect("a singleton with two #[constructor] methods must be rejected");
 

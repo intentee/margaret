@@ -31,6 +31,7 @@ coverage: node_modules
 		--gated margaret_console_codegen=100 \
 		--gated margaret_container=100 \
 		--gated margaret_example=100 \
+		--gated margaret_example_macros=100 \
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100
 

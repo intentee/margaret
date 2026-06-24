@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use clap::Arg;
-use clap::ArgMatches;
 use margaret_console::command::Command;
 use margaret_console::command_outcome::CommandOutcome;
 use margaret_macros::console_command;
@@ -15,27 +13,23 @@ use crate::greeter::Greeter;
 #[console_command(name = "greet", description = "Greets a person by name")]
 pub struct Greet {
     greeter: Arc<dyn Greeter + Send + Sync>,
+    name: String,
 }
 
 impl Greet {
     #[constructor]
-    pub fn create(greeter: Arc<dyn Greeter + Send + Sync>) -> Self {
-        Self { greeter }
+    pub fn create(
+        greeter: Arc<dyn Greeter + Send + Sync>,
+        #[console_argument(name = "name", required = true)] name: String,
+    ) -> Self {
+        Self { greeter, name }
     }
 }
 
 #[async_trait]
 impl Command for Greet {
-    fn arguments(&self) -> Vec<Arg> {
-        vec![Arg::new("name").long("name").required(true)]
-    }
-
-    async fn run(&self, matches: &ArgMatches) -> CommandOutcome {
-        let name = matches
-            .get_one::<String>("name")
-            .expect("name is a required argument");
-
-        println!("{}, {name}", self.greeter.greet());
+    async fn run(&self) -> CommandOutcome {
+        println!("{}, {}", self.greeter.greet(), self.name);
 
         CommandOutcome::Succeeded
     }

@@ -21,7 +21,7 @@ pub struct AttributeArgs {
 }
 
 impl AttributeArgs {
-    pub(crate) fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeError> {
+    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeError> {
         let attribute_path = format_path(attribute.path());
 
         match &attribute.meta {
@@ -100,6 +100,17 @@ impl AttributeArgs {
             None => Ok(None),
             Some(Expr::Path(expression)) => Ok(Some(expression.path.clone())),
             Some(_) => Err(self.unexpected_argument(key, "path")),
+        }
+    }
+
+    pub fn boolean(&self, key: &str) -> Result<Option<bool>, AttributeError> {
+        match self.named(key) {
+            None => Ok(None),
+            Some(Expr::Lit(expression)) => match &expression.lit {
+                Lit::Bool(literal) => Ok(Some(literal.value)),
+                _ => Err(self.unexpected_argument(key, "boolean literal")),
+            },
+            Some(_) => Err(self.unexpected_argument(key, "boolean literal")),
         }
     }
 
@@ -188,6 +199,17 @@ mod tests {
         assert!(parsed.path("method").expect("a path argument").is_some());
         assert!(parsed.path("absent").expect("an absent argument").is_none());
         assert!(parsed.path("pattern").is_err());
+    }
+
+    #[test]
+    fn reads_a_boolean_argument_and_rejects_non_booleans() {
+        let parsed =
+            args(parse_quote!(#[console_argument(required = true, name = "x", kind = Flag)]));
+
+        assert_eq!(parsed.boolean("required").expect("a boolean"), Some(true));
+        assert_eq!(parsed.boolean("absent").expect("an absent argument"), None);
+        assert!(parsed.boolean("name").is_err());
+        assert!(parsed.boolean("kind").is_err());
     }
 
     #[test]

@@ -101,7 +101,7 @@ fn dependency_indices(
 ) -> Vec<usize> {
     let mut indices = Vec::new();
 
-    for dependency in &provider.dependencies {
+    for dependency in provider.dependencies() {
         match dependency {
             DependencyKind::Single { provider_key } => {
                 indices.push(index_of(index_by_key, provider_key));
