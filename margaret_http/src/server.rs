@@ -51,7 +51,7 @@ impl BoundServer {
             .expect("a bound listener has a local address")
     }
 
-    pub async fn serve(self) {
+    pub async fn serve(self) -> ! {
         loop {
             let (stream, _remote) = self
                 .listener
@@ -101,7 +101,7 @@ mod tests {
 
     #[tokio::test]
     async fn bind_fails_for_an_invalid_address() {
-        let server = Server::new(Router::default());
+        let server = Server::new(Router::empty());
 
         assert!(server.bind("this is not an address").await.is_err());
     }

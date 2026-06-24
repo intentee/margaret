@@ -14,17 +14,15 @@ pub struct Router {
     routes: Vec<HashMap<Method, Arc<dyn Handler>>>,
 }
 
-impl Default for Router {
-    fn default() -> Self {
+impl Router {
+    pub fn empty() -> Self {
         Self {
             matcher: matchit::Router::new(),
             paths: HashMap::new(),
             routes: Vec::new(),
         }
     }
-}
 
-impl Router {
     pub fn route(mut self, method: Method, path: &str, handler: Arc<dyn Handler>) -> Self {
         let index = match self.paths.get(path) {
             Some(&index) => index,
@@ -96,7 +94,7 @@ mod tests {
     }
 
     fn router() -> Router {
-        Router::default()
+        Router::empty()
             .route(Method::Get, "/items", responder_handler(Arc::new(Ok200)))
             .route(Method::Post, "/items", responder_handler(Arc::new(Ok200)))
             .route(

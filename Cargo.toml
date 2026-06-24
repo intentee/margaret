@@ -3,20 +3,20 @@ resolver = "3"
 members = [
     "margaret_attributes",
     "margaret_codegen",
+    "margaret_console",
+    "margaret_console_codegen",
     "margaret_container",
-    "margaret_container_example",
-    "margaret_everything_example",
-    "margaret_everything_example_macros",
+    "margaret_example",
+    "margaret_example_macros",
     "margaret_http",
     "margaret_http_codegen",
-    "margaret_http_example",
-    "margaret_http_example_macros",
     "margaret_macros",
 ]
 
 [workspace.dependencies]
 async-trait = "=0.1.89"
 bytes = "=1.12.0"
+clap = { version = "=4.5.47", default-features = false, features = ["std", "help", "usage", "error-context"] }
 heck = "=0.5.0"
 http = "=1.4.2"
 http-body-util = "=0.1.3"

@@ -1,5 +1,5 @@
 [package]
-name = "margaret_http_codegen"
+name = "margaret_console_codegen"
 version = "0.1.0"
 edition = "2024"
 

@@ -1,6 +1,0 @@
-pub mod action;
-pub mod middleware;
-pub mod routes;
-
-#[rustfmt::skip]
-pub mod margaret;

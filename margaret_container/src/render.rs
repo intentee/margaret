@@ -22,18 +22,12 @@ pub(crate) fn render(plan: &ContainerPlan, order: &[usize]) -> String {
         }
 
         impl Container {
-            pub fn new() -> Self {
+            pub fn build() -> Self {
                 #(#local_bindings)*
 
                 Self {
                     #(#field_initializers,)*
                 }
-            }
-        }
-
-        impl Default for Container {
-            fn default() -> Self {
-                Self::new()
             }
         }
     };

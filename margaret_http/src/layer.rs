@@ -8,9 +8,13 @@ use crate::next::Next;
 use crate::request::Request;
 use crate::response::Response;
 
-pub fn layer<M>(middleware: Arc<M>, marker: M::Marker, inner: Arc<dyn Handler>) -> Arc<dyn Handler>
+pub fn layer<Middleware>(
+    middleware: Arc<Middleware>,
+    marker: Middleware::Marker,
+    inner: Arc<dyn Handler>,
+) -> Arc<dyn Handler>
 where
-    M: HttpMiddleware + Send + Sync + 'static,
+    Middleware: HttpMiddleware + Send + Sync + 'static,
 {
     Arc::new(LayeredHandler {
         inner,
@@ -19,16 +23,16 @@ where
     })
 }
 
-struct LayeredHandler<M: HttpMiddleware> {
+struct LayeredHandler<Middleware: HttpMiddleware> {
     inner: Arc<dyn Handler>,
-    marker: M::Marker,
-    middleware: Arc<M>,
+    marker: Middleware::Marker,
+    middleware: Arc<Middleware>,
 }
 
 #[async_trait]
-impl<M> Handler for LayeredHandler<M>
+impl<Middleware> Handler for LayeredHandler<Middleware>
 where
-    M: HttpMiddleware + Send + Sync + 'static,
+    Middleware: HttpMiddleware + Send + Sync + 'static,
 {
     async fn handle(&self, request: Request) -> Response {
         self.middleware

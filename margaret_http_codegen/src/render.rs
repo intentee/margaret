@@ -18,9 +18,8 @@ pub(crate) fn render(routes: &[HttpRoute]) -> String {
     let tokens = quote! {
         use super::container::Container;
 
-        pub fn server() -> margaret_http::server::Server {
-            let container = Container::default();
-            let router = margaret_http::router::Router::default()
+        pub fn server(container: &Container) -> margaret_http::server::Server {
+            let router = margaret_http::router::Router::empty()
                 #(#route_calls)*;
 
             margaret_http::server::Server::new(router)

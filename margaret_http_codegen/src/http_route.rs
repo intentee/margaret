@@ -9,7 +9,6 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use crate::field_name::field_name;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::middleware_binding::MiddlewareBinding;
 
@@ -79,7 +78,7 @@ pub(crate) fn http_routes(
                 .ident
                 .clone(),
             path,
-            responder_field: format_ident!("{}", field_name(item.canonical_path())),
+            responder_field: format_ident!("{}", item.canonical_path().field_name()),
         });
     }
 

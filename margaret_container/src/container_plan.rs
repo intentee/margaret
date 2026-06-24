@@ -1,4 +1,3 @@
-use heck::ToSnakeCase;
 use margaret_attributes::attribute_holder::AttributeHolder;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
@@ -131,7 +130,7 @@ fn build_drafts<'index>(
             });
         }
 
-        let field_name = field_name(provided.key());
+        let field_name = provided.key().field_name();
 
         if let Some(existing) = drafts.iter().find(|draft| draft.field_name == field_name) {
             return Err(ContainerError::DuplicateFieldName {
@@ -268,13 +267,6 @@ fn parameter_name(pattern: &Pat, position: usize) -> String {
         Pat::Ident(pattern_ident) => pattern_ident.ident.to_string(),
         _ => position.to_string(),
     }
-}
-
-fn field_name(key: &CanonicalPath) -> String {
-    key.segments()
-        .last()
-        .expect("a canonical path has at least one segment")
-        .to_snake_case()
 }
 
 fn trait_paths(index: &AttributeIndex) -> Vec<CanonicalPath> {

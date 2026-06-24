@@ -3,6 +3,12 @@
 version = 4
 
 [[package]]
+name = "anstyle"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
+
+[[package]]
 name = "async-trait"
 version = "0.1.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -36,6 +42,31 @@ name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
+
+[[package]]
+name = "clap"
+version = "4.5.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7eac00902d9d136acd712710d71823fb8ac8004ca445a89e73a41d45aa712931"
+dependencies = [
+ "clap_builder",
+]
+
+[[package]]
+name = "clap_builder"
+version = "4.5.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ad9bbf750e73b5884fb8a211a9424a1906c1e156724260fdae972f31d70e1d6"
+dependencies = [
+ "anstyle",
+ "clap_lex",
+]
+
+[[package]]
+name = "clap_lex"
+version = "0.7.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3e64b0cc0439b12df2fa678eae89a1c56a529fd067a9115f7827f1fffd22b32"
 
 [[package]]
 name = "equivalent"
@@ -261,6 +292,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 name = "margaret_attributes"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "syn",
  "thiserror",
 ]
@@ -270,6 +302,7 @@ name = "margaret_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_console_codegen",
  "margaret_container",
  "margaret_http_codegen",
  "tempfile",
@@ -277,10 +310,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_container"
+name = "margaret_console"
 version = "0.1.0"
 dependencies = [
- "heck",
+ "async-trait",
+ "clap",
+ "margaret_http",
+ "tokio",
+]
+
+[[package]]
+name = "margaret_console_codegen"
+version = "0.1.0"
+dependencies = [
  "margaret_attributes",
  "prettyplease",
  "proc-macro2",
@@ -291,32 +333,39 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_container_example"
+name = "margaret_container"
 version = "0.1.0"
 dependencies = [
- "margaret_codegen",
- "margaret_macros",
+ "margaret_attributes",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
-name = "margaret_everything_example"
+name = "margaret_example"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
+ "clap",
  "http",
  "http-body-util",
  "hyper",
  "hyper-util",
  "margaret_codegen",
- "margaret_everything_example_macros",
+ "margaret_console",
+ "margaret_example_macros",
  "margaret_http",
  "margaret_macros",
  "tokio",
 ]
 
 [[package]]
-name = "margaret_everything_example_macros"
+name = "margaret_example_macros"
 version = "0.1.0"
 
 [[package]]
@@ -338,7 +387,6 @@ dependencies = [
 name = "margaret_http_codegen"
 version = "0.1.0"
 dependencies = [
- "heck",
  "margaret_attributes",
  "prettyplease",
  "proc-macro2",
@@ -347,27 +395,6 @@ dependencies = [
  "tempfile",
  "thiserror",
 ]
-
-[[package]]
-name = "margaret_http_example"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "bytes",
- "http",
- "http-body-util",
- "hyper",
- "hyper-util",
- "margaret_codegen",
- "margaret_http",
- "margaret_http_example_macros",
- "margaret_macros",
- "tokio",
-]
-
-[[package]]
-name = "margaret_http_example_macros"
-version = "0.1.0"
 
 [[package]]
 name = "margaret_macros"

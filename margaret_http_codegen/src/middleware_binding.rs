@@ -8,7 +8,6 @@ use syn::Expr;
 use syn::ExprLit;
 use syn::Lit;
 
-use crate::field_name::field_name;
 use crate::http_codegen_error::HttpCodegenError;
 
 pub(crate) struct MiddlewareBinding {
@@ -53,7 +52,7 @@ pub(crate) fn middleware_bindings(
         };
 
         bindings.push(MiddlewareBinding {
-            field: format_ident!("{}", field_name(item.canonical_path())),
+            field: format_ident!("{}", item.canonical_path().field_name()),
             priority,
             selector: AttributeSelector::from_path(handles),
         });

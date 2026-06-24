@@ -1,4 +1,5 @@
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 use thiserror::Error;
@@ -21,5 +22,11 @@ pub enum CodegenError {
     Http {
         #[from]
         source: HttpCodegenError,
+    },
+
+    #[error("failed to generate the console: {source}")]
+    Console {
+        #[from]
+        source: ConsoleCodegenError,
     },
 }
