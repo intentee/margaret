@@ -7,7 +7,7 @@ edition = "2024"
 margaret_macros = { path = "../margaret_macros" }
 
 [build-dependencies]
-margaret_container = { path = "../margaret_container" }
+margaret_codegen = { path = "../margaret_codegen" }
 
 [lints]
 workspace = true

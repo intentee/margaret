@@ -5,7 +5,7 @@ use http::Method;
 use http_body_util::BodyExt;
 use http_body_util::Empty;
 use hyper_util::rt::TokioIo;
-use margaret_http_example::http::server;
+use margaret_http_example::margaret::http::server;
 use tokio::net::TcpStream;
 
 struct Reply {

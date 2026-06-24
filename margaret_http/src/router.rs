@@ -99,7 +99,11 @@ mod tests {
         Router::default()
             .route(Method::Get, "/items", responder_handler(Arc::new(Ok200)))
             .route(Method::Post, "/items", responder_handler(Arc::new(Ok200)))
-            .route(Method::Get, "/items/{id}", responder_handler(Arc::new(Ok200)))
+            .route(
+                Method::Get,
+                "/items/{id}",
+                responder_handler(Arc::new(Ok200)),
+            )
     }
 
     async fn status_of(method: Method, path: &str) -> u16 {

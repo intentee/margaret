@@ -266,6 +266,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_container",
+ "margaret_http_codegen",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "margaret_container"
 version = "0.1.0"
 dependencies = [
@@ -283,7 +294,7 @@ dependencies = [
 name = "margaret_container_example"
 version = "0.1.0"
 dependencies = [
- "margaret_container",
+ "margaret_codegen",
  "margaret_macros",
 ]
 
@@ -308,7 +319,6 @@ version = "0.1.0"
 dependencies = [
  "heck",
  "margaret_attributes",
- "margaret_container",
  "prettyplease",
  "proc-macro2",
  "quote",
@@ -327,8 +337,8 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "margaret_codegen",
  "margaret_http",
- "margaret_http_codegen",
  "margaret_http_example_macros",
  "margaret_macros",
  "tokio",

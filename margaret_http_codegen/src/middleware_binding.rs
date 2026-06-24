@@ -35,11 +35,12 @@ pub(crate) fn middleware_bindings(
 
         let arguments = matched.args()?;
         let middleware = item.canonical_path().to_string();
-        let handles = arguments
-            .path("handles")?
-            .ok_or(HttpCodegenError::MissingMiddlewareHandles {
-                middleware: middleware.clone(),
-            })?;
+        let handles =
+            arguments
+                .path("handles")?
+                .ok_or(HttpCodegenError::MissingMiddlewareHandles {
+                    middleware: middleware.clone(),
+                })?;
         let priority = match arguments.named("priority") {
             Some(Expr::Lit(ExprLit {
                 lit: Lit::Int(value),

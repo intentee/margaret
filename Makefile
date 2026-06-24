@@ -1,5 +1,6 @@
 COVERAGE_PACKAGES := \
 	-p margaret_attributes \
+	-p margaret_codegen \
 	-p margaret_container \
 	-p margaret_container_example \
 	-p margaret_http \
@@ -24,6 +25,7 @@ coverage: node_modules
 	npx rust-coverage-check target/llvm-cov.json \
 		--workspace-root $(CURDIR) \
 		--gated margaret_attributes=100 \
+		--gated margaret_codegen=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_example=100 \
 		--gated margaret_http=100 \

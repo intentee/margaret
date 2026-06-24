@@ -1,4 +1,3 @@
 fn main() {
-    margaret_container::build(env!("CARGO_MANIFEST_DIR"))
-        .expect("the example container is generated");
+    margaret_codegen::build(env!("CARGO_MANIFEST_DIR")).expect("the example is generated");
 }

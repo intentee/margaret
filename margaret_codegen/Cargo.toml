@@ -1,15 +1,12 @@
 [package]
-name = "margaret_http_codegen"
+name = "margaret_codegen"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-heck = { workspace = true }
 margaret_attributes = { path = "../margaret_attributes" }
-prettyplease = { workspace = true }
-proc-macro2 = { workspace = true }
-quote = { workspace = true }
-syn = { workspace = true }
+margaret_container = { path = "../margaret_container" }
+margaret_http_codegen = { path = "../margaret_http_codegen" }
 thiserror = { workspace = true }
 
 [dev-dependencies]

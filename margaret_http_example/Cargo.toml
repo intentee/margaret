@@ -10,7 +10,7 @@ margaret_http_example_macros = { path = "../margaret_http_example_macros" }
 margaret_macros = { path = "../margaret_macros" }
 
 [build-dependencies]
-margaret_http_codegen = { path = "../margaret_http_codegen" }
+margaret_codegen = { path = "../margaret_codegen" }
 
 [dev-dependencies]
 bytes = { workspace = true }

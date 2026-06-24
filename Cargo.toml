@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "margaret_attributes",
+    "margaret_codegen",
     "margaret_container",
     "margaret_container_example",
     "margaret_http",

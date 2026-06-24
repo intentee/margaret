@@ -5,6 +5,4 @@ pub mod resource;
 pub mod restricted_resource;
 
 #[rustfmt::skip]
-pub mod container;
-#[rustfmt::skip]
-pub mod http;
+pub mod margaret;

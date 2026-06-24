@@ -4,62 +4,48 @@ mod http_route;
 mod middleware_binding;
 mod render;
 
-use std::fs;
 use std::path::Path;
 
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::attribute_selector::AttributeSelector;
 
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::http_routes;
 use crate::middleware_binding::middleware_bindings;
 use crate::render::render;
 
+pub fn render_http(index: &AttributeIndex) -> Result<String, HttpCodegenError> {
+    let bindings = middleware_bindings(index)?;
+    let routes = http_routes(index, &bindings)?;
+
+    Ok(render(&routes))
+}
+
+pub fn has_responders(index: &AttributeIndex) -> bool {
+    let selector = AttributeSelector::parse("responds_to_http").expect("a valid selector");
+
+    !index.select(&selector).is_empty()
+}
+
 pub fn generate_http_source(
     crate_name: &str,
     source_directory: &Path,
 ) -> Result<String, HttpCodegenError> {
     let index = AttributeIndex::from_crate_root(crate_name, source_directory)?;
-    let bindings = middleware_bindings(&index)?;
-    let routes = http_routes(&index, &bindings)?;
 
-    Ok(render(&routes))
-}
-
-pub fn build(manifest_directory: impl AsRef<Path>) -> Result<(), HttpCodegenError> {
-    let manifest_directory = manifest_directory.as_ref();
-    let source_directory = manifest_directory.join("src");
-    let http_path = source_directory.join("http.rs");
-
-    if !http_path.exists() {
-        fs::write(&http_path, "").expect("the http stub is written");
-    }
-
-    margaret_container::build(manifest_directory)?;
-
-    let source = generate_http_source("crate", &source_directory)?;
-
-    if !file_matches(&http_path, &source) {
-        fs::write(&http_path, &source).expect("the generated http source is written");
-    }
-
-    println!("cargo:rerun-if-changed={}", source_directory.display());
-
-    Ok(())
-}
-
-fn file_matches(path: &Path, source: &str) -> bool {
-    matches!(fs::read_to_string(path), Ok(existing) if existing == source)
+    render_http(&index)
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
 
+    use margaret_attributes::attribute_index::AttributeIndex;
     use tempfile::TempDir;
     use tempfile::tempdir;
 
-    use crate::build;
     use crate::generate_http_source;
+    use crate::has_responders;
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"
 #[responds_to_http(method = Get, path = "/resource")]
@@ -77,30 +63,6 @@ struct Guard;
 struct Tracer;
 "#;
 
-    const BUILDABLE: &str = r#"
-pub mod container;
-pub mod http;
-
-#[singleton]
-#[responds_to_http(method = Get, path = "/items")]
-#[traced]
-struct ShowItems;
-
-impl ShowItems {
-    #[constructor]
-    fn create() -> Self {}
-}
-
-#[singleton]
-#[http_middleware(handles = traced, priority = 100)]
-struct RequestLogger;
-
-impl RequestLogger {
-    #[constructor]
-    fn create() -> Self {}
-}
-"#;
-
     fn crate_with(lib_source: &str) -> TempDir {
         let directory = tempdir().expect("a temporary crate directory is created");
         let source_directory = directory.path().join("src");
@@ -109,6 +71,13 @@ impl RequestLogger {
         fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
 
         directory
+    }
+
+    fn index_for(lib_source: &str) -> AttributeIndex {
+        let directory = crate_with(lib_source);
+
+        AttributeIndex::from_crate_root("crate", &directory.path().join("src"))
+            .expect("the crate is indexed")
     }
 
     fn source_for(lib_source: &str) -> String {
@@ -133,6 +102,7 @@ impl RequestLogger {
         let source = source_for(RESPONDERS_AND_MIDDLEWARE);
 
         assert!(source.contains("pubfnserver"));
+        assert!(source.contains("usesuper::container::Container"));
         assert!(source.contains("margaret_http::method::Method::Get"));
         assert!(source.contains(
             "\"/open\",margaret_http::responder_handler::responder_handler(container.open.clone())"
@@ -144,7 +114,9 @@ impl RequestLogger {
         ));
 
         let guard = source.find("container.guard").expect("the guard is wired");
-        let tracer = source.find("container.tracer").expect("the tracer is wired");
+        let tracer = source
+            .find("container.tracer")
+            .expect("the tracer is wired");
 
         assert!(guard < tracer);
     }
@@ -234,7 +206,8 @@ impl RequestLogger {
 
     #[test]
     fn rejects_middleware_with_a_non_integer_priority() {
-        let message = error_for("#[http_middleware(handles = x, priority = \"high\")]\nstruct Bad;\n");
+        let message =
+            error_for("#[http_middleware(handles = x, priority = \"high\")]\nstruct Bad;\n");
 
         assert!(message.contains("not an integer"));
     }
@@ -258,43 +231,16 @@ impl RequestLogger {
     }
 
     #[test]
-    fn build_generates_the_server_and_is_idempotent() {
-        let directory = crate_with(BUILDABLE);
+    fn reports_responders_present() {
+        let index = index_for("#[responds_to_http(method = Get, path = \"/x\")]\nstruct R;\n");
 
-        build(directory.path()).expect("the first build succeeds");
-        build(directory.path()).expect("the second build is idempotent");
-
-        let http =
-            fs::read_to_string(directory.path().join("src/http.rs")).expect("http.rs exists");
-        let container = fs::read_to_string(directory.path().join("src/container.rs"))
-            .expect("container.rs exists");
-
-        assert!(http.contains("fn server"));
-        assert!(container.contains("struct Container"));
+        assert!(has_responders(&index));
     }
 
     #[test]
-    fn build_propagates_a_container_failure() {
-        let directory =
-            crate_with("pub mod container;\npub mod http;\n\n#[singleton]\nenum Bad {}\n");
+    fn reports_no_responders() {
+        let index = index_for("#[singleton]\nstruct S;\n");
 
-        let message = build(directory.path())
-            .expect_err("the build fails")
-            .to_string();
-
-        assert!(message.contains("failed to generate the dependency container"));
-    }
-
-    #[test]
-    fn build_propagates_an_http_failure() {
-        let directory = crate_with(
-            "pub mod container;\npub mod http;\n\n#[singleton]\n#[responds_to_http(path = \"/x\")]\nstruct Bad;\n\nimpl Bad {\n    #[constructor]\n    fn create() -> Self {}\n}\n",
-        );
-
-        let message = build(directory.path())
-            .expect_err("the build fails")
-            .to_string();
-
-        assert!(message.contains("missing the 'method'"));
+        assert!(!has_responders(&index));
     }
 }

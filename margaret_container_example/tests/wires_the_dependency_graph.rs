@@ -1,4 +1,4 @@
-use margaret_container_example::container::Container;
+use margaret_container_example::margaret::container::Container;
 
 #[test]
 fn wires_the_dependency_graph() {

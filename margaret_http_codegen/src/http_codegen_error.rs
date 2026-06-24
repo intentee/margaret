@@ -1,15 +1,8 @@
 use margaret_attributes::attribute_error::AttributeError;
-use margaret_container::container_error::ContainerError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum HttpCodegenError {
-    #[error("failed to generate the dependency container: {source}")]
-    Container {
-        #[from]
-        source: ContainerError,
-    },
-
     #[error("failed to index the crate: {source}")]
     Index {
         #[from]

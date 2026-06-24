@@ -2,12 +2,12 @@ use std::io::ErrorKind;
 use std::io::Result as IoResult;
 use std::path::Path;
 
-pub struct GeneratedContainer {
+pub struct GeneratedSource {
     source: String,
 }
 
-impl GeneratedContainer {
-    pub(crate) fn new(source: String) -> Self {
+impl GeneratedSource {
+    pub fn new(source: String) -> Self {
         Self { source }
     }
 
@@ -40,13 +40,13 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use super::GeneratedContainer;
+    use super::GeneratedSource;
 
     #[test]
     fn writes_when_the_file_is_absent() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("container.rs");
-        let wrote = GeneratedContainer::new("first".to_string())
+        let wrote = GeneratedSource::new("first".to_string())
             .write_if_changed(&path)
             .expect("the write succeeds");
 
@@ -61,7 +61,7 @@ mod tests {
     fn skips_writing_when_the_content_matches() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("container.rs");
-        let generated = GeneratedContainer::new("same".to_string());
+        let generated = GeneratedSource::new("same".to_string());
         generated
             .write_if_changed(&path)
             .expect("the first write succeeds");
@@ -77,11 +77,11 @@ mod tests {
     fn rewrites_when_the_content_differs() {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("container.rs");
-        GeneratedContainer::new("old".to_string())
+        GeneratedSource::new("old".to_string())
             .write_if_changed(&path)
             .expect("the first write succeeds");
 
-        let wrote = GeneratedContainer::new("new".to_string())
+        let wrote = GeneratedSource::new("new".to_string())
             .write_if_changed(&path)
             .expect("the second write succeeds");
 
@@ -96,8 +96,7 @@ mod tests {
     fn propagates_a_read_error() {
         let directory = tempdir().expect("a temporary directory");
 
-        let result =
-            GeneratedContainer::new("content".to_string()).write_if_changed(directory.path());
+        let result = GeneratedSource::new("content".to_string()).write_if_changed(directory.path());
 
         assert!(result.is_err());
     }
@@ -107,7 +106,7 @@ mod tests {
         let directory = tempdir().expect("a temporary directory");
         let path = directory.path().join("missing").join("container.rs");
 
-        let result = GeneratedContainer::new("content".to_string()).write_if_changed(&path);
+        let result = GeneratedSource::new("content".to_string()).write_if_changed(&path);
 
         assert!(result.is_err());
     }
