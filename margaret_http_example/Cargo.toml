@@ -1,0 +1,24 @@
+[package]
+name = "margaret_http_example"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = { workspace = true }
+margaret_http = { path = "../margaret_http" }
+margaret_http_example_macros = { path = "../margaret_http_example_macros" }
+margaret_macros = { path = "../margaret_macros" }
+
+[build-dependencies]
+margaret_http_codegen = { path = "../margaret_http_codegen" }
+
+[dev-dependencies]
+bytes = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true, features = ["client", "http1"] }
+hyper-util = { workspace = true, features = ["tokio"] }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }
+
+[lints]
+workspace = true

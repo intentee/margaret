@@ -1,0 +1,20 @@
+[package]
+name = "margaret_http_codegen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+heck = { workspace = true }
+margaret_attributes = { path = "../margaret_attributes" }
+margaret_container = { path = "../margaret_container" }
+prettyplease = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

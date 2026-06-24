@@ -1,7 +1,10 @@
 COVERAGE_PACKAGES := \
 	-p margaret_attributes \
 	-p margaret_container \
-	-p margaret_container_example
+	-p margaret_container_example \
+	-p margaret_http \
+	-p margaret_http_codegen \
+	-p margaret_http_example
 
 node_modules: package.json
 	npm install
@@ -22,7 +25,10 @@ coverage: node_modules
 		--workspace-root $(CURDIR) \
 		--gated margaret_attributes=100 \
 		--gated margaret_container=100 \
-		--gated margaret_container_example=100
+		--gated margaret_container_example=100 \
+		--gated margaret_http=100 \
+		--gated margaret_http_codegen=100 \
+		--gated margaret_http_example=100
 
 .PHONY: fmt
 fmt:

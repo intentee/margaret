@@ -18,6 +18,10 @@ impl AttributeSelector {
         }
     }
 
+    pub fn from_path(path: Path) -> Self {
+        Self { path }
+    }
+
     pub(crate) fn matches(&self, attribute_path: &Path) -> bool {
         let selector_length = self.path.segments.len();
         let attribute_length = attribute_path.segments.len();
@@ -94,5 +98,12 @@ mod tests {
     #[test]
     fn display_path_renders_the_written_selector() {
         assert_eq!(selector("ns::tagged").display_path(), "ns::tagged");
+    }
+
+    #[test]
+    fn from_path_builds_a_matching_selector() {
+        let selector = AttributeSelector::from_path(parse_quote!(can));
+
+        assert!(selector.matches(&parse_quote!(crate::markers::can)));
     }
 }
