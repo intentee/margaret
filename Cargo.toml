@@ -5,6 +5,8 @@ members = [
     "margaret_codegen",
     "margaret_container",
     "margaret_container_example",
+    "margaret_everything_example",
+    "margaret_everything_example_macros",
     "margaret_http",
     "margaret_http_codegen",
     "margaret_http_example",

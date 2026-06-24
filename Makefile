@@ -3,6 +3,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_codegen \
 	-p margaret_container \
 	-p margaret_container_example \
+	-p margaret_everything_example \
 	-p margaret_http \
 	-p margaret_http_codegen \
 	-p margaret_http_example
@@ -28,6 +29,7 @@ coverage: node_modules
 		--gated margaret_codegen=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_example=100 \
+		--gated margaret_everything_example=100 \
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \
 		--gated margaret_http_example=100

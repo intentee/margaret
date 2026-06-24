@@ -10,9 +10,9 @@ use margaret_macros::singleton;
 #[singleton]
 #[responds_to_http(method = Get, path = "/restricted")]
 #[can(crate::action::Action::Write)]
-pub struct RestrictedResource;
+pub struct GetRestricted;
 
-impl RestrictedResource {
+impl GetRestricted {
     #[constructor]
     pub fn create() -> Self {
         Self
@@ -20,7 +20,7 @@ impl RestrictedResource {
 }
 
 #[async_trait]
-impl HttpResponder for RestrictedResource {
+impl HttpResponder for GetRestricted {
     async fn respond(&self, request: Request) -> Response {
         Response::text(200, request.path().to_string())
     }
@@ -32,11 +32,11 @@ mod tests {
     use margaret_http::method::Method;
     use margaret_http::request::Request;
 
-    use super::RestrictedResource;
+    use super::GetRestricted;
 
     #[tokio::test]
     async fn echoes_the_requested_path() {
-        let response = RestrictedResource
+        let response = GetRestricted
             .respond(Request::new(Method::Get, "/restricted".to_string()))
             .await;
 
