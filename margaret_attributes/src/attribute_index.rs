@@ -1,14 +1,13 @@
 use std::path::Path;
 
+use crate::attribute_error::AttributeError;
+use crate::attribute_holder::AttributeHolder;
 use crate::attribute_selector::AttributeSelector;
-use crate::error::AttributeError;
-use crate::indexed_item::IndexedItem;
 use crate::matched_attribute::MatchedAttribute;
 use crate::module_walker::ModuleWalker;
-use crate::selected_item::SelectedItem;
 
 pub struct AttributeIndex {
-    items: Vec<IndexedItem>,
+    holders: Vec<AttributeHolder>,
 }
 
 impl AttributeIndex {
@@ -16,22 +15,22 @@ impl AttributeIndex {
         crate_name: &str,
         source_directory: &Path,
     ) -> Result<Self, AttributeError> {
-        let items = ModuleWalker::walk_crate(crate_name, source_directory)?;
+        let holders = ModuleWalker::walk_crate(crate_name, source_directory)?;
 
-        Ok(Self { items })
+        Ok(Self { holders })
     }
 
-    pub fn items(&self) -> &[IndexedItem] {
-        &self.items
+    pub fn holders(&self) -> &[AttributeHolder] {
+        &self.holders
     }
 
-    pub fn select(&self, selector: &AttributeSelector) -> Vec<SelectedItem<'_>> {
+    pub fn select(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'_>> {
         let mut selected = Vec::new();
 
-        for item in &self.items {
-            for attribute in item.attributes() {
+        for holder in &self.holders {
+            for attribute in holder.attributes() {
                 if selector.matches(attribute.path()) {
-                    selected.push(SelectedItem::new(MatchedAttribute::new(item, attribute)));
+                    selected.push(MatchedAttribute::new(holder, attribute));
                 }
             }
         }

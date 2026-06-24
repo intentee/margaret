@@ -4,14 +4,19 @@ use std::path::PathBuf;
 
 use syn::Attribute;
 use syn::Ident;
+use syn::ImplItem;
 use syn::Item;
+use syn::ItemImpl;
 use syn::ItemMod;
 use syn::ItemUse;
+use syn::Type;
 use syn::UseTree;
 
+use crate::attribute_error::AttributeError;
+use crate::attribute_holder::AttributeHolder;
 use crate::canonical_path::CanonicalPath;
-use crate::error::AttributeError;
 use crate::indexed_item::IndexedItem;
+use crate::indexed_method::IndexedMethod;
 use crate::item_kind::ItemKind;
 
 struct Recordable<'item> {
@@ -21,7 +26,7 @@ struct Recordable<'item> {
 }
 
 pub(crate) struct ModuleWalker {
-    items: Vec<IndexedItem>,
+    holders: Vec<AttributeHolder>,
     seen_paths: HashSet<CanonicalPath>,
 }
 
@@ -29,20 +34,18 @@ impl ModuleWalker {
     pub(crate) fn walk_crate(
         crate_name: &str,
         source_directory: &Path,
-    ) -> Result<Vec<IndexedItem>, AttributeError> {
+    ) -> Result<Vec<AttributeHolder>, AttributeError> {
         let mut walker = Self {
-            items: Vec::new(),
+            holders: Vec::new(),
             seen_paths: HashSet::new(),
         };
         let root_file = source_directory.join("lib.rs");
         let module_path = vec![crate_name.to_string()];
 
         walker.walk_file(&root_file, &module_path, source_directory)?;
-        walker
-            .items
-            .sort_by(|left, right| left.canonical_path().cmp(right.canonical_path()));
+        walker.holders.sort_by_key(AttributeHolder::target_path);
 
-        Ok(walker.items)
+        Ok(walker.holders)
     }
 
     fn walk_file(
@@ -129,6 +132,11 @@ impl ModuleWalker {
 
                 None
             }
+            Item::Impl(item_impl) => {
+                self.walk_impl(item_impl, module_path);
+
+                None
+            }
             _ => None,
         };
 
@@ -155,14 +163,41 @@ impl ModuleWalker {
         }
 
         self.seen_paths.insert(canonical_path.clone());
-        self.items.push(IndexedItem::new(
+        self.holders.push(AttributeHolder::Item(IndexedItem::new(
             recordable.kind,
             recordable.identifier.to_string(),
             canonical_path,
             recordable.attributes.to_vec(),
-        ));
+        )));
 
         Ok(())
+    }
+
+    fn walk_impl(&mut self, item_impl: &ItemImpl, module_path: &[String]) {
+        if item_impl.trait_.is_some() {
+            return;
+        }
+
+        let Some(self_identifier) = self_type_identifier(&item_impl.self_ty) else {
+            return;
+        };
+
+        let mut segments = module_path.to_vec();
+        segments.push(self_identifier.to_string());
+
+        let self_type_path = CanonicalPath::new(segments);
+
+        for impl_item in &item_impl.items {
+            if let ImplItem::Fn(method) = impl_item {
+                self.holders
+                    .push(AttributeHolder::Method(IndexedMethod::new(
+                        self_type_path.clone(),
+                        method.sig.ident.to_string(),
+                        method.attrs.clone(),
+                        method.sig.clone(),
+                    )));
+            }
+        }
     }
 
     fn walk_module(
@@ -194,6 +229,13 @@ impl ModuleWalker {
                 self.walk_file(&resolved_file, &child_module_path, &child_directory)
             }
         }
+    }
+}
+
+fn self_type_identifier(self_type: &Type) -> Option<&Ident> {
+    match self_type {
+        Type::Path(type_path) => type_path.path.segments.last().map(|segment| &segment.ident),
+        _ => None,
     }
 }
 

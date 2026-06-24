@@ -39,3 +39,30 @@ mod inline_module {
 
 mod file_module;
 mod dir_module;
+
+struct WithConstructor;
+
+impl WithConstructor {
+    #[constructor]
+    fn new(root: Arc<RootStruct>) -> Self {}
+
+    fn other(&self) {}
+
+    const UNUSED: u8 = 0;
+}
+
+struct AnotherService;
+
+impl AnotherService {
+    fn build() {}
+}
+
+trait SomeTrait {}
+
+impl SomeTrait for WithConstructor {
+    fn skipped_trait_method(&self) {}
+}
+
+impl (RootStruct, RootEnum) {
+    fn skipped_tuple_method() {}
+}

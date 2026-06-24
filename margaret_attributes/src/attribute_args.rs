@@ -6,8 +6,8 @@ use syn::Path;
 use syn::Token;
 use syn::punctuated::Punctuated;
 
-use crate::error::AttributeError;
-use crate::path_text::format_path;
+use crate::attribute_error::AttributeError;
+use crate::format_path::format_path;
 
 struct NamedArgument {
     name: String,
@@ -125,4 +125,78 @@ fn named_argument(expression: &Expr) -> Option<NamedArgument> {
         name: name.to_string(),
         value: assign.right.as_ref().clone(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use syn::Attribute;
+    use syn::parse_quote;
+
+    use crate::attribute_args::AttributeArgs;
+
+    fn args(attribute: Attribute) -> AttributeArgs {
+        AttributeArgs::from_attribute(&attribute).expect("the arguments parse")
+    }
+
+    #[test]
+    fn a_bare_attribute_has_no_arguments() {
+        assert!(args(parse_quote!(#[singleton])).is_empty());
+    }
+
+    #[test]
+    fn a_name_value_attribute_exposes_its_named_argument() {
+        assert!(args(parse_quote!(#[doc = "text"])).named("doc").is_some());
+    }
+
+    #[test]
+    fn a_list_attribute_splits_named_and_positional_arguments() {
+        let parsed = args(parse_quote!(#[route(method = Get, "/home")]));
+
+        assert!(!parsed.is_empty());
+        assert!(parsed.named("method").is_some());
+        assert!(parsed.named("absent").is_none());
+        assert!(parsed.positional(0).is_some());
+        assert!(parsed.positional(99).is_none());
+    }
+
+    #[test]
+    fn non_identifier_assignments_are_treated_as_positional() {
+        let parsed = args(parse_quote!(#[route(0 = 1, outer::inner = 2)]));
+
+        assert!(parsed.named("outer").is_none());
+        assert!(parsed.positional(0).is_some());
+        assert!(parsed.positional(1).is_some());
+    }
+
+    #[test]
+    fn reads_a_string_argument_and_rejects_non_strings() {
+        let parsed = args(parse_quote!(#[route(pattern = "/home", count = 5, method = Get)]));
+
+        assert_eq!(
+            parsed.string("pattern").expect("a string argument"),
+            Some("/home".to_string())
+        );
+        assert_eq!(parsed.string("absent").expect("an absent argument"), None);
+        assert!(parsed.string("count").is_err());
+        assert!(parsed.string("method").is_err());
+    }
+
+    #[test]
+    fn reads_a_path_argument_and_rejects_non_paths() {
+        let parsed = args(parse_quote!(#[route(method = Get, pattern = "/home")]));
+
+        assert!(parsed.path("method").expect("a path argument").is_some());
+        assert!(parsed.path("absent").expect("an absent argument").is_none());
+        assert!(parsed.path("pattern").is_err());
+    }
+
+    #[test]
+    fn reports_malformed_list_arguments() {
+        let message = AttributeArgs::from_attribute(&parse_quote!(#[route(= 5)]))
+            .err()
+            .expect("malformed arguments fail to parse")
+            .to_string();
+
+        assert!(message.contains("could not be parsed"));
+    }
 }

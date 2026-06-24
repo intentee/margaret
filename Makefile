@@ -1,4 +1,7 @@
-COVERAGE_PACKAGES := -p margaret_attributes
+COVERAGE_PACKAGES := \
+	-p margaret_attributes \
+	-p margaret_container \
+	-p margaret_container_example
 
 node_modules: package.json
 	npm install
@@ -17,7 +20,9 @@ coverage: node_modules
 	cargo llvm-cov report
 	npx rust-coverage-check target/llvm-cov.json \
 		--workspace-root $(CURDIR) \
-		--gated margaret_attributes=100
+		--gated margaret_attributes=100 \
+		--gated margaret_container=100 \
+		--gated margaret_container_example=100
 
 .PHONY: fmt
 fmt:

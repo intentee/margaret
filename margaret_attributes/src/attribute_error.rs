@@ -5,6 +5,7 @@ pub enum AttributeError {
     #[error("arguments of attribute '{attribute_path}' could not be parsed: {source}")]
     AttributeArguments {
         attribute_path: String,
+        #[source]
         source: syn::Error,
     },
 
@@ -12,11 +13,16 @@ pub enum AttributeError {
     DuplicateCanonicalPath { path: String },
 
     #[error("failed to parse Rust source file '{path}': {source}")]
-    FileParse { path: String, source: syn::Error },
+    FileParse {
+        path: String,
+        #[source]
+        source: syn::Error,
+    },
 
     #[error("failed to read Rust source file '{path}': {source}")]
     FileRead {
         path: String,
+        #[source]
         source: std::io::Error,
     },
 
@@ -24,7 +30,11 @@ pub enum AttributeError {
     GlobImport { file: String },
 
     #[error("invalid attribute selector '{input}': {source}")]
-    InvalidSelector { input: String, source: syn::Error },
+    InvalidSelector {
+        input: String,
+        #[source]
+        source: syn::Error,
+    },
 
     #[error("module '{module}' resolves to both '{file_module}' and '{directory_module}'")]
     ModuleFileCollision {
@@ -44,11 +54,11 @@ pub enum AttributeError {
     ModulePathAttribute { module: String, file: String },
 
     #[error(
-        "attribute '{attribute_path}' is repeated on item '{item_path}' but a single occurrence was expected"
+        "attribute '{attribute_path}' is repeated on '{target}' but a single occurrence was expected"
     )]
     RepeatedAttribute {
         attribute_path: String,
-        item_path: String,
+        target: String,
     },
 
     #[error("argument '{key}' of attribute '{attribute_path}' is not a {expected}")]
