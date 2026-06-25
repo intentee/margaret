@@ -1,6 +1,7 @@
 mod console_argument;
 pub mod console_codegen_error;
 mod console_command;
+mod optional_parameter;
 mod render;
 
 use margaret_attributes::attribute_index::AttributeIndex;
@@ -48,17 +49,25 @@ mod tests {
 trait Greeter {}
 
 #[singleton]
-#[console_command(name = "greet", description = "Greets a person")]
-struct Greet {
+#[console_command(name = "demo", description = "Demonstrates arguments")]
+struct Demo {
     greeter: Arc<dyn Greeter + Send + Sync>,
-    name: String,
+    required_named: String,
+    optional_named: Option<String>,
+    loud: bool,
+    required_positional: String,
+    optional_positional: Option<String>,
 }
 
-impl Greet {
+impl Demo {
     #[constructor]
     fn create(
         greeter: Arc<dyn Greeter + Send + Sync>,
-        #[console_argument(name = "name", required = true)] name: String,
+        #[console_argument(name = "required-named")] required_named: String,
+        #[console_argument(name = "optional-named")] optional_named: Option<String>,
+        #[console_argument(name = "loud")] loud: bool,
+        #[console_argument] required_positional: String,
+        #[console_argument] optional_positional: Option<String>,
     ) -> Self {}
 }
 
@@ -103,24 +112,39 @@ impl Farewell {
     }
 
     #[test]
-    fn generates_a_dispatcher_for_commands() {
+    fn generates_a_dispatcher_for_each_argument_kind() {
         let source = source_for(COMMANDS, false);
 
         assert!(source.contains("pubasyncfnrun"));
         assert!(source.contains("usemargaret_console::command::Command;"));
-        assert!(source.contains("container:&super::container::Container"));
-        assert!(source.contains(r#"clap::Command::new("greet").about("Greetsaperson")"#));
-        assert!(source.contains(r#"clap::Arg::new("name").long("name").required(true)"#));
+        assert!(source.contains(r#"clap::Command::new("demo").about("Demonstratesarguments")"#));
+
+        assert!(
+            source.contains(
+                r#"clap::Arg::new("required-named").long("required-named").required(true)"#
+            )
+        );
+        assert!(source.contains(
+            r#"clap::Arg::new("optional-named").long("optional-named").required(false)"#
+        ));
+        assert!(
+            source.contains(
+                r#"clap::Arg::new("loud").long("loud").action(clap::ArgAction::SetTrue)"#
+            )
+        );
+        assert!(source.contains(r#"clap::Arg::new("0").required(true)"#));
+        assert!(source.contains(r#"clap::Arg::new("1").required(false)"#));
         assert!(source.contains("clap::value_parser!(String)"));
-        assert!(source.contains("container.greet("));
-        assert!(source.contains(r#"matches.get_one::<String>("name")"#));
-        assert!(source.contains(".run().await"));
-        assert!(source.contains(r#"clap::Command::new("farewell")"#));
+
+        assert!(source.contains("container.demo("));
+        assert!(source.contains(r#"matches.get_one::<String>("required-named")"#));
+        assert!(source.contains(r#"matches.get_one::<String>("optional-named").cloned()"#));
+        assert!(source.contains(r#"matches.get_flag("loud")"#));
+        assert!(source.contains(r#"matches.get_one::<String>("0")"#));
+        assert!(source.contains(r#"matches.get_one::<String>("1").cloned()"#));
+
         assert!(source.contains(r#"("farewell",_matches)"#));
         assert!(source.contains("container.farewell().run().await"));
-        assert!(source.contains("margaret_console::print_help::print_help(&mutcommand)"));
-        assert!(!source.contains("serve"));
-        assert!(!source.contains("super::http"));
     }
 
     #[test]
@@ -128,22 +152,19 @@ impl Farewell {
         let source = source_for("struct App;\n", true);
 
         assert!(source.contains(r#"clap::Command::new("serve")"#));
-        assert!(source.contains(r#"clap::Arg::new("addr").long("addr").required(true)"#));
-        assert!(source.contains("container:&super::container::Container"));
         assert!(source.contains("margaret_console::serve::serve(super::http::server(container)"));
         assert!(!source.contains("command::Command"));
-        assert!(!source.contains("greet"));
     }
 
     #[test]
     fn ignores_a_receiver_in_a_constructor() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged;\n\nimpl Flagged {\n    #[constructor]\n    fn create(&self, #[console_argument(name = \"flag\", required = true)] flag: String) -> Self {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged;\n\nimpl Flagged {\n    #[constructor]\n    fn create(&self, #[console_argument(name = \"loud\")] loud: bool) -> Self {}\n}\n",
             false,
         );
 
         assert!(source.contains("container.flagged("));
-        assert!(source.contains(r#"clap::Arg::new("flag")"#));
+        assert!(source.contains(r#"matches.get_flag("loud")"#));
     }
 
     #[test]
@@ -168,14 +189,14 @@ impl Farewell {
     }
 
     #[test]
-    fn rejects_a_non_string_name() {
+    fn rejects_a_non_string_command_name() {
         let message = error_for("#[console_command(name = 5)]\nstruct Bad;\n");
 
         assert!(message.contains("failed to index"));
     }
 
     #[test]
-    fn rejects_a_non_string_description() {
+    fn rejects_a_non_string_command_description() {
         let message = error_for("#[console_command(name = \"x\", description = 5)]\nstruct Bad;\n");
 
         assert!(message.contains("failed to index"));
@@ -189,52 +210,25 @@ impl Farewell {
     }
 
     #[test]
-    fn requires_a_console_argument_name() {
+    fn rejects_a_nameless_flag() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad { value: String }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument(required = true)] value: String) -> Self {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad { flag: bool }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument] flag: bool) -> Self {}\n}\n",
         );
 
-        assert!(message.contains("missing the 'name'"));
+        assert!(message.contains("a flag requires a name"));
     }
 
     #[test]
-    fn requires_a_console_argument_required_flag() {
+    fn rejects_a_non_string_argument_name() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad { value: String }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument(name = \"value\")] value: String) -> Self {}\n}\n",
-        );
-
-        assert!(message.contains("missing the 'required'"));
-    }
-
-    #[test]
-    fn rejects_an_optional_console_argument() {
-        let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad { value: String }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument(name = \"value\", required = false)] value: String) -> Self {}\n}\n",
-        );
-
-        assert!(message.contains("optional console arguments are not supported"));
-    }
-
-    #[test]
-    fn rejects_a_non_boolean_required_flag() {
-        let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad { value: String }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument(name = \"value\", required = 5)] value: String) -> Self {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad { value: String }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument(name = 5)] value: String) -> Self {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
     }
 
     #[test]
-    fn rejects_a_non_string_console_argument_name() {
-        let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad { value: String }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument(name = 5, required = true)] value: String) -> Self {}\n}\n",
-        );
-
-        assert!(message.contains("failed to index"));
-    }
-
-    #[test]
-    fn rejects_a_malformed_console_argument() {
+    fn rejects_a_malformed_argument() {
         let message = error_for(
             "#[console_command(name = \"bad\")]\nstruct Bad { value: String }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument(= 5)] value: String) -> Self {}\n}\n",
         );

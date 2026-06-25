@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::Type;
 
 use crate::console_argument::ConsoleArgument;
 use crate::console_command::ConsoleCommand;
@@ -82,18 +83,33 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
 }
 
 fn argument_registration(argument: &ConsoleArgument) -> TokenStream {
-    let ConsoleArgument {
-        cli_name,
-        value_type,
-    } = argument;
-
-    quote! {
-        .arg(
-            clap::Arg::new(#cli_name)
-                .long(#cli_name)
-                .required(true)
-                .value_parser(clap::value_parser!(#value_type)),
-        )
+    match argument {
+        ConsoleArgument::Flag { name } => quote! {
+            .arg(clap::Arg::new(#name).long(#name).action(clap::ArgAction::SetTrue))
+        },
+        ConsoleArgument::Named {
+            name,
+            required,
+            value_type,
+        } => quote! {
+            .arg(
+                clap::Arg::new(#name)
+                    .long(#name)
+                    .required(#required)
+                    .value_parser(clap::value_parser!(#value_type)),
+            )
+        },
+        ConsoleArgument::Positional {
+            id,
+            required,
+            value_type,
+        } => quote! {
+            .arg(
+                clap::Arg::new(#id)
+                    .required(#required)
+                    .value_parser(clap::value_parser!(#value_type)),
+            )
+        },
     }
 }
 
@@ -113,15 +129,30 @@ fn command_arm(command: &ConsoleCommand) -> TokenStream {
 }
 
 fn argument_value(argument: &ConsoleArgument) -> TokenStream {
-    let ConsoleArgument {
-        cli_name,
-        value_type,
-    } = argument;
+    match argument {
+        ConsoleArgument::Flag { name } => quote! { matches.get_flag(#name) },
+        ConsoleArgument::Named {
+            name,
+            required,
+            value_type,
+        } => value_expression(name, *required, value_type),
+        ConsoleArgument::Positional {
+            id,
+            required,
+            value_type,
+        } => value_expression(id, *required, value_type),
+    }
+}
 
-    quote! {
-        matches
-            .get_one::<#value_type>(#cli_name)
-            .expect("a required console argument is present")
-            .clone()
+fn value_expression(id: &str, required: bool, value_type: &Type) -> TokenStream {
+    if required {
+        quote! {
+            matches
+                .get_one::<#value_type>(#id)
+                .expect("a required console argument is present")
+                .clone()
+        }
+    } else {
+        quote! { matches.get_one::<#value_type>(#id).cloned() }
     }
 }

@@ -14,22 +14,37 @@ use crate::greeter::Greeter;
 pub struct Greet {
     greeter: Arc<dyn Greeter + Send + Sync>,
     name: String,
+    salutation: Option<String>,
+    loud: bool,
 }
 
 impl Greet {
     #[constructor]
     pub fn create(
         greeter: Arc<dyn Greeter + Send + Sync>,
-        #[console_argument(name = "name", required = true)] name: String,
+        #[console_argument] name: String,
+        #[console_argument(name = "salutation")] salutation: Option<String>,
+        #[console_argument(name = "loud")] loud: bool,
     ) -> Self {
-        Self { greeter, name }
+        Self {
+            greeter,
+            name,
+            salutation,
+            loud,
+        }
     }
 }
 
 #[async_trait]
 impl Command for Greet {
     async fn run(&self) -> CommandOutcome {
-        println!("{}, {}", self.greeter.greet(), self.name);
+        println!(
+            "{}, {} (salutation: {:?}, loud: {})",
+            self.greeter.greet(),
+            self.name,
+            self.salutation,
+            self.loud
+        );
 
         CommandOutcome::Succeeded
     }

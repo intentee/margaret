@@ -7,7 +7,11 @@ async fn dispatches_console_commands() {
     let container = Container::build();
 
     assert_eq!(
-        run(&container, ["app", "greet", "--name", "Margaret"]).await,
+        run(
+            &container,
+            ["app", "greet", "Margaret", "--salutation", "Hi", "--loud"]
+        )
+        .await,
         CommandOutcome::Succeeded
     );
 

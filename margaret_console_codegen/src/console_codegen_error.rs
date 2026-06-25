@@ -19,17 +19,7 @@ pub enum ConsoleCodegenError {
     MissingCommandConstructor { command: String },
 
     #[error(
-        "console argument '{parameter}' of console command '{command}' is missing the 'name' argument"
+        "console argument '{parameter}' of console command '{command}' has a boolean type but no name; a flag requires a name"
     )]
-    MissingConsoleArgumentName { command: String, parameter: String },
-
-    #[error(
-        "console argument '{parameter}' of console command '{command}' is missing the 'required' argument"
-    )]
-    MissingConsoleArgumentRequired { command: String, parameter: String },
-
-    #[error(
-        "console argument '{parameter}' of console command '{command}' declares 'required = false', but optional console arguments are not supported yet"
-    )]
-    ConsoleArgumentOptionalUnsupported { command: String, parameter: String },
+    NamelessFlag { command: String, parameter: String },
 }

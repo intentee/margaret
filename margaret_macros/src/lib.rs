@@ -57,9 +57,10 @@ mod tests {
         let stripped = strip_console_arguments(quote! {
             pub fn create(
                 greeter: Arc<dyn Greeter>,
-                #[console_argument(name = "name", required = true)] name: String,
+                #[console_argument] name: String,
+                #[console_argument(name = "loud")] loud: bool,
             ) -> Self {
-                Self { greeter, name }
+                Self { greeter, name, loud }
             }
         })
         .expect("the constructor parses")
@@ -68,6 +69,7 @@ mod tests {
         assert!(!stripped.contains("console_argument"));
         assert!(stripped.contains("greeter"));
         assert!(stripped.contains("name"));
+        assert!(stripped.contains("loud"));
     }
 
     #[test]

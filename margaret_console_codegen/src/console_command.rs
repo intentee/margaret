@@ -8,10 +8,12 @@ use margaret_attributes::item_kind::ItemKind;
 use proc_macro2::Ident;
 use quote::format_ident;
 use syn::FnArg;
+use syn::Type;
 
 use crate::console_argument::ConsoleArgument;
 use crate::console_argument_selector;
 use crate::console_codegen_error::ConsoleCodegenError;
+use crate::optional_parameter::OptionalParameter;
 
 pub(crate) struct ConsoleCommand {
     pub(crate) accessor: Ident,
@@ -68,6 +70,7 @@ fn command_arguments(
 ) -> Result<Vec<ConsoleArgument>, ConsoleCodegenError> {
     let constructor = command_constructor(index, command_path, command)?;
     let mut arguments = Vec::new();
+    let mut positional_index = 0;
 
     for (position, input) in constructor.signature().inputs.iter().enumerate() {
         let FnArg::Typed(pattern_type) = input else {
@@ -81,34 +84,59 @@ fn command_arguments(
             continue;
         };
 
-        let argument = AttributeArgs::from_attribute(attribute)?;
-        let cli_name = argument.string("name")?.ok_or_else(|| {
-            ConsoleCodegenError::MissingConsoleArgumentName {
-                command: command.to_string(),
-                parameter: position.to_string(),
-            }
-        })?;
-        let required = argument.boolean("required")?.ok_or_else(|| {
-            ConsoleCodegenError::MissingConsoleArgumentRequired {
-                command: command.to_string(),
-                parameter: position.to_string(),
-            }
-        })?;
+        let name = AttributeArgs::from_attribute(attribute)?.string("name")?;
 
-        if !required {
-            return Err(ConsoleCodegenError::ConsoleArgumentOptionalUnsupported {
-                command: command.to_string(),
-                parameter: position.to_string(),
-            });
-        }
+        let argument = match (name, is_bool(&pattern_type.ty)) {
+            (Some(name), true) => ConsoleArgument::Flag { name },
+            (Some(name), false) => named_value(name, &pattern_type.ty),
+            (None, true) => {
+                return Err(ConsoleCodegenError::NamelessFlag {
+                    command: command.to_string(),
+                    parameter: position.to_string(),
+                });
+            }
+            (None, false) => {
+                let positional = positional_value(positional_index, &pattern_type.ty);
+                positional_index += 1;
 
-        arguments.push(ConsoleArgument {
-            cli_name,
-            value_type: (*pattern_type.ty).clone(),
-        });
+                positional
+            }
+        };
+
+        arguments.push(argument);
     }
 
     Ok(arguments)
+}
+
+fn named_value(name: String, declared: &Type) -> ConsoleArgument {
+    let OptionalParameter {
+        required,
+        value_type,
+    } = OptionalParameter::from_type(declared);
+
+    ConsoleArgument::Named {
+        name,
+        required,
+        value_type,
+    }
+}
+
+fn positional_value(positional_index: usize, declared: &Type) -> ConsoleArgument {
+    let OptionalParameter {
+        required,
+        value_type,
+    } = OptionalParameter::from_type(declared);
+
+    ConsoleArgument::Positional {
+        id: positional_index.to_string(),
+        required,
+        value_type,
+    }
+}
+
+fn is_bool(declared: &Type) -> bool {
+    matches!(declared, Type::Path(type_path) if type_path.path.is_ident("bool"))
 }
 
 fn command_constructor<'index>(
