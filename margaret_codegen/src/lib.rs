@@ -28,9 +28,8 @@ pub fn build(manifest_directory: impl AsRef<Path>) -> Result<(), CodegenError> {
     }
 
     let index = AttributeIndex::from_crate_root("crate", &source_directory)?;
-    let input_selectors = margaret_console_codegen::input_selectors();
 
-    margaret_container::render_container(&index, &input_selectors)?
+    margaret_container::render_container(&index)?
         .write_if_changed(&container_path)
         .expect("the generated container is written");
 
@@ -95,8 +94,8 @@ pub mod margaret;
 struct Page;
 
 impl Page {
-    #[constructor]
-    fn create() -> Self {}
+    #[responder]
+    fn respond(&self) -> Response {}
 }
 ";
 
@@ -122,8 +121,8 @@ pub mod margaret;
 struct Greet;
 
 impl Greet {
-    #[constructor]
-    fn create() -> Self {}
+    #[runner]
+    fn run(&self) -> CommandOutcome {}
 }
 ";
 

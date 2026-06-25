@@ -1,2 +1,4 @@
 #[singleton]
-struct Lonely;
+struct Lonely {
+    value: String,
+}

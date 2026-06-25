@@ -4,7 +4,6 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_method::IndexedMethod;
-use margaret_attributes::item_kind::ItemKind;
 use proc_macro2::Ident;
 use quote::format_ident;
 use syn::FnArg;
@@ -31,7 +30,7 @@ pub(crate) fn console_commands(
 
     for matched in index.select(&command_selector) {
         let item = match matched.holder() {
-            AttributeHolder::Item(item) if item.kind() == ItemKind::Struct => item,
+            AttributeHolder::Item(item) if item.kind().is_struct() => item,
             holder => {
                 return Err(ConsoleCodegenError::ConsoleCommandNotOnStruct {
                     target: holder.target_path(),
@@ -68,11 +67,15 @@ fn command_arguments(
     argument_selector: &AttributeSelector,
     command: &str,
 ) -> Result<Vec<ConsoleArgument>, ConsoleCodegenError> {
-    let constructor = command_constructor(index, command_path, command)?;
+    let runner = command_runner(index, command_path).ok_or_else(|| {
+        ConsoleCodegenError::MissingCommandRunner {
+            command: command.to_string(),
+        }
+    })?;
     let mut arguments = Vec::new();
     let mut positional_index = 0;
 
-    for (position, input) in constructor.signature().inputs.iter().enumerate() {
+    for (position, input) in runner.signature().inputs.iter().enumerate() {
         let FnArg::Typed(pattern_type) = input else {
             continue;
         };
@@ -81,7 +84,10 @@ fn command_arguments(
             .iter()
             .find(|attribute| argument_selector.matches(attribute.path()))
         else {
-            continue;
+            return Err(ConsoleCodegenError::UnmarkedRunnerParameter {
+                command: command.to_string(),
+                parameter: position.to_string(),
+            });
         };
 
         let name = AttributeArgs::from_attribute(attribute)?.string("name")?;
@@ -139,23 +145,19 @@ fn is_bool(declared: &Type) -> bool {
     matches!(declared, Type::Path(type_path) if type_path.path.is_ident("bool"))
 }
 
-fn command_constructor<'index>(
+fn command_runner<'index>(
     index: &'index AttributeIndex,
     command_path: &CanonicalPath,
-    command: &str,
-) -> Result<&'index IndexedMethod, ConsoleCodegenError> {
-    let constructor_selector = AttributeSelector::parse("constructor").expect("a valid selector");
+) -> Option<&'index IndexedMethod> {
+    let runner_selector = AttributeSelector::parse("runner").expect("a valid selector");
 
     index
-        .select(&constructor_selector)
+        .select(&runner_selector)
         .into_iter()
         .find_map(|matched| match matched.holder() {
             AttributeHolder::Method(method) if method.self_type_path() == command_path => {
                 Some(method)
             }
             _ => None,
-        })
-        .ok_or_else(|| ConsoleCodegenError::MissingCommandConstructor {
-            command: command.to_string(),
         })
 }

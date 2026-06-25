@@ -1,8 +1,5 @@
-use async_trait::async_trait;
-use margaret_http::http_responder::HttpResponder;
-use margaret_http::request::Request;
 use margaret_http::response::Response;
-use margaret_macros::constructor;
+use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
@@ -11,21 +8,8 @@ use margaret_macros::singleton;
 pub struct GetUsers;
 
 impl GetUsers {
-    #[constructor]
-    pub fn create() -> Self {
-        Self
-    }
-}
-
-#[async_trait]
-impl HttpResponder for GetUsers {
-    async fn respond(&self, request: Request) -> Response {
-        Response::text(
-            200,
-            request
-                .path_param("id")
-                .expect("the /users/{id} route guarantees the id path parameter")
-                .to_string(),
-        )
+    #[responder]
+    pub async fn respond(&self, #[route_parameter] id: String) -> Response {
+        Response::text(200, id)
     }
 }

@@ -38,10 +38,11 @@ mod tests {
     use crate::indexed_item::IndexedItem;
     use crate::item_kind::ItemKind;
     use crate::matched_attribute::MatchedAttribute;
+    use crate::struct_shape::StructShape;
 
     fn holder_bearing(attribute: Attribute) -> AttributeHolder {
         AttributeHolder::Item(IndexedItem::new(
-            ItemKind::Struct,
+            ItemKind::Struct(StructShape::Unit),
             "Service".to_string(),
             CanonicalPath::new(vec!["crate".to_string(), "Service".to_string()]),
             vec![attribute],

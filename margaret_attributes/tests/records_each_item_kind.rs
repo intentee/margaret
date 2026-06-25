@@ -18,7 +18,7 @@ fn records_each_item_kind() {
         })
         .collect();
 
-    assert!(kinds.contains(&ItemKind::Struct));
+    assert!(kinds.iter().any(ItemKind::is_struct));
     assert!(kinds.contains(&ItemKind::Enum));
     assert!(kinds.contains(&ItemKind::Function));
     assert!(kinds.contains(&ItemKind::Trait));

@@ -9,6 +9,7 @@ pub mod indexed_item;
 pub mod indexed_method;
 pub mod item_kind;
 pub mod matched_attribute;
+pub mod struct_shape;
 
 mod format_path;
 mod module_walker;

@@ -36,10 +36,11 @@ mod tests {
     use crate::indexed_item::IndexedItem;
     use crate::indexed_method::IndexedMethod;
     use crate::item_kind::ItemKind;
+    use crate::struct_shape::StructShape;
 
     fn item_holder() -> AttributeHolder {
         AttributeHolder::Item(IndexedItem::new(
-            ItemKind::Struct,
+            ItemKind::Struct(StructShape::Unit),
             "Config".to_string(),
             CanonicalPath::new(vec!["crate".to_string(), "Config".to_string()]),
             vec![parse_quote!(#[singleton])],

@@ -89,9 +89,21 @@ async fn dispatch(
         return Response::text(405, "Method Not Allowed").into_http();
     };
 
-    app.handle(Request::new(method, request.uri().path().to_string()))
-        .await
-        .into_http()
+    let headers = request
+        .headers()
+        .iter()
+        .filter_map(|(name, value)| {
+            value
+                .to_str()
+                .ok()
+                .map(|value| (name.as_str().to_string(), value.to_string()))
+        })
+        .collect();
+    let mut handled = Request::new(method, request.uri().path().to_string());
+
+    handled.set_headers(headers);
+
+    app.handle(handled).await.into_http()
 }
 
 #[cfg(test)]

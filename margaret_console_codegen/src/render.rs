@@ -9,12 +9,6 @@ pub(crate) fn render(commands: &[ConsoleCommand], has_http: bool) -> String {
     let subcommands = commands.iter().map(subcommand_registration);
     let arms = commands.iter().map(command_arm);
 
-    let command_trait_import = if commands.is_empty() {
-        quote! {}
-    } else {
-        quote! { use margaret_console::command::Command; }
-    };
-
     let serve_registration = if has_http {
         quote! {
             .subcommand(
@@ -37,8 +31,6 @@ pub(crate) fn render(commands: &[ConsoleCommand], has_http: bool) -> String {
     };
 
     let tokens = quote! {
-        #command_trait_import
-
         pub async fn run<Arguments, Argument>(
             container: &super::container::Container,
             args: Arguments,
@@ -124,7 +116,7 @@ fn command_arm(command: &ConsoleCommand) -> TokenStream {
     let values = command.arguments.iter().map(argument_value);
 
     quote! {
-        Some((#name, #matches_binding)) => container.#accessor(#(#values),*).run().await,
+        Some((#name, #matches_binding)) => container.#accessor().run(#(#values),*).await,
     }
 }
 

@@ -12,8 +12,13 @@ pub enum ContainerError {
     #[error("#[singleton] is only supported on structs, but '{path}' is not a struct")]
     NotASingletonStruct { path: String },
 
-    #[error("singleton '{singleton}' has no #[constructor] method in its module")]
-    MissingConstructor { singleton: String },
+    #[error(
+        "singleton '{singleton}' has {field_count} field(s) but no #[constructor] method; only fieldless singletons may omit a #[constructor]"
+    )]
+    SingletonRequiresConstructor {
+        singleton: String,
+        field_count: usize,
+    },
 
     #[error("singleton '{singleton}' has more than one #[constructor] method: {methods}")]
     AmbiguousConstructor { singleton: String, methods: String },
@@ -89,12 +94,4 @@ pub enum ContainerError {
 
     #[error("dependency cycle detected: {path}")]
     DependencyCycle { path: String },
-
-    #[error(
-        "parameter '{parameter}' of deferred singleton '{singleton}' is a collection dependency, which is not supported for deferred construction"
-    )]
-    DeferredCollectionDependencyUnsupported {
-        singleton: String,
-        parameter: String,
-    },
 }

@@ -3,7 +3,6 @@ use std::path::Path;
 use margaret_attributes::attribute_holder::AttributeHolder;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_attributes::item_kind::ItemKind;
 
 #[test]
 fn selected_holder_targets_an_item_struct() {
@@ -29,7 +28,7 @@ fn selected_holder_targets_an_item_struct() {
         .find(|item| item.canonical_path().to_string() == "valid_crate::Qualified")
         .expect("the qualified item is indexed");
 
-    assert_eq!(qualified.kind(), ItemKind::Struct);
+    assert!(qualified.kind().is_struct());
     assert_eq!(
         qualified.canonical_path().segments(),
         ["valid_crate".to_string(), "Qualified".to_string()]

@@ -1,6 +1,5 @@
 pub mod handler;
 pub mod http_middleware;
-pub mod http_responder;
 pub mod layer;
 pub mod method;
 pub mod next;

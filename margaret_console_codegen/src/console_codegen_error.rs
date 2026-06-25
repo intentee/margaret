@@ -15,8 +15,13 @@ pub enum ConsoleCodegenError {
     #[error("console command '{command}' is missing the 'name' argument")]
     MissingCommandName { command: String },
 
-    #[error("console command '{command}' has no #[constructor] method")]
-    MissingCommandConstructor { command: String },
+    #[error("console command '{command}' has no #[runner] method")]
+    MissingCommandRunner { command: String },
+
+    #[error(
+        "parameter '{parameter}' of console command '{command}' is not marked #[console_argument]; every runner parameter must be a console argument"
+    )]
+    UnmarkedRunnerParameter { command: String, parameter: String },
 
     #[error(
         "console argument '{parameter}' of console command '{command}' has a boolean type but no name; a flag requires a name"

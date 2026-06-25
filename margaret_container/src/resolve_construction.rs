@@ -1,16 +1,19 @@
 use margaret_attributes::attribute_holder::AttributeHolder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_method::IndexedMethod;
+use margaret_attributes::struct_shape::StructShape;
 use syn::ReturnType;
 use syn::Signature;
 use syn::Type;
 
+use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
 
-pub(crate) fn find_constructor<'index>(
+pub(crate) fn resolve_construction<'index>(
     holders: &'index [AttributeHolder],
     concrete_path: &CanonicalPath,
-) -> Result<&'index IndexedMethod, ContainerError> {
+    shape: StructShape,
+) -> Result<ConstructionSource<'index>, ContainerError> {
     let mut found: Vec<&IndexedMethod> = holders
         .iter()
         .filter_map(|holder| match holder {
@@ -34,13 +37,29 @@ pub(crate) fn find_constructor<'index>(
     }
 
     match found.pop() {
-        Some(method) if constructor_returns_self(method.signature()) => Ok(method),
+        Some(method) if constructor_returns_self(method.signature()) => {
+            Ok(ConstructionSource::Constructor(method))
+        }
         Some(_) => Err(ContainerError::ConstructorReturnTypeMismatch {
             singleton: concrete_path.to_string(),
         }),
-        None => Err(ContainerError::MissingConstructor {
-            singleton: concrete_path.to_string(),
-        }),
+        None => {
+            let field_count = match shape {
+                StructShape::Unit => 0,
+                StructShape::Named { field_count } | StructShape::Unnamed { field_count } => {
+                    field_count
+                }
+            };
+
+            if field_count > 0 {
+                Err(ContainerError::SingletonRequiresConstructor {
+                    singleton: concrete_path.to_string(),
+                    field_count,
+                })
+            } else {
+                Ok(ConstructionSource::Fieldless(shape))
+            }
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::struct_shape::StructShape;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -6,9 +7,9 @@ use quote::quote;
 
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
-use crate::parameter_plan::ParameterPlan;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
+use crate::provider_construction::ProviderConstruction;
 
 pub(crate) fn render(plan: &ContainerPlan) -> String {
     let fields = plan.providers.iter().map(field_declaration);
@@ -70,58 +71,59 @@ fn field_type(provider: &Provider) -> TokenStream {
 fn accessor(provider: &Provider, plan: &ContainerPlan) -> TokenStream {
     let name = field_ident(provider);
     let field_type = field_type(provider);
-    let inputs = input_parameters(provider);
     let construction = construction(provider, plan);
 
-    let init = match (&provider.provided, provider.is_parameterized()) {
-        (ProvidedType::Concrete(_), false) => quote! { || #construction },
-        (ProvidedType::Concrete(_), true) => quote! { move || #construction },
-        (ProvidedType::Interface(_), false) => quote! { || -> #field_type { #construction } },
-        (ProvidedType::Interface(_), true) => quote! { move || -> #field_type { #construction } },
+    let init = match &provider.provided {
+        ProvidedType::Concrete(_) => quote! { || #construction },
+        ProvidedType::Interface(_) => quote! { || -> #field_type { #construction } },
     };
 
     quote! {
-        pub fn #name(&self, #(#inputs),*) -> #field_type {
+        pub fn #name(&self) -> #field_type {
             self.#name.get_or_init(#init).clone()
         }
     }
 }
 
-fn input_parameters(provider: &Provider) -> Vec<TokenStream> {
-    provider
-        .parameters
-        .iter()
-        .filter_map(|parameter| match parameter {
-            ParameterPlan::Input(input) => {
-                let name = format_ident!("{}", input.name);
-                let ty = &input.ty;
-
-                Some(quote! { #name: #ty })
-            }
-            ParameterPlan::Dependency(_) => None,
-        })
-        .collect()
-}
-
 fn construction(provider: &Provider, plan: &ContainerPlan) -> TokenStream {
     let concrete = crate_path_tokens(&provider.concrete_path);
-    let constructor = format_ident!("{}", provider.constructor_method);
-    let arguments = provider
-        .parameters
-        .iter()
-        .map(|parameter| parameter_expression(parameter, plan));
 
-    quote! { std::sync::Arc::new(#concrete::#constructor(#(#arguments),*)) }
+    match &provider.construction {
+        ProviderConstruction::Constructor {
+            method,
+            dependencies,
+        } => {
+            let constructor = format_ident!("{}", method);
+            let arguments = dependencies
+                .iter()
+                .map(|dependency| dependency_expression(dependency, plan));
+
+            quote! { std::sync::Arc::new(#concrete::#constructor(#(#arguments),*)) }
+        }
+        ProviderConstruction::Fieldless { shape } => {
+            let literal = fieldless_literal(&concrete, *shape);
+
+            quote! { std::sync::Arc::new(#literal) }
+        }
+    }
 }
 
-fn parameter_expression(parameter: &ParameterPlan, plan: &ContainerPlan) -> TokenStream {
-    match parameter {
-        ParameterPlan::Dependency(DependencyKind::Single { provider_key }) => {
+fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {
+    match shape {
+        StructShape::Named { .. } => quote! { #concrete {} },
+        StructShape::Unit => quote! { #concrete },
+        StructShape::Unnamed { .. } => quote! { #concrete() },
+    }
+}
+
+fn dependency_expression(dependency: &DependencyKind, plan: &ContainerPlan) -> TokenStream {
+    match dependency {
+        DependencyKind::Single { provider_key } => {
             let accessor = field_ident(provider_by_key(plan, provider_key));
 
             quote! { self.#accessor() }
         }
-        ParameterPlan::Dependency(DependencyKind::Collection { trait_path }) => {
+        DependencyKind::Collection { trait_path } => {
             let elements = plan
                 .collections
                 .members_of(trait_path)
@@ -133,11 +135,6 @@ fn parameter_expression(parameter: &ParameterPlan, plan: &ContainerPlan) -> Toke
                 });
 
             quote! { vec![#(#elements),*] }
-        }
-        ParameterPlan::Input(input) => {
-            let name = format_ident!("{}", input.name);
-
-            quote! { #name }
         }
     }
 }

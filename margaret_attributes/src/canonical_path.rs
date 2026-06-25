@@ -20,9 +20,11 @@ impl CanonicalPath {
 
     pub fn field_name(&self) -> String {
         self.segments
-            .last()
-            .expect("a canonical path has at least one segment")
-            .to_snake_case()
+            .iter()
+            .skip(1)
+            .map(|segment| segment.to_snake_case())
+            .collect::<Vec<String>>()
+            .join("_")
     }
 }
 
@@ -37,13 +39,33 @@ mod tests {
     use super::CanonicalPath;
 
     #[test]
-    fn field_name_is_the_snake_cased_leaf() {
+    fn field_name_joins_the_snake_cased_module_path() {
         let path = CanonicalPath::new(vec![
             "crate".to_string(),
             "routes".to_string(),
             "GetGreeting".to_string(),
         ]);
 
-        assert_eq!(path.field_name(), "get_greeting");
+        assert_eq!(path.field_name(), "routes_get_greeting");
+    }
+
+    #[test]
+    fn field_name_disambiguates_repeated_leaves_across_modules() {
+        let routes = CanonicalPath::new(vec![
+            "crate".to_string(),
+            "routes".to_string(),
+            "get_users".to_string(),
+            "GetUsers".to_string(),
+        ]);
+        let commands = CanonicalPath::new(vec![
+            "crate".to_string(),
+            "commands".to_string(),
+            "get_users".to_string(),
+            "GetUsers".to_string(),
+        ]);
+
+        assert_ne!(routes.field_name(), commands.field_name());
+        assert_eq!(routes.field_name(), "routes_get_users_get_users");
+        assert_eq!(commands.field_name(), "commands_get_users_get_users");
     }
 }

@@ -1,7 +1,6 @@
 use margaret_attributes::attribute_holder::AttributeHolder;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_attributes::item_kind::ItemKind;
 use proc_macro2::Ident;
 use quote::format_ident;
 use syn::Expr;
@@ -24,7 +23,7 @@ pub(crate) fn middleware_bindings(
 
     for matched in index.select(&selector) {
         let item = match matched.holder() {
-            AttributeHolder::Item(item) if item.kind() == ItemKind::Struct => item,
+            AttributeHolder::Item(item) if item.kind().is_struct() => item,
             holder => {
                 return Err(HttpCodegenError::HttpMiddlewareNotOnStruct {
                     target: holder.target_path(),

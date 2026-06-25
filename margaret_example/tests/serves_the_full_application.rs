@@ -15,7 +15,12 @@ struct Reply {
     trace: Option<String>,
 }
 
-async fn request(address: SocketAddr, method: Method, path: &str) -> Reply {
+async fn request(
+    address: SocketAddr,
+    method: Method,
+    path: &str,
+    headers: &[(&str, &str)],
+) -> Reply {
     let stream = TcpStream::connect(address)
         .await
         .expect("the client connects to the server");
@@ -25,10 +30,16 @@ async fn request(address: SocketAddr, method: Method, path: &str) -> Reply {
 
     tokio::spawn(connection);
 
-    let request = http::Request::builder()
+    let mut builder = http::Request::builder()
         .method(method)
         .uri(path)
-        .header("host", "example")
+        .header("host", "example");
+
+    for (name, value) in headers {
+        builder = builder.header(*name, *value);
+    }
+
+    let request = builder
         .body(Empty::<Bytes>::new())
         .expect("a well-formed request");
     let response = sender
@@ -65,36 +76,47 @@ async fn serves_the_full_application() {
 
     tokio::spawn(bound.serve());
 
-    let greeting = request(address, Method::GET, "/greeting").await;
+    let greeting = request(address, Method::GET, "/greeting", &[]).await;
 
     assert_eq!(greeting.status, 200);
     assert_eq!(greeting.body, "hello, margaret");
 
-    let user = request(address, Method::GET, "/users/7").await;
+    let user = request(address, Method::GET, "/users/7", &[]).await;
 
     assert_eq!(user.status, 200);
     assert_eq!(user.body, "7");
 
-    let health = request(address, Method::GET, "/health").await;
+    let health = request(address, Method::GET, "/health", &[]).await;
 
     assert_eq!(health.status, 200);
     assert_eq!(health.body, "ok");
 
-    let report = request(address, Method::GET, "/admin/report").await;
+    let report = request(address, Method::GET, "/admin/report", &[]).await;
 
     assert_eq!(report.status, 200);
     assert_eq!(report.body, "report");
     assert_eq!(report.trace.as_deref(), Some("logging,metrics"));
 
-    let mutation = request(address, Method::POST, "/admin/report").await;
+    let forbidden = request(address, Method::POST, "/admin/report", &[]).await;
 
-    assert_eq!(mutation.status, 403);
+    assert_eq!(forbidden.status, 403);
 
-    let missing = request(address, Method::GET, "/nowhere").await;
+    let mutation = request(
+        address,
+        Method::POST,
+        "/admin/report",
+        &[("x-authorized", "yes")],
+    )
+    .await;
+
+    assert_eq!(mutation.status, 200);
+    assert_eq!(mutation.body, "mutated");
+
+    let missing = request(address, Method::GET, "/nowhere", &[]).await;
 
     assert_eq!(missing.status, 404);
 
-    let unsupported = request(address, Method::OPTIONS, "/health").await;
+    let unsupported = request(address, Method::OPTIONS, "/health", &[]).await;
 
     assert_eq!(unsupported.status, 405);
 }

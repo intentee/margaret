@@ -6,23 +6,22 @@ use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
 use syn::FnArg;
 use syn::Pat;
-use syn::PatType;
 use syn::Path;
 
 use crate::collection_table::CollectionTable;
+use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
 use crate::dependency_kind::DependencyKind;
-use crate::find_constructor::find_constructor;
-use crate::input_parameter::InputParameter;
-use crate::parameter_plan::ParameterPlan;
 use crate::path_text::path_text;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
+use crate::provider_construction::ProviderConstruction;
 use crate::raw_target::RawTarget;
 use crate::raw_target::peel_target;
 use crate::resolution::Resolution;
 use crate::resolution::join_candidates;
 use crate::resolution::resolve_unique;
+use crate::resolve_construction::resolve_construction;
 use crate::type_text::type_text;
 
 pub(crate) struct ContainerPlan {
@@ -37,9 +36,8 @@ struct Membership {
 
 struct ProviderDraft<'index> {
     concrete_path: CanonicalPath,
-    constructor: &'index IndexedMethod,
+    construction: ConstructionSource<'index>,
     field_name: String,
-    parameterized: bool,
     provided: ProvidedType,
 }
 
@@ -48,18 +46,14 @@ struct DraftSet<'index> {
     memberships: Vec<Membership>,
 }
 
-pub(crate) fn build_plan(
-    index: &AttributeIndex,
-    input_selectors: &[AttributeSelector],
-) -> Result<ContainerPlan, ContainerError> {
+pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
     let trait_paths = trait_paths(index);
     let DraftSet {
         drafts,
         memberships,
-    } = build_drafts(index, &trait_paths, input_selectors)?;
+    } = build_drafts(index, &trait_paths)?;
     let provider_keys: Vec<CanonicalPath> = drafts
         .iter()
-        .filter(|draft| !draft.parameterized)
         .map(|draft| draft.provided.key().clone())
         .collect();
 
@@ -70,14 +64,35 @@ pub(crate) fn build_plan(
 
     let mut providers = Vec::new();
     for draft in drafts {
-        let parameters = resolve_parameters(&draft, &provider_keys, &trait_paths, input_selectors)?;
+        let ProviderDraft {
+            concrete_path,
+            construction,
+            field_name,
+            provided,
+        } = draft;
+
+        let construction = match construction {
+            ConstructionSource::Constructor(constructor) => {
+                let dependencies = resolve_dependencies(
+                    &concrete_path,
+                    constructor,
+                    &provider_keys,
+                    &trait_paths,
+                )?;
+
+                ProviderConstruction::Constructor {
+                    method: constructor.identifier().to_string(),
+                    dependencies,
+                }
+            }
+            ConstructionSource::Fieldless(shape) => ProviderConstruction::Fieldless { shape },
+        };
 
         providers.push(Provider {
-            concrete_path: draft.concrete_path,
-            constructor_method: draft.constructor.identifier().to_string(),
-            field_name: draft.field_name,
-            parameters,
-            provided: draft.provided,
+            concrete_path,
+            construction,
+            field_name,
+            provided,
         });
     }
 
@@ -90,19 +105,21 @@ pub(crate) fn build_plan(
 fn build_drafts<'index>(
     index: &'index AttributeIndex,
     trait_paths: &[CanonicalPath],
-    input_selectors: &[AttributeSelector],
 ) -> Result<DraftSet<'index>, ContainerError> {
     let mut drafts: Vec<ProviderDraft> = Vec::new();
     let mut memberships: Vec<Membership> = Vec::new();
 
     for matched in index.select(&singleton_selector()) {
-        let item = match matched.holder() {
-            AttributeHolder::Item(item) if item.kind() == ItemKind::Struct => item,
-            holder => {
-                return Err(ContainerError::NotASingletonStruct {
-                    path: holder.target_path(),
-                });
-            }
+        let holder = matched.holder();
+        let AttributeHolder::Item(item) = holder else {
+            return Err(ContainerError::NotASingletonStruct {
+                path: holder.target_path(),
+            });
+        };
+        let ItemKind::Struct(shape) = item.kind() else {
+            return Err(ContainerError::NotASingletonStruct {
+                path: item.canonical_path().to_string(),
+            });
         };
 
         let concrete_path = item.canonical_path().clone();
@@ -149,10 +166,9 @@ fn build_drafts<'index>(
             });
         }
 
-        let constructor = find_constructor(index.holders(), &concrete_path)?;
-        let parameterized = constructor_has_input(constructor, input_selectors);
+        let construction = resolve_construction(index.holders(), &concrete_path, shape)?;
 
-        if !parameterized && let Some(written) = arguments.path("collection")? {
+        if let Some(written) = arguments.path("collection")? {
             let trait_path = match resolve_unique(&written, trait_paths) {
                 Resolution::Resolved(path) => path,
                 Resolution::NotFound => {
@@ -178,9 +194,8 @@ fn build_drafts<'index>(
 
         drafts.push(ProviderDraft {
             concrete_path,
-            constructor,
+            construction,
             field_name,
-            parameterized,
             provided,
         });
     }
@@ -191,18 +206,18 @@ fn build_drafts<'index>(
     })
 }
 
-fn resolve_parameters(
-    draft: &ProviderDraft,
+fn resolve_dependencies(
+    concrete_path: &CanonicalPath,
+    constructor: &IndexedMethod,
     provider_keys: &[CanonicalPath],
     trait_paths: &[CanonicalPath],
-    input_selectors: &[AttributeSelector],
-) -> Result<Vec<ParameterPlan>, ContainerError> {
-    let mut parameters = Vec::new();
+) -> Result<Vec<DependencyKind>, ContainerError> {
+    let mut dependencies = Vec::new();
 
-    for (position, input) in draft.constructor.signature().inputs.iter().enumerate() {
+    for (position, input) in constructor.signature().inputs.iter().enumerate() {
         let FnArg::Typed(pattern_type) = input else {
             return Err(ContainerError::UnsupportedParameterShape {
-                singleton: draft.concrete_path.to_string(),
+                singleton: concrete_path.to_string(),
                 parameter: "self".to_string(),
                 written: "self".to_string(),
             });
@@ -210,55 +225,24 @@ fn resolve_parameters(
 
         let parameter = parameter_name(&pattern_type.pat, position);
 
-        if is_input(pattern_type, input_selectors) {
-            parameters.push(ParameterPlan::Input(Box::new(InputParameter {
-                name: parameter,
-                ty: (*pattern_type.ty).clone(),
-            })));
-
-            continue;
-        }
-
         let Some(target) = peel_target(&pattern_type.ty) else {
             return Err(ContainerError::UnsupportedParameterShape {
-                singleton: draft.concrete_path.to_string(),
+                singleton: concrete_path.to_string(),
                 parameter,
                 written: type_text(&pattern_type.ty),
             });
         };
 
-        parameters.push(ParameterPlan::Dependency(resolve_target(
+        dependencies.push(resolve_target(
             target,
-            &draft.concrete_path,
+            concrete_path,
             &parameter,
             provider_keys,
             trait_paths,
-        )?));
+        )?);
     }
 
-    Ok(parameters)
-}
-
-fn constructor_has_input(
-    constructor: &IndexedMethod,
-    input_selectors: &[AttributeSelector],
-) -> bool {
-    constructor
-        .signature()
-        .inputs
-        .iter()
-        .any(|input| match input {
-            FnArg::Typed(pattern_type) => is_input(pattern_type, input_selectors),
-            FnArg::Receiver(_) => false,
-        })
-}
-
-fn is_input(pattern_type: &PatType, input_selectors: &[AttributeSelector]) -> bool {
-    pattern_type.attrs.iter().any(|attribute| {
-        input_selectors
-            .iter()
-            .any(|selector| selector.matches(attribute.path()))
-    })
+    Ok(dependencies)
 }
 
 fn resolve_target(

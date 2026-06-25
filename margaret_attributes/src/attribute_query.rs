@@ -52,10 +52,11 @@ mod tests {
     use crate::canonical_path::CanonicalPath;
     use crate::indexed_item::IndexedItem;
     use crate::item_kind::ItemKind;
+    use crate::struct_shape::StructShape;
 
     fn holder(attributes: Vec<Attribute>) -> AttributeHolder {
         AttributeHolder::Item(IndexedItem::new(
-            ItemKind::Struct,
+            ItemKind::Struct(StructShape::Unit),
             "Service".to_string(),
             CanonicalPath::new(vec!["crate".to_string(), "Service".to_string()]),
             attributes,

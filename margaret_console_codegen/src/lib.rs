@@ -17,10 +17,6 @@ pub fn has_commands(index: &AttributeIndex) -> bool {
     !index.select(&selector).is_empty()
 }
 
-pub fn input_selectors() -> Vec<AttributeSelector> {
-    vec![console_argument_selector()]
-}
-
 pub(crate) fn console_argument_selector() -> AttributeSelector {
     AttributeSelector::parse("console_argument").expect("a valid selector")
 }
@@ -52,23 +48,21 @@ trait Greeter {}
 #[console_command(name = "demo", description = "Demonstrates arguments")]
 struct Demo {
     greeter: Arc<dyn Greeter + Send + Sync>,
-    required_named: String,
-    optional_named: Option<String>,
-    loud: bool,
-    required_positional: String,
-    optional_positional: Option<String>,
 }
 
 impl Demo {
     #[constructor]
-    fn create(
-        greeter: Arc<dyn Greeter + Send + Sync>,
+    fn create(greeter: Arc<dyn Greeter + Send + Sync>) -> Self {}
+
+    #[runner]
+    fn run(
+        &self,
         #[console_argument(name = "required-named")] required_named: String,
         #[console_argument(name = "optional-named")] optional_named: Option<String>,
         #[console_argument(name = "loud")] loud: bool,
         #[console_argument] required_positional: String,
         #[console_argument] optional_positional: Option<String>,
-    ) -> Self {}
+    ) -> CommandOutcome {}
 }
 
 #[singleton]
@@ -76,8 +70,8 @@ impl Demo {
 struct Farewell;
 
 impl Farewell {
-    #[constructor]
-    fn create() -> Self {}
+    #[runner]
+    fn run(&self) -> CommandOutcome {}
 }
 "#;
 
@@ -116,7 +110,6 @@ impl Farewell {
         let source = source_for(COMMANDS, false);
 
         assert!(source.contains("pubasyncfnrun"));
-        assert!(source.contains("usemargaret_console::command::Command;"));
         assert!(source.contains(r#"clap::Command::new("demo").about("Demonstratesarguments")"#));
 
         assert!(
@@ -136,7 +129,7 @@ impl Farewell {
         assert!(source.contains(r#"clap::Arg::new("1").required(false)"#));
         assert!(source.contains("clap::value_parser!(String)"));
 
-        assert!(source.contains("container.demo("));
+        assert!(source.contains("container.demo().run("));
         assert!(source.contains(r#"matches.get_one::<String>("required-named")"#));
         assert!(source.contains(r#"matches.get_one::<String>("optional-named").cloned()"#));
         assert!(source.contains(r#"matches.get_flag("loud")"#));
@@ -157,13 +150,13 @@ impl Farewell {
     }
 
     #[test]
-    fn ignores_a_receiver_in_a_constructor() {
+    fn ignores_a_receiver_in_a_runner() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged;\n\nimpl Flagged {\n    #[constructor]\n    fn create(&self, #[console_argument(name = \"loud\")] loud: bool) -> Self {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged;\n\nimpl Flagged {\n    #[runner]\n    fn run(&self, #[console_argument(name = \"loud\")] loud: bool) -> CommandOutcome {}\n}\n",
             false,
         );
 
-        assert!(source.contains("container.flagged("));
+        assert!(source.contains("container.flagged().run("));
         assert!(source.contains(r#"matches.get_flag("loud")"#));
     }
 
@@ -203,16 +196,36 @@ impl Farewell {
     }
 
     #[test]
-    fn reports_a_missing_command_constructor() {
+    fn dispatches_a_fieldless_command_without_a_constructor() {
+        let source = source_for(
+            "#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[runner]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains(r#"("bare",_matches)"#));
+        assert!(source.contains("container.bare().run().await"));
+    }
+
+    #[test]
+    fn reports_a_missing_command_runner() {
         let message = error_for("#[console_command(name = \"bad\")]\nstruct Bad;\n");
 
-        assert!(message.contains("no #[constructor]"));
+        assert!(message.contains("no #[runner] method"));
+    }
+
+    #[test]
+    fn rejects_an_unmarked_runner_parameter() {
+        let message = error_for(
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, value: String) -> CommandOutcome {}\n}\n",
+        );
+
+        assert!(message.contains("must be a console argument"));
     }
 
     #[test]
     fn rejects_a_nameless_flag() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad { flag: bool }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument] flag: bool) -> Self {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, #[console_argument] flag: bool) -> CommandOutcome {}\n}\n",
         );
 
         assert!(message.contains("a flag requires a name"));
@@ -221,7 +234,7 @@ impl Farewell {
     #[test]
     fn rejects_a_non_string_argument_name() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad { value: String }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument(name = 5)] value: String) -> Self {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, #[console_argument(name = 5)] value: String) -> CommandOutcome {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -230,7 +243,7 @@ impl Farewell {
     #[test]
     fn rejects_a_malformed_argument() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad { value: String }\n\nimpl Bad {\n    #[constructor]\n    fn create(#[console_argument(= 5)] value: String) -> Self {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, #[console_argument(= 5)] value: String) -> CommandOutcome {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));

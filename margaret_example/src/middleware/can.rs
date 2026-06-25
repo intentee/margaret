@@ -32,6 +32,7 @@ impl HttpMiddleware for Can {
     async fn process(&self, request: Request, action: Action, next: Next) -> Response {
         match action {
             Action::Read => next.run(request).await,
+            Action::Write if request.header("x-authorized").is_some() => next.run(request).await,
             Action::Write => Response::text(403, format!("{}: forbidden", self.config.app_name())),
         }
     }

@@ -1,19 +1,9 @@
-mod first {
+mod user_account {
     #[singleton]
-    struct Config;
-
-    impl Config {
-        #[constructor]
-        fn new() -> Self {}
-    }
+    struct Detail;
 }
 
-mod second {
+mod user {
     #[singleton]
-    struct Config;
-
-    impl Config {
-        #[constructor]
-        fn new() -> Self {}
-    }
+    struct AccountDetail;
 }

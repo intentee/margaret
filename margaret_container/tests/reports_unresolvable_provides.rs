@@ -7,7 +7,7 @@ use margaret_container::generate_container_source;
 fn reports_unresolvable_provides() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/provides_unresolvable");
-    let error = generate_container_source("provides_unresolvable", &directory, &[])
+    let error = generate_container_source("provides_unresolvable", &directory)
         .err()
         .expect("a provides interface matching no trait must be rejected");
 

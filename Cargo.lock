@@ -313,7 +313,6 @@ dependencies = [
 name = "margaret_console"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "clap",
  "margaret_http",
  "tokio",
@@ -388,6 +387,7 @@ name = "margaret_http_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "matchit",
  "prettyplease",
  "proc-macro2",
  "quote",

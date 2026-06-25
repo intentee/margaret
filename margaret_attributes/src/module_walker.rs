@@ -18,6 +18,7 @@ use crate::canonical_path::CanonicalPath;
 use crate::indexed_item::IndexedItem;
 use crate::indexed_method::IndexedMethod;
 use crate::item_kind::ItemKind;
+use crate::struct_shape::StructShape;
 
 struct Recordable<'item> {
     attributes: &'item [Attribute],
@@ -101,7 +102,7 @@ impl ModuleWalker {
             Item::Struct(item_struct) => Some(Recordable {
                 attributes: &item_struct.attrs,
                 identifier: &item_struct.ident,
-                kind: ItemKind::Struct,
+                kind: ItemKind::Struct(StructShape::from(&item_struct.fields)),
             }),
             Item::Enum(item_enum) => Some(Recordable {
                 attributes: &item_enum.attrs,

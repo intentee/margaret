@@ -1,7 +1,10 @@
 pub mod http_codegen_error;
 mod http_route;
 mod middleware_binding;
+mod path_parameter_names;
 mod render;
+mod responder_method;
+mod route_parameter;
 
 use std::path::Path;
 
@@ -52,14 +55,34 @@ mod tests {
 #[guard(crate::action::Action::Read)]
 struct Resource;
 
+impl Resource {
+    #[responder]
+    fn respond(&self) -> Response {}
+}
+
 #[responds_to_http(method = Get, path = "/open")]
 struct Open;
+
+impl Open {
+    #[responder]
+    fn respond(&self) -> Response {}
+}
 
 #[http_middleware(handles = guard, priority = 100)]
 struct Guard;
 
 #[http_middleware(handles = traced, priority = 10)]
 struct Tracer;
+"#;
+
+    const ROUTE_PARAMETER: &str = r#"
+#[responds_to_http(method = Get, path = "/users/{id}")]
+struct GetUser;
+
+impl GetUser {
+    #[responder]
+    fn respond(&self, #[route_parameter] id: String) -> Response {}
+}
 "#;
 
     fn crate_with(lib_source: &str) -> TempDir {
@@ -103,16 +126,16 @@ struct Tracer;
         assert!(source.contains("pubfnserver"));
         assert!(source.contains("usesuper::container::Container"));
         assert!(source.contains("margaret_http::method::Method::Get"));
+        assert!(
+            source.contains("margaret_http::responder_handler::responder_handler(container.open()")
+        );
         assert!(source.contains(
-            "\"/open\",margaret_http::responder_handler::responder_handler(container.open())"
+            "|responder:std::sync::Arc<crate::Open>,_request:margaret_http::request::Request|"
         ));
+        assert!(source.contains("responder.respond().await"));
         assert!(source.contains("container.guard(),crate::action::Action::Read"));
         assert!(source.contains("container.tracer(),()"));
-        assert!(
-            source.contains(
-                "margaret_http::responder_handler::responder_handler(container.resource()"
-            )
-        );
+        assert!(source.contains("container.resource()"));
 
         let guard = source.find("container.guard").expect("the guard is wired");
         let tracer = source
@@ -120,6 +143,62 @@ struct Tracer;
             .expect("the tracer is wired");
 
         assert!(guard < tracer);
+    }
+
+    #[test]
+    fn injects_route_parameters_into_the_responder() {
+        let source = source_for(ROUTE_PARAMETER);
+
+        assert!(source.contains("\"/users/{id}\""));
+        assert!(source.contains("container.get_user()"));
+        assert!(source.contains(
+            "|responder:std::sync::Arc<crate::GetUser>,request:margaret_http::request::Request|"
+        ));
+        assert!(source.contains(r#"responder.respond(request.path_param("id").expect"#));
+        assert!(source.contains(".to_string()"));
+    }
+
+    #[test]
+    fn rejects_a_responder_without_a_responder_method() {
+        let message = error_for("#[responds_to_http(method = Get, path = \"/x\")]\nstruct Bare;\n");
+
+        assert!(message.contains("no #[responder] method"));
+    }
+
+    #[test]
+    fn rejects_an_unmarked_responder_parameter() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/x/{id}\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, id: String) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("must be a route parameter"));
+    }
+
+    #[test]
+    fn rejects_a_non_identifier_route_parameter() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/x/{id}\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, #[route_parameter] (id, extra): (String, String)) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("not a plain identifier"));
+    }
+
+    #[test]
+    fn rejects_a_route_parameter_absent_from_the_path() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/users/{id}\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, #[route_parameter] slug: String) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("does not appear in the route path"));
+    }
+
+    #[test]
+    fn rejects_a_malformed_route_path() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/users/{id\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("malformed route path"));
     }
 
     #[test]

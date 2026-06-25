@@ -78,30 +78,24 @@ mod tests {
 
     use super::Router;
     use crate::handler::Handler;
-    use crate::http_responder::HttpResponder;
     use crate::method::Method;
     use crate::request::Request;
-    use crate::responder_handler::responder_handler;
     use crate::response::Response;
 
     struct Ok200;
 
     #[async_trait]
-    impl HttpResponder for Ok200 {
-        async fn respond(&self, request: Request) -> Response {
+    impl Handler for Ok200 {
+        async fn handle(&self, request: Request) -> Response {
             Response::text(200, request.path_param("id").unwrap_or("none").to_string())
         }
     }
 
     fn router() -> Router {
         Router::empty()
-            .route(Method::Get, "/items", responder_handler(Arc::new(Ok200)))
-            .route(Method::Post, "/items", responder_handler(Arc::new(Ok200)))
-            .route(
-                Method::Get,
-                "/items/{id}",
-                responder_handler(Arc::new(Ok200)),
-            )
+            .route(Method::Get, "/items", Arc::new(Ok200))
+            .route(Method::Post, "/items", Arc::new(Ok200))
+            .route(Method::Get, "/items/{id}", Arc::new(Ok200))
     }
 
     async fn status_of(method: Method, path: &str) -> u16 {

@@ -2,7 +2,7 @@ use margaret_attributes::attribute_holder::AttributeHolder;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_attributes::item_kind::ItemKind;
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
@@ -11,6 +11,9 @@ use quote::quote;
 
 use crate::http_codegen_error::HttpCodegenError;
 use crate::middleware_binding::MiddlewareBinding;
+use crate::path_parameter_names::path_parameter_names;
+use crate::responder_method::responder_method;
+use crate::route_parameter::RouteParameter;
 
 pub(crate) struct LayerApplication {
     pub(crate) marker_value: TokenStream,
@@ -23,6 +26,8 @@ pub(crate) struct HttpRoute {
     pub(crate) method: Ident,
     pub(crate) path: String,
     pub(crate) responder_field: Ident,
+    pub(crate) responder_path: CanonicalPath,
+    pub(crate) route_parameters: Vec<RouteParameter>,
 }
 
 pub(crate) fn http_routes(
@@ -34,7 +39,7 @@ pub(crate) fn http_routes(
 
     for matched in index.select(&selector) {
         let item = match matched.holder() {
-            AttributeHolder::Item(item) if item.kind() == ItemKind::Struct => item,
+            AttributeHolder::Item(item) if item.kind().is_struct() => item,
             holder => {
                 return Err(HttpCodegenError::RespondsToHttpNotOnStruct {
                     target: holder.target_path(),
@@ -69,6 +74,24 @@ pub(crate) fn http_routes(
 
         layers.sort_by_key(|application| application.priority);
 
+        let route_parameters = responder_method(index, item.canonical_path(), &responder)?;
+        let path_parameters =
+            path_parameter_names(&path).map_err(|source| HttpCodegenError::InvalidRoutePath {
+                responder: responder.clone(),
+                path: path.clone(),
+                source,
+            })?;
+
+        for route_parameter in &route_parameters {
+            if !path_parameters.contains(&route_parameter.name) {
+                return Err(HttpCodegenError::RouteParameterNotInPath {
+                    responder: responder.clone(),
+                    parameter: route_parameter.name.clone(),
+                    path: path.clone(),
+                });
+            }
+        }
+
         routes.push(HttpRoute {
             layers,
             method: method
@@ -79,6 +102,8 @@ pub(crate) fn http_routes(
                 .clone(),
             path,
             responder_field: format_ident!("{}", item.canonical_path().field_name()),
+            responder_path: item.canonical_path().clone(),
+            route_parameters,
         });
     }
 
