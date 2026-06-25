@@ -1,9 +1,11 @@
 use bytes::Bytes;
 use http_body_util::Full;
 
+use crate::header::Header;
+
 pub struct Response {
     body: String,
-    headers: Vec<(String, String)>,
+    headers: Vec<Header>,
     status: u16,
 }
 
@@ -16,8 +18,19 @@ impl Response {
         }
     }
 
+    pub fn not_found() -> Self {
+        Self::text(404, "Not Found")
+    }
+
+    pub fn forbidden() -> Self {
+        Self::text(403, "Forbidden")
+    }
+
     pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.push((name.into(), value.into()));
+        self.headers.push(Header {
+            name: name.into(),
+            value: value.into(),
+        });
 
         self
     }
@@ -33,8 +46,8 @@ impl Response {
     pub(crate) fn into_http(self) -> http::Response<Full<Bytes>> {
         let mut builder = http::Response::builder().status(self.status);
 
-        for (name, value) in self.headers {
-            builder = builder.header(name, value);
+        for header in self.headers {
+            builder = builder.header(header.name, header.value);
         }
 
         builder

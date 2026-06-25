@@ -1,23 +1,23 @@
 use crate::attribute_error::AttributeError;
-use crate::attribute_holder::AttributeHolder;
 use crate::attribute_selector::AttributeSelector;
+use crate::indexed_item::IndexedItem;
 use crate::matched_attribute::MatchedAttribute;
 
 pub struct AttributeQuery<'index> {
-    holder: &'index AttributeHolder,
+    item: &'index IndexedItem,
 }
 
 impl<'index> AttributeQuery<'index> {
-    pub fn new(holder: &'index AttributeHolder) -> Self {
-        Self { holder }
+    pub fn new(item: &'index IndexedItem) -> Self {
+        Self { item }
     }
 
     pub fn find_all(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'index>> {
         let mut matches = Vec::new();
 
-        for attribute in self.holder.attributes() {
+        for attribute in self.item.attributes() {
             if selector.matches(attribute.path()) {
-                matches.push(MatchedAttribute::new(self.holder, attribute));
+                matches.push(MatchedAttribute::new(self.item, attribute));
             }
         }
 
@@ -33,7 +33,7 @@ impl<'index> AttributeQuery<'index> {
         if matches.len() > 1 {
             return Err(AttributeError::RepeatedAttribute {
                 attribute_path: selector.display_path(),
-                target: self.holder.target_path(),
+                target: self.item.canonical_path().to_string(),
             });
         }
 
@@ -46,7 +46,6 @@ mod tests {
     use syn::Attribute;
     use syn::parse_quote;
 
-    use crate::attribute_holder::AttributeHolder;
     use crate::attribute_query::AttributeQuery;
     use crate::attribute_selector::AttributeSelector;
     use crate::canonical_path::CanonicalPath;
@@ -54,13 +53,13 @@ mod tests {
     use crate::item_kind::ItemKind;
     use crate::struct_shape::StructShape;
 
-    fn holder(attributes: Vec<Attribute>) -> AttributeHolder {
-        AttributeHolder::Item(IndexedItem::new(
+    fn item(attributes: Vec<Attribute>) -> IndexedItem {
+        IndexedItem::new(
             ItemKind::Struct(StructShape::Unit),
             "Service".to_string(),
             CanonicalPath::new(vec!["crate".to_string(), "Service".to_string()]),
             attributes,
-        ))
+        )
     }
 
     fn selector(input: &str) -> AttributeSelector {
@@ -69,10 +68,10 @@ mod tests {
 
     #[test]
     fn find_returns_the_single_matching_sibling() {
-        let holder = holder(vec![parse_quote!(#[singleton])]);
+        let item = item(vec![parse_quote!(#[singleton])]);
 
         assert!(
-            AttributeQuery::new(&holder)
+            AttributeQuery::new(&item)
                 .find(&selector("singleton"))
                 .expect("the lookup succeeds")
                 .is_some()
@@ -81,10 +80,10 @@ mod tests {
 
     #[test]
     fn find_returns_none_when_no_sibling_matches() {
-        let holder = holder(vec![parse_quote!(#[singleton])]);
+        let item = item(vec![parse_quote!(#[singleton])]);
 
         assert!(
-            AttributeQuery::new(&holder)
+            AttributeQuery::new(&item)
                 .find(&selector("does_not_exist"))
                 .expect("the lookup succeeds")
                 .is_none()
@@ -93,8 +92,8 @@ mod tests {
 
     #[test]
     fn find_rejects_a_repeated_sibling() {
-        let holder = holder(vec![parse_quote!(#[singleton]), parse_quote!(#[singleton])]);
-        let message = AttributeQuery::new(&holder)
+        let item = item(vec![parse_quote!(#[singleton]), parse_quote!(#[singleton])]);
+        let message = AttributeQuery::new(&item)
             .find(&selector("singleton"))
             .err()
             .expect("a repeated sibling is rejected")
@@ -105,10 +104,10 @@ mod tests {
 
     #[test]
     fn find_all_returns_every_matching_sibling() {
-        let holder = holder(vec![parse_quote!(#[singleton]), parse_quote!(#[singleton])]);
+        let item = item(vec![parse_quote!(#[singleton]), parse_quote!(#[singleton])]);
 
         assert_eq!(
-            AttributeQuery::new(&holder)
+            AttributeQuery::new(&item)
                 .find_all(&selector("singleton"))
                 .len(),
             2

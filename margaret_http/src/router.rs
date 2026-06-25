@@ -65,7 +65,7 @@ impl Handler for Router {
                 }
                 None => Response::text(405, "Method Not Allowed"),
             },
-            Err(_) => Response::text(404, "Not Found"),
+            Err(_) => Response::not_found(),
         }
     }
 }

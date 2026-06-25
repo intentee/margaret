@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::next::Next;
 use margaret_http::request::Request;
@@ -9,17 +10,17 @@ use margaret_macros::constructor;
 use margaret_macros::http_middleware;
 use margaret_macros::singleton;
 
-use crate::plugins::Plugin;
+use crate::plugin::Plugin;
 
 #[singleton]
 #[http_middleware(handles = traced, priority = 10)]
 pub struct Tracing {
-    plugins: Vec<Arc<dyn Plugin + Send + Sync>>,
+    plugins: Vec<Arc<dyn Plugin>>,
 }
 
 impl Tracing {
     #[constructor]
-    pub fn create(plugins: Vec<Arc<dyn Plugin + Send + Sync>>) -> Self {
+    pub fn create(plugins: Vec<Arc<dyn Plugin>>) -> Self {
         Self { plugins }
     }
 }

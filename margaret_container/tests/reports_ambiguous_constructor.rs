@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use margaret_container::container_error::ContainerError;
-use margaret_container::generate_container_source;
+use margaret_container::generate_container_source::generate_container_source;
 
 #[test]
 fn reports_ambiguous_constructor() {

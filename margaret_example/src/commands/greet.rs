@@ -11,12 +11,12 @@ use crate::greeter::Greeter;
 #[singleton]
 #[console_command(name = "greet", description = "Greets a person by name")]
 pub struct Greet {
-    greeter: Arc<dyn Greeter + Send + Sync>,
+    greeter: Arc<dyn Greeter>,
 }
 
 impl Greet {
     #[constructor]
-    pub fn create(greeter: Arc<dyn Greeter + Send + Sync>) -> Self {
+    pub fn create(greeter: Arc<dyn Greeter>) -> Self {
         Self { greeter }
     }
 

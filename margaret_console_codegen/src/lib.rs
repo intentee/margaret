@@ -1,34 +1,12 @@
 mod console_argument;
+mod console_argument_selector;
 pub mod console_codegen_error;
 mod console_command;
+mod console_commands;
+pub mod has_commands;
 mod optional_parameter;
 mod render;
-
-use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
-
-use crate::console_codegen_error::ConsoleCodegenError;
-use crate::console_command::console_commands;
-use crate::render::render;
-
-pub fn has_commands(index: &AttributeIndex) -> bool {
-    let selector = AttributeSelector::parse("console_command").expect("a valid selector");
-
-    !index.select(&selector).is_empty()
-}
-
-pub(crate) fn console_argument_selector() -> AttributeSelector {
-    AttributeSelector::parse("console_argument").expect("a valid selector")
-}
-
-pub fn render_console(
-    index: &AttributeIndex,
-    has_http: bool,
-) -> Result<String, ConsoleCodegenError> {
-    let commands = console_commands(index)?;
-
-    Ok(render(&commands, has_http))
-}
+pub mod render_console;
 
 #[cfg(test)]
 mod tests {
@@ -38,21 +16,21 @@ mod tests {
     use tempfile::TempDir;
     use tempfile::tempdir;
 
-    use crate::has_commands;
-    use crate::render_console;
+    use crate::has_commands::has_commands;
+    use crate::render_console::render_console;
 
     const COMMANDS: &str = r#"
-trait Greeter {}
+trait Greeter: Send + Sync {}
 
 #[singleton]
 #[console_command(name = "demo", description = "Demonstrates arguments")]
 struct Demo {
-    greeter: Arc<dyn Greeter + Send + Sync>,
+    greeter: Arc<dyn Greeter>,
 }
 
 impl Demo {
     #[constructor]
-    fn create(greeter: Arc<dyn Greeter + Send + Sync>) -> Self {}
+    fn create(greeter: Arc<dyn Greeter>) -> Self {}
 
     #[runner]
     fn run(

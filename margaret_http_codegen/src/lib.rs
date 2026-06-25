@@ -1,42 +1,21 @@
+mod authorization;
+mod build_registry;
+pub mod generate_http_source;
+pub mod has_responders;
 pub mod http_codegen_error;
 mod http_route;
+mod http_routes;
+mod layer_application;
 mod middleware_binding;
+mod middleware_bindings;
 mod path_parameter_names;
+mod registries;
 mod render;
+pub mod render_http;
+mod resolve_struct;
 mod responder_method;
 mod route_parameter;
-
-use std::path::Path;
-
-use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
-
-use crate::http_codegen_error::HttpCodegenError;
-use crate::http_route::http_routes;
-use crate::middleware_binding::middleware_bindings;
-use crate::render::render;
-
-pub fn render_http(index: &AttributeIndex) -> Result<String, HttpCodegenError> {
-    let bindings = middleware_bindings(index)?;
-    let routes = http_routes(index, &bindings)?;
-
-    Ok(render(&routes))
-}
-
-pub fn has_responders(index: &AttributeIndex) -> bool {
-    let selector = AttributeSelector::parse("responds_to_http").expect("a valid selector");
-
-    !index.select(&selector).is_empty()
-}
-
-pub fn generate_http_source(
-    crate_name: &str,
-    source_directory: &Path,
-) -> Result<String, HttpCodegenError> {
-    let index = AttributeIndex::from_crate_root(crate_name, source_directory)?;
-
-    render_http(&index)
-}
+mod route_parameter_binding;
 
 #[cfg(test)]
 mod tests {
@@ -46,8 +25,8 @@ mod tests {
     use tempfile::TempDir;
     use tempfile::tempdir;
 
-    use crate::generate_http_source;
-    use crate::has_responders;
+    use crate::generate_http_source::generate_http_source;
+    use crate::has_responders::has_responders;
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"
 #[responds_to_http(method = Get, path = "/resource")]
@@ -82,6 +61,54 @@ struct GetUser;
 impl GetUser {
     #[responder]
     fn respond(&self, #[route_parameter] id: String) -> Response {}
+}
+"#;
+
+    const BOUND_WITHOUT_INTENT: &str = r#"
+struct User;
+
+#[route_parameter_binder]
+struct UserBinder;
+
+impl RouteParameterBinder for UserBinder {
+    type Model = User;
+    async fn bind(&self, value: String) -> Option<User> {}
+}
+
+#[responds_to_http(method = Get, path = "/users/{user}")]
+struct GetUser;
+
+impl GetUser {
+    #[responder]
+    fn respond(&self, #[route_parameter] user: User) -> Response {}
+}
+"#;
+
+    const MODEL_PARAMETER: &str = r#"
+struct User;
+
+#[route_parameter_binder]
+struct UserBinder;
+
+impl RouteParameterBinder for UserBinder {
+    type Model = User;
+    async fn bind(&self, value: String) -> Option<User> {}
+}
+
+#[crud_gate]
+struct UserGate;
+
+impl CrudActionGate for UserGate {
+    type Subject = User;
+    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}
+}
+
+#[responds_to_http(method = Get, path = "/profiles/{user}")]
+struct GetProfile;
+
+impl GetProfile {
+    #[responder]
+    fn respond(&self, #[route_parameter(intent = CrudAction::Read)] user: User) -> Response {}
 }
 "#;
 
@@ -154,8 +181,133 @@ impl GetUser {
         assert!(source.contains(
             "|responder:std::sync::Arc<crate::GetUser>,request:margaret_http::request::Request|"
         ));
-        assert!(source.contains(r#"responder.respond(request.path_param("id").expect"#));
-        assert!(source.contains(".to_string()"));
+        assert!(source.contains(r#"letid=request.path_param("id").expect"#));
+        assert!(source.contains(".to_string();"));
+        assert!(source.contains("responder.respond(id).await"));
+    }
+
+    #[test]
+    fn injects_a_bound_model_with_an_authorization_gate() {
+        let source = source_for(MODEL_PARAMETER);
+
+        assert!(source.contains("usemargaret_http::crud_action::CrudAction;"));
+        assert!(source.contains("usemargaret_http::route_parameter_binder::RouteParameterBinder;"));
+        assert!(source.contains("usemargaret_http::crud_action_gate::CrudActionGate;"));
+        assert!(source.contains("container.user_binder()"));
+        assert!(source.contains("container.user_gate()"));
+        assert!(source.contains(r#"user_binder.bind(request.path_param("user").expect"#));
+        assert!(source.contains("margaret_http::response::Response::not_found()"));
+        assert!(source.contains("user_gate.can(&request,&user,CrudAction::Read).await"));
+        assert!(source.contains("margaret_http::response::Response::forbidden()"));
+        assert!(source.contains("responder.respond(user).await"));
+    }
+
+    #[test]
+    fn injects_a_bound_model_without_authorization() {
+        let source = source_for(BOUND_WITHOUT_INTENT);
+
+        assert!(source.contains("usemargaret_http::route_parameter_binder::RouteParameterBinder;"));
+        assert!(source.contains("container.user_binder()"));
+        assert!(source.contains(r#"user_binder.bind(request.path_param("user").expect"#));
+        assert!(source.contains("margaret_http::response::Response::not_found()"));
+        assert!(source.contains("responder.respond(user).await"));
+        assert!(!source.contains("CrudAction"));
+        assert!(!source.contains("forbidden"));
+    }
+
+    #[test]
+    fn reports_a_binder_without_a_model_associated_type() {
+        let message = error_for("#[route_parameter_binder]\nstruct Bare;\n");
+
+        assert!(message.contains("type Model"));
+    }
+
+    #[test]
+    fn reports_a_binder_with_a_non_struct_model() {
+        let message = error_for(
+            "#[route_parameter_binder]\nstruct UnitBinder;\nimpl RouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> Option<()> {}\n}\n",
+        );
+
+        assert!(message.contains("type Model"));
+    }
+
+    #[test]
+    fn rejects_a_route_parameter_of_an_unknown_type() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/things/{thing}\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter] thing: Unknown) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("no #[route_parameter_binder]"));
+    }
+
+    #[test]
+    fn propagates_malformed_route_parameter_arguments() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/things/{thing}\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter(= 5)] thing: String) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("failed to index"));
+    }
+
+    #[test]
+    fn rejects_a_non_path_intent() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/things/{thing}\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter(intent = 5)] thing: String) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("failed to index"));
+    }
+
+    #[test]
+    fn rejects_two_binders_for_the_same_model() {
+        let message = error_for(
+            "struct User;\n\n#[route_parameter_binder]\nstruct First;\nimpl RouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[route_parameter_binder]\nstruct Second;\nimpl RouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n",
+        );
+
+        assert!(message.contains("more than one route parameter binder"));
+    }
+
+    #[test]
+    fn reports_a_gate_without_a_subject_associated_type() {
+        let message = error_for("#[crud_gate]\nstruct Bare;\n");
+
+        assert!(message.contains("type Subject"));
+    }
+
+    #[test]
+    fn rejects_two_gates_for_the_same_subject() {
+        let message = error_for(
+            "struct User;\n\n#[crud_gate]\nstruct First;\nimpl CrudActionGate for First {\n    type Subject = User;\n    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}\n}\n\n#[crud_gate]\nstruct Second;\nimpl CrudActionGate for Second {\n    type Subject = User;\n    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}\n}\n",
+        );
+
+        assert!(message.contains("more than one CRUD gate"));
+    }
+
+    #[test]
+    fn rejects_a_model_parameter_without_a_binder() {
+        let message = error_for(
+            "struct User;\n\n#[responds_to_http(method = Get, path = \"/users/{user}\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter] user: User) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("no #[route_parameter_binder]"));
+    }
+
+    #[test]
+    fn rejects_an_intent_without_a_gate() {
+        let message = error_for(
+            "struct User;\n\n#[route_parameter_binder]\nstruct UserBinder;\nimpl RouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = Get, path = \"/users/{user}\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter(intent = CrudAction::Read)] user: User) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("no #[crud_gate]"));
+    }
+
+    #[test]
+    fn rejects_an_intent_on_a_raw_parameter() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/users/{id}\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter(intent = CrudAction::Read)] id: String) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("intent only applies to model parameters"));
     }
 
     #[test]

@@ -1,4 +1,5 @@
 use clap::ArgMatches;
+
 use margaret_http::server::Server;
 
 use crate::command_outcome::CommandOutcome;
@@ -22,10 +23,11 @@ pub async fn serve(server: Server, matches: &ArgMatches) -> CommandOutcome {
 mod tests {
     use clap::Arg;
     use clap::Command;
-    use margaret_http::router::Router;
-    use margaret_http::server::Server;
     use tokio::net::TcpListener;
     use tokio::net::TcpStream;
+
+    use margaret_http::router::Router;
+    use margaret_http::server::Server;
 
     use super::serve;
     use crate::command_outcome::CommandOutcome;

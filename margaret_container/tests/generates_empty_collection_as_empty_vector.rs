@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use margaret_container::generate_container_source;
+use margaret_container::generate_container_source::generate_container_source;
 
 #[test]
 fn generates_empty_collection_as_empty_vector() {

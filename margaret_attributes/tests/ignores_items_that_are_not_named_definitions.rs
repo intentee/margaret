@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use margaret_attributes::attribute_holder::AttributeHolder;
 use margaret_attributes::attribute_index::AttributeIndex;
 
 #[test]
@@ -9,12 +8,9 @@ fn ignores_items_that_are_not_named_definitions() {
     let index = AttributeIndex::from_crate_root("valid_crate", &directory)
         .expect("the valid fixture indexes cleanly");
     let paths: Vec<String> = index
-        .holders()
+        .items()
         .iter()
-        .filter_map(|holder| match holder {
-            AttributeHolder::Item(item) => Some(item.canonical_path().to_string()),
-            AttributeHolder::Method(_) => None,
-        })
+        .map(|item| item.canonical_path().to_string())
         .collect();
 
     assert!(!paths.contains(&"valid_crate::ROOT_CONST".to_string()));

@@ -30,6 +30,16 @@ pub fn responds_to_http(_attributes: TokenStream, item: TokenStream) -> TokenStr
 }
 
 #[proc_macro_attribute]
+pub fn route_parameter_binder(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn crud_gate(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
 pub fn http_middleware(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }

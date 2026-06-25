@@ -12,7 +12,7 @@ fn selects_items_bearing_an_attribute() {
     let targets: Vec<String> = index
         .select(&selector)
         .iter()
-        .map(|matched| matched.holder().target_path())
+        .map(|matched| matched.item().canonical_path().to_string())
         .collect();
 
     assert!(targets.contains(&"valid_crate::RootStruct".to_string()));

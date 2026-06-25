@@ -1,8 +1,9 @@
+use thiserror::Error;
+
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
-use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum CodegenError {

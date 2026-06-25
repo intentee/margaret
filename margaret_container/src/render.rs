@@ -1,9 +1,10 @@
-use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::struct_shape::StructShape;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
+
+use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::struct_shape::StructShape;
 
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
@@ -63,7 +64,7 @@ fn field_type(provider: &Provider) -> TokenStream {
         ProvidedType::Interface(path) => {
             let interface = crate_path_tokens(path);
 
-            quote! { std::sync::Arc<dyn #interface + Send + Sync> }
+            quote! { std::sync::Arc<dyn #interface> }
         }
     }
 }

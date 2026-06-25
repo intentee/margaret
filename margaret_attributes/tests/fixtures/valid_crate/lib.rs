@@ -66,3 +66,7 @@ impl SomeTrait for WithConstructor {
 impl (RootStruct, RootEnum) {
     fn skipped_tuple_method() {}
 }
+
+impl Undeclared {
+    fn orphaned_method() {}
+}

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use margaret_container::generate_container_source;
+use margaret_container::generate_container_source::generate_container_source;
 
 #[test]
 fn generation_is_deterministic() {

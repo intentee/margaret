@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
@@ -13,8 +14,8 @@ use syn::Type;
 use syn::UseTree;
 
 use crate::attribute_error::AttributeError;
-use crate::attribute_holder::AttributeHolder;
 use crate::canonical_path::CanonicalPath;
+use crate::indexed_associated_type::IndexedAssociatedType;
 use crate::indexed_item::IndexedItem;
 use crate::indexed_method::IndexedMethod;
 use crate::item_kind::ItemKind;
@@ -26,8 +27,19 @@ struct Recordable<'item> {
     kind: ItemKind,
 }
 
+enum PendingMemberKind {
+    AssociatedType(IndexedAssociatedType),
+    Method(IndexedMethod),
+}
+
+struct PendingMember {
+    kind: PendingMemberKind,
+    self_type_path: CanonicalPath,
+}
+
 pub(crate) struct ModuleWalker {
-    holders: Vec<AttributeHolder>,
+    items: Vec<IndexedItem>,
+    pending_members: Vec<PendingMember>,
     seen_paths: HashSet<CanonicalPath>,
 }
 
@@ -35,18 +47,63 @@ impl ModuleWalker {
     pub(crate) fn walk_crate(
         crate_name: &str,
         source_directory: &Path,
-    ) -> Result<Vec<AttributeHolder>, AttributeError> {
+    ) -> Result<Vec<IndexedItem>, AttributeError> {
         let mut walker = Self {
-            holders: Vec::new(),
+            items: Vec::new(),
+            pending_members: Vec::new(),
             seen_paths: HashSet::new(),
         };
         let root_file = source_directory.join("lib.rs");
         let module_path = vec![crate_name.to_string()];
 
         walker.walk_file(&root_file, &module_path, source_directory)?;
-        walker.holders.sort_by_key(AttributeHolder::target_path);
 
-        Ok(walker.holders)
+        Ok(walker.into_items())
+    }
+
+    fn into_items(self) -> Vec<IndexedItem> {
+        let Self {
+            mut items,
+            pending_members,
+            seen_paths: _,
+        } = self;
+
+        let index_by_path: HashMap<CanonicalPath, usize> = items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| (item.canonical_path().clone(), index))
+            .collect();
+
+        for PendingMember {
+            kind,
+            self_type_path,
+        } in pending_members
+        {
+            let Some(&index) = index_by_path.get(&self_type_path) else {
+                continue;
+            };
+
+            match kind {
+                PendingMemberKind::AssociatedType(associated_type) => {
+                    items[index].add_associated_type(associated_type);
+                }
+                PendingMemberKind::Method(method) => {
+                    items[index].add_method(method);
+                }
+            }
+        }
+
+        items.sort_by(|left, right| {
+            left.canonical_path()
+                .to_string()
+                .cmp(&right.canonical_path().to_string())
+        });
+
+        for item in &mut items {
+            item.sort_members();
+        }
+
+        items
     }
 
     fn walk_file(
@@ -164,21 +221,17 @@ impl ModuleWalker {
         }
 
         self.seen_paths.insert(canonical_path.clone());
-        self.holders.push(AttributeHolder::Item(IndexedItem::new(
+        self.items.push(IndexedItem::new(
             recordable.kind,
             recordable.identifier.to_string(),
             canonical_path,
             recordable.attributes.to_vec(),
-        )));
+        ));
 
         Ok(())
     }
 
     fn walk_impl(&mut self, item_impl: &ItemImpl, module_path: &[String]) {
-        if item_impl.trait_.is_some() {
-            return;
-        }
-
         let Some(self_identifier) = self_type_identifier(&item_impl.self_ty) else {
             return;
         };
@@ -188,15 +241,32 @@ impl ModuleWalker {
 
         let self_type_path = CanonicalPath::new(segments);
 
+        if item_impl.trait_.is_some() {
+            for impl_item in &item_impl.items {
+                if let ImplItem::Type(associated_type) = impl_item {
+                    self.pending_members.push(PendingMember {
+                        kind: PendingMemberKind::AssociatedType(IndexedAssociatedType::new(
+                            associated_type.ident.to_string(),
+                            associated_type.ty.clone(),
+                        )),
+                        self_type_path: self_type_path.clone(),
+                    });
+                }
+            }
+
+            return;
+        }
+
         for impl_item in &item_impl.items {
             if let ImplItem::Fn(method) = impl_item {
-                self.holders
-                    .push(AttributeHolder::Method(IndexedMethod::new(
-                        self_type_path.clone(),
+                self.pending_members.push(PendingMember {
+                    kind: PendingMemberKind::Method(IndexedMethod::new(
                         method.sig.ident.to_string(),
                         method.attrs.clone(),
                         method.sig.clone(),
-                    )));
+                    )),
+                    self_type_path: self_type_path.clone(),
+                });
             }
         }
     }

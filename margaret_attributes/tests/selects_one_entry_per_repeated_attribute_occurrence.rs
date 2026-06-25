@@ -12,7 +12,9 @@ fn selects_one_entry_per_repeated_attribute_occurrence() {
     let occurrences = index
         .select(&selector)
         .iter()
-        .filter(|matched| matched.holder().target_path() == "valid_crate::RepeatedAttrs")
+        .filter(|matched| {
+            matched.item().canonical_path().to_string() == "valid_crate::RepeatedAttrs"
+        })
         .count();
 
     assert_eq!(occurrences, 2);

@@ -1,6 +1,7 @@
-use margaret_attributes::attribute_error::AttributeError;
 use matchit::InsertError;
 use thiserror::Error;
+
+use margaret_attributes::attribute_error::AttributeError;
 
 #[derive(Debug, Error)]
 pub enum HttpCodegenError {
@@ -68,5 +69,55 @@ pub enum HttpCodegenError {
         path: String,
         #[source]
         source: InsertError,
+    },
+
+    #[error(
+        "#[route_parameter_binder] '{binder}' has no `type Model = <struct>` associated type that resolves to a known model"
+    )]
+    RouteParameterBinderModel { binder: String },
+
+    #[error("model '{model}' has more than one route parameter binder: '{first}' and '{second}'")]
+    AmbiguousRouteParameterBinder {
+        model: String,
+        first: String,
+        second: String,
+    },
+
+    #[error(
+        "#[crud_gate] '{gate}' has no `type Subject = <struct>` associated type that resolves to a known model"
+    )]
+    CrudGateSubject { gate: String },
+
+    #[error("model '{subject}' has more than one CRUD gate: '{first}' and '{second}'")]
+    AmbiguousCrudGate {
+        subject: String,
+        first: String,
+        second: String,
+    },
+
+    #[error(
+        "route parameter '{parameter}' of responder '{responder}' has type '{written}', which has no #[route_parameter_binder]"
+    )]
+    MissingRouteParameterBinder {
+        responder: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "route parameter '{parameter}' of responder '{responder}' declares an intent but type '{written}' has no #[crud_gate]"
+    )]
+    MissingCrudGate {
+        responder: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "route parameter '{parameter}' of responder '{responder}' is a raw String but declares an intent; intent only applies to model parameters"
+    )]
+    IntentOnRawParameter {
+        responder: String,
+        parameter: String,
     },
 }

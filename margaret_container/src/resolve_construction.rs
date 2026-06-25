@@ -1,28 +1,22 @@
-use margaret_attributes::attribute_holder::AttributeHolder;
-use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::indexed_method::IndexedMethod;
-use margaret_attributes::struct_shape::StructShape;
 use syn::ReturnType;
 use syn::Signature;
 use syn::Type;
+
+use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::indexed_method::IndexedMethod;
+use margaret_attributes::struct_shape::StructShape;
 
 use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
 
 pub(crate) fn resolve_construction<'index>(
-    holders: &'index [AttributeHolder],
+    methods: &'index [IndexedMethod],
     concrete_path: &CanonicalPath,
     shape: StructShape,
 ) -> Result<ConstructionSource<'index>, ContainerError> {
-    let mut found: Vec<&IndexedMethod> = holders
+    let mut found: Vec<&IndexedMethod> = methods
         .iter()
-        .filter_map(|holder| match holder {
-            AttributeHolder::Method(method) => Some(method),
-            AttributeHolder::Item(_) => None,
-        })
-        .filter(|method| {
-            method.self_type_path() == concrete_path && has_constructor_attribute(method)
-        })
+        .filter(|method| has_constructor_attribute(method))
         .collect();
 
     if found.len() > 1 {

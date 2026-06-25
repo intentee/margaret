@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use margaret_container::generate_container_source;
+use margaret_container::generate_container_source::generate_container_source;
 
 #[test]
 fn generates_concrete_and_interface_fields() {
@@ -10,7 +10,5 @@ fn generates_concrete_and_interface_fields() {
     let source: String = generated.source().split_whitespace().collect();
 
     assert!(source.contains("config:std::sync::OnceLock<std::sync::Arc<crate::Config>>"));
-    assert!(
-        source.contains("greeter:std::sync::OnceLock<std::sync::Arc<dyncrate::Greeter+Send+Sync>>")
-    );
+    assert!(source.contains("greeter:std::sync::OnceLock<std::sync::Arc<dyncrate::Greeter>>"));
 }

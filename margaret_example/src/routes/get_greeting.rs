@@ -11,12 +11,12 @@ use crate::greeter::Greeter;
 #[singleton]
 #[responds_to_http(method = Get, path = "/greeting")]
 pub struct GetGreeting {
-    greeter: Arc<dyn Greeter + Send + Sync>,
+    greeter: Arc<dyn Greeter>,
 }
 
 impl GetGreeting {
     #[constructor]
-    pub fn create(greeter: Arc<dyn Greeter + Send + Sync>) -> Self {
+    pub fn create(greeter: Arc<dyn Greeter>) -> Self {
         Self { greeter }
     }
 

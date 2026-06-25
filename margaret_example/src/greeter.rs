@@ -1,28 +1,3 @@
-use std::sync::Arc;
-
-use margaret_macros::constructor;
-use margaret_macros::singleton;
-
-use crate::config::Config;
-
-pub trait Greeter {
+pub trait Greeter: Send + Sync {
     fn greet(&self) -> String;
-}
-
-#[singleton(provides = Greeter)]
-pub struct EnglishGreeter {
-    config: Arc<Config>,
-}
-
-impl EnglishGreeter {
-    #[constructor]
-    pub fn create(config: Arc<Config>) -> Self {
-        Self { config }
-    }
-}
-
-impl Greeter for EnglishGreeter {
-    fn greet(&self) -> String {
-        format!("hello, {}", self.config.app_name())
-    }
 }

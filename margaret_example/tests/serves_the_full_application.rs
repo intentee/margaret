@@ -5,9 +5,10 @@ use http::Method;
 use http_body_util::BodyExt;
 use http_body_util::Empty;
 use hyper_util::rt::TokioIo;
+use tokio::net::TcpStream;
+
 use margaret_example::margaret::container::Container;
 use margaret_example::margaret::http::server;
-use tokio::net::TcpStream;
 
 struct Reply {
     body: String,
@@ -85,6 +86,31 @@ async fn serves_the_full_application() {
 
     assert_eq!(user.status, 200);
     assert_eq!(user.body, "7");
+
+    let profile = request(
+        address,
+        Method::GET,
+        "/profiles/7",
+        &[("x-authorized", "yes")],
+    )
+    .await;
+
+    assert_eq!(profile.status, 200);
+    assert_eq!(profile.body, "Margaret #7");
+
+    let unauthorized_profile = request(address, Method::GET, "/profiles/7", &[]).await;
+
+    assert_eq!(unauthorized_profile.status, 403);
+
+    let unknown_profile = request(
+        address,
+        Method::GET,
+        "/profiles/404",
+        &[("x-authorized", "yes")],
+    )
+    .await;
+
+    assert_eq!(unknown_profile.status, 404);
 
     let health = request(address, Method::GET, "/health", &[]).await;
 

@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use margaret_attributes::attribute_holder::AttributeHolder;
 use margaret_attributes::attribute_index::AttributeIndex;
 
 #[test]
@@ -9,12 +8,9 @@ fn skips_non_path_self_type_impl_methods() {
     let index = AttributeIndex::from_crate_root("valid_crate", &directory)
         .expect("the valid fixture indexes cleanly");
     let has_tuple_method = index
-        .holders()
+        .items()
         .iter()
-        .filter_map(|holder| match holder {
-            AttributeHolder::Method(method) => Some(method),
-            AttributeHolder::Item(_) => None,
-        })
+        .flat_map(|item| item.methods())
         .any(|method| method.identifier() == "skipped_tuple_method");
 
     assert!(!has_tuple_method);

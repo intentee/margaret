@@ -1,5 +1,6 @@
-use margaret_attributes::attribute_error::AttributeError;
 use thiserror::Error;
+
+use margaret_attributes::attribute_error::AttributeError;
 
 #[derive(Debug, Error)]
 pub enum ConsoleCodegenError {
