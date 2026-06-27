@@ -7,4 +7,5 @@ pub(crate) struct ConsoleCommand {
     pub(crate) arguments: Vec<ConsoleArgument>,
     pub(crate) description: Option<String>,
     pub(crate) name: String,
+    pub(crate) takes_token: bool,
 }

@@ -1,12 +1,15 @@
 use std::path::Path;
 
-use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+use margaret_attributes::crate_root::CrateRoot;
 
 #[test]
 fn indexes_associated_types() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/associated_types");
-    let index = AttributeIndex::from_crate_root("associated_types", &directory)
-        .expect("the associated types fixture indexes cleanly");
+    let index = AttributeIndexBuilder::new()
+        .index_crate(&CrateRoot::new("associated_types", &directory))
+        .expect("the associated types fixture indexes cleanly")
+        .build();
 
     let producer = index
         .items()

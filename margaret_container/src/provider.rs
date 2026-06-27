@@ -13,9 +13,10 @@ pub(crate) struct Provider {
 
 impl Provider {
     pub(crate) fn dependencies(&self) -> &[DependencyKind] {
-        match &self.construction {
-            ProviderConstruction::Constructor { dependencies, .. } => dependencies,
-            ProviderConstruction::Fieldless { .. } => &[],
-        }
+        self.construction.dependencies()
+    }
+
+    pub(crate) fn is_async(&self) -> bool {
+        self.construction.is_async()
     }
 }

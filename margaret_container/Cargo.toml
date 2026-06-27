@@ -2,6 +2,7 @@
 name = "margaret_container"
 version = "0.1.0"
 edition = "2024"
+autotests = false
 
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
@@ -13,6 +14,10 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
 
 [lints]
 workspace = true

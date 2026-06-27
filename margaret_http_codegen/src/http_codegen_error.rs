@@ -26,12 +26,6 @@ pub enum HttpCodegenError {
     #[error("middleware '{middleware}' is missing the 'handles' argument")]
     MissingMiddlewareHandles { middleware: String },
 
-    #[error("middleware '{middleware}' is missing the 'priority' argument")]
-    MissingMiddlewarePriority { middleware: String },
-
-    #[error("middleware '{middleware}' has a 'priority' that is not an integer literal")]
-    MalformedMiddlewarePriority { middleware: String },
-
     #[error(
         "marker '{marker}' on responder '{responder}' must carry zero or one positional argument"
     )]

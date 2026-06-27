@@ -4,6 +4,5 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 
 pub(crate) struct MiddlewareBinding {
     pub(crate) field: Ident,
-    pub(crate) priority: i64,
     pub(crate) selector: AttributeSelector,
 }

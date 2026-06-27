@@ -70,12 +70,13 @@ async fn request(
 async fn serves_the_full_application() {
     let container = Container::build();
     let bound = server(&container)
+        .await
         .bind("127.0.0.1:0")
         .await
         .expect("the server binds to an ephemeral port");
     let address = bound.local_addr();
-
-    tokio::spawn(bound.serve());
+    let cancellation_token = tokio_util::sync::CancellationToken::new();
+    let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 
     let greeting = request(address, Method::GET, "/greeting", &[]).await;
 
@@ -117,6 +118,11 @@ async fn serves_the_full_application() {
     assert_eq!(health.status, 200);
     assert_eq!(health.body, "ok");
 
+    let revision = request(address, Method::GET, "/revision", &[]).await;
+
+    assert_eq!(revision.status, 200);
+    assert_eq!(revision.body, "1.0.0");
+
     let report = request(address, Method::GET, "/admin/report", &[]).await;
 
     assert_eq!(report.status, 200);
@@ -145,4 +151,10 @@ async fn serves_the_full_application() {
     let unsupported = request(address, Method::OPTIONS, "/health", &[]).await;
 
     assert_eq!(unsupported.status, 405);
+
+    cancellation_token.cancel();
+
+    serving
+        .await
+        .expect("the serving task joins and the server drains cleanly");
 }

@@ -21,9 +21,12 @@ mod route_parameter_binding;
 mod tests {
     use std::fs;
 
-    use margaret_attributes::attribute_index::AttributeIndex;
     use tempfile::TempDir;
     use tempfile::tempdir;
+
+    use margaret_attributes::attribute_index::AttributeIndex;
+    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+    use margaret_attributes::crate_root::CrateRoot;
 
     use crate::generate_http_source::generate_http_source;
     use crate::has_responders::has_responders;
@@ -47,10 +50,10 @@ impl Open {
     fn respond(&self) -> Response {}
 }
 
-#[http_middleware(handles = guard, priority = 100)]
+#[http_middleware(handles = guard)]
 struct Guard;
 
-#[http_middleware(handles = traced, priority = 10)]
+#[http_middleware(handles = traced)]
 struct Tracer;
 "#;
 
@@ -125,14 +128,20 @@ impl GetProfile {
     fn index_for(lib_source: &str) -> AttributeIndex {
         let directory = crate_with(lib_source);
 
-        AttributeIndex::from_crate_root("crate", &directory.path().join("src"))
+        AttributeIndexBuilder::new()
+            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
             .expect("the crate is indexed")
+            .build()
     }
 
     fn source_for(lib_source: &str) -> String {
+        rendered(lib_source, false)
+    }
+
+    fn rendered(lib_source: &str, container_is_async: bool) -> String {
         let directory = crate_with(lib_source);
 
-        generate_http_source("crate", &directory.path().join("src"))
+        generate_http_source("crate", &directory.path().join("src"), container_is_async)
             .expect("the http source is generated")
             .split_whitespace()
             .collect()
@@ -141,7 +150,7 @@ impl GetProfile {
     fn error_for(lib_source: &str) -> String {
         let directory = crate_with(lib_source);
 
-        generate_http_source("crate", &directory.path().join("src"))
+        generate_http_source("crate", &directory.path().join("src"), false)
             .expect_err("the http source fails to generate")
             .to_string()
     }
@@ -169,7 +178,18 @@ impl GetProfile {
             .find("container.tracer")
             .expect("the tracer is wired");
 
-        assert!(guard < tracer);
+        assert!(tracer < guard);
+    }
+
+    #[test]
+    fn generates_an_async_server_that_awaits_container_accessors() {
+        let source = rendered(
+            "#[responds_to_http(method = Get, path = \"/open\")]\nstruct Open;\n\nimpl Open {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            true,
+        );
+
+        assert!(source.contains("pubasyncfnserver"));
+        assert!(source.contains("container.open().await"));
     }
 
     #[test]
@@ -403,7 +423,7 @@ impl GetProfile {
 
     #[test]
     fn rejects_http_middleware_on_a_non_struct() {
-        let message = error_for("#[http_middleware(handles = x, priority = 1)]\nenum Bad {}\n");
+        let message = error_for("#[http_middleware(handles = x)]\nenum Bad {}\n");
 
         assert!(message.contains("#[http_middleware]"));
     }
@@ -415,39 +435,20 @@ impl GetProfile {
 
     #[test]
     fn rejects_middleware_without_handles() {
-        assert!(
-            error_for("#[http_middleware(priority = 1)]\nstruct Bad;\n")
-                .contains("missing the 'handles'")
-        );
+        assert!(error_for("#[http_middleware]\nstruct Bad;\n").contains("missing the 'handles'"));
     }
 
     #[test]
     fn propagates_a_non_path_handles_argument() {
-        let message = error_for("#[http_middleware(handles = \"x\", priority = 1)]\nstruct Bad;\n");
+        let message = error_for("#[http_middleware(handles = \"x\")]\nstruct Bad;\n");
 
         assert!(message.contains("failed to index"));
     }
 
     #[test]
-    fn rejects_middleware_without_a_priority() {
-        assert!(
-            error_for("#[http_middleware(handles = x)]\nstruct Bad;\n")
-                .contains("missing the 'priority'")
-        );
-    }
-
-    #[test]
-    fn rejects_middleware_with_a_non_integer_priority() {
-        let message =
-            error_for("#[http_middleware(handles = x, priority = \"high\")]\nstruct Bad;\n");
-
-        assert!(message.contains("not an integer"));
-    }
-
-    #[test]
     fn rejects_a_malformed_marker() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(crate::A, crate::B)]\nstruct Bad;\n\n#[http_middleware(handles = guard, priority = 1)]\nstruct Guard;\n",
+            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(crate::A, crate::B)]\nstruct Bad;\n\n#[http_middleware(handles = guard)]\nstruct Guard;\n",
         );
 
         assert!(message.contains("must carry zero or one positional argument"));
@@ -456,7 +457,7 @@ impl GetProfile {
     #[test]
     fn propagates_malformed_marker_arguments() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(= 5)]\nstruct Bad;\n\n#[http_middleware(handles = guard, priority = 1)]\nstruct Guard;\n",
+            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(= 5)]\nstruct Bad;\n\n#[http_middleware(handles = guard)]\nstruct Guard;\n",
         );
 
         assert!(message.contains("failed to index"));

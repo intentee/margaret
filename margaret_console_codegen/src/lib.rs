@@ -12,9 +12,12 @@ pub mod render_console;
 mod tests {
     use std::fs;
 
-    use margaret_attributes::attribute_index::AttributeIndex;
     use tempfile::TempDir;
     use tempfile::tempdir;
+
+    use margaret_attributes::attribute_index::AttributeIndex;
+    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+    use margaret_attributes::crate_root::CrateRoot;
 
     use crate::has_commands::has_commands;
     use crate::render_console::render_console;
@@ -66,19 +69,30 @@ impl Farewell {
     fn index_for(lib_source: &str) -> AttributeIndex {
         let directory = crate_with(lib_source);
 
-        AttributeIndex::from_crate_root("crate", &directory.path().join("src"))
+        AttributeIndexBuilder::new()
+            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
             .expect("the crate is indexed")
+            .build()
     }
 
     fn source_for(lib_source: &str, has_http: bool) -> String {
-        render_console(&index_for(lib_source), has_http)
-            .expect("the console source is generated")
-            .split_whitespace()
-            .collect()
+        rendered(lib_source, has_http, false)
+    }
+
+    fn rendered(lib_source: &str, has_http: bool, container_is_async: bool) -> String {
+        render_console(
+            &index_for(lib_source),
+            has_http,
+            has_http,
+            container_is_async,
+        )
+        .expect("the console source is generated")
+        .split_whitespace()
+        .collect()
     }
 
     fn error_for(lib_source: &str) -> String {
-        render_console(&index_for(lib_source), false)
+        render_console(&index_for(lib_source), false, false, false)
             .expect_err("the console source fails to generate")
             .to_string()
     }
@@ -123,8 +137,43 @@ impl Farewell {
         let source = source_for("struct App;\n", true);
 
         assert!(source.contains(r#"clap::Command::new("serve")"#));
-        assert!(source.contains("margaret_console::serve::serve(super::http::server(container)"));
-        assert!(!source.contains("command::Command"));
+        assert!(source.contains(r#"clap::Arg::new("addr").long("addr").required(true)"#));
+        assert!(source.contains("super::services::serve(container,matches,cancellation_token)"));
+        assert!(source.contains("margaret_service::install::install()"));
+    }
+
+    #[test]
+    fn awaits_container_accessors_for_an_async_container() {
+        let source = rendered(
+            "#[singleton]\n#[console_command(name = \"go\")]\nstruct Go;\n\nimpl Go {\n    #[runner]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            true,
+            true,
+        );
+
+        assert!(source.contains("container.go().await.run().await"));
+        assert!(source.contains("super::services::serve(container,matches,cancellation_token)"));
+    }
+
+    #[test]
+    fn registers_a_serve_command_without_addr_for_a_service_only_app() {
+        let source: String = render_console(&index_for("struct App;\n"), true, false, false)
+            .expect("the console source is generated")
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(r#"clap::Command::new("serve")"#));
+        assert!(!source.contains(r#"clap::Arg::new("addr")"#));
+    }
+
+    #[test]
+    fn injects_the_cancellation_token_into_a_command_runner() {
+        let source = source_for(
+            "#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[runner]\n    fn run(&self, #[console_argument] target: String, token: CancellationToken) -> CommandOutcome {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains("letcancellation_token=margaret_service::install::install();"));
+        assert!(source.contains(".clone(),cancellation_token"));
     }
 
     #[test]

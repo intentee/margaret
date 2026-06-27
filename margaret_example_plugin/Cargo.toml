@@ -1,0 +1,10 @@
+[package]
+name = "margaret_example_plugin"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+margaret_macros = { path = "../margaret_macros" }
+
+[lints]
+workspace = true

@@ -1,0 +1,19 @@
+[package]
+name = "margaret_service_codegen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+heck = { workspace = true }
+margaret_attributes = { path = "../margaret_attributes" }
+proc-macro2 = { workspace = true }
+prettyplease = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

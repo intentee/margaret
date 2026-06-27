@@ -29,7 +29,11 @@ pub(crate) fn build_registry(
         }
 
         let provider = item.canonical_path().clone();
-        let model = associated_model(item, associated_type_name, struct_paths)
+        let referencing_root = provider
+            .segments()
+            .first()
+            .expect("a canonical path has at least one segment");
+        let model = associated_model(item, associated_type_name, struct_paths, referencing_root)
             .ok_or_else(|| missing(provider.to_string()))?;
 
         if let Some(existing) = registry.get(&model) {
@@ -50,11 +54,12 @@ fn associated_model(
     item: &IndexedItem,
     associated_type_name: &str,
     struct_paths: &[CanonicalPath],
+    referencing_root: &str,
 ) -> Option<CanonicalPath> {
     let associated_type = item
         .associated_types()
         .iter()
         .find(|associated_type| associated_type.name() == associated_type_name)?;
 
-    resolve_struct(associated_type.ty(), struct_paths)
+    resolve_struct(associated_type.ty(), struct_paths, referencing_root)
 }

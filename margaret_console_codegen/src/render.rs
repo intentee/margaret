@@ -5,25 +5,37 @@ use syn::Type;
 use crate::console_argument::ConsoleArgument;
 use crate::console_command::ConsoleCommand;
 
-pub(crate) fn render(commands: &[ConsoleCommand], has_http: bool) -> String {
+pub(crate) fn render(
+    commands: &[ConsoleCommand],
+    serves: bool,
+    has_http: bool,
+    container_is_async: bool,
+) -> String {
     let subcommands = commands.iter().map(subcommand_registration);
-    let arms = commands.iter().map(command_arm);
+    let arms = commands
+        .iter()
+        .map(|command| command_arm(command, container_is_async));
 
-    let serve_registration = if has_http {
+    let serve_registration = if serves {
+        let address_argument = if has_http {
+            quote! { .arg(clap::Arg::new("addr").long("addr").required(true)) }
+        } else {
+            quote! {}
+        };
+
         quote! {
-            .subcommand(
-                clap::Command::new("serve")
-                    .arg(clap::Arg::new("addr").long("addr").required(true)),
-            )
+            .subcommand(clap::Command::new("serve")#address_argument)
         }
     } else {
         quote! {}
     };
 
-    let serve_arm = if has_http {
+    let serve_arm = if serves {
         quote! {
             Some(("serve", matches)) => {
-                margaret_console::serve::serve(super::http::server(container), matches).await
+                let cancellation_token = margaret_service::install::install();
+
+                super::services::serve(container, matches, cancellation_token).await
             }
         }
     } else {
@@ -105,7 +117,7 @@ fn argument_registration(argument: &ConsoleArgument) -> TokenStream {
     }
 }
 
-fn command_arm(command: &ConsoleCommand) -> TokenStream {
+fn command_arm(command: &ConsoleCommand, container_is_async: bool) -> TokenStream {
     let name = &command.name;
     let accessor = &command.accessor;
     let matches_binding = if command.arguments.is_empty() {
@@ -114,9 +126,24 @@ fn command_arm(command: &ConsoleCommand) -> TokenStream {
         quote! { matches }
     };
     let values = command.arguments.iter().map(argument_value);
+    let accessor_access = if container_is_async {
+        quote! { container.#accessor().await }
+    } else {
+        quote! { container.#accessor() }
+    };
 
-    quote! {
-        Some((#name, #matches_binding)) => container.#accessor().run(#(#values),*).await,
+    if command.takes_token {
+        quote! {
+            Some((#name, #matches_binding)) => {
+                let cancellation_token = margaret_service::install::install();
+
+                #accessor_access.run(#(#values,)* cancellation_token).await
+            }
+        }
+    } else {
+        quote! {
+            Some((#name, #matches_binding)) => #accessor_access.run(#(#values),*).await,
+        }
     }
 }
 

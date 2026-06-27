@@ -1,13 +1,31 @@
-use margaret_attributes::struct_shape::StructShape;
-
 use crate::dependency_kind::DependencyKind;
+use crate::direct_construction::DirectConstruction;
 
 pub(crate) enum ProviderConstruction {
-    Constructor {
-        method: String,
-        dependencies: Vec<DependencyKind>,
+    Direct(DirectConstruction),
+    Factory {
+        factory_is_async: bool,
+        factory_method: String,
+        provider: DirectConstruction,
     },
-    Fieldless {
-        shape: StructShape,
-    },
+}
+
+impl ProviderConstruction {
+    pub(crate) fn dependencies(&self) -> &[DependencyKind] {
+        match self {
+            ProviderConstruction::Direct(construction) => construction.dependencies(),
+            ProviderConstruction::Factory { provider, .. } => provider.dependencies(),
+        }
+    }
+
+    pub(crate) fn is_async(&self) -> bool {
+        match self {
+            ProviderConstruction::Direct(construction) => construction.is_async(),
+            ProviderConstruction::Factory {
+                factory_is_async,
+                provider,
+                ..
+            } => provider.is_async() || *factory_is_async,
+        }
+    }
 }

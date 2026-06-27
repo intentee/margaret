@@ -5,19 +5,19 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::path_tokens::path_tokens;
 
 use crate::authorization::Authorization;
 use crate::http_route::HttpRoute;
 use crate::route_parameter::RouteParameter;
 use crate::route_parameter_binding::RouteParameterBinding;
 
-pub(crate) fn render(routes: &[HttpRoute]) -> String {
+pub(crate) fn render(routes: &[HttpRoute], container_is_async: bool) -> String {
     let route_calls = routes.iter().map(|route| {
         let method = &route.method;
         let path = &route.path;
 
-        let handler = onion(route);
+        let handler = onion(route, container_is_async);
 
         quote! {
             .route(margaret_http::method::Method::#method, #path, #handler)
@@ -37,13 +37,18 @@ pub(crate) fn render(routes: &[HttpRoute]) -> String {
     } else {
         quote! {}
     };
+    let server_asyncness = if container_is_async {
+        quote! { async }
+    } else {
+        quote! {}
+    };
 
     let tokens = quote! {
         use super::container::Container;
         #binder_import
         #gate_import
 
-        pub fn server(container: &Container) -> margaret_http::server::Server {
+        pub #server_asyncness fn server(container: &Container) -> margaret_http::server::Server {
             let router = margaret_http::router::Router::empty()
                 #(#route_calls)*;
 
@@ -57,9 +62,18 @@ pub(crate) fn render(routes: &[HttpRoute]) -> String {
     prettyplease::unparse(&file)
 }
 
-fn onion(route: &HttpRoute) -> TokenStream {
+fn access(call: TokenStream, is_async: bool) -> TokenStream {
+    if is_async {
+        quote! { #call.await }
+    } else {
+        call
+    }
+}
+
+fn onion(route: &HttpRoute, container_is_async: bool) -> TokenStream {
     let responder = &route.responder_field;
-    let responder_type = crate_path_tokens(&route.responder_path);
+    let responder_type = path_tokens(&route.responder_path);
+    let responder_access = access(quote! { container.#responder() }, container_is_async);
     let request_binding = if route.route_parameters.is_empty() {
         format_ident!("_request")
     } else {
@@ -83,7 +97,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let mut handler = if captures.is_empty() {
         quote! {
             margaret_http::responder_handler::responder_handler(
-                container.#responder(),
+                #responder_access,
                 |responder: std::sync::Arc<#responder_type>,
                  #request_binding: margaret_http::request::Request| async move {
                     #body
@@ -91,9 +105,11 @@ fn onion(route: &HttpRoute) -> TokenStream {
             )
         }
     } else {
-        let capture_bindings = captures
-            .iter()
-            .map(|field| quote! { let #field = container.#field(); });
+        let capture_bindings = captures.iter().map(|field| {
+            let field_access = access(quote! { container.#field() }, container_is_async);
+
+            quote! { let #field = #field_access; }
+        });
         let capture_clones = captures
             .iter()
             .map(|field| quote! { let #field = #field.clone(); });
@@ -102,7 +118,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
             {
                 #(#capture_bindings)*
                 margaret_http::responder_handler::responder_handler(
-                    container.#responder(),
+                    #responder_access,
                     move |responder: std::sync::Arc<#responder_type>,
                           #request_binding: margaret_http::request::Request| {
                         #(#capture_clones)*
@@ -118,9 +134,10 @@ fn onion(route: &HttpRoute) -> TokenStream {
     for application in &route.layers {
         let middleware = &application.middleware_field;
         let marker = &application.marker_value;
+        let middleware_access = access(quote! { container.#middleware() }, container_is_async);
 
         handler = quote! {
-            margaret_http::layer::layer(container.#middleware(), #marker, #handler)
+            margaret_http::layer::layer(#middleware_access, #marker, #handler)
         };
     }
 
@@ -210,14 +227,4 @@ fn route_is_authorized(route: &HttpRoute) -> bool {
             }
         )
     })
-}
-
-fn crate_path_tokens(path: &CanonicalPath) -> TokenStream {
-    let mut segments = path.segments().iter();
-    segments
-        .next()
-        .expect("a canonical path has at least one segment");
-    let rest = segments.map(|segment| format_ident!("{}", segment));
-
-    quote! { crate #(:: #rest)* }
 }

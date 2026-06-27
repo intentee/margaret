@@ -5,7 +5,7 @@ use margaret_container::generate_container_source::generate_container_source;
 #[test]
 fn generates_concrete_and_interface_fields() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/full");
-    let generated = generate_container_source("full", &directory)
+    let generated = generate_container_source("crate", &directory)
         .expect("the full fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 

@@ -27,6 +27,11 @@ pub(crate) fn responder_method(
         })?;
     let route_parameter_selector =
         AttributeSelector::parse("route_parameter").expect("a valid selector");
+    let referencing_root = item
+        .canonical_path()
+        .segments()
+        .first()
+        .expect("a canonical path has at least one segment");
     let mut parameters = Vec::new();
 
     for (position, input) in method.signature().inputs.iter().enumerate() {
@@ -53,7 +58,14 @@ pub(crate) fn responder_method(
         };
 
         let name = pattern_ident.ident.to_string();
-        let binding = classify(responder, &name, &pattern_type.ty, attribute, registries)?;
+        let binding = classify(
+            responder,
+            &name,
+            &pattern_type.ty,
+            attribute,
+            registries,
+            referencing_root,
+        )?;
 
         parameters.push(RouteParameter { name, binding });
     }
@@ -67,6 +79,7 @@ fn classify(
     declared: &Type,
     attribute: &Attribute,
     registries: &Registries,
+    referencing_root: &str,
 ) -> Result<RouteParameterBinding, HttpCodegenError> {
     let intent = AttributeArgs::from_attribute(attribute)?.path("intent")?;
 
@@ -82,13 +95,14 @@ fn classify(
     }
 
     let written = declared.to_token_stream().to_string();
-    let model = resolve_struct(declared, registries.struct_paths).ok_or_else(|| {
-        HttpCodegenError::MissingRouteParameterBinder {
-            responder: responder.to_string(),
-            parameter: parameter.to_string(),
-            written: written.clone(),
-        }
-    })?;
+    let model =
+        resolve_struct(declared, registries.struct_paths, referencing_root).ok_or_else(|| {
+            HttpCodegenError::MissingRouteParameterBinder {
+                responder: responder.to_string(),
+                parameter: parameter.to_string(),
+                written: written.clone(),
+            }
+        })?;
     let binder = registries.binders.get(&model).cloned().ok_or_else(|| {
         HttpCodegenError::MissingRouteParameterBinder {
             responder: responder.to_string(),

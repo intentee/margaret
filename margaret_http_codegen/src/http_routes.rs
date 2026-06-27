@@ -77,17 +77,19 @@ pub(crate) fn http_routes(
 
         let mut layers = Vec::new();
 
-        for binding in bindings {
-            for marker in AttributeQuery::new(item).find_all(&binding.selector) {
+        for matched in AttributeQuery::new(item).matched_attributes() {
+            if let Some(binding) = bindings
+                .iter()
+                .find(|binding| matched.matches(&binding.selector))
+            {
                 layers.push(LayerApplication {
-                    marker_value: marker_value(&marker, &responder)?,
+                    marker_value: marker_value(&matched, &responder)?,
                     middleware_field: binding.field.clone(),
-                    priority: binding.priority,
                 });
             }
         }
 
-        layers.sort_by_key(|application| application.priority);
+        layers.reverse();
 
         let route_parameters = responder_method(item, &responder, &registries)?;
         let path_parameters =

@@ -8,9 +8,10 @@ use hyper::body::Incoming;
 use hyper_util::rt::TokioExecutor;
 use hyper_util::rt::TokioIo;
 use hyper_util::server::conn::auto::Builder;
+use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::service::TowerToHyperService;
 use tokio::net::TcpListener;
-use tokio::net::TcpStream;
+use tokio_util::sync::CancellationToken;
 
 use crate::handler::Handler;
 use crate::method::Method;
@@ -33,34 +34,35 @@ impl BoundServer {
             .expect("a bound listener has a local address")
     }
 
-    pub async fn serve(self) -> ! {
-        loop {
-            let (stream, _remote) = self
-                .listener
-                .accept()
-                .await
-                .expect("the listener accepts connections");
+    pub async fn serve(self, cancellation_token: CancellationToken) {
+        let builder = Arc::new(Builder::new(TokioExecutor::new()));
+        let graceful = GracefulShutdown::new();
 
-            tokio::spawn(serve_connection(stream, self.app.clone()));
+        while let Some(accepted) = cancellation_token
+            .run_until_cancelled(self.listener.accept())
+            .await
+        {
+            let (stream, _remote) = accepted.expect("the listener accepts connections");
+            let app = self.app.clone();
+            let builder = builder.clone();
+            let watcher = graceful.watcher();
+
+            tokio::spawn(async move {
+                let service = TowerToHyperService::new(tower::service_fn(
+                    move |request: http::Request<Incoming>| {
+                        let app = app.clone();
+
+                        async move { Ok::<_, Infallible>(dispatch(app, request).await) }
+                    },
+                ));
+                let connection = builder.serve_connection(TokioIo::new(stream), service);
+
+                let _ = watcher.watch(connection).await;
+            });
         }
+
+        graceful.shutdown().await;
     }
-}
-
-async fn serve_connection(
-    stream: TcpStream,
-    app: Arc<dyn Handler>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let service = TowerToHyperService::new(tower::service_fn(
-        move |request: http::Request<Incoming>| {
-            let app = app.clone();
-
-            async move { Ok::<_, Infallible>(dispatch(app, request).await) }
-        },
-    ));
-
-    Builder::new(TokioExecutor::new())
-        .serve_connection(TokioIo::new(stream), service)
-        .await
 }
 
 async fn dispatch(

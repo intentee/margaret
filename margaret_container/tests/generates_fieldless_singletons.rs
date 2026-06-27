@@ -5,7 +5,7 @@ use margaret_container::generate_container_source::generate_container_source;
 #[test]
 fn generates_fieldless_singletons() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fieldless");
-    let generated = generate_container_source("fieldless", &directory)
+    let generated = generate_container_source("crate", &directory)
         .expect("fieldless singletons generate without a #[constructor]");
     let source: String = generated.source().split_whitespace().collect();
 

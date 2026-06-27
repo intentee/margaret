@@ -6,7 +6,9 @@ COVERAGE_PACKAGES := \
 	-p margaret_container \
 	-p margaret_example \
 	-p margaret_http \
-	-p margaret_http_codegen
+	-p margaret_http_codegen \
+	-p margaret_service_codegen \
+	-p margaret_service_tests
 
 node_modules: package.json
 	npm install
@@ -33,7 +35,9 @@ coverage: node_modules
 		--gated margaret_example=100 \
 		--gated margaret_example_macros=100 \
 		--gated margaret_http=100 \
-		--gated margaret_http_codegen=100
+		--gated margaret_http_codegen=100 \
+		--gated margaret_service=100 \
+		--gated margaret_service_codegen=100
 
 .PHONY: fmt
 fmt:

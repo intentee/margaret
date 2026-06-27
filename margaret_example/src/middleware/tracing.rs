@@ -13,7 +13,7 @@ use margaret_macros::singleton;
 use crate::plugin::Plugin;
 
 #[singleton]
-#[http_middleware(handles = traced, priority = 10)]
+#[http_middleware(handles = traced)]
 pub struct Tracing {
     plugins: Vec<Arc<dyn Plugin>>,
 }

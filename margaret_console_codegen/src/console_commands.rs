@@ -39,13 +39,18 @@ pub(crate) fn console_commands(
             })?;
         let description = attributes.string("description")?;
         let accessor = format_ident!("{}", item.canonical_path().field_name());
-        let arguments = command_arguments(item, &argument_selector, &command)?;
+        let runner =
+            command_runner(item).ok_or_else(|| ConsoleCodegenError::MissingCommandRunner {
+                command: command.clone(),
+            })?;
+        let arguments = command_arguments(runner, &argument_selector, &command)?;
 
         commands.push(ConsoleCommand {
             accessor,
             arguments,
             description,
             name,
+            takes_token: runner_takes_token(runner),
         });
     }
 
@@ -53,13 +58,10 @@ pub(crate) fn console_commands(
 }
 
 fn command_arguments(
-    item: &IndexedItem,
+    runner: &IndexedMethod,
     argument_selector: &AttributeSelector,
     command: &str,
 ) -> Result<Vec<ConsoleArgument>, ConsoleCodegenError> {
-    let runner = command_runner(item).ok_or_else(|| ConsoleCodegenError::MissingCommandRunner {
-        command: command.to_string(),
-    })?;
     let mut arguments = Vec::new();
     let mut positional_index = 0;
 
@@ -67,6 +69,11 @@ fn command_arguments(
         let FnArg::Typed(pattern_type) = input else {
             continue;
         };
+
+        if is_cancellation_token(&pattern_type.ty) {
+            continue;
+        }
+
         let Some(attribute) = pattern_type
             .attrs
             .iter()
@@ -131,6 +138,24 @@ fn positional_value(positional_index: usize, declared: &Type) -> ConsoleArgument
 
 fn is_bool(declared: &Type) -> bool {
     matches!(declared, Type::Path(type_path) if type_path.path.is_ident("bool"))
+}
+
+fn is_cancellation_token(declared: &Type) -> bool {
+    matches!(
+        declared,
+        Type::Path(type_path)
+            if type_path
+                .path
+                .segments
+                .last()
+                .is_some_and(|segment| segment.ident == "CancellationToken")
+    )
+}
+
+fn runner_takes_token(runner: &IndexedMethod) -> bool {
+    runner.signature().inputs.iter().any(|input| {
+        matches!(input, FnArg::Typed(pattern_type) if is_cancellation_token(&pattern_type.ty))
+    })
 }
 
 fn command_runner(item: &IndexedItem) -> Option<&IndexedMethod> {

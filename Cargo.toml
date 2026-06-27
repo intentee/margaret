@@ -8,12 +8,17 @@ members = [
     "margaret_container",
     "margaret_example",
     "margaret_example_macros",
+    "margaret_example_plugin",
     "margaret_http",
     "margaret_http_codegen",
     "margaret_macros",
+    "margaret_service",
+    "margaret_service_codegen",
+    "margaret_service_tests",
 ]
 
 [workspace.dependencies]
+anyhow = "=1.0.102"
 async-trait = "=0.1.89"
 bytes = "=1.12.0"
 clap = { version = "=4.5.47", default-features = false, features = ["std", "help", "usage", "error-context"] }
@@ -30,7 +35,9 @@ syn = { version = "=2.0.118", features = ["full", "extra-traits"] }
 tempfile = "=3.20.0"
 thiserror = "=2.0.18"
 tokio = "=1.52.3"
+tokio-util = "=0.7.18"
 tower = "=0.5.3"
+trzcina = "=0.3.0"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }

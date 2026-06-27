@@ -4,21 +4,30 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::path_tokens::path_tokens;
 use margaret_attributes::struct_shape::StructShape;
 
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
+use crate::direct_construction::DirectConstruction;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provider_construction::ProviderConstruction;
 
 pub(crate) fn render(plan: &ContainerPlan) -> String {
-    let fields = plan.providers.iter().map(field_declaration);
-    let initializers = plan.providers.iter().map(field_initializer);
+    let is_async = plan.providers.iter().any(Provider::is_async);
+    let fields = plan
+        .providers
+        .iter()
+        .map(|provider| field_declaration(provider, is_async));
+    let initializers = plan
+        .providers
+        .iter()
+        .map(|provider| field_initializer(provider, is_async));
     let accessors = plan
         .providers
         .iter()
-        .map(|provider| accessor(provider, plan));
+        .map(|provider| accessor(provider, plan, is_async));
 
     let tokens = quote! {
         pub struct Container {
@@ -41,71 +50,133 @@ pub(crate) fn render(plan: &ContainerPlan) -> String {
     prettyplease::unparse(&file)
 }
 
-fn field_declaration(provider: &Provider) -> TokenStream {
-    let name = field_ident(provider);
-    let field_type = field_type(provider);
-
-    quote! { #name: std::sync::OnceLock<#field_type> }
+fn cell_type(is_async: bool) -> TokenStream {
+    if is_async {
+        quote! { tokio::sync::OnceCell }
+    } else {
+        quote! { std::sync::OnceLock }
+    }
 }
 
-fn field_initializer(provider: &Provider) -> TokenStream {
+fn field_declaration(provider: &Provider, is_async: bool) -> TokenStream {
     let name = field_ident(provider);
+    let field_type = field_type(provider);
+    let cell = cell_type(is_async);
 
-    quote! { #name: std::sync::OnceLock::new() }
+    quote! { #name: #cell<#field_type> }
+}
+
+fn field_initializer(provider: &Provider, is_async: bool) -> TokenStream {
+    let name = field_ident(provider);
+    let cell = cell_type(is_async);
+
+    quote! { #name: #cell::new() }
 }
 
 fn field_type(provider: &Provider) -> TokenStream {
     match &provider.provided {
         ProvidedType::Concrete(path) => {
-            let concrete = crate_path_tokens(path);
+            let concrete = path_tokens(path);
 
             quote! { std::sync::Arc<#concrete> }
         }
         ProvidedType::Interface(path) => {
-            let interface = crate_path_tokens(path);
+            let interface = path_tokens(path);
 
             quote! { std::sync::Arc<dyn #interface> }
         }
     }
 }
 
-fn accessor(provider: &Provider, plan: &ContainerPlan) -> TokenStream {
+fn accessor(provider: &Provider, plan: &ContainerPlan, is_async: bool) -> TokenStream {
     let name = field_ident(provider);
     let field_type = field_type(provider);
-    let construction = construction(provider, plan);
+    let construction = construction(provider, plan, is_async);
 
-    let init = match &provider.provided {
-        ProvidedType::Concrete(_) => quote! { || #construction },
-        ProvidedType::Interface(_) => quote! { || -> #field_type { #construction } },
-    };
+    if is_async {
+        quote! {
+            pub async fn #name(&self) -> #field_type {
+                self.#name
+                    .get_or_init(|| async move {
+                        let provided: #field_type = #construction;
 
-    quote! {
-        pub fn #name(&self) -> #field_type {
-            self.#name.get_or_init(#init).clone()
+                        provided
+                    })
+                    .await
+                    .clone()
+            }
+        }
+    } else {
+        let init = match &provider.provided {
+            ProvidedType::Concrete(_) => quote! { || #construction },
+            ProvidedType::Interface(_) => quote! { || -> #field_type { #construction } },
+        };
+
+        quote! {
+            pub fn #name(&self) -> #field_type {
+                self.#name.get_or_init(#init).clone()
+            }
         }
     }
 }
 
-fn construction(provider: &Provider, plan: &ContainerPlan) -> TokenStream {
-    let concrete = crate_path_tokens(&provider.concrete_path);
-
+fn construction(provider: &Provider, plan: &ContainerPlan, is_async: bool) -> TokenStream {
     match &provider.construction {
-        ProviderConstruction::Constructor {
-            method,
+        ProviderConstruction::Direct(direct) => {
+            let value = direct_value(direct, &provider.concrete_path, plan, is_async);
+
+            quote! { std::sync::Arc::new(#value) }
+        }
+        ProviderConstruction::Factory {
+            factory_is_async,
+            factory_method,
+            provider: own,
+        } => {
+            let value = direct_value(own, &provider.concrete_path, plan, is_async);
+            let factory = format_ident!("{}", factory_method);
+            let call = if *factory_is_async {
+                quote! { provider.#factory().await }
+            } else {
+                quote! { provider.#factory() }
+            };
+
+            quote! {
+                {
+                    let provider = #value;
+
+                    #call
+                }
+            }
+        }
+    }
+}
+
+fn direct_value(
+    direct: &DirectConstruction,
+    concrete_path: &CanonicalPath,
+    plan: &ContainerPlan,
+    is_async: bool,
+) -> TokenStream {
+    let concrete = path_tokens(concrete_path);
+
+    match direct {
+        DirectConstruction::Constructor {
             dependencies,
+            is_async: constructor_is_async,
+            method,
         } => {
             let constructor = format_ident!("{}", method);
             let arguments = dependencies
                 .iter()
-                .map(|dependency| dependency_expression(dependency, plan));
+                .map(|dependency| dependency_expression(dependency, plan, is_async));
 
-            quote! { std::sync::Arc::new(#concrete::#constructor(#(#arguments),*)) }
+            if *constructor_is_async {
+                quote! { #concrete::#constructor(#(#arguments),*).await }
+            } else {
+                quote! { #concrete::#constructor(#(#arguments),*) }
+            }
         }
-        ProviderConstruction::Fieldless { shape } => {
-            let literal = fieldless_literal(&concrete, *shape);
-
-            quote! { std::sync::Arc::new(#literal) }
-        }
+        DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
     }
 }
 
@@ -117,12 +188,16 @@ fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream 
     }
 }
 
-fn dependency_expression(dependency: &DependencyKind, plan: &ContainerPlan) -> TokenStream {
+fn dependency_expression(
+    dependency: &DependencyKind,
+    plan: &ContainerPlan,
+    is_async: bool,
+) -> TokenStream {
     match dependency {
         DependencyKind::Single { provider_key } => {
             let accessor = field_ident(provider_by_key(plan, provider_key));
 
-            quote! { self.#accessor() }
+            access(&accessor, is_async)
         }
         DependencyKind::Collection { trait_path } => {
             let elements = plan
@@ -132,11 +207,19 @@ fn dependency_expression(dependency: &DependencyKind, plan: &ContainerPlan) -> T
                 .map(|member| {
                     let accessor = field_ident(provider_by_key(plan, member));
 
-                    quote! { self.#accessor() }
+                    access(&accessor, is_async)
                 });
 
             quote! { vec![#(#elements),*] }
         }
+    }
+}
+
+fn access(accessor: &Ident, is_async: bool) -> TokenStream {
+    if is_async {
+        quote! { self.#accessor().await }
+    } else {
+        quote! { self.#accessor() }
     }
 }
 
@@ -149,14 +232,4 @@ fn provider_by_key<'plan>(plan: &'plan ContainerPlan, key: &CanonicalPath) -> &'
 
 fn field_ident(provider: &Provider) -> Ident {
     format_ident!("{}", provider.field_name)
-}
-
-fn crate_path_tokens(path: &CanonicalPath) -> TokenStream {
-    let mut segments = path.segments().iter();
-    segments
-        .next()
-        .expect("a canonical path has at least one segment");
-    let rest = segments.map(|segment| format_ident!("{}", segment));
-
-    quote! { crate #(:: #rest)* }
 }

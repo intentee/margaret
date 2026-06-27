@@ -1,7 +1,4 @@
 use quote::format_ident;
-use syn::Expr;
-use syn::ExprLit;
-use syn::Lit;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
@@ -32,20 +29,9 @@ pub(crate) fn middleware_bindings(
                 .ok_or(HttpCodegenError::MissingMiddlewareHandles {
                     middleware: middleware.clone(),
                 })?;
-        let priority = match arguments.named("priority") {
-            Some(Expr::Lit(ExprLit {
-                lit: Lit::Int(value),
-                ..
-            })) => value
-                .base10_parse::<i64>()
-                .expect("a priority that fits in i64"),
-            Some(_) => return Err(HttpCodegenError::MalformedMiddlewarePriority { middleware }),
-            None => return Err(HttpCodegenError::MissingMiddlewarePriority { middleware }),
-        };
 
         bindings.push(MiddlewareBinding {
             field: format_ident!("{}", item.canonical_path().field_name()),
-            priority,
             selector: AttributeSelector::from_path(handles),
         });
     }

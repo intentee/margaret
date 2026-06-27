@@ -14,7 +14,7 @@ use crate::action::Action;
 use crate::config::Config;
 
 #[singleton]
-#[http_middleware(handles = can, priority = 100)]
+#[http_middleware(handles = can)]
 pub struct Can {
     config: Arc<Config>,
 }
