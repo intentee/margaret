@@ -76,23 +76,18 @@ impl Farewell {
     }
 
     fn source_for(lib_source: &str, has_http: bool) -> String {
-        rendered(lib_source, has_http, false)
+        rendered(lib_source, has_http)
     }
 
-    fn rendered(lib_source: &str, has_http: bool, container_is_async: bool) -> String {
-        render_console(
-            &index_for(lib_source),
-            has_http,
-            has_http,
-            container_is_async,
-        )
-        .expect("the console source is generated")
-        .split_whitespace()
-        .collect()
+    fn rendered(lib_source: &str, has_http: bool) -> String {
+        render_console(&index_for(lib_source), has_http, has_http)
+            .expect("the console source is generated")
+            .split_whitespace()
+            .collect()
     }
 
     fn error_for(lib_source: &str) -> String {
-        render_console(&index_for(lib_source), false, false, false)
+        render_console(&index_for(lib_source), false, false)
             .expect_err("the console source fails to generate")
             .to_string()
     }
@@ -121,7 +116,7 @@ impl Farewell {
         assert!(source.contains(r#"clap::Arg::new("1").required(false)"#));
         assert!(source.contains("clap::value_parser!(String)"));
 
-        assert!(source.contains("container.demo().run("));
+        assert!(source.contains("container.demo().await.run("));
         assert!(source.contains(r#"matches.get_one::<String>("required-named")"#));
         assert!(source.contains(r#"matches.get_one::<String>("optional-named").cloned()"#));
         assert!(source.contains(r#"matches.get_flag("loud")"#));
@@ -129,7 +124,7 @@ impl Farewell {
         assert!(source.contains(r#"matches.get_one::<String>("1").cloned()"#));
 
         assert!(source.contains(r#"("farewell",_matches)"#));
-        assert!(source.contains("container.farewell().run().await"));
+        assert!(source.contains("container.farewell().await.run().await"));
     }
 
     #[test]
@@ -143,20 +138,8 @@ impl Farewell {
     }
 
     #[test]
-    fn awaits_container_accessors_for_an_async_container() {
-        let source = rendered(
-            "#[singleton]\n#[console_command(name = \"go\")]\nstruct Go;\n\nimpl Go {\n    #[runner]\n    fn run(&self) -> CommandOutcome {}\n}\n",
-            true,
-            true,
-        );
-
-        assert!(source.contains("container.go().await.run().await"));
-        assert!(source.contains("super::services::serve(container,matches,cancellation_token)"));
-    }
-
-    #[test]
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
-        let source: String = render_console(&index_for("struct App;\n"), true, false, false)
+        let source: String = render_console(&index_for("struct App;\n"), true, false)
             .expect("the console source is generated")
             .split_whitespace()
             .collect();
@@ -183,7 +166,7 @@ impl Farewell {
             false,
         );
 
-        assert!(source.contains("container.flagged().run("));
+        assert!(source.contains("container.flagged().await.run("));
         assert!(source.contains(r#"matches.get_flag("loud")"#));
     }
 
@@ -230,7 +213,7 @@ impl Farewell {
         );
 
         assert!(source.contains(r#"("bare",_matches)"#));
-        assert!(source.contains("container.bare().run().await"));
+        assert!(source.contains("container.bare().await.run().await"));
     }
 
     #[test]

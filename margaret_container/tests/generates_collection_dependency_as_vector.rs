@@ -9,5 +9,5 @@ fn generates_collection_dependency_as_vector() {
         .expect("the full fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("vec![self.logging_plugin(),self.metrics_plugin()]"));
+    assert!(source.contains("vec![self.logging_plugin().await,self.metrics_plugin().await]"));
 }

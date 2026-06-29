@@ -37,6 +37,65 @@ struct PendingMember {
     self_type_path: CanonicalPath,
 }
 
+fn self_type_identifier(self_type: &Type) -> Option<&Ident> {
+    match self_type {
+        Type::Path(type_path) => type_path.path.segments.last().map(|segment| &segment.ident),
+        _ => None,
+    }
+}
+
+fn has_path_attribute(attributes: &[Attribute]) -> bool {
+    attributes
+        .iter()
+        .any(|attribute| attribute.path().is_ident("path"))
+}
+
+fn member_path(module_path: &[String], identifier: &Ident) -> String {
+    let mut segments = module_path.to_vec();
+    segments.push(identifier.to_string());
+
+    segments.join("::")
+}
+
+fn check_use(item_use: &ItemUse, file_path: &Path) -> Result<(), AttributeError> {
+    if use_tree_has_glob(&item_use.tree) {
+        return Err(AttributeError::GlobImport {
+            file: file_path.display().to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+fn use_tree_has_glob(tree: &UseTree) -> bool {
+    match tree {
+        UseTree::Glob(_) => true,
+        UseTree::Path(use_path) => use_tree_has_glob(&use_path.tree),
+        UseTree::Group(use_group) => use_group.items.iter().any(use_tree_has_glob),
+        UseTree::Name(_) | UseTree::Rename(_) => false,
+    }
+}
+
+fn resolve_module_file(directory: &Path, identifier: &Ident) -> Result<PathBuf, AttributeError> {
+    let file_module = directory.join(format!("{identifier}.rs"));
+    let directory_module = directory.join(identifier.to_string()).join("mod.rs");
+
+    match (file_module.is_file(), directory_module.is_file()) {
+        (true, true) => Err(AttributeError::ModuleFileCollision {
+            module: identifier.to_string(),
+            file_module: file_module.display().to_string(),
+            directory_module: directory_module.display().to_string(),
+        }),
+        (true, false) => Ok(file_module),
+        (false, true) => Ok(directory_module),
+        (false, false) => Err(AttributeError::ModuleFileNotFound {
+            module: identifier.to_string(),
+            file_module: file_module.display().to_string(),
+            directory_module: directory_module.display().to_string(),
+        }),
+    }
+}
+
 pub(crate) struct ModuleWalker {
     items: Vec<IndexedItem>,
     pending_members: Vec<PendingMember>,
@@ -300,64 +359,5 @@ impl ModuleWalker {
                 self.walk_file(&resolved_file, &child_module_path, &child_directory)
             }
         }
-    }
-}
-
-fn self_type_identifier(self_type: &Type) -> Option<&Ident> {
-    match self_type {
-        Type::Path(type_path) => type_path.path.segments.last().map(|segment| &segment.ident),
-        _ => None,
-    }
-}
-
-fn has_path_attribute(attributes: &[Attribute]) -> bool {
-    attributes
-        .iter()
-        .any(|attribute| attribute.path().is_ident("path"))
-}
-
-fn member_path(module_path: &[String], identifier: &Ident) -> String {
-    let mut segments = module_path.to_vec();
-    segments.push(identifier.to_string());
-
-    segments.join("::")
-}
-
-fn check_use(item_use: &ItemUse, file_path: &Path) -> Result<(), AttributeError> {
-    if use_tree_has_glob(&item_use.tree) {
-        return Err(AttributeError::GlobImport {
-            file: file_path.display().to_string(),
-        });
-    }
-
-    Ok(())
-}
-
-fn use_tree_has_glob(tree: &UseTree) -> bool {
-    match tree {
-        UseTree::Glob(_) => true,
-        UseTree::Path(use_path) => use_tree_has_glob(&use_path.tree),
-        UseTree::Group(use_group) => use_group.items.iter().any(use_tree_has_glob),
-        UseTree::Name(_) | UseTree::Rename(_) => false,
-    }
-}
-
-fn resolve_module_file(directory: &Path, identifier: &Ident) -> Result<PathBuf, AttributeError> {
-    let file_module = directory.join(format!("{identifier}.rs"));
-    let directory_module = directory.join(identifier.to_string()).join("mod.rs");
-
-    match (file_module.is_file(), directory_module.is_file()) {
-        (true, true) => Err(AttributeError::ModuleFileCollision {
-            module: identifier.to_string(),
-            file_module: file_module.display().to_string(),
-            directory_module: directory_module.display().to_string(),
-        }),
-        (true, false) => Ok(file_module),
-        (false, true) => Ok(directory_module),
-        (false, false) => Err(AttributeError::ModuleFileNotFound {
-            module: identifier.to_string(),
-            file_module: file_module.display().to_string(),
-            directory_module: directory_module.display().to_string(),
-        }),
     }
 }

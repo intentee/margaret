@@ -8,6 +8,16 @@ use margaret_container::generated_source::GeneratedSource;
 
 use crate::generated_module::GeneratedModule;
 
+fn remove_stale_sources(directory: &Path, written: &BTreeSet<PathBuf>) {
+    for entry in fs::read_dir(directory).expect("the generated directory is read") {
+        let path = entry.expect("the generated directory entry is read").path();
+
+        if path.extension() == Some(OsStr::new("rs")) && !written.contains(&path) {
+            fs::remove_file(&path).expect("the stale generated source is removed");
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct GeneratedCode {
     modules: Vec<GeneratedModule>,
@@ -37,15 +47,5 @@ impl GeneratedCode {
         }
 
         remove_stale_sources(directory, &written);
-    }
-}
-
-fn remove_stale_sources(directory: &Path, written: &BTreeSet<PathBuf>) {
-    for entry in fs::read_dir(directory).expect("the generated directory is read") {
-        let path = entry.expect("the generated directory entry is read").path();
-
-        if path.extension() == Some(OsStr::new("rs")) && !written.contains(&path) {
-            fs::remove_file(&path).expect("the stale generated source is removed");
-        }
     }
 }

@@ -5,64 +5,6 @@ use crate::codegen_error::CodegenError;
 use crate::generated_code::GeneratedCode;
 use crate::generated_module::GeneratedModule;
 
-pub fn build(crates: &[CrateRoot]) -> Result<GeneratedCode, CodegenError> {
-    let mut builder = AttributeIndexBuilder::new();
-
-    for crate_root in crates {
-        builder = builder.index_crate(crate_root)?;
-    }
-
-    let index = builder.build();
-    let container_is_async = margaret_container::container_is_async::container_is_async(&index)?;
-
-    let has_http = margaret_http_codegen::has_responders::has_responders(&index);
-    let has_services = margaret_service_codegen::has_services::has_services(&index);
-    let serves = has_http || has_services;
-    let has_console = margaret_console_codegen::has_commands::has_commands(&index) || serves;
-
-    let mut modules = vec![GeneratedModule::new(
-        "container",
-        margaret_container::render_container::render_container(&index)?.source(),
-    )];
-
-    if has_http {
-        modules.push(GeneratedModule::new(
-            "http",
-            margaret_http_codegen::render_http::render_http(&index, container_is_async)?,
-        ));
-    }
-
-    if serves {
-        modules.push(GeneratedModule::new(
-            "services",
-            margaret_service_codegen::render_services::render_services(
-                &index,
-                has_http,
-                container_is_async,
-            )?,
-        ));
-    }
-
-    if has_console {
-        modules.push(GeneratedModule::new(
-            "console",
-            margaret_console_codegen::render_console::render_console(
-                &index,
-                serves,
-                has_http,
-                container_is_async,
-            )?,
-        ));
-    }
-
-    modules.push(GeneratedModule::new(
-        "mod",
-        render_umbrella(has_http, has_console, serves),
-    ));
-
-    Ok(GeneratedCode::new(modules))
-}
-
 fn render_umbrella(has_http: bool, has_console: bool, serves: bool) -> String {
     let mut umbrella = String::from("#[rustfmt::skip]\npub mod container;\n");
 
@@ -79,6 +21,54 @@ fn render_umbrella(has_http: bool, has_console: bool, serves: bool) -> String {
     }
 
     umbrella
+}
+
+pub fn build(crates: &[CrateRoot]) -> Result<GeneratedCode, CodegenError> {
+    let mut builder = AttributeIndexBuilder::new();
+
+    for crate_root in crates {
+        builder = builder.index_crate(crate_root)?;
+    }
+
+    let index = builder.build();
+
+    let has_http = margaret_http_codegen::has_responders::has_responders(&index);
+    let has_services = margaret_service_codegen::has_services::has_services(&index);
+    let serves = has_http || has_services;
+    let has_console = margaret_console_codegen::has_commands::has_commands(&index) || serves;
+
+    let mut modules = vec![GeneratedModule::new(
+        "container",
+        margaret_container::render_container::render_container(&index)?.source(),
+    )];
+
+    if has_http {
+        modules.push(GeneratedModule::new(
+            "http",
+            margaret_http_codegen::render_http::render_http(&index)?,
+        ));
+    }
+
+    if serves {
+        modules.push(GeneratedModule::new(
+            "services",
+            margaret_service_codegen::render_services::render_services(&index, has_http)?,
+        ));
+    }
+
+    if has_console {
+        modules.push(GeneratedModule::new(
+            "console",
+            margaret_console_codegen::render_console::render_console(&index, serves, has_http)?,
+        ));
+    }
+
+    modules.push(GeneratedModule::new(
+        "mod",
+        render_umbrella(has_http, has_console, serves),
+    ));
+
+    Ok(GeneratedCode::new(modules))
 }
 
 #[cfg(test)]
@@ -185,7 +175,7 @@ impl Greet {
         assert!(module(&code, "mod").contains("pub mod http;"));
         assert!(module(&code, "mod").contains("pub mod console;"));
         assert!(module(&code, "http").contains("use super::container::Container"));
-        assert!(module(&code, "http").contains("fn server"));
+        assert!(module(&code, "http").contains("async fn server"));
         assert!(module(&code, "container").contains("struct Container"));
         assert!(module(&code, "console").contains("\"serve\""));
     }
@@ -361,17 +351,14 @@ impl Greet {
     }
 
     #[test]
-    fn generates_an_async_application_when_a_constructor_is_async() {
+    fn awaits_an_async_constructor_in_the_container() {
         let code = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/x\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         )
         .expect("the async build succeeds");
 
+        assert!(module(&code, "container").contains("Pool::create().await"));
         assert!(module(&code, "http").contains("async fn server"));
         assert!(module(&code, "services").contains("super::http::server(container).await"));
-        assert!(
-            module(&code, "console")
-                .contains("super::services::serve(container, matches, cancellation_token)")
-        );
     }
 }

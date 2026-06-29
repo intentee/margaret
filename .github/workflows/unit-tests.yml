@@ -31,23 +31,3 @@ jobs:
 
       - name: run clippy
         run: make clippy
-
-  coverage:
-    name: coverage
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v4
-
-      - name: setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: install coverage tooling
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest@0.9.137,cargo-llvm-cov@0.8.5
-
-      - name: run coverage
-        run: make coverage

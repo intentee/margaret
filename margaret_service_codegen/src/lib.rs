@@ -39,15 +39,15 @@ mod tests {
             .build()
     }
 
-    fn rendered(lib_source: &str, has_http: bool, container_is_async: bool) -> String {
-        render_services(&index_for(lib_source), has_http, container_is_async)
+    fn rendered(lib_source: &str, has_http: bool) -> String {
+        render_services(&index_for(lib_source), has_http)
             .expect("the services source is generated")
             .split_whitespace()
             .collect()
     }
 
     fn error_for(lib_source: &str) -> String {
-        render_services(&index_for(lib_source), false, false)
+        render_services(&index_for(lib_source), false)
             .expect_err("the services source fails to generate")
             .to_string()
     }
@@ -64,16 +64,18 @@ mod tests {
 
     #[test]
     fn renders_a_service_adapter_that_passes_the_token() {
-        let source = rendered(SERVICE, false, false);
+        let source = rendered(SERVICE, false);
 
         assert!(source.contains("structPumpService"));
         assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
-        assert!(source.contains("manager.register_service(PumpService{inner:container.pump()"));
+        assert!(
+            source.contains("manager.register_service(PumpService{inner:container.pump().await")
+        );
     }
 
     #[test]
     fn renders_a_ticker_adapter_with_interval_and_behavior() {
-        let source = rendered(TICKER, false, false);
+        let source = rendered(TICKER, false);
 
         assert!(source.contains("structFlusherTicker"));
         assert!(source.contains("letmutinterval=tokio::time::interval(crate::schedule::PERIOD);"));
@@ -89,7 +91,6 @@ mod tests {
         let source = rendered(
             "#[ticker(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[runner]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
             false,
-            false,
         );
 
         assert!(source.contains("self.inner.run(cancellation_token.clone()).await?"));
@@ -99,7 +100,6 @@ mod tests {
     fn renders_a_ticker_without_a_behavior() {
         let source = rendered(
             "#[ticker(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
-            false,
             false,
         );
 
@@ -112,7 +112,6 @@ mod tests {
         let source = rendered(
             "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
             false,
-            false,
         );
 
         assert!(source.contains("_cancellation_token:margaret_service::CancellationToken"));
@@ -121,26 +120,12 @@ mod tests {
 
     #[test]
     fn registers_the_http_server_when_responders_exist() {
-        let source = rendered(SERVICE, true, false);
+        let source = rendered(SERVICE, true);
 
         assert!(source.contains(r#"matches.get_one::<String>("addr")"#));
         assert!(source.contains(
-            "margaret_service::server_service::ServerService::new(super::http::server(container),address,)"
+            "margaret_service::server_service::ServerService::new(super::http::server(container).await,address,)"
         ));
-    }
-
-    #[test]
-    fn awaits_accessors_for_an_async_container() {
-        let source = rendered(SERVICE, false, true);
-
-        assert!(source.contains("container.pump().await"));
-    }
-
-    #[test]
-    fn awaits_the_http_server_for_an_async_container() {
-        let source = rendered(SERVICE, true, true);
-
-        assert!(source.contains("super::http::server(container).await"));
     }
 
     #[test]

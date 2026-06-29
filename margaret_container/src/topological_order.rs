@@ -21,26 +21,6 @@ struct Visitor<'graph> {
     order: Vec<usize>,
 }
 
-pub(crate) fn topological_order(
-    providers: &[Provider],
-    collections: &CollectionTable,
-) -> Result<Vec<usize>, ContainerError> {
-    let adjacency = build_adjacency(providers, collections);
-    let mut visitor = Visitor {
-        adjacency: &adjacency,
-        providers,
-        state: providers.iter().map(|_| Mark::Unvisited).collect(),
-        stack: Vec::new(),
-        order: Vec::new(),
-    };
-
-    for index in 0..providers.len() {
-        visitor.visit(index)?;
-    }
-
-    Ok(visitor.order)
-}
-
 impl Visitor<'_> {
     fn visit(&mut self, index: usize) -> Result<(), ContainerError> {
         match self.state[index] {
@@ -121,4 +101,24 @@ fn index_of(index_by_key: &BTreeMap<CanonicalPath, usize>, key: &CanonicalPath) 
     *index_by_key
         .get(key)
         .expect("a resolved dependency key maps to a provider")
+}
+
+pub(crate) fn topological_order(
+    providers: &[Provider],
+    collections: &CollectionTable,
+) -> Result<Vec<usize>, ContainerError> {
+    let adjacency = build_adjacency(providers, collections);
+    let mut visitor = Visitor {
+        adjacency: &adjacency,
+        providers,
+        state: providers.iter().map(|_| Mark::Unvisited).collect(),
+        stack: Vec::new(),
+        order: Vec::new(),
+    };
+
+    for index in 0..providers.len() {
+        visitor.visit(index)?;
+    }
+
+    Ok(visitor.order)
 }

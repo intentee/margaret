@@ -9,6 +9,6 @@ fn generates_concrete_and_interface_fields() {
         .expect("the full fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("config:std::sync::OnceLock<std::sync::Arc<crate::Config>>"));
-    assert!(source.contains("greeter:std::sync::OnceLock<std::sync::Arc<dyncrate::Greeter>>"));
+    assert!(source.contains("config:tokio::sync::OnceCell<std::sync::Arc<crate::Config>>"));
+    assert!(source.contains("greeter:tokio::sync::OnceCell<std::sync::Arc<dyncrate::Greeter>>"));
 }

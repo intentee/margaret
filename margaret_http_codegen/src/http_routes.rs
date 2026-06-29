@@ -16,6 +16,25 @@ use crate::path_parameter_names::path_parameter_names;
 use crate::registries::Registries;
 use crate::responder_method::responder_method;
 
+fn marker_value(
+    marker: &MatchedAttribute,
+    responder: &str,
+) -> Result<TokenStream, HttpCodegenError> {
+    let arguments = marker.args()?;
+
+    if arguments.is_empty() {
+        return Ok(quote! { () });
+    }
+
+    match arguments.positional(0) {
+        Some(value) if arguments.positional(1).is_none() => Ok(quote! { #value }),
+        _ => Err(HttpCodegenError::MalformedMarker {
+            marker: marker.path(),
+            responder: responder.to_string(),
+        }),
+    }
+}
+
 pub(crate) fn http_routes(
     index: &AttributeIndex,
     bindings: &[MiddlewareBinding],
@@ -125,23 +144,4 @@ pub(crate) fn http_routes(
     }
 
     Ok(routes)
-}
-
-fn marker_value(
-    marker: &MatchedAttribute,
-    responder: &str,
-) -> Result<TokenStream, HttpCodegenError> {
-    let arguments = marker.args()?;
-
-    if arguments.is_empty() {
-        return Ok(quote! { () });
-    }
-
-    match arguments.positional(0) {
-        Some(value) if arguments.positional(1).is_none() => Ok(quote! { #value }),
-        _ => Err(HttpCodegenError::MalformedMarker {
-            marker: marker.path(),
-            responder: responder.to_string(),
-        }),
-    }
 }

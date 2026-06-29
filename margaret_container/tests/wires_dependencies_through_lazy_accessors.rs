@@ -9,6 +9,6 @@ fn wires_dependencies_through_lazy_accessors() {
         .expect("the full fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("crate::EnglishGreeter::new(self.config())"));
-    assert!(source.contains("crate::App::new(self.greeter(),"));
+    assert!(source.contains("crate::EnglishGreeter::new(self.config().await)"));
+    assert!(source.contains("crate::App::new(self.greeter().await,"));
 }

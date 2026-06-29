@@ -8,21 +8,6 @@ use crate::next::Next;
 use crate::request::Request;
 use crate::response::Response;
 
-pub fn layer<Middleware>(
-    middleware: Arc<Middleware>,
-    marker: Middleware::Marker,
-    inner: Arc<dyn Handler>,
-) -> Arc<dyn Handler>
-where
-    Middleware: HttpMiddleware + Send + Sync + 'static,
-{
-    Arc::new(LayeredHandler {
-        inner,
-        marker,
-        middleware,
-    })
-}
-
 struct LayeredHandler<Middleware: HttpMiddleware> {
     inner: Arc<dyn Handler>,
     marker: Middleware::Marker,
@@ -39,6 +24,21 @@ where
             .process(request, self.marker.clone(), Next::new(self.inner.clone()))
             .await
     }
+}
+
+pub fn layer<Middleware>(
+    middleware: Arc<Middleware>,
+    marker: Middleware::Marker,
+    inner: Arc<dyn Handler>,
+) -> Arc<dyn Handler>
+where
+    Middleware: HttpMiddleware + Send + Sync + 'static,
+{
+    Arc::new(LayeredHandler {
+        inner,
+        marker,
+        middleware,
+    })
 }
 
 #[cfg(test)]

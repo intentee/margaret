@@ -8,9 +8,8 @@ pub fn render_console(
     index: &AttributeIndex,
     serves: bool,
     has_http: bool,
-    container_is_async: bool,
 ) -> Result<String, ConsoleCodegenError> {
     let commands = console_commands(index)?;
 
-    Ok(render(&commands, serves, has_http, container_is_async))
+    Ok(render(&commands, serves, has_http))
 }

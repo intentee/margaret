@@ -135,13 +135,9 @@ impl GetProfile {
     }
 
     fn source_for(lib_source: &str) -> String {
-        rendered(lib_source, false)
-    }
-
-    fn rendered(lib_source: &str, container_is_async: bool) -> String {
         let directory = crate_with(lib_source);
 
-        generate_http_source("crate", &directory.path().join("src"), container_is_async)
+        generate_http_source("crate", &directory.path().join("src"))
             .expect("the http source is generated")
             .split_whitespace()
             .collect()
@@ -150,7 +146,7 @@ impl GetProfile {
     fn error_for(lib_source: &str) -> String {
         let directory = crate_with(lib_source);
 
-        generate_http_source("crate", &directory.path().join("src"), false)
+        generate_http_source("crate", &directory.path().join("src"))
             .expect_err("the http source fails to generate")
             .to_string()
     }
@@ -159,19 +155,19 @@ impl GetProfile {
     fn generates_per_route_typed_marker_middleware() {
         let source = source_for(RESPONDERS_AND_MIDDLEWARE);
 
-        assert!(source.contains("pubfnserver"));
+        assert!(source.contains("pubasyncfnserver"));
         assert!(source.contains("usesuper::container::Container"));
         assert!(source.contains("margaret_http::method::Method::Get"));
-        assert!(
-            source.contains("margaret_http::responder_handler::responder_handler(container.open()")
-        );
+        assert!(source.contains(
+            "margaret_http::responder_handler::responder_handler(container.open().await"
+        ));
         assert!(source.contains(
             "|responder:std::sync::Arc<crate::Open>,_request:margaret_http::request::Request|"
         ));
         assert!(source.contains("responder.respond().await"));
-        assert!(source.contains("container.guard(),crate::action::Action::Read"));
-        assert!(source.contains("container.tracer(),()"));
-        assert!(source.contains("container.resource()"));
+        assert!(source.contains("container.guard().await,crate::action::Action::Read"));
+        assert!(source.contains("container.tracer().await,()"));
+        assert!(source.contains("container.resource().await"));
 
         let guard = source.find("container.guard").expect("the guard is wired");
         let tracer = source
@@ -182,22 +178,11 @@ impl GetProfile {
     }
 
     #[test]
-    fn generates_an_async_server_that_awaits_container_accessors() {
-        let source = rendered(
-            "#[responds_to_http(method = Get, path = \"/open\")]\nstruct Open;\n\nimpl Open {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
-            true,
-        );
-
-        assert!(source.contains("pubasyncfnserver"));
-        assert!(source.contains("container.open().await"));
-    }
-
-    #[test]
     fn injects_route_parameters_into_the_responder() {
         let source = source_for(ROUTE_PARAMETER);
 
         assert!(source.contains("\"/users/{id}\""));
-        assert!(source.contains("container.get_user()"));
+        assert!(source.contains("container.get_user().await"));
         assert!(source.contains(
             "|responder:std::sync::Arc<crate::GetUser>,request:margaret_http::request::Request|"
         ));
@@ -213,8 +198,8 @@ impl GetProfile {
         assert!(source.contains("usemargaret_http::crud_action::CrudAction;"));
         assert!(source.contains("usemargaret_http::route_parameter_binder::RouteParameterBinder;"));
         assert!(source.contains("usemargaret_http::crud_action_gate::CrudActionGate;"));
-        assert!(source.contains("container.user_binder()"));
-        assert!(source.contains("container.user_gate()"));
+        assert!(source.contains("container.user_binder().await"));
+        assert!(source.contains("container.user_gate().await"));
         assert!(source.contains(r#"user_binder.bind(request.path_param("user").expect"#));
         assert!(source.contains("margaret_http::response::Response::not_found()"));
         assert!(source.contains("user_gate.can(&request,&user,CrudAction::Read).await"));
@@ -227,7 +212,7 @@ impl GetProfile {
         let source = source_for(BOUND_WITHOUT_INTENT);
 
         assert!(source.contains("usemargaret_http::route_parameter_binder::RouteParameterBinder;"));
-        assert!(source.contains("container.user_binder()"));
+        assert!(source.contains("container.user_binder().await"));
         assert!(source.contains(r#"user_binder.bind(request.path_param("user").expect"#));
         assert!(source.contains("margaret_http::response::Response::not_found()"));
         assert!(source.contains("responder.respond(user).await"));

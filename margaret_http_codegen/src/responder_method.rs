@@ -16,63 +16,6 @@ use crate::resolve_struct::resolve_struct;
 use crate::route_parameter::RouteParameter;
 use crate::route_parameter_binding::RouteParameterBinding;
 
-pub(crate) fn responder_method(
-    item: &IndexedItem,
-    responder: &str,
-    registries: &Registries,
-) -> Result<Vec<RouteParameter>, HttpCodegenError> {
-    let method =
-        find_responder_method(item).ok_or_else(|| HttpCodegenError::MissingResponderMethod {
-            responder: responder.to_string(),
-        })?;
-    let route_parameter_selector =
-        AttributeSelector::parse("route_parameter").expect("a valid selector");
-    let referencing_root = item
-        .canonical_path()
-        .segments()
-        .first()
-        .expect("a canonical path has at least one segment");
-    let mut parameters = Vec::new();
-
-    for (position, input) in method.signature().inputs.iter().enumerate() {
-        let FnArg::Typed(pattern_type) = input else {
-            continue;
-        };
-
-        let Some(attribute) = pattern_type
-            .attrs
-            .iter()
-            .find(|attribute| route_parameter_selector.matches(attribute.path()))
-        else {
-            return Err(HttpCodegenError::UnmarkedResponderParameter {
-                responder: responder.to_string(),
-                parameter: position.to_string(),
-            });
-        };
-
-        let Pat::Ident(pattern_ident) = &*pattern_type.pat else {
-            return Err(HttpCodegenError::RouteParameterNotIdentifier {
-                responder: responder.to_string(),
-                parameter: position.to_string(),
-            });
-        };
-
-        let name = pattern_ident.ident.to_string();
-        let binding = classify(
-            responder,
-            &name,
-            &pattern_type.ty,
-            attribute,
-            registries,
-            referencing_root,
-        )?;
-
-        parameters.push(RouteParameter { name, binding });
-    }
-
-    Ok(parameters)
-}
-
 fn classify(
     responder: &str,
     parameter: &str,
@@ -145,4 +88,61 @@ fn find_responder_method(item: &IndexedItem) -> Option<&IndexedMethod> {
             .iter()
             .any(|attribute| responder_selector.matches(attribute.path()))
     })
+}
+
+pub(crate) fn responder_method(
+    item: &IndexedItem,
+    responder: &str,
+    registries: &Registries,
+) -> Result<Vec<RouteParameter>, HttpCodegenError> {
+    let method =
+        find_responder_method(item).ok_or_else(|| HttpCodegenError::MissingResponderMethod {
+            responder: responder.to_string(),
+        })?;
+    let route_parameter_selector =
+        AttributeSelector::parse("route_parameter").expect("a valid selector");
+    let referencing_root = item
+        .canonical_path()
+        .segments()
+        .first()
+        .expect("a canonical path has at least one segment");
+    let mut parameters = Vec::new();
+
+    for (position, input) in method.signature().inputs.iter().enumerate() {
+        let FnArg::Typed(pattern_type) = input else {
+            continue;
+        };
+
+        let Some(attribute) = pattern_type
+            .attrs
+            .iter()
+            .find(|attribute| route_parameter_selector.matches(attribute.path()))
+        else {
+            return Err(HttpCodegenError::UnmarkedResponderParameter {
+                responder: responder.to_string(),
+                parameter: position.to_string(),
+            });
+        };
+
+        let Pat::Ident(pattern_ident) = &*pattern_type.pat else {
+            return Err(HttpCodegenError::RouteParameterNotIdentifier {
+                responder: responder.to_string(),
+                parameter: position.to_string(),
+            });
+        };
+
+        let name = pattern_ident.ident.to_string();
+        let binding = classify(
+            responder,
+            &name,
+            &pattern_type.ty,
+            attribute,
+            registries,
+            referencing_root,
+        )?;
+
+        parameters.push(RouteParameter { name, binding });
+    }
+
+    Ok(parameters)
 }

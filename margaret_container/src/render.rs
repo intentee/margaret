@@ -14,63 +14,17 @@ use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provider_construction::ProviderConstruction;
 
-pub(crate) fn render(plan: &ContainerPlan) -> String {
-    let is_async = plan.providers.iter().any(Provider::is_async);
-    let fields = plan
-        .providers
-        .iter()
-        .map(|provider| field_declaration(provider, is_async));
-    let initializers = plan
-        .providers
-        .iter()
-        .map(|provider| field_initializer(provider, is_async));
-    let accessors = plan
-        .providers
-        .iter()
-        .map(|provider| accessor(provider, plan, is_async));
-
-    let tokens = quote! {
-        pub struct Container {
-            #(#fields,)*
-        }
-
-        impl Container {
-            pub fn build() -> Self {
-                Self {
-                    #(#initializers,)*
-                }
-            }
-
-            #(#accessors)*
-        }
-    };
-    let file =
-        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
-
-    prettyplease::unparse(&file)
-}
-
-fn cell_type(is_async: bool) -> TokenStream {
-    if is_async {
-        quote! { tokio::sync::OnceCell }
-    } else {
-        quote! { std::sync::OnceLock }
-    }
-}
-
-fn field_declaration(provider: &Provider, is_async: bool) -> TokenStream {
+fn field_declaration(provider: &Provider) -> TokenStream {
     let name = field_ident(provider);
     let field_type = field_type(provider);
-    let cell = cell_type(is_async);
 
-    quote! { #name: #cell<#field_type> }
+    quote! { #name: tokio::sync::OnceCell<#field_type> }
 }
 
-fn field_initializer(provider: &Provider, is_async: bool) -> TokenStream {
+fn field_initializer(provider: &Provider) -> TokenStream {
     let name = field_ident(provider);
-    let cell = cell_type(is_async);
 
-    quote! { #name: #cell::new() }
+    quote! { #name: tokio::sync::OnceCell::new() }
 }
 
 fn field_type(provider: &Provider) -> TokenStream {
@@ -88,42 +42,29 @@ fn field_type(provider: &Provider) -> TokenStream {
     }
 }
 
-fn accessor(provider: &Provider, plan: &ContainerPlan, is_async: bool) -> TokenStream {
+fn accessor(provider: &Provider, plan: &ContainerPlan) -> TokenStream {
     let name = field_ident(provider);
     let field_type = field_type(provider);
-    let construction = construction(provider, plan, is_async);
+    let construction = construction(provider, plan);
 
-    if is_async {
-        quote! {
-            pub async fn #name(&self) -> #field_type {
-                self.#name
-                    .get_or_init(|| async move {
-                        let provided: #field_type = #construction;
+    quote! {
+        pub async fn #name(&self) -> #field_type {
+            self.#name
+                .get_or_init(|| async move {
+                    let provided: #field_type = #construction;
 
-                        provided
-                    })
-                    .await
-                    .clone()
-            }
-        }
-    } else {
-        let init = match &provider.provided {
-            ProvidedType::Concrete(_) => quote! { || #construction },
-            ProvidedType::Interface(_) => quote! { || -> #field_type { #construction } },
-        };
-
-        quote! {
-            pub fn #name(&self) -> #field_type {
-                self.#name.get_or_init(#init).clone()
-            }
+                    provided
+                })
+                .await
+                .clone()
         }
     }
 }
 
-fn construction(provider: &Provider, plan: &ContainerPlan, is_async: bool) -> TokenStream {
+fn construction(provider: &Provider, plan: &ContainerPlan) -> TokenStream {
     match &provider.construction {
         ProviderConstruction::Direct(direct) => {
-            let value = direct_value(direct, &provider.concrete_path, plan, is_async);
+            let value = direct_value(direct, &provider.concrete_path, plan);
 
             quote! { std::sync::Arc::new(#value) }
         }
@@ -132,7 +73,7 @@ fn construction(provider: &Provider, plan: &ContainerPlan, is_async: bool) -> To
             factory_method,
             provider: own,
         } => {
-            let value = direct_value(own, &provider.concrete_path, plan, is_async);
+            let value = direct_value(own, &provider.concrete_path, plan);
             let factory = format_ident!("{}", factory_method);
             let call = if *factory_is_async {
                 quote! { provider.#factory().await }
@@ -155,7 +96,6 @@ fn direct_value(
     direct: &DirectConstruction,
     concrete_path: &CanonicalPath,
     plan: &ContainerPlan,
-    is_async: bool,
 ) -> TokenStream {
     let concrete = path_tokens(concrete_path);
 
@@ -168,7 +108,7 @@ fn direct_value(
             let constructor = format_ident!("{}", method);
             let arguments = dependencies
                 .iter()
-                .map(|dependency| dependency_expression(dependency, plan, is_async));
+                .map(|dependency| dependency_expression(dependency, plan));
 
             if *constructor_is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
@@ -188,16 +128,12 @@ fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream 
     }
 }
 
-fn dependency_expression(
-    dependency: &DependencyKind,
-    plan: &ContainerPlan,
-    is_async: bool,
-) -> TokenStream {
+fn dependency_expression(dependency: &DependencyKind, plan: &ContainerPlan) -> TokenStream {
     match dependency {
         DependencyKind::Single { provider_key } => {
             let accessor = field_ident(provider_by_key(plan, provider_key));
 
-            access(&accessor, is_async)
+            access(&accessor)
         }
         DependencyKind::Collection { trait_path } => {
             let elements = plan
@@ -207,7 +143,7 @@ fn dependency_expression(
                 .map(|member| {
                     let accessor = field_ident(provider_by_key(plan, member));
 
-                    access(&accessor, is_async)
+                    access(&accessor)
                 });
 
             quote! { vec![#(#elements),*] }
@@ -215,12 +151,8 @@ fn dependency_expression(
     }
 }
 
-fn access(accessor: &Ident, is_async: bool) -> TokenStream {
-    if is_async {
-        quote! { self.#accessor().await }
-    } else {
-        quote! { self.#accessor() }
-    }
+fn access(accessor: &Ident) -> TokenStream {
+    quote! { self.#accessor().await }
 }
 
 fn provider_by_key<'plan>(plan: &'plan ContainerPlan, key: &CanonicalPath) -> &'plan Provider {
@@ -232,4 +164,33 @@ fn provider_by_key<'plan>(plan: &'plan ContainerPlan, key: &CanonicalPath) -> &'
 
 fn field_ident(provider: &Provider) -> Ident {
     format_ident!("{}", provider.field_name)
+}
+
+pub(crate) fn render(plan: &ContainerPlan) -> String {
+    let fields = plan.providers.iter().map(field_declaration);
+    let initializers = plan.providers.iter().map(field_initializer);
+    let accessors = plan
+        .providers
+        .iter()
+        .map(|provider| accessor(provider, plan));
+
+    let tokens = quote! {
+        pub struct Container {
+            #(#fields,)*
+        }
+
+        impl Container {
+            pub fn build() -> Self {
+                Self {
+                    #(#initializers,)*
+                }
+            }
+
+            #(#accessors)*
+        }
+    };
+    let file =
+        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
+
+    prettyplease::unparse(&file)
 }

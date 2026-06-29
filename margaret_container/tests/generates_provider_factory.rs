@@ -9,9 +9,8 @@ fn generates_provider_factory() {
         .expect("the provider fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("greeter:std::sync::OnceLock<std::sync::Arc<dyncrate::Greeter>>"));
-    assert!(
-        source
-            .contains("letprovider=crate::GreeterProvider::new(self.config());provider.provide()")
-    );
+    assert!(source.contains("greeter:tokio::sync::OnceCell<std::sync::Arc<dyncrate::Greeter>>"));
+    assert!(source.contains(
+        "letprovider=crate::GreeterProvider::new(self.config().await);provider.provide()"
+    ));
 }

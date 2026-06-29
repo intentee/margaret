@@ -9,6 +9,30 @@ use margaret_attributes::struct_shape::StructShape;
 use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
 
+fn has_constructor_attribute(method: &IndexedMethod) -> bool {
+    method.attributes().iter().any(|attribute| {
+        attribute
+            .path()
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident == "constructor")
+    })
+}
+
+fn constructor_returns_self(signature: &Signature) -> bool {
+    match &signature.output {
+        ReturnType::Type(_, return_type) => is_self_type(return_type),
+        ReturnType::Default => false,
+    }
+}
+
+fn is_self_type(return_type: &Type) -> bool {
+    match return_type {
+        Type::Path(type_path) => type_path.path.is_ident("Self"),
+        _ => false,
+    }
+}
+
 pub(crate) fn resolve_construction<'index>(
     methods: &'index [IndexedMethod],
     concrete_path: &CanonicalPath,
@@ -54,30 +78,6 @@ pub(crate) fn resolve_construction<'index>(
                 Ok(ConstructionSource::Fieldless(shape))
             }
         }
-    }
-}
-
-fn has_constructor_attribute(method: &IndexedMethod) -> bool {
-    method.attributes().iter().any(|attribute| {
-        attribute
-            .path()
-            .segments
-            .last()
-            .is_some_and(|segment| segment.ident == "constructor")
-    })
-}
-
-fn constructor_returns_self(signature: &Signature) -> bool {
-    match &signature.output {
-        ReturnType::Type(_, return_type) => is_self_type(return_type),
-        ReturnType::Default => false,
-    }
-}
-
-fn is_self_type(return_type: &Type) -> bool {
-    match return_type {
-        Type::Path(type_path) => type_path.path.is_ident("Self"),
-        _ => false,
     }
 }
 

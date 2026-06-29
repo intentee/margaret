@@ -12,68 +12,14 @@ use crate::http_route::HttpRoute;
 use crate::route_parameter::RouteParameter;
 use crate::route_parameter_binding::RouteParameterBinding;
 
-pub(crate) fn render(routes: &[HttpRoute], container_is_async: bool) -> String {
-    let route_calls = routes.iter().map(|route| {
-        let method = &route.method;
-        let path = &route.path;
-
-        let handler = onion(route, container_is_async);
-
-        quote! {
-            .route(margaret_http::method::Method::#method, #path, #handler)
-        }
-    });
-
-    let binder_import = if routes.iter().any(route_is_bound) {
-        quote! { use margaret_http::route_parameter_binder::RouteParameterBinder; }
-    } else {
-        quote! {}
-    };
-    let gate_import = if routes.iter().any(route_is_authorized) {
-        quote! {
-            use margaret_http::crud_action::CrudAction;
-            use margaret_http::crud_action_gate::CrudActionGate;
-        }
-    } else {
-        quote! {}
-    };
-    let server_asyncness = if container_is_async {
-        quote! { async }
-    } else {
-        quote! {}
-    };
-
-    let tokens = quote! {
-        use super::container::Container;
-        #binder_import
-        #gate_import
-
-        pub #server_asyncness fn server(container: &Container) -> margaret_http::server::Server {
-            let router = margaret_http::router::Router::empty()
-                #(#route_calls)*;
-
-            margaret_http::server::Server::new(router)
-        }
-    };
-
-    let file =
-        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
-
-    prettyplease::unparse(&file)
+fn access(call: TokenStream) -> TokenStream {
+    quote! { #call.await }
 }
 
-fn access(call: TokenStream, is_async: bool) -> TokenStream {
-    if is_async {
-        quote! { #call.await }
-    } else {
-        call
-    }
-}
-
-fn onion(route: &HttpRoute, container_is_async: bool) -> TokenStream {
+fn onion(route: &HttpRoute) -> TokenStream {
     let responder = &route.responder_field;
     let responder_type = path_tokens(&route.responder_path);
-    let responder_access = access(quote! { container.#responder() }, container_is_async);
+    let responder_access = access(quote! { container.#responder() });
     let request_binding = if route.route_parameters.is_empty() {
         format_ident!("_request")
     } else {
@@ -106,7 +52,7 @@ fn onion(route: &HttpRoute, container_is_async: bool) -> TokenStream {
         }
     } else {
         let capture_bindings = captures.iter().map(|field| {
-            let field_access = access(quote! { container.#field() }, container_is_async);
+            let field_access = access(quote! { container.#field() });
 
             quote! { let #field = #field_access; }
         });
@@ -134,7 +80,7 @@ fn onion(route: &HttpRoute, container_is_async: bool) -> TokenStream {
     for application in &route.layers {
         let middleware = &application.middleware_field;
         let marker = &application.marker_value;
-        let middleware_access = access(quote! { container.#middleware() }, container_is_async);
+        let middleware_access = access(quote! { container.#middleware() });
 
         handler = quote! {
             margaret_http::layer::layer(#middleware_access, #marker, #handler)
@@ -227,4 +173,48 @@ fn route_is_authorized(route: &HttpRoute) -> bool {
             }
         )
     })
+}
+
+pub(crate) fn render(routes: &[HttpRoute]) -> String {
+    let route_calls = routes.iter().map(|route| {
+        let method = &route.method;
+        let path = &route.path;
+
+        let handler = onion(route);
+
+        quote! {
+            .route(margaret_http::method::Method::#method, #path, #handler)
+        }
+    });
+
+    let binder_import = if routes.iter().any(route_is_bound) {
+        quote! { use margaret_http::route_parameter_binder::RouteParameterBinder; }
+    } else {
+        quote! {}
+    };
+    let gate_import = if routes.iter().any(route_is_authorized) {
+        quote! {
+            use margaret_http::crud_action::CrudAction;
+            use margaret_http::crud_action_gate::CrudActionGate;
+        }
+    } else {
+        quote! {}
+    };
+    let tokens = quote! {
+        use super::container::Container;
+        #binder_import
+        #gate_import
+
+        pub async fn server(container: &Container) -> margaret_http::server::Server {
+            let router = margaret_http::router::Router::empty()
+                #(#route_calls)*;
+
+            margaret_http::server::Server::new(router)
+        }
+    };
+
+    let file =
+        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
+
+    prettyplease::unparse(&file)
 }

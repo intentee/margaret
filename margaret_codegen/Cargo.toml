@@ -10,6 +10,7 @@ margaret_container = { path = "../margaret_container" }
 margaret_http_codegen = { path = "../margaret_http_codegen" }
 margaret_service_codegen = { path = "../margaret_service_codegen" }
 thiserror = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

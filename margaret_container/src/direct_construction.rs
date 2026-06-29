@@ -20,11 +20,4 @@ impl DirectConstruction {
             DirectConstruction::Fieldless { .. } => &[],
         }
     }
-
-    pub(crate) fn is_async(&self) -> bool {
-        match self {
-            DirectConstruction::Constructor { is_async, .. } => *is_async,
-            DirectConstruction::Fieldless { .. } => false,
-        }
-    }
 }

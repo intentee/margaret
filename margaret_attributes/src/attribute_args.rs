@@ -14,6 +14,21 @@ struct NamedArgument {
     value: Expr,
 }
 
+fn named_argument(expression: &Expr) -> Option<NamedArgument> {
+    let Expr::Assign(assign) = expression else {
+        return None;
+    };
+    let Expr::Path(left) = assign.left.as_ref() else {
+        return None;
+    };
+    let name = left.path.get_ident()?;
+
+    Some(NamedArgument {
+        name: name.to_string(),
+        value: assign.right.as_ref().clone(),
+    })
+}
+
 pub struct AttributeArgs {
     attribute_path: String,
     named: Vec<NamedArgument>,
@@ -121,21 +136,6 @@ impl AttributeArgs {
             expected: expected.to_string(),
         }
     }
-}
-
-fn named_argument(expression: &Expr) -> Option<NamedArgument> {
-    let Expr::Assign(assign) = expression else {
-        return None;
-    };
-    let Expr::Path(left) = assign.left.as_ref() else {
-        return None;
-    };
-    let name = left.path.get_ident()?;
-
-    Some(NamedArgument {
-        name: name.to_string(),
-        value: assign.right.as_ref().clone(),
-    })
 }
 
 #[cfg(test)]

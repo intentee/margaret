@@ -7,8 +7,9 @@ paths:
 # Rust Standards
 
 - Always use explicit lifetime variable names (do not use `'a` and such, use descriptive names like `'message` or similar)
-- Always use descriptive parameter names (never use single letter names for generics)
-- Each file must contain at most a single struct, or single enum, or a single public function. It must contain at most a single public item. You can still keep multiple private function helpers. Files need to be named after their public item.
+- Always use descriptive parameter names (never use single letter names for generics
+- Each file must contain at most a single struct, or single enum, or a single public function (at most one of any of those).
+- Each file must contain at most a single public item. You can still keep multiple private function helpers. Files need to be named after their public item.
 - Always destructure structs in arguments if possible.
 
 # Code Style

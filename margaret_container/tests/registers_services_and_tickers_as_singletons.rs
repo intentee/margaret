@@ -9,6 +9,6 @@ fn registers_services_and_tickers_as_singletons() {
         .expect("the services fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("pubfnpulse(&self)->std::sync::Arc<crate::Pulse>"));
-    assert!(source.contains("pubfnsweeper(&self)->std::sync::Arc<crate::Sweeper>"));
+    assert!(source.contains("pubasyncfnpulse(&self)->std::sync::Arc<crate::Pulse>"));
+    assert!(source.contains("pubasyncfnsweeper(&self)->std::sync::Arc<crate::Sweeper>"));
 }

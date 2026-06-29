@@ -3,29 +3,6 @@ use syn::Path;
 use crate::canonical_path::CanonicalPath;
 use crate::resolution::Resolution;
 
-pub fn resolve_unique(
-    written: &Path,
-    candidates: &[CanonicalPath],
-    referencing_root: &str,
-) -> Resolution {
-    let written_segments = normalized_segments(written, referencing_root);
-    let absolute = is_absolute(&written_segments, candidates);
-    let mut matches: Vec<CanonicalPath> = candidates
-        .iter()
-        .filter(|candidate| segments_match(&written_segments, candidate.segments(), absolute))
-        .cloned()
-        .collect();
-
-    if matches.len() > 1 {
-        return Resolution::Ambiguous(matches);
-    }
-
-    match matches.pop() {
-        Some(single) => Resolution::Resolved(single),
-        None => Resolution::NotFound,
-    }
-}
-
 fn normalized_segments(written: &Path, referencing_root: &str) -> Vec<String> {
     let mut segments: Vec<String> = written
         .segments
@@ -53,6 +30,29 @@ fn segments_match(written: &[String], candidate: &[String], absolute: bool) -> b
         written == candidate
     } else {
         written.len() <= candidate.len() && written == &candidate[candidate.len() - written.len()..]
+    }
+}
+
+pub fn resolve_unique(
+    written: &Path,
+    candidates: &[CanonicalPath],
+    referencing_root: &str,
+) -> Resolution {
+    let written_segments = normalized_segments(written, referencing_root);
+    let absolute = is_absolute(&written_segments, candidates);
+    let mut matches: Vec<CanonicalPath> = candidates
+        .iter()
+        .filter(|candidate| segments_match(&written_segments, candidate.segments(), absolute))
+        .cloned()
+        .collect();
+
+    if matches.len() > 1 {
+        return Resolution::Ambiguous(matches);
+    }
+
+    match matches.pop() {
+        Some(single) => Resolution::Resolved(single),
+        None => Resolution::NotFound,
     }
 }
 

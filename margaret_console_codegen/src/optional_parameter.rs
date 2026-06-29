@@ -2,26 +2,6 @@ use syn::GenericArgument;
 use syn::PathArguments;
 use syn::Type;
 
-pub(crate) struct OptionalParameter {
-    pub(crate) required: bool,
-    pub(crate) value_type: Type,
-}
-
-impl OptionalParameter {
-    pub(crate) fn from_type(declared: &Type) -> Self {
-        match option_inner(declared) {
-            Some(inner) => Self {
-                required: false,
-                value_type: inner.clone(),
-            },
-            None => Self {
-                required: true,
-                value_type: declared.clone(),
-            },
-        }
-    }
-}
-
 fn option_inner(declared: &Type) -> Option<&Type> {
     let Type::Path(type_path) = declared else {
         return None;
@@ -43,6 +23,26 @@ fn option_inner(declared: &Type) -> Option<&Type> {
     match arguments.args.first() {
         Some(GenericArgument::Type(inner)) => Some(inner),
         _ => None,
+    }
+}
+
+pub(crate) struct OptionalParameter {
+    pub(crate) required: bool,
+    pub(crate) value_type: Type,
+}
+
+impl OptionalParameter {
+    pub(crate) fn from_type(declared: &Type) -> Self {
+        match option_inner(declared) {
+            Some(inner) => Self {
+                required: false,
+                value_type: inner.clone(),
+            },
+            None => Self {
+                required: true,
+                value_type: declared.clone(),
+            },
+        }
     }
 }
 

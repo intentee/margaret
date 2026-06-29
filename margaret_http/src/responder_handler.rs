@@ -7,18 +7,6 @@ use crate::handler::Handler;
 use crate::request::Request;
 use crate::response::Response;
 
-pub fn responder_handler<Responder, Extract, ResponseFuture>(
-    responder: Arc<Responder>,
-    extract: Extract,
-) -> Arc<dyn Handler>
-where
-    Responder: Send + Sync + 'static,
-    Extract: Fn(Arc<Responder>, Request) -> ResponseFuture + Send + Sync + 'static,
-    ResponseFuture: Future<Output = Response> + Send + 'static,
-{
-    Arc::new(FnHandler { extract, responder })
-}
-
 struct FnHandler<Responder, Extract> {
     extract: Extract,
     responder: Arc<Responder>,
@@ -34,6 +22,18 @@ where
     async fn handle(&self, request: Request) -> Response {
         (self.extract)(self.responder.clone(), request).await
     }
+}
+
+pub fn responder_handler<Responder, Extract, ResponseFuture>(
+    responder: Arc<Responder>,
+    extract: Extract,
+) -> Arc<dyn Handler>
+where
+    Responder: Send + Sync + 'static,
+    Extract: Fn(Arc<Responder>, Request) -> ResponseFuture + Send + Sync + 'static,
+    ResponseFuture: Future<Output = Response> + Send + 'static,
+{
+    Arc::new(FnHandler { extract, responder })
 }
 
 #[cfg(test)]

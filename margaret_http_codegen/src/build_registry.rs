@@ -8,6 +8,20 @@ use margaret_attributes::indexed_item::IndexedItem;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::resolve_struct::resolve_struct;
 
+fn associated_model(
+    item: &IndexedItem,
+    associated_type_name: &str,
+    struct_paths: &[CanonicalPath],
+    referencing_root: &str,
+) -> Option<CanonicalPath> {
+    let associated_type = item
+        .associated_types()
+        .iter()
+        .find(|associated_type| associated_type.name() == associated_type_name)?;
+
+    resolve_struct(associated_type.ty(), struct_paths, referencing_root)
+}
+
 pub(crate) fn build_registry(
     index: &AttributeIndex,
     struct_paths: &[CanonicalPath],
@@ -48,18 +62,4 @@ pub(crate) fn build_registry(
     }
 
     Ok(registry)
-}
-
-fn associated_model(
-    item: &IndexedItem,
-    associated_type_name: &str,
-    struct_paths: &[CanonicalPath],
-    referencing_root: &str,
-) -> Option<CanonicalPath> {
-    let associated_type = item
-        .associated_types()
-        .iter()
-        .find(|associated_type| associated_type.name() == associated_type_name)?;
-
-    resolve_struct(associated_type.ty(), struct_paths, referencing_root)
 }

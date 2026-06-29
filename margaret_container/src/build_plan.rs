@@ -44,58 +44,6 @@ struct ProviderDraft<'index> {
     provided: ProvidedType,
 }
 
-pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
-    let trait_paths = trait_paths(index);
-    let drafts = build_drafts(index, &trait_paths)?;
-    let provider_keys: Vec<CanonicalPath> = drafts
-        .iter()
-        .map(|draft| draft.provided.key().clone())
-        .collect();
-
-    let mut collections = CollectionTable::new();
-    let mut providers = Vec::new();
-
-    for draft in drafts {
-        let ProviderDraft {
-            collection,
-            concrete_path,
-            construction,
-            field_name,
-            provided,
-        } = draft;
-
-        if let Some(trait_path) = collection {
-            collections.add(trait_path, provided.key().clone());
-        }
-
-        let construction = match construction {
-            DraftConstruction::Direct(source) => ProviderConstruction::Direct(resolve_direct(
-                source,
-                &concrete_path,
-                &provider_keys,
-                &trait_paths,
-            )?),
-            DraftConstruction::Factory { factory, own } => ProviderConstruction::Factory {
-                factory_is_async: factory.signature().asyncness.is_some(),
-                factory_method: factory.identifier().to_string(),
-                provider: resolve_direct(own, &concrete_path, &provider_keys, &trait_paths)?,
-            },
-        };
-
-        providers.push(Provider {
-            concrete_path,
-            construction,
-            field_name,
-            provided,
-        });
-    }
-
-    Ok(ContainerPlan {
-        collections,
-        providers,
-    })
-}
-
 #[derive(Clone, Copy)]
 enum Role {
     Provider,
@@ -451,4 +399,56 @@ fn service_selector() -> AttributeSelector {
 
 fn ticker_selector() -> AttributeSelector {
     AttributeSelector::parse("ticker").expect("the ticker selector is valid")
+}
+
+pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
+    let trait_paths = trait_paths(index);
+    let drafts = build_drafts(index, &trait_paths)?;
+    let provider_keys: Vec<CanonicalPath> = drafts
+        .iter()
+        .map(|draft| draft.provided.key().clone())
+        .collect();
+
+    let mut collections = CollectionTable::new();
+    let mut providers = Vec::new();
+
+    for draft in drafts {
+        let ProviderDraft {
+            collection,
+            concrete_path,
+            construction,
+            field_name,
+            provided,
+        } = draft;
+
+        if let Some(trait_path) = collection {
+            collections.add(trait_path, provided.key().clone());
+        }
+
+        let construction = match construction {
+            DraftConstruction::Direct(source) => ProviderConstruction::Direct(resolve_direct(
+                source,
+                &concrete_path,
+                &provider_keys,
+                &trait_paths,
+            )?),
+            DraftConstruction::Factory { factory, own } => ProviderConstruction::Factory {
+                factory_is_async: factory.signature().asyncness.is_some(),
+                factory_method: factory.identifier().to_string(),
+                provider: resolve_direct(own, &concrete_path, &provider_keys, &trait_paths)?,
+            },
+        };
+
+        providers.push(Provider {
+            concrete_path,
+            construction,
+            field_name,
+            provided,
+        });
+    }
+
+    Ok(ContainerPlan {
+        collections,
+        providers,
+    })
 }

@@ -8,27 +8,6 @@ use syn::TypeTraitObject;
 
 use crate::raw_target::RawTarget;
 
-pub(crate) fn peel_target(parameter_type: &Type) -> Option<RawTarget> {
-    let Type::Path(type_path) = parameter_type else {
-        return None;
-    };
-    let segment = type_path
-        .path
-        .segments
-        .last()
-        .expect("a type path has at least one segment");
-
-    if segment.ident == "Arc" || segment.ident == "Rc" {
-        peel_arc_inner(single_generic_argument(segment)?)
-    } else if segment.ident == "Vec" {
-        Some(RawTarget::Collection(peel_collection_inner(
-            single_generic_argument(segment)?,
-        )?))
-    } else {
-        None
-    }
-}
-
 fn peel_arc_inner(inner: &Type) -> Option<RawTarget> {
     match inner {
         Type::Path(type_path) => Some(RawTarget::Single(type_path.path.clone())),
@@ -99,6 +78,27 @@ fn single_trait_bound(trait_object: &TypeTraitObject) -> Option<Path> {
 
 fn is_marker_trait(path: &Path) -> bool {
     path.is_ident("Send") || path.is_ident("Sync")
+}
+
+pub(crate) fn peel_target(parameter_type: &Type) -> Option<RawTarget> {
+    let Type::Path(type_path) = parameter_type else {
+        return None;
+    };
+    let segment = type_path
+        .path
+        .segments
+        .last()
+        .expect("a type path has at least one segment");
+
+    if segment.ident == "Arc" || segment.ident == "Rc" {
+        peel_arc_inner(single_generic_argument(segment)?)
+    } else if segment.ident == "Vec" {
+        Some(RawTarget::Collection(peel_collection_inner(
+            single_generic_argument(segment)?,
+        )?))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

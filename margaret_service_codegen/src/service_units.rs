@@ -17,22 +17,6 @@ enum Role {
     Ticker,
 }
 
-pub(crate) fn service_units(
-    index: &AttributeIndex,
-) -> Result<Vec<ServiceUnit>, ServiceCodegenError> {
-    let mut units = Vec::new();
-
-    for matched in index.select(&selector("service")) {
-        units.push(build_unit(&matched, Role::Service)?);
-    }
-
-    for matched in index.select(&selector("ticker")) {
-        units.push(build_unit(&matched, Role::Ticker)?);
-    }
-
-    Ok(units)
-}
-
 fn build_unit(matched: &MatchedAttribute, role: Role) -> Result<ServiceUnit, ServiceCodegenError> {
     let item = matched.item();
     let path = item.canonical_path().to_string();
@@ -159,4 +143,20 @@ fn is_cancellation_token(declared: &Type) -> bool {
 
 fn selector(name: &str) -> AttributeSelector {
     AttributeSelector::parse(name).expect("a marker selector is valid")
+}
+
+pub(crate) fn service_units(
+    index: &AttributeIndex,
+) -> Result<Vec<ServiceUnit>, ServiceCodegenError> {
+    let mut units = Vec::new();
+
+    for matched in index.select(&selector("service")) {
+        units.push(build_unit(&matched, Role::Service)?);
+    }
+
+    for matched in index.select(&selector("ticker")) {
+        units.push(build_unit(&matched, Role::Ticker)?);
+    }
+
+    Ok(units)
 }

@@ -14,49 +14,6 @@ use crate::console_codegen_error::ConsoleCodegenError;
 use crate::console_command::ConsoleCommand;
 use crate::optional_parameter::OptionalParameter;
 
-pub(crate) fn console_commands(
-    index: &AttributeIndex,
-) -> Result<Vec<ConsoleCommand>, ConsoleCodegenError> {
-    let command_selector = AttributeSelector::parse("console_command").expect("a valid selector");
-    let argument_selector = console_argument_selector();
-    let mut commands = Vec::new();
-
-    for matched in index.select(&command_selector) {
-        let item = matched.item();
-
-        if !item.kind().is_struct() {
-            return Err(ConsoleCodegenError::ConsoleCommandNotOnStruct {
-                target: item.canonical_path().to_string(),
-            });
-        }
-
-        let attributes = matched.args()?;
-        let command = item.canonical_path().to_string();
-        let name = attributes
-            .string("name")?
-            .ok_or(ConsoleCodegenError::MissingCommandName {
-                command: command.clone(),
-            })?;
-        let description = attributes.string("description")?;
-        let accessor = format_ident!("{}", item.canonical_path().field_name());
-        let runner =
-            command_runner(item).ok_or_else(|| ConsoleCodegenError::MissingCommandRunner {
-                command: command.clone(),
-            })?;
-        let arguments = command_arguments(runner, &argument_selector, &command)?;
-
-        commands.push(ConsoleCommand {
-            accessor,
-            arguments,
-            description,
-            name,
-            takes_token: runner_takes_token(runner),
-        });
-    }
-
-    Ok(commands)
-}
-
 fn command_arguments(
     runner: &IndexedMethod,
     argument_selector: &AttributeSelector,
@@ -167,4 +124,47 @@ fn command_runner(item: &IndexedItem) -> Option<&IndexedMethod> {
             .iter()
             .any(|attribute| runner_selector.matches(attribute.path()))
     })
+}
+
+pub(crate) fn console_commands(
+    index: &AttributeIndex,
+) -> Result<Vec<ConsoleCommand>, ConsoleCodegenError> {
+    let command_selector = AttributeSelector::parse("console_command").expect("a valid selector");
+    let argument_selector = console_argument_selector();
+    let mut commands = Vec::new();
+
+    for matched in index.select(&command_selector) {
+        let item = matched.item();
+
+        if !item.kind().is_struct() {
+            return Err(ConsoleCodegenError::ConsoleCommandNotOnStruct {
+                target: item.canonical_path().to_string(),
+            });
+        }
+
+        let attributes = matched.args()?;
+        let command = item.canonical_path().to_string();
+        let name = attributes
+            .string("name")?
+            .ok_or(ConsoleCodegenError::MissingCommandName {
+                command: command.clone(),
+            })?;
+        let description = attributes.string("description")?;
+        let accessor = format_ident!("{}", item.canonical_path().field_name());
+        let runner =
+            command_runner(item).ok_or_else(|| ConsoleCodegenError::MissingCommandRunner {
+                command: command.clone(),
+            })?;
+        let arguments = command_arguments(runner, &argument_selector, &command)?;
+
+        commands.push(ConsoleCommand {
+            accessor,
+            arguments,
+            description,
+            name,
+            takes_token: runner_takes_token(runner),
+        });
+    }
+
+    Ok(commands)
 }

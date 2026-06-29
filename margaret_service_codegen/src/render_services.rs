@@ -12,63 +12,12 @@ use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
 use crate::service_units::service_units;
 
-pub fn render_services(
-    index: &AttributeIndex,
-    has_http: bool,
-    container_is_async: bool,
-) -> Result<String, ServiceCodegenError> {
-    let units = service_units(index)?;
-    let adapters = units.iter().map(adapter);
-    let registrations = units
-        .iter()
-        .map(|unit| registration(unit, container_is_async));
-    let server_registration = server_registration(has_http, container_is_async);
-    let matches_binding = if has_http {
-        quote! { matches }
-    } else {
-        quote! { _matches }
-    };
-
-    let tokens = quote! {
-        use super::container::Container;
-
-        #(#adapters)*
-
-        pub async fn serve(
-            container: &Container,
-            #matches_binding: &clap::ArgMatches,
-            cancellation_token: margaret_service::CancellationToken,
-        ) -> margaret_console::command_outcome::CommandOutcome {
-            let mut manager = margaret_service::ServiceManager::default();
-
-            #server_registration
-            #(#registrations)*
-
-            margaret_service::run::run(
-                manager,
-                cancellation_token,
-                margaret_service::ServiceShutdownOptions::default(),
-            )
-            .await
-        }
-    };
-
-    let file =
-        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
-
-    Ok(prettyplease::unparse(&file))
-}
-
-fn server_registration(has_http: bool, container_is_async: bool) -> TokenStream {
+fn server_registration(has_http: bool) -> TokenStream {
     if !has_http {
         return quote! {};
     }
 
-    let server_call = if container_is_async {
-        quote! { super::http::server(container).await }
-    } else {
-        quote! { super::http::server(container) }
-    };
+    let server_call = quote! { super::http::server(container).await };
 
     quote! {
         let address = matches
@@ -155,14 +104,10 @@ fn adapter_body(unit: &ServiceUnit) -> TokenStream {
     }
 }
 
-fn registration(unit: &ServiceUnit, container_is_async: bool) -> TokenStream {
+fn registration(unit: &ServiceUnit) -> TokenStream {
     let name = adapter_ident(unit);
     let accessor = format_ident!("{}", unit.field_name);
-    let inner = if container_is_async {
-        quote! { container.#accessor().await }
-    } else {
-        quote! { container.#accessor() }
-    };
+    let inner = quote! { container.#accessor().await };
 
     quote! {
         manager.register_service(#name { inner: #inner });
@@ -180,4 +125,48 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
 
 fn uses_token(unit: &ServiceUnit) -> bool {
     matches!(unit.kind, ServiceKind::Ticker { .. }) || unit.takes_token
+}
+
+pub fn render_services(
+    index: &AttributeIndex,
+    has_http: bool,
+) -> Result<String, ServiceCodegenError> {
+    let units = service_units(index)?;
+    let adapters = units.iter().map(adapter);
+    let registrations = units.iter().map(registration);
+    let server_registration = server_registration(has_http);
+    let matches_binding = if has_http {
+        quote! { matches }
+    } else {
+        quote! { _matches }
+    };
+
+    let tokens = quote! {
+        use super::container::Container;
+
+        #(#adapters)*
+
+        pub async fn serve(
+            container: &Container,
+            #matches_binding: &clap::ArgMatches,
+            cancellation_token: margaret_service::CancellationToken,
+        ) -> margaret_console::command_outcome::CommandOutcome {
+            let mut manager = margaret_service::ServiceManager::default();
+
+            #server_registration
+            #(#registrations)*
+
+            margaret_service::run::run(
+                manager,
+                cancellation_token,
+                margaret_service::ServiceShutdownOptions::default(),
+            )
+            .await
+        }
+    };
+
+    let file =
+        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
+
+    Ok(prettyplease::unparse(&file))
 }

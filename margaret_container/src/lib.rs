@@ -2,7 +2,6 @@ mod build_plan;
 mod collection_table;
 mod construction_source;
 pub mod container_error;
-pub mod container_is_async;
 mod container_plan;
 mod dependency_kind;
 mod direct_construction;
