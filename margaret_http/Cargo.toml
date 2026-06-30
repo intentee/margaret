@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 async-trait = { workspace = true }
 bytes = { workspace = true }
+cookie = { workspace = true }
+form_urlencoded = { workspace = true }
 http = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["http1", "server"] }

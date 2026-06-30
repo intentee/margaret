@@ -7,13 +7,13 @@ use margaret_http::next::Next;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_macros::constructor;
-use margaret_macros::http_middleware;
+use margaret_macros::handles_middleware_attribute;
 use margaret_macros::singleton;
 
 use crate::plugin::Plugin;
 
 #[singleton]
-#[http_middleware(handles = traced)]
+#[handles_middleware_attribute(attribute = traced)]
 pub struct Tracing {
     plugins: Vec<Arc<dyn Plugin>>,
 }

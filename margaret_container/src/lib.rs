@@ -1,3 +1,4 @@
+mod append_synthetic_providers;
 mod build_plan;
 mod collection_table;
 mod construction_source;
@@ -16,5 +17,6 @@ mod raw_target;
 mod render;
 pub mod render_container;
 mod resolve_construction;
+pub mod synthetic_provider;
 mod topological_order;
 mod type_text;

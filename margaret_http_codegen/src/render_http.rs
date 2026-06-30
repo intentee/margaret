@@ -1,13 +1,17 @@
 use margaret_attributes::attribute_index::AttributeIndex;
 
+use crate::authenticated_actor_store::authenticated_actor_store;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_routes::http_routes;
 use crate::middleware_bindings::middleware_bindings;
 use crate::render::render;
+use crate::site_action_gates::site_action_gates;
 
 pub fn render_http(index: &AttributeIndex) -> Result<String, HttpCodegenError> {
     let bindings = middleware_bindings(index)?;
-    let routes = http_routes(index, &bindings)?;
+    let store = authenticated_actor_store(index)?;
+    let site_gates = site_action_gates(index)?;
+    let routes = http_routes(index, &bindings, &site_gates, store.is_some())?;
 
     Ok(render(&routes))
 }

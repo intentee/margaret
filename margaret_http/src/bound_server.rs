@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper_util::rt::TokioExecutor;
@@ -73,6 +74,7 @@ async fn dispatch(
         return Response::text(405, "Method Not Allowed").into_http();
     };
 
+    let path = request.uri().path().to_string();
     let headers = request
         .headers()
         .iter()
@@ -83,9 +85,14 @@ async fn dispatch(
                 .map(|value| (name.as_str().to_string(), value.to_string()))
         })
         .collect();
-    let mut handled = Request::new(method, request.uri().path().to_string());
+    let body = match request.into_body().collect().await {
+        Ok(collected) => String::from_utf8_lossy(&collected.to_bytes()).into_owned(),
+        Err(source) => return Response::text(400, format!("Bad Request: {source}")).into_http(),
+    };
+    let mut handled = Request::new(method, path);
 
     handled.set_headers(headers);
+    handled.set_body(body);
 
     app.handle(handled).await.into_http()
 }

@@ -1,11 +1,15 @@
+use syn::Path;
+
 use margaret_attributes::canonical_path::CanonicalPath;
 
-use crate::authorization::Authorization;
+use crate::session_requirement::SessionRequirement;
 
 pub(crate) enum RouteParameterBinding {
+    CurrentRequest,
     Raw,
+    SessionAuthenticated(SessionRequirement),
     Bound {
         binder: CanonicalPath,
-        authorization: Option<Authorization>,
+        intent: Option<Path>,
     },
 }

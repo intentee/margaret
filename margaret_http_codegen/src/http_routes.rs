@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
+use syn::Path;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
@@ -15,6 +18,7 @@ use crate::middleware_binding::MiddlewareBinding;
 use crate::path_parameter_names::path_parameter_names;
 use crate::registries::Registries;
 use crate::responder_method::responder_method;
+use crate::route_parameter_binding::RouteParameterBinding;
 
 fn marker_value(
     marker: &MatchedAttribute,
@@ -35,19 +39,75 @@ fn marker_value(
     }
 }
 
+fn is_path_parameter(binding: &RouteParameterBinding) -> bool {
+    matches!(
+        binding,
+        RouteParameterBinding::Raw | RouteParameterBinding::Bound { .. }
+    )
+}
+
+fn needs_authenticated_actor(route_parameters: &[crate::route_parameter::RouteParameter]) -> bool {
+    route_parameters.iter().any(|route_parameter| {
+        matches!(
+            &route_parameter.binding,
+            RouteParameterBinding::SessionAuthenticated(_)
+                | RouteParameterBinding::Bound {
+                    intent: Some(_),
+                    ..
+                }
+        )
+    })
+}
+
+fn site_action_guards(
+    item: &margaret_attributes::indexed_item::IndexedItem,
+    responder: &str,
+    site_gates: &HashMap<Path, String>,
+) -> Result<Vec<Path>, HttpCodegenError> {
+    let can_selector = AttributeSelector::parse("can").expect("a valid selector");
+    let mut guards = Vec::new();
+
+    for matched in AttributeQuery::new(item).matched_attributes() {
+        if !matched.matches(&can_selector) {
+            continue;
+        }
+
+        let action = matched
+            .args()?
+            .positional_path(0)
+            .ok_or_else(|| HttpCodegenError::CanWithoutAction {
+                responder: responder.to_string(),
+            })?
+            .clone();
+
+        if !site_gates.contains_key(&action) {
+            return Err(HttpCodegenError::MissingSiteActionGate {
+                responder: responder.to_string(),
+                action: quote! { #action }.to_string(),
+            });
+        }
+
+        guards.push(action);
+    }
+
+    Ok(guards)
+}
+
 pub(crate) fn http_routes(
     index: &AttributeIndex,
     bindings: &[MiddlewareBinding],
+    site_gates: &HashMap<Path, String>,
+    has_store: bool,
 ) -> Result<Vec<HttpRoute>, HttpCodegenError> {
     let selector = AttributeSelector::parse("responds_to_http").expect("a valid selector");
     let struct_paths = index.struct_paths();
     let binders = build_registry(
         index,
         &struct_paths,
-        "route_parameter_binder",
+        "provides_route_parameter",
         "Model",
-        |binder| HttpCodegenError::RouteParameterBinderModel { binder },
-        |model, first, second| HttpCodegenError::AmbiguousRouteParameterBinder {
+        |binder| HttpCodegenError::HttpRouteParameterBinderModel { binder },
+        |model, first, second| HttpCodegenError::AmbiguousHttpRouteParameterBinder {
             model,
             first,
             second,
@@ -56,7 +116,7 @@ pub(crate) fn http_routes(
     let gates = build_registry(
         index,
         &struct_paths,
-        "crud_gate",
+        "decides_crud_action",
         "Subject",
         |gate| HttpCodegenError::CrudGateSubject { gate },
         |subject, first, second| HttpCodegenError::AmbiguousCrudGate {
@@ -111,6 +171,7 @@ pub(crate) fn http_routes(
         layers.reverse();
 
         let route_parameters = responder_method(item, &responder, &registries)?;
+        let guards = site_action_guards(item, &responder, site_gates)?;
         let path_parameters =
             path_parameter_names(&path).map_err(|source| HttpCodegenError::InvalidRoutePath {
                 responder: responder.clone(),
@@ -119,13 +180,21 @@ pub(crate) fn http_routes(
             })?;
 
         for route_parameter in &route_parameters {
-            if !path_parameters.contains(&route_parameter.name) {
+            if is_path_parameter(&route_parameter.binding)
+                && !path_parameters.contains(&route_parameter.name)
+            {
                 return Err(HttpCodegenError::RouteParameterNotInPath {
                     responder: responder.clone(),
                     parameter: route_parameter.name.clone(),
                     path: path.clone(),
                 });
             }
+        }
+
+        if (!guards.is_empty() || needs_authenticated_actor(&route_parameters)) && !has_store {
+            return Err(HttpCodegenError::NoAuthenticatedActorStore {
+                responder: responder.clone(),
+            });
         }
 
         routes.push(HttpRoute {
@@ -140,6 +209,7 @@ pub(crate) fn http_routes(
             responder_field: format_ident!("{}", item.canonical_path().field_name()),
             responder_path: item.canonical_path().clone(),
             route_parameters,
+            site_action_guards: guards,
         });
     }
 

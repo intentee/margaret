@@ -99,6 +99,13 @@ impl AttributeArgs {
         self.positional.get(index)
     }
 
+    pub fn positional_path(&self, index: usize) -> Option<&Path> {
+        match self.positional.get(index) {
+            Some(Expr::Path(expression)) => Some(&expression.path),
+            _ => None,
+        }
+    }
+
     pub fn string(&self, key: &str) -> Result<Option<String>, AttributeError> {
         match self.named(key) {
             None => Ok(None),
@@ -220,5 +227,14 @@ mod tests {
             .to_string();
 
         assert!(message.contains("could not be parsed"));
+    }
+
+    #[test]
+    fn reads_a_positional_path_and_ignores_non_paths() {
+        let parsed = args(parse_quote!(#[decides(crate::action::Action::ViewAdmin, 5)]));
+
+        assert!(parsed.positional_path(0).is_some());
+        assert!(parsed.positional_path(1).is_none());
+        assert!(parsed.positional_path(99).is_none());
     }
 }

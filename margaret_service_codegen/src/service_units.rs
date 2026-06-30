@@ -61,7 +61,7 @@ fn build_unit(matched: &MatchedAttribute, role: Role) -> Result<ServiceUnit, Ser
 
 fn has_conflicting_roles(item: &IndexedItem, role: Role) -> bool {
     let others = match role {
-        Role::Service => ["console_command", "ticker"],
+        Role::Service => ["console_command", "scheduled_with_tick_timer"],
         Role::Ticker => ["console_command", "service"],
     };
 
@@ -154,7 +154,7 @@ pub(crate) fn service_units(
         units.push(build_unit(&matched, Role::Service)?);
     }
 
-    for matched in index.select(&selector("ticker")) {
+    for matched in index.select(&selector("scheduled_with_tick_timer")) {
         units.push(build_unit(&matched, Role::Ticker)?);
     }
 

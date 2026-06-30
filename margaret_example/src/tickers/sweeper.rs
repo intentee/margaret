@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use margaret_macros::constructor;
 use margaret_macros::runner;
-use margaret_macros::ticker;
+use margaret_macros::scheduled_with_tick_timer;
 
 use crate::metrics::Metrics;
 
-#[ticker(
+#[scheduled_with_tick_timer(
     interval = crate::sweep_interval::SWEEP_INTERVAL,
     behavior = tokio::time::MissedTickBehavior::Delay
 )]

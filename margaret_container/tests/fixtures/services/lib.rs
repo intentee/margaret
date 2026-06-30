@@ -16,5 +16,5 @@ impl Pulse {
     fn new(config: Arc<Config>) -> Self {}
 }
 
-#[ticker(interval = crate::schedule::PERIOD)]
+#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD)]
 struct Sweeper;

@@ -5,8 +5,12 @@ use crate::codegen_error::CodegenError;
 use crate::generated_code::GeneratedCode;
 use crate::generated_module::GeneratedModule;
 
-fn render_umbrella(has_http: bool, has_console: bool, serves: bool) -> String {
+fn render_umbrella(has_http: bool, has_console: bool, has_security: bool, serves: bool) -> String {
     let mut umbrella = String::from("#[rustfmt::skip]\npub mod container;\n");
+
+    if has_security {
+        umbrella.push_str("#[rustfmt::skip]\npub mod security;\n");
+    }
 
     if has_http {
         umbrella.push_str("#[rustfmt::skip]\npub mod http;\n");
@@ -34,13 +38,25 @@ pub fn build(crates: &[CrateRoot]) -> Result<GeneratedCode, CodegenError> {
 
     let has_http = margaret_http_codegen::has_responders::has_responders(&index);
     let has_services = margaret_service_codegen::has_services::has_services(&index);
+    let security = margaret_security_codegen::render_security::render_security(&index)?;
+    let has_security = security.is_some();
     let serves = has_http || has_services;
     let has_console = margaret_console_codegen::has_commands::has_commands(&index) || serves;
 
+    let synthetic_providers: Vec<_> = security
+        .as_ref()
+        .map(|artifacts| artifacts.providers.clone())
+        .unwrap_or_default();
+
     let mut modules = vec![GeneratedModule::new(
         "container",
-        margaret_container::render_container::render_container(&index)?.source(),
+        margaret_container::render_container::render_container(&index, &synthetic_providers)?
+            .source(),
     )];
+
+    if let Some(artifacts) = security {
+        modules.push(GeneratedModule::new("security", artifacts.module_source));
+    }
 
     if has_http {
         modules.push(GeneratedModule::new(
@@ -65,7 +81,7 @@ pub fn build(crates: &[CrateRoot]) -> Result<GeneratedCode, CodegenError> {
 
     modules.push(GeneratedModule::new(
         "mod",
-        render_umbrella(has_http, has_console, serves),
+        render_umbrella(has_http, has_console, has_security, serves),
     ));
 
     Ok(GeneratedCode::new(modules))
@@ -122,6 +138,33 @@ struct Greet;
 impl Greet {
     #[runner]
     fn run(&self) -> CommandOutcome {}
+}
+";
+
+    const SECURITY_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+struct User;
+struct Article;
+
+#[singleton]
+#[provides_authenticated_actor]
+struct SessionStore;
+
+impl AuthenticatedActorStore for SessionStore {
+    type Actor = User;
+    async fn get_authenticated_actor(&self, request: &Request) -> Authentication<User> {}
+}
+
+#[singleton]
+#[decides_crud_action]
+struct ArticleGate;
+
+impl CrudActionGate for ArticleGate {
+    type Actor = User;
+    type Subject = Article;
+    async fn can(&self, authentication: &Authentication<User>, subject: &Article, action: CrudAction) -> bool {}
 }
 ";
 
@@ -188,6 +231,35 @@ impl Greet {
         assert!(!module(&code, "mod").contains("pub mod http;"));
         assert!(!has_module(&code, "http"));
         assert!(module(&code, "console").contains("\"greet\""));
+    }
+
+    #[test]
+    fn wires_an_injectable_gatekeeper_when_a_user_store_exists() {
+        let code = generate(SECURITY_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod security;"));
+        assert!(module(&code, "security").contains("pub struct SecurityBackend"));
+        assert!(module(&code, "security").contains(
+            "impl CrudActionGateRegistry<crate::User, crate::Article> for SecurityBackend"
+        ));
+        assert!(module(&code, "security").contains(
+            "pub type Gatekeeper = margaret_security::gatekeeper::Gatekeeper<SecurityBackend>;"
+        ));
+        assert!(module(&code, "container").contains("pub async fn gatekeeper"));
+        assert!(module(&code, "container").contains("pub async fn security_backend"));
+        assert!(module(&code, "container").contains("crate::margaret::security::Gatekeeper::new("));
+        assert!(
+            module(&code, "container").contains("crate::margaret::security::SecurityBackend::new(")
+        );
+    }
+
+    #[test]
+    fn omits_the_security_module_without_a_user_store() {
+        let code = generate(PLAIN_CRATE).expect("the build succeeds");
+
+        assert!(!module(&code, "mod").contains("pub mod security;"));
+        assert!(!has_module(&code, "security"));
+        assert!(!module(&code, "container").contains("gatekeeper"));
     }
 
     #[test]
@@ -311,6 +383,17 @@ impl Greet {
             .to_string();
 
         assert!(message.contains("failed to generate the services"));
+    }
+
+    #[test]
+    fn propagates_a_security_failure() {
+        let message = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\nstruct User;\n\n#[singleton]\n#[provides_authenticated_actor]\nstruct First;\n\nimpl AuthenticatedActorStore for First {\n    type Actor = User;\n    async fn get_authenticated_actor(&self, request: &Request) -> Authentication<User> {}\n}\n\n#[singleton]\n#[provides_authenticated_actor]\nstruct Second;\n\nimpl AuthenticatedActorStore for Second {\n    type Actor = User;\n    async fn get_authenticated_actor(&self, request: &Request) -> Authentication<User> {}\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(message.contains("failed to generate the security layer"));
     }
 
     #[test]

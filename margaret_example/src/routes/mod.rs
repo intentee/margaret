@@ -1,7 +1,12 @@
-pub mod get_admin_report;
+pub mod delete_article;
+pub mod get_account;
+pub mod get_admin_users;
+pub mod get_article;
+pub mod get_articles;
 pub mod get_greeting;
 pub mod get_health;
-pub mod get_profile;
+pub mod get_login;
 pub mod get_revision;
-pub mod get_users;
-pub mod post_admin_report;
+pub mod patch_article;
+pub mod post_login;
+pub mod post_logout;

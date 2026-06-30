@@ -1,5 +1,4 @@
 pub mod action;
-pub mod binders;
 pub mod clock;
 pub mod commands;
 pub mod config;
@@ -13,12 +12,14 @@ pub mod middleware;
 pub mod models;
 pub mod plugin;
 pub mod providers;
+pub mod repositories;
 pub mod routes;
+pub mod security;
 pub mod services;
 pub mod sweep_interval;
 pub mod system_clock;
 pub mod tickers;
-pub mod user_repository;
+pub mod views;
 
 #[rustfmt::skip]
 pub mod margaret;

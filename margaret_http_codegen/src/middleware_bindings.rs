@@ -9,7 +9,8 @@ use crate::middleware_binding::MiddlewareBinding;
 pub(crate) fn middleware_bindings(
     index: &AttributeIndex,
 ) -> Result<Vec<MiddlewareBinding>, HttpCodegenError> {
-    let selector = AttributeSelector::parse("http_middleware").expect("a valid selector");
+    let selector =
+        AttributeSelector::parse("handles_middleware_attribute").expect("a valid selector");
     let mut bindings = Vec::new();
 
     for matched in index.select(&selector) {
@@ -25,7 +26,7 @@ pub(crate) fn middleware_bindings(
         let middleware = item.canonical_path().to_string();
         let handles =
             arguments
-                .path("handles")?
+                .path("attribute")?
                 .ok_or(HttpCodegenError::MissingMiddlewareHandles {
                     middleware: middleware.clone(),
                 })?;

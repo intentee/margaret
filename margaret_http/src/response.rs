@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use cookie::Cookie;
 use http_body_util::Full;
 
 use crate::header::Header;
@@ -18,6 +19,14 @@ impl Response {
         }
     }
 
+    pub fn html(status: u16, body: impl Into<String>) -> Self {
+        Self::text(status, body).header("content-type", "text/html; charset=utf-8")
+    }
+
+    pub fn see_other(location: impl Into<String>) -> Self {
+        Self::text(303, "").header("location", location)
+    }
+
     pub fn not_found() -> Self {
         Self::text(404, "Not Found")
     }
@@ -33,6 +42,10 @@ impl Response {
         });
 
         self
+    }
+
+    pub fn set_cookie(self, cookie: Cookie<'static>) -> Self {
+        self.header("set-cookie", cookie.to_string())
     }
 
     pub fn status(&self) -> u16 {
@@ -58,6 +71,8 @@ impl Response {
 
 #[cfg(test)]
 mod tests {
+    use cookie::Cookie;
+
     use super::Response;
 
     #[test]
@@ -68,5 +83,49 @@ mod tests {
 
         assert_eq!(response.status().as_u16(), 201);
         assert!(response.headers().contains_key("x-marker"));
+    }
+
+    #[test]
+    fn builds_an_html_response_with_a_content_type() {
+        let response = Response::html(200, "<p>hi</p>").into_http();
+
+        assert_eq!(
+            response
+                .headers()
+                .get("content-type")
+                .expect("the content type header is present"),
+            "text/html; charset=utf-8"
+        );
+    }
+
+    #[test]
+    fn builds_a_see_other_redirect_with_a_location() {
+        let response = Response::see_other("/profile").into_http();
+
+        assert_eq!(response.status().as_u16(), 303);
+        assert_eq!(
+            response
+                .headers()
+                .get("location")
+                .expect("the location header is present"),
+            "/profile"
+        );
+    }
+
+    #[test]
+    fn attaches_a_set_cookie_header() {
+        let response = Response::see_other("/profile")
+            .set_cookie(Cookie::new("session", "abc"))
+            .into_http();
+
+        assert!(
+            response
+                .headers()
+                .get("set-cookie")
+                .expect("the set-cookie header is present")
+                .to_str()
+                .expect("the header is valid text")
+                .starts_with("session=abc")
+        );
     }
 }

@@ -20,7 +20,7 @@ fn rejects_a_non_struct_ticker() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ticker_not_a_struct");
     let error = generate_container_source("crate", &directory)
         .err()
-        .expect("a #[ticker] on a non-struct must be rejected");
+        .expect("a #[scheduled_with_tick_timer] on a non-struct must be rejected");
 
     assert!(matches!(error, ContainerError::NotASingletonStruct { .. }));
 }

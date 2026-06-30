@@ -13,11 +13,13 @@ pub enum ServiceCodegenError {
     #[error("#[service] is only supported on structs, but '{path}' is not a struct")]
     ServiceNotAStruct { path: String },
 
-    #[error("#[ticker] is only supported on structs, but '{path}' is not a struct")]
+    #[error(
+        "#[scheduled_with_tick_timer] is only supported on structs, but '{path}' is not a struct"
+    )]
     TickerNotAStruct { path: String },
 
     #[error(
-        "'{path}' carries more than one of #[console_command]/#[service]/#[ticker]; these roles are mutually exclusive"
+        "'{path}' carries more than one of #[console_command]/#[service]/#[scheduled_with_tick_timer]; these roles are mutually exclusive"
     )]
     ConflictingRoles { path: String },
 
@@ -32,6 +34,6 @@ pub enum ServiceCodegenError {
     )]
     UnexpectedRunnerParameter { unit: String, parameter: String },
 
-    #[error("#[ticker] '{ticker}' is missing the 'interval' argument")]
+    #[error("#[scheduled_with_tick_timer] '{ticker}' is missing the 'interval' argument")]
     TickerMissingInterval { ticker: String },
 }

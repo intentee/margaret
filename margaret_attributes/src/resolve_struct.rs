@@ -1,10 +1,10 @@
 use syn::Type;
 
-use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::resolution::Resolution;
-use margaret_attributes::resolve_unique::resolve_unique;
+use crate::canonical_path::CanonicalPath;
+use crate::resolution::Resolution;
+use crate::resolve_unique::resolve_unique;
 
-pub(crate) fn resolve_struct(
+pub fn resolve_struct(
     declared: &Type,
     candidates: &[CanonicalPath],
     referencing_root: &str,

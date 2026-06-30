@@ -20,10 +20,12 @@ pub enum HttpCodegenError {
     #[error("responder '{responder}' is missing the 'path' argument")]
     MissingHttpPath { responder: String },
 
-    #[error("#[http_middleware] is only supported on structs, but '{target}' is not a struct")]
+    #[error(
+        "#[handles_middleware_attribute] is only supported on structs, but '{target}' is not a struct"
+    )]
     HttpMiddlewareNotOnStruct { target: String },
 
-    #[error("middleware '{middleware}' is missing the 'handles' argument")]
+    #[error("middleware '{middleware}' is missing the 'attribute' argument")]
     MissingMiddlewareHandles { middleware: String },
 
     #[error(
@@ -35,7 +37,7 @@ pub enum HttpCodegenError {
     MissingResponderMethod { responder: String },
 
     #[error(
-        "parameter '{parameter}' of responder '{responder}' is not marked #[route_parameter]; every responder parameter must be a route parameter"
+        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a session-authenticated parameter, or the current request"
     )]
     UnmarkedResponderParameter {
         responder: String,
@@ -66,19 +68,19 @@ pub enum HttpCodegenError {
     },
 
     #[error(
-        "#[route_parameter_binder] '{binder}' has no `type Model = <struct>` associated type that resolves to a known model"
+        "#[provides_route_parameter] '{binder}' has no `type Model = <struct>` associated type that resolves to a known model"
     )]
-    RouteParameterBinderModel { binder: String },
+    HttpRouteParameterBinderModel { binder: String },
 
     #[error("model '{model}' has more than one route parameter binder: '{first}' and '{second}'")]
-    AmbiguousRouteParameterBinder {
+    AmbiguousHttpRouteParameterBinder {
         model: String,
         first: String,
         second: String,
     },
 
     #[error(
-        "#[crud_gate] '{gate}' has no `type Subject = <struct>` associated type that resolves to a known model"
+        "#[decides_crud_action] '{gate}' has no `type Subject = <struct>` associated type that resolves to a known model"
     )]
     CrudGateSubject { gate: String },
 
@@ -90,16 +92,16 @@ pub enum HttpCodegenError {
     },
 
     #[error(
-        "route parameter '{parameter}' of responder '{responder}' has type '{written}', which has no #[route_parameter_binder]"
+        "route parameter '{parameter}' of responder '{responder}' has type '{written}', which has no #[provides_route_parameter]"
     )]
-    MissingRouteParameterBinder {
+    MissingHttpRouteParameterBinder {
         responder: String,
         parameter: String,
         written: String,
     },
 
     #[error(
-        "route parameter '{parameter}' of responder '{responder}' declares an intent but type '{written}' has no #[crud_gate]"
+        "route parameter '{parameter}' of responder '{responder}' declares an intent but type '{written}' has no #[decides_crud_action] gate"
     )]
     MissingCrudGate {
         responder: String,
@@ -114,4 +116,32 @@ pub enum HttpCodegenError {
         responder: String,
         parameter: String,
     },
+
+    #[error(
+        "more than one #[provides_authenticated_actor] store is defined: '{first}' and '{second}'; exactly one is allowed"
+    )]
+    AmbiguousAuthenticatedActorStore { first: String, second: String },
+
+    #[error(
+        "responder '{responder}' needs the authenticated actor but no #[provides_authenticated_actor] store is defined"
+    )]
+    NoAuthenticatedActorStore { responder: String },
+
+    #[error("#[decides_site_action] gate '{gate}' is missing its site action argument")]
+    MissingSiteActionArgument { gate: String },
+
+    #[error("site action '{action}' has more than one gate: '{first}' and '{second}'")]
+    AmbiguousSiteActionGate {
+        action: String,
+        first: String,
+        second: String,
+    },
+
+    #[error("responder '{responder}' has a #[can] attribute without a site action argument")]
+    CanWithoutAction { responder: String },
+
+    #[error(
+        "responder '{responder}' is guarded by site action '{action}' but no #[decides_site_action] gate decides it"
+    )]
+    MissingSiteActionGate { responder: String, action: String },
 }

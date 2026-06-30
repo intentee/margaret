@@ -7,34 +7,80 @@ use quote::quote;
 
 use margaret_attributes::path_tokens::path_tokens;
 
-use crate::authorization::Authorization;
 use crate::http_route::HttpRoute;
 use crate::route_parameter::RouteParameter;
 use crate::route_parameter_binding::RouteParameterBinding;
+use crate::session_requirement::SessionRequirement;
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
+}
+
+fn route_needs_user(route: &HttpRoute) -> bool {
+    !route.site_action_guards.is_empty()
+        || route.route_parameters.iter().any(|route_parameter| {
+            matches!(
+                &route_parameter.binding,
+                RouteParameterBinding::SessionAuthenticated(_)
+                    | RouteParameterBinding::Bound {
+                        intent: Some(_),
+                        ..
+                    }
+            )
+        })
+}
+
+fn is_session_authenticated(route_parameter: &RouteParameter) -> bool {
+    matches!(
+        route_parameter.binding,
+        RouteParameterBinding::SessionAuthenticated(_)
+    )
 }
 
 fn onion(route: &HttpRoute) -> TokenStream {
     let responder = &route.responder_field;
     let responder_type = path_tokens(&route.responder_path);
     let responder_access = access(quote! { container.#responder() });
-    let request_binding = if route.route_parameters.is_empty() {
-        format_ident!("_request")
+    let request_binding =
+        if route.route_parameters.is_empty() && route.site_action_guards.is_empty() {
+            format_ident!("_request")
+        } else {
+            format_ident!("request")
+        };
+
+    let user_resolution = if route_needs_user(route) {
+        quote! {
+            let authenticated_actor = gatekeeper.authenticate(&request).await;
+        }
     } else {
-        format_ident!("request")
+        quote! {}
     };
-    let bindings = route
+    let site_guards = route.site_action_guards.iter().map(|action| {
+        quote! {
+            if !gatekeeper.can_site_action(&authenticated_actor, #action).await {
+                return margaret_http::response::Response::forbidden();
+            }
+        }
+    });
+    let general_bindings = route
         .route_parameters
         .iter()
+        .filter(|route_parameter| !is_session_authenticated(route_parameter))
+        .map(|route_parameter| parameter_binding(route_parameter, &request_binding));
+    let session_bindings = route
+        .route_parameters
+        .iter()
+        .filter(|route_parameter| is_session_authenticated(route_parameter))
         .map(|route_parameter| parameter_binding(route_parameter, &request_binding));
     let arguments = route
         .route_parameters
         .iter()
         .map(|route_parameter| format_ident!("{}", route_parameter.name));
     let body = quote! {
-        #(#bindings)*
+        #user_resolution
+        #(#site_guards)*
+        #(#general_bindings)*
+        #(#session_bindings)*
         responder.respond(#(#arguments),*).await
     };
 
@@ -99,10 +145,21 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
         RouteParameterBinding::Raw => quote! {
             let #name = #request.path_param(#key).expect(#message).to_string();
         },
-        RouteParameterBinding::Bound {
-            binder,
-            authorization,
-        } => {
+        RouteParameterBinding::CurrentRequest => quote! {
+            let #name = &#request;
+        },
+        RouteParameterBinding::SessionAuthenticated(SessionRequirement::Required) => quote! {
+            let #name = match authenticated_actor {
+                margaret_security::authenticated_actor::AuthenticatedActor::Session(user) => user,
+                margaret_security::authenticated_actor::AuthenticatedActor::Anonymous => {
+                    return margaret_http::response::Response::forbidden();
+                }
+            };
+        },
+        RouteParameterBinding::SessionAuthenticated(SessionRequirement::Optional) => quote! {
+            let #name = authenticated_actor;
+        },
+        RouteParameterBinding::Bound { binder, intent } => {
             let binder_field = format_ident!("{}", binder.field_name());
             let load = quote! {
                 let #name = match #binder_field
@@ -114,17 +171,13 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
                 };
             };
 
-            match authorization {
-                Some(Authorization { gate, intent }) => {
-                    let gate_field = format_ident!("{}", gate.field_name());
-
-                    quote! {
-                        #load
-                        if !#gate_field.can(&#request, &#name, #intent).await {
-                            return margaret_http::response::Response::forbidden();
-                        }
+            match intent {
+                Some(intent) => quote! {
+                    #load
+                    if !gatekeeper.can_crud(&authenticated_actor, &#name, #intent).await {
+                        return margaret_http::response::Response::forbidden();
                     }
-                }
+                },
                 None => load,
             }
         }
@@ -135,17 +188,13 @@ fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
     let mut fields: BTreeSet<String> = BTreeSet::new();
 
     for route_parameter in &route.route_parameters {
-        if let RouteParameterBinding::Bound {
-            binder,
-            authorization,
-        } = &route_parameter.binding
-        {
+        if let RouteParameterBinding::Bound { binder, .. } = &route_parameter.binding {
             fields.insert(binder.field_name());
-
-            if let Some(Authorization { gate, .. }) = authorization {
-                fields.insert(gate.field_name());
-            }
         }
+    }
+
+    if route_needs_user(route) {
+        fields.insert("gatekeeper".to_string());
     }
 
     fields
@@ -168,7 +217,7 @@ fn route_is_authorized(route: &HttpRoute) -> bool {
         matches!(
             &route_parameter.binding,
             RouteParameterBinding::Bound {
-                authorization: Some(_),
+                intent: Some(_),
                 ..
             }
         )
@@ -188,22 +237,19 @@ pub(crate) fn render(routes: &[HttpRoute]) -> String {
     });
 
     let binder_import = if routes.iter().any(route_is_bound) {
-        quote! { use margaret_http::route_parameter_binder::RouteParameterBinder; }
+        quote! { use margaret_http::http_route_parameter_binder::HttpRouteParameterBinder; }
     } else {
         quote! {}
     };
-    let gate_import = if routes.iter().any(route_is_authorized) {
-        quote! {
-            use margaret_http::crud_action::CrudAction;
-            use margaret_http::crud_action_gate::CrudActionGate;
-        }
+    let crud_import = if routes.iter().any(route_is_authorized) {
+        quote! { use margaret_security::crud_action::CrudAction; }
     } else {
         quote! {}
     };
     let tokens = quote! {
         use super::container::Container;
         #binder_import
-        #gate_import
+        #crud_import
 
         pub async fn server(container: &Container) -> margaret_http::server::Server {
             let router = margaret_http::router::Router::empty()

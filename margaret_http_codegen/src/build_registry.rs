@@ -4,9 +4,9 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
+use margaret_attributes::resolve_struct::resolve_struct;
 
 use crate::http_codegen_error::HttpCodegenError;
-use crate::resolve_struct::resolve_struct;
 
 fn associated_model(
     item: &IndexedItem,

@@ -30,18 +30,18 @@ pub fn service(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn ticker(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn scheduled_with_tick_timer(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
 #[proc_macro_attribute]
 pub fn runner(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, "console_argument")
+    strip_parameter_markers(item, &["console_argument"])
 }
 
 #[proc_macro_attribute]
 pub fn responder(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, "route_parameter")
+    strip_parameter_markers(item, &["route_parameter", "session_authenticated"])
 }
 
 #[proc_macro_attribute]
@@ -50,17 +50,17 @@ pub fn responds_to_http(_attributes: TokenStream, item: TokenStream) -> TokenStr
 }
 
 #[proc_macro_attribute]
-pub fn route_parameter_binder(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
 #[proc_macro_attribute]
-pub fn crud_gate(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn decides_crud_action(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
 #[proc_macro_attribute]
-pub fn http_middleware(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn handles_middleware_attribute(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
@@ -69,21 +69,42 @@ pub fn console_command(_attributes: TokenStream, item: TokenStream) -> TokenStre
     item
 }
 
-fn strip_parameter_markers(item: TokenStream, marker: &str) -> TokenStream {
-    match strip(item.into(), marker) {
-        Ok(stripped) => stripped.into(),
-        Err(error) => error.to_compile_error().into(),
+#[proc_macro_attribute]
+pub fn provides_authenticated_actor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn decides_site_action(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn can(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+fn strip_parameter_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
+    strip_or_compile_error(item.into(), markers).into()
+}
+
+fn strip_or_compile_error(item: TokenStream2, markers: &[&str]) -> TokenStream2 {
+    match strip(item, markers) {
+        Ok(stripped) => stripped,
+        Err(error) => error.to_compile_error(),
     }
 }
 
-fn strip(item: TokenStream2, marker: &str) -> Result<TokenStream2, syn::Error> {
+fn strip(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
     let mut function: ImplItemFn = syn::parse2(item)?;
 
     for input in &mut function.sig.inputs {
         if let FnArg::Typed(pattern_type) = input {
-            pattern_type
-                .attrs
-                .retain(|attribute| !attribute.path().is_ident(marker));
+            pattern_type.attrs.retain(|attribute| {
+                !markers
+                    .iter()
+                    .any(|marker| attribute.path().is_ident(marker))
+            });
         }
     }
 
@@ -94,11 +115,11 @@ fn strip(item: TokenStream2, marker: &str) -> Result<TokenStream2, syn::Error> {
 mod tests {
     use quote::quote;
 
-    use super::strip;
+    use super::strip_or_compile_error;
 
     #[test]
     fn removes_console_argument_markers_from_parameters() {
-        let stripped = strip(
+        let stripped = strip_or_compile_error(
             quote! {
                 pub fn create(
                     greeter: Arc<dyn Greeter>,
@@ -108,9 +129,8 @@ mod tests {
                     Self { greeter, name, loud }
                 }
             },
-            "console_argument",
+            &["console_argument"],
         )
-        .expect("the constructor parses")
         .to_string();
 
         assert!(!stripped.contains("console_argument"));
@@ -120,24 +140,32 @@ mod tests {
     }
 
     #[test]
-    fn removes_route_parameter_markers_from_parameters() {
-        let stripped = strip(
+    fn removes_several_parameter_markers_at_once() {
+        let stripped = strip_or_compile_error(
             quote! {
-                pub async fn respond(&self, #[route_parameter] id: String) -> Response {
+                pub async fn respond(
+                    &self,
+                    #[route_parameter] id: String,
+                    #[session_authenticated] user: User,
+                ) -> Response {
                     Response::text(200, id)
                 }
             },
-            "route_parameter",
+            &["route_parameter", "session_authenticated"],
         )
-        .expect("the responder parses")
         .to_string();
 
         assert!(!stripped.contains("route_parameter"));
+        assert!(!stripped.contains("session_authenticated"));
         assert!(stripped.contains("id"));
+        assert!(stripped.contains("user"));
     }
 
     #[test]
-    fn reports_a_parse_error_for_a_non_method() {
-        assert!(strip(quote! { struct NotAMethod; }, "route_parameter").is_err());
+    fn turns_a_parse_error_into_a_compile_error() {
+        let output =
+            strip_or_compile_error(quote! { struct NotAMethod; }, &["route_parameter"]).to_string();
+
+        assert!(output.contains("compile_error"));
     }
 }

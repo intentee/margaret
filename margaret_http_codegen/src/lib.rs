@@ -1,4 +1,4 @@
-mod authorization;
+mod authenticated_actor_store;
 mod build_registry;
 pub mod generate_http_source;
 pub mod has_responders;
@@ -12,10 +12,11 @@ mod path_parameter_names;
 mod registries;
 mod render;
 pub mod render_http;
-mod resolve_struct;
 mod responder_method;
 mod route_parameter;
 mod route_parameter_binding;
+mod session_requirement;
+mod site_action_gates;
 
 #[cfg(test)]
 mod tests {
@@ -50,10 +51,10 @@ impl Open {
     fn respond(&self) -> Response {}
 }
 
-#[http_middleware(handles = guard)]
+#[handles_middleware_attribute(attribute = guard)]
 struct Guard;
 
-#[http_middleware(handles = traced)]
+#[handles_middleware_attribute(attribute = traced)]
 struct Tracer;
 "#;
 
@@ -70,10 +71,10 @@ impl GetUser {
     const BOUND_WITHOUT_INTENT: &str = r#"
 struct User;
 
-#[route_parameter_binder]
+#[provides_route_parameter]
 struct UserBinder;
 
-impl RouteParameterBinder for UserBinder {
+impl HttpRouteParameterBinder for UserBinder {
     type Model = User;
     async fn bind(&self, value: String) -> Option<User> {}
 }
@@ -90,20 +91,29 @@ impl GetUser {
     const MODEL_PARAMETER: &str = r#"
 struct User;
 
-#[route_parameter_binder]
+#[provides_authenticated_actor]
+struct SessionStore;
+
+impl AuthenticatedActorStore for SessionStore {
+    type Actor = User;
+    async fn get_authenticated_actor(&self, request: &Request) -> Option<User> {}
+}
+
+#[provides_route_parameter]
 struct UserBinder;
 
-impl RouteParameterBinder for UserBinder {
+impl HttpRouteParameterBinder for UserBinder {
     type Model = User;
     async fn bind(&self, value: String) -> Option<User> {}
 }
 
-#[crud_gate]
+#[decides_crud_action]
 struct UserGate;
 
 impl CrudActionGate for UserGate {
+    type Actor = User;
     type Subject = User;
-    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}
+    async fn can(&self, user: Option<&User>, subject: &User, action: CrudAction) -> bool {}
 }
 
 #[responds_to_http(method = Get, path = "/profiles/{user}")]
@@ -112,6 +122,63 @@ struct GetProfile;
 impl GetProfile {
     #[responder]
     fn respond(&self, #[route_parameter(intent = CrudAction::Read)] user: User) -> Response {}
+}
+"#;
+
+    const SESSION_AUTHENTICATED: &str = r#"
+struct User;
+
+#[provides_authenticated_actor]
+struct SessionStore;
+
+impl AuthenticatedActorStore for SessionStore {
+    type Actor = User;
+    async fn get_authenticated_actor(&self, request: &Request) -> Option<User> {}
+}
+
+#[responds_to_http(method = Get, path = "/account")]
+struct GetAccount;
+
+impl GetAccount {
+    #[responder]
+    fn respond(&self, #[session_authenticated] user: User) -> Response {}
+}
+
+#[responds_to_http(method = Get, path = "/maybe")]
+struct GetMaybe;
+
+impl GetMaybe {
+    #[responder]
+    fn respond(&self, #[session_authenticated] user: AuthenticatedActor<User>) -> Response {}
+}
+"#;
+
+    const SITE_ACTION: &str = r#"
+struct User;
+
+#[provides_authenticated_actor]
+struct SessionStore;
+
+impl AuthenticatedActorStore for SessionStore {
+    type Actor = User;
+    async fn get_authenticated_actor(&self, request: &Request) -> Option<User> {}
+}
+
+#[decides_site_action(crate::action::Action::ViewAdmin)]
+struct ViewAdminGate;
+
+impl SiteActionGate for ViewAdminGate {
+    type Actor = User;
+    async fn can(&self, user: Option<&User>) -> bool {}
+}
+
+#[responds_to_http(method = Get, path = "/admin")]
+#[can(crate::action::Action::ViewAdmin)]
+struct GetAdmin;
+
+impl GetAdmin {
+    #[responder]
+    fn respond(&self, request: &Request) -> Response {}
 }
 "#;
 
@@ -195,23 +262,64 @@ impl GetProfile {
     fn injects_a_bound_model_with_an_authorization_gate() {
         let source = source_for(MODEL_PARAMETER);
 
-        assert!(source.contains("usemargaret_http::crud_action::CrudAction;"));
-        assert!(source.contains("usemargaret_http::route_parameter_binder::RouteParameterBinder;"));
-        assert!(source.contains("usemargaret_http::crud_action_gate::CrudActionGate;"));
+        assert!(source.contains("usemargaret_security::crud_action::CrudAction;"));
+        assert!(
+            source.contains(
+                "usemargaret_http::http_route_parameter_binder::HttpRouteParameterBinder;"
+            )
+        );
+        assert!(!source.contains("CrudActionGateRegistry"));
+        assert!(source.contains("container.gatekeeper().await"));
         assert!(source.contains("container.user_binder().await"));
-        assert!(source.contains("container.user_gate().await"));
+        assert!(source.contains("letauthenticated_actor=gatekeeper.authenticate(&request).await;"));
         assert!(source.contains(r#"user_binder.bind(request.path_param("user").expect"#));
         assert!(source.contains("margaret_http::response::Response::not_found()"));
-        assert!(source.contains("user_gate.can(&request,&user,CrudAction::Read).await"));
-        assert!(source.contains("margaret_http::response::Response::forbidden()"));
+        assert!(source.contains(
+            "if!gatekeeper.can_crud(&authenticated_actor,&user,CrudAction::Read).await{returnmargaret_http::response::Response::forbidden();}"
+        ));
         assert!(source.contains("responder.respond(user).await"));
+        assert!(!source.contains("get_authenticated_actor"));
+    }
+
+    #[test]
+    fn injects_a_required_session_authenticated_actor() {
+        let source = source_for(SESSION_AUTHENTICATED);
+
+        assert!(source.contains("container.gatekeeper().await"));
+        assert!(source.contains("letauthenticated_actor=gatekeeper.authenticate(&request).await;"));
+        assert!(source.contains("letuser=matchauthenticated_actor{margaret_security::authenticated_actor::AuthenticatedActor::Session(user,)=>user,margaret_security::authenticated_actor::AuthenticatedActor::Anonymous=>{returnmargaret_http::response::Response::forbidden();}};"));
+        assert!(source.contains("responder.respond(user).await"));
+        assert!(!source.contains("AuthenticatedActorStore"));
+    }
+
+    #[test]
+    fn injects_an_optional_session_authenticated_actor() {
+        let source = source_for(SESSION_AUTHENTICATED);
+
+        assert!(source.contains("letuser=authenticated_actor;"));
+    }
+
+    #[test]
+    fn guards_a_responder_with_a_site_action() {
+        let source = source_for(SITE_ACTION);
+
+        assert!(source.contains("container.gatekeeper().await"));
+        assert!(source.contains("letauthenticated_actor=gatekeeper.authenticate(&request).await;"));
+        assert!(source.contains("if!gatekeeper.can_site_action(&authenticated_actor,crate::action::Action::ViewAdmin,).await{returnmargaret_http::response::Response::forbidden();}"));
+        assert!(source.contains("letrequest=&request;"));
+        assert!(source.contains("responder.respond(request).await"));
+        assert!(!source.contains("SiteActionGate"));
     }
 
     #[test]
     fn injects_a_bound_model_without_authorization() {
         let source = source_for(BOUND_WITHOUT_INTENT);
 
-        assert!(source.contains("usemargaret_http::route_parameter_binder::RouteParameterBinder;"));
+        assert!(
+            source.contains(
+                "usemargaret_http::http_route_parameter_binder::HttpRouteParameterBinder;"
+            )
+        );
         assert!(source.contains("container.user_binder().await"));
         assert!(source.contains(r#"user_binder.bind(request.path_param("user").expect"#));
         assert!(source.contains("margaret_http::response::Response::not_found()"));
@@ -222,7 +330,7 @@ impl GetProfile {
 
     #[test]
     fn reports_a_binder_without_a_model_associated_type() {
-        let message = error_for("#[route_parameter_binder]\nstruct Bare;\n");
+        let message = error_for("#[provides_route_parameter]\nstruct Bare;\n");
 
         assert!(message.contains("type Model"));
     }
@@ -230,7 +338,7 @@ impl GetProfile {
     #[test]
     fn reports_a_binder_with_a_non_struct_model() {
         let message = error_for(
-            "#[route_parameter_binder]\nstruct UnitBinder;\nimpl RouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> Option<()> {}\n}\n",
+            "#[provides_route_parameter]\nstruct UnitBinder;\nimpl HttpRouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> Option<()> {}\n}\n",
         );
 
         assert!(message.contains("type Model"));
@@ -242,7 +350,7 @@ impl GetProfile {
             "#[responds_to_http(method = Get, path = \"/things/{thing}\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter] thing: Unknown) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("no #[route_parameter_binder]"));
+        assert!(message.contains("no #[provides_route_parameter]"));
     }
 
     #[test]
@@ -266,7 +374,7 @@ impl GetProfile {
     #[test]
     fn rejects_two_binders_for_the_same_model() {
         let message = error_for(
-            "struct User;\n\n#[route_parameter_binder]\nstruct First;\nimpl RouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[route_parameter_binder]\nstruct Second;\nimpl RouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n",
+            "struct User;\n\n#[provides_route_parameter]\nstruct First;\nimpl HttpRouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[provides_route_parameter]\nstruct Second;\nimpl HttpRouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n",
         );
 
         assert!(message.contains("more than one route parameter binder"));
@@ -274,7 +382,7 @@ impl GetProfile {
 
     #[test]
     fn reports_a_gate_without_a_subject_associated_type() {
-        let message = error_for("#[crud_gate]\nstruct Bare;\n");
+        let message = error_for("#[decides_crud_action]\nstruct Bare;\n");
 
         assert!(message.contains("type Subject"));
     }
@@ -282,7 +390,7 @@ impl GetProfile {
     #[test]
     fn rejects_two_gates_for_the_same_subject() {
         let message = error_for(
-            "struct User;\n\n#[crud_gate]\nstruct First;\nimpl CrudActionGate for First {\n    type Subject = User;\n    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}\n}\n\n#[crud_gate]\nstruct Second;\nimpl CrudActionGate for Second {\n    type Subject = User;\n    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}\n}\n",
+            "struct User;\n\n#[decides_crud_action]\nstruct First;\nimpl CrudActionGate for First {\n    type Subject = User;\n    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}\n}\n\n#[decides_crud_action]\nstruct Second;\nimpl CrudActionGate for Second {\n    type Subject = User;\n    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}\n}\n",
         );
 
         assert!(message.contains("more than one CRUD gate"));
@@ -294,16 +402,16 @@ impl GetProfile {
             "struct User;\n\n#[responds_to_http(method = Get, path = \"/users/{user}\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter] user: User) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("no #[route_parameter_binder]"));
+        assert!(message.contains("no #[provides_route_parameter]"));
     }
 
     #[test]
     fn rejects_an_intent_without_a_gate() {
         let message = error_for(
-            "struct User;\n\n#[route_parameter_binder]\nstruct UserBinder;\nimpl RouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = Get, path = \"/users/{user}\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter(intent = CrudAction::Read)] user: User) -> Response {}\n}\n",
+            "struct User;\n\n#[provides_route_parameter]\nstruct UserBinder;\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = Get, path = \"/users/{user}\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter(intent = CrudAction::Read)] user: User) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("no #[crud_gate]"));
+        assert!(message.contains("no #[decides_crud_action] gate"));
     }
 
     #[test]
@@ -408,24 +516,31 @@ impl GetProfile {
 
     #[test]
     fn rejects_http_middleware_on_a_non_struct() {
-        let message = error_for("#[http_middleware(handles = x)]\nenum Bad {}\n");
+        let message = error_for("#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n");
 
-        assert!(message.contains("#[http_middleware]"));
+        assert!(message.contains("#[handles_middleware_attribute]"));
     }
 
     #[test]
     fn propagates_malformed_middleware_arguments() {
-        assert!(error_for("#[http_middleware(= 5)]\nstruct Bad;\n").contains("failed to index"));
+        assert!(
+            error_for("#[handles_middleware_attribute(= 5)]\nstruct Bad;\n")
+                .contains("failed to index")
+        );
     }
 
     #[test]
     fn rejects_middleware_without_handles() {
-        assert!(error_for("#[http_middleware]\nstruct Bad;\n").contains("missing the 'handles'"));
+        assert!(
+            error_for("#[handles_middleware_attribute]\nstruct Bad;\n")
+                .contains("missing the 'attribute'")
+        );
     }
 
     #[test]
     fn propagates_a_non_path_handles_argument() {
-        let message = error_for("#[http_middleware(handles = \"x\")]\nstruct Bad;\n");
+        let message =
+            error_for("#[handles_middleware_attribute(attribute = \"x\")]\nstruct Bad;\n");
 
         assert!(message.contains("failed to index"));
     }
@@ -433,7 +548,7 @@ impl GetProfile {
     #[test]
     fn rejects_a_malformed_marker() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(crate::A, crate::B)]\nstruct Bad;\n\n#[http_middleware(handles = guard)]\nstruct Guard;\n",
+            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(crate::A, crate::B)]\nstruct Bad;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n",
         );
 
         assert!(message.contains("must carry zero or one positional argument"));
@@ -442,7 +557,7 @@ impl GetProfile {
     #[test]
     fn propagates_malformed_marker_arguments() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(= 5)]\nstruct Bad;\n\n#[http_middleware(handles = guard)]\nstruct Guard;\n",
+            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(= 5)]\nstruct Bad;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -460,5 +575,73 @@ impl GetProfile {
         let index = index_for("#[singleton]\nstruct S;\n");
 
         assert!(!has_responders(&index));
+    }
+
+    #[test]
+    fn rejects_two_authenticated_actor_stores() {
+        let message = error_for(
+            "struct User;\n\n#[provides_authenticated_actor]\nstruct First;\nimpl AuthenticatedActorStore for First {\n    type Actor = User;\n    async fn get_authenticated_actor(&self, request: &Request) -> Option<User> {}\n}\n\n#[provides_authenticated_actor]\nstruct Second;\nimpl AuthenticatedActorStore for Second {\n    type Actor = User;\n    async fn get_authenticated_actor(&self, request: &Request) -> Option<User> {}\n}\n",
+        );
+
+        assert!(message.contains("exactly one is allowed"));
+    }
+
+    #[test]
+    fn rejects_a_session_authenticated_responder_without_a_store() {
+        let message = error_for(
+            "struct User;\n\n#[responds_to_http(method = Get, path = \"/account\")]\nstruct GetAccount;\nimpl GetAccount {\n    #[responder]\n    fn respond(&self, #[session_authenticated] user: User) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("no #[provides_authenticated_actor] store"));
+    }
+
+    #[test]
+    fn rejects_a_site_action_gate_without_an_action() {
+        let message = error_for("#[decides_site_action]\nstruct Bare;\n");
+
+        assert!(message.contains("missing its site action argument"));
+    }
+
+    #[test]
+    fn rejects_two_gates_for_the_same_site_action() {
+        let message = error_for(
+            "struct User;\n\n#[decides_site_action(crate::action::Action::ViewAdmin)]\nstruct First;\nimpl SiteActionGate for First {\n    type Actor = User;\n    async fn can(&self, user: Option<&User>) -> bool {}\n}\n\n#[decides_site_action(crate::action::Action::ViewAdmin)]\nstruct Second;\nimpl SiteActionGate for Second {\n    type Actor = User;\n    async fn can(&self, user: Option<&User>) -> bool {}\n}\n",
+        );
+
+        assert!(message.contains("more than one gate"));
+    }
+
+    #[test]
+    fn rejects_a_can_attribute_without_an_action() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/admin\")]\n#[can]\nstruct GetAdmin;\nimpl GetAdmin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("#[can] attribute without a site action"));
+    }
+
+    #[test]
+    fn rejects_a_can_guard_without_a_matching_gate() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/admin\")]\n#[can(crate::action::Action::ViewAdmin)]\nstruct GetAdmin;\nimpl GetAdmin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("no #[decides_site_action] gate decides it"));
+    }
+
+    #[test]
+    fn propagates_malformed_can_arguments() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/admin\")]\n#[can(= 5)]\nstruct GetAdmin;\nimpl GetAdmin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("failed to index"));
+    }
+
+    #[test]
+    fn propagates_malformed_decides_site_action_arguments() {
+        let message = error_for("#[decides_site_action(= 5)]\nstruct Bad;\n");
+
+        assert!(message.contains("failed to index"));
     }
 }

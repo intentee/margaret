@@ -10,7 +10,7 @@ pub struct CanonicalPath {
 }
 
 impl CanonicalPath {
-    pub(crate) fn new(segments: Vec<String>) -> Self {
+    pub fn new(segments: Vec<String>) -> Self {
         Self { segments }
     }
 

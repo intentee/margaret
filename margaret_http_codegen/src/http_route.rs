@@ -1,4 +1,5 @@
 use proc_macro2::Ident;
+use syn::Path;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 
@@ -12,4 +13,5 @@ pub(crate) struct HttpRoute {
     pub(crate) responder_field: Ident,
     pub(crate) responder_path: CanonicalPath,
     pub(crate) route_parameters: Vec<RouteParameter>,
+    pub(crate) site_action_guards: Vec<Path>,
 }

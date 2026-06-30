@@ -53,7 +53,7 @@ mod tests {
     }
 
     const SERVICE: &str = "#[service]\nstruct Pump;\n\nimpl Pump {\n    #[runner]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
-    const TICKER: &str = "#[ticker(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n";
+    const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n";
 
     #[test]
     fn reports_units_present() {
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn renders_a_ticker_that_passes_the_token() {
         let source = rendered(
-            "#[ticker(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[runner]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[runner]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
             false,
         );
 
@@ -99,7 +99,7 @@ mod tests {
     #[test]
     fn renders_a_ticker_without_a_behavior() {
         let source = rendered(
-            "#[ticker(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
             false,
         );
 
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn rejects_a_ticker_conflicting_with_a_command() {
         let message = error_for(
-            "#[ticker(interval = crate::P)]\n#[console_command(name = \"x\")]\nstruct Bad;\n",
+            "#[scheduled_with_tick_timer(interval = crate::P)]\n#[console_command(name = \"x\")]\nstruct Bad;\n",
         );
 
         assert!(message.contains("mutually exclusive"));
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn rejects_a_non_path_interval() {
         let message = error_for(
-            "#[ticker(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -149,7 +149,7 @@ mod tests {
     #[test]
     fn rejects_a_non_path_behavior() {
         let message = error_for(
-            "#[ticker(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -162,13 +162,16 @@ mod tests {
 
     #[test]
     fn rejects_a_ticker_on_a_non_struct() {
-        assert!(error_for("#[ticker(interval = crate::P)]\nenum Bad {}\n").contains("#[ticker]"));
+        assert!(
+            error_for("#[scheduled_with_tick_timer(interval = crate::P)]\nenum Bad {}\n")
+                .contains("#[scheduled_with_tick_timer]")
+        );
     }
 
     #[test]
     fn rejects_conflicting_roles() {
         let message = error_for(
-            "#[service]\n#[ticker(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
         );
 
         assert!(message.contains("mutually exclusive"));
@@ -191,7 +194,7 @@ mod tests {
     #[test]
     fn rejects_a_ticker_without_an_interval() {
         let message = error_for(
-            "#[ticker]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
         );
 
         assert!(message.contains("missing the 'interval'"));
@@ -209,7 +212,7 @@ mod tests {
     #[test]
     fn propagates_malformed_ticker_arguments() {
         let message = error_for(
-            "#[ticker(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
