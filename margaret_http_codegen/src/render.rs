@@ -248,28 +248,28 @@ fn route_is_authorized(route: &HttpRoute) -> bool {
 fn route_call(route: &HttpRoute) -> TokenStream {
     let method = &route.method;
     let path = &route.path;
-    let variant = &route.route_symbol_variant;
     let handler = onion(route);
 
-    quote! {
-        .route(
-            margaret_http::method::Method::#method,
-            #path,
-            RouteSymbol::#variant.route_key(),
-            #handler,
-        )
+    match &route.symbol {
+        Some(symbol) => quote! {
+            .route_with_symbol(
+                margaret_http::method::Method::#method,
+                #path,
+                margaret_http::http_route_symbol::HttpRouteSymbol::route_key(&#symbol),
+                #handler,
+            )
+        },
+        None => quote! {
+            .route(
+                margaret_http::method::Method::#method,
+                #path,
+                #handler,
+            )
+        },
     }
 }
 
 pub(crate) fn render(routes: &[HttpRoute], servers: &[HttpServer]) -> String {
-    let symbol_variants = routes.iter().map(|route| &route.route_symbol_variant);
-    let symbol_arms = routes.iter().map(|route| {
-        let variant = &route.route_symbol_variant;
-        let symbol_key = &route.route_symbol_key;
-
-        quote! { Self::#variant => #symbol_key }
-    });
-
     let binder_import = if routes.iter().any(route_is_bound) {
         quote! { use margaret_http::http_route_parameter_binder::HttpRouteParameterBinder; }
     } else {
@@ -300,21 +300,8 @@ pub(crate) fn render(routes: &[HttpRoute], servers: &[HttpServer]) -> String {
 
     let tokens = quote! {
         use super::container::Container;
-        use margaret_http::http_route_symbol::HttpRouteSymbol;
         #binder_import
         #crud_import
-
-        pub enum RouteSymbol {
-            #(#symbol_variants),*
-        }
-
-        impl margaret_http::http_route_symbol::HttpRouteSymbol for RouteSymbol {
-            fn route_key(&self) -> &'static str {
-                match self {
-                    #(#symbol_arms),*
-                }
-            }
-        }
 
         #(#server_functions)*
     };

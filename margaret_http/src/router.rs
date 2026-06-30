@@ -27,13 +27,32 @@ impl Router {
         }
     }
 
-    pub fn route(
+    pub fn route(mut self, method: Method, path: &str, handler: Arc<dyn Handler>) -> Self {
+        self.register(method, path, handler);
+
+        self
+    }
+
+    pub fn route_with_symbol(
         mut self,
         method: Method,
         path: &str,
         symbol_key: &'static str,
         handler: Arc<dyn Handler>,
     ) -> Self {
+        let handler = self.register(method, path, handler);
+
+        self.by_symbol.insert(symbol_key, handler);
+
+        self
+    }
+
+    fn register(
+        &mut self,
+        method: Method,
+        path: &str,
+        handler: Arc<dyn Handler>,
+    ) -> Arc<dyn Handler> {
         let index = match self.paths.get(path) {
             Some(&index) => index,
             None => {
@@ -50,9 +69,8 @@ impl Router {
         };
 
         self.routes[index].insert(method, handler.clone());
-        self.by_symbol.insert(symbol_key, handler);
 
-        self
+        handler
     }
 }
 
@@ -90,7 +108,9 @@ mod tests {
     use async_trait::async_trait;
 
     use super::Router;
+    use crate::forward::Forward;
     use crate::handler::Handler;
+    use crate::http_route_symbol::HttpRouteSymbol;
     use crate::method::Method;
     use crate::request::Request;
     use crate::responded::Responded;
@@ -110,9 +130,9 @@ mod tests {
 
     fn router() -> Router {
         Router::empty()
-            .route(Method::Get, "/items", "items", Arc::new(EchoId))
-            .route(Method::Post, "/items", "items", Arc::new(EchoId))
-            .route(Method::Get, "/items/{id}", "item", Arc::new(EchoId))
+            .route(Method::Get, "/items", Arc::new(EchoId))
+            .route(Method::Post, "/items", Arc::new(EchoId))
+            .route(Method::Get, "/items/{id}", Arc::new(EchoId))
     }
 
     async fn status_of(method: Method, path: &str) -> u16 {
@@ -142,5 +162,55 @@ mod tests {
     #[tokio::test]
     async fn returns_405_for_an_unregistered_method() {
         assert_eq!(status_of(Method::Delete, "/items").await, 405);
+    }
+
+    struct PublicGreetingSymbol;
+
+    impl HttpRouteSymbol for PublicGreetingSymbol {
+        fn route_key(&self) -> &'static str {
+            "crate::routes::public::get_greeting::GetGreeting"
+        }
+    }
+
+    struct ForwardsToPublicGreeting;
+
+    #[async_trait]
+    impl Handler for ForwardsToPublicGreeting {
+        async fn handle(&self, _request: Request) -> Responded {
+            Responded::from(Forward::to(PublicGreetingSymbol))
+        }
+    }
+
+    struct PlainOk;
+
+    #[async_trait]
+    impl Handler for PlainOk {
+        async fn handle(&self, _request: Request) -> Responded {
+            Responded::Done(Response::text(200, "ok"))
+        }
+    }
+
+    async fn handle_status(router: &Router, method: Method, path: &str) -> u16 {
+        router
+            .handle(Request::new(method, path.to_string()))
+            .await
+            .into_http()
+            .status()
+            .as_u16()
+    }
+
+    #[tokio::test]
+    async fn a_server_cannot_forward_to_a_route_registered_on_another_server() {
+        let public_server = Router::empty().route_with_symbol(
+            Method::Get,
+            "/greeting",
+            "crate::routes::public::get_greeting::GetGreeting",
+            Arc::new(PlainOk),
+        );
+        let internal_server =
+            Router::empty().route(Method::Get, "/forward", Arc::new(ForwardsToPublicGreeting));
+
+        assert_eq!(handle_status(&public_server, Method::Get, "/greeting").await, 200);
+        assert_eq!(handle_status(&internal_server, Method::Get, "/forward").await, 404);
     }
 }

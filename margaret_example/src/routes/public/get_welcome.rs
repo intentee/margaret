@@ -4,7 +4,7 @@ use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
-use crate::margaret::http::RouteSymbol;
+use crate::route_symbol::RouteSymbol;
 
 #[singleton]
 #[traced]

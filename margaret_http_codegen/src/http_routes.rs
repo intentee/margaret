@@ -101,6 +101,14 @@ fn site_action_guards(
     Ok(guards)
 }
 
+fn path_text(path: &Path) -> String {
+    path.segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect::<Vec<String>>()
+        .join("::")
+}
+
 fn resolve_server(
     arguments: &AttributeArgs,
     item: &IndexedItem,
@@ -121,12 +129,7 @@ fn resolve_server(
         .iter()
         .map(|declared_server| declared_server.path().clone())
         .collect();
-    let written_text = written
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect::<Vec<String>>()
-        .join("::");
+    let written_text = path_text(&written);
 
     match resolve_unique(&written, &candidates, referencing_root) {
         Resolution::Resolved(path) => Ok(declared
@@ -260,22 +263,21 @@ pub(crate) fn http_routes(
         }
 
         let server = resolve_server(&arguments, item, &responder, declared)?;
-        let symbol_name = item
-            .canonical_path()
-            .segments()
-            .last()
-            .expect("a canonical path has at least one segment")
-            .clone();
+        let symbol = arguments.path("symbol")?;
 
-        if let Some(first) = seen_symbols.get(&symbol_name) {
-            return Err(HttpCodegenError::DuplicateRouteSymbol {
-                symbol: symbol_name,
-                first: first.clone(),
-                second: responder.clone(),
-            });
+        if let Some(symbol) = &symbol {
+            let symbol_text = path_text(symbol);
+
+            if let Some(first) = seen_symbols.get(&symbol_text) {
+                return Err(HttpCodegenError::DuplicateRouteSymbol {
+                    symbol: symbol_text,
+                    first: first.clone(),
+                    second: responder.clone(),
+                });
+            }
+
+            seen_symbols.insert(symbol_text, responder.clone());
         }
-
-        seen_symbols.insert(symbol_name.clone(), responder.clone());
 
         routes.push(HttpRoute {
             layers,
@@ -290,10 +292,9 @@ pub(crate) fn http_routes(
             responder_output,
             responder_path: item.canonical_path().clone(),
             route_parameters,
-            route_symbol_key: responder.clone(),
-            route_symbol_variant: format_ident!("{}", symbol_name),
             server,
             site_action_guards: guards,
+            symbol,
         });
     }
 

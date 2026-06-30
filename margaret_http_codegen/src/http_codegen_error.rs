@@ -146,7 +146,7 @@ pub enum HttpCodegenError {
     MissingSiteActionGate { responder: String, action: String },
 
     #[error(
-        "responders '{first}' and '{second}' share the route symbol '{symbol}'; responder struct names must be unique"
+        "responders '{first}' and '{second}' both declare the route symbol '{symbol}'; each route symbol may identify at most one responder"
     )]
     DuplicateRouteSymbol {
         symbol: String,

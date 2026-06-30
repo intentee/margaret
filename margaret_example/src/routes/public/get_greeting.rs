@@ -11,7 +11,12 @@ use crate::greeter::Greeter;
 
 #[singleton]
 #[traced]
-#[responds_to_http(method = Get, path = "/greeting", server = crate::servers::public::Public)]
+#[responds_to_http(
+    method = Get,
+    path = "/greeting",
+    server = crate::servers::public::Public,
+    symbol = crate::route_symbol::RouteSymbol::GetGreeting
+)]
 pub struct GetGreeting {
     greeter: Arc<dyn Greeter>,
 }

@@ -544,4 +544,35 @@ impl Metrics {
         assert!(http.contains("\"/plugin\""));
         assert!(http.contains("margaret_plugin::PluginPage"));
     }
+
+    #[test]
+    fn supports_same_struct_name_route_handlers_across_crates() {
+        let host = crate_with(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[http_server(name = \"public\")]\nstruct Public;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/a\", server = crate::Public)]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
+        );
+        bootstrap(&host);
+        let plugin = tempdir().expect("a plugin crate directory is created");
+        let plugin_source = plugin.path().join("src");
+
+        fs::create_dir_all(&plugin_source).expect("the plugin src directory exists");
+        fs::write(
+            plugin_source.join("lib.rs"),
+            "#[http_server(name = \"internal\")]\nstruct Internal;\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/b\", server = crate::Internal)]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
+        )
+        .expect("the plugin lib is written");
+
+        let code = build(&[
+            CrateRoot::new("crate", host.path().join("src")),
+            CrateRoot::new("margaret_plugin", plugin_source),
+        ])
+        .expect("two `Page` handlers in different modules coexist");
+
+        let http = module(&code, "http");
+
+        assert!(!http.contains("enum RouteSymbol"));
+        assert!(http.contains("\"/a\""));
+        assert!(http.contains("\"/b\""));
+        assert!(http.contains("crate::routes::Page"));
+        assert!(http.contains("margaret_plugin::endpoints::Page"));
+    }
 }

@@ -672,25 +672,59 @@ impl GetAdmin {
     }
 
     #[test]
-    fn generates_route_symbols_for_forwarding() {
+    fn never_generates_a_route_symbol_enum_and_omits_symbols_for_plain_routes() {
         let source = source_for(RESPONDERS_AND_MIDDLEWARE);
 
-        assert!(source.contains("pubenumRouteSymbol"));
-        assert!(
-            source.contains("implmargaret_http::http_route_symbol::HttpRouteSymbolforRouteSymbol")
-        );
-        assert!(source.contains("Self::Open=>\"crate::Open\""));
-        assert!(source.contains("Self::Resource=>\"crate::Resource\""));
-        assert!(source.contains("RouteSymbol::Open.route_key()"));
+        assert!(!source.contains("enumRouteSymbol"));
+        assert!(!source.contains("route_with_symbol"));
+        assert!(source.contains(".route(margaret_http::method::Method::Get,\"/open\","));
+    }
+
+    const USER_SYMBOL_ROUTE: &str = r#"
+#[http_server(name = "public")]
+struct Public;
+
+#[responds_to_http(
+    method = Get,
+    path = "/greeting",
+    server = crate::Public,
+    symbol = crate::symbols::RouteSymbol::GetGreeting
+)]
+struct GetGreeting;
+
+impl GetGreeting {
+    #[responder]
+    fn respond(&self) -> Response {}
+}
+"#;
+
+    #[test]
+    fn registers_a_route_under_an_explicit_user_defined_symbol() {
+        let source = source_for(USER_SYMBOL_ROUTE);
+
+        assert!(!source.contains("enumRouteSymbol"));
+        assert!(source.contains(".route_with_symbol(margaret_http::method::Method::Get,\"/greeting\","));
+        assert!(source.contains(
+            "margaret_http::http_route_symbol::HttpRouteSymbol::route_key(&crate::symbols::RouteSymbol::GetGreeting"
+        ));
     }
 
     #[test]
-    fn rejects_two_responders_sharing_a_route_symbol() {
+    fn rejects_two_routes_sharing_a_symbol() {
         let message = error_for(
-            "#[http_server(name = \"public\")]\nstruct Public;\n\nmod a {\n#[responds_to_http(method = Get, path = \"/a\", server = crate::Public)]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n\nmod b {\n#[responds_to_http(method = Get, path = \"/b\", server = crate::Public)]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
+            "#[http_server(name = \"public\")]\nstruct Public;\n\n#[responds_to_http(method = Get, path = \"/a\", server = crate::Public, symbol = crate::symbols::RouteSymbol::Shared)]\nstruct A;\nimpl A {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n\n#[responds_to_http(method = Get, path = \"/b\", server = crate::Public, symbol = crate::symbols::RouteSymbol::Shared)]\nstruct B;\nimpl B {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("share the route symbol"));
+        assert!(message.contains("both declare the route symbol"));
+    }
+
+    #[test]
+    fn propagates_a_non_path_symbol_argument() {
+        let message = error_for(
+            "#[http_server(name = \"public\")]\nstruct Public;\n\n#[responds_to_http(method = Get, path = \"/a\", server = crate::Public, symbol = \"x\")]\nstruct A;\nimpl A {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("failed to index"));
     }
 
     #[test]
@@ -799,12 +833,6 @@ impl GetMetrics {
         ));
     }
 
-    #[test]
-    fn shares_one_route_symbol_enum_across_servers() {
-        let source = source_for(MULTIPLE_SERVERS);
-
-        assert!(source.contains("pubenumRouteSymbol{GetIndex,GetMetrics"));
-    }
 
     #[test]
     fn resolves_identically_named_markers_to_distinct_servers_by_full_path() {

@@ -14,6 +14,7 @@ pub mod models;
 pub mod plugin;
 pub mod providers;
 pub mod repositories;
+pub mod route_symbol;
 pub mod routes;
 pub mod security;
 pub mod servers;
