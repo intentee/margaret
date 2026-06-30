@@ -235,19 +235,16 @@ async fn establishes_and_clears_a_session_through_login_and_logout() {
 
     assert_eq!(anonymous_account.status, 403);
 
-    let stale_account = server
+    let forged_account = server
         .send(
             Method::GET,
             "/account",
-            &[(
-                "cookie",
-                "margaret_session=00000000-0000-0000-0000-000000000000",
-            )],
+            &[("cookie", "access_token=not-a-valid-token")],
             "",
         )
         .await;
 
-    assert_eq!(stale_account.status, 403);
+    assert_eq!(forged_account.status, 403);
 
     let relogin = server
         .send(
@@ -265,12 +262,13 @@ async fn establishes_and_clears_a_session_through_login_and_logout() {
         .await;
 
     assert_eq!(logout.status, 303);
-
-    let after_logout = server
-        .send(Method::GET, "/account", &[("cookie", &cookie)], "")
-        .await;
-
-    assert_eq!(after_logout.status, 403);
+    assert!(
+        logout
+            .set_cookie
+            .expect("logout returns a set-cookie that clears the access token")
+            .contains("Max-Age=0"),
+        "stateless logout clears the access token cookie on the client"
+    );
 
     let anonymous_logout = server.send(Method::POST, "/logout", &[], "").await;
 
@@ -493,4 +491,32 @@ async fn rejects_a_request_whose_body_cannot_be_read() {
     serving
         .await
         .expect("the serving task joins and the server drains cleanly");
+}
+
+#[tokio::test]
+async fn forwards_to_a_responder_and_re_runs_its_middleware() {
+    let mut server = TestServer::start().await;
+
+    let welcome = server.send(Method::GET, "/welcome", &[], "").await;
+
+    assert_eq!(welcome.status, 200);
+    assert_eq!(welcome.body, "hello, margaret");
+    assert!(
+        welcome.trace.is_some(),
+        "the forwarded responder's tracing middleware re-runs after the forward"
+    );
+
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn renders_an_interceptable_return_through_its_interceptor() {
+    let mut server = TestServer::start().await;
+
+    let card = server.send(Method::GET, "/greeting-card", &[], "").await;
+
+    assert_eq!(card.status, 200);
+    assert_eq!(card.body, "<p>hello, margaret</p>");
+
+    server.shutdown().await;
 }

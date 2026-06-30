@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::next::Next;
 use margaret_http::request::Request;
-use margaret_http::response::Response;
+use margaret_http::responded::Responded;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
 use margaret_macros::singleton;
@@ -29,7 +29,7 @@ impl Tracing {
 impl HttpMiddleware for Tracing {
     type Marker = ();
 
-    async fn process(&self, request: Request, _marker: (), next: Next) -> Response {
+    async fn process(&self, request: Request, _marker: (), next: Next) -> Responded {
         let trace = self
             .plugins
             .iter()
@@ -37,6 +37,9 @@ impl HttpMiddleware for Tracing {
             .collect::<Vec<String>>()
             .join(",");
 
-        next.run(request).await.header("x-traced", trace)
+        match next.run(request).await {
+            Responded::Done(response) => Responded::Done(response.header("x-traced", trace)),
+            outcome => outcome,
+        }
     }
 }

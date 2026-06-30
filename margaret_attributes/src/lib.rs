@@ -15,6 +15,7 @@ pub mod matched_attribute;
 pub mod path_tokens;
 pub mod resolution;
 pub mod resolve_struct;
+pub mod resolve_trait;
 pub mod resolve_unique;
 pub mod struct_shape;
 

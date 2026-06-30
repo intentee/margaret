@@ -84,6 +84,11 @@ pub fn can(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
+#[proc_macro_attribute]
+pub fn intercepts(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
 fn strip_parameter_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
     strip_or_compile_error(item.into(), markers).into()
 }

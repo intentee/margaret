@@ -144,4 +144,27 @@ pub enum HttpCodegenError {
         "responder '{responder}' is guarded by site action '{action}' but no #[decides_site_action] gate decides it"
     )]
     MissingSiteActionGate { responder: String, action: String },
+
+    #[error(
+        "responders '{first}' and '{second}' share the route symbol '{symbol}'; responder struct names must be unique"
+    )]
+    DuplicateRouteSymbol {
+        symbol: String,
+        first: String,
+        second: String,
+    },
+
+    #[error(
+        "#[intercepts] '{interceptor}' has no `type Intercepted = dyn <marker trait>` associated type that resolves to a known marker trait"
+    )]
+    MissingInterceptedType { interceptor: String },
+
+    #[error(
+        "marker trait '{intercepted}' has more than one interceptor: '{first}' and '{second}'"
+    )]
+    AmbiguousInterceptor {
+        intercepted: String,
+        first: String,
+        second: String,
+    },
 }

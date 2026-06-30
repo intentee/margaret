@@ -48,14 +48,6 @@ impl Response {
         self.header("set-cookie", cookie.to_string())
     }
 
-    pub fn status(&self) -> u16 {
-        self.status
-    }
-
-    pub fn body(&self) -> &str {
-        &self.body
-    }
-
     pub(crate) fn into_http(self) -> http::Response<Full<Bytes>> {
         let mut builder = http::Response::builder().status(self.status);
 

@@ -9,7 +9,6 @@ pub mod gatekeeper;
 pub mod gatekeeper_backend;
 pub mod gatekeeper_user_context;
 pub mod security_error;
-pub mod session_authentication;
 pub mod site_action_dispatcher;
 pub mod site_action_gate;
 pub mod user_repository;

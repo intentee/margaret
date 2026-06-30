@@ -1,7 +1,7 @@
 use margaret_console::command_outcome::CommandOutcome;
 use margaret_example::margaret::container::Container;
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main() -> CommandOutcome {
     let container = Container::build();
 

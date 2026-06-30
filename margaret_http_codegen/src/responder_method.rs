@@ -2,6 +2,7 @@ use quote::ToTokens;
 use syn::Attribute;
 use syn::FnArg;
 use syn::Pat;
+use syn::ReturnType;
 use syn::Type;
 
 use margaret_attributes::attribute_args::AttributeArgs;
@@ -9,9 +10,12 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::resolve_struct::resolve_struct;
+use margaret_attributes::resolve_trait::resolve_trait;
 
 use crate::http_codegen_error::HttpCodegenError;
 use crate::registries::Registries;
+use crate::responder_output::ResponderOutput;
+use crate::responder_signature::ResponderSignature;
 use crate::route_parameter::RouteParameter;
 use crate::route_parameter_binding::RouteParameterBinding;
 use crate::session_requirement::SessionRequirement;
@@ -132,11 +136,32 @@ fn find_responder_method(item: &IndexedItem) -> Option<&IndexedMethod> {
     })
 }
 
+fn responder_output(
+    method: &IndexedMethod,
+    registries: &Registries,
+    referencing_root: &str,
+) -> ResponderOutput {
+    let ReturnType::Type(_, declared) = &method.signature().output else {
+        return ResponderOutput::Plain;
+    };
+
+    let Some(intercepted) = resolve_trait(declared, registries.trait_paths, referencing_root) else {
+        return ResponderOutput::Plain;
+    };
+
+    match registries.interceptors.get(&intercepted) {
+        Some(interceptor) => ResponderOutput::Intercepted {
+            interceptor: interceptor.clone(),
+        },
+        None => ResponderOutput::Plain,
+    }
+}
+
 pub(crate) fn responder_method(
     item: &IndexedItem,
     responder: &str,
     registries: &Registries,
-) -> Result<Vec<RouteParameter>, HttpCodegenError> {
+) -> Result<ResponderSignature, HttpCodegenError> {
     let method =
         find_responder_method(item).ok_or_else(|| HttpCodegenError::MissingResponderMethod {
             responder: responder.to_string(),
@@ -194,5 +219,8 @@ pub(crate) fn responder_method(
         parameters.push(RouteParameter { name, binding });
     }
 
-    Ok(parameters)
+    Ok(ResponderSignature {
+        output: responder_output(method, registries, referencing_root),
+        parameters,
+    })
 }

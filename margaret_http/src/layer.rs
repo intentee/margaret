@@ -6,7 +6,7 @@ use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
 use crate::next::Next;
 use crate::request::Request;
-use crate::response::Response;
+use crate::responded::Responded;
 
 struct LayeredHandler<Middleware: HttpMiddleware> {
     inner: Arc<dyn Handler>,
@@ -19,7 +19,7 @@ impl<Middleware> Handler for LayeredHandler<Middleware>
 where
     Middleware: HttpMiddleware + Send + Sync + 'static,
 {
-    async fn handle(&self, request: Request) -> Response {
+    async fn handle(&self, request: Request) -> Responded {
         self.middleware
             .process(request, self.marker.clone(), Next::new(self.inner.clone()))
             .await
@@ -53,14 +53,15 @@ mod tests {
     use crate::method::Method;
     use crate::next::Next;
     use crate::request::Request;
+    use crate::responded::Responded;
     use crate::response::Response;
 
     struct Inner;
 
     #[async_trait]
     impl Handler for Inner {
-        async fn handle(&self, _request: Request) -> Response {
-            Response::text(200, "inner")
+        async fn handle(&self, _request: Request) -> Responded {
+            Responded::Done(Response::text(200, "inner"))
         }
     }
 
@@ -70,11 +71,11 @@ mod tests {
     impl HttpMiddleware for Gate {
         type Marker = u16;
 
-        async fn process(&self, request: Request, marker: u16, next: Next) -> Response {
+        async fn process(&self, request: Request, marker: u16, next: Next) -> Responded {
             if marker == 200 {
                 next.run(request).await
             } else {
-                Response::text(marker, "blocked")
+                Responded::Done(Response::text(marker, "blocked"))
             }
         }
     }

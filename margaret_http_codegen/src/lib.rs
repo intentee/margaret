@@ -5,6 +5,7 @@ pub mod has_responders;
 pub mod http_codegen_error;
 mod http_route;
 mod http_routes;
+mod interceptor_bindings;
 mod layer_application;
 mod middleware_binding;
 mod middleware_bindings;
@@ -13,6 +14,8 @@ mod registries;
 mod render;
 pub mod render_http;
 mod responder_method;
+mod responder_output;
+mod responder_signature;
 mod route_parameter;
 mod route_parameter_binding;
 mod session_requirement;
@@ -275,7 +278,7 @@ impl GetAdmin {
         assert!(source.contains(r#"user_binder.bind(request.path_param("user").expect"#));
         assert!(source.contains("margaret_http::response::Response::not_found()"));
         assert!(source.contains(
-            "if!gatekeeper.can_crud(&authenticated_actor,&user,CrudAction::Read).await{returnmargaret_http::response::Response::forbidden();}"
+            "if!gatekeeper.can_crud(&authenticated_actor,&user,CrudAction::Read).await{returnmargaret_http::response::Response::forbidden().into();}"
         ));
         assert!(source.contains("responder.respond(user).await"));
         assert!(!source.contains("get_authenticated_actor"));
@@ -287,7 +290,7 @@ impl GetAdmin {
 
         assert!(source.contains("container.gatekeeper().await"));
         assert!(source.contains("letauthenticated_actor=gatekeeper.authenticate(&request).await;"));
-        assert!(source.contains("letuser=matchauthenticated_actor{margaret_security::authenticated_actor::AuthenticatedActor::Session(user,)=>user,margaret_security::authenticated_actor::AuthenticatedActor::Anonymous=>{returnmargaret_http::response::Response::forbidden();}};"));
+        assert!(source.contains("letuser=matchauthenticated_actor{margaret_security::authenticated_actor::AuthenticatedActor::Session(user,)=>user,margaret_security::authenticated_actor::AuthenticatedActor::Anonymous=>{returnmargaret_http::response::Response::forbidden().into();}};"));
         assert!(source.contains("responder.respond(user).await"));
         assert!(!source.contains("AuthenticatedActorStore"));
     }
@@ -305,7 +308,7 @@ impl GetAdmin {
 
         assert!(source.contains("container.gatekeeper().await"));
         assert!(source.contains("letauthenticated_actor=gatekeeper.authenticate(&request).await;"));
-        assert!(source.contains("if!gatekeeper.can_site_action(&authenticated_actor,crate::action::Action::ViewAdmin,).await{returnmargaret_http::response::Response::forbidden();}"));
+        assert!(source.contains("if!gatekeeper.can_site_action(&authenticated_actor,crate::action::Action::ViewAdmin,).await{returnmargaret_http::response::Response::forbidden().into();}"));
         assert!(source.contains("letrequest=&request;"));
         assert!(source.contains("responder.respond(request).await"));
         assert!(!source.contains("SiteActionGate"));
@@ -643,5 +646,78 @@ impl GetAdmin {
         let message = error_for("#[decides_site_action(= 5)]\nstruct Bad;\n");
 
         assert!(message.contains("failed to index"));
+    }
+
+    #[test]
+    fn generates_route_symbols_for_forwarding() {
+        let source = source_for(RESPONDERS_AND_MIDDLEWARE);
+
+        assert!(source.contains("pubenumRouteSymbol"));
+        assert!(source.contains(
+            "implmargaret_http::http_route_symbol::HttpRouteSymbolforRouteSymbol"
+        ));
+        assert!(source.contains("Self::Open=>\"crate::Open\""));
+        assert!(source.contains("Self::Resource=>\"crate::Resource\""));
+        assert!(source.contains("RouteSymbol::Open.route_key()"));
+    }
+
+    #[test]
+    fn rejects_two_responders_sharing_a_route_symbol() {
+        let message = error_for(
+            "mod a {\n#[responds_to_http(method = Get, path = \"/a\")]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n\nmod b {\n#[responds_to_http(method = Get, path = \"/b\")]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
+        );
+
+        assert!(message.contains("share the route symbol"));
+    }
+
+    #[test]
+    fn routes_an_interceptable_return_through_its_interceptor() {
+        let source = source_for(
+            "struct GreetingView;\n\n#[intercepts]\nstruct GreetingInterceptor;\nimpl HttpInterceptor for GreetingInterceptor {\n    type Intercepted = GreetingView;\n    async fn intercept(&self, request: &Request, view: GreetingView) -> Responded {}\n}\n\n#[responds_to_http(method = Get, path = \"/greeting\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[responder]\n    fn respond(&self) -> GreetingView {}\n}\n",
+        );
+
+        assert!(source.contains("usemargaret_http::http_interceptor::HttpInterceptor;"));
+        assert!(source.contains("container.greeting_interceptor().await"));
+        assert!(source.contains(
+            "greeting_interceptor.intercept(&request,responder.respond().await).await"
+        ));
+    }
+
+    #[test]
+    fn reports_an_interceptor_without_an_intercepted_type() {
+        let message = error_for("#[intercepts]\nstruct Bare;\n");
+
+        assert!(message.contains("type Intercepted"));
+    }
+
+    #[test]
+    fn rejects_two_interceptors_for_the_same_type() {
+        let message = error_for(
+            "struct View;\n\n#[intercepts]\nstruct First;\nimpl HttpInterceptor for First {\n    type Intercepted = View;\n    async fn intercept(&self, request: &Request, view: View) -> Responded {}\n}\n\n#[intercepts]\nstruct Second;\nimpl HttpInterceptor for Second {\n    type Intercepted = View;\n    async fn intercept(&self, request: &Request, view: View) -> Responded {}\n}\n",
+        );
+
+        assert!(message.contains("more than one interceptor"));
+    }
+
+    #[test]
+    fn treats_a_responder_without_a_return_type_as_plain() {
+        let source = source_for(
+            "#[responds_to_http(method = Get, path = \"/x\")]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) {}\n}\n",
+        );
+
+        assert!(source.contains(
+            "margaret_http::responded::Responded::from(responder.respond().await)"
+        ));
+    }
+
+    #[test]
+    fn treats_an_unregistered_struct_return_as_plain() {
+        let source = source_for(
+            "struct Card;\n\n#[responds_to_http(method = Get, path = \"/x\")]\nstruct GetCard;\nimpl GetCard {\n    #[responder]\n    fn respond(&self) -> Card {}\n}\n",
+        );
+
+        assert!(source.contains(
+            "margaret_http::responded::Responded::from(responder.respond().await)"
+        ));
     }
 }

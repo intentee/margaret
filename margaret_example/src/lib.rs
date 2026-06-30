@@ -5,6 +5,7 @@ pub mod config;
 pub mod english_greeter;
 pub mod gates;
 pub mod greeter;
+pub mod interceptors;
 pub mod logging_plugin;
 pub mod metrics;
 pub mod metrics_plugin;

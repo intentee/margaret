@@ -8,6 +8,7 @@ use quote::quote;
 use margaret_attributes::path_tokens::path_tokens;
 
 use crate::http_route::HttpRoute;
+use crate::responder_output::ResponderOutput;
 use crate::route_parameter::RouteParameter;
 use crate::route_parameter_binding::RouteParameterBinding;
 use crate::session_requirement::SessionRequirement;
@@ -58,7 +59,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let site_guards = route.site_action_guards.iter().map(|action| {
         quote! {
             if !gatekeeper.can_site_action(&authenticated_actor, #action).await {
-                return margaret_http::response::Response::forbidden();
+                return margaret_http::response::Response::forbidden().into();
             }
         }
     });
@@ -76,12 +77,27 @@ fn onion(route: &HttpRoute) -> TokenStream {
         .route_parameters
         .iter()
         .map(|route_parameter| format_ident!("{}", route_parameter.name));
+    let respond_call = quote! { responder.respond(#(#arguments),*).await };
+    let body_tail = match &route.responder_output {
+        ResponderOutput::Plain => quote! {
+            margaret_http::responded::Responded::from(#respond_call)
+        },
+        ResponderOutput::Intercepted { interceptor } => {
+            let interceptor_field = format_ident!("{}", interceptor.field_name());
+
+            quote! {
+                margaret_http::responded::Responded::Intercept(Box::new(
+                    margaret_http::interception::Interception::new(#interceptor_field, #respond_call),
+                ))
+            }
+        }
+    };
     let body = quote! {
         #user_resolution
         #(#site_guards)*
         #(#general_bindings)*
         #(#session_bindings)*
-        responder.respond(#(#arguments),*).await
+        #body_tail
     };
 
     let captures = capture_fields(route);
@@ -152,7 +168,7 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
             let #name = match authenticated_actor {
                 margaret_security::authenticated_actor::AuthenticatedActor::Session(user) => user,
                 margaret_security::authenticated_actor::AuthenticatedActor::Anonymous => {
-                    return margaret_http::response::Response::forbidden();
+                    return margaret_http::response::Response::forbidden().into();
                 }
             };
         },
@@ -167,7 +183,7 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
                     .await
                 {
                     Some(value) => value,
-                    None => return margaret_http::response::Response::not_found(),
+                    None => return margaret_http::response::Response::not_found().into(),
                 };
             };
 
@@ -175,7 +191,7 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
                 Some(intent) => quote! {
                     #load
                     if !gatekeeper.can_crud(&authenticated_actor, &#name, #intent).await {
-                        return margaret_http::response::Response::forbidden();
+                        return margaret_http::response::Response::forbidden().into();
                     }
                 },
                 None => load,
@@ -195,6 +211,10 @@ fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
 
     if route_needs_user(route) {
         fields.insert("gatekeeper".to_string());
+    }
+
+    if let ResponderOutput::Intercepted { interceptor } = &route.responder_output {
+        fields.insert(interceptor.field_name());
     }
 
     fields
@@ -228,12 +248,26 @@ pub(crate) fn render(routes: &[HttpRoute]) -> String {
     let route_calls = routes.iter().map(|route| {
         let method = &route.method;
         let path = &route.path;
+        let variant = &route.route_symbol_variant;
 
         let handler = onion(route);
 
         quote! {
-            .route(margaret_http::method::Method::#method, #path, #handler)
+            .route(
+                margaret_http::method::Method::#method,
+                #path,
+                RouteSymbol::#variant.route_key(),
+                #handler,
+            )
         }
+    });
+
+    let symbol_variants = routes.iter().map(|route| &route.route_symbol_variant);
+    let symbol_arms = routes.iter().map(|route| {
+        let variant = &route.route_symbol_variant;
+        let symbol_key = &route.route_symbol_key;
+
+        quote! { Self::#variant => #symbol_key }
     });
 
     let binder_import = if routes.iter().any(route_is_bound) {
@@ -248,8 +282,21 @@ pub(crate) fn render(routes: &[HttpRoute]) -> String {
     };
     let tokens = quote! {
         use super::container::Container;
+        use margaret_http::http_route_symbol::HttpRouteSymbol;
         #binder_import
         #crud_import
+
+        pub enum RouteSymbol {
+            #(#symbol_variants),*
+        }
+
+        impl margaret_http::http_route_symbol::HttpRouteSymbol for RouteSymbol {
+            fn route_key(&self) -> &'static str {
+                match self {
+                    #(#symbol_arms),*
+                }
+            }
+        }
 
         pub async fn server(container: &Container) -> margaret_http::server::Server {
             let router = margaret_http::router::Router::empty()

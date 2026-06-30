@@ -1,6 +1,7 @@
 use crate::attribute_selector::AttributeSelector;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_item::IndexedItem;
+use crate::item_kind::ItemKind;
 use crate::matched_attribute::MatchedAttribute;
 
 pub struct AttributeIndex {
@@ -20,6 +21,14 @@ impl AttributeIndex {
         self.items
             .iter()
             .filter(|item| item.kind().is_struct())
+            .map(|item| item.canonical_path().clone())
+            .collect()
+    }
+
+    pub fn trait_paths(&self) -> Vec<CanonicalPath> {
+        self.items
+            .iter()
+            .filter(|item| item.kind() == ItemKind::Trait)
             .map(|item| item.canonical_path().clone())
             .collect()
     }

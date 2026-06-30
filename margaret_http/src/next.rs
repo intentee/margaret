@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::handler::Handler;
 use crate::request::Request;
-use crate::response::Response;
+use crate::responded::Responded;
 
 pub struct Next {
     inner: Arc<dyn Handler>,
@@ -13,7 +13,7 @@ impl Next {
         Self { inner }
     }
 
-    pub async fn run(self, request: Request) -> Response {
+    pub async fn run(self, request: Request) -> Responded {
         self.inner.handle(request).await
     }
 }

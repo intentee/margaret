@@ -8,21 +8,21 @@ use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
 use crate::security::credential_authenticator::CredentialAuthenticator;
-use crate::security::session_user_store::SessionUserStore;
+use crate::security::token_actor_store::TokenActorStore;
 use crate::views::login::LOGIN_FORM;
 
 #[singleton]
 #[responds_to_http(method = Post, path = "/login")]
 pub struct PostLogin {
     authenticator: Arc<CredentialAuthenticator>,
-    store: Arc<SessionUserStore>,
+    store: Arc<TokenActorStore>,
 }
 
 impl PostLogin {
     #[constructor]
     pub fn create(
         authenticator: Arc<CredentialAuthenticator>,
-        store: Arc<SessionUserStore>,
+        store: Arc<TokenActorStore>,
     ) -> Self {
         Self {
             authenticator,
@@ -38,9 +38,7 @@ impl PostLogin {
         };
 
         match self.authenticator.authenticate(&username, &password).await {
-            Some(user) => self
-                .store
-                .login(request, Response::see_other("/account"), &user),
+            Some(user) => self.store.login(Response::see_other("/account"), &user),
             None => Response::html(401, LOGIN_FORM),
         }
     }

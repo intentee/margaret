@@ -75,23 +75,14 @@ async fn dispatch(
     };
 
     let path = request.uri().path().to_string();
-    let headers = request
-        .headers()
-        .iter()
-        .filter_map(|(name, value)| {
-            value
-                .to_str()
-                .ok()
-                .map(|value| (name.as_str().to_string(), value.to_string()))
-        })
-        .collect();
-    let body = match request.into_body().collect().await {
-        Ok(collected) => String::from_utf8_lossy(&collected.to_bytes()).into_owned(),
+    let (parts, incoming) = request.into_parts();
+    let body = match incoming.collect().await {
+        Ok(collected) => collected.to_bytes(),
         Err(source) => return Response::text(400, format!("Bad Request: {source}")).into_http(),
     };
     let mut handled = Request::new(method, path);
 
-    handled.set_headers(headers);
+    handled.set_headers(parts.headers);
     handled.set_body(body);
 
     app.handle(handled).await.into_http()

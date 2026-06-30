@@ -54,3 +54,13 @@ fmt:
 .PHONY: test
 test:
 	cargo nextest run --workspace
+
+.PHONY: bench-http
+bench-http:
+	cargo build --release -p margaret_example
+	@addr=127.0.0.1:8079; \
+	target/release/margaret_example serve --addr $$addr & \
+	server=$$!; \
+	until curl -sf "http://$$addr/health" >/dev/null 2>&1; do :; done; \
+	wrk -t4 -c64 -d10s "http://$$addr/health"; \
+	kill $$server

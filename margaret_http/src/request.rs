@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
+use bytes::Bytes;
 use cookie::Cookie;
+use http::HeaderMap;
 
 use crate::method::Method;
 
+#[derive(Clone)]
 pub struct Request {
-    body: String,
-    headers: HashMap<String, String>,
+    body: Bytes,
+    headers: HeaderMap,
     method: Method,
     path: String,
     path_params: HashMap<String, String>,
@@ -15,24 +18,28 @@ pub struct Request {
 impl Request {
     pub fn new(method: Method, path: String) -> Self {
         Self {
-            body: String::new(),
-            headers: HashMap::new(),
+            body: Bytes::new(),
+            headers: HeaderMap::new(),
             method,
             path,
             path_params: HashMap::new(),
         }
     }
 
-    pub(crate) fn set_body(&mut self, body: String) {
+    pub(crate) fn set_body(&mut self, body: Bytes) {
         self.body = body;
     }
 
-    pub(crate) fn set_headers(&mut self, headers: HashMap<String, String>) {
+    pub(crate) fn set_headers(&mut self, headers: HeaderMap) {
         self.headers = headers;
     }
 
     pub(crate) fn set_path_params(&mut self, path_params: HashMap<String, String>) {
         self.path_params = path_params;
+    }
+
+    pub(crate) fn clear_path_params(&mut self) {
+        self.path_params.clear();
     }
 
     pub fn method(&self) -> Method {
@@ -44,7 +51,7 @@ impl Request {
     }
 
     pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers.get(name).map(String::as_str)
+        self.headers.get(name)?.to_str().ok()
     }
 
     pub fn path_param(&self, name: &str) -> Option<&str> {
@@ -61,7 +68,7 @@ impl Request {
     }
 
     pub fn form(&self, key: &str) -> Option<String> {
-        form_urlencoded::parse(self.body.as_bytes()).find_map(|(field, value)| {
+        form_urlencoded::parse(&self.body).find_map(|(field, value)| {
             if &*field == key {
                 Some(value.into_owned())
             } else {
@@ -73,16 +80,22 @@ impl Request {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use bytes::Bytes;
+    use http::HeaderMap;
+    use http::HeaderName;
+    use http::HeaderValue;
 
     use super::Request;
     use crate::method::Method;
 
     fn request_with_header(name: &str, value: &str) -> Request {
         let mut request = Request::new(Method::Get, "/".to_string());
-        let mut headers = HashMap::new();
+        let mut headers = HeaderMap::new();
 
-        headers.insert(name.to_string(), value.to_string());
+        headers.insert(
+            HeaderName::from_bytes(name.as_bytes()).expect("a valid header name"),
+            HeaderValue::from_str(value).expect("a valid header value"),
+        );
         request.set_headers(headers);
 
         request
@@ -109,10 +122,25 @@ mod tests {
     }
 
     #[test]
+    fn ignores_a_header_value_that_is_not_visible_ascii() {
+        let mut request = Request::new(Method::Get, "/".to_string());
+        let mut headers = HeaderMap::new();
+
+        headers.insert(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_bytes(&[0xC0, 0xC1]).expect("an opaque header value"),
+        );
+        request.set_headers(headers);
+
+        assert_eq!(request.header("cookie"), None);
+        assert_eq!(request.cookie("session"), None);
+    }
+
+    #[test]
     fn reads_a_form_field_from_the_body() {
         let mut request = Request::new(Method::Post, "/login".to_string());
 
-        request.set_body("username=margaret&password=secret".to_string());
+        request.set_body(Bytes::from_static(b"username=margaret&password=secret"));
 
         assert_eq!(request.form("username"), Some("margaret".to_string()));
         assert_eq!(request.form("password"), Some("secret".to_string()));

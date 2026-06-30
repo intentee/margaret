@@ -13,11 +13,13 @@ use margaret_attributes::matched_attribute::MatchedAttribute;
 use crate::build_registry::build_registry;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
+use crate::interceptor_bindings::interceptor_bindings;
 use crate::layer_application::LayerApplication;
 use crate::middleware_binding::MiddlewareBinding;
 use crate::path_parameter_names::path_parameter_names;
 use crate::registries::Registries;
 use crate::responder_method::responder_method;
+use crate::responder_signature::ResponderSignature;
 use crate::route_parameter_binding::RouteParameterBinding;
 
 fn marker_value(
@@ -125,12 +127,17 @@ pub(crate) fn http_routes(
             second,
         },
     )?;
+    let trait_paths = index.trait_paths();
+    let interceptors = interceptor_bindings(index, &trait_paths)?;
     let registries = Registries {
         binders: &binders,
         gates: &gates,
+        interceptors: &interceptors,
         struct_paths: &struct_paths,
+        trait_paths: &trait_paths,
     };
     let mut routes = Vec::new();
+    let mut seen_symbols: HashMap<String, String> = HashMap::new();
 
     for matched in index.select(&selector) {
         let item = matched.item();
@@ -170,7 +177,10 @@ pub(crate) fn http_routes(
 
         layers.reverse();
 
-        let route_parameters = responder_method(item, &responder, &registries)?;
+        let ResponderSignature {
+            output: responder_output,
+            parameters: route_parameters,
+        } = responder_method(item, &responder, &registries)?;
         let guards = site_action_guards(item, &responder, site_gates)?;
         let path_parameters =
             path_parameter_names(&path).map_err(|source| HttpCodegenError::InvalidRoutePath {
@@ -197,6 +207,23 @@ pub(crate) fn http_routes(
             });
         }
 
+        let symbol_name = item
+            .canonical_path()
+            .segments()
+            .last()
+            .expect("a canonical path has at least one segment")
+            .clone();
+
+        if let Some(first) = seen_symbols.get(&symbol_name) {
+            return Err(HttpCodegenError::DuplicateRouteSymbol {
+                symbol: symbol_name,
+                first: first.clone(),
+                second: responder.clone(),
+            });
+        }
+
+        seen_symbols.insert(symbol_name.clone(), responder.clone());
+
         routes.push(HttpRoute {
             layers,
             method: method
@@ -207,8 +234,11 @@ pub(crate) fn http_routes(
                 .clone(),
             path,
             responder_field: format_ident!("{}", item.canonical_path().field_name()),
+            responder_output,
             responder_path: item.canonical_path().clone(),
             route_parameters,
+            route_symbol_key: responder.clone(),
+            route_symbol_variant: format_ident!("{}", symbol_name),
             site_action_guards: guards,
         });
     }
