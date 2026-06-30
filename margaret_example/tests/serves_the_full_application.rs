@@ -510,13 +510,99 @@ async fn forwards_to_a_responder_and_re_runs_its_middleware() {
 }
 
 #[tokio::test]
-async fn renders_an_interceptable_return_through_its_interceptor() {
+async fn renders_distinct_views_through_one_marker_interceptor() {
     let mut server = TestServer::start().await;
 
-    let card = server.send(Method::GET, "/greeting-card", &[], "").await;
+    let greeting = server.send(Method::GET, "/greeting-card", &[], "").await;
 
-    assert_eq!(card.status, 200);
-    assert_eq!(card.body, "<p>hello, margaret</p>");
+    assert_eq!(greeting.status, 200);
+    assert_eq!(greeting.body, "<main>hello, margaret</main>");
+
+    let farewell = server.send(Method::GET, "/farewell-card", &[], "").await;
+
+    assert_eq!(farewell.status, 200);
+    assert_eq!(farewell.body, "<main>goodbye, margaret</main>");
+
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn creates_reads_updates_and_deletes_an_article_in_memory() {
+    let mut server = TestServer::start().await;
+    let member = server.login_as("member").await;
+
+    let anonymous = server
+        .send(
+            Method::POST,
+            "/articles",
+            &[("content-type", FORM)],
+            "title=Ghost&body=Post",
+        )
+        .await;
+
+    assert_eq!(anonymous.status, 403);
+
+    let incomplete = server
+        .send(
+            Method::POST,
+            "/articles",
+            &[("content-type", FORM), ("cookie", &member)],
+            "title=Only",
+        )
+        .await;
+
+    assert_eq!(incomplete.status, 422);
+
+    let created = server
+        .send(
+            Method::POST,
+            "/articles",
+            &[("content-type", FORM), ("cookie", &member)],
+            "title=My+Post&body=Hello",
+        )
+        .await;
+
+    assert_eq!(created.status, 201);
+    assert_eq!(created.body, "created \"My Post\"");
+
+    let read = server
+        .send(Method::GET, "/articles/103", &[("cookie", &member)], "")
+        .await;
+
+    assert_eq!(read.status, 200);
+    assert!(read.body.contains("My Post"));
+    assert!(read.body.contains("Hello"));
+
+    let updated = server
+        .send(
+            Method::PATCH,
+            "/articles/103",
+            &[("content-type", FORM), ("cookie", &member)],
+            "title=Edited&body=World",
+        )
+        .await;
+
+    assert_eq!(updated.status, 200);
+    assert_eq!(updated.body, "updated \"Edited\"");
+
+    let reread = server
+        .send(Method::GET, "/articles/103", &[("cookie", &member)], "")
+        .await;
+
+    assert!(reread.body.contains("Edited"));
+    assert!(reread.body.contains("World"));
+
+    let deleted = server
+        .send(Method::DELETE, "/articles/103", &[("cookie", &member)], "")
+        .await;
+
+    assert_eq!(deleted.status, 200);
+
+    let gone = server
+        .send(Method::GET, "/articles/103", &[("cookie", &member)], "")
+        .await;
+
+    assert_eq!(gone.status, 404);
 
     server.shutdown().await;
 }

@@ -671,29 +671,28 @@ impl GetAdmin {
     }
 
     #[test]
-    fn routes_an_interceptable_return_through_its_interceptor() {
+    fn routes_an_interceptable_return_through_its_marker_interceptor() {
         let source = source_for(
-            "struct GreetingView;\n\n#[intercepts]\nstruct GreetingInterceptor;\nimpl HttpInterceptor for GreetingInterceptor {\n    type Intercepted = GreetingView;\n    async fn intercept(&self, request: &Request, view: GreetingView) -> Responded {}\n}\n\n#[responds_to_http(method = Get, path = \"/greeting\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[responder]\n    fn respond(&self) -> GreetingView {}\n}\n",
+            "trait View {}\n\n#[intercepts]\nstruct ViewInterceptor;\nimpl HttpInterceptor for ViewInterceptor {\n    type Intercepted = dyn View;\n    async fn intercept(&self, request: &Request, view: Box<dyn View>) -> Response {}\n}\n\n#[responds_to_http(method = Get, path = \"/greeting\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[responder]\n    fn respond(&self) -> Box<dyn View> {}\n}\n",
         );
 
-        assert!(source.contains("usemargaret_http::http_interceptor::HttpInterceptor;"));
-        assert!(source.contains("container.greeting_interceptor().await"));
+        assert!(source.contains("container.view_interceptor().await"));
         assert!(source.contains(
-            "greeting_interceptor.intercept(&request,responder.respond().await).await"
+            "margaret_http::responded::Responded::Intercept(Box::new(margaret_http::interception::Interception::new(view_interceptor,responder.respond().await"
         ));
     }
 
     #[test]
-    fn reports_an_interceptor_without_an_intercepted_type() {
+    fn reports_an_interceptor_without_an_intercepted_marker_trait() {
         let message = error_for("#[intercepts]\nstruct Bare;\n");
 
         assert!(message.contains("type Intercepted"));
     }
 
     #[test]
-    fn rejects_two_interceptors_for_the_same_type() {
+    fn rejects_two_interceptors_for_the_same_marker_trait() {
         let message = error_for(
-            "struct View;\n\n#[intercepts]\nstruct First;\nimpl HttpInterceptor for First {\n    type Intercepted = View;\n    async fn intercept(&self, request: &Request, view: View) -> Responded {}\n}\n\n#[intercepts]\nstruct Second;\nimpl HttpInterceptor for Second {\n    type Intercepted = View;\n    async fn intercept(&self, request: &Request, view: View) -> Responded {}\n}\n",
+            "trait View {}\n\n#[intercepts]\nstruct First;\nimpl HttpInterceptor for First {\n    type Intercepted = dyn View;\n    async fn intercept(&self, request: &Request, view: Box<dyn View>) -> Response {}\n}\n\n#[intercepts]\nstruct Second;\nimpl HttpInterceptor for Second {\n    type Intercepted = dyn View;\n    async fn intercept(&self, request: &Request, view: Box<dyn View>) -> Response {}\n}\n",
         );
 
         assert!(message.contains("more than one interceptor"));
@@ -714,6 +713,17 @@ impl GetAdmin {
     fn treats_an_unregistered_struct_return_as_plain() {
         let source = source_for(
             "struct Card;\n\n#[responds_to_http(method = Get, path = \"/x\")]\nstruct GetCard;\nimpl GetCard {\n    #[responder]\n    fn respond(&self) -> Card {}\n}\n",
+        );
+
+        assert!(source.contains(
+            "margaret_http::responded::Responded::from(responder.respond().await)"
+        ));
+    }
+
+    #[test]
+    fn treats_a_trait_object_return_without_an_interceptor_as_plain() {
+        let source = source_for(
+            "trait Widget {}\n\n#[responds_to_http(method = Get, path = \"/x\")]\nstruct GetWidget;\nimpl GetWidget {\n    #[responder]\n    fn respond(&self) -> Box<dyn Widget> {}\n}\n",
         );
 
         assert!(source.contains(

@@ -1,6 +1,7 @@
 ---
 paths:
   - "margaret_container/**"
+  - "margaret_macros/**"
 ---
 
 # `margaret_container` crate rules

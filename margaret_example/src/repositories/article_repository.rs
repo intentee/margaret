@@ -1,61 +1,103 @@
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+
 use async_trait::async_trait;
+use dashmap::DashMap;
 
 use margaret_http::http_route_parameter_binder::HttpRouteParameterBinder;
+use margaret_macros::constructor;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::singleton;
 
 use crate::models::article::Article;
 
-fn published_member_article() -> Article {
-    Article {
-        id: "100".to_string(),
-        title: "Shipping Margaret".to_string(),
-        author_id: "3".to_string(),
-        body: "A public note from Milo.".to_string(),
-        published: true,
-    }
-}
+const FIRST_AUTHORED_ID: u64 = 103;
 
-fn member_draft() -> Article {
-    Article {
-        id: "101".to_string(),
-        title: "Milo's draft".to_string(),
-        author_id: "3".to_string(),
-        body: "An unpublished draft from Milo.".to_string(),
-        published: false,
-    }
-}
-
-fn moderator_draft() -> Article {
-    Article {
-        id: "102".to_string(),
-        title: "Mona's draft".to_string(),
-        author_id: "2".to_string(),
-        body: "An unpublished draft from Mona.".to_string(),
-        published: false,
-    }
+fn seed() -> Vec<Article> {
+    vec![
+        Article {
+            id: "100".to_string(),
+            title: "Shipping Margaret".to_string(),
+            author_id: "3".to_string(),
+            body: "A public note from Milo.".to_string(),
+            published: true,
+        },
+        Article {
+            id: "101".to_string(),
+            title: "Milo's draft".to_string(),
+            author_id: "3".to_string(),
+            body: "An unpublished draft from Milo.".to_string(),
+            published: false,
+        },
+        Article {
+            id: "102".to_string(),
+            title: "Mona's draft".to_string(),
+            author_id: "2".to_string(),
+            body: "An unpublished draft from Mona.".to_string(),
+            published: false,
+        },
+    ]
 }
 
 #[singleton]
 #[provides_route_parameter]
-pub struct ArticleRepository;
+pub struct ArticleRepository {
+    articles: DashMap<String, Article>,
+    next_id: AtomicU64,
+}
 
 impl ArticleRepository {
-    pub fn find_article_by_id(&self, id: &str) -> Option<Article> {
-        match id {
-            "100" => Some(published_member_article()),
-            "101" => Some(member_draft()),
-            "102" => Some(moderator_draft()),
-            _ => None,
+    #[constructor]
+    pub fn create() -> Self {
+        let articles = DashMap::new();
+
+        for article in seed() {
+            articles.insert(article.id.clone(), article);
+        }
+
+        Self {
+            articles,
+            next_id: AtomicU64::new(FIRST_AUTHORED_ID),
         }
     }
 
+    pub fn find_article_by_id(&self, id: &str) -> Option<Article> {
+        self.articles.get(id).map(|article| article.value().clone())
+    }
+
     pub fn all(&self) -> Vec<Article> {
-        vec![
-            published_member_article(),
-            member_draft(),
-            moderator_draft(),
-        ]
+        let mut all: Vec<Article> = self
+            .articles
+            .iter()
+            .map(|article| article.value().clone())
+            .collect();
+
+        all.sort_by(|first, second| first.id.cmp(&second.id));
+
+        all
+    }
+
+    pub fn insert(&self, title: String, body: String, author_id: String) -> Article {
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed).to_string();
+        let article = Article {
+            id: id.clone(),
+            title,
+            author_id,
+            body,
+            published: false,
+        };
+
+        self.articles.insert(id, article.clone());
+
+        article
+    }
+
+    pub fn save(&self, article: Article) {
+        self.articles.insert(article.id.clone(), article);
+    }
+
+    pub fn remove(&self, id: &str) {
+        self.articles.remove(id);
     }
 }
 

@@ -8,6 +8,7 @@ autotests = false
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
+dashmap = { workspace = true }
 jsonwebtoken = { workspace = true }
 margaret_console = { path = "../margaret_console" }
 margaret_example_macros = { path = "../margaret_example_macros" }
