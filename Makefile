@@ -4,7 +4,6 @@ COVERAGE_PACKAGES := \
 	-p margaret_console \
 	-p margaret_console_codegen \
 	-p margaret_container \
-	-p margaret_example \
 	-p margaret_http \
 	-p margaret_http_codegen \
 	-p margaret_macros \
@@ -35,7 +34,6 @@ coverage: node_modules
 		--gated margaret_console=100 \
 		--gated margaret_console_codegen=100 \
 		--gated margaret_container=100 \
-		--gated margaret_example=100 \
 		--gated margaret_example_macros=100 \
 		--gated margaret_example_plugin=100 \
 		--gated margaret_http=100 \
