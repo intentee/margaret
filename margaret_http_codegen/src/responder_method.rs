@@ -145,7 +145,8 @@ fn responder_output(
         return ResponderOutput::Plain;
     };
 
-    let Some(intercepted) = resolve_trait(declared, registries.trait_paths, referencing_root) else {
+    let Some(intercepted) = resolve_trait(declared, registries.trait_paths, referencing_root)
+    else {
         return ResponderOutput::Plain;
     };
 

@@ -561,6 +561,7 @@ name = "margaret_console_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_http_codegen",
  "prettyplease",
  "proc-macro2",
  "quote",
@@ -642,6 +643,7 @@ dependencies = [
 name = "margaret_http_codegen"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "margaret_attributes",
  "matchit",
  "prettyplease",
@@ -705,6 +707,7 @@ version = "0.1.0"
 dependencies = [
  "heck",
  "margaret_attributes",
+ "margaret_http_codegen",
  "prettyplease",
  "proc-macro2",
  "quote",

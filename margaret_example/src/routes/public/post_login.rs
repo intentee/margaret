@@ -12,7 +12,7 @@ use crate::security::token_actor_store::TokenActorStore;
 use crate::views::login::LOGIN_FORM;
 
 #[singleton]
-#[responds_to_http(method = Post, path = "/login")]
+#[responds_to_http(method = Post, path = "/login", server = crate::servers::public::Public)]
 pub struct PostLogin {
     authenticator: Arc<CredentialAuthenticator>,
     store: Arc<TokenActorStore>,

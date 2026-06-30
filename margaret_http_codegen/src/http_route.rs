@@ -17,5 +17,6 @@ pub(crate) struct HttpRoute {
     pub(crate) route_parameters: Vec<RouteParameter>,
     pub(crate) route_symbol_key: String,
     pub(crate) route_symbol_variant: Ident,
+    pub(crate) server: String,
     pub(crate) site_action_guards: Vec<Path>,
 }

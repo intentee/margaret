@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
+heck = { workspace = true }
 matchit = { workspace = true }
 prettyplease = { workspace = true }
 proc-macro2 = { workspace = true }

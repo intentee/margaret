@@ -5,3 +5,6 @@
 - make sure that all the framework functions, traits, structs are single purpose, and focus on a single objective
 - make sure that no attribute support "priority" of any kind; all the handlers, deciders etc must be unique (error otherwise); there must be zero ambiguity
 - the framework itself must be opinionated, and take the heavy load onto itself; the applications that use it should not need to know the framework internals, everything needs to be managed by minimal, simple, declarative attributes and the DI container
+- nothing in the consumer project can be implicit, everything must be explicitly bound together for attributes
+- if an enum is used, or any struct is referenced, the entire path to it must be present in the file that uses it (through an attribute or not)
+- never use string heuristics in the attributes, all the connections, bindings, architecture, attributes must be verifiable at compile time

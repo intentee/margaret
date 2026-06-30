@@ -11,8 +11,19 @@ async fn runs_services_until_cancelled() {
     let container = Container::build();
     let metrics = container.metrics_metrics().await;
     let matches = Command::new("test")
-        .arg(Arg::new("addr").long("addr").required(true))
-        .try_get_matches_from(["test", "--addr", "127.0.0.1:0"])
+        .arg(Arg::new("public-addr").long("public-addr").required(true))
+        .arg(
+            Arg::new("internal-addr")
+                .long("internal-addr")
+                .required(true),
+        )
+        .try_get_matches_from([
+            "test",
+            "--public-addr",
+            "127.0.0.1:0",
+            "--internal-addr",
+            "127.0.0.1:0",
+        ])
         .expect("the serve arguments parse");
 
     let cancellation_token = CancellationToken::new();

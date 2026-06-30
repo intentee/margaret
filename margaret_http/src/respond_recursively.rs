@@ -137,11 +137,15 @@ mod tests {
         by_symbol: HashMap<&'static str, Arc<dyn Handler>>,
         first: Arc<dyn Handler>,
     ) -> u16 {
-        respond_recursively(&by_symbol, Request::new(Method::Get, "/".to_string()), first)
-            .await
-            .into_http()
-            .status()
-            .as_u16()
+        respond_recursively(
+            &by_symbol,
+            Request::new(Method::Get, "/".to_string()),
+            first,
+        )
+        .await
+        .into_http()
+        .status()
+        .as_u16()
     }
 
     #[tokio::test]

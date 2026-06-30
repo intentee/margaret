@@ -18,6 +18,7 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_http_codegen::http_server::HttpServer;
 
     use crate::has_commands::has_commands;
     use crate::render_console::render_console;
@@ -80,14 +81,20 @@ impl Farewell {
     }
 
     fn rendered(lib_source: &str, has_http: bool) -> String {
-        render_console(&index_for(lib_source), has_http, has_http)
+        let servers = if has_http {
+            vec![HttpServer::new("public".to_string())]
+        } else {
+            Vec::new()
+        };
+
+        render_console(&index_for(lib_source), has_http, &servers)
             .expect("the console source is generated")
             .split_whitespace()
             .collect()
     }
 
     fn error_for(lib_source: &str) -> String {
-        render_console(&index_for(lib_source), false, false)
+        render_console(&index_for(lib_source), false, &[])
             .expect_err("the console source fails to generate")
             .to_string()
     }
@@ -132,20 +139,47 @@ impl Farewell {
         let source = source_for("struct App;\n", true);
 
         assert!(source.contains(r#"clap::Command::new("serve")"#));
-        assert!(source.contains(r#"clap::Arg::new("addr").long("addr").required(true)"#));
+        assert!(
+            source.contains(r#"clap::Arg::new("public-addr").long("public-addr").required(true)"#)
+        );
         assert!(source.contains("super::services::serve(container,matches,cancellation_token)"));
         assert!(source.contains("margaret_service::install::install()"));
     }
 
     #[test]
+    fn registers_one_address_argument_per_active_server() {
+        let source: String = render_console(
+            &index_for("struct App;\n"),
+            true,
+            &[
+                HttpServer::new("public".to_string()),
+                HttpServer::new("internal".to_string()),
+            ],
+        )
+        .expect("the console source is generated")
+        .split_whitespace()
+        .collect();
+
+        assert!(
+            source.contains(r#"clap::Arg::new("public-addr").long("public-addr").required(true)"#)
+        );
+        assert!(
+            source.contains(
+                r#"clap::Arg::new("internal-addr").long("internal-addr").required(true)"#
+            )
+        );
+    }
+
+    #[test]
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
-        let source: String = render_console(&index_for("struct App;\n"), true, false)
+        let source: String = render_console(&index_for("struct App;\n"), true, &[])
             .expect("the console source is generated")
             .split_whitespace()
             .collect();
 
         assert!(source.contains(r#"clap::Command::new("serve")"#));
         assert!(!source.contains(r#"clap::Arg::new("addr")"#));
+        assert!(!source.contains("-addr"));
     }
 
     #[test]

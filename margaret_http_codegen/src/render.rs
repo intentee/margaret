@@ -8,6 +8,7 @@ use quote::quote;
 use margaret_attributes::path_tokens::path_tokens;
 
 use crate::http_route::HttpRoute;
+use crate::http_server::HttpServer;
 use crate::responder_output::ResponderOutput;
 use crate::route_parameter::RouteParameter;
 use crate::route_parameter_binding::RouteParameterBinding;
@@ -244,24 +245,23 @@ fn route_is_authorized(route: &HttpRoute) -> bool {
     })
 }
 
-pub(crate) fn render(routes: &[HttpRoute]) -> String {
-    let route_calls = routes.iter().map(|route| {
-        let method = &route.method;
-        let path = &route.path;
-        let variant = &route.route_symbol_variant;
+fn route_call(route: &HttpRoute) -> TokenStream {
+    let method = &route.method;
+    let path = &route.path;
+    let variant = &route.route_symbol_variant;
+    let handler = onion(route);
 
-        let handler = onion(route);
+    quote! {
+        .route(
+            margaret_http::method::Method::#method,
+            #path,
+            RouteSymbol::#variant.route_key(),
+            #handler,
+        )
+    }
+}
 
-        quote! {
-            .route(
-                margaret_http::method::Method::#method,
-                #path,
-                RouteSymbol::#variant.route_key(),
-                #handler,
-            )
-        }
-    });
-
+pub(crate) fn render(routes: &[HttpRoute], servers: &[HttpServer]) -> String {
     let symbol_variants = routes.iter().map(|route| &route.route_symbol_variant);
     let symbol_arms = routes.iter().map(|route| {
         let variant = &route.route_symbol_variant;
@@ -280,6 +280,24 @@ pub(crate) fn render(routes: &[HttpRoute]) -> String {
     } else {
         quote! {}
     };
+
+    let server_functions = servers.iter().map(|server| {
+        let function_name = server.function_name();
+        let route_calls = routes
+            .iter()
+            .filter(|route| route.server == server.name())
+            .map(route_call);
+
+        quote! {
+            pub async fn #function_name(container: &Container) -> margaret_http::server::Server {
+                let router = margaret_http::router::Router::empty()
+                    #(#route_calls)*;
+
+                margaret_http::server::Server::new(router)
+            }
+        }
+    });
+
     let tokens = quote! {
         use super::container::Container;
         use margaret_http::http_route_symbol::HttpRouteSymbol;
@@ -298,12 +316,7 @@ pub(crate) fn render(routes: &[HttpRoute]) -> String {
             }
         }
 
-        pub async fn server(container: &Container) -> margaret_http::server::Server {
-            let router = margaret_http::router::Router::empty()
-                #(#route_calls)*;
-
-            margaret_http::server::Server::new(router)
-        }
+        #(#server_functions)*
     };
 
     let file =

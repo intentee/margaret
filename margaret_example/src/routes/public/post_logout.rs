@@ -9,7 +9,7 @@ use margaret_macros::singleton;
 use crate::security::token_actor_store::TokenActorStore;
 
 #[singleton]
-#[responds_to_http(method = Post, path = "/logout")]
+#[responds_to_http(method = Post, path = "/logout", server = crate::servers::public::Public)]
 pub struct PostLogout {
     store: Arc<TokenActorStore>,
 }

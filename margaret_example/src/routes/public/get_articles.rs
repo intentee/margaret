@@ -13,7 +13,7 @@ use crate::margaret::security::Gatekeeper;
 use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/articles")]
+#[responds_to_http(method = Get, path = "/articles", server = crate::servers::public::Public)]
 pub struct GetArticles {
     articles: Arc<ArticleRepository>,
     gatekeeper: Arc<Gatekeeper>,

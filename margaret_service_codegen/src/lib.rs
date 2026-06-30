@@ -16,6 +16,7 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_http_codegen::http_server::HttpServer;
 
     use crate::has_services::has_services;
     use crate::render_services::render_services;
@@ -39,17 +40,21 @@ mod tests {
             .build()
     }
 
-    fn rendered(lib_source: &str, has_http: bool) -> String {
-        render_services(&index_for(lib_source), has_http)
+    fn rendered(lib_source: &str, servers: &[HttpServer]) -> String {
+        render_services(&index_for(lib_source), servers)
             .expect("the services source is generated")
             .split_whitespace()
             .collect()
     }
 
     fn error_for(lib_source: &str) -> String {
-        render_services(&index_for(lib_source), false)
+        render_services(&index_for(lib_source), &[])
             .expect_err("the services source fails to generate")
             .to_string()
+    }
+
+    fn public() -> Vec<HttpServer> {
+        vec![HttpServer::new("public".to_string())]
     }
 
     const SERVICE: &str = "#[service]\nstruct Pump;\n\nimpl Pump {\n    #[runner]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
@@ -64,7 +69,7 @@ mod tests {
 
     #[test]
     fn renders_a_service_adapter_that_passes_the_token() {
-        let source = rendered(SERVICE, false);
+        let source = rendered(SERVICE, &[]);
 
         assert!(source.contains("structPumpService"));
         assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
@@ -75,7 +80,7 @@ mod tests {
 
     #[test]
     fn renders_a_ticker_adapter_with_interval_and_behavior() {
-        let source = rendered(TICKER, false);
+        let source = rendered(TICKER, &[]);
 
         assert!(source.contains("structFlusherTicker"));
         assert!(source.contains("letmutinterval=tokio::time::interval(crate::schedule::PERIOD);"));
@@ -90,7 +95,7 @@ mod tests {
     fn renders_a_ticker_that_passes_the_token() {
         let source = rendered(
             "#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[runner]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
-            false,
+            &[],
         );
 
         assert!(source.contains("self.inner.run(cancellation_token.clone()).await?"));
@@ -100,7 +105,7 @@ mod tests {
     fn renders_a_ticker_without_a_behavior() {
         let source = rendered(
             "#[scheduled_with_tick_timer(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
-            false,
+            &[],
         );
 
         assert!(source.contains("tokio::time::interval(crate::PERIOD)"));
@@ -111,7 +116,7 @@ mod tests {
     fn renders_a_service_without_a_token() {
         let source = rendered(
             "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[runner]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
-            false,
+            &[],
         );
 
         assert!(source.contains("_cancellation_token:margaret_service::CancellationToken"));
@@ -120,11 +125,31 @@ mod tests {
 
     #[test]
     fn registers_the_http_server_when_responders_exist() {
-        let source = rendered(SERVICE, true);
+        let source = rendered(SERVICE, &public());
 
-        assert!(source.contains(r#"matches.get_one::<String>("addr")"#));
+        assert!(source.contains(r#"matches.get_one::<String>("public-addr")"#));
         assert!(source.contains(
-            "margaret_service::server_service::ServerService::new(super::http::server(container).await,address,)"
+            "margaret_service::server_service::ServerService::new(super::http::server_public(container).await,address_public,)"
+        ));
+    }
+
+    #[test]
+    fn registers_one_server_service_per_active_server() {
+        let source = rendered(
+            SERVICE,
+            &[
+                HttpServer::new("public".to_string()),
+                HttpServer::new("internal".to_string()),
+            ],
+        );
+
+        assert!(source.contains(r#"matches.get_one::<String>("public-addr")"#));
+        assert!(source.contains(
+            "margaret_service::server_service::ServerService::new(super::http::server_public(container).await,address_public,)"
+        ));
+        assert!(source.contains(r#"matches.get_one::<String>("internal-addr")"#));
+        assert!(source.contains(
+            "margaret_service::server_service::ServerService::new(super::http::server_internal(container).await,address_internal,)"
         ));
     }
 

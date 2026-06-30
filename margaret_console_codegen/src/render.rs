@@ -2,6 +2,8 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Type;
 
+use margaret_http_codegen::http_server::HttpServer;
+
 use crate::console_argument::ConsoleArgument;
 use crate::console_command::ConsoleCommand;
 
@@ -104,19 +106,21 @@ fn value_expression(id: &str, required: bool, value_type: &Type) -> TokenStream 
     }
 }
 
-pub(crate) fn render(commands: &[ConsoleCommand], serves: bool, has_http: bool) -> String {
+pub(crate) fn render(commands: &[ConsoleCommand], serves: bool, servers: &[HttpServer]) -> String {
     let subcommands = commands.iter().map(subcommand_registration);
     let arms = commands.iter().map(command_arm);
 
     let serve_registration = if serves {
-        let address_argument = if has_http {
-            quote! { .arg(clap::Arg::new("addr").long("addr").required(true)) }
-        } else {
-            quote! {}
-        };
+        let address_arguments = servers.iter().map(|server| {
+            let address_argument = server.address_argument();
+
+            quote! {
+                .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
+            }
+        });
 
         quote! {
-            .subcommand(clap::Command::new("serve")#address_argument)
+            .subcommand(clap::Command::new("serve")#(#address_arguments)*)
         }
     } else {
         quote! {}

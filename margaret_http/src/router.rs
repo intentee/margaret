@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use crate::handler::Handler;
 use crate::method::Method;
 use crate::request::Request;
-use crate::responded::Responded;
 use crate::respond_recursively::respond_recursively;
+use crate::responded::Responded;
 use crate::response::Response;
 
 pub struct Router {

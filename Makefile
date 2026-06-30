@@ -59,7 +59,7 @@ test:
 bench-http:
 	cargo build --release -p margaret_example
 	@addr=127.0.0.1:8079; \
-	target/release/margaret_example serve --addr $$addr & \
+	target/release/margaret_example serve --public-addr $$addr --internal-addr 127.0.0.1:8078 & \
 	server=$$!; \
 	until curl -sf "http://$$addr/health" >/dev/null 2>&1; do :; done; \
 	wrk -t4 -c64 -d10s "http://$$addr/health"; \

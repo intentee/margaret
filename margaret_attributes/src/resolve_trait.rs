@@ -70,7 +70,10 @@ mod tests {
     use crate::canonical_path::CanonicalPath;
 
     fn marker_traits() -> Vec<CanonicalPath> {
-        vec![CanonicalPath::new(vec!["crate".to_string(), "View".to_string()])]
+        vec![CanonicalPath::new(vec![
+            "crate".to_string(),
+            "View".to_string(),
+        ])]
     }
 
     fn resolved(declared: Type) -> Option<String> {
@@ -87,7 +90,10 @@ mod tests {
 
     #[test]
     fn resolves_a_bare_marker_trait_object() {
-        assert_eq!(resolved(parse_quote!(dyn View)), Some("crate::View".to_string()));
+        assert_eq!(
+            resolved(parse_quote!(dyn View)),
+            Some("crate::View".to_string())
+        );
     }
 
     #[test]

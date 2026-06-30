@@ -6,7 +6,7 @@ use margaret_macros::singleton;
 use crate::models::user::User;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/account")]
+#[responds_to_http(method = Get, path = "/account", server = crate::servers::public::Public)]
 pub struct GetAccount;
 
 impl GetAccount {

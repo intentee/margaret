@@ -6,29 +6,35 @@ use quote::quote;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::path_tokens::path_tokens;
+use margaret_http_codegen::http_server::HttpServer;
 
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
 use crate::service_units::service_units;
 
-fn server_registration(has_http: bool) -> TokenStream {
-    if !has_http {
-        return quote! {};
-    }
+fn server_registrations(servers: &[HttpServer]) -> TokenStream {
+    let registrations = servers.iter().map(|server| {
+        let function_name = server.function_name();
+        let address_argument = server.address_argument();
+        let address_variable = format_ident!("address_{}", server.name());
 
-    let server_call = quote! { super::http::server(container).await };
+        quote! {
+            let #address_variable = matches
+                .get_one::<String>(#address_argument)
+                .expect("a required console argument is present")
+                .clone();
 
-    quote! {
-        let address = matches
-            .get_one::<String>("addr")
-            .expect("a required console argument is present")
-            .clone();
+            manager.register_service(
+                margaret_service::server_service::ServerService::new(
+                    super::http::#function_name(container).await,
+                    #address_variable,
+                ),
+            );
+        }
+    });
 
-        manager.register_service(
-            margaret_service::server_service::ServerService::new(#server_call, address),
-        );
-    }
+    quote! { #(#registrations)* }
 }
 
 fn adapter(unit: &ServiceUnit) -> TokenStream {
@@ -129,16 +135,16 @@ fn uses_token(unit: &ServiceUnit) -> bool {
 
 pub fn render_services(
     index: &AttributeIndex,
-    has_http: bool,
+    servers: &[HttpServer],
 ) -> Result<String, ServiceCodegenError> {
     let units = service_units(index)?;
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(registration);
-    let server_registration = server_registration(has_http);
-    let matches_binding = if has_http {
-        quote! { matches }
-    } else {
+    let server_registration = server_registrations(servers);
+    let matches_binding = if servers.is_empty() {
         quote! { _matches }
+    } else {
+        quote! { matches }
     };
 
     let tokens = quote! {

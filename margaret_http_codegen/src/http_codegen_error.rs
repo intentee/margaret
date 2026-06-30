@@ -159,12 +159,43 @@ pub enum HttpCodegenError {
     )]
     MissingInterceptedType { interceptor: String },
 
-    #[error(
-        "marker trait '{intercepted}' has more than one interceptor: '{first}' and '{second}'"
-    )]
+    #[error("marker trait '{intercepted}' has more than one interceptor: '{first}' and '{second}'")]
     AmbiguousInterceptor {
         intercepted: String,
         first: String,
         second: String,
     },
+
+    #[error("#[http_server] is only supported on structs, but '{target}' is not a struct")]
+    HttpServerNotOnStruct { target: String },
+
+    #[error("#[http_server] marker '{marker}' is missing the 'name' argument")]
+    MissingHttpServerName { marker: String },
+
+    #[error(
+        "server name '{name}' is declared by more than one #[http_server] marker: '{first}' and '{second}'; each server must have a unique name"
+    )]
+    DuplicateHttpServer {
+        name: String,
+        first: String,
+        second: String,
+    },
+
+    #[error("responder '{responder}' is missing the 'server' argument")]
+    MissingHttpServer { responder: String },
+
+    #[error(
+        "responder '{responder}' targets server '{server}', which is not declared by any #[http_server] marker"
+    )]
+    UnknownHttpServer { responder: String, server: String },
+
+    #[error(
+        "responder '{responder}' targets server '{server}', which resolves to more than one #[http_server] marker; reference it by its full path"
+    )]
+    AmbiguousHttpServerReference { responder: String, server: String },
+
+    #[error(
+        "#[http_server] marker '{server}' has no routes; every declared server must have at least one responder"
+    )]
+    DeclaredHttpServerWithoutRoutes { server: String },
 }

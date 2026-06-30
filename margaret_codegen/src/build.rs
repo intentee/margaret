@@ -1,5 +1,6 @@
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_http_codegen::http_server::HttpServer;
 
 use crate::codegen_error::CodegenError;
 use crate::generated_code::GeneratedCode;
@@ -48,6 +49,16 @@ pub fn build(crates: &[CrateRoot]) -> Result<GeneratedCode, CodegenError> {
         .map(|artifacts| artifacts.providers.clone())
         .unwrap_or_default();
 
+    let http = if has_http {
+        Some(margaret_http_codegen::render_http::render_http(&index)?)
+    } else {
+        None
+    };
+    let servers: &[HttpServer] = http
+        .as_ref()
+        .map(|artifacts| artifacts.servers())
+        .unwrap_or(&[]);
+
     let mut modules = vec![GeneratedModule::new(
         "container",
         margaret_container::render_container::render_container(&index, &synthetic_providers)?
@@ -58,24 +69,21 @@ pub fn build(crates: &[CrateRoot]) -> Result<GeneratedCode, CodegenError> {
         modules.push(GeneratedModule::new("security", artifacts.module_source));
     }
 
-    if has_http {
-        modules.push(GeneratedModule::new(
-            "http",
-            margaret_http_codegen::render_http::render_http(&index)?,
-        ));
+    if let Some(artifacts) = &http {
+        modules.push(GeneratedModule::new("http", artifacts.source().to_string()));
     }
 
     if serves {
         modules.push(GeneratedModule::new(
             "services",
-            margaret_service_codegen::render_services::render_services(&index, has_http)?,
+            margaret_service_codegen::render_services::render_services(&index, servers)?,
         ));
     }
 
     if has_console {
         modules.push(GeneratedModule::new(
             "console",
-            margaret_console_codegen::render_console::render_console(&index, serves, has_http)?,
+            margaret_console_codegen::render_console::render_console(&index, serves, servers)?,
         ));
     }
 
@@ -104,8 +112,11 @@ mod tests {
 #[rustfmt::skip]
 pub mod margaret;
 
+#[http_server(name = \"public\")]
+struct Public;
+
 #[singleton]
-#[responds_to_http(method = Get, path = \"/x\")]
+#[responds_to_http(method = Get, path = \"/x\", server = crate::Public)]
 struct Page;
 
 impl Page {
@@ -436,12 +447,101 @@ impl CrudActionGate for ArticleGate {
     #[test]
     fn awaits_an_async_constructor_in_the_container() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/x\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[http_server(name = \"public\")]\nstruct Public;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/x\", server = crate::Public)]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         )
         .expect("the async build succeeds");
 
         assert!(module(&code, "container").contains("Pool::create().await"));
-        assert!(module(&code, "http").contains("async fn server"));
-        assert!(module(&code, "services").contains("super::http::server(container).await"));
+        assert!(module(&code, "http").contains("async fn server_public"));
+        assert!(module(&code, "services").contains("super::http::server_public(container).await"));
+    }
+
+    const MULTI_SERVER_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[http_server(name = \"public\")]
+struct Public;
+
+#[http_server(name = \"internal\")]
+struct Internal;
+
+#[singleton]
+#[responds_to_http(method = Get, path = \"/\", server = crate::Public)]
+struct Index;
+
+impl Index {
+    #[responder]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[responds_to_http(method = Get, path = \"/metrics\", server = crate::Internal)]
+struct Metrics;
+
+impl Metrics {
+    #[responder]
+    fn respond(&self) -> Response {}
+}
+";
+
+    #[test]
+    fn generates_a_server_function_and_address_argument_per_active_server() {
+        let code = generate(MULTI_SERVER_CRATE).expect("the build succeeds");
+
+        let http = module(&code, "http");
+        assert!(http.contains("async fn server_public"));
+        assert!(http.contains("async fn server_internal"));
+
+        let services = module(&code, "services");
+        assert!(services.contains("super::http::server_public(container).await"));
+        assert!(services.contains("super::http::server_internal(container).await"));
+        assert!(services.contains(r#"get_one::<String>("public-addr")"#));
+        assert!(services.contains(r#"get_one::<String>("internal-addr")"#));
+
+        let console = module(&code, "console");
+        assert!(console.contains(r#"clap::Arg::new("public-addr")"#));
+        assert!(console.contains(r#"clap::Arg::new("internal-addr")"#));
+    }
+
+    #[test]
+    fn rejects_a_route_targeting_an_undeclared_server() {
+        let message = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(message.contains("not declared by any #[http_server] marker"));
+    }
+
+    #[test]
+    fn resolves_identically_named_servers_across_crates_by_full_path() {
+        let host = crate_with(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[http_server(name = \"public\")]\nstruct Internal;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/\", server = crate::Internal)]\nstruct HostPage;\n\nimpl HostPage {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+        bootstrap(&host);
+        let plugin = tempdir().expect("a plugin crate directory is created");
+        let plugin_source = plugin.path().join("src");
+
+        fs::create_dir_all(&plugin_source).expect("the plugin src directory exists");
+        fs::write(
+            plugin_source.join("lib.rs"),
+            "#[http_server(name = \"internal\")]\nstruct Internal;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/plugin\", server = crate::Internal)]\nstruct PluginPage;\n\nimpl PluginPage {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+        )
+        .expect("the plugin lib is written");
+
+        let code = build(&[
+            CrateRoot::new("crate", host.path().join("src")),
+            CrateRoot::new("margaret_plugin", plugin_source),
+        ])
+        .expect("the build succeeds across crates");
+
+        let http = module(&code, "http");
+
+        assert!(http.contains("async fn server_public"));
+        assert!(http.contains("async fn server_internal"));
+        assert!(http.contains("\"/plugin\""));
+        assert!(http.contains("margaret_plugin::PluginPage"));
     }
 }

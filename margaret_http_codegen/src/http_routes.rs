@@ -5,12 +5,18 @@ use quote::format_ident;
 use quote::quote;
 use syn::Path;
 
+use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::matched_attribute::MatchedAttribute;
+use margaret_attributes::resolution::Resolution;
+use margaret_attributes::resolve_unique::resolve_unique;
 
 use crate::build_registry::build_registry;
+use crate::declared_server::DeclaredServer;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
 use crate::interceptor_bindings::interceptor_bindings;
@@ -95,11 +101,57 @@ fn site_action_guards(
     Ok(guards)
 }
 
+fn resolve_server(
+    arguments: &AttributeArgs,
+    item: &IndexedItem,
+    responder: &str,
+    declared: &[DeclaredServer],
+) -> Result<String, HttpCodegenError> {
+    let written = arguments
+        .path("server")?
+        .ok_or_else(|| HttpCodegenError::MissingHttpServer {
+            responder: responder.to_string(),
+        })?;
+    let referencing_root = item
+        .canonical_path()
+        .segments()
+        .first()
+        .expect("a canonical path has at least one segment");
+    let candidates: Vec<CanonicalPath> = declared
+        .iter()
+        .map(|declared_server| declared_server.path().clone())
+        .collect();
+    let written_text = written
+        .segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect::<Vec<String>>()
+        .join("::");
+
+    match resolve_unique(&written, &candidates, referencing_root) {
+        Resolution::Resolved(path) => Ok(declared
+            .iter()
+            .find(|declared_server| declared_server.path() == &path)
+            .expect("a resolved server matches a declared server")
+            .name()
+            .to_string()),
+        Resolution::Ambiguous(_) => Err(HttpCodegenError::AmbiguousHttpServerReference {
+            responder: responder.to_string(),
+            server: written_text,
+        }),
+        Resolution::NotFound => Err(HttpCodegenError::UnknownHttpServer {
+            responder: responder.to_string(),
+            server: written_text,
+        }),
+    }
+}
+
 pub(crate) fn http_routes(
     index: &AttributeIndex,
     bindings: &[MiddlewareBinding],
     site_gates: &HashMap<Path, String>,
     has_store: bool,
+    declared: &[DeclaredServer],
 ) -> Result<Vec<HttpRoute>, HttpCodegenError> {
     let selector = AttributeSelector::parse("responds_to_http").expect("a valid selector");
     let struct_paths = index.struct_paths();
@@ -207,6 +259,7 @@ pub(crate) fn http_routes(
             });
         }
 
+        let server = resolve_server(&arguments, item, &responder, declared)?;
         let symbol_name = item
             .canonical_path()
             .segments()
@@ -239,6 +292,7 @@ pub(crate) fn http_routes(
             route_parameters,
             route_symbol_key: responder.clone(),
             route_symbol_variant: format_ident!("{}", symbol_name),
+            server,
             site_action_guards: guards,
         });
     }

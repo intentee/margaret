@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 heck = { workspace = true }
 margaret_attributes = { path = "../margaret_attributes" }
+margaret_http_codegen = { path = "../margaret_http_codegen" }
 proc-macro2 = { workspace = true }
 prettyplease = { workspace = true }
 quote = { workspace = true }

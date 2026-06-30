@@ -14,5 +14,5 @@ pub fn generate_http_source(
         .index_crate(&CrateRoot::new(crate_name, source_directory))?
         .build();
 
-    render_http(&index)
+    Ok(render_http(&index)?.source().to_string())
 }

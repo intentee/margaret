@@ -11,7 +11,8 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use margaret_example::margaret::container::Container;
-use margaret_example::margaret::http::server;
+use margaret_example::margaret::http::server_internal;
+use margaret_example::margaret::http::server_public;
 
 const FORM: &str = "application/x-www-form-urlencoded";
 
@@ -32,8 +33,18 @@ struct TestServer {
 impl TestServer {
     async fn start() -> Self {
         let container = Container::build();
-        let bound = server(&container)
-            .await
+
+        Self::serve(server_public(&container).await).await
+    }
+
+    async fn start_internal() -> Self {
+        let container = Container::build();
+
+        Self::serve(server_internal(&container).await).await
+    }
+
+    async fn serve(server: margaret_http::server::Server) -> Self {
+        let bound = server
             .bind("127.0.0.1:0")
             .await
             .expect("the server binds to an ephemeral port");
@@ -148,6 +159,30 @@ fn cookie_header(set_cookie: &str) -> String {
         .expect("a valid set-cookie header");
 
     format!("{}={}", parsed.name(), parsed.value())
+}
+
+#[tokio::test]
+async fn isolates_routes_between_the_public_and_internal_servers() {
+    let mut internal = TestServer::start_internal().await;
+
+    let metrics = internal.send(Method::GET, "/metrics", &[], "").await;
+
+    assert_eq!(metrics.status, 200);
+    assert!(metrics.body.starts_with("sweeps="));
+
+    let public_route_on_internal = internal.send(Method::GET, "/health", &[], "").await;
+
+    assert_eq!(public_route_on_internal.status, 404);
+
+    internal.shutdown().await;
+
+    let mut public = TestServer::start().await;
+
+    let internal_route_on_public = public.send(Method::GET, "/metrics", &[], "").await;
+
+    assert_eq!(internal_route_on_public.status, 404);
+
+    public.shutdown().await;
 }
 
 #[tokio::test]
@@ -458,7 +493,7 @@ async fn exercises_the_manual_gatekeeper_and_site_action_guard() {
 #[tokio::test]
 async fn rejects_a_request_whose_body_cannot_be_read() {
     let container = Container::build();
-    let bound = server(&container)
+    let bound = server_public(&container)
         .await
         .bind("127.0.0.1:0")
         .await

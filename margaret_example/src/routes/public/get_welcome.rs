@@ -8,7 +8,7 @@ use crate::margaret::http::RouteSymbol;
 
 #[singleton]
 #[traced]
-#[responds_to_http(method = Get, path = "/welcome")]
+#[responds_to_http(method = Get, path = "/welcome", server = crate::servers::public::Public)]
 pub struct GetWelcome;
 
 impl GetWelcome {

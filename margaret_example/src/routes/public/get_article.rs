@@ -8,7 +8,7 @@ use crate::models::article::Article;
 use crate::models::user::User;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/articles/{article}")]
+#[responds_to_http(method = Get, path = "/articles/{article}", server = crate::servers::public::Public)]
 pub struct GetArticle;
 
 impl GetArticle {

@@ -18,7 +18,14 @@ async fn dispatches_console_commands() {
     assert_eq!(
         run(
             &container,
-            ["app", "serve", "--addr", "this is not an address"]
+            [
+                "app",
+                "serve",
+                "--public-addr",
+                "this is not an address",
+                "--internal-addr",
+                "127.0.0.1:0",
+            ]
         )
         .await,
         CommandOutcome::Failed

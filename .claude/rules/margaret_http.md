@@ -12,6 +12,17 @@ paths:
 - every item (http responders, http middlewares, etc) must be non-blocking, and async
 - server must be able to process multiple connections in parallel
 
+# `margaret_http` servers
+
+- an application may run multiple named HTTP servers in parallel (e.g. a public-facing one and an internal-facing one), each bound to its own address
+- there is no implicit/default server; every server must be declared explicitly with `#[http_server(name = "<name>")]` and every route must name its server with `server = <full::path::to::marker>`
+- the server name is the snake_case of the explicit `name` argument; server names must be globally unique — two markers resolving to the same name is a compile-time error
+- a route references its server by the marker's full path (compile-time verifiable, never a string); a reference that resolves to more than one marker, to no marker, or that is missing entirely is a compile-time error (zero ambiguity)
+- base and plugin crates may each declare a marker struct with the exact same type name (e.g. both `Internal`); the full-path reference and the explicit unique names keep resolution unambiguous
+- a declared server with no routes is a compile-time error
+- each declared server is generated as its own `server_<name>` entry point, registered as its own parallel `ServerService`, and reads its own `--<name>-addr` console argument
+- forwarding is intra-server: a responder may only forward to another responder on the same server
+
 # `margaret_http` data flow
 
 - each http request needs to through its entire middleware stack (first attribute in order becomes the first middleware to apply)
@@ -30,7 +41,8 @@ Route patterns themselves, obviously, can be string patterns (compatible with `m
 Specific attribute rules:
 
 - `#[middleware(<name>)]` - `<name>` is the name of the actual middleware tag
-- `#[responds_to_http(method = <method>, path = <path>)]` - `<method>` must map directly into `Method` enum, `<path>` must be `matchit`-compatible string
+- `#[responds_to_http(method = <method>, path = <path>, server = <marker>)]` - `<method>` must map directly into `Method` enum, `<path>` must be `matchit`-compatible string, `<server>` is required and must be the full path to a declared `#[http_server]` marker
+- `#[http_server(name = <name>)]` - attached to a marker struct that declares a named HTTP server; `<name>` is a required `use`-style path to the server struct
 - `#[provides_route_parameter]` - attached to a struct implementing `HttpRouteParameterBinder` with a specific type
 
 # `margaret_http` lifecycle algorithm
