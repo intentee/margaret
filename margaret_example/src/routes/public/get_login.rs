@@ -6,7 +6,7 @@ use margaret_macros::singleton;
 use crate::views::login::LOGIN_FORM;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/login", server = crate::servers::public::Public)]
+#[responds_to_http(method = Get, path = "/login", server = "public")]
 pub struct GetLogin;
 
 impl GetLogin {

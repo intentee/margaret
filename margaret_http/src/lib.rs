@@ -7,7 +7,6 @@ pub mod http_interceptable;
 pub mod http_interceptor;
 pub mod http_middleware;
 pub mod http_route_parameter_binder;
-pub mod http_route_symbol;
 pub mod interception;
 pub mod layer;
 pub mod method;

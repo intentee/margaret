@@ -9,7 +9,7 @@ use margaret_macros::singleton;
 use crate::config::Config;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/health", server = crate::servers::public::Public)]
+#[responds_to_http(method = Get, path = "/health", server = "public")]
 pub struct GetHealth {
     config: Arc<Config>,
 }

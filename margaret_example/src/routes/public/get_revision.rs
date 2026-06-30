@@ -9,7 +9,7 @@ use margaret_macros::singleton;
 use crate::clock::Clock;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/revision", server = crate::servers::public::Public)]
+#[responds_to_http(method = Get, path = "/revision", server = "public")]
 pub struct GetRevision {
     clock: Arc<dyn Clock>,
 }

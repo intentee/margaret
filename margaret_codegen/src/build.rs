@@ -112,11 +112,8 @@ mod tests {
 #[rustfmt::skip]
 pub mod margaret;
 
-#[http_server(name = \"public\")]
-struct Public;
-
 #[singleton]
-#[responds_to_http(method = Get, path = \"/x\", server = crate::Public)]
+#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]
 struct Page;
 
 impl Page {
@@ -447,7 +444,7 @@ impl CrudActionGate for ArticleGate {
     #[test]
     fn awaits_an_async_constructor_in_the_container() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[http_server(name = \"public\")]\nstruct Public;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/x\", server = crate::Public)]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         )
         .expect("the async build succeeds");
 
@@ -460,14 +457,8 @@ impl CrudActionGate for ArticleGate {
 #[rustfmt::skip]
 pub mod margaret;
 
-#[http_server(name = \"public\")]
-struct Public;
-
-#[http_server(name = \"internal\")]
-struct Internal;
-
 #[singleton]
-#[responds_to_http(method = Get, path = \"/\", server = crate::Public)]
+#[responds_to_http(method = Get, path = \"/\", server = \"public\")]
 struct Index;
 
 impl Index {
@@ -476,7 +467,7 @@ impl Index {
 }
 
 #[singleton]
-#[responds_to_http(method = Get, path = \"/metrics\", server = crate::Internal)]
+#[responds_to_http(method = Get, path = \"/metrics\", server = \"internal\")]
 struct Metrics;
 
 impl Metrics {
@@ -505,20 +496,20 @@ impl Metrics {
     }
 
     #[test]
-    fn rejects_a_route_targeting_an_undeclared_server() {
+    fn rejects_a_non_string_server() {
         let message = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
 
-        assert!(message.contains("not declared by any #[http_server] marker"));
+        assert!(message.contains("failed to index"));
     }
 
     #[test]
-    fn resolves_identically_named_servers_across_crates_by_full_path() {
+    fn merges_routes_for_the_same_named_server_across_crates() {
         let host = crate_with(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[http_server(name = \"public\")]\nstruct Internal;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/\", server = crate::Internal)]\nstruct HostPage;\n\nimpl HostPage {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/\", server = \"internal\")]\nstruct HostPage;\n\nimpl HostPage {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
         bootstrap(&host);
         let plugin = tempdir().expect("a plugin crate directory is created");
@@ -527,7 +518,7 @@ impl Metrics {
         fs::create_dir_all(&plugin_source).expect("the plugin src directory exists");
         fs::write(
             plugin_source.join("lib.rs"),
-            "#[http_server(name = \"internal\")]\nstruct Internal;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/plugin\", server = crate::Internal)]\nstruct PluginPage;\n\nimpl PluginPage {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[singleton]\n#[responds_to_http(method = Get, path = \"/plugin\", server = \"internal\")]\nstruct PluginPage;\n\nimpl PluginPage {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         )
         .expect("the plugin lib is written");
 
@@ -539,8 +530,8 @@ impl Metrics {
 
         let http = module(&code, "http");
 
-        assert!(http.contains("async fn server_public"));
         assert!(http.contains("async fn server_internal"));
+        assert!(!http.contains("async fn server_public"));
         assert!(http.contains("\"/plugin\""));
         assert!(http.contains("margaret_plugin::PluginPage"));
     }
@@ -548,7 +539,7 @@ impl Metrics {
     #[test]
     fn supports_same_struct_name_route_handlers_across_crates() {
         let host = crate_with(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[http_server(name = \"public\")]\nstruct Public;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/a\", server = crate::Public)]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
         );
         bootstrap(&host);
         let plugin = tempdir().expect("a plugin crate directory is created");
@@ -557,7 +548,7 @@ impl Metrics {
         fs::create_dir_all(&plugin_source).expect("the plugin src directory exists");
         fs::write(
             plugin_source.join("lib.rs"),
-            "#[http_server(name = \"internal\")]\nstruct Internal;\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/b\", server = crate::Internal)]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
+            "mod endpoints {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
         )
         .expect("the plugin lib is written");
 
@@ -569,7 +560,7 @@ impl Metrics {
 
         let http = module(&code, "http");
 
-        assert!(!http.contains("enum RouteSymbol"));
+        assert!(!http.contains("enum RouteName"));
         assert!(http.contains("\"/a\""));
         assert!(http.contains("\"/b\""));
         assert!(http.contains("crate::routes::Page"));

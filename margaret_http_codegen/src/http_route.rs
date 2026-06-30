@@ -10,6 +10,7 @@ use crate::route_parameter::RouteParameter;
 pub(crate) struct HttpRoute {
     pub(crate) layers: Vec<LayerApplication>,
     pub(crate) method: Ident,
+    pub(crate) name: Option<String>,
     pub(crate) path: String,
     pub(crate) responder_field: Ident,
     pub(crate) responder_output: ResponderOutput,
@@ -17,5 +18,4 @@ pub(crate) struct HttpRoute {
     pub(crate) route_parameters: Vec<RouteParameter>,
     pub(crate) server: String,
     pub(crate) site_action_guards: Vec<Path>,
-    pub(crate) symbol: Option<Path>,
 }

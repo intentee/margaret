@@ -38,16 +38,7 @@ impl From<Forward> for Responded {
 mod tests {
     use super::Responded;
     use crate::forward::Forward;
-    use crate::http_route_symbol::HttpRouteSymbol;
     use crate::response::Response;
-
-    struct Symbol;
-
-    impl HttpRouteSymbol for Symbol {
-        fn route_key(&self) -> &'static str {
-            "crate::Target"
-        }
-    }
 
     #[test]
     fn renders_a_done_outcome_as_its_response() {
@@ -63,7 +54,7 @@ mod tests {
     #[test]
     fn renders_an_unresolved_outcome_as_a_server_error() {
         assert_eq!(
-            Responded::from(Forward::to(Symbol))
+            Responded::from(Forward::to("crate::Target"))
                 .into_http()
                 .status()
                 .as_u16(),

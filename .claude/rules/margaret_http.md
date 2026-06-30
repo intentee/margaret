@@ -21,32 +21,12 @@ Route patterns themselves, obviously, can be string patterns (compatible with `m
 Specific attribute rules:
 
 - `#[middleware(<name>)]` - `<name>` is the name of the actual middleware tag
-- `#[responds_to_http(method = <method>, path = <path>, server = <marker>, symbol = <enum variant>)]` 
+- `#[responds_to_http(method = <method>, name = <name>, path = <path>, server = <marker>)]` 
     * `<method>` must map directly into `Method` enum
+    * `<name>` is optional and must be a globally unique route name string (validated at compile time)
     * `<path>` must be `matchit`-compatible string 
-    * `<server>` is required and must be the full path to a declared `#[http_server]` marker
-    * `<symbol>` is optional and must be the full path to a user-defined enum variant implementing `HttpRouteSymbol`
-- `#[http_server(name = <name>)]` - attached to a marker struct that declares a named HTTP server; `<name>` is a required string literal, unique string literal (only used in CLI); routes target the marker by its full path through the required `server =` argument
+    * `<server>`  must be a string with a server name
 - `#[provides_route_parameter]` - attached to a struct implementing `HttpRouteParameterBinder` with a specific type
-
-# `margaret_http` servers
-
-- an application may run multiple named HTTP servers in parallel (e.g. a public-facing one and an internal-facing one), each bound to its own address
-- there is no implicit/default server; every server must be declared explicitly with `#[http_server(name = "<name>")]` and every route must name its server with `server = <full::path::to::marker>`
-- the server name is the snake_case of the explicit `name` argument; server names must be globally unique — two markers resolving to the same name is a compile-time error
-- a route references its server by the marker's full path (compile-time verifiable, never a string); a reference that resolves to more than one marker, to no marker, or that is missing entirely is a compile-time error (zero ambiguity)
-- base and plugin crates may each declare a marker struct with the exact same type name (e.g. both `Internal`); the full-path reference and the explicit unique names keep resolution unambiguous
-- a declared server with no routes is a compile-time error
-- each declared server is generated as its own `server_<name>` entry point, registered as its own parallel `ServerService`, and reads its own `--<name>-addr` console argument
-- forwarding is intra-server: each server's router only knows its own routes; trying to forward a route to a different server must be detectable at compile time
-
-# `margaret_http` route symbols
-
-- the framework never generates a route symbol enum; route symbols are defined by the user, in user-space, as their own enum implementing `HttpRouteSymbol`
-- a route symbol is optional on a route; it is only declared (via `symbol = <full::path::to::Enum::Variant>`) when the user needs to point at that route from elsewhere in the codebase (e.g. as a forward target)
-- a route without a `symbol =` is path-matched but cannot be forwarded to
-- two routes declaring the same symbol is a compile-time error (each symbol identifies at most one responder)
-- forwarding targets are referenced through the user's enum (`Forward::to(MyRouteSymbol::Variant)`), never a raw string
 
 # `margaret_http` data flow
 

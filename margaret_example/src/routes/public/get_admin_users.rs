@@ -14,7 +14,7 @@ use crate::repositories::article_repository::ArticleRepository;
 use crate::repositories::user_repository::UserRepository;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/admin/users", server = crate::servers::public::Public)]
+#[responds_to_http(method = Get, path = "/admin/users", server = "public")]
 #[can(crate::action::Action::ManageUsers)]
 #[traced]
 pub struct GetAdminUsers {

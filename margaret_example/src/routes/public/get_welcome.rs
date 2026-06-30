@@ -4,16 +4,14 @@ use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
-use crate::route_symbol::RouteSymbol;
-
 #[singleton]
 #[traced]
-#[responds_to_http(method = Get, path = "/welcome", server = crate::servers::public::Public)]
+#[responds_to_http(method = Get, path = "/welcome", server = "public")]
 pub struct GetWelcome;
 
 impl GetWelcome {
     #[responder]
     pub async fn respond(&self) -> Forward {
-        Forward::to(RouteSymbol::GetGreeting)
+        Forward::to("get_greeting")
     }
 }

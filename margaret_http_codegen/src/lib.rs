@@ -1,8 +1,6 @@
 mod active_servers;
 mod authenticated_actor_store;
 mod build_registry;
-mod declared_server;
-mod declared_servers;
 pub mod generate_http_source;
 pub mod has_responders;
 pub mod http_artifacts;
@@ -41,10 +39,7 @@ mod tests {
     use crate::has_responders::has_responders;
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"
-#[http_server(name = "public")]
-struct Public;
-
-#[responds_to_http(method = Get, path = "/resource", server = crate::Public)]
+#[responds_to_http(method = Get, path = "/resource", server = "public")]
 #[traced]
 #[guard(crate::action::Action::Read)]
 struct Resource;
@@ -54,7 +49,7 @@ impl Resource {
     fn respond(&self) -> Response {}
 }
 
-#[responds_to_http(method = Get, path = "/open", server = crate::Public)]
+#[responds_to_http(method = Get, path = "/open", server = "public")]
 struct Open;
 
 impl Open {
@@ -70,10 +65,7 @@ struct Tracer;
 "#;
 
     const ROUTE_PARAMETER: &str = r#"
-#[http_server(name = "public")]
-struct Public;
-
-#[responds_to_http(method = Get, path = "/users/{id}", server = crate::Public)]
+#[responds_to_http(method = Get, path = "/users/{id}", server = "public")]
 struct GetUser;
 
 impl GetUser {
@@ -83,9 +75,6 @@ impl GetUser {
 "#;
 
     const BOUND_WITHOUT_INTENT: &str = r#"
-#[http_server(name = "public")]
-struct Public;
-
 struct User;
 
 #[provides_route_parameter]
@@ -96,7 +85,7 @@ impl HttpRouteParameterBinder for UserBinder {
     async fn bind(&self, value: String) -> Option<User> {}
 }
 
-#[responds_to_http(method = Get, path = "/users/{user}", server = crate::Public)]
+#[responds_to_http(method = Get, path = "/users/{user}", server = "public")]
 struct GetUser;
 
 impl GetUser {
@@ -106,9 +95,6 @@ impl GetUser {
 "#;
 
     const MODEL_PARAMETER: &str = r#"
-#[http_server(name = "public")]
-struct Public;
-
 struct User;
 
 #[provides_authenticated_actor]
@@ -136,7 +122,7 @@ impl CrudActionGate for UserGate {
     async fn can(&self, user: Option<&User>, subject: &User, action: CrudAction) -> bool {}
 }
 
-#[responds_to_http(method = Get, path = "/profiles/{user}", server = crate::Public)]
+#[responds_to_http(method = Get, path = "/profiles/{user}", server = "public")]
 struct GetProfile;
 
 impl GetProfile {
@@ -146,9 +132,6 @@ impl GetProfile {
 "#;
 
     const SESSION_AUTHENTICATED: &str = r#"
-#[http_server(name = "public")]
-struct Public;
-
 struct User;
 
 #[provides_authenticated_actor]
@@ -159,7 +142,7 @@ impl AuthenticatedActorStore for SessionStore {
     async fn get_authenticated_actor(&self, request: &Request) -> Option<User> {}
 }
 
-#[responds_to_http(method = Get, path = "/account", server = crate::Public)]
+#[responds_to_http(method = Get, path = "/account", server = "public")]
 struct GetAccount;
 
 impl GetAccount {
@@ -167,7 +150,7 @@ impl GetAccount {
     fn respond(&self, #[session_authenticated] user: User) -> Response {}
 }
 
-#[responds_to_http(method = Get, path = "/maybe", server = crate::Public)]
+#[responds_to_http(method = Get, path = "/maybe", server = "public")]
 struct GetMaybe;
 
 impl GetMaybe {
@@ -177,9 +160,6 @@ impl GetMaybe {
 "#;
 
     const SITE_ACTION: &str = r#"
-#[http_server(name = "public")]
-struct Public;
-
 struct User;
 
 #[provides_authenticated_actor]
@@ -198,7 +178,7 @@ impl SiteActionGate for ViewAdminGate {
     async fn can(&self, user: Option<&User>) -> bool {}
 }
 
-#[responds_to_http(method = Get, path = "/admin", server = crate::Public)]
+#[responds_to_http(method = Get, path = "/admin", server = "public")]
 #[can(crate::action::Action::ViewAdmin)]
 struct GetAdmin;
 
@@ -672,23 +652,20 @@ impl GetAdmin {
     }
 
     #[test]
-    fn never_generates_a_route_symbol_enum_and_omits_symbols_for_plain_routes() {
+    fn never_generates_a_route_name_enum_and_omits_names_for_plain_routes() {
         let source = source_for(RESPONDERS_AND_MIDDLEWARE);
 
-        assert!(!source.contains("enumRouteSymbol"));
-        assert!(!source.contains("route_with_symbol"));
+        assert!(!source.contains("enumRouteName"));
+        assert!(!source.contains("route_with_name"));
         assert!(source.contains(".route(margaret_http::method::Method::Get,\"/open\","));
     }
 
-    const USER_SYMBOL_ROUTE: &str = r#"
-#[http_server(name = "public")]
-struct Public;
-
+    const NAMED_ROUTE: &str = r#"
 #[responds_to_http(
     method = Get,
+    name = "get_greeting",
     path = "/greeting",
-    server = crate::Public,
-    symbol = crate::symbols::RouteSymbol::GetGreeting
+    server = "public"
 )]
 struct GetGreeting;
 
@@ -699,29 +676,28 @@ impl GetGreeting {
 "#;
 
     #[test]
-    fn registers_a_route_under_an_explicit_user_defined_symbol() {
-        let source = source_for(USER_SYMBOL_ROUTE);
+    fn registers_a_route_under_an_explicit_name() {
+        let source = source_for(NAMED_ROUTE);
 
-        assert!(!source.contains("enumRouteSymbol"));
-        assert!(source.contains(".route_with_symbol(margaret_http::method::Method::Get,\"/greeting\","));
+        assert!(!source.contains("enumRouteName"));
         assert!(source.contains(
-            "margaret_http::http_route_symbol::HttpRouteSymbol::route_key(&crate::symbols::RouteSymbol::GetGreeting"
+            ".route_with_name(margaret_http::method::Method::Get,\"/greeting\",\"get_greeting\","
         ));
     }
 
     #[test]
-    fn rejects_two_routes_sharing_a_symbol() {
+    fn rejects_two_routes_sharing_a_name() {
         let message = error_for(
-            "#[http_server(name = \"public\")]\nstruct Public;\n\n#[responds_to_http(method = Get, path = \"/a\", server = crate::Public, symbol = crate::symbols::RouteSymbol::Shared)]\nstruct A;\nimpl A {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n\n#[responds_to_http(method = Get, path = \"/b\", server = crate::Public, symbol = crate::symbols::RouteSymbol::Shared)]\nstruct B;\nimpl B {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, name = \"shared\", path = \"/a\", server = \"public\")]\nstruct A;\nimpl A {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n\n#[responds_to_http(method = Get, name = \"shared\", path = \"/b\", server = \"public\")]\nstruct B;\nimpl B {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("both declare the route symbol"));
+        assert!(message.contains("both declare the route name"));
     }
 
     #[test]
-    fn propagates_a_non_path_symbol_argument() {
+    fn propagates_a_non_string_name_argument() {
         let message = error_for(
-            "#[http_server(name = \"public\")]\nstruct Public;\n\n#[responds_to_http(method = Get, path = \"/a\", server = crate::Public, symbol = \"x\")]\nstruct A;\nimpl A {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, name = crate::symbols::RouteName::Shared, path = \"/a\", server = \"public\")]\nstruct A;\nimpl A {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -730,7 +706,7 @@ impl GetGreeting {
     #[test]
     fn routes_an_interceptable_return_through_its_marker_interceptor() {
         let source = source_for(
-            "trait View {}\n\n#[http_server(name = \"public\")]\nstruct Public;\n\n#[intercepts]\nstruct ViewInterceptor;\nimpl HttpInterceptor for ViewInterceptor {\n    type Intercepted = dyn View;\n    async fn intercept(&self, request: &Request, view: Box<dyn View>) -> Response {}\n}\n\n#[responds_to_http(method = Get, path = \"/greeting\", server = crate::Public)]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[responder]\n    fn respond(&self) -> Box<dyn View> {}\n}\n",
+            "trait View {}\n\n#[intercepts]\nstruct ViewInterceptor;\nimpl HttpInterceptor for ViewInterceptor {\n    type Intercepted = dyn View;\n    async fn intercept(&self, request: &Request, view: Box<dyn View>) -> Response {}\n}\n\n#[responds_to_http(method = Get, path = \"/greeting\", server = \"public\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[responder]\n    fn respond(&self) -> Box<dyn View> {}\n}\n",
         );
 
         assert!(source.contains("container.view_interceptor().await"));
@@ -758,7 +734,7 @@ impl GetGreeting {
     #[test]
     fn treats_a_responder_without_a_return_type_as_plain() {
         let source = source_for(
-            "#[http_server(name = \"public\")]\nstruct Public;\n\n#[responds_to_http(method = Get, path = \"/x\", server = crate::Public)]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) {}\n}\n",
         );
 
         assert!(
@@ -769,7 +745,7 @@ impl GetGreeting {
     #[test]
     fn treats_an_unregistered_struct_return_as_plain() {
         let source = source_for(
-            "#[http_server(name = \"public\")]\nstruct Public;\n\nstruct Card;\n\n#[responds_to_http(method = Get, path = \"/x\", server = crate::Public)]\nstruct GetCard;\nimpl GetCard {\n    #[responder]\n    fn respond(&self) -> Card {}\n}\n",
+            "struct Card;\n\n#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nstruct GetCard;\nimpl GetCard {\n    #[responder]\n    fn respond(&self) -> Card {}\n}\n",
         );
 
         assert!(
@@ -780,7 +756,7 @@ impl GetGreeting {
     #[test]
     fn treats_a_trait_object_return_without_an_interceptor_as_plain() {
         let source = source_for(
-            "trait Widget {}\n\n#[http_server(name = \"public\")]\nstruct Public;\n\n#[responds_to_http(method = Get, path = \"/x\", server = crate::Public)]\nstruct GetWidget;\nimpl GetWidget {\n    #[responder]\n    fn respond(&self) -> Box<dyn Widget> {}\n}\n",
+            "trait Widget {}\n\n#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nstruct GetWidget;\nimpl GetWidget {\n    #[responder]\n    fn respond(&self) -> Box<dyn Widget> {}\n}\n",
         );
 
         assert!(
@@ -789,13 +765,7 @@ impl GetGreeting {
     }
 
     const MULTIPLE_SERVERS: &str = r#"
-#[http_server(name = "public")]
-struct Public;
-
-#[http_server(name = "internal")]
-struct Internal;
-
-#[responds_to_http(method = Get, path = "/", server = crate::Public)]
+#[responds_to_http(method = Get, path = "/", server = "public")]
 struct GetIndex;
 
 impl GetIndex {
@@ -803,7 +773,7 @@ impl GetIndex {
     fn respond(&self) -> Response {}
 }
 
-#[responds_to_http(method = Get, path = "/metrics", server = crate::Internal)]
+#[responds_to_http(method = Get, path = "/metrics", server = "internal")]
 struct GetMetrics;
 
 impl GetMetrics {
@@ -822,7 +792,7 @@ impl GetMetrics {
     }
 
     #[test]
-    fn groups_each_route_under_its_declared_server() {
+    fn groups_each_route_under_its_named_server() {
         let source = source_for(MULTIPLE_SERVERS);
 
         assert!(source.contains(
@@ -833,85 +803,19 @@ impl GetMetrics {
         ));
     }
 
-
     #[test]
-    fn resolves_identically_named_markers_to_distinct_servers_by_full_path() {
+    fn normalizes_a_server_name_to_snake_case() {
         let source = source_for(
-            "mod base {\n#[http_server(name = \"public\")]\nstruct Internal;\n\n#[responds_to_http(method = Get, path = \"/base\", server = crate::base::Internal)]\nstruct PageBase;\nimpl PageBase {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n\nmod plugin {\n#[http_server(name = \"internal\")]\nstruct Internal;\n\n#[responds_to_http(method = Get, path = \"/plugin\", server = crate::plugin::Internal)]\nstruct PagePlugin;\nimpl PagePlugin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/\", server = \"Public API\")]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
-        assert!(source.contains("pubasyncfnserver_public"));
-        assert!(source.contains("pubasyncfnserver_internal"));
+        assert!(source.contains("pubasyncfnserver_public_api"));
     }
 
     #[test]
-    fn rejects_http_server_on_a_non_struct() {
-        let message = error_for("#[http_server(name = \"public\")]\nenum Bad {}\n");
-
-        assert!(message.contains("#[http_server] is only supported on structs"));
-    }
-
-    #[test]
-    fn rejects_an_http_server_without_a_name() {
-        let message = error_for("#[http_server]\nstruct Internal;\n");
-
-        assert!(message.contains("missing the 'name' argument"));
-    }
-
-    #[test]
-    fn propagates_malformed_http_server_arguments() {
-        let message = error_for("#[http_server(= 5)]\nstruct Internal;\n");
-
-        assert!(message.contains("failed to index"));
-    }
-
-    #[test]
-    fn rejects_a_non_string_server_name() {
-        let message = error_for("#[http_server(name = 5)]\nstruct Internal;\n");
-
-        assert!(message.contains("failed to index"));
-    }
-
-    #[test]
-    fn rejects_two_markers_declaring_the_same_server_name() {
+    fn propagates_a_non_string_server_argument() {
         let message = error_for(
-            "mod a {\n#[http_server(name = \"internal\")]\nstruct Internal;\n}\n\nmod b {\n#[http_server(name = \"internal\")]\nstruct Internal;\n}\n",
-        );
-
-        assert!(message.contains("declared by more than one #[http_server] marker"));
-    }
-
-    #[test]
-    fn rejects_a_route_targeting_an_undeclared_server() {
-        let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/\", server = crate::Ghost)]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
-        );
-
-        assert!(message.contains("not declared by any #[http_server] marker"));
-    }
-
-    #[test]
-    fn rejects_an_ambiguous_server_reference() {
-        let message = error_for(
-            "mod base {\n#[http_server(name = \"public\")]\nstruct Internal;\n}\n\nmod plugin {\n#[http_server(name = \"internal\")]\nstruct Internal;\n}\n\n#[responds_to_http(method = Get, path = \"/\", server = Internal)]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
-        );
-
-        assert!(message.contains("resolves to more than one"));
-    }
-
-    #[test]
-    fn rejects_a_declared_server_without_routes() {
-        let message = error_for(
-            "#[http_server(name = \"public\")]\nstruct Public;\n\n#[http_server(name = \"internal\")]\nstruct Internal;\n\n#[responds_to_http(method = Get, path = \"/\", server = crate::Public)]\nstruct GetIndex;\nimpl GetIndex {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
-        );
-
-        assert!(message.contains("has no routes"));
-    }
-
-    #[test]
-    fn propagates_a_non_path_server_argument() {
-        let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/\", server = \"internal\")]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/\", server = ServerMarker)]\nstruct Page;\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));

@@ -8,7 +8,7 @@ use crate::responded::Responded;
 use crate::response::Response;
 
 pub(crate) async fn respond_recursively(
-    by_symbol: &HashMap<&'static str, Arc<dyn Handler>>,
+    by_name: &HashMap<&'static str, Arc<dyn Handler>>,
     request: Request,
     first: Arc<dyn Handler>,
 ) -> Response {
@@ -20,11 +20,11 @@ pub(crate) async fn respond_recursively(
         match outcome {
             Responded::Done(response) => return response,
             Responded::Forward(forward) => {
-                if !visited.insert(forward.key()) {
+                if !visited.insert(forward.name()) {
                     return Response::text(500, "Internal Server Error");
                 }
 
-                let Some(target) = by_symbol.get(forward.key()).cloned() else {
+                let Some(target) = by_name.get(forward.name()).cloned() else {
                     return Response::not_found();
                 };
 
@@ -49,42 +49,17 @@ mod tests {
     use crate::deferred_interception::DeferredInterception;
     use crate::forward::Forward;
     use crate::handler::Handler;
-    use crate::http_route_symbol::HttpRouteSymbol;
     use crate::method::Method;
     use crate::request::Request;
     use crate::responded::Responded;
     use crate::response::Response;
-
-    struct SymbolTarget;
-
-    impl HttpRouteSymbol for SymbolTarget {
-        fn route_key(&self) -> &'static str {
-            "target"
-        }
-    }
-
-    struct SymbolSelf;
-
-    impl HttpRouteSymbol for SymbolSelf {
-        fn route_key(&self) -> &'static str {
-            "origin"
-        }
-    }
-
-    struct SymbolUnknown;
-
-    impl HttpRouteSymbol for SymbolUnknown {
-        fn route_key(&self) -> &'static str {
-            "unknown"
-        }
-    }
 
     struct ForwardToTarget;
 
     #[async_trait]
     impl Handler for ForwardToTarget {
         async fn handle(&self, _request: Request) -> Responded {
-            Responded::from(Forward::to(SymbolTarget))
+            Responded::from(Forward::to("target"))
         }
     }
 
@@ -93,7 +68,7 @@ mod tests {
     #[async_trait]
     impl Handler for ForwardToSelf {
         async fn handle(&self, _request: Request) -> Responded {
-            Responded::from(Forward::to(SymbolSelf))
+            Responded::from(Forward::to("origin"))
         }
     }
 
@@ -102,7 +77,7 @@ mod tests {
     #[async_trait]
     impl Handler for ForwardToUnknown {
         async fn handle(&self, _request: Request) -> Responded {
-            Responded::from(Forward::to(SymbolUnknown))
+            Responded::from(Forward::to("unknown"))
         }
     }
 
@@ -134,40 +109,36 @@ mod tests {
     }
 
     async fn status_of(
-        by_symbol: HashMap<&'static str, Arc<dyn Handler>>,
+        by_name: HashMap<&'static str, Arc<dyn Handler>>,
         first: Arc<dyn Handler>,
     ) -> u16 {
-        respond_recursively(
-            &by_symbol,
-            Request::new(Method::Get, "/".to_string()),
-            first,
-        )
-        .await
-        .into_http()
-        .status()
-        .as_u16()
+        respond_recursively(&by_name, Request::new(Method::Get, "/".to_string()), first)
+            .await
+            .into_http()
+            .status()
+            .as_u16()
     }
 
     #[tokio::test]
     async fn forwards_to_the_target_responder() {
-        let mut by_symbol: HashMap<&'static str, Arc<dyn Handler>> = HashMap::new();
+        let mut by_name: HashMap<&'static str, Arc<dyn Handler>> = HashMap::new();
 
-        by_symbol.insert("target", Arc::new(Target));
+        by_name.insert("target", Arc::new(Target));
 
-        assert_eq!(status_of(by_symbol, Arc::new(ForwardToTarget)).await, 222);
+        assert_eq!(status_of(by_name, Arc::new(ForwardToTarget)).await, 222);
     }
 
     #[tokio::test]
     async fn returns_a_server_error_on_a_forward_cycle() {
-        let mut by_symbol: HashMap<&'static str, Arc<dyn Handler>> = HashMap::new();
+        let mut by_name: HashMap<&'static str, Arc<dyn Handler>> = HashMap::new();
 
-        by_symbol.insert("origin", Arc::new(ForwardToSelf));
+        by_name.insert("origin", Arc::new(ForwardToSelf));
 
-        assert_eq!(status_of(by_symbol, Arc::new(ForwardToSelf)).await, 500);
+        assert_eq!(status_of(by_name, Arc::new(ForwardToSelf)).await, 500);
     }
 
     #[tokio::test]
-    async fn returns_not_found_when_forwarding_to_an_unknown_symbol() {
+    async fn returns_not_found_when_forwarding_to_an_unknown_name() {
         assert_eq!(
             status_of(HashMap::new(), Arc::new(ForwardToUnknown)).await,
             404

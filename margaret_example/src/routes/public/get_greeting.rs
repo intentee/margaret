@@ -13,9 +13,9 @@ use crate::greeter::Greeter;
 #[traced]
 #[responds_to_http(
     method = Get,
+    name = "get_greeting",
     path = "/greeting",
-    server = crate::servers::public::Public,
-    symbol = crate::route_symbol::RouteSymbol::GetGreeting
+    server = "public"
 )]
 pub struct GetGreeting {
     greeter: Arc<dyn Greeter>,

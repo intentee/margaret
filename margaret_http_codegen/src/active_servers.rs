@@ -1,26 +1,14 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
-use crate::declared_server::DeclaredServer;
-use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
 use crate::http_server::HttpServer;
 
-pub(crate) fn active_servers(
-    declared: &[DeclaredServer],
-    routes: &[HttpRoute],
-) -> Result<Vec<HttpServer>, HttpCodegenError> {
-    let used: HashSet<&str> = routes.iter().map(|route| route.server.as_str()).collect();
-    let mut servers: Vec<HttpServer> = Vec::new();
-
-    for declared_server in declared {
-        if !used.contains(declared_server.name()) {
-            return Err(HttpCodegenError::DeclaredHttpServerWithoutRoutes {
-                server: declared_server.name().to_string(),
-            });
-        }
-
-        servers.push(HttpServer::new(declared_server.name().to_string()));
-    }
-
-    Ok(servers)
+pub(crate) fn active_servers(routes: &[HttpRoute]) -> Vec<HttpServer> {
+    routes
+        .iter()
+        .map(|route| route.server.as_str())
+        .collect::<BTreeSet<&str>>()
+        .into_iter()
+        .map(|name| HttpServer::new(name.to_string()))
+        .collect()
 }

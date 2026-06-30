@@ -11,7 +11,7 @@ use crate::responded::Responded;
 use crate::response::Response;
 
 pub struct Router {
-    by_symbol: HashMap<&'static str, Arc<dyn Handler>>,
+    by_name: HashMap<&'static str, Arc<dyn Handler>>,
     matcher: matchit::Router<usize>,
     paths: HashMap<String, usize>,
     routes: Vec<HashMap<Method, Arc<dyn Handler>>>,
@@ -20,7 +20,7 @@ pub struct Router {
 impl Router {
     pub fn empty() -> Self {
         Self {
-            by_symbol: HashMap::new(),
+            by_name: HashMap::new(),
             matcher: matchit::Router::new(),
             paths: HashMap::new(),
             routes: Vec::new(),
@@ -33,16 +33,16 @@ impl Router {
         self
     }
 
-    pub fn route_with_symbol(
+    pub fn route_with_name(
         mut self,
         method: Method,
         path: &str,
-        symbol_key: &'static str,
+        name: &'static str,
         handler: Arc<dyn Handler>,
     ) -> Self {
         let handler = self.register(method, path, handler);
 
-        self.by_symbol.insert(symbol_key, handler);
+        self.by_name.insert(name, handler);
 
         self
     }
@@ -97,7 +97,7 @@ impl Handler for Router {
             Err(_) => return Responded::Done(Response::not_found()),
         };
 
-        Responded::Done(respond_recursively(&self.by_symbol, request, handler).await)
+        Responded::Done(respond_recursively(&self.by_name, request, handler).await)
     }
 }
 
@@ -110,7 +110,6 @@ mod tests {
     use super::Router;
     use crate::forward::Forward;
     use crate::handler::Handler;
-    use crate::http_route_symbol::HttpRouteSymbol;
     use crate::method::Method;
     use crate::request::Request;
     use crate::responded::Responded;
@@ -164,20 +163,14 @@ mod tests {
         assert_eq!(status_of(Method::Delete, "/items").await, 405);
     }
 
-    struct PublicGreetingSymbol;
-
-    impl HttpRouteSymbol for PublicGreetingSymbol {
-        fn route_key(&self) -> &'static str {
-            "crate::routes::public::get_greeting::GetGreeting"
-        }
-    }
-
     struct ForwardsToPublicGreeting;
 
     #[async_trait]
     impl Handler for ForwardsToPublicGreeting {
         async fn handle(&self, _request: Request) -> Responded {
-            Responded::from(Forward::to(PublicGreetingSymbol))
+            Responded::from(Forward::to(
+                "crate::routes::public::get_greeting::GetGreeting",
+            ))
         }
     }
 
@@ -201,7 +194,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_server_cannot_forward_to_a_route_registered_on_another_server() {
-        let public_server = Router::empty().route_with_symbol(
+        let public_server = Router::empty().route_with_name(
             Method::Get,
             "/greeting",
             "crate::routes::public::get_greeting::GetGreeting",
@@ -210,7 +203,13 @@ mod tests {
         let internal_server =
             Router::empty().route(Method::Get, "/forward", Arc::new(ForwardsToPublicGreeting));
 
-        assert_eq!(handle_status(&public_server, Method::Get, "/greeting").await, 200);
-        assert_eq!(handle_status(&internal_server, Method::Get, "/forward").await, 404);
+        assert_eq!(
+            handle_status(&public_server, Method::Get, "/greeting").await,
+            200
+        );
+        assert_eq!(
+            handle_status(&internal_server, Method::Get, "/forward").await,
+            404
+        );
     }
 }

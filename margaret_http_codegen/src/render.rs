@@ -250,12 +250,12 @@ fn route_call(route: &HttpRoute) -> TokenStream {
     let path = &route.path;
     let handler = onion(route);
 
-    match &route.symbol {
-        Some(symbol) => quote! {
-            .route_with_symbol(
+    match &route.name {
+        Some(name) => quote! {
+            .route_with_name(
                 margaret_http::method::Method::#method,
                 #path,
-                margaret_http::http_route_symbol::HttpRouteSymbol::route_key(&#symbol),
+                #name,
                 #handler,
             )
         },

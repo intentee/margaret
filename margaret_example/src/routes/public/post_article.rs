@@ -12,7 +12,7 @@ use crate::models::user::User;
 use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
-#[responds_to_http(method = Post, path = "/articles", server = crate::servers::public::Public)]
+#[responds_to_http(method = Post, path = "/articles", server = "public")]
 pub struct PostArticle {
     articles: Arc<ArticleRepository>,
 }
