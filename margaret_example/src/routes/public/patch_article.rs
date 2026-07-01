@@ -26,12 +26,16 @@ impl PatchArticle {
     pub async fn respond(
         &self,
         request: &Request,
-        #[route_parameter(intent = CrudAction::Update)] article: Article,
+        #[route_parameter(from = "article", intent = CrudAction::Update)] article: Article,
     ) -> Response {
-        let title = request
-            .form("title")
-            .unwrap_or_else(|| article.title.clone());
-        let body = request.form("body").unwrap_or_else(|| article.body.clone());
+        let title = match request.form("title") {
+            Some(title) => title,
+            None => article.title.clone(),
+        };
+        let body = match request.form("body") {
+            Some(body) => body,
+            None => article.body.clone(),
+        };
 
         self.articles.save(Article {
             id: article.id.clone(),

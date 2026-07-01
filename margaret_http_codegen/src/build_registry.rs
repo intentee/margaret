@@ -4,6 +4,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
+use margaret_attributes::resolution_index::ResolutionIndex;
 use margaret_attributes::resolve_struct::resolve_struct;
 
 use crate::http_codegen_error::HttpCodegenError;
@@ -11,7 +12,7 @@ use crate::http_codegen_error::HttpCodegenError;
 fn associated_model(
     item: &IndexedItem,
     associated_type_name: &str,
-    struct_paths: &[CanonicalPath],
+    struct_resolution: &ResolutionIndex,
     referencing_root: &str,
 ) -> Option<CanonicalPath> {
     let associated_type = item
@@ -19,12 +20,12 @@ fn associated_model(
         .iter()
         .find(|associated_type| associated_type.name() == associated_type_name)?;
 
-    resolve_struct(associated_type.ty(), struct_paths, referencing_root)
+    resolve_struct(associated_type.ty(), struct_resolution, referencing_root)
 }
 
 pub(crate) fn build_registry(
     index: &AttributeIndex,
-    struct_paths: &[CanonicalPath],
+    struct_resolution: &ResolutionIndex,
     marker: &str,
     associated_type_name: &str,
     missing: impl Fn(String) -> HttpCodegenError,
@@ -47,8 +48,13 @@ pub(crate) fn build_registry(
             .segments()
             .first()
             .expect("a canonical path has at least one segment");
-        let model = associated_model(item, associated_type_name, struct_paths, referencing_root)
-            .ok_or_else(|| missing(provider.to_string()))?;
+        let model = associated_model(
+            item,
+            associated_type_name,
+            struct_resolution,
+            referencing_root,
+        )
+        .ok_or_else(|| missing(provider.to_string()))?;
 
         if let Some(existing) = registry.get(&model) {
             return Err(ambiguous(

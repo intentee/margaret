@@ -1,7 +1,10 @@
 use std::path::Path;
 
+use syn::parse_quote;
+
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_attributes::resolution::Resolution;
 
 #[test]
 fn indexes_associated_types() {
@@ -24,12 +27,16 @@ fn indexes_associated_types() {
 
     assert_eq!(names, ["Extra", "Output"]);
 
-    let struct_paths: Vec<String> = index
-        .struct_paths()
-        .iter()
-        .map(|path| path.to_string())
-        .collect();
+    let resolution = index.struct_resolution();
+    let resolved = |written: syn::Path| match resolution.resolve(&written, "associated_types") {
+        Resolution::Resolved(path) => path.to_string(),
+        Resolution::NotFound => "<not found>".to_string(),
+        Resolution::Ambiguous(_) => "<ambiguous>".to_string(),
+    };
 
-    assert!(struct_paths.contains(&"associated_types::Model".to_string()));
-    assert!(struct_paths.contains(&"associated_types::Producer".to_string()));
+    assert_eq!(resolved(parse_quote!(Model)), "associated_types::Model");
+    assert_eq!(
+        resolved(parse_quote!(Producer)),
+        "associated_types::Producer"
+    );
 }

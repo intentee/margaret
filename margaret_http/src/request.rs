@@ -5,6 +5,7 @@ use cookie::Cookie;
 use http::HeaderMap;
 
 use crate::method::Method;
+use crate::request_error::RequestError;
 
 #[derive(Clone)]
 pub struct Request {
@@ -50,21 +51,31 @@ impl Request {
         &self.path
     }
 
-    pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers.get(name)?.to_str().ok()
+    pub fn header(&self, name: &str) -> Result<Option<&str>, RequestError> {
+        match self.headers.get(name) {
+            Some(value) => Ok(Some(value.to_str()?)),
+            None => Ok(None),
+        }
     }
 
     pub fn path_param(&self, name: &str) -> Option<&str> {
         self.path_params.get(name).map(String::as_str)
     }
 
-    pub fn cookie(&self, name: &str) -> Option<String> {
-        let raw = self.header("cookie")?;
+    pub fn cookie(&self, name: &str) -> Result<Option<String>, RequestError> {
+        let Some(raw) = self.header("cookie")? else {
+            return Ok(None);
+        };
 
-        Cookie::split_parse(raw)
-            .filter_map(Result::ok)
-            .find(|cookie| cookie.name() == name)
-            .map(|cookie| cookie.value().to_string())
+        for parsed in Cookie::split_parse(raw) {
+            let cookie = parsed?;
+
+            if cookie.name() == name {
+                return Ok(Some(cookie.value().to_string()));
+            }
+        }
+
+        Ok(None)
     }
 
     pub fn form(&self, key: &str) -> Option<String> {
@@ -105,24 +116,34 @@ mod tests {
     fn reads_a_cookie_by_name() {
         let request = request_with_header("cookie", "session=abc; theme=dark");
 
-        assert_eq!(request.cookie("session"), Some("abc".to_string()));
-        assert_eq!(request.cookie("theme"), Some("dark".to_string()));
+        assert_eq!(
+            request.cookie("session").expect("the cookie header parses"),
+            Some("abc".to_string())
+        );
+        assert_eq!(
+            request.cookie("theme").expect("the cookie header parses"),
+            Some("dark".to_string())
+        );
     }
 
     #[test]
     fn returns_none_for_a_missing_cookie() {
         assert_eq!(
-            request_with_header("cookie", "theme=dark").cookie("session"),
+            request_with_header("cookie", "theme=dark")
+                .cookie("session")
+                .expect("the cookie header parses"),
             None
         );
         assert_eq!(
-            Request::new(Method::Get, "/".to_string()).cookie("session"),
+            Request::new(Method::Get, "/".to_string())
+                .cookie("session")
+                .expect("an absent cookie header yields no cookie"),
             None
         );
     }
 
     #[test]
-    fn ignores_a_header_value_that_is_not_visible_ascii() {
+    fn rejects_a_header_value_that_is_not_visible_ascii() {
         let mut request = Request::new(Method::Get, "/".to_string());
         let mut headers = HeaderMap::new();
 
@@ -132,8 +153,23 @@ mod tests {
         );
         request.set_headers(headers);
 
-        assert_eq!(request.header("cookie"), None);
-        assert_eq!(request.cookie("session"), None);
+        let message = request
+            .header("cookie")
+            .expect_err("an opaque header value is rejected")
+            .to_string();
+
+        assert!(message.contains("not visible ASCII text"));
+        assert!(request.cookie("session").is_err());
+    }
+
+    #[test]
+    fn rejects_a_malformed_cookie_header() {
+        let message = request_with_header("cookie", "=nameless")
+            .cookie("session")
+            .expect_err("a malformed cookie is rejected")
+            .to_string();
+
+        assert!(message.contains("could not be parsed"));
     }
 
     #[test]

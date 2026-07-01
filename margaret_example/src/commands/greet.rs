@@ -23,9 +23,9 @@ impl Greet {
     #[runner]
     pub async fn run(
         &self,
-        #[console_argument] name: String,
-        #[console_argument(name = "salutation")] salutation: Option<String>,
-        #[console_argument(name = "loud")] loud: bool,
+        #[console_argument(from = "name")] name: String,
+        #[console_argument(from = "salutation")] salutation: Option<String>,
+        #[console_argument(from = "loud")] loud: bool,
     ) -> CommandOutcome {
         println!(
             "{}, {} (salutation: {:?}, loud: {})",

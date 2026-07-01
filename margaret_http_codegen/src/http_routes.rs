@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -12,53 +11,33 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 
 use crate::build_registry::build_registry;
+use crate::can_arguments::CanArguments;
+use crate::crud_gate_subjects::crud_gate_subjects;
 use crate::http_codegen_error::HttpCodegenError;
+use crate::http_responder_arguments::HttpResponderArguments;
 use crate::http_route::HttpRoute;
 use crate::interceptor_bindings::interceptor_bindings;
 use crate::layer_application::LayerApplication;
+use crate::marker_arguments::MarkerArguments;
 use crate::middleware_binding::MiddlewareBinding;
 use crate::path_parameter_names::path_parameter_names;
 use crate::registries::Registries;
 use crate::responder_method::responder_method;
 use crate::responder_signature::ResponderSignature;
-use crate::route_parameter_binding::RouteParameterBinding;
 
 fn marker_value(
     marker: &MatchedAttribute,
     responder: &str,
 ) -> Result<TokenStream, HttpCodegenError> {
-    let arguments = marker.args()?;
+    let MarkerArguments { value } =
+        MarkerArguments::parse(&marker.args()?, marker.path(), responder)?;
 
-    if arguments.is_empty() {
-        return Ok(quote! { () });
-    }
-
-    match arguments.positional(0) {
-        Some(value) if arguments.positional(1).is_none() => Ok(quote! { #value }),
-        _ => Err(HttpCodegenError::MalformedMarker {
-            marker: marker.path(),
-            responder: responder.to_string(),
-        }),
-    }
-}
-
-fn is_path_parameter(binding: &RouteParameterBinding) -> bool {
-    matches!(
-        binding,
-        RouteParameterBinding::Raw | RouteParameterBinding::Bound { .. }
-    )
+    Ok(value.map_or_else(|| quote! { () }, |value| quote! { #value }))
 }
 
 fn needs_authenticated_actor(route_parameters: &[crate::route_parameter::RouteParameter]) -> bool {
     route_parameters.iter().any(|route_parameter| {
-        matches!(
-            &route_parameter.binding,
-            RouteParameterBinding::SessionAuthenticated(_)
-                | RouteParameterBinding::Bound {
-                    intent: Some(_),
-                    ..
-                }
-        )
+        route_parameter.binding.is_actor() || route_parameter.binding.is_authorizing()
     })
 }
 
@@ -75,13 +54,7 @@ fn site_action_guards(
             continue;
         }
 
-        let action = matched
-            .args()?
-            .positional_path(0)
-            .ok_or_else(|| HttpCodegenError::CanWithoutAction {
-                responder: responder.to_string(),
-            })?
-            .clone();
+        let CanArguments { action } = CanArguments::parse(&matched.args()?, responder)?;
 
         if !site_gates.contains_key(&action) {
             return Err(HttpCodegenError::MissingSiteActionGate {
@@ -103,10 +76,10 @@ pub(crate) fn http_routes(
     has_store: bool,
 ) -> Result<Vec<HttpRoute>, HttpCodegenError> {
     let selector = AttributeSelector::parse("responds_to_http").expect("a valid selector");
-    let struct_paths = index.struct_paths();
+    let struct_resolution = index.struct_resolution();
     let binders = build_registry(
         index,
-        &struct_paths,
+        struct_resolution,
         "provides_route_parameter",
         "Model",
         |binder| HttpCodegenError::HttpRouteParameterBinderModel { binder },
@@ -116,26 +89,15 @@ pub(crate) fn http_routes(
             second,
         },
     )?;
-    let gates = build_registry(
-        index,
-        &struct_paths,
-        "decides_crud_action",
-        "Subject",
-        |gate| HttpCodegenError::CrudGateSubject { gate },
-        |subject, first, second| HttpCodegenError::AmbiguousCrudGate {
-            subject,
-            first,
-            second,
-        },
-    )?;
-    let trait_paths = index.trait_paths();
-    let interceptors = interceptor_bindings(index, &trait_paths)?;
+    let gates = crud_gate_subjects(index, struct_resolution)?;
+    let trait_resolution = index.trait_resolution();
+    let interceptors = interceptor_bindings(index, trait_resolution)?;
     let registries = Registries {
         binders: &binders,
         gates: &gates,
         interceptors: &interceptors,
-        struct_paths: &struct_paths,
-        trait_paths: &trait_paths,
+        struct_resolution,
+        trait_resolution,
     };
     let mut routes = Vec::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
@@ -149,18 +111,13 @@ pub(crate) fn http_routes(
             });
         }
 
-        let arguments = matched.args()?;
         let responder = item.canonical_path().to_string();
-        let method = arguments
-            .path("method")?
-            .ok_or(HttpCodegenError::MissingHttpMethod {
-                responder: responder.clone(),
-            })?;
-        let path = arguments
-            .string("path")?
-            .ok_or(HttpCodegenError::MissingHttpPath {
-                responder: responder.clone(),
-            })?;
+        let HttpResponderArguments {
+            method,
+            name,
+            path,
+            server,
+        } = HttpResponderArguments::parse(&matched.args()?, &responder)?;
 
         let mut layers = Vec::new();
 
@@ -191,12 +148,12 @@ pub(crate) fn http_routes(
             })?;
 
         for route_parameter in &route_parameters {
-            if is_path_parameter(&route_parameter.binding)
-                && !path_parameters.contains(&route_parameter.name)
+            if let Some(path_key) = route_parameter.binding.path_key()
+                && !path_parameters.iter().any(|name| name == path_key)
             {
                 return Err(HttpCodegenError::RouteParameterNotInPath {
                     responder: responder.clone(),
-                    parameter: route_parameter.name.clone(),
+                    parameter: path_key.to_string(),
                     path: path.clone(),
                 });
             }
@@ -207,14 +164,6 @@ pub(crate) fn http_routes(
                 responder: responder.clone(),
             });
         }
-
-        let server = arguments
-            .string("server")?
-            .ok_or_else(|| HttpCodegenError::MissingHttpServer {
-                responder: responder.clone(),
-            })?
-            .to_snake_case();
-        let name = arguments.string("name")?;
 
         if let Some(name) = &name {
             if let Some(first) = seen_names.get(name) {

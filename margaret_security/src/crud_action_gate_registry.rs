@@ -11,7 +11,7 @@ where
 {
     async fn can_crud(
         &self,
-        authenticated_actor: &AuthenticatedActor<ActorType>,
+        authenticated_actor: Option<&AuthenticatedActor<ActorType>>,
         subject: &Subject,
         action: CrudAction,
     ) -> bool;

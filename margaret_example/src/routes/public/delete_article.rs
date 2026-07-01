@@ -24,7 +24,7 @@ impl DeleteArticle {
     #[responder]
     pub async fn respond(
         &self,
-        #[route_parameter(intent = CrudAction::Delete)] article: Article,
+        #[route_parameter(from = "article", intent = CrudAction::Delete)] article: Article,
     ) -> Response {
         self.articles.remove(&article.id);
 

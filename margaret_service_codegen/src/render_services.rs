@@ -40,7 +40,7 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
 fn adapter(unit: &ServiceUnit) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
-    let token_binding = if uses_token(unit) {
+    let token_binding = if unit.uses_token() {
         quote! { cancellation_token }
     } else {
         quote! { _cancellation_token }
@@ -127,10 +127,6 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
     };
 
     format_ident!("{}{}", unit.field_name.to_upper_camel_case(), suffix)
-}
-
-fn uses_token(unit: &ServiceUnit) -> bool {
-    matches!(unit.kind, ServiceKind::Ticker { .. }) || unit.takes_token
 }
 
 pub fn render_services(

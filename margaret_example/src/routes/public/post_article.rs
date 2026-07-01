@@ -7,6 +7,7 @@ use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 use margaret_security::actor::Actor;
+use margaret_security::authenticated_actor::AuthenticatedActor;
 
 use crate::models::user::User;
 use crate::repositories::article_repository::ArticleRepository;
@@ -24,18 +25,14 @@ impl PostArticle {
     }
 
     #[responder]
-    pub async fn respond(
-        &self,
-        request: &Request,
-        #[session_authenticated] author: User,
-    ) -> Response {
+    pub async fn respond(&self, request: &Request, author: AuthenticatedActor<User>) -> Response {
         let (Some(title), Some(body)) = (request.form("title"), request.form("body")) else {
             return Response::text(422, "title and body are required");
         };
 
         let article = self
             .articles
-            .insert(title, body, author.identifier().to_string());
+            .insert(title, body, author.actor.identifier().to_string());
 
         Response::text(201, format!("created \"{}\"", article.title))
     }

@@ -8,5 +8,8 @@ use crate::authenticated_actor::AuthenticatedActor;
 pub trait AuthenticatedActorStore: Send + Sync {
     type Actor: crate::actor::Actor;
 
-    async fn get_authenticated_actor(&self, request: &Request) -> AuthenticatedActor<Self::Actor>;
+    async fn get_authenticated_actor(
+        &self,
+        request: &Request,
+    ) -> Option<AuthenticatedActor<Self::Actor>>;
 }

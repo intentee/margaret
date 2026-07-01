@@ -12,6 +12,7 @@ pub mod layer;
 pub mod method;
 pub mod next;
 pub mod request;
+pub mod request_error;
 pub mod respond_recursively;
 pub mod responded;
 pub mod responder_handler;

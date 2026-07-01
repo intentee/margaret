@@ -25,7 +25,7 @@ pub enum ConsoleCodegenError {
     UnmarkedRunnerParameter { command: String, parameter: String },
 
     #[error(
-        "console argument '{parameter}' of console command '{command}' has a boolean type but no name; a flag requires a name"
+        "console argument #{parameter} of console command '{command}' is missing `from = \"...\"`; it must name the command-line argument it binds"
     )]
-    NamelessFlag { command: String, parameter: String },
+    ConsoleArgumentMissingFrom { command: String, parameter: String },
 }

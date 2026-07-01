@@ -7,7 +7,7 @@ use syn::TypeTraitObject;
 
 use crate::canonical_path::CanonicalPath;
 use crate::resolution::Resolution;
-use crate::resolve_unique::resolve_unique;
+use crate::resolution_index::ResolutionIndex;
 
 fn boxed_type_argument(segment: &PathSegment) -> Option<&Type> {
     let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
@@ -42,7 +42,7 @@ fn peel_trait_object(declared: &Type) -> Option<&TypeTraitObject> {
 
 pub fn resolve_trait(
     declared: &Type,
-    candidates: &[CanonicalPath],
+    resolution: &ResolutionIndex,
     referencing_root: &str,
 ) -> Option<CanonicalPath> {
     let trait_object = peel_trait_object(declared)?;
@@ -55,7 +55,7 @@ pub fn resolve_trait(
         })
         .expect("a trait object names at least one trait");
 
-    match resolve_unique(written, candidates, referencing_root) {
+    match resolution.resolve(written, referencing_root) {
         Resolution::Resolved(resolved) => Some(resolved),
         _ => None,
     }
@@ -68,12 +68,13 @@ mod tests {
 
     use super::resolve_trait;
     use crate::canonical_path::CanonicalPath;
+    use crate::resolution_index::ResolutionIndex;
 
-    fn marker_traits() -> Vec<CanonicalPath> {
-        vec![CanonicalPath::new(vec![
+    fn marker_traits() -> ResolutionIndex {
+        ResolutionIndex::new([CanonicalPath::new(vec![
             "crate".to_string(),
             "View".to_string(),
-        ])]
+        ])])
     }
 
     fn resolved(declared: Type) -> Option<String> {

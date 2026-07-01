@@ -7,6 +7,7 @@ use margaret_http::cookie::Cookie;
 use margaret_http::cookie::SameSite;
 use margaret_http::cookie::time::Duration;
 use margaret_http::request::Request;
+use margaret_http::request_error::RequestError;
 use margaret_http::response::Response;
 use margaret_macros::constructor;
 use margaret_macros::provides_authenticated_actor;
@@ -91,18 +92,18 @@ impl TokenActorStore {
 impl AuthenticatedActorStore for TokenActorStore {
     type Actor = User;
 
-    async fn get_authenticated_actor(&self, request: &Request) -> AuthenticatedActor<User> {
+    async fn get_authenticated_actor(&self, request: &Request) -> Option<AuthenticatedActor<User>> {
         let user = match request.cookie(COOKIE_NAME) {
-            Some(token) => match self.verifier.verify(&token) {
+            Ok(Some(token)) => match self.verifier.verify(&token) {
                 Some(claims) => self.repository.find_user_by_id(&claims.sub).await,
                 None => None,
             },
-            None => None,
+            Ok(None) => None,
+            Err(RequestError::HeaderNotText { .. }) | Err(RequestError::MalformedCookie { .. }) => {
+                None
+            }
         };
 
-        match user {
-            Some(user) => AuthenticatedActor::Session(user),
-            None => AuthenticatedActor::Anonymous,
-        }
+        user.map(AuthenticatedActor::new)
     }
 }

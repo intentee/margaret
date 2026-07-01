@@ -20,24 +20,18 @@ pub enum SecurityCodegenError {
     )]
     StoreUserUnresolved { store: String },
 
-    #[error(
-        "#[decides_crud_action] gate '{gate}' has no `type Subject = <struct>` associated type that resolves to a known model"
-    )]
-    CrudGateSubjectUnresolved { gate: String },
+    #[error("#[decides_crud_action] gate '{gate}' has no #[decides] method")]
+    CrudGateDecisionMissing { gate: String },
 
     #[error(
-        "#[decides_crud_action] gate '{gate}' has no `type Actor = <struct>` associated type that resolves to a known model"
+        "the #[decides] method of #[decides_crud_action] gate '{gate}' must take an `AuthenticatedActor` or `Option<AuthenticatedActor>` parameter"
     )]
-    CrudGateUserUnresolved { gate: String },
+    CrudGateActorMissing { gate: String },
 
     #[error(
-        "#[decides_crud_action] gate '{gate}' decides for user '{gate_user}', but the authenticated actor store provides '{store_user}'"
+        "the #[decides] method of #[decides_crud_action] gate '{gate}' must take a subject reference that resolves to a known model"
     )]
-    MismatchedCrudGateUser {
-        gate: String,
-        gate_user: String,
-        store_user: String,
-    },
+    CrudGateSubjectMissing { gate: String },
 
     #[error("model '{subject}' has more than one CRUD gate: '{first}' and '{second}'")]
     AmbiguousCrudActionGate {
@@ -46,19 +40,13 @@ pub enum SecurityCodegenError {
         second: String,
     },
 
-    #[error(
-        "#[decides_site_action] gate '{gate}' has no `type Actor = <struct>` associated type that resolves to a known model"
-    )]
-    SiteActionGateUserUnresolved { gate: String },
+    #[error("#[decides_site_action] gate '{gate}' has no #[decides] method")]
+    SiteActionGateDecisionMissing { gate: String },
 
     #[error(
-        "#[decides_site_action] gate '{gate}' decides for user '{gate_user}', but the authenticated actor store provides '{store_user}'"
+        "the #[decides] method of #[decides_site_action] gate '{gate}' must take an `AuthenticatedActor` or `Option<AuthenticatedActor>` parameter"
     )]
-    MismatchedSiteActionGateUser {
-        gate: String,
-        gate_user: String,
-        store_user: String,
-    },
+    SiteActionGateActorMissing { gate: String },
 
     #[error("#[decides_site_action] gate '{gate}' is missing its site action argument")]
     MissingSiteActionArgument { gate: String },

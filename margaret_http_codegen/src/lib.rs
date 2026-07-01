@@ -1,15 +1,20 @@
 mod active_servers;
 mod authenticated_actor_store;
 mod build_registry;
+mod can_arguments;
+mod crud_gate_subjects;
 pub mod generate_http_source;
 pub mod has_responders;
 pub mod http_artifacts;
 pub mod http_codegen_error;
+mod http_responder_arguments;
 mod http_route;
 mod http_routes;
 pub mod http_server;
 mod interceptor_bindings;
 mod layer_application;
+mod marker_arguments;
+mod middleware_attribute_arguments;
 mod middleware_binding;
 mod middleware_bindings;
 mod path_parameter_names;
@@ -20,8 +25,9 @@ mod responder_method;
 mod responder_output;
 mod responder_signature;
 mod route_parameter;
+mod route_parameter_arguments;
 mod route_parameter_binding;
-mod session_requirement;
+mod site_action_arguments;
 mod site_action_gates;
 
 #[cfg(test)]
@@ -70,7 +76,7 @@ struct GetUser;
 
 impl GetUser {
     #[responder]
-    fn respond(&self, #[route_parameter] id: String) -> Response {}
+    fn respond(&self, #[route_parameter(from = "id")] id: String) -> Response {}
 }
 "#;
 
@@ -90,7 +96,7 @@ struct GetUser;
 
 impl GetUser {
     #[responder]
-    fn respond(&self, #[route_parameter] user: User) -> Response {}
+    fn respond(&self, #[route_parameter(from = "user")] user: User) -> Response {}
 }
 "#;
 
@@ -116,10 +122,9 @@ impl HttpRouteParameterBinder for UserBinder {
 #[decides_crud_action]
 struct UserGate;
 
-impl CrudActionGate for UserGate {
-    type Actor = User;
-    type Subject = User;
-    async fn can(&self, user: Option<&User>, subject: &User, action: CrudAction) -> bool {}
+impl UserGate {
+    #[decides]
+    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>, subject: &User, action: CrudAction) -> bool {}
 }
 
 #[responds_to_http(method = Get, path = "/profiles/{user}", server = "public")]
@@ -127,11 +132,11 @@ struct GetProfile;
 
 impl GetProfile {
     #[responder]
-    fn respond(&self, #[route_parameter(intent = CrudAction::Read)] user: User) -> Response {}
+    fn respond(&self, #[route_parameter(from = "user", intent = CrudAction::Read)] user: User) -> Response {}
 }
 "#;
 
-    const SESSION_AUTHENTICATED: &str = r#"
+    const AUTHENTICATED_ACTOR: &str = r#"
 struct User;
 
 #[provides_authenticated_actor]
@@ -139,7 +144,7 @@ struct SessionStore;
 
 impl AuthenticatedActorStore for SessionStore {
     type Actor = User;
-    async fn get_authenticated_actor(&self, request: &Request) -> Option<User> {}
+    async fn get_authenticated_actor(&self, request: &Request) -> Option<AuthenticatedActor<User>> {}
 }
 
 #[responds_to_http(method = Get, path = "/account", server = "public")]
@@ -147,7 +152,7 @@ struct GetAccount;
 
 impl GetAccount {
     #[responder]
-    fn respond(&self, #[session_authenticated] user: User) -> Response {}
+    fn respond(&self, user: AuthenticatedActor<User>) -> Response {}
 }
 
 #[responds_to_http(method = Get, path = "/maybe", server = "public")]
@@ -155,7 +160,67 @@ struct GetMaybe;
 
 impl GetMaybe {
     #[responder]
-    fn respond(&self, #[session_authenticated] user: AuthenticatedActor<User>) -> Response {}
+    fn respond(&self, user: Option<AuthenticatedActor<User>>) -> Response {}
+}
+"#;
+
+    const DESTRUCTURED_ACTOR: &str = r#"
+struct User;
+
+#[provides_authenticated_actor]
+struct SessionStore;
+
+impl AuthenticatedActorStore for SessionStore {
+    type Actor = User;
+    async fn get_authenticated_actor(&self, request: &Request) -> Option<AuthenticatedActor<User>> {}
+}
+
+#[responds_to_http(method = Get, path = "/account", server = "public")]
+struct GetAccount;
+
+impl GetAccount {
+    #[responder]
+    fn respond(&self, AuthenticatedActor { actor }: AuthenticatedActor<User>) -> Response {}
+}
+"#;
+
+    const DESTRUCTURED_ROUTE_PARAMETER: &str = r#"
+struct User;
+
+#[provides_route_parameter]
+struct UserBinder;
+
+impl HttpRouteParameterBinder for UserBinder {
+    type Model = User;
+    async fn bind(&self, value: String) -> Option<User> {}
+}
+
+#[responds_to_http(method = Get, path = "/users/{id}", server = "public")]
+struct GetUser;
+
+impl GetUser {
+    #[responder]
+    fn respond(&self, #[route_parameter(from = "id")] User { name }: User) -> Response {}
+}
+"#;
+
+    const ROUTE_PARAMETER_FROM_UNKNOWN: &str = r#"
+struct User;
+
+#[provides_route_parameter]
+struct UserBinder;
+
+impl HttpRouteParameterBinder for UserBinder {
+    type Model = User;
+    async fn bind(&self, value: String) -> Option<User> {}
+}
+
+#[responds_to_http(method = Get, path = "/users/{id}", server = "public")]
+struct GetUser;
+
+impl GetUser {
+    #[responder]
+    fn respond(&self, #[route_parameter(from = "missing")] User { name }: User) -> Response {}
 }
 "#;
 
@@ -281,26 +346,50 @@ impl GetAdmin {
         assert!(source.contains(r#"user_binder.bind(request.path_param("user").expect"#));
         assert!(source.contains("margaret_http::response::Response::not_found()"));
         assert!(source.contains(
-            "if!gatekeeper.can_crud(&authenticated_actor,&user,CrudAction::Read).await{returnmargaret_http::response::Response::forbidden().into();}"
+            "if!gatekeeper.can_crud(authenticated_actor.as_ref(),&user,CrudAction::Read,).await{returnmargaret_http::response::Response::forbidden().into();}"
         ));
         assert!(source.contains("responder.respond(user).await"));
         assert!(!source.contains("get_authenticated_actor"));
     }
 
     #[test]
-    fn injects_a_required_session_authenticated_actor() {
-        let source = source_for(SESSION_AUTHENTICATED);
+    fn injects_a_required_authenticated_actor() {
+        let source = source_for(AUTHENTICATED_ACTOR);
 
         assert!(source.contains("container.gatekeeper().await"));
         assert!(source.contains("letauthenticated_actor=gatekeeper.authenticate(&request).await;"));
-        assert!(source.contains("letuser=matchauthenticated_actor{margaret_security::authenticated_actor::AuthenticatedActor::Session(user,)=>user,margaret_security::authenticated_actor::AuthenticatedActor::Anonymous=>{returnmargaret_http::response::Response::forbidden().into();}};"));
+        assert!(source.contains("letuser=matchauthenticated_actor{Some(authenticated_actor)=>authenticated_actor,None=>{returnmargaret_http::response::Response::forbidden().into();}};"));
         assert!(source.contains("responder.respond(user).await"));
         assert!(!source.contains("AuthenticatedActorStore"));
     }
 
     #[test]
-    fn injects_an_optional_session_authenticated_actor() {
-        let source = source_for(SESSION_AUTHENTICATED);
+    fn accepts_a_destructured_authenticated_actor_argument() {
+        let source = source_for(DESTRUCTURED_ACTOR);
+
+        assert!(source.contains("letargument_1=matchauthenticated_actor{Some(authenticated_actor)=>authenticated_actor,None=>{returnmargaret_http::response::Response::forbidden().into();}};"));
+        assert!(source.contains("responder.respond(argument_1).await"));
+    }
+
+    #[test]
+    fn binds_a_destructured_route_parameter_named_by_from() {
+        let source = source_for(DESTRUCTURED_ROUTE_PARAMETER);
+
+        assert!(source.contains(r#"user_binder.bind(request.path_param("id").expect"#));
+        assert!(source.contains("responder.respond(argument_1).await"));
+    }
+
+    #[test]
+    fn rejects_a_from_that_is_absent_from_the_path() {
+        let message = error_for(ROUTE_PARAMETER_FROM_UNKNOWN);
+
+        assert!(message.contains("'missing'"));
+        assert!(message.contains("does not appear in the route path"));
+    }
+
+    #[test]
+    fn injects_an_optional_authenticated_actor() {
+        let source = source_for(AUTHENTICATED_ACTOR);
 
         assert!(source.contains("letuser=authenticated_actor;"));
     }
@@ -311,7 +400,7 @@ impl GetAdmin {
 
         assert!(source.contains("container.gatekeeper().await"));
         assert!(source.contains("letauthenticated_actor=gatekeeper.authenticate(&request).await;"));
-        assert!(source.contains("if!gatekeeper.can_site_action(&authenticated_actor,crate::action::Action::ViewAdmin,).await{returnmargaret_http::response::Response::forbidden().into();}"));
+        assert!(source.contains("if!gatekeeper.can_site_action(authenticated_actor.as_ref(),crate::action::Action::ViewAdmin,).await{returnmargaret_http::response::Response::forbidden().into();}"));
         assert!(source.contains("letrequest=&request;"));
         assert!(source.contains("responder.respond(request).await"));
         assert!(!source.contains("SiteActionGate"));
@@ -353,7 +442,7 @@ impl GetAdmin {
     #[test]
     fn rejects_a_route_parameter_of_an_unknown_type() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/things/{thing}\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter] thing: Unknown) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter(from = \"thing\")] thing: Unknown) -> Response {}\n}\n",
         );
 
         assert!(message.contains("no #[provides_route_parameter]"));
@@ -362,7 +451,7 @@ impl GetAdmin {
     #[test]
     fn propagates_malformed_route_parameter_arguments() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/things/{thing}\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter(= 5)] thing: String) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter(= 5)] thing: String) -> Response {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -371,7 +460,7 @@ impl GetAdmin {
     #[test]
     fn rejects_a_non_path_intent() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/things/{thing}\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter(intent = 5)] thing: String) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[responder]\n    fn respond(&self, #[route_parameter(from = \"thing\", intent = 5)] thing: String) -> Response {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -396,16 +485,25 @@ impl GetAdmin {
     #[test]
     fn rejects_two_gates_for_the_same_subject() {
         let message = error_for(
-            "struct User;\n\n#[decides_crud_action]\nstruct First;\nimpl CrudActionGate for First {\n    type Subject = User;\n    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}\n}\n\n#[decides_crud_action]\nstruct Second;\nimpl CrudActionGate for Second {\n    type Subject = User;\n    async fn can(&self, request: &Request, subject: &User, action: CrudAction) -> bool {}\n}\n",
+            "struct User;\n\n#[decides_crud_action]\nstruct First;\nimpl First {\n    #[decides]\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>, subject: &User, action: CrudAction) -> bool {}\n}\n\n#[decides_crud_action]\nstruct Second;\nimpl Second {\n    #[decides]\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>, subject: &User, action: CrudAction) -> bool {}\n}\n",
         );
 
         assert!(message.contains("more than one CRUD gate"));
     }
 
     #[test]
+    fn rejects_a_crud_gate_without_a_decision_method() {
+        let message = error_for(
+            "struct User;\n\n#[decides_crud_action]\nstruct ArticleGate;\nimpl ArticleGate {\n    async fn describe(&self) -> bool {}\n}\n",
+        );
+
+        assert!(message.contains("crate::ArticleGate"));
+    }
+
+    #[test]
     fn rejects_a_model_parameter_without_a_binder() {
         let message = error_for(
-            "struct User;\n\n#[responds_to_http(method = Get, path = \"/users/{user}\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter] user: User) -> Response {}\n}\n",
+            "struct User;\n\n#[responds_to_http(method = Get, path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> Response {}\n}\n",
         );
 
         assert!(message.contains("no #[provides_route_parameter]"));
@@ -414,7 +512,7 @@ impl GetAdmin {
     #[test]
     fn rejects_an_intent_without_a_gate() {
         let message = error_for(
-            "struct User;\n\n#[provides_route_parameter]\nstruct UserBinder;\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = Get, path = \"/users/{user}\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter(intent = CrudAction::Read)] user: User) -> Response {}\n}\n",
+            "struct User;\n\n#[provides_route_parameter]\nstruct UserBinder;\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = Get, path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter(from = \"user\", intent = CrudAction::Read)] user: User) -> Response {}\n}\n",
         );
 
         assert!(message.contains("no #[decides_crud_action] gate"));
@@ -423,7 +521,7 @@ impl GetAdmin {
     #[test]
     fn rejects_an_intent_on_a_raw_parameter() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/users/{id}\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter(intent = CrudAction::Read)] id: String) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/users/{id}\", server = \"public\")]\nstruct GetUser;\nimpl GetUser {\n    #[responder]\n    fn respond(&self, #[route_parameter(from = \"id\", intent = CrudAction::Read)] id: String) -> Response {}\n}\n",
         );
 
         assert!(message.contains("intent only applies to model parameters"));
@@ -431,7 +529,9 @@ impl GetAdmin {
 
     #[test]
     fn rejects_a_responder_without_a_responder_method() {
-        let message = error_for("#[responds_to_http(method = Get, path = \"/x\")]\nstruct Bare;\n");
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nstruct Bare;\n",
+        );
 
         assert!(message.contains("no #[responder] method"));
     }
@@ -439,25 +539,34 @@ impl GetAdmin {
     #[test]
     fn rejects_an_unmarked_responder_parameter() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x/{id}\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, id: String) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, id: String) -> Response {}\n}\n",
         );
 
         assert!(message.contains("must be a route parameter"));
     }
 
     #[test]
-    fn rejects_a_non_identifier_route_parameter() {
+    fn rejects_a_non_string_route_parameter_source() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x/{id}\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, #[route_parameter] (id, extra): (String, String)) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, #[route_parameter(from = 5)] id: String) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("not a plain identifier"));
+        assert!(message.contains("failed to index"));
+    }
+
+    #[test]
+    fn rejects_a_route_parameter_without_from() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, #[route_parameter] id: String) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("must name the path parameter it binds"));
     }
 
     #[test]
     fn rejects_a_route_parameter_absent_from_the_path() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/users/{id}\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, #[route_parameter] slug: String) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/users/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self, #[route_parameter(from = \"slug\")] slug: String) -> Response {}\n}\n",
         );
 
         assert!(message.contains("does not appear in the route path"));
@@ -466,7 +575,7 @@ impl GetAdmin {
     #[test]
     fn rejects_a_malformed_route_path() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/users/{id\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/users/{id\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
         assert!(message.contains("malformed route path"));
@@ -479,20 +588,26 @@ impl GetAdmin {
 
     #[test]
     fn rejects_responds_to_http_on_a_non_struct() {
-        let message = error_for("#[responds_to_http(method = Get, path = \"/x\")]\nenum Bad {}\n");
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nenum Bad {}\n",
+        );
 
         assert!(message.contains("#[responds_to_http]"));
     }
 
     #[test]
     fn propagates_malformed_responder_arguments() {
-        assert!(error_for("#[responds_to_http(= 5)]\nstruct Bad;\n").contains("failed to index"));
+        assert!(
+            error_for("#[responds_to_http(= 5, server = \"public\")]\nstruct Bad;\n")
+                .contains("failed to index")
+        );
     }
 
     #[test]
     fn propagates_a_non_path_method_argument() {
-        let message =
-            error_for("#[responds_to_http(method = \"GET\", path = \"/x\")]\nstruct Bad;\n");
+        let message = error_for(
+            "#[responds_to_http(method = \"GET\", path = \"/x\", server = \"public\")]\nstruct Bad;\n",
+        );
 
         assert!(message.contains("failed to index"));
     }
@@ -500,14 +615,16 @@ impl GetAdmin {
     #[test]
     fn rejects_a_responder_without_a_method() {
         assert!(
-            error_for("#[responds_to_http(path = \"/x\")]\nstruct Bad;\n")
+            error_for("#[responds_to_http(path = \"/x\", server = \"public\")]\nstruct Bad;\n")
                 .contains("missing the 'method'")
         );
     }
 
     #[test]
     fn propagates_a_non_string_path_argument() {
-        let message = error_for("#[responds_to_http(method = Get, path = 5)]\nstruct Bad;\n");
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = 5, server = \"public\")]\nstruct Bad;\n",
+        );
 
         assert!(message.contains("failed to index"));
     }
@@ -515,7 +632,7 @@ impl GetAdmin {
     #[test]
     fn rejects_a_responder_without_a_path() {
         assert!(
-            error_for("#[responds_to_http(method = Get)]\nstruct Bad;\n")
+            error_for("#[responds_to_http(method = Get, server = \"public\")]\nstruct Bad;\n")
                 .contains("missing the 'path'")
         );
     }
@@ -554,7 +671,7 @@ impl GetAdmin {
     #[test]
     fn rejects_a_malformed_marker() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(crate::A, crate::B)]\nstruct Bad;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n",
+            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\n#[guard(crate::A, crate::B)]\nstruct Bad;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n",
         );
 
         assert!(message.contains("must carry zero or one positional argument"));
@@ -563,7 +680,7 @@ impl GetAdmin {
     #[test]
     fn propagates_malformed_marker_arguments() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x\")]\n#[guard(= 5)]\nstruct Bad;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n",
+            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\n#[guard(= 5)]\nstruct Bad;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -571,7 +688,9 @@ impl GetAdmin {
 
     #[test]
     fn reports_responders_present() {
-        let index = index_for("#[responds_to_http(method = Get, path = \"/x\")]\nstruct R;\n");
+        let index = index_for(
+            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nstruct R;\n",
+        );
 
         assert!(has_responders(&index));
     }
@@ -593,9 +712,9 @@ impl GetAdmin {
     }
 
     #[test]
-    fn rejects_a_session_authenticated_responder_without_a_store() {
+    fn rejects_an_authenticated_actor_responder_without_a_store() {
         let message = error_for(
-            "struct User;\n\n#[responds_to_http(method = Get, path = \"/account\")]\nstruct GetAccount;\nimpl GetAccount {\n    #[responder]\n    fn respond(&self, #[session_authenticated] user: User) -> Response {}\n}\n",
+            "struct User;\n\n#[responds_to_http(method = Get, path = \"/account\", server = \"public\")]\nstruct GetAccount;\nimpl GetAccount {\n    #[responder]\n    fn respond(&self, user: AuthenticatedActor<User>) -> Response {}\n}\n",
         );
 
         assert!(message.contains("no #[provides_authenticated_actor] store"));
@@ -620,7 +739,7 @@ impl GetAdmin {
     #[test]
     fn rejects_a_can_attribute_without_an_action() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/admin\")]\n#[can]\nstruct GetAdmin;\nimpl GetAdmin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/admin\", server = \"public\")]\n#[can]\nstruct GetAdmin;\nimpl GetAdmin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
         assert!(message.contains("#[can] attribute without a site action"));
@@ -629,7 +748,7 @@ impl GetAdmin {
     #[test]
     fn rejects_a_can_guard_without_a_matching_gate() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/admin\")]\n#[can(crate::action::Action::ViewAdmin)]\nstruct GetAdmin;\nimpl GetAdmin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/admin\", server = \"public\")]\n#[can(crate::action::Action::ViewAdmin)]\nstruct GetAdmin;\nimpl GetAdmin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
         assert!(message.contains("no #[decides_site_action] gate decides it"));
@@ -638,7 +757,7 @@ impl GetAdmin {
     #[test]
     fn propagates_malformed_can_arguments() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/admin\")]\n#[can(= 5)]\nstruct GetAdmin;\nimpl GetAdmin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[responds_to_http(method = Get, path = \"/admin\", server = \"public\")]\n#[can(= 5)]\nstruct GetAdmin;\nimpl GetAdmin {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));

@@ -12,7 +12,7 @@ where
 
     async fn can_site_action(
         &self,
-        authenticated_actor: &AuthenticatedActor<ActorType>,
+        authenticated_actor: Option<&AuthenticatedActor<ActorType>>,
         action: Self::SiteAction,
     ) -> bool;
 }

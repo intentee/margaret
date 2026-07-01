@@ -434,7 +434,6 @@ dependencies = [
  "pin-project-lite",
  "smallvec",
  "tokio",
- "want",
 ]
 
 [[package]]
@@ -589,13 +588,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bytes",
  "clap",
  "dashmap",
- "http",
- "http-body-util",
- "hyper",
- "hyper-util",
  "jsonwebtoken",
  "margaret_codegen",
  "margaret_console",
@@ -634,6 +628,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "matchit",
+ "thiserror",
  "tokio",
  "tokio-util",
  "tower",
@@ -686,6 +681,16 @@ dependencies = [
  "syn",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "margaret_security_tests"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "margaret_http",
+ "margaret_security",
+ "tokio",
 ]
 
 [[package]]
@@ -1261,12 +1266,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "try-lock"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
-
-[[package]]
 name = "trzcina"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1314,15 +1313,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "want"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa7760aed19e106de2c7c0b581b509f2f25d3dacaf737cb82ac61bc6d760b0e"
-dependencies = [
- "try-lock",
-]
 
 [[package]]
 name = "wasi"

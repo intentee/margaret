@@ -6,10 +6,12 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::matched_attribute::MatchedAttribute;
+use margaret_attributes::type_leaf_ident::type_leaf_ident;
 
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
+use crate::tick_timer_arguments::TickTimerArguments;
 
 #[derive(Clone, Copy)]
 enum Role {
@@ -37,16 +39,10 @@ fn build_unit(matched: &MatchedAttribute, role: Role) -> Result<ServiceUnit, Ser
     let kind = match role {
         Role::Service => ServiceKind::Service,
         Role::Ticker => {
-            let arguments = matched.args()?;
+            let TickTimerArguments { behavior, interval } =
+                TickTimerArguments::parse(&matched.args()?, &path)?;
 
-            ServiceKind::Ticker {
-                behavior: arguments.path("behavior")?,
-                interval: arguments.path("interval")?.ok_or_else(|| {
-                    ServiceCodegenError::TickerMissingInterval {
-                        ticker: path.clone(),
-                    }
-                })?,
-            }
+            ServiceKind::Ticker { behavior, interval }
         }
     };
 
@@ -130,15 +126,7 @@ fn runner_takes_token(method: &IndexedMethod, path: &str) -> Result<bool, Servic
 }
 
 fn is_cancellation_token(declared: &Type) -> bool {
-    matches!(
-        declared,
-        Type::Path(type_path)
-            if type_path
-                .path
-                .segments
-                .last()
-                .is_some_and(|segment| segment.ident == "CancellationToken")
-    )
+    type_leaf_ident(declared).is_some_and(|ident| ident == "CancellationToken")
 }
 
 fn selector(name: &str) -> AttributeSelector {

@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::collections::HashSet;
+
 use syn::Path;
 
 use crate::canonical_path::CanonicalPath;
@@ -17,14 +20,6 @@ fn normalized_segments(written: &Path, referencing_root: &str) -> Vec<String> {
     segments
 }
 
-fn is_absolute(written_segments: &[String], candidates: &[CanonicalPath]) -> bool {
-    let head = written_segments.first();
-
-    candidates
-        .iter()
-        .any(|candidate| candidate.segments().first() == head)
-}
-
 fn segments_match(written: &[String], candidate: &[String], absolute: bool) -> bool {
     if absolute {
         written == candidate
@@ -33,26 +28,67 @@ fn segments_match(written: &[String], candidate: &[String], absolute: bool) -> b
     }
 }
 
-pub fn resolve_unique(
-    written: &Path,
-    candidates: &[CanonicalPath],
-    referencing_root: &str,
-) -> Resolution {
-    let written_segments = normalized_segments(written, referencing_root);
-    let absolute = is_absolute(&written_segments, candidates);
-    let mut matches: Vec<CanonicalPath> = candidates
-        .iter()
-        .filter(|candidate| segments_match(&written_segments, candidate.segments(), absolute))
-        .cloned()
-        .collect();
+pub struct ResolutionIndex {
+    candidates_by_leaf: HashMap<String, Vec<CanonicalPath>>,
+    roots: HashSet<String>,
+}
 
-    if matches.len() > 1 {
-        return Resolution::Ambiguous(matches);
+impl ResolutionIndex {
+    pub fn new(candidates: impl IntoIterator<Item = CanonicalPath>) -> Self {
+        let mut candidates_by_leaf: HashMap<String, Vec<CanonicalPath>> = HashMap::new();
+        let mut roots: HashSet<String> = HashSet::new();
+
+        for candidate in candidates {
+            let segments = candidate.segments();
+
+            roots.insert(
+                segments
+                    .first()
+                    .expect("a canonical path has at least one segment")
+                    .clone(),
+            );
+
+            let leaf = segments
+                .last()
+                .expect("a canonical path has at least one segment")
+                .clone();
+
+            candidates_by_leaf.entry(leaf).or_default().push(candidate);
+        }
+
+        Self {
+            candidates_by_leaf,
+            roots,
+        }
     }
 
-    match matches.pop() {
-        Some(single) => Resolution::Resolved(single),
-        None => Resolution::NotFound,
+    pub fn resolve(&self, written: &Path, referencing_root: &str) -> Resolution {
+        let written_segments = normalized_segments(written, referencing_root);
+        let leaf = written_segments
+            .last()
+            .expect("a written path has at least one segment");
+        let absolute = written_segments
+            .first()
+            .is_some_and(|head| self.roots.contains(head));
+
+        let Some(candidates) = self.candidates_by_leaf.get(leaf) else {
+            return Resolution::NotFound;
+        };
+
+        let mut matches: Vec<CanonicalPath> = candidates
+            .iter()
+            .filter(|candidate| segments_match(&written_segments, candidate.segments(), absolute))
+            .cloned()
+            .collect();
+
+        if matches.len() > 1 {
+            return Resolution::Ambiguous(matches);
+        }
+
+        match matches.pop() {
+            Some(single) => Resolution::Resolved(single),
+            None => Resolution::NotFound,
+        }
     }
 }
 
@@ -61,7 +97,7 @@ mod tests {
     use syn::Path;
     use syn::parse_quote;
 
-    use super::resolve_unique;
+    use super::ResolutionIndex;
     use crate::canonical_path::CanonicalPath;
     use crate::resolution::Resolution;
 
@@ -70,7 +106,9 @@ mod tests {
     }
 
     fn outcome(written: Path, candidates: &[CanonicalPath], referencing_root: &str) -> String {
-        match resolve_unique(&written, candidates, referencing_root) {
+        let index = ResolutionIndex::new(candidates.iter().cloned());
+
+        match index.resolve(&written, referencing_root) {
             Resolution::Resolved(path) => path.to_string(),
             Resolution::NotFound => "<not found>".to_string(),
             Resolution::Ambiguous(_) => "<ambiguous>".to_string(),

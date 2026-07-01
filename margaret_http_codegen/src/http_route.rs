@@ -19,3 +19,24 @@ pub(crate) struct HttpRoute {
     pub(crate) server: String,
     pub(crate) site_action_guards: Vec<Path>,
 }
+
+impl HttpRoute {
+    pub(crate) fn needs_user(&self) -> bool {
+        !self.site_action_guards.is_empty()
+            || self.route_parameters.iter().any(|route_parameter| {
+                route_parameter.binding.is_actor() || route_parameter.binding.is_authorizing()
+            })
+    }
+
+    pub(crate) fn is_bound(&self) -> bool {
+        self.route_parameters
+            .iter()
+            .any(|route_parameter| route_parameter.binding.is_bound())
+    }
+
+    pub(crate) fn is_authorized(&self) -> bool {
+        self.route_parameters
+            .iter()
+            .any(|route_parameter| route_parameter.binding.is_authorizing())
+    }
+}

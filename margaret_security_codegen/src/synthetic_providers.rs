@@ -3,7 +3,7 @@ use margaret_container::synthetic_provider::SyntheticProvider;
 
 use crate::security_plan::SecurityPlan;
 
-pub(crate) fn backend_path() -> CanonicalPath {
+fn backend_path() -> CanonicalPath {
     CanonicalPath::new(vec![
         "crate".to_string(),
         "margaret".to_string(),
@@ -12,7 +12,7 @@ pub(crate) fn backend_path() -> CanonicalPath {
     ])
 }
 
-pub(crate) fn gatekeeper_path() -> CanonicalPath {
+fn gatekeeper_path() -> CanonicalPath {
     CanonicalPath::new(vec![
         "crate".to_string(),
         "margaret".to_string(),

@@ -1,7 +1,8 @@
 mod console_argument;
-mod console_argument_selector;
+mod console_argument_arguments;
 pub mod console_codegen_error;
 mod console_command;
+mod console_command_arguments;
 mod console_commands;
 pub mod has_commands;
 mod optional_parameter;
@@ -39,11 +40,9 @@ impl Demo {
     #[runner]
     fn run(
         &self,
-        #[console_argument(name = "required-named")] required_named: String,
-        #[console_argument(name = "optional-named")] optional_named: Option<String>,
-        #[console_argument(name = "loud")] loud: bool,
-        #[console_argument] required_positional: String,
-        #[console_argument] optional_positional: Option<String>,
+        #[console_argument(from = "name")] name: String,
+        #[console_argument(from = "salutation")] salutation: Option<String>,
+        #[console_argument(from = "loud")] loud: bool,
     ) -> CommandOutcome {}
 }
 
@@ -106,29 +105,21 @@ impl Farewell {
         assert!(source.contains("pubasyncfnrun"));
         assert!(source.contains(r#"clap::Command::new("demo").about("Demonstratesarguments")"#));
 
+        assert!(source.contains(r#"clap::Arg::new("name").required(true)"#));
         assert!(
-            source.contains(
-                r#"clap::Arg::new("required-named").long("required-named").required(true)"#
-            )
+            source.contains(r#"clap::Arg::new("salutation").long("salutation").required(false)"#)
         );
-        assert!(source.contains(
-            r#"clap::Arg::new("optional-named").long("optional-named").required(false)"#
-        ));
         assert!(
             source.contains(
                 r#"clap::Arg::new("loud").long("loud").action(clap::ArgAction::SetTrue)"#
             )
         );
-        assert!(source.contains(r#"clap::Arg::new("0").required(true)"#));
-        assert!(source.contains(r#"clap::Arg::new("1").required(false)"#));
         assert!(source.contains("clap::value_parser!(String)"));
 
         assert!(source.contains("container.demo().await.run("));
-        assert!(source.contains(r#"matches.get_one::<String>("required-named")"#));
-        assert!(source.contains(r#"matches.get_one::<String>("optional-named").cloned()"#));
+        assert!(source.contains(r#"matches.get_one::<String>("name")"#));
+        assert!(source.contains(r#"matches.get_one::<String>("salutation").cloned()"#));
         assert!(source.contains(r#"matches.get_flag("loud")"#));
-        assert!(source.contains(r#"matches.get_one::<String>("0")"#));
-        assert!(source.contains(r#"matches.get_one::<String>("1").cloned()"#));
 
         assert!(source.contains(r#"("farewell",_matches)"#));
         assert!(source.contains("container.farewell().await.run().await"));
@@ -185,7 +176,7 @@ impl Farewell {
     #[test]
     fn injects_the_cancellation_token_into_a_command_runner() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[runner]\n    fn run(&self, #[console_argument] target: String, token: CancellationToken) -> CommandOutcome {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[runner]\n    fn run(&self, #[console_argument(from = \"target\")] target: String, token: CancellationToken) -> CommandOutcome {}\n}\n",
             false,
         );
 
@@ -196,7 +187,7 @@ impl Farewell {
     #[test]
     fn ignores_a_receiver_in_a_runner() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged;\n\nimpl Flagged {\n    #[runner]\n    fn run(&self, #[console_argument(name = \"loud\")] loud: bool) -> CommandOutcome {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged;\n\nimpl Flagged {\n    #[runner]\n    fn run(&self, #[console_argument(from = \"loud\")] loud: bool) -> CommandOutcome {}\n}\n",
             false,
         );
 
@@ -267,18 +258,29 @@ impl Farewell {
     }
 
     #[test]
-    fn rejects_a_nameless_flag() {
+    fn binds_a_destructured_console_argument_named_by_from() {
+        let source = source_for(
+            "#[console_command(name = \"plot\")]\nstruct Plot;\n\nimpl Plot {\n    #[runner]\n    fn run(&self, #[console_argument(from = \"point\")] Point { x, y }: Point) -> CommandOutcome {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains(r#"clap::Arg::new("point").required(true)"#));
+        assert!(source.contains(r#"matches.get_one::<Point>("point")"#));
+    }
+
+    #[test]
+    fn rejects_a_console_argument_without_from() {
         let message = error_for(
             "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, #[console_argument] flag: bool) -> CommandOutcome {}\n}\n",
         );
 
-        assert!(message.contains("a flag requires a name"));
+        assert!(message.contains("must name the command-line argument it binds"));
     }
 
     #[test]
-    fn rejects_a_non_string_argument_name() {
+    fn rejects_a_non_string_argument_source() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, #[console_argument(name = 5)] value: String) -> CommandOutcome {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, #[console_argument(from = 5)] value: String) -> CommandOutcome {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));

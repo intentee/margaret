@@ -9,5 +9,5 @@ use crate::authenticated_actor::AuthenticatedActor;
 pub trait GatekeeperBackend: Send + Sync {
     type Actor: Actor;
 
-    async fn authenticate(&self, request: &Request) -> AuthenticatedActor<Self::Actor>;
+    async fn authenticate(&self, request: &Request) -> Option<AuthenticatedActor<Self::Actor>>;
 }

@@ -8,6 +8,7 @@ mod dependency_kind;
 mod direct_construction;
 pub mod generate_container_source;
 pub mod generated_source;
+mod managed_arguments;
 mod path_text;
 mod peel_target;
 mod provided_type;

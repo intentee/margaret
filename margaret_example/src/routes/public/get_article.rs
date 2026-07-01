@@ -15,17 +15,14 @@ impl GetArticle {
     #[responder]
     pub async fn respond(
         &self,
-        #[route_parameter(intent = CrudAction::Read)] article: Article,
-        #[session_authenticated] viewer: AuthenticatedActor<User>,
+        #[route_parameter(from = "article", intent = CrudAction::Read)] Article { title, body, .. }: Article,
+        viewer: Option<AuthenticatedActor<User>>,
     ) -> Response {
         let reader = match viewer {
-            AuthenticatedActor::Anonymous => "a guest".to_string(),
-            AuthenticatedActor::Session(user) => user.name.clone(),
+            None => "a guest".to_string(),
+            Some(viewer) => viewer.actor.name.clone(),
         };
 
-        Response::text(
-            200,
-            format!("{} reads \"{}\": {}", reader, article.title, article.body),
-        )
+        Response::text(200, format!("{reader} reads \"{title}\": {body}"))
     }
 }

@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::resolution_index::ResolutionIndex;
 use margaret_attributes::resolve_trait::resolve_trait;
 
 use crate::http_codegen_error::HttpCodegenError;
 
 pub(crate) fn interceptor_bindings(
     index: &AttributeIndex,
-    trait_paths: &[CanonicalPath],
+    trait_resolution: &ResolutionIndex,
 ) -> Result<HashMap<CanonicalPath, CanonicalPath>, HttpCodegenError> {
     let selector = AttributeSelector::parse("intercepts").expect("a valid selector");
     let mut registry: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
@@ -33,7 +34,7 @@ pub(crate) fn interceptor_bindings(
             .iter()
             .find(|associated_type| associated_type.name() == "Intercepted")
             .and_then(|associated_type| {
-                resolve_trait(associated_type.ty(), trait_paths, referencing_root)
+                resolve_trait(associated_type.ty(), trait_resolution, referencing_root)
             })
             .ok_or_else(|| HttpCodegenError::MissingInterceptedType {
                 interceptor: interceptor.to_string(),

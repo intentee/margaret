@@ -105,6 +105,13 @@ mod tests {
     }
 
     #[test]
+    fn builds_a_forbidden_response() {
+        let response = Response::forbidden().into_http();
+
+        assert_eq!(response.status().as_u16(), 403);
+    }
+
+    #[test]
     fn attaches_a_set_cookie_header() {
         let response = Response::see_other("/profile")
             .set_cookie(Cookie::new("session", "abc"))

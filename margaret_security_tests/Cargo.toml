@@ -1,0 +1,20 @@
+[package]
+name = "margaret_security_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dependencies]
+
+[dev-dependencies]
+async-trait = { workspace = true }
+margaret_http = { path = "../margaret_http" }
+margaret_security = { path = "../margaret_security" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

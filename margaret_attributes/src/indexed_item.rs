@@ -1,5 +1,6 @@
 use syn::Attribute;
 
+use crate::attribute_selector::AttributeSelector;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_associated_type::IndexedAssociatedType;
 use crate::indexed_method::IndexedMethod;
@@ -68,5 +69,61 @@ impl IndexedItem {
 
     pub fn methods(&self) -> &[IndexedMethod] {
         &self.methods
+    }
+
+    pub fn method_matching(&self, selector: &AttributeSelector) -> Option<&IndexedMethod> {
+        self.methods.iter().find(|method| {
+            method
+                .attributes()
+                .iter()
+                .any(|attribute| selector.matches(attribute.path()))
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use syn::parse_quote;
+
+    use super::IndexedItem;
+    use crate::attribute_selector::AttributeSelector;
+    use crate::canonical_path::CanonicalPath;
+    use crate::indexed_method::IndexedMethod;
+    use crate::item_kind::ItemKind;
+    use crate::struct_shape::StructShape;
+
+    fn gate_with_marked_method(method_attributes: Vec<syn::Attribute>) -> IndexedItem {
+        let mut item = IndexedItem::new(
+            ItemKind::Struct(StructShape::Unit),
+            "Gate".to_string(),
+            CanonicalPath::new(vec!["crate".to_string(), "Gate".to_string()]),
+            Vec::new(),
+        );
+
+        item.add_method(IndexedMethod::new(
+            "can".to_string(),
+            method_attributes,
+            parse_quote!(fn can(&self)),
+        ));
+
+        item
+    }
+
+    fn selector(input: &str) -> AttributeSelector {
+        AttributeSelector::parse(input).expect("the selector parses")
+    }
+
+    #[test]
+    fn method_matching_finds_a_method_bearing_the_selector() {
+        let item = gate_with_marked_method(vec![parse_quote!(#[decides])]);
+
+        assert!(item.method_matching(&selector("decides")).is_some());
+    }
+
+    #[test]
+    fn method_matching_returns_none_when_no_method_bears_the_selector() {
+        let item = gate_with_marked_method(vec![parse_quote!(#[decides])]);
+
+        assert!(item.method_matching(&selector("responder")).is_none());
     }
 }

@@ -58,7 +58,9 @@ impl BoundServer {
                 ));
                 let connection = builder.serve_connection(TokioIo::new(stream), service);
 
-                let _ = watcher.watch(connection).await;
+                if let Err(error) = watcher.watch(connection).await {
+                    eprintln!("margaret_http: connection error: {error}");
+                }
             });
         }
 
@@ -86,4 +88,91 @@ async fn dispatch(
     handled.set_body(body);
 
     app.handle(handled).await.into_http()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::SocketAddr;
+
+    use tokio::io::AsyncReadExt;
+    use tokio::io::AsyncWriteExt;
+    use tokio::net::TcpStream;
+    use tokio_util::sync::CancellationToken;
+
+    use crate::router::Router;
+    use crate::server::Server;
+
+    async fn exchange(address: SocketAddr, request: &[u8], close_write: bool) -> String {
+        let mut stream = TcpStream::connect(address)
+            .await
+            .expect("the client connects to the bound server");
+
+        stream
+            .write_all(request)
+            .await
+            .expect("the request reaches the server");
+
+        if close_write {
+            stream.shutdown().await.expect("the write half closes");
+        }
+
+        let mut response = Vec::new();
+
+        stream
+            .read_to_end(&mut response)
+            .await
+            .expect("the response is read to completion");
+
+        String::from_utf8_lossy(&response).into_owned()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn serves_connections_until_cancellation() {
+        let bound = Server::new(Router::empty())
+            .bind("127.0.0.1:0")
+            .await
+            .expect("the server binds to an ephemeral port");
+        let address = bound.local_addr();
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let unmatched = exchange(
+            address,
+            b"GET /missing HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            false,
+        )
+        .await;
+        assert!(unmatched.contains(" 404 "));
+
+        let unsupported = exchange(
+            address,
+            b"OPTIONS / HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            false,
+        )
+        .await;
+        assert!(unsupported.contains(" 405 "));
+
+        let truncated = exchange(
+            address,
+            b"POST / HTTP/1.1\r\nHost: test\r\nContent-Length: 64\r\nConnection: close\r\n\r\nshort",
+            true,
+        )
+        .await;
+        assert!(truncated.contains(" 400 "));
+
+        let malformed = exchange(address, b"this is not a valid request line\r\n\r\n", true).await;
+        assert!(!malformed.contains(" 200 "));
+
+        let recovered = exchange(
+            address,
+            b"GET /missing HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            false,
+        )
+        .await;
+        assert!(recovered.contains(" 404 "));
+
+        cancellation_token.cancel();
+
+        serving.await.expect("the server task finishes cleanly");
+    }
 }

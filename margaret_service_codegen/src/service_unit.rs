@@ -9,3 +9,9 @@ pub(crate) struct ServiceUnit {
     pub(crate) runner: String,
     pub(crate) takes_token: bool,
 }
+
+impl ServiceUnit {
+    pub(crate) fn uses_token(&self) -> bool {
+        matches!(self.kind, ServiceKind::Ticker { .. }) || self.takes_token
+    }
+}

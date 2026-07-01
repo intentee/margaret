@@ -14,6 +14,7 @@ members = [
     "margaret_macros",
     "margaret_security",
     "margaret_security_codegen",
+    "margaret_security_tests",
     "margaret_service",
     "margaret_service_codegen",
     "margaret_service_tests",

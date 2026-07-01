@@ -94,7 +94,9 @@ impl Handler for Router {
                 }
                 None => return Responded::Done(Response::text(405, "Method Not Allowed")),
             },
-            Err(_) => return Responded::Done(Response::not_found()),
+            Err(matchit::MatchError::NotFound) => {
+                return Responded::Done(Response::not_found());
+            }
         };
 
         Responded::Done(respond_recursively(&self.by_name, request, handler).await)
@@ -122,15 +124,18 @@ mod tests {
         async fn handle(&self, request: Request) -> Responded {
             Responded::Done(Response::text(
                 200,
-                request.path_param("id").unwrap_or("none").to_string(),
+                request
+                    .path_param("id")
+                    .expect("the matched route binds the id path parameter")
+                    .to_string(),
             ))
         }
     }
 
     fn router() -> Router {
         Router::empty()
-            .route(Method::Get, "/items", Arc::new(EchoId))
-            .route(Method::Post, "/items", Arc::new(EchoId))
+            .route(Method::Get, "/items", Arc::new(PlainOk))
+            .route(Method::Post, "/items", Arc::new(PlainOk))
             .route(Method::Get, "/items/{id}", Arc::new(EchoId))
     }
 

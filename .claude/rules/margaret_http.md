@@ -27,6 +27,10 @@ Specific attribute rules:
     * `<path>` must be `matchit`-compatible string 
     * `<server>`  must be a string with a server name
 - `#[provides_route_parameter]` - attached to a struct implementing `HttpRouteParameterBinder` with a specific type
+- `#[route_parameter(from = <from>, intent = <intent>)]` 
+    * used as a part of `#[responder]` method
+    * `<from>` must be the name of a route parameter that is mapped into the argument (must result in compile time error if there is no such parameter)
+    * `<intent>` must directly and explicitly map to `CrudAction` enum
 
 # `margaret_http` data flow
 

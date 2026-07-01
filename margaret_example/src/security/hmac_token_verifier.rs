@@ -33,8 +33,9 @@ impl HmacTokenVerifier {
 
 impl VerifiesToken for HmacTokenVerifier {
     fn verify(&self, token: &str) -> Option<AccessTokenClaims> {
-        decode::<AccessTokenClaims>(token, &self.key, &self.validation)
-            .ok()
-            .map(|token_data| token_data.claims)
+        match decode::<AccessTokenClaims>(token, &self.key, &self.validation) {
+            Ok(token_data) => Some(token_data.claims),
+            Err(_) => None,
+        }
     }
 }

@@ -44,20 +44,20 @@ pub fn build(crates: &[CrateRoot]) -> Result<GeneratedCode, CodegenError> {
     let serves = has_http || has_services;
     let has_console = margaret_console_codegen::has_commands::has_commands(&index) || serves;
 
-    let synthetic_providers: Vec<_> = security
-        .as_ref()
-        .map(|artifacts| artifacts.providers.clone())
-        .unwrap_or_default();
+    let synthetic_providers: Vec<_> = match &security {
+        Some(artifacts) => artifacts.providers.clone(),
+        None => Vec::new(),
+    };
 
     let http = if has_http {
         Some(margaret_http_codegen::render_http::render_http(&index)?)
     } else {
         None
     };
-    let servers: &[HttpServer] = http
-        .as_ref()
-        .map(|artifacts| artifacts.servers())
-        .unwrap_or(&[]);
+    let servers: &[HttpServer] = match &http {
+        Some(artifacts) => artifacts.servers(),
+        None => &[],
+    };
 
     let mut modules = vec![GeneratedModule::new(
         "container",
@@ -169,10 +169,9 @@ impl AuthenticatedActorStore for SessionStore {
 #[decides_crud_action]
 struct ArticleGate;
 
-impl CrudActionGate for ArticleGate {
-    type Actor = User;
-    type Subject = Article;
-    async fn can(&self, authentication: &Authentication<User>, subject: &Article, action: CrudAction) -> bool {}
+impl ArticleGate {
+    #[decides]
+    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>, subject: &Article, action: CrudAction) -> bool {}
 }
 ";
 

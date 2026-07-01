@@ -1,8 +1,9 @@
+use std::collections::HashMap;
+
 use syn::FnArg;
 use syn::Pat;
 use syn::Path;
 
-use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -11,7 +12,7 @@ use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::join_candidates::join_candidates;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 use margaret_attributes::resolution::Resolution;
-use margaret_attributes::resolve_unique::resolve_unique;
+use margaret_attributes::resolution_index::ResolutionIndex;
 
 use crate::collection_table::CollectionTable;
 use crate::construction_source::ConstructionSource;
@@ -19,6 +20,7 @@ use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
+use crate::managed_arguments::ManagedArguments;
 use crate::path_text::path_text;
 use crate::peel_target::peel_target;
 use crate::provided_type::ProvidedType;
@@ -51,34 +53,54 @@ enum Role {
     Singleton,
 }
 
+struct DraftCategory {
+    role: Role,
+    selector: AttributeSelector,
+}
+
+fn draft_categories() -> [DraftCategory; 4] {
+    [
+        DraftCategory {
+            role: Role::Singleton,
+            selector: singleton_selector(),
+        },
+        DraftCategory {
+            role: Role::Provider,
+            selector: provider_selector(),
+        },
+        DraftCategory {
+            role: Role::Singleton,
+            selector: service_selector(),
+        },
+        DraftCategory {
+            role: Role::Singleton,
+            selector: scheduled_with_tick_timer_selector(),
+        },
+    ]
+}
+
 fn build_drafts<'index>(
     index: &'index AttributeIndex,
-    trait_paths: &[CanonicalPath],
+    trait_resolution: &ResolutionIndex,
 ) -> Result<Vec<ProviderDraft<'index>>, ContainerError> {
     let mut drafts: Vec<ProviderDraft> = Vec::new();
+    let mut provided_keys: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
+    let mut field_names: HashMap<String, CanonicalPath> = HashMap::new();
 
-    for matched in index.select(&singleton_selector()) {
-        let draft = build_draft(&matched, trait_paths, &drafts, Role::Singleton)?;
+    for DraftCategory { role, selector } in draft_categories() {
+        for matched in index.select(&selector) {
+            let draft = build_draft(
+                &matched,
+                trait_resolution,
+                &provided_keys,
+                &field_names,
+                role,
+            )?;
 
-        drafts.push(draft);
-    }
-
-    for matched in index.select(&provider_selector()) {
-        let draft = build_draft(&matched, trait_paths, &drafts, Role::Provider)?;
-
-        drafts.push(draft);
-    }
-
-    for matched in index.select(&service_selector()) {
-        let draft = build_draft(&matched, trait_paths, &drafts, Role::Singleton)?;
-
-        drafts.push(draft);
-    }
-
-    for matched in index.select(&scheduled_with_tick_timer_selector()) {
-        let draft = build_draft(&matched, trait_paths, &drafts, Role::Singleton)?;
-
-        drafts.push(draft);
+            provided_keys.insert(draft.provided.key().clone(), draft.concrete_path.clone());
+            field_names.insert(draft.field_name.clone(), draft.concrete_path.clone());
+            drafts.push(draft);
+        }
     }
 
     Ok(drafts)
@@ -86,8 +108,9 @@ fn build_drafts<'index>(
 
 fn build_draft<'index>(
     matched: &MatchedAttribute<'index>,
-    trait_paths: &[CanonicalPath],
-    drafts: &[ProviderDraft<'index>],
+    trait_resolution: &ResolutionIndex,
+    provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
+    field_names: &HashMap<String, CanonicalPath>,
     role: Role,
 ) -> Result<ProviderDraft<'index>, ContainerError> {
     let item = matched.item();
@@ -96,14 +119,17 @@ fn build_draft<'index>(
     };
 
     let concrete_path = item.canonical_path().clone();
-    let arguments = matched.args()?;
-    let provided = resolve_provided(&arguments, trait_paths, &concrete_path, role)?;
+    let ManagedArguments {
+        collection,
+        provides,
+    } = ManagedArguments::parse(&matched.args()?)?;
+    let provided = resolve_provided(provides.as_ref(), trait_resolution, &concrete_path, role)?;
 
-    check_unique_provided(drafts, &provided, &concrete_path)?;
+    check_unique_provided(provided_keys, &provided, &concrete_path)?;
 
-    let field_name = field_name(drafts, &provided, &concrete_path)?;
+    let field_name = field_name(field_names, &provided, &concrete_path)?;
     let own = resolve_construction(item.methods(), &concrete_path, shape)?;
-    let collection = resolve_collection(&arguments, trait_paths, &concrete_path)?;
+    let collection = resolve_collection(collection.as_ref(), trait_resolution, &concrete_path)?;
     let construction = match role {
         Role::Singleton => DraftConstruction::Direct(own),
         Role::Provider => DraftConstruction::Factory {
@@ -129,13 +155,13 @@ fn not_a_struct(role: Role, path: String) -> ContainerError {
 }
 
 fn resolve_provided(
-    arguments: &AttributeArgs,
-    trait_paths: &[CanonicalPath],
+    provides: Option<&Path>,
+    trait_resolution: &ResolutionIndex,
     concrete_path: &CanonicalPath,
     role: Role,
 ) -> Result<ProvidedType, ContainerError> {
-    match arguments.path("provides")? {
-        Some(written) => resolve_interface(&written, trait_paths, concrete_path),
+    match provides {
+        Some(written) => resolve_interface(written, trait_resolution, concrete_path),
         None => match role {
             Role::Singleton => Ok(ProvidedType::Concrete(concrete_path.clone())),
             Role::Provider => Err(ContainerError::ProviderMissingProvides {
@@ -147,10 +173,10 @@ fn resolve_provided(
 
 fn resolve_interface(
     written: &Path,
-    trait_paths: &[CanonicalPath],
+    trait_resolution: &ResolutionIndex,
     concrete_path: &CanonicalPath,
 ) -> Result<ProvidedType, ContainerError> {
-    match resolve_unique(written, trait_paths, crate_root(concrete_path)) {
+    match trait_resolution.resolve(written, crate_root(concrete_path)) {
         Resolution::Resolved(path) => Ok(ProvidedType::Interface(path)),
         Resolution::NotFound => Err(ContainerError::ProvidesUnresolvable {
             singleton: concrete_path.to_string(),
@@ -165,20 +191,20 @@ fn resolve_interface(
 }
 
 fn resolve_collection(
-    arguments: &AttributeArgs,
-    trait_paths: &[CanonicalPath],
+    collection: Option<&Path>,
+    trait_resolution: &ResolutionIndex,
     concrete_path: &CanonicalPath,
 ) -> Result<Option<CanonicalPath>, ContainerError> {
-    match arguments.path("collection")? {
-        Some(written) => match resolve_unique(&written, trait_paths, crate_root(concrete_path)) {
+    match collection {
+        Some(written) => match trait_resolution.resolve(written, crate_root(concrete_path)) {
             Resolution::Resolved(path) => Ok(Some(path)),
             Resolution::NotFound => Err(ContainerError::CollectionUnresolvable {
                 singleton: concrete_path.to_string(),
-                written: path_text(&written),
+                written: path_text(written),
             }),
             Resolution::Ambiguous(candidates) => Err(ContainerError::CollectionAmbiguous {
                 singleton: concrete_path.to_string(),
-                written: path_text(&written),
+                written: path_text(written),
                 candidates: join_candidates(&candidates),
             }),
         },
@@ -187,17 +213,14 @@ fn resolve_collection(
 }
 
 fn check_unique_provided(
-    drafts: &[ProviderDraft],
+    provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
     provided: &ProvidedType,
     concrete_path: &CanonicalPath,
 ) -> Result<(), ContainerError> {
-    if let Some(existing) = drafts
-        .iter()
-        .find(|draft| draft.provided.key() == provided.key())
-    {
+    if let Some(existing) = provided_keys.get(provided.key()) {
         return Err(ContainerError::DuplicateProvider {
             provided: provided.key().to_string(),
-            first: existing.concrete_path.to_string(),
+            first: existing.to_string(),
             second: concrete_path.to_string(),
         });
     }
@@ -206,16 +229,16 @@ fn check_unique_provided(
 }
 
 fn field_name(
-    drafts: &[ProviderDraft],
+    field_names: &HashMap<String, CanonicalPath>,
     provided: &ProvidedType,
     concrete_path: &CanonicalPath,
 ) -> Result<String, ContainerError> {
     let field_name = provided.key().field_name();
 
-    if let Some(existing) = drafts.iter().find(|draft| draft.field_name == field_name) {
+    if let Some(existing) = field_names.get(&field_name) {
         return Err(ContainerError::DuplicateFieldName {
             field: field_name,
-            first: existing.concrete_path.to_string(),
+            first: existing.to_string(),
             second: concrete_path.to_string(),
         });
     }
@@ -263,13 +286,17 @@ fn has_provide_attribute(method: &IndexedMethod) -> bool {
 fn resolve_direct(
     source: ConstructionSource,
     concrete_path: &CanonicalPath,
-    provider_keys: &[CanonicalPath],
-    trait_paths: &[CanonicalPath],
+    provider_resolution: &ResolutionIndex,
+    trait_resolution: &ResolutionIndex,
 ) -> Result<DirectConstruction, ContainerError> {
     match source {
         ConstructionSource::Constructor(constructor) => {
-            let dependencies =
-                resolve_dependencies(concrete_path, constructor, provider_keys, trait_paths)?;
+            let dependencies = resolve_dependencies(
+                concrete_path,
+                constructor,
+                provider_resolution,
+                trait_resolution,
+            )?;
 
             Ok(DirectConstruction::Constructor {
                 dependencies,
@@ -284,8 +311,8 @@ fn resolve_direct(
 fn resolve_dependencies(
     concrete_path: &CanonicalPath,
     constructor: &IndexedMethod,
-    provider_keys: &[CanonicalPath],
-    trait_paths: &[CanonicalPath],
+    provider_resolution: &ResolutionIndex,
+    trait_resolution: &ResolutionIndex,
 ) -> Result<Vec<DependencyKind>, ContainerError> {
     let mut dependencies = Vec::new();
 
@@ -312,8 +339,8 @@ fn resolve_dependencies(
             target,
             concrete_path,
             &parameter,
-            provider_keys,
-            trait_paths,
+            provider_resolution,
+            trait_resolution,
         )?);
     }
 
@@ -324,18 +351,19 @@ fn resolve_target(
     target: RawTarget,
     concrete_path: &CanonicalPath,
     parameter: &str,
-    provider_keys: &[CanonicalPath],
-    trait_paths: &[CanonicalPath],
+    provider_resolution: &ResolutionIndex,
+    trait_resolution: &ResolutionIndex,
 ) -> Result<DependencyKind, ContainerError> {
     match target {
         RawTarget::Single(written) => {
             let provider_key =
-                resolve_reference(&written, provider_keys, concrete_path, parameter)?;
+                resolve_reference(&written, provider_resolution, concrete_path, parameter)?;
 
             Ok(DependencyKind::Single { provider_key })
         }
         RawTarget::Collection(written) => {
-            let trait_path = resolve_reference(&written, trait_paths, concrete_path, parameter)?;
+            let trait_path =
+                resolve_reference(&written, trait_resolution, concrete_path, parameter)?;
 
             Ok(DependencyKind::Collection { trait_path })
         }
@@ -344,11 +372,11 @@ fn resolve_target(
 
 fn resolve_reference(
     written: &Path,
-    candidates: &[CanonicalPath],
+    resolution: &ResolutionIndex,
     concrete_path: &CanonicalPath,
     parameter: &str,
 ) -> Result<CanonicalPath, ContainerError> {
-    match resolve_unique(written, candidates, crate_root(concrete_path)) {
+    match resolution.resolve(written, crate_root(concrete_path)) {
         Resolution::Resolved(path) => Ok(path),
         Resolution::NotFound => Err(ContainerError::MissingProvider {
             singleton: concrete_path.to_string(),
@@ -377,15 +405,6 @@ fn crate_root(path: &CanonicalPath) -> &str {
         .expect("a canonical path has at least one segment")
 }
 
-fn trait_paths(index: &AttributeIndex) -> Vec<CanonicalPath> {
-    index
-        .items()
-        .iter()
-        .filter(|item| item.kind() == ItemKind::Trait)
-        .map(|item| item.canonical_path().clone())
-        .collect()
-}
-
 fn singleton_selector() -> AttributeSelector {
     AttributeSelector::parse("singleton").expect("the singleton selector is valid")
 }
@@ -407,8 +426,8 @@ pub(crate) fn build_plan(
     index: &AttributeIndex,
     synthetic: &[SyntheticProvider],
 ) -> Result<ContainerPlan, ContainerError> {
-    let trait_paths = trait_paths(index);
-    let drafts = build_drafts(index, &trait_paths)?;
+    let trait_resolution = index.trait_resolution();
+    let drafts = build_drafts(index, trait_resolution)?;
     let mut provider_keys: Vec<CanonicalPath> = drafts
         .iter()
         .map(|draft| draft.provided.key().clone())
@@ -420,6 +439,7 @@ pub(crate) fn build_plan(
             .map(|provider| provider.concrete_path.clone()),
     );
 
+    let provider_resolution = ResolutionIndex::new(provider_keys);
     let mut collections = CollectionTable::new();
     let mut providers = Vec::new();
 
@@ -440,13 +460,18 @@ pub(crate) fn build_plan(
             DraftConstruction::Direct(source) => ProviderConstruction::Direct(resolve_direct(
                 source,
                 &concrete_path,
-                &provider_keys,
-                &trait_paths,
+                &provider_resolution,
+                trait_resolution,
             )?),
             DraftConstruction::Factory { factory, own } => ProviderConstruction::Factory {
                 factory_is_async: factory.signature().asyncness.is_some(),
                 factory_method: factory.identifier().to_string(),
-                provider: resolve_direct(own, &concrete_path, &provider_keys, &trait_paths)?,
+                provider: resolve_direct(
+                    own,
+                    &concrete_path,
+                    &provider_resolution,
+                    trait_resolution,
+                )?,
             },
         };
 

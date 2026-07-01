@@ -7,11 +7,24 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::path_tokens::path_tokens;
 
+use crate::actor_requirement::ActorRequirement;
 use crate::build_security_plan::build_security_plan;
-use crate::gatekeeper_provider::synthetic_providers;
 use crate::security_artifacts::SecurityArtifacts;
 use crate::security_codegen_error::SecurityCodegenError;
 use crate::security_plan::SecurityPlan;
+use crate::synthetic_providers::synthetic_providers;
+
+fn dispatch_call(actor_requirement: &ActorRequirement, call: TokenStream) -> TokenStream {
+    match actor_requirement {
+        ActorRequirement::Optional => call,
+        ActorRequirement::Required => quote! {
+            match authenticated_actor {
+                Some(authenticated_actor) => #call,
+                None => false,
+            }
+        },
+    }
+}
 
 struct Component {
     field: Ident,
@@ -39,24 +52,30 @@ fn components(plan: &SecurityPlan) -> Vec<Component> {
     components
 }
 
+fn crud_imports(plan: &SecurityPlan) -> TokenStream {
+    if plan.crud_gates.is_empty() {
+        return quote! {};
+    }
+
+    quote! {
+        use margaret_security::crud_action::CrudAction;
+        use margaret_security::crud_action_gate_registry::CrudActionGateRegistry;
+    }
+}
+
+fn site_imports(plan: &SecurityPlan) -> TokenStream {
+    if plan.site_gates.is_empty() {
+        return quote! {};
+    }
+
+    quote! {
+        use margaret_security::site_action_dispatcher::SiteActionDispatcher;
+    }
+}
+
 fn imports(plan: &SecurityPlan) -> TokenStream {
-    let crud_imports = if plan.crud_gates.is_empty() {
-        quote! {}
-    } else {
-        quote! {
-            use margaret_security::crud_action::CrudAction;
-            use margaret_security::crud_action_gate::CrudActionGate;
-            use margaret_security::crud_action_gate_registry::CrudActionGateRegistry;
-        }
-    };
-    let site_imports = if plan.site_gates.is_empty() {
-        quote! {}
-    } else {
-        quote! {
-            use margaret_security::site_action_dispatcher::SiteActionDispatcher;
-            use margaret_security::site_action_gate::SiteActionGate;
-        }
-    };
+    let crud_imports = crud_imports(plan);
+    let site_imports = site_imports(plan);
 
     quote! {
         use margaret_security::authenticated_actor_store::AuthenticatedActorStore;
@@ -110,7 +129,7 @@ fn backend_impl(plan: &SecurityPlan) -> TokenStream {
             async fn authenticate(
                 &self,
                 request: &margaret_http::request::Request,
-            ) -> AuthenticatedActor<#user> {
+            ) -> Option<AuthenticatedActor<#user>> {
                 self.#store_field.get_authenticated_actor(request).await
             }
         }
@@ -126,8 +145,12 @@ fn dispatcher_impl(plan: &SecurityPlan) -> TokenStream {
     let arms = plan.site_gates.iter().map(|gate| {
         let action_path = &gate.action_path;
         let field = format_ident!("{}", gate.gate_path.field_name());
+        let body = dispatch_call(
+            &gate.actor_requirement,
+            quote! { self.#field.can(authenticated_actor).await },
+        );
 
-        quote! { #action_path => self.#field.can(authenticated_actor).await, }
+        quote! { #action_path => #body, }
     });
 
     quote! {
@@ -137,7 +160,7 @@ fn dispatcher_impl(plan: &SecurityPlan) -> TokenStream {
 
             async fn can_site_action(
                 &self,
-                authenticated_actor: &AuthenticatedActor<#user>,
+                authenticated_actor: Option<&AuthenticatedActor<#user>>,
                 action: #action_type,
             ) -> bool {
                 match action {
@@ -153,17 +176,21 @@ fn registry_impls(plan: &SecurityPlan) -> TokenStream {
     let impls = plan.crud_gates.iter().map(|gate| {
         let subject = path_tokens(&gate.subject_type);
         let field = format_ident!("{}", gate.gate_path.field_name());
+        let body = dispatch_call(
+            &gate.actor_requirement,
+            quote! { self.#field.can(authenticated_actor, subject, action).await },
+        );
 
         quote! {
             #[async_trait::async_trait]
             impl CrudActionGateRegistry<#user, #subject> for SecurityBackend {
                 async fn can_crud(
                     &self,
-                    authenticated_actor: &AuthenticatedActor<#user>,
+                    authenticated_actor: Option<&AuthenticatedActor<#user>>,
                     subject: &#subject,
                     action: CrudAction,
                 ) -> bool {
-                    self.#field.can(authenticated_actor, subject, action).await
+                    #body
                 }
             }
         }
@@ -237,7 +264,7 @@ struct SessionStore;
 
 impl AuthenticatedActorStore for SessionStore {
     type Actor = User;
-    async fn get_authenticated_actor(&self, request: &Request) -> AuthenticatedActor<User> {}
+    async fn get_authenticated_actor(&self, request: &Request) -> Option<AuthenticatedActor<User>> {}
 }
 "#;
 
@@ -245,10 +272,9 @@ impl AuthenticatedActorStore for SessionStore {
 #[decides_crud_action]
 struct ArticleGate;
 
-impl CrudActionGate for ArticleGate {
-    type Actor = User;
-    type Subject = Article;
-    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>, subject: &Article, action: CrudAction) -> bool {}
+impl ArticleGate {
+    #[decides]
+    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>, subject: &Article, action: CrudAction) -> bool {}
 }
 "#;
 
@@ -256,8 +282,28 @@ impl CrudActionGate for ArticleGate {
 #[decides_site_action(crate::action::Action::ManageUsers)]
 struct ManageUsersGate;
 
-impl SiteActionGate for ManageUsersGate {
-    type Actor = User;
+impl ManageUsersGate {
+    #[decides]
+    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>) -> bool {}
+}
+"#;
+
+    const REQUIRED_ARTICLE_GATE: &str = r#"
+#[decides_crud_action]
+struct ArticleGate;
+
+impl ArticleGate {
+    #[decides]
+    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>, subject: &Article, action: CrudAction) -> bool {}
+}
+"#;
+
+    const REQUIRED_MANAGE_USERS_GATE: &str = r#"
+#[decides_site_action(crate::action::Action::ManageUsers)]
+struct ManageUsersGate;
+
+impl ManageUsersGate {
+    #[decides]
     async fn can(&self, authenticated_actor: &AuthenticatedActor<User>) -> bool {}
 }
 "#;
@@ -328,7 +374,6 @@ impl SiteActionGate for ManageUsersGate {
             )
         );
         assert!(source.contains("self.article_gate.can(authenticated_actor,subject,action).await"));
-        assert!(source.contains("usemargaret_security::crud_action_gate::CrudActionGate;"));
     }
 
     #[test]
@@ -342,7 +387,22 @@ impl SiteActionGate for ManageUsersGate {
         assert!(source.contains(
             "crate::action::Action::ManageUsers=>{self.manage_users_gate.can(authenticated_actor).await}"
         ));
-        assert!(source.contains("usemargaret_security::site_action_gate::SiteActionGate;"));
+    }
+
+    #[test]
+    fn auto_denies_required_gates_for_anonymous_requests() {
+        let source = source_for(&[
+            MODELS_AND_STORE,
+            REQUIRED_ARTICLE_GATE,
+            REQUIRED_MANAGE_USERS_GATE,
+        ]);
+
+        assert!(source.contains(
+            "Some(authenticated_actor)=>{self.article_gate.can(authenticated_actor,subject,action).await}None=>false,"
+        ));
+        assert!(source.contains(
+            "Some(authenticated_actor)=>{self.manage_users_gate.can(authenticated_actor).await}None=>false,"
+        ));
     }
 
     #[test]
@@ -359,41 +419,39 @@ struct SessionStore;
 
 impl AuthenticatedActorStore for SessionStore {
     type Actor = User;
-    async fn get_authenticated_actor(&self, request: &Request) -> AuthenticatedActor<User> {}
+    async fn get_authenticated_actor(&self, request: &Request) -> Option<AuthenticatedActor<User>> {}
 }
 
 #[decides_crud_action]
 struct CommentGate;
 
-impl CrudActionGate for CommentGate {
-    type Actor = User;
-    type Subject = Comment;
-    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>, subject: &Comment, action: CrudAction) -> bool {}
+impl CommentGate {
+    #[decides]
+    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>, subject: &Comment, action: CrudAction) -> bool {}
 }
 
 #[decides_crud_action]
 struct ArticleGate;
 
-impl CrudActionGate for ArticleGate {
-    type Actor = User;
-    type Subject = Article;
-    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>, subject: &Article, action: CrudAction) -> bool {}
+impl ArticleGate {
+    #[decides]
+    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>, subject: &Article, action: CrudAction) -> bool {}
 }
 
 #[decides_site_action(crate::action::Action::ViewReports)]
 struct ViewReportsGate;
 
-impl SiteActionGate for ViewReportsGate {
-    type Actor = User;
-    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>) -> bool {}
+impl ViewReportsGate {
+    #[decides]
+    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>) -> bool {}
 }
 
 #[decides_site_action(crate::action::Action::ManageUsers)]
 struct ManageUsersGate;
 
-impl SiteActionGate for ManageUsersGate {
-    type Actor = User;
-    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>) -> bool {}
+impl ManageUsersGate {
+    #[decides]
+    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>) -> bool {}
 }
 "#,
             );
@@ -463,7 +521,7 @@ impl SiteActionGate for ManageUsersGate {
     #[test]
     fn rejects_two_authenticated_actor_stores() {
         let source = format!(
-            "{MODELS_AND_STORE}\n#[provides_authenticated_actor]\nstruct OtherStore;\n\nimpl AuthenticatedActorStore for OtherStore {{\n    type Actor = User;\n    async fn get_authenticated_actor(&self, request: &Request) -> AuthenticatedActor<User> {{}}\n}}\n"
+            "{MODELS_AND_STORE}\n#[provides_authenticated_actor]\nstruct OtherStore;\n\nimpl AuthenticatedActorStore for OtherStore {{\n    type Actor = User;\n    async fn get_authenticated_actor(&self, request: &Request) -> Option<AuthenticatedActor<User>> {{}}\n}}\n"
         );
 
         assert!(error_for(&source).contains("more than one #[provides_authenticated_actor]"));
@@ -480,77 +538,65 @@ impl SiteActionGate for ManageUsersGate {
     }
 
     #[test]
-    fn rejects_a_crud_gate_without_a_actor_type() {
+    fn rejects_a_crud_gate_without_an_authenticated_actor() {
         let source = format!(
-            "{MODELS_AND_STORE}\n#[decides_crud_action]\nstruct ArticleGate;\n\nimpl CrudActionGate for ArticleGate {{\n    type Subject = Article;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>, subject: &Article, action: CrudAction) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}\n#[decides_crud_action]\nstruct ArticleGate;\n\nimpl ArticleGate {{\n    #[decides]\n    async fn can(&self, subject: &Article, action: CrudAction) -> bool {{}}\n}}\n"
         );
 
-        assert!(
-            error_for(&source).contains("gate 'crate::ArticleGate' has no `type Actor = <struct>`")
-        );
+        assert!(error_for(&source).contains("must take an `AuthenticatedActor`"));
     }
 
     #[test]
-    fn rejects_a_crud_gate_for_a_foreign_user() {
+    fn rejects_a_crud_gate_without_a_decision_method() {
         let source = format!(
-            "{MODELS_AND_STORE}\nstruct Robot;\n\n#[decides_crud_action]\nstruct ArticleGate;\n\nimpl CrudActionGate for ArticleGate {{\n    type Actor = Robot;\n    type Subject = Article;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<Robot>, subject: &Article, action: CrudAction) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}\n#[decides_crud_action]\nstruct ArticleGate;\n\nimpl ArticleGate {{\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>, subject: &Article, action: CrudAction) -> bool {{}}\n}}\n"
         );
 
-        assert!(
-            error_for(&source)
-                .contains("gate 'crate::ArticleGate' decides for user 'crate::Robot'")
-        );
+        assert!(error_for(&source).contains("gate 'crate::ArticleGate' has no #[decides] method"));
     }
 
     #[test]
-    fn rejects_a_crud_gate_without_a_subject_type() {
+    fn rejects_a_crud_gate_without_a_subject() {
         let source = format!(
-            "{MODELS_AND_STORE}\n#[decides_crud_action]\nstruct ArticleGate;\n\nimpl CrudActionGate for ArticleGate {{\n    type Actor = User;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>, action: CrudAction) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}\n#[decides_crud_action]\nstruct ArticleGate;\n\nimpl ArticleGate {{\n    #[decides]\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>, action: CrudAction) -> bool {{}}\n}}\n"
         );
 
-        assert!(
-            error_for(&source)
-                .contains("gate 'crate::ArticleGate' has no `type Subject = <struct>`")
-        );
+        assert!(error_for(&source).contains("must take a subject reference"));
     }
 
     #[test]
     fn rejects_two_crud_gates_for_one_subject() {
         let source = format!(
-            "{MODELS_AND_STORE}{ARTICLE_GATE}\n#[decides_crud_action]\nstruct OtherArticleGate;\n\nimpl CrudActionGate for OtherArticleGate {{\n    type Actor = User;\n    type Subject = Article;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>, subject: &Article, action: CrudAction) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}{ARTICLE_GATE}\n#[decides_crud_action]\nstruct OtherArticleGate;\n\nimpl OtherArticleGate {{\n    #[decides]\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>, subject: &Article, action: CrudAction) -> bool {{}}\n}}\n"
         );
 
         assert!(error_for(&source).contains("has more than one CRUD gate"));
     }
 
     #[test]
-    fn rejects_a_site_gate_without_a_actor_type() {
+    fn rejects_a_site_gate_without_an_authenticated_actor() {
         let source = format!(
-            "{MODELS_AND_STORE}\n#[decides_site_action(crate::action::Action::ManageUsers)]\nstruct ManageUsersGate;\n\nimpl SiteActionGate for ManageUsersGate {{\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}\n#[decides_site_action(crate::action::Action::ManageUsers)]\nstruct ManageUsersGate;\n\nimpl ManageUsersGate {{\n    #[decides]\n    async fn can(&self) -> bool {{}}\n}}\n"
         );
 
-        assert!(
-            error_for(&source)
-                .contains("gate 'crate::ManageUsersGate' has no `type Actor = <struct>`")
-        );
+        assert!(error_for(&source).contains("must take an `AuthenticatedActor`"));
     }
 
     #[test]
-    fn rejects_a_site_gate_for_a_foreign_user() {
+    fn rejects_a_site_gate_without_a_decision_method() {
         let source = format!(
-            "{MODELS_AND_STORE}\nstruct Robot;\n\n#[decides_site_action(crate::action::Action::ManageUsers)]\nstruct ManageUsersGate;\n\nimpl SiteActionGate for ManageUsersGate {{\n    type Actor = Robot;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<Robot>) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}\n#[decides_site_action(crate::action::Action::ManageUsers)]\nstruct ManageUsersGate;\n\nimpl ManageUsersGate {{\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>) -> bool {{}}\n}}\n"
         );
 
         assert!(
-            error_for(&source)
-                .contains("gate 'crate::ManageUsersGate' decides for user 'crate::Robot'")
+            error_for(&source).contains("gate 'crate::ManageUsersGate' has no #[decides] method")
         );
     }
 
     #[test]
     fn rejects_a_site_gate_without_an_action_argument() {
         let source = format!(
-            "{MODELS_AND_STORE}\n#[decides_site_action]\nstruct ManageUsersGate;\n\nimpl SiteActionGate for ManageUsersGate {{\n    type Actor = User;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}\n#[decides_site_action]\nstruct ManageUsersGate;\n\nimpl ManageUsersGate {{\n    #[decides]\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>) -> bool {{}}\n}}\n"
         );
 
         assert!(error_for(&source).contains("is missing its site action argument"));
@@ -559,7 +605,7 @@ impl SiteActionGate for ManageUsersGate {
     #[test]
     fn propagates_malformed_site_action_arguments() {
         let source = format!(
-            "{MODELS_AND_STORE}\n#[decides_site_action(= 5)]\nstruct ManageUsersGate;\n\nimpl SiteActionGate for ManageUsersGate {{\n    type Actor = User;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}\n#[decides_site_action(= 5)]\nstruct ManageUsersGate;\n\nimpl ManageUsersGate {{\n    #[decides]\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>) -> bool {{}}\n}}\n"
         );
 
         assert!(error_for(&source).contains("failed to index"));
@@ -568,7 +614,7 @@ impl SiteActionGate for ManageUsersGate {
     #[test]
     fn rejects_a_site_action_without_an_enum_qualifier() {
         let source = format!(
-            "{MODELS_AND_STORE}\n#[decides_site_action(ManageUsers)]\nstruct ManageUsersGate;\n\nimpl SiteActionGate for ManageUsersGate {{\n    type Actor = User;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}\n#[decides_site_action(ManageUsers)]\nstruct ManageUsersGate;\n\nimpl ManageUsersGate {{\n    #[decides]\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>) -> bool {{}}\n}}\n"
         );
 
         assert!(error_for(&source).contains("is not a fully qualified"));
@@ -577,7 +623,7 @@ impl SiteActionGate for ManageUsersGate {
     #[test]
     fn rejects_two_gates_for_one_site_action() {
         let source = format!(
-            "{MODELS_AND_STORE}{MANAGE_USERS_GATE}\n#[decides_site_action(crate::action::Action::ManageUsers)]\nstruct OtherManageUsersGate;\n\nimpl SiteActionGate for OtherManageUsersGate {{\n    type Actor = User;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}{MANAGE_USERS_GATE}\n#[decides_site_action(crate::action::Action::ManageUsers)]\nstruct OtherManageUsersGate;\n\nimpl OtherManageUsersGate {{\n    #[decides]\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>) -> bool {{}}\n}}\n"
         );
 
         assert!(error_for(&source).contains("has more than one gate"));
@@ -586,7 +632,7 @@ impl SiteActionGate for ManageUsersGate {
     #[test]
     fn rejects_site_actions_from_different_enums() {
         let source = format!(
-            "{MODELS_AND_STORE}{MANAGE_USERS_GATE}\n#[decides_site_action(crate::area::Area::ViewReports)]\nstruct ViewReportsGate;\n\nimpl SiteActionGate for ViewReportsGate {{\n    type Actor = User;\n    async fn can(&self, authenticated_actor: &AuthenticatedActor<User>) -> bool {{}}\n}}\n"
+            "{MODELS_AND_STORE}{MANAGE_USERS_GATE}\n#[decides_site_action(crate::area::Area::ViewReports)]\nstruct ViewReportsGate;\n\nimpl ViewReportsGate {{\n    #[decides]\n    async fn can(&self, authenticated_actor: Option<&AuthenticatedActor<User>>) -> bool {{}}\n}}\n"
         );
 
         assert!(error_for(&source).contains("all site actions must share one enum"));

@@ -6,5 +6,5 @@ pub fn has_services(index: &AttributeIndex) -> bool {
     let ticker = AttributeSelector::parse("scheduled_with_tick_timer")
         .expect("the ticker selector is valid");
 
-    !index.select(&service).is_empty() || !index.select(&ticker).is_empty()
+    index.has(&service) || index.has(&ticker)
 }

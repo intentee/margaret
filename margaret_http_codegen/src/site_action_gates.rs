@@ -7,6 +7,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 
 use crate::http_codegen_error::HttpCodegenError;
+use crate::site_action_arguments::SiteActionArguments;
 
 pub(crate) fn site_action_gates(
     index: &AttributeIndex,
@@ -16,11 +17,7 @@ pub(crate) fn site_action_gates(
 
     for matched in index.select(&selector) {
         let gate = matched.item().canonical_path().to_string();
-        let action = matched
-            .args()?
-            .positional_path(0)
-            .ok_or(HttpCodegenError::MissingSiteActionArgument { gate: gate.clone() })?
-            .clone();
+        let SiteActionArguments { action } = SiteActionArguments::parse(&matched.args()?, &gate)?;
 
         if let Some(existing) = registry.get(&action) {
             return Err(HttpCodegenError::AmbiguousSiteActionGate {

@@ -1,3 +1,4 @@
+use syn::Ident;
 use syn::Path;
 
 use crate::attribute_error::AttributeError;
@@ -43,6 +44,15 @@ impl AttributeSelector {
 
     pub(crate) fn display_path(&self) -> String {
         format_path(&self.path)
+    }
+
+    pub(crate) fn leaf_ident(&self) -> &Ident {
+        &self
+            .path
+            .segments
+            .last()
+            .expect("a selector path has at least one segment")
+            .ident
     }
 }
 

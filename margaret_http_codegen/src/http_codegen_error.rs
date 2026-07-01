@@ -44,8 +44,10 @@ pub enum HttpCodegenError {
         parameter: String,
     },
 
-    #[error("route parameter '{parameter}' of responder '{responder}' is not a plain identifier")]
-    RouteParameterNotIdentifier {
+    #[error(
+        "route parameter #{parameter} of responder '{responder}' is missing `from = \"...\"`; it must name the path parameter it binds"
+    )]
+    RouteParameterMissingFrom {
         responder: String,
         parameter: String,
     },

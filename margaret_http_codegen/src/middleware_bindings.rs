@@ -4,6 +4,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 
 use crate::http_codegen_error::HttpCodegenError;
+use crate::middleware_attribute_arguments::MiddlewareAttributeArguments;
 use crate::middleware_binding::MiddlewareBinding;
 
 pub(crate) fn middleware_bindings(
@@ -22,14 +23,9 @@ pub(crate) fn middleware_bindings(
             });
         }
 
-        let arguments = matched.args()?;
         let middleware = item.canonical_path().to_string();
-        let handles =
-            arguments
-                .path("attribute")?
-                .ok_or(HttpCodegenError::MissingMiddlewareHandles {
-                    middleware: middleware.clone(),
-                })?;
+        let MiddlewareAttributeArguments { handles } =
+            MiddlewareAttributeArguments::parse(&matched.args()?, &middleware)?;
 
         bindings.push(MiddlewareBinding {
             field: format_ident!("{}", item.canonical_path().field_name()),

@@ -24,13 +24,16 @@ where
         Self { backend }
     }
 
-    pub async fn authenticate(&self, request: &Request) -> AuthenticatedActor<Backend::Actor> {
+    pub async fn authenticate(
+        &self,
+        request: &Request,
+    ) -> Option<AuthenticatedActor<Backend::Actor>> {
         self.backend.authenticate(request).await
     }
 
     pub async fn can_site_action(
         &self,
-        authenticated_actor: &AuthenticatedActor<Backend::Actor>,
+        authenticated_actor: Option<&AuthenticatedActor<Backend::Actor>>,
         action: <Backend as SiteActionDispatcher<Backend::Actor>>::SiteAction,
     ) -> bool
     where
@@ -43,7 +46,7 @@ where
 
     pub async fn can_crud<Subject>(
         &self,
-        authenticated_actor: &AuthenticatedActor<Backend::Actor>,
+        authenticated_actor: Option<&AuthenticatedActor<Backend::Actor>>,
         subject: &Subject,
         action: CrudAction,
     ) -> bool
@@ -63,7 +66,7 @@ where
 
     pub fn with_user(
         &self,
-        authenticated_actor: AuthenticatedActor<Backend::Actor>,
+        authenticated_actor: Option<AuthenticatedActor<Backend::Actor>>,
     ) -> GatekeeperUserContext<Backend> {
         GatekeeperUserContext::new(self.backend.clone(), authenticated_actor)
     }

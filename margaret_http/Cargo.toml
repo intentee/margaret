@@ -13,12 +13,13 @@ http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server", "server-auto", "server-graceful", "service", "tokio"] }
 matchit = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt"] }
 tokio-util = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread"] }
 
 [lints]
 workspace = true

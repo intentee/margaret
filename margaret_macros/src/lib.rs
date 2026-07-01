@@ -41,7 +41,7 @@ pub fn runner(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn responder(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, &["route_parameter", "session_authenticated"])
+    strip_parameter_markers(item, &["route_parameter"])
 }
 
 #[proc_macro_attribute]
@@ -56,6 +56,11 @@ pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> 
 
 #[proc_macro_attribute]
 pub fn decides_crud_action(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn decides(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
@@ -151,19 +156,19 @@ mod tests {
                 pub async fn respond(
                     &self,
                     #[route_parameter] id: String,
-                    #[session_authenticated] user: User,
+                    #[console_argument] name: String,
                 ) -> Response {
                     Response::text(200, id)
                 }
             },
-            &["route_parameter", "session_authenticated"],
+            &["route_parameter", "console_argument"],
         )
         .to_string();
 
         assert!(!stripped.contains("route_parameter"));
-        assert!(!stripped.contains("session_authenticated"));
+        assert!(!stripped.contains("console_argument"));
         assert!(stripped.contains("id"));
-        assert!(stripped.contains("user"));
+        assert!(stripped.contains("name"));
     }
 
     #[test]

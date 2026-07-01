@@ -10,7 +10,7 @@ pub struct GatekeeperUserContext<Backend>
 where
     Backend: GatekeeperBackend,
 {
-    authenticated_actor: AuthenticatedActor<Backend::Actor>,
+    authenticated_actor: Option<AuthenticatedActor<Backend::Actor>>,
     backend: Arc<Backend>,
 }
 
@@ -20,7 +20,7 @@ where
 {
     pub(crate) fn new(
         backend: Arc<Backend>,
-        authenticated_actor: AuthenticatedActor<Backend::Actor>,
+        authenticated_actor: Option<AuthenticatedActor<Backend::Actor>>,
     ) -> Self {
         Self {
             authenticated_actor,
@@ -36,7 +36,7 @@ where
         Backend: SiteActionDispatcher<Backend::Actor>,
     {
         self.backend
-            .can_site_action(&self.authenticated_actor, action)
+            .can_site_action(self.authenticated_actor.as_ref(), action)
             .await
     }
 
@@ -45,7 +45,7 @@ where
         Backend: CrudActionGateRegistry<Backend::Actor, Subject>,
     {
         self.backend
-            .can_crud(&self.authenticated_actor, subject, action)
+            .can_crud(self.authenticated_actor.as_ref(), subject, action)
             .await
     }
 

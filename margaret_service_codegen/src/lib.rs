@@ -5,6 +5,7 @@ pub mod service_codegen_error;
 mod service_kind;
 mod service_unit;
 mod service_units;
+mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
