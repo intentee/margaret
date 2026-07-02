@@ -41,6 +41,14 @@ Specific attribute rules:
 - during the http request handling there must be no cycles (entering the same responder twice must result in a cycle error; same middleware or interceptors can be entered multiple times)
 - interceptors must only attach themselves to marker traits, never specific types
 
+# `margaret_http` request object
+
+- request's form data, or any kind of input data must be parsed exactly once during the entire request's lifecycle
+- request object must be similar in structure to what PHP provides globally ($_POST, $_GET, $_SERVER, $_FILES) - this kind of information must not be global, it must be scoped to the request
+- uploaded files must be streamed into temporary directory, and only stored as a pointer (similar to PHP)
+- temporary directory for uploads must be configurable per-server through CLI server flag (defaults to system TMP dir)
+- request object must not be clone-able, and most not be cloned, or copied at any point; its properties must not be cloned or copied at any point in the framework
+
 # `margaret_http` lifecycle algorithm
 
 Middleware -> responder -> interceptor loop must follow this algorithm. You need to assume that all the responders are stateless, so you need to add a safeguard against cycles to be safe.
