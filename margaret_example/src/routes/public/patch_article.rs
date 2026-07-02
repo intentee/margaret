@@ -26,23 +26,29 @@ impl PatchArticle {
     pub async fn respond(
         &self,
         request: &Request,
-        #[route_parameter(from = "article", intent = CrudAction::Update)] article: Article,
+        #[route_parameter(from = "article")] Article {
+            id,
+            title: current_title,
+            author_id,
+            body: current_body,
+            published,
+        }: Article,
     ) -> Response {
         let title = match request.form("title") {
             Some(title) => title,
-            None => article.title.clone(),
+            None => current_title,
         };
         let body = match request.form("body") {
             Some(body) => body,
-            None => article.body.clone(),
+            None => current_body,
         };
 
         self.articles.save(Article {
-            id: article.id.clone(),
+            id,
             title: title.clone(),
-            author_id: article.author_id.clone(),
+            author_id,
             body,
-            published: article.published,
+            published,
         });
 
         Response::text(200, format!("updated \"{title}\""))

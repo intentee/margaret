@@ -37,7 +37,7 @@ pub enum HttpCodegenError {
     MissingResponderMethod { responder: String },
 
     #[error(
-        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a session-authenticated parameter, or the current request"
+        "parameter '{parameter}' of responder '{responder}' must be a route parameter or the current request"
     )]
     UnmarkedResponderParameter {
         responder: String,
@@ -82,18 +82,6 @@ pub enum HttpCodegenError {
     },
 
     #[error(
-        "#[decides_crud_action] '{gate}' has no `type Subject = <struct>` associated type that resolves to a known model"
-    )]
-    CrudGateSubject { gate: String },
-
-    #[error("model '{subject}' has more than one CRUD gate: '{first}' and '{second}'")]
-    AmbiguousCrudGate {
-        subject: String,
-        first: String,
-        second: String,
-    },
-
-    #[error(
         "route parameter '{parameter}' of responder '{responder}' has type '{written}', which has no #[provides_route_parameter]"
     )]
     MissingHttpRouteParameterBinder {
@@ -101,51 +89,6 @@ pub enum HttpCodegenError {
         parameter: String,
         written: String,
     },
-
-    #[error(
-        "route parameter '{parameter}' of responder '{responder}' declares an intent but type '{written}' has no #[decides_crud_action] gate"
-    )]
-    MissingCrudGate {
-        responder: String,
-        parameter: String,
-        written: String,
-    },
-
-    #[error(
-        "route parameter '{parameter}' of responder '{responder}' is a raw String but declares an intent; intent only applies to model parameters"
-    )]
-    IntentOnRawParameter {
-        responder: String,
-        parameter: String,
-    },
-
-    #[error(
-        "more than one #[provides_authenticated_actor] store is defined: '{first}' and '{second}'; exactly one is allowed"
-    )]
-    AmbiguousAuthenticatedActorStore { first: String, second: String },
-
-    #[error(
-        "responder '{responder}' needs the authenticated actor but no #[provides_authenticated_actor] store is defined"
-    )]
-    NoAuthenticatedActorStore { responder: String },
-
-    #[error("#[decides_site_action] gate '{gate}' is missing its site action argument")]
-    MissingSiteActionArgument { gate: String },
-
-    #[error("site action '{action}' has more than one gate: '{first}' and '{second}'")]
-    AmbiguousSiteActionGate {
-        action: String,
-        first: String,
-        second: String,
-    },
-
-    #[error("responder '{responder}' has a #[can] attribute without a site action argument")]
-    CanWithoutAction { responder: String },
-
-    #[error(
-        "responder '{responder}' is guarded by site action '{action}' but no #[decides_site_action] gate decides it"
-    )]
-    MissingSiteActionGate { responder: String, action: String },
 
     #[error(
         "responders '{first}' and '{second}' both declare the route name '{name}'; each route name may identify at most one responder"

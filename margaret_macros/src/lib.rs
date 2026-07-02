@@ -55,37 +55,12 @@ pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> 
 }
 
 #[proc_macro_attribute]
-pub fn decides_crud_action(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
-pub fn decides(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
 pub fn handles_middleware_attribute(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
 #[proc_macro_attribute]
 pub fn console_command(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
-pub fn provides_authenticated_actor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
-pub fn decides_site_action(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
-pub fn can(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 

@@ -1,14 +1,9 @@
-use margaret_macros::can;
 use margaret_macros::console_command;
 use margaret_macros::constructor;
-use margaret_macros::decides;
-use margaret_macros::decides_crud_action;
-use margaret_macros::decides_site_action;
 use margaret_macros::handles_middleware_attribute;
 use margaret_macros::intercepts;
 use margaret_macros::provide;
 use margaret_macros::provider;
-use margaret_macros::provides_authenticated_actor;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
@@ -22,7 +17,6 @@ use margaret_macros::singleton;
 #[console_command]
 #[handles_middleware_attribute(attribute = traced)]
 #[intercepts(SomeMarker)]
-#[can(SomeAction::View)]
 struct Subject;
 
 impl Subject {
@@ -52,16 +46,12 @@ impl Catalog {
     }
 }
 
-#[provides_authenticated_actor]
 #[provides_route_parameter]
-#[decides_crud_action]
-#[decides_site_action(SomeAction::Manage)]
-struct Authority;
+struct Binder;
 
-impl Authority {
-    #[decides]
-    fn can(&self, granted: bool) -> bool {
-        granted
+impl Binder {
+    fn bind(&self, value: String) -> String {
+        value
     }
 }
 
@@ -76,7 +66,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(subject.respond("path-id".to_string()), "path-id");
     assert_eq!(subject.run("typed-name".to_string()), "typed-name");
     assert_eq!(Catalog.provide(), 7);
-    assert!(Authority.can(true));
+    assert_eq!(Binder.bind("bound".to_string()), "bound");
 
     let _worker = Worker;
 }

@@ -8,7 +8,6 @@ margaret_attributes = { path = "../margaret_attributes" }
 margaret_console_codegen = { path = "../margaret_console_codegen" }
 margaret_container = { path = "../margaret_container" }
 margaret_http_codegen = { path = "../margaret_http_codegen" }
-margaret_security_codegen = { path = "../margaret_security_codegen" }
 margaret_service_codegen = { path = "../margaret_service_codegen" }
 thiserror = { workspace = true }
 toml = { workspace = true }

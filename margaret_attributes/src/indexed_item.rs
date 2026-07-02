@@ -92,18 +92,18 @@ mod tests {
     use crate::item_kind::ItemKind;
     use crate::struct_shape::StructShape;
 
-    fn gate_with_marked_method(method_attributes: Vec<syn::Attribute>) -> IndexedItem {
+    fn item_with_marked_method(method_attributes: Vec<syn::Attribute>) -> IndexedItem {
         let mut item = IndexedItem::new(
             ItemKind::Struct(StructShape::Unit),
-            "Gate".to_string(),
-            CanonicalPath::new(vec!["crate".to_string(), "Gate".to_string()]),
+            "Widget".to_string(),
+            CanonicalPath::new(vec!["crate".to_string(), "Widget".to_string()]),
             Vec::new(),
         );
 
         item.add_method(IndexedMethod::new(
-            "can".to_string(),
+            "run".to_string(),
             method_attributes,
-            parse_quote!(fn can(&self)),
+            parse_quote!(fn run(&self)),
         ));
 
         item
@@ -115,14 +115,14 @@ mod tests {
 
     #[test]
     fn method_matching_finds_a_method_bearing_the_selector() {
-        let item = gate_with_marked_method(vec![parse_quote!(#[decides])]);
+        let item = item_with_marked_method(vec![parse_quote!(#[runner])]);
 
-        assert!(item.method_matching(&selector("decides")).is_some());
+        assert!(item.method_matching(&selector("runner")).is_some());
     }
 
     #[test]
     fn method_matching_returns_none_when_no_method_bears_the_selector() {
-        let item = gate_with_marked_method(vec![parse_quote!(#[decides])]);
+        let item = item_with_marked_method(vec![parse_quote!(#[runner])]);
 
         assert!(item.method_matching(&selector("responder")).is_none());
     }

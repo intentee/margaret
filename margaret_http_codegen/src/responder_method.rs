@@ -2,9 +2,7 @@ use quote::ToTokens;
 use quote::format_ident;
 use syn::Attribute;
 use syn::FnArg;
-use syn::GenericArgument;
 use syn::Pat;
-use syn::PathArguments;
 use syn::ReturnType;
 use syn::Type;
 
@@ -31,16 +29,9 @@ fn classify(
     registries: &Registries,
     referencing_root: &str,
 ) -> Result<RouteParameterBinding, HttpCodegenError> {
-    let RouteParameterArguments { from, intent } = arguments;
+    let RouteParameterArguments { from } = arguments;
 
     if is_string(declared) {
-        if intent.is_some() {
-            return Err(HttpCodegenError::IntentOnRawParameter {
-                responder: responder.to_string(),
-                parameter: from,
-            });
-        }
-
         return Ok(RouteParameterBinding::Raw { path_key: from });
     }
 
@@ -55,28 +46,12 @@ fn classify(
         HttpCodegenError::MissingHttpRouteParameterBinder {
             responder: responder.to_string(),
             parameter: from.clone(),
-            written: written.clone(),
+            written,
         }
     })?;
 
-    let intent = match intent {
-        Some(intent) => {
-            if !registries.gates.contains_key(&model) {
-                return Err(HttpCodegenError::MissingCrudGate {
-                    responder: responder.to_string(),
-                    parameter: from,
-                    written,
-                });
-            }
-
-            Some(intent)
-        }
-        None => None,
-    };
-
     Ok(RouteParameterBinding::Bound {
         binder,
-        intent,
         path_key: from,
     })
 }
@@ -85,34 +60,12 @@ fn is_string(declared: &Type) -> bool {
     matches!(declared, Type::Path(type_path) if type_path.path.is_ident("String"))
 }
 
-fn is_authenticated_actor(declared: &Type) -> bool {
-    type_leaf_ident(declared).is_some_and(|ident| ident == "AuthenticatedActor")
-}
-
 fn is_request(declared: &Type) -> bool {
     let Type::Reference(reference) = declared else {
         return false;
     };
 
     type_leaf_ident(&reference.elem).is_some_and(|ident| ident == "Request")
-}
-
-fn is_optional_authenticated_actor(declared: &Type) -> bool {
-    let Type::Path(type_path) = declared else {
-        return false;
-    };
-
-    type_path.path.segments.last().is_some_and(|segment| {
-        segment.ident == "Option"
-            && matches!(
-                &segment.arguments,
-                PathArguments::AngleBracketed(arguments)
-                    if matches!(
-                        arguments.args.first(),
-                        Some(GenericArgument::Type(inner)) if is_authenticated_actor(inner)
-                    )
-            )
-    })
 }
 
 fn find_marker<'attribute>(
@@ -174,15 +127,9 @@ pub(crate) fn responder_method(
         };
 
         let route_parameter = find_marker(&pattern_type.attrs, &route_parameter_selector);
-        let is_optional_actor = is_optional_authenticated_actor(&pattern_type.ty);
-        let is_required_actor = is_authenticated_actor(&pattern_type.ty);
         let is_current_request = is_request(&pattern_type.ty);
 
-        if route_parameter.is_none()
-            && !is_optional_actor
-            && !is_required_actor
-            && !is_current_request
-        {
+        if route_parameter.is_none() && !is_current_request {
             return Err(HttpCodegenError::UnmarkedResponderParameter {
                 responder: responder.to_string(),
                 parameter: position.to_string(),
@@ -204,10 +151,6 @@ pub(crate) fn responder_method(
                 registries,
                 referencing_root,
             )?
-        } else if is_optional_actor {
-            RouteParameterBinding::OptionalActor
-        } else if is_required_actor {
-            RouteParameterBinding::RequiredActor
         } else {
             RouteParameterBinding::CurrentRequest
         };

@@ -107,26 +107,4 @@ pub enum ContainerError {
 
     #[error("dependency cycle detected: {path}")]
     DependencyCycle { path: String },
-
-    #[error(
-        "synthetic provider '{provided}' collides with singleton '{existing}', which already provides that type"
-    )]
-    SyntheticProviderConflict { provided: String, existing: String },
-
-    #[error(
-        "synthetic provider '{second}' maps to container field '{field}', which is already used by '{first}'"
-    )]
-    SyntheticFieldConflict {
-        field: String,
-        first: String,
-        second: String,
-    },
-
-    #[error(
-        "synthetic provider '{provider}' depends on '{dependency}', which no singleton provides"
-    )]
-    SyntheticDependencyMissing {
-        provider: String,
-        dependency: String,
-    },
 }

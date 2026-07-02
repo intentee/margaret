@@ -21,36 +21,15 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let responder = &route.responder_field;
     let responder_type = path_tokens(&route.responder_path);
     let responder_access = access(quote! { container.#responder() });
-    let request_binding =
-        if route.route_parameters.is_empty() && route.site_action_guards.is_empty() {
-            format_ident!("_request")
-        } else {
-            format_ident!("request")
-        };
-
-    let user_resolution = if route.needs_user() {
-        quote! {
-            let authenticated_actor = gatekeeper.authenticate(&request).await;
-        }
+    let request_binding = if route.route_parameters.is_empty() {
+        format_ident!("_request")
     } else {
-        quote! {}
+        format_ident!("request")
     };
-    let site_guards = route.site_action_guards.iter().map(|action| {
-        quote! {
-            if !gatekeeper.can_site_action(authenticated_actor.as_ref(), #action).await {
-                return margaret_http::response::Response::forbidden().into();
-            }
-        }
-    });
-    let general_bindings = route
+
+    let bindings = route
         .route_parameters
         .iter()
-        .filter(|route_parameter| !route_parameter.binding.is_actor())
-        .map(|route_parameter| parameter_binding(route_parameter, &request_binding));
-    let actor_bindings = route
-        .route_parameters
-        .iter()
-        .filter(|route_parameter| route_parameter.binding.is_actor())
         .map(|route_parameter| parameter_binding(route_parameter, &request_binding));
     let arguments = route
         .route_parameters
@@ -72,10 +51,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
         }
     };
     let body = quote! {
-        #user_resolution
-        #(#site_guards)*
-        #(#general_bindings)*
-        #(#actor_bindings)*
+        #(#bindings)*
         #body_tail
     };
 
@@ -145,25 +121,11 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
         RouteParameterBinding::CurrentRequest => quote! {
             let #holder = &#request;
         },
-        RouteParameterBinding::RequiredActor => quote! {
-            let #holder = match authenticated_actor {
-                Some(authenticated_actor) => authenticated_actor,
-                None => {
-                    return margaret_http::response::Response::forbidden().into();
-                }
-            };
-        },
-        RouteParameterBinding::OptionalActor => quote! {
-            let #holder = authenticated_actor;
-        },
-        RouteParameterBinding::Bound {
-            binder,
-            intent,
-            path_key,
-        } => {
+        RouteParameterBinding::Bound { binder, path_key } => {
             let binder_field = format_ident!("{}", binder.field_name());
             let message = format!("the route guarantees the '{path_key}' path parameter");
-            let load = quote! {
+
+            quote! {
                 let #holder = match #binder_field
                     .bind(#request.path_param(#path_key).expect(#message).to_string())
                     .await
@@ -171,16 +133,6 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
                     Some(value) => value,
                     None => return margaret_http::response::Response::not_found().into(),
                 };
-            };
-
-            match intent {
-                Some(intent) => quote! {
-                    #load
-                    if !gatekeeper.can_crud(authenticated_actor.as_ref(), &#holder, #intent).await {
-                        return margaret_http::response::Response::forbidden().into();
-                    }
-                },
-                None => load,
             }
         }
     }
@@ -193,10 +145,6 @@ fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
         if let RouteParameterBinding::Bound { binder, .. } = &route_parameter.binding {
             fields.insert(binder.field_name());
         }
-    }
-
-    if route.needs_user() {
-        fields.insert("gatekeeper".to_string());
     }
 
     if let ResponderOutput::Intercepted { interceptor } = &route.responder_output {
@@ -239,11 +187,6 @@ pub(crate) fn render(routes: &[HttpRoute], servers: &[HttpServer]) -> String {
     } else {
         quote! {}
     };
-    let crud_import = if routes.iter().any(HttpRoute::is_authorized) {
-        quote! { use margaret_security::crud_action::CrudAction; }
-    } else {
-        quote! {}
-    };
 
     let server_functions = servers.iter().map(|server| {
         let function_name = server.function_name();
@@ -265,7 +208,6 @@ pub(crate) fn render(routes: &[HttpRoute], servers: &[HttpServer]) -> String {
     let tokens = quote! {
         use super::container::Container;
         #binder_import
-        #crud_import
 
         #(#server_functions)*
     };

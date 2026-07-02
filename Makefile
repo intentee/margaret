@@ -7,9 +7,6 @@ COVERAGE_PACKAGES := \
 	-p margaret_http \
 	-p margaret_http_codegen \
 	-p margaret_macros \
-	-p margaret_security \
-	-p margaret_security_codegen \
-	-p margaret_security_tests \
 	-p margaret_service_codegen \
 	-p margaret_service_tests
 
@@ -38,9 +35,6 @@ coverage: node_modules
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \
 		--gated margaret_macros=100 \
-		--gated margaret_security=100 \
-		--gated margaret_security_codegen=100 \
-		--gated margaret_security_tests=100 \
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100

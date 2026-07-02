@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn reads_a_positional_path_and_ignores_non_paths() {
-        let parsed = args(parse_quote!(#[decides(crate::action::Action::ViewAdmin, 5)]));
+        let parsed = args(parse_quote!(#[intercepts(crate::markers::View, 5)]));
 
         assert!(parsed.positional_path(0).is_some());
         assert!(parsed.positional_path(1).is_none());

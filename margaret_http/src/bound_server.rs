@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::fmt::Display;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -58,13 +59,17 @@ impl BoundServer {
                 ));
                 let connection = builder.serve_connection(TokioIo::new(stream), service);
 
-                if let Err(error) = watcher.watch(connection).await {
-                    eprintln!("margaret_http: connection error: {error}");
-                }
+                report_connection_outcome(watcher.watch(connection).await);
             });
         }
 
         graceful.shutdown().await;
+    }
+}
+
+fn report_connection_outcome<Error: Display>(outcome: Result<(), Error>) {
+    if let Err(error) = outcome {
+        eprintln!("margaret_http: connection error: {error}");
     }
 }
 
@@ -136,6 +141,14 @@ mod tests {
         let cancellation_token = CancellationToken::new();
         let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 
+        let interrupted = exchange(
+            address,
+            b"GET /interrupted HTTP/1.1\r\nHost: test\r\n",
+            true,
+        )
+        .await;
+        assert!(!interrupted.contains(" 200 "));
+
         let unmatched = exchange(
             address,
             b"GET /missing HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
@@ -159,17 +172,6 @@ mod tests {
         )
         .await;
         assert!(truncated.contains(" 400 "));
-
-        let malformed = exchange(address, b"this is not a valid request line\r\n\r\n", true).await;
-        assert!(!malformed.contains(" 200 "));
-
-        let recovered = exchange(
-            address,
-            b"GET /missing HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-            false,
-        )
-        .await;
-        assert!(recovered.contains(" 404 "));
 
         cancellation_token.cancel();
 

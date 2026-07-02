@@ -17,6 +17,8 @@ pub struct AttributeIndex {
 impl AttributeIndex {
     pub(crate) fn new(items: Vec<IndexedItem>) -> Self {
         let mut locations_by_leaf: HashMap<String, Vec<AttributeLocation>> = HashMap::new();
+        let mut struct_candidates = Vec::new();
+        let mut trait_candidates = Vec::new();
 
         for (item_index, item) in items.iter().enumerate() {
             for (attribute_index, attribute) in item.attributes().iter().enumerate() {
@@ -33,26 +35,19 @@ impl AttributeIndex {
                     .or_default()
                     .push(AttributeLocation::new(item_index, attribute_index));
             }
-        }
 
-        let struct_resolution = ResolutionIndex::new(
-            items
-                .iter()
-                .filter(|item| item.kind().is_struct())
-                .map(|item| item.canonical_path().clone()),
-        );
-        let trait_resolution = ResolutionIndex::new(
-            items
-                .iter()
-                .filter(|item| item.kind() == ItemKind::Trait)
-                .map(|item| item.canonical_path().clone()),
-        );
+            if item.kind().is_struct() {
+                struct_candidates.push(item.canonical_path().clone());
+            } else if item.kind() == ItemKind::Trait {
+                trait_candidates.push(item.canonical_path().clone());
+            }
+        }
 
         Self {
             items,
             locations_by_leaf,
-            struct_resolution,
-            trait_resolution,
+            struct_resolution: ResolutionIndex::new(struct_candidates),
+            trait_resolution: ResolutionIndex::new(trait_candidates),
         }
     }
 

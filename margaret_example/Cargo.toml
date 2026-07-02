@@ -8,15 +8,12 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 dashmap = { workspace = true }
-jsonwebtoken = { workspace = true }
 margaret_console = { path = "../margaret_console" }
 margaret_example_macros = { path = "../margaret_example_macros" }
 margaret_example_plugin = { path = "../margaret_example_plugin" }
 margaret_http = { path = "../margaret_http" }
 margaret_macros = { path = "../margaret_macros" }
-margaret_security = { path = "../margaret_security" }
 margaret_service = { path = "../margaret_service" }
-serde = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-util = { workspace = true }
 

@@ -24,10 +24,10 @@ impl DeleteArticle {
     #[responder]
     pub async fn respond(
         &self,
-        #[route_parameter(from = "article", intent = CrudAction::Delete)] article: Article,
+        #[route_parameter(from = "article")] Article { id, title, .. }: Article,
     ) -> Response {
-        self.articles.remove(&article.id);
+        self.articles.remove(&id);
 
-        Response::text(200, format!("deleted \"{}\"", article.title))
+        Response::text(200, format!("deleted \"{title}\""))
     }
 }

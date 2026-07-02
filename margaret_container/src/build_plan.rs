@@ -28,7 +28,6 @@ use crate::provider::Provider;
 use crate::provider_construction::ProviderConstruction;
 use crate::raw_target::RawTarget;
 use crate::resolve_construction::resolve_construction;
-use crate::synthetic_provider::SyntheticProvider;
 use crate::type_text::type_text;
 
 enum DraftConstruction<'index> {
@@ -422,22 +421,13 @@ fn scheduled_with_tick_timer_selector() -> AttributeSelector {
         .expect("the scheduled_with_tick_timer selector is valid")
 }
 
-pub(crate) fn build_plan(
-    index: &AttributeIndex,
-    synthetic: &[SyntheticProvider],
-) -> Result<ContainerPlan, ContainerError> {
+pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
     let trait_resolution = index.trait_resolution();
     let drafts = build_drafts(index, trait_resolution)?;
-    let mut provider_keys: Vec<CanonicalPath> = drafts
+    let provider_keys: Vec<CanonicalPath> = drafts
         .iter()
         .map(|draft| draft.provided.key().clone())
         .collect();
-
-    provider_keys.extend(
-        synthetic
-            .iter()
-            .map(|provider| provider.concrete_path.clone()),
-    );
 
     let provider_resolution = ResolutionIndex::new(provider_keys);
     let mut collections = CollectionTable::new();

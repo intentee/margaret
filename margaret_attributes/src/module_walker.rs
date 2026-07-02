@@ -152,11 +152,7 @@ impl ModuleWalker {
             }
         }
 
-        items.sort_by(|left, right| {
-            left.canonical_path()
-                .to_string()
-                .cmp(&right.canonical_path().to_string())
-        });
+        items.sort_by(|left, right| left.canonical_path().cmp(right.canonical_path()));
 
         for item in &mut items {
             item.sort_members();
