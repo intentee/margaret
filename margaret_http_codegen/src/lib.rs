@@ -10,7 +10,6 @@ mod http_routes;
 pub mod http_server;
 mod interceptor_bindings;
 mod layer_application;
-mod marker_arguments;
 mod middleware_attribute_arguments;
 mod middleware_binding;
 mod middleware_bindings;
@@ -41,8 +40,8 @@ mod tests {
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"
 #[responds_to_http(method = Get, path = "/resource", server = "public")]
-#[traced]
-#[guard(crate::action::Action::Read)]
+#[middleware(traced)]
+#[middleware(guard)]
 struct Resource;
 
 impl Resource {
@@ -162,7 +161,7 @@ impl Echo {
     }
 
     #[test]
-    fn generates_per_route_typed_marker_middleware() {
+    fn wraps_a_responder_with_its_middleware_in_attribute_order() {
         let source = source_for(RESPONDERS_AND_MIDDLEWARE);
 
         assert!(source.contains("pubasyncfnserver"));
@@ -172,12 +171,15 @@ impl Echo {
             "margaret_http::responder_handler::responder_handler(container.open().await"
         ));
         assert!(source.contains(
-            "|responder:std::sync::Arc<crate::Open>,_request:margaret_http::request::Request|"
+            "|responder:std::sync::Arc<crate::Open>,_request:&margaret_http::request::Request"
         ));
         assert!(source.contains("responder.respond().await"));
-        assert!(source.contains("container.guard().await,crate::action::Action::Read"));
-        assert!(source.contains("container.tracer().await,()"));
-        assert!(source.contains("container.resource().await"));
+        assert!(source.contains(
+            "margaret_http::layer::layer(container.guard().await,margaret_http::responder_handler::responder_handler(container.resource().await"
+        ));
+        assert!(source.contains(
+            "margaret_http::layer::layer(container.tracer().await,margaret_http::layer::layer(container.guard().await,"
+        ));
 
         let guard = source.find("container.guard").expect("the guard is wired");
         let tracer = source
@@ -194,7 +196,7 @@ impl Echo {
         assert!(source.contains("\"/users/{id}\""));
         assert!(source.contains("container.get_user().await"));
         assert!(source.contains(
-            "|responder:std::sync::Arc<crate::GetUser>,request:margaret_http::request::Request|"
+            "|responder:std::sync::Arc<crate::GetUser>,request:&margaret_http::request::Request"
         ));
         assert!(source.contains(r#"letid=request.path_param("id").expect"#));
         assert!(source.contains(".to_string();"));
@@ -205,9 +207,21 @@ impl Echo {
     fn binds_the_current_request_alongside_a_route_parameter() {
         let source = source_for(CURRENT_REQUEST);
 
-        assert!(source.contains("letrequest=&request;"));
+        assert!(source.contains(
+            "|responder:std::sync::Arc<crate::Echo>,request:&margaret_http::request::Request"
+        ));
         assert!(source.contains(r#"letid=request.path_param("id").expect"#));
         assert!(source.contains("responder.respond(request,id).await"));
+    }
+
+    #[test]
+    fn binds_a_current_request_parameter_under_a_custom_name() {
+        let source = source_for(
+            "#[responds_to_http(method = Get, path = \"/echo\", server = \"public\")]\nstruct Echo;\n\nimpl Echo {\n    #[responder]\n    fn respond(&self, incoming: &Request) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("letincoming=request;"));
+        assert!(source.contains("responder.respond(incoming).await"));
     }
 
     #[test]
@@ -428,18 +442,27 @@ impl Echo {
     }
 
     #[test]
-    fn rejects_a_malformed_marker() {
+    fn rejects_a_middleware_attribute_without_a_tag() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\n#[guard(crate::A, crate::B)]\nstruct Bad;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n",
+            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\n#[middleware]\nstruct Bad;\nimpl Bad {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("must carry zero or one positional argument"));
+        assert!(message.contains("must name exactly one middleware tag"));
     }
 
     #[test]
-    fn propagates_malformed_marker_arguments() {
+    fn rejects_an_unknown_middleware_tag() {
         let message = error_for(
-            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\n#[guard(= 5)]\nstruct Bad;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n",
+            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\n#[middleware(missing)]\nstruct Bad;\nimpl Bad {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("no #[handles_middleware_attribute] handles it"));
+    }
+
+    #[test]
+    fn propagates_malformed_middleware_attribute_arguments() {
+        let message = error_for(
+            "#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\n#[middleware(= 5)]\nstruct Bad;\nimpl Bad {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -521,7 +544,7 @@ impl GetGreeting {
 
         assert!(source.contains("container.view_interceptor().await"));
         assert!(source.contains(
-            "margaret_http::responded::Responded::Intercept(Box::new(margaret_http::interception::Interception::new(view_interceptor,responder.respond().await"
+            "margaret_http::response_continuation::ResponseContinuation::Intercept(Box::new(margaret_http::interception::Interception::new(view_interceptor,responder.respond().await"
         ));
     }
 
@@ -548,7 +571,7 @@ impl GetGreeting {
         );
 
         assert!(
-            source.contains("margaret_http::responded::Responded::from(responder.respond().await)")
+            source.contains("margaret_http::response_continuation::ResponseContinuation::from(responder.respond().await,)")
         );
     }
 
@@ -559,7 +582,7 @@ impl GetGreeting {
         );
 
         assert!(
-            source.contains("margaret_http::responded::Responded::from(responder.respond().await)")
+            source.contains("margaret_http::response_continuation::ResponseContinuation::from(responder.respond().await,)")
         );
     }
 
@@ -570,7 +593,7 @@ impl GetGreeting {
         );
 
         assert!(
-            source.contains("margaret_http::responded::Responded::from(responder.respond().await)")
+            source.contains("margaret_http::response_continuation::ResponseContinuation::from(responder.respond().await,)")
         );
     }
 

@@ -1,11 +1,12 @@
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 
 use crate::handler::Handler;
 use crate::request::Request;
-use crate::responded::Responded;
+use crate::response_continuation::ResponseContinuation;
 
 struct FnHandler<Responder, Extract> {
     extract: Extract,
@@ -13,25 +14,37 @@ struct FnHandler<Responder, Extract> {
 }
 
 #[async_trait]
-impl<Responder, Extract, OutcomeFuture> Handler for FnHandler<Responder, Extract>
+impl<Responder, Extract> Handler for FnHandler<Responder, Extract>
 where
     Responder: Send + Sync + 'static,
-    Extract: Fn(Arc<Responder>, Request) -> OutcomeFuture + Send + Sync + 'static,
-    OutcomeFuture: Future<Output = Responded> + Send + 'static,
+    Extract: for<'request> Fn(
+            Arc<Responder>,
+            &'request Request,
+        )
+            -> Pin<Box<dyn Future<Output = ResponseContinuation> + Send + 'request>>
+        + Send
+        + Sync
+        + 'static,
 {
-    async fn handle(&self, request: Request) -> Responded {
+    async fn handle(&self, request: &Request) -> ResponseContinuation {
         (self.extract)(self.responder.clone(), request).await
     }
 }
 
-pub fn responder_handler<Responder, Extract, OutcomeFuture>(
+pub fn responder_handler<Responder, Extract>(
     responder: Arc<Responder>,
     extract: Extract,
 ) -> Arc<dyn Handler>
 where
     Responder: Send + Sync + 'static,
-    Extract: Fn(Arc<Responder>, Request) -> OutcomeFuture + Send + Sync + 'static,
-    OutcomeFuture: Future<Output = Responded> + Send + 'static,
+    Extract: for<'request> Fn(
+            Arc<Responder>,
+            &'request Request,
+        )
+            -> Pin<Box<dyn Future<Output = ResponseContinuation> + Send + 'request>>
+        + Send
+        + Sync
+        + 'static,
 {
     Arc::new(FnHandler { extract, responder })
 }
@@ -39,6 +52,8 @@ where
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::future::Future;
+    use std::pin::Pin;
     use std::sync::Arc;
 
     use http_body_util::BodyExt;
@@ -46,8 +61,9 @@ mod tests {
     use super::responder_handler;
     use crate::method::Method;
     use crate::request::Request;
-    use crate::responded::Responded;
+    use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
+    use crate::response_continuation::ResponseContinuation;
 
     struct Echo;
 
@@ -61,25 +77,29 @@ mod tests {
     async fn injects_request_values_into_the_responder() {
         let handler = responder_handler(
             Arc::new(Echo),
-            |responder: Arc<Echo>, request: Request| async move {
-                Responded::from(
-                    responder
-                        .respond(
-                            request
-                                .path_param("id")
-                                .expect("the test request carries the id parameter")
-                                .to_string(),
-                        )
-                        .await,
-                )
+            |responder: Arc<Echo>,
+             request: &Request|
+             -> Pin<Box<dyn Future<Output = ResponseContinuation> + Send + '_>> {
+                Box::pin(async move {
+                    ResponseContinuation::from(
+                        responder
+                            .respond(
+                                request
+                                    .path_param("id")
+                                    .expect("the test request carries the id parameter")
+                                    .to_string(),
+                            )
+                            .await,
+                    )
+                })
             },
         );
-        let mut request = Request::new(Method::Get, "/echo/7".to_string());
-        let mut path_params = HashMap::new();
-        path_params.insert("id".to_string(), "7".to_string());
-        request.set_path_params(path_params);
+        let request = Request::new(Method::Get, "/echo/7".to_string())
+            .with_path_params(HashMap::from([("id".to_string(), "7".to_string())]));
 
-        let response = handler.handle(request).await.into_http();
+        let response = respond_recursively(&HashMap::new(), request, handler)
+            .await
+            .into_http();
 
         assert_eq!(response.status().as_u16(), 200);
         assert_eq!(

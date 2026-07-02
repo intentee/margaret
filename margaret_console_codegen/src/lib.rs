@@ -133,6 +133,12 @@ impl Farewell {
         assert!(
             source.contains(r#"clap::Arg::new("public-addr").long("public-addr").required(true)"#)
         );
+        assert!(source.contains(
+            r#"clap::Arg::new("public-uploads").long("public-uploads").action(clap::ArgAction::SetTrue)"#
+        ));
+        assert!(source.contains(
+            r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(false).requires("public-uploads")"#
+        ));
         assert!(source.contains("super::services::serve(container,matches,cancellation_token)"));
         assert!(source.contains("margaret_service::install::install()"));
     }

@@ -16,20 +16,20 @@ impl<'index> MatchedAttribute<'index> {
         Self { attribute, item }
     }
 
-    pub fn item(&self) -> &'index IndexedItem {
-        self.item
+    pub fn args(&self) -> Result<AttributeArgs, AttributeError> {
+        AttributeArgs::from_attribute(self.attribute)
     }
 
-    pub fn path(&self) -> String {
-        format_path(self.attribute.path())
+    pub fn item(&self) -> &'index IndexedItem {
+        self.item
     }
 
     pub fn matches(&self, selector: &AttributeSelector) -> bool {
         selector.matches(self.attribute.path())
     }
 
-    pub fn args(&self) -> Result<AttributeArgs, AttributeError> {
-        AttributeArgs::from_attribute(self.attribute)
+    pub fn path(&self) -> String {
+        format_path(self.attribute.path())
     }
 }
 

@@ -111,16 +111,20 @@ pub(crate) fn render(commands: &[ConsoleCommand], serves: bool, servers: &[HttpS
     let arms = commands.iter().map(command_arm);
 
     let serve_registration = if serves {
-        let address_arguments = servers.iter().map(|server| {
+        let server_arguments = servers.iter().map(|server| {
             let address_argument = server.address_argument();
+            let uploads_argument = server.uploads_argument();
+            let upload_dir_argument = server.upload_dir_argument();
 
             quote! {
                 .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
+                .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
+                .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
             }
         });
 
         quote! {
-            .subcommand(clap::Command::new("serve")#(#address_arguments)*)
+            .subcommand(clap::Command::new("serve")#(#server_arguments)*)
         }
     } else {
         quote! {}

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use crate::deferred_interception::DeferredInterception;
 use crate::http_interceptor::HttpInterceptor;
 use crate::request::Request;
-use crate::response::Response;
+use crate::response_continuation::ResponseContinuation;
 
 pub struct Interception<Interceptor>
 where
@@ -32,7 +32,7 @@ impl<Interceptor> DeferredInterception for Interception<Interceptor>
 where
     Interceptor: HttpInterceptor + 'static,
 {
-    async fn render(self: Box<Self>, request: &Request) -> Response {
+    async fn render(self: Box<Self>, request: &Request) -> ResponseContinuation {
         let Self {
             intercepted,
             interceptor,
@@ -44,17 +44,20 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     use async_trait::async_trait;
 
     use super::Interception;
-    use crate::deferred_interception::DeferredInterception;
+    use crate::handler::Handler;
     use crate::http_interceptable::HttpInterceptable;
     use crate::http_interceptor::HttpInterceptor;
     use crate::method::Method;
     use crate::request::Request;
+    use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
+    use crate::response_continuation::ResponseContinuation;
 
     struct Payload {
         status: u16,
@@ -68,20 +71,39 @@ mod tests {
     impl HttpInterceptor for Renderer {
         type Intercepted = Payload;
 
-        async fn intercept(&self, _request: &Request, intercepted: Box<Payload>) -> Response {
-            Response::text(intercepted.status, "intercepted")
+        async fn intercept(
+            &self,
+            _request: &Request,
+            intercepted: Box<Payload>,
+        ) -> ResponseContinuation {
+            ResponseContinuation::from(Response::text(intercepted.status, "intercepted"))
+        }
+    }
+
+    struct YieldsInterception;
+
+    #[async_trait]
+    impl Handler for YieldsInterception {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::Intercept(Box::new(Interception::new(
+                Arc::new(Renderer),
+                Box::new(Payload { status: 207 }),
+            )))
         }
     }
 
     #[tokio::test]
     async fn renders_the_intercepted_value_through_its_interceptor() {
-        let interception = Interception::new(Arc::new(Renderer), Box::new(Payload { status: 207 }));
+        let status = respond_recursively(
+            &HashMap::new(),
+            Request::new(Method::Get, "/".to_string()),
+            Arc::new(YieldsInterception),
+        )
+        .await
+        .into_http()
+        .status()
+        .as_u16();
 
-        let response = Box::new(interception)
-            .render(&Request::new(Method::Get, "/".to_string()))
-            .await
-            .into_http();
-
-        assert_eq!(response.status().as_u16(), 207);
+        assert_eq!(status, 207);
     }
 }

@@ -1,185 +1,222 @@
 use std::collections::HashMap;
 
-use bytes::Bytes;
-use cookie::Cookie;
-use http::HeaderMap;
-
 use crate::method::Method;
-use crate::request_error::RequestError;
+use crate::request_inputs::RequestInputs;
+use crate::server_params::ServerParams;
+use crate::uploaded_file::UploadedFile;
 
-#[derive(Clone)]
 pub struct Request {
-    body: Bytes,
-    headers: HeaderMap,
-    method: Method,
-    path: String,
+    inputs: RequestInputs,
     path_params: HashMap<String, String>,
 }
 
 impl Request {
-    pub fn new(method: Method, path: String) -> Self {
+    pub(crate) fn from_inputs(inputs: RequestInputs) -> Self {
         Self {
-            body: Bytes::new(),
-            headers: HeaderMap::new(),
-            method,
-            path,
+            inputs,
             path_params: HashMap::new(),
         }
     }
 
-    pub(crate) fn set_body(&mut self, body: Bytes) {
-        self.body = body;
-    }
-
-    pub(crate) fn set_headers(&mut self, headers: HeaderMap) {
-        self.headers = headers;
-    }
-
-    pub(crate) fn set_path_params(&mut self, path_params: HashMap<String, String>) {
-        self.path_params = path_params;
-    }
-
-    pub(crate) fn clear_path_params(&mut self) {
-        self.path_params.clear();
-    }
-
-    pub fn method(&self) -> Method {
-        self.method
-    }
-
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
-    pub fn header(&self, name: &str) -> Result<Option<&str>, RequestError> {
-        match self.headers.get(name) {
-            Some(value) => Ok(Some(value.to_str()?)),
-            None => Ok(None),
+    pub fn new(method: Method, path: String) -> Self {
+        Self {
+            inputs: RequestInputs::empty(method, path),
+            path_params: HashMap::new(),
         }
+    }
+
+    pub(crate) fn with_path_params(self, path_params: HashMap<String, String>) -> Self {
+        Self {
+            inputs: self.inputs,
+            path_params,
+        }
+    }
+
+    pub fn cookie(&self, name: &str) -> Option<&str> {
+        self.inputs.cookies.get(name).map(String::as_str)
+    }
+
+    pub fn file(&self, field_name: &str) -> Option<&UploadedFile> {
+        self.inputs.files.get(field_name)
+    }
+
+    pub fn form(&self, key: &str) -> Option<&str> {
+        self.inputs.post.get(key).map(String::as_str)
+    }
+
+    pub fn json(&self) -> Option<&serde_json::Value> {
+        self.inputs.json.as_ref()
     }
 
     pub fn path_param(&self, name: &str) -> Option<&str> {
         self.path_params.get(name).map(String::as_str)
     }
 
-    pub fn cookie(&self, name: &str) -> Result<Option<String>, RequestError> {
-        let Some(raw) = self.header("cookie")? else {
-            return Ok(None);
-        };
-
-        for parsed in Cookie::split_parse(raw) {
-            let cookie = parsed?;
-
-            if cookie.name() == name {
-                return Ok(Some(cookie.value().to_string()));
-            }
-        }
-
-        Ok(None)
+    pub fn query(&self, key: &str) -> Option<&str> {
+        self.inputs.query.get(key).map(String::as_str)
     }
 
-    pub fn form(&self, key: &str) -> Option<String> {
-        form_urlencoded::parse(&self.body).find_map(|(field, value)| {
-            if &*field == key {
-                Some(value.into_owned())
-            } else {
-                None
-            }
-        })
+    pub fn server(&self) -> &ServerParams {
+        &self.inputs.server
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
+    use std::collections::HashMap;
+    use std::net::SocketAddr;
+
     use http::HeaderMap;
-    use http::HeaderName;
-    use http::HeaderValue;
+    use tempfile::NamedTempFile;
 
     use super::Request;
     use crate::method::Method;
+    use crate::request_inputs::RequestInputs;
+    use crate::server_params::ServerParams;
+    use crate::uploaded_file::UploadedFile;
 
-    fn request_with_header(name: &str, value: &str) -> Request {
-        let mut request = Request::new(Method::Get, "/".to_string());
-        let mut headers = HeaderMap::new();
+    fn request_from(inputs: RequestInputs) -> Request {
+        Request::from_inputs(inputs)
+    }
 
-        headers.insert(
-            HeaderName::from_bytes(name.as_bytes()).expect("a valid header name"),
-            HeaderValue::from_str(value).expect("a valid header value"),
-        );
-        request.set_headers(headers);
-
-        request
+    fn request_with_cookies(cookies: HashMap<String, String>) -> Request {
+        request_from(RequestInputs {
+            cookies,
+            files: HashMap::new(),
+            json: None,
+            post: HashMap::new(),
+            query: HashMap::new(),
+            server: ServerParams::new(
+                Method::Get,
+                "/".to_string(),
+                String::new(),
+                SocketAddr::from(([127, 0, 0, 1], 0)),
+                HeaderMap::new(),
+            ),
+        })
     }
 
     #[test]
     fn reads_a_cookie_by_name() {
-        let request = request_with_header("cookie", "session=abc; theme=dark");
+        let request = request_with_cookies(HashMap::from([
+            ("session".to_string(), "abc".to_string()),
+            ("theme".to_string(), "dark".to_string()),
+        ]));
 
-        assert_eq!(
-            request.cookie("session").expect("the cookie header parses"),
-            Some("abc".to_string())
-        );
-        assert_eq!(
-            request.cookie("theme").expect("the cookie header parses"),
-            Some("dark".to_string())
-        );
+        assert_eq!(request.cookie("session"), Some("abc"));
+        assert_eq!(request.cookie("theme"), Some("dark"));
     }
 
     #[test]
     fn returns_none_for_a_missing_cookie() {
+        assert_eq!(request_with_cookies(HashMap::new()).cookie("session"), None);
         assert_eq!(
-            request_with_header("cookie", "theme=dark")
-                .cookie("session")
-                .expect("the cookie header parses"),
-            None
-        );
-        assert_eq!(
-            Request::new(Method::Get, "/".to_string())
-                .cookie("session")
-                .expect("an absent cookie header yields no cookie"),
+            Request::new(Method::Get, "/".to_string()).cookie("session"),
             None
         );
     }
 
     #[test]
-    fn rejects_a_header_value_that_is_not_visible_ascii() {
-        let mut request = Request::new(Method::Get, "/".to_string());
-        let mut headers = HeaderMap::new();
+    fn exposes_query_and_form_fields() {
+        let request = request_from(RequestInputs {
+            cookies: HashMap::new(),
+            files: HashMap::new(),
+            json: None,
+            post: HashMap::from([("title".to_string(), "hello".to_string())]),
+            query: HashMap::from([("page".to_string(), "2".to_string())]),
+            server: ServerParams::new(
+                Method::Post,
+                "/articles".to_string(),
+                "page=2".to_string(),
+                SocketAddr::from(([203, 0, 113, 7], 4000)),
+                HeaderMap::new(),
+            ),
+        })
+        .with_path_params(HashMap::from([("id".to_string(), "42".to_string())]));
 
-        headers.insert(
-            HeaderName::from_static("cookie"),
-            HeaderValue::from_bytes(&[0xC0, 0xC1]).expect("an opaque header value"),
+        assert_eq!(request.form("title"), Some("hello"));
+        assert_eq!(request.form("missing"), None);
+        assert_eq!(request.query("page"), Some("2"));
+        assert_eq!(request.query("missing"), None);
+        assert_eq!(request.server().method(), Method::Post);
+        assert_eq!(request.server().path(), "/articles");
+        assert_eq!(request.server().query_string(), "page=2");
+        assert_eq!(
+            request.server().remote_addr(),
+            SocketAddr::from(([203, 0, 113, 7], 4000))
         );
-        request.set_headers(headers);
-
-        let message = request
-            .header("cookie")
-            .expect_err("an opaque header value is rejected")
-            .to_string();
-
-        assert!(message.contains("not visible ASCII text"));
-        assert!(request.cookie("session").is_err());
+        assert_eq!(request.path_param("id"), Some("42"));
+        assert_eq!(request.path_param("missing"), None);
     }
 
     #[test]
-    fn rejects_a_malformed_cookie_header() {
-        let message = request_with_header("cookie", "=nameless")
-            .cookie("session")
-            .expect_err("a malformed cookie is rejected")
-            .to_string();
+    fn exposes_uploaded_files() {
+        let avatar = NamedTempFile::new()
+            .expect("a temporary file")
+            .into_temp_path();
+        let attachment = NamedTempFile::new()
+            .expect("a temporary file")
+            .into_temp_path();
+        let request = request_from(RequestInputs {
+            cookies: HashMap::new(),
+            files: HashMap::from([
+                (
+                    "avatar".to_string(),
+                    UploadedFile::new(
+                        "avatar".to_string(),
+                        "face.png".to_string(),
+                        "image/png".to_string(),
+                        3,
+                        avatar,
+                    ),
+                ),
+                (
+                    "attachment".to_string(),
+                    UploadedFile::new(
+                        "attachment".to_string(),
+                        "notes.txt".to_string(),
+                        "text/plain".to_string(),
+                        5,
+                        attachment,
+                    ),
+                ),
+            ]),
+            json: None,
+            post: HashMap::new(),
+            query: HashMap::new(),
+            server: ServerParams::new(
+                Method::Post,
+                "/upload".to_string(),
+                String::new(),
+                SocketAddr::from(([127, 0, 0, 1], 0)),
+                HeaderMap::new(),
+            ),
+        });
 
-        assert!(message.contains("could not be parsed"));
+        let avatar = request.file("avatar").expect("the avatar file is present");
+        assert_eq!(avatar.file_name(), "face.png");
+        assert_eq!(avatar.content_type(), "image/png");
+        assert_eq!(avatar.size(), 3);
+        assert!(request.file("missing").is_none());
     }
 
     #[test]
-    fn reads_a_form_field_from_the_body() {
-        let mut request = Request::new(Method::Post, "/login".to_string());
+    fn exposes_the_json_body() {
+        let request = request_from(RequestInputs {
+            cookies: HashMap::new(),
+            files: HashMap::new(),
+            json: Some(serde_json::json!({ "title": "hello" })),
+            post: HashMap::new(),
+            query: HashMap::new(),
+            server: ServerParams::new(
+                Method::Post,
+                "/articles".to_string(),
+                String::new(),
+                SocketAddr::from(([127, 0, 0, 1], 0)),
+                HeaderMap::new(),
+            ),
+        });
 
-        request.set_body(Bytes::from_static(b"username=margaret&password=secret"));
-
-        assert_eq!(request.form("username"), Some("margaret".to_string()));
-        assert_eq!(request.form("password"), Some("secret".to_string()));
-        assert_eq!(request.form("absent"), None);
+        assert!(request.json() == Some(&serde_json::json!({ "title": "hello" })));
     }
 }

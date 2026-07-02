@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
@@ -9,6 +10,7 @@ use margaret_macros::constructor;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::singleton;
 
+use crate::clock::Clock;
 use crate::models::article::Article;
 
 const FIRST_AUTHORED_ID: u64 = 103;
@@ -21,6 +23,7 @@ fn seed() -> Vec<Article> {
             author_id: "3".to_string(),
             body: "A public note from Milo.".to_string(),
             published: true,
+            created_at: 1_704_067_200,
         },
         Article {
             id: "101".to_string(),
@@ -28,6 +31,7 @@ fn seed() -> Vec<Article> {
             author_id: "3".to_string(),
             body: "An unpublished draft from Milo.".to_string(),
             published: false,
+            created_at: 1_704_153_600,
         },
         Article {
             id: "102".to_string(),
@@ -35,6 +39,7 @@ fn seed() -> Vec<Article> {
             author_id: "2".to_string(),
             body: "An unpublished draft from Mona.".to_string(),
             published: false,
+            created_at: 1_704_240_000,
         },
     ]
 }
@@ -43,12 +48,13 @@ fn seed() -> Vec<Article> {
 #[provides_route_parameter]
 pub struct ArticleRepository {
     articles: DashMap<String, Article>,
+    clock: Arc<dyn Clock>,
     next_id: AtomicU64,
 }
 
 impl ArticleRepository {
     #[constructor]
-    pub fn create() -> Self {
+    pub fn create(clock: Arc<dyn Clock>) -> Self {
         let articles = DashMap::new();
 
         for article in seed() {
@@ -57,12 +63,9 @@ impl ArticleRepository {
 
         Self {
             articles,
+            clock,
             next_id: AtomicU64::new(FIRST_AUTHORED_ID),
         }
-    }
-
-    pub fn find_article_by_id(&self, id: &str) -> Option<Article> {
-        self.articles.get(id).map(|article| article.value().clone())
     }
 
     pub fn all(&self) -> Vec<Article> {
@@ -77,6 +80,10 @@ impl ArticleRepository {
         all
     }
 
+    pub fn find_article_by_id(&self, id: &str) -> Option<Article> {
+        self.articles.get(id).map(|article| article.value().clone())
+    }
+
     pub fn insert(&self, title: String, body: String, author_id: String) -> Article {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed).to_string();
         let article = Article {
@@ -85,6 +92,7 @@ impl ArticleRepository {
             author_id,
             body,
             published: false,
+            created_at: self.clock.now(),
         };
 
         self.articles.insert(id, article.clone());
@@ -92,12 +100,12 @@ impl ArticleRepository {
         article
     }
 
-    pub fn save(&self, article: Article) {
-        self.articles.insert(article.id.clone(), article);
-    }
-
     pub fn remove(&self, id: &str) {
         self.articles.remove(id);
+    }
+
+    pub fn save(&self, article: Article) {
+        self.articles.insert(article.id.clone(), article);
     }
 }
 

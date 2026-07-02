@@ -3,11 +3,11 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 
 use crate::bound_server::BoundServer;
-use crate::handler::Handler;
 use crate::router::Router;
+use crate::upload_config::UploadConfig;
 
 pub struct Server {
-    app: Arc<dyn Handler>,
+    app: Arc<Router>,
 }
 
 impl Server {
@@ -17,10 +17,18 @@ impl Server {
         }
     }
 
-    pub async fn bind(self, address: &str) -> std::io::Result<BoundServer> {
+    pub async fn bind(
+        self,
+        address: &str,
+        upload_config: UploadConfig,
+    ) -> std::io::Result<BoundServer> {
         let listener = TcpListener::bind(address).await?;
 
-        Ok(BoundServer::new(self.app, listener))
+        Ok(BoundServer::new(
+            self.app,
+            listener,
+            Arc::new(upload_config),
+        ))
     }
 }
 
@@ -28,11 +36,17 @@ impl Server {
 mod tests {
     use super::Server;
     use crate::router::Router;
+    use crate::upload_config::UploadConfig;
 
     #[tokio::test]
     async fn bind_fails_for_an_invalid_address() {
         let server = Server::new(Router::empty());
 
-        assert!(server.bind("this is not an address").await.is_err());
+        assert!(
+            server
+                .bind("this is not an address", UploadConfig::Disabled)
+                .await
+                .is_err()
+        );
     }
 }

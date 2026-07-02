@@ -17,18 +17,32 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
     let registrations = servers.iter().map(|server| {
         let function_name = server.function_name();
         let address_argument = server.address_argument();
+        let uploads_argument = server.uploads_argument();
+        let upload_dir_argument = server.upload_dir_argument();
         let address_variable = format_ident!("address_{}", server.name());
+        let upload_config_variable = format_ident!("upload_config_{}", server.name());
 
         quote! {
             let #address_variable = matches
                 .get_one::<String>(#address_argument)
                 .expect("a required console argument is present")
                 .clone();
+            let #upload_config_variable = if matches.get_flag(#uploads_argument) {
+                margaret_http::upload_config::UploadConfig::enabled(
+                    matches
+                        .get_one::<String>(#upload_dir_argument)
+                        .map(std::path::PathBuf::from)
+                        .unwrap_or_else(std::env::temp_dir),
+                )
+            } else {
+                margaret_http::upload_config::UploadConfig::Disabled
+            };
 
             manager.register_service(
                 margaret_service::server_service::ServerService::new(
                     super::http::#function_name(container).await,
                     #address_variable,
+                    #upload_config_variable,
                 ),
             );
         }

@@ -11,26 +11,6 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn text(status: u16, body: impl Into<String>) -> Self {
-        Self {
-            body: body.into(),
-            headers: Vec::new(),
-            status,
-        }
-    }
-
-    pub fn html(status: u16, body: impl Into<String>) -> Self {
-        Self::text(status, body).header("content-type", "text/html; charset=utf-8")
-    }
-
-    pub fn see_other(location: impl Into<String>) -> Self {
-        Self::text(303, "").header("location", location)
-    }
-
-    pub fn not_found() -> Self {
-        Self::text(404, "Not Found")
-    }
-
     pub fn forbidden() -> Self {
         Self::text(403, "Forbidden")
     }
@@ -44,8 +24,28 @@ impl Response {
         self
     }
 
+    pub fn html(status: u16, body: impl Into<String>) -> Self {
+        Self::text(status, body).header("content-type", "text/html; charset=utf-8")
+    }
+
+    pub fn not_found() -> Self {
+        Self::text(404, "Not Found")
+    }
+
+    pub fn see_other(location: impl Into<String>) -> Self {
+        Self::text(303, "").header("location", location)
+    }
+
     pub fn set_cookie(self, cookie: Cookie<'static>) -> Self {
         self.header("set-cookie", cookie.to_string())
+    }
+
+    pub fn text(status: u16, body: impl Into<String>) -> Self {
+        Self {
+            body: body.into(),
+            headers: Vec::new(),
+            status,
+        }
     }
 
     pub(crate) fn into_http(self) -> http::Response<Full<Bytes>> {

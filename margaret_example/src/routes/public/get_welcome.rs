@@ -1,11 +1,11 @@
-use margaret_example_macros::traced;
 use margaret_http::forward::Forward;
+use margaret_macros::middleware;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
 #[singleton]
-#[traced]
+#[middleware(logged)]
 #[responds_to_http(method = Get, path = "/welcome", server = "public")]
 pub struct GetWelcome;
 

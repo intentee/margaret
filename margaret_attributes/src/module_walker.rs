@@ -161,6 +161,33 @@ impl ModuleWalker {
         items
     }
 
+    fn record(
+        &mut self,
+        recordable: &Recordable,
+        module_path: &[String],
+    ) -> Result<(), AttributeError> {
+        let mut segments = module_path.to_vec();
+        segments.push(recordable.identifier.to_string());
+
+        let canonical_path = CanonicalPath::new(segments);
+
+        if self.seen_paths.contains(&canonical_path) {
+            return Err(AttributeError::DuplicateCanonicalPath {
+                path: canonical_path.to_string(),
+            });
+        }
+
+        self.seen_paths.insert(canonical_path.clone());
+        self.items.push(IndexedItem::new(
+            recordable.kind,
+            recordable.identifier.to_string(),
+            canonical_path,
+            recordable.attributes.to_vec(),
+        ));
+
+        Ok(())
+    }
+
     fn walk_file(
         &mut self,
         file_path: &Path,
@@ -189,18 +216,44 @@ impl ModuleWalker {
         self.walk_items(&parsed.items, module_path, file_path, directory)
     }
 
-    fn walk_items(
-        &mut self,
-        items: &[Item],
-        module_path: &[String],
-        file_path: &Path,
-        directory: &Path,
-    ) -> Result<(), AttributeError> {
-        for item in items {
-            self.walk_item(item, module_path, file_path, directory)?;
+    fn walk_impl(&mut self, item_impl: &ItemImpl, module_path: &[String]) {
+        let Some(self_identifier) = self_type_identifier(&item_impl.self_ty) else {
+            return;
+        };
+
+        let mut segments = module_path.to_vec();
+        segments.push(self_identifier.to_string());
+
+        let self_type_path = CanonicalPath::new(segments);
+
+        if item_impl.trait_.is_some() {
+            for impl_item in &item_impl.items {
+                if let ImplItem::Type(associated_type) = impl_item {
+                    self.pending_members.push(PendingMember {
+                        kind: PendingMemberKind::AssociatedType(IndexedAssociatedType::new(
+                            associated_type.ident.to_string(),
+                            associated_type.ty.clone(),
+                        )),
+                        self_type_path: self_type_path.clone(),
+                    });
+                }
+            }
+
+            return;
         }
 
-        Ok(())
+        for impl_item in &item_impl.items {
+            if let ImplItem::Fn(method) = impl_item {
+                self.pending_members.push(PendingMember {
+                    kind: PendingMemberKind::Method(IndexedMethod::new(
+                        method.sig.ident.to_string(),
+                        method.attrs.clone(),
+                        method.sig.clone(),
+                    )),
+                    self_type_path: self_type_path.clone(),
+                });
+            }
+        }
     }
 
     fn walk_item(
@@ -259,71 +312,18 @@ impl ModuleWalker {
         }
     }
 
-    fn record(
+    fn walk_items(
         &mut self,
-        recordable: &Recordable,
+        items: &[Item],
         module_path: &[String],
+        file_path: &Path,
+        directory: &Path,
     ) -> Result<(), AttributeError> {
-        let mut segments = module_path.to_vec();
-        segments.push(recordable.identifier.to_string());
-
-        let canonical_path = CanonicalPath::new(segments);
-
-        if self.seen_paths.contains(&canonical_path) {
-            return Err(AttributeError::DuplicateCanonicalPath {
-                path: canonical_path.to_string(),
-            });
+        for item in items {
+            self.walk_item(item, module_path, file_path, directory)?;
         }
-
-        self.seen_paths.insert(canonical_path.clone());
-        self.items.push(IndexedItem::new(
-            recordable.kind,
-            recordable.identifier.to_string(),
-            canonical_path,
-            recordable.attributes.to_vec(),
-        ));
 
         Ok(())
-    }
-
-    fn walk_impl(&mut self, item_impl: &ItemImpl, module_path: &[String]) {
-        let Some(self_identifier) = self_type_identifier(&item_impl.self_ty) else {
-            return;
-        };
-
-        let mut segments = module_path.to_vec();
-        segments.push(self_identifier.to_string());
-
-        let self_type_path = CanonicalPath::new(segments);
-
-        if item_impl.trait_.is_some() {
-            for impl_item in &item_impl.items {
-                if let ImplItem::Type(associated_type) = impl_item {
-                    self.pending_members.push(PendingMember {
-                        kind: PendingMemberKind::AssociatedType(IndexedAssociatedType::new(
-                            associated_type.ident.to_string(),
-                            associated_type.ty.clone(),
-                        )),
-                        self_type_path: self_type_path.clone(),
-                    });
-                }
-            }
-
-            return;
-        }
-
-        for impl_item in &item_impl.items {
-            if let ImplItem::Fn(method) = impl_item {
-                self.pending_members.push(PendingMember {
-                    kind: PendingMemberKind::Method(IndexedMethod::new(
-                        method.sig.ident.to_string(),
-                        method.attrs.clone(),
-                        method.sig.clone(),
-                    )),
-                    self_type_path: self_type_path.clone(),
-                });
-            }
-        }
     }
 
     fn walk_module(

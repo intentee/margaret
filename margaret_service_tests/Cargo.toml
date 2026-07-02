@@ -15,7 +15,6 @@ margaret_http = { path = "../margaret_http" }
 margaret_service = { path = "../margaret_service" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 tokio-util = { workspace = true }
-trzcina = { workspace = true }
 
 [[test]]
 name = "main"

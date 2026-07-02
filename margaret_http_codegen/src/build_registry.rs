@@ -13,14 +13,13 @@ fn associated_model(
     item: &IndexedItem,
     associated_type_name: &str,
     struct_resolution: &ResolutionIndex,
-    referencing_root: &str,
 ) -> Option<CanonicalPath> {
     let associated_type = item
         .associated_types()
         .iter()
         .find(|associated_type| associated_type.name() == associated_type_name)?;
 
-    resolve_struct(associated_type.ty(), struct_resolution, referencing_root)
+    resolve_struct(associated_type.ty(), struct_resolution)
 }
 
 pub(crate) fn build_registry(
@@ -44,17 +43,8 @@ pub(crate) fn build_registry(
         }
 
         let provider = item.canonical_path().clone();
-        let referencing_root = provider
-            .segments()
-            .first()
-            .expect("a canonical path has at least one segment");
-        let model = associated_model(
-            item,
-            associated_type_name,
-            struct_resolution,
-            referencing_root,
-        )
-        .ok_or_else(|| missing(provider.to_string()))?;
+        let model = associated_model(item, associated_type_name, struct_resolution)
+            .ok_or_else(|| missing(provider.to_string()))?;
 
         if let Some(existing) = registry.get(&model) {
             return Err(ambiguous(

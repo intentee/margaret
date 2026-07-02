@@ -13,8 +13,13 @@ impl GetArticle {
     #[responder]
     pub async fn respond(
         &self,
-        #[route_parameter(from = "article")] Article { title, body, .. }: Article,
+        #[route_parameter(from = "article")] Article {
+            title,
+            body,
+            created_at,
+            ..
+        }: Article,
     ) -> Response {
-        Response::text(200, format!("\"{title}\": {body}"))
+        Response::text(200, format!("\"{title}\" (posted at {created_at}): {body}"))
     }
 }

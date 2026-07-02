@@ -1,13 +1,10 @@
 use std::collections::HashMap;
 
-use proc_macro2::TokenStream;
 use quote::format_ident;
-use quote::quote;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_attributes::matched_attribute::MatchedAttribute;
 
 use crate::build_registry::build_registry;
 use crate::http_codegen_error::HttpCodegenError;
@@ -15,22 +12,11 @@ use crate::http_responder_arguments::HttpResponderArguments;
 use crate::http_route::HttpRoute;
 use crate::interceptor_bindings::interceptor_bindings;
 use crate::layer_application::LayerApplication;
-use crate::marker_arguments::MarkerArguments;
 use crate::middleware_binding::MiddlewareBinding;
 use crate::path_parameter_names::path_parameter_names;
 use crate::registries::Registries;
 use crate::responder_method::responder_method;
 use crate::responder_signature::ResponderSignature;
-
-fn marker_value(
-    marker: &MatchedAttribute,
-    responder: &str,
-) -> Result<TokenStream, HttpCodegenError> {
-    let MarkerArguments { value } =
-        MarkerArguments::parse(&marker.args()?, marker.path(), responder)?;
-
-    Ok(value.map_or_else(|| quote! { () }, |value| quote! { #value }))
-}
 
 pub(crate) fn http_routes(
     index: &AttributeIndex,
@@ -78,18 +64,34 @@ pub(crate) fn http_routes(
             server,
         } = HttpResponderArguments::parse(&matched.args()?, &responder)?;
 
+        let middleware_selector = AttributeSelector::parse("middleware").expect("a valid selector");
         let mut layers = Vec::new();
 
-        for matched in AttributeQuery::new(item).matched_attributes() {
-            if let Some(binding) = bindings
-                .iter()
-                .find(|binding| matched.matches(&binding.selector))
-            {
-                layers.push(LayerApplication {
-                    marker_value: marker_value(&matched, &responder)?,
-                    middleware_field: binding.field.clone(),
+        for matched in AttributeQuery::new(item).find_all(&middleware_selector) {
+            let arguments = matched.args()?;
+            let (Some(tag), None) = (arguments.positional_path(0), arguments.positional(1)) else {
+                return Err(HttpCodegenError::MalformedMiddleware {
+                    responder: responder.clone(),
                 });
-            }
+            };
+            let Some(binding) = bindings
+                .iter()
+                .find(|binding| binding.selector.matches(tag))
+            else {
+                return Err(HttpCodegenError::UnknownMiddleware {
+                    responder: responder.clone(),
+                    tag: tag
+                        .segments
+                        .last()
+                        .expect("a path has at least one segment")
+                        .ident
+                        .to_string(),
+                });
+            };
+
+            layers.push(LayerApplication {
+                middleware_field: binding.field.clone(),
+            });
         }
 
         layers.reverse();

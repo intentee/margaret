@@ -25,17 +25,11 @@ pub(crate) fn interceptor_bindings(
         }
 
         let interceptor = item.canonical_path().clone();
-        let referencing_root = interceptor
-            .segments()
-            .first()
-            .expect("a canonical path has at least one segment");
         let intercepted = item
             .associated_types()
             .iter()
             .find(|associated_type| associated_type.name() == "Intercepted")
-            .and_then(|associated_type| {
-                resolve_trait(associated_type.ty(), trait_resolution, referencing_root)
-            })
+            .and_then(|associated_type| resolve_trait(associated_type.ty(), trait_resolution))
             .ok_or_else(|| HttpCodegenError::MissingInterceptedType {
                 interceptor: interceptor.to_string(),
             })?;

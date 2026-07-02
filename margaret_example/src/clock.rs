@@ -1,3 +1,3 @@
 pub trait Clock: Send + Sync {
-    fn revision(&self) -> String;
+    fn now(&self) -> u64;
 }

@@ -38,13 +38,13 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let respond_call = quote! { responder.respond(#(#arguments),*).await };
     let body_tail = match &route.responder_output {
         ResponderOutput::Plain => quote! {
-            margaret_http::responded::Responded::from(#respond_call)
+            margaret_http::response_continuation::ResponseContinuation::from(#respond_call)
         },
         ResponderOutput::Intercepted { interceptor } => {
             let interceptor_field = format_ident!("{}", interceptor.field_name());
 
             quote! {
-                margaret_http::responded::Responded::Intercept(Box::new(
+                margaret_http::response_continuation::ResponseContinuation::Intercept(Box::new(
                     margaret_http::interception::Interception::new(#interceptor_field, #respond_call),
                 ))
             }
@@ -56,14 +56,27 @@ fn onion(route: &HttpRoute) -> TokenStream {
     };
 
     let captures = capture_fields(route);
+    let outcome_future = quote! {
+        std::pin::Pin<
+            std::boxed::Box<
+                dyn std::future::Future<
+                    Output = margaret_http::response_continuation::ResponseContinuation,
+                > + Send
+                + '_,
+            >,
+        >
+    };
 
     let mut handler = if captures.is_empty() {
         quote! {
             margaret_http::responder_handler::responder_handler(
                 #responder_access,
                 |responder: std::sync::Arc<#responder_type>,
-                 #request_binding: margaret_http::request::Request| async move {
-                    #body
+                 #request_binding: &margaret_http::request::Request|
+                 -> #outcome_future {
+                    std::boxed::Box::pin(async move {
+                        #body
+                    })
                 },
             )
         }
@@ -83,11 +96,12 @@ fn onion(route: &HttpRoute) -> TokenStream {
                 margaret_http::responder_handler::responder_handler(
                     #responder_access,
                     move |responder: std::sync::Arc<#responder_type>,
-                          #request_binding: margaret_http::request::Request| {
+                          #request_binding: &margaret_http::request::Request|
+                          -> #outcome_future {
                         #(#capture_clones)*
-                        async move {
+                        std::boxed::Box::pin(async move {
                             #body
-                        }
+                        })
                     },
                 )
             }
@@ -96,11 +110,10 @@ fn onion(route: &HttpRoute) -> TokenStream {
 
     for application in &route.layers {
         let middleware = &application.middleware_field;
-        let marker = &application.marker_value;
         let middleware_access = access(quote! { container.#middleware() });
 
         handler = quote! {
-            margaret_http::layer::layer(#middleware_access, #marker, #handler)
+            margaret_http::layer::layer(#middleware_access, #handler)
         };
     }
 
@@ -118,9 +131,15 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
                 let #holder = #request.path_param(#path_key).expect(#message).to_string();
             }
         }
-        RouteParameterBinding::CurrentRequest => quote! {
-            let #holder = &#request;
-        },
+        RouteParameterBinding::CurrentRequest => {
+            if holder == request {
+                TokenStream::new()
+            } else {
+                quote! {
+                    let #holder = #request;
+                }
+            }
+        }
         RouteParameterBinding::Bound { binder, path_key } => {
             let binder_field = format_ident!("{}", binder.field_name());
             let message = format!("the route guarantees the '{path_key}' path parameter");

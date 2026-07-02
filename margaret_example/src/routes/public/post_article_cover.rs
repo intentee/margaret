@@ -1,0 +1,34 @@
+use margaret_http::request::Request;
+use margaret_http::response::Response;
+use margaret_macros::responder;
+use margaret_macros::responds_to_http;
+use margaret_macros::singleton;
+
+use crate::models::article::Article;
+
+#[singleton]
+#[responds_to_http(method = Post, path = "/articles/{article}/cover", server = "public")]
+pub struct PostArticleCover;
+
+impl PostArticleCover {
+    #[responder]
+    pub async fn respond(
+        &self,
+        request: &Request,
+        #[route_parameter(from = "article")] Article { title, .. }: Article,
+    ) -> Response {
+        let Some(cover) = request.file("cover") else {
+            return Response::text(422, "a \"cover\" file upload is required");
+        };
+
+        Response::text(
+            201,
+            format!(
+                "stored {} byte {} cover for \"{title}\" from {}",
+                cover.size(),
+                cover.content_type(),
+                request.server().remote_addr(),
+            ),
+        )
+    }
+}

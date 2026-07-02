@@ -1,13 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-
 use crate::handler::Handler;
 use crate::method::Method;
 use crate::request::Request;
 use crate::respond_recursively::respond_recursively;
-use crate::responded::Responded;
 use crate::response::Response;
 
 pub struct Router {
@@ -47,6 +44,29 @@ impl Router {
         self
     }
 
+    pub async fn respond(&self, request: Request) -> Response {
+        let path = request.server().path().to_string();
+        let method = request.server().method();
+
+        let matched = match self.matcher.at(&path) {
+            Ok(matched) => matched,
+            Err(matchit::MatchError::NotFound) => return Response::not_found(),
+        };
+
+        let Some(handler) = self.routes[*matched.value].get(&method).cloned() else {
+            return Response::text(405, "Method Not Allowed");
+        };
+
+        let path_params = matched
+            .params
+            .iter()
+            .map(|(name, value)| (name.to_string(), value.to_string()))
+            .collect();
+        let request = request.with_path_params(path_params);
+
+        respond_recursively(&self.by_name, request, handler).await
+    }
+
     fn register(
         &mut self,
         method: Method,
@@ -74,35 +94,6 @@ impl Router {
     }
 }
 
-#[async_trait]
-impl Handler for Router {
-    async fn handle(&self, mut request: Request) -> Responded {
-        let path = request.path().to_string();
-
-        let handler = match self.matcher.at(&path) {
-            Ok(matched) => match self.routes[*matched.value].get(&request.method()).cloned() {
-                Some(handler) => {
-                    let path_params = matched
-                        .params
-                        .iter()
-                        .map(|(name, value)| (name.to_string(), value.to_string()))
-                        .collect();
-
-                    request.set_path_params(path_params);
-
-                    handler
-                }
-                None => return Responded::Done(Response::text(405, "Method Not Allowed")),
-            },
-            Err(matchit::MatchError::NotFound) => {
-                return Responded::Done(Response::not_found());
-            }
-        };
-
-        Responded::Done(respond_recursively(&self.by_name, request, handler).await)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -114,15 +105,15 @@ mod tests {
     use crate::handler::Handler;
     use crate::method::Method;
     use crate::request::Request;
-    use crate::responded::Responded;
     use crate::response::Response;
+    use crate::response_continuation::ResponseContinuation;
 
     struct EchoId;
 
     #[async_trait]
     impl Handler for EchoId {
-        async fn handle(&self, request: Request) -> Responded {
-            Responded::Done(Response::text(
+        async fn handle(&self, request: &Request) -> ResponseContinuation {
+            ResponseContinuation::Done(Response::text(
                 200,
                 request
                     .path_param("id")
@@ -141,7 +132,7 @@ mod tests {
 
     async fn status_of(method: Method, path: &str) -> u16 {
         router()
-            .handle(Request::new(method, path.to_string()))
+            .respond(Request::new(method, path.to_string()))
             .await
             .into_http()
             .status()
@@ -172,8 +163,8 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardsToPublicGreeting {
-        async fn handle(&self, _request: Request) -> Responded {
-            Responded::from(Forward::to(
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::from(Forward::to(
                 "crate::routes::public::get_greeting::GetGreeting",
             ))
         }
@@ -183,14 +174,14 @@ mod tests {
 
     #[async_trait]
     impl Handler for PlainOk {
-        async fn handle(&self, _request: Request) -> Responded {
-            Responded::Done(Response::text(200, "ok"))
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::Done(Response::text(200, "ok"))
         }
     }
 
     async fn handle_status(router: &Router, method: Method, path: &str) -> u16 {
         router
-            .handle(Request::new(method, path.to_string()))
+            .respond(Request::new(method, path.to_string()))
             .await
             .into_http()
             .status()

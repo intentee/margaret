@@ -28,7 +28,7 @@ fn indexes_associated_types() {
     assert_eq!(names, ["Extra", "Output"]);
 
     let resolution = index.struct_resolution();
-    let resolved = |written: syn::Path| match resolution.resolve(&written, "associated_types") {
+    let resolved = |written: syn::Path| match resolution.resolve(&written) {
         Resolution::Resolved(path) => path.to_string(),
         Resolution::NotFound => "<not found>".to_string(),
         Resolution::Ambiguous(_) => "<ambiguous>".to_string(),

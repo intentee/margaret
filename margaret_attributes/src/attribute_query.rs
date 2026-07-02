@@ -12,6 +12,22 @@ impl<'index> AttributeQuery<'index> {
         Self { item }
     }
 
+    pub fn find(
+        &self,
+        selector: &AttributeSelector,
+    ) -> Result<Option<MatchedAttribute<'index>>, AttributeError> {
+        let mut matches = self.find_all(selector);
+
+        if matches.len() > 1 {
+            return Err(AttributeError::RepeatedAttribute {
+                attribute_path: selector.display_path(),
+                target: self.item.canonical_path().to_string(),
+            });
+        }
+
+        Ok(matches.pop())
+    }
+
     pub fn find_all(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'index>> {
         let mut matches = Vec::new();
 
@@ -30,22 +46,6 @@ impl<'index> AttributeQuery<'index> {
             .iter()
             .map(|attribute| MatchedAttribute::new(self.item, attribute))
             .collect()
-    }
-
-    pub fn find(
-        &self,
-        selector: &AttributeSelector,
-    ) -> Result<Option<MatchedAttribute<'index>>, AttributeError> {
-        let mut matches = self.find_all(selector);
-
-        if matches.len() > 1 {
-            return Err(AttributeError::RepeatedAttribute {
-                attribute_path: selector.display_path(),
-                target: self.item.canonical_path().to_string(),
-            });
-        }
-
-        Ok(matches.pop())
     }
 }
 

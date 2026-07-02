@@ -27,10 +27,9 @@ Specific attribute rules:
     * `<path>` must be `matchit`-compatible string 
     * `<server>`  must be a string with a server name
 - `#[provides_route_parameter]` - attached to a struct implementing `HttpRouteParameterBinder` with a specific type
-- `#[route_parameter(from = <from>, intent = <intent>)]` 
+- `#[route_parameter(from = <from>)]` 
     * used as a part of `#[responder]` method
     * `<from>` must be the name of a route parameter that is mapped into the argument (must result in compile time error if there is no such parameter)
-    * `<intent>` must directly and explicitly map to `CrudAction` enum
 
 # `margaret_http` data flow
 
@@ -51,6 +50,10 @@ Specific attribute rules:
 - request object must not be mutable in any way
 - all the request fields that are keyed (equivalents to $_POST, $_GET, $_COOKIE, $_SERVER, $_FILES, path params etc), must be accessible with O(1) complexity
 - make sure there are no aliases; specific information needs to be reachable in exactly one way (for example if $_SERVER has 'remote_addr' do not expose the same field again in Request)
+
+# `margaret_http` middleware
+
+- middleware handlers must unconditionally have a signature of `process(request, next)`, where `request` is the current request, and `next` invokes the next handler; they need to return ResponseContinuation
 
 # `margaret_http` lifecycle algorithm
 

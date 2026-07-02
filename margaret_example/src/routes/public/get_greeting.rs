@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use margaret_example_macros::traced;
 use margaret_http::response::Response;
 use margaret_macros::constructor;
+use margaret_macros::middleware;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
@@ -10,7 +10,7 @@ use margaret_macros::singleton;
 use crate::greeter::Greeter;
 
 #[singleton]
-#[traced]
+#[middleware(logged)]
 #[responds_to_http(
     method = Get,
     name = "get_greeting",

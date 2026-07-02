@@ -9,6 +9,10 @@ pub struct AttributeSelector {
 }
 
 impl AttributeSelector {
+    pub fn from_path(path: Path) -> Self {
+        Self { path }
+    }
+
     pub fn parse(input: &str) -> Result<Self, AttributeError> {
         match syn::parse_str::<Path>(input) {
             Ok(path) => Ok(Self { path }),
@@ -17,10 +21,6 @@ impl AttributeSelector {
                 source,
             }),
         }
-    }
-
-    pub fn from_path(path: Path) -> Self {
-        Self { path }
     }
 
     pub fn matches(&self, attribute_path: &Path) -> bool {

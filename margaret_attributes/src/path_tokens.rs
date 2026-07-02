@@ -42,8 +42,8 @@ mod tests {
     #[test]
     fn renders_a_foreign_crate_root_as_its_crate_name() {
         assert_eq!(
-            rendered(&["margaret_example_plugin", "metrics", "Metrics"]),
-            "margaret_example_plugin :: metrics :: Metrics"
+            rendered(&["margaret_http", "response", "Response"]),
+            "margaret_http :: response :: Response"
         );
     }
 

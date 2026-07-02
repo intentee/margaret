@@ -15,6 +15,9 @@
 - the attributes must be read only once during the entire application lifecycle, then reused from memory through attribute selector
 - never create aliases, make sure that a specific information is only achievable in a single way (and code is never duplicated)
 - there must always be exactly as single correct, single available way to do any specific thing
+- never add syntax sugar of any kind; optimize the base architecture instead
+- the codebase must never panic (panics are only allowed in the tests)
+- generated code must never panic
 
 ## Dependency Injection Container
 

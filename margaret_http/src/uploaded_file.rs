@@ -1,0 +1,49 @@
+use std::path::Path;
+
+use tempfile::TempPath;
+
+pub struct UploadedFile {
+    content_type: String,
+    field_name: String,
+    file_name: String,
+    path: TempPath,
+    size: u64,
+}
+
+impl UploadedFile {
+    pub(crate) fn new(
+        field_name: String,
+        file_name: String,
+        content_type: String,
+        size: u64,
+        path: TempPath,
+    ) -> Self {
+        Self {
+            content_type,
+            field_name,
+            file_name,
+            path,
+            size,
+        }
+    }
+
+    pub fn content_type(&self) -> &str {
+        &self.content_type
+    }
+
+    pub fn field_name(&self) -> &str {
+        &self.field_name
+    }
+
+    pub fn file_name(&self) -> &str {
+        &self.file_name
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+}

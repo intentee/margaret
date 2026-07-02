@@ -32,14 +32,15 @@ impl PatchArticle {
             author_id,
             body: current_body,
             published,
+            created_at,
         }: Article,
     ) -> Response {
         let title = match request.form("title") {
-            Some(title) => title,
+            Some(title) => title.to_string(),
             None => current_title,
         };
         let body = match request.form("body") {
-            Some(body) => body,
+            Some(body) => body.to_string(),
             None => current_body,
         };
 
@@ -49,6 +50,7 @@ impl PatchArticle {
             author_id,
             body,
             published,
+            created_at,
         });
 
         Response::text(200, format!("updated \"{title}\""))

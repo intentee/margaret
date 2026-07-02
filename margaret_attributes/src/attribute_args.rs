@@ -84,6 +84,17 @@ impl AttributeArgs {
         }
     }
 
+    pub fn boolean(&self, key: &str) -> Result<Option<bool>, AttributeError> {
+        match self.named(key) {
+            None => Ok(None),
+            Some(Expr::Lit(expression)) => match &expression.lit {
+                Lit::Bool(literal) => Ok(Some(literal.value)),
+                _ => Err(self.unexpected_argument(key, "boolean literal")),
+            },
+            Some(_) => Err(self.unexpected_argument(key, "boolean literal")),
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.named.is_empty() && self.positional.is_empty()
     }
@@ -93,6 +104,14 @@ impl AttributeArgs {
             .iter()
             .find(|argument| argument.name == key)
             .map(|argument| &argument.value)
+    }
+
+    pub fn path(&self, key: &str) -> Result<Option<Path>, AttributeError> {
+        match self.named(key) {
+            None => Ok(None),
+            Some(Expr::Path(expression)) => Ok(Some(expression.path.clone())),
+            Some(_) => Err(self.unexpected_argument(key, "path")),
+        }
     }
 
     pub fn positional(&self, index: usize) -> Option<&Expr> {
@@ -114,25 +133,6 @@ impl AttributeArgs {
                 _ => Err(self.unexpected_argument(key, "string literal")),
             },
             Some(_) => Err(self.unexpected_argument(key, "string literal")),
-        }
-    }
-
-    pub fn path(&self, key: &str) -> Result<Option<Path>, AttributeError> {
-        match self.named(key) {
-            None => Ok(None),
-            Some(Expr::Path(expression)) => Ok(Some(expression.path.clone())),
-            Some(_) => Err(self.unexpected_argument(key, "path")),
-        }
-    }
-
-    pub fn boolean(&self, key: &str) -> Result<Option<bool>, AttributeError> {
-        match self.named(key) {
-            None => Ok(None),
-            Some(Expr::Lit(expression)) => match &expression.lit {
-                Lit::Bool(literal) => Ok(Some(literal.value)),
-                _ => Err(self.unexpected_argument(key, "boolean literal")),
-            },
-            Some(_) => Err(self.unexpected_argument(key, "boolean literal")),
         }
     }
 

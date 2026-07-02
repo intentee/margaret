@@ -22,6 +22,23 @@ struct Visitor<'graph> {
 }
 
 impl Visitor<'_> {
+    fn cycle(&self, index: usize) -> ContainerError {
+        let start = self
+            .stack
+            .iter()
+            .position(|&node| node == index)
+            .expect("an in-progress node is on the stack");
+        let mut path: Vec<String> = self.stack[start..]
+            .iter()
+            .map(|&node| self.providers[node].provided.key().to_string())
+            .collect();
+        path.push(self.providers[index].provided.key().to_string());
+
+        ContainerError::DependencyCycle {
+            path: path.join(" -> "),
+        }
+    }
+
     fn visit(&mut self, index: usize) -> Result<(), ContainerError> {
         match self.state[index] {
             Mark::Done => return Ok(()),
@@ -42,23 +59,6 @@ impl Visitor<'_> {
         self.order.push(index);
 
         Ok(())
-    }
-
-    fn cycle(&self, index: usize) -> ContainerError {
-        let start = self
-            .stack
-            .iter()
-            .position(|&node| node == index)
-            .expect("an in-progress node is on the stack");
-        let mut path: Vec<String> = self.stack[start..]
-            .iter()
-            .map(|&node| self.providers[node].provided.key().to_string())
-            .collect();
-        path.push(self.providers[index].provided.key().to_string());
-
-        ContainerError::DependencyCycle {
-            path: path.join(" -> "),
-        }
     }
 }
 

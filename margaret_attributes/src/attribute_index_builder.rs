@@ -10,10 +10,6 @@ pub struct AttributeIndexBuilder {
 }
 
 impl AttributeIndexBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn index_crate(mut self, crate_root: &CrateRoot) -> Result<Self, AttributeError> {
         self.items.extend(ModuleWalker::walk_crate(
             &crate_root.name,
@@ -21,6 +17,10 @@ impl AttributeIndexBuilder {
         )?);
 
         Ok(self)
+    }
+
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn build(self) -> AttributeIndex {

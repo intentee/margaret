@@ -40,11 +40,7 @@ fn peel_trait_object(declared: &Type) -> Option<&TypeTraitObject> {
     }
 }
 
-pub fn resolve_trait(
-    declared: &Type,
-    resolution: &ResolutionIndex,
-    referencing_root: &str,
-) -> Option<CanonicalPath> {
+pub fn resolve_trait(declared: &Type, resolution: &ResolutionIndex) -> Option<CanonicalPath> {
     let trait_object = peel_trait_object(declared)?;
     let written = trait_object
         .bounds
@@ -55,7 +51,7 @@ pub fn resolve_trait(
         })
         .expect("a trait object names at least one trait");
 
-    match resolution.resolve(written, referencing_root) {
+    match resolution.resolve(written) {
         Resolution::Resolved(resolved) => Some(resolved),
         _ => None,
     }
@@ -78,7 +74,7 @@ mod tests {
     }
 
     fn resolved(declared: Type) -> Option<String> {
-        resolve_trait(&declared, &marker_traits(), "crate").map(|path| path.to_string())
+        resolve_trait(&declared, &marker_traits()).map(|path| path.to_string())
     }
 
     #[test]

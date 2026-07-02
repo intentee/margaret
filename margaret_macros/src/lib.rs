@@ -50,6 +50,11 @@ pub fn handles_middleware_attribute(_attributes: TokenStream, item: TokenStream)
 }
 
 #[proc_macro_attribute]
+pub fn middleware(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
 pub fn console_command(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }

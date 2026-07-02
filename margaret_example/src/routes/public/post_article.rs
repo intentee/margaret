@@ -31,7 +31,9 @@ impl PostArticle {
             return Response::text(422, "title, body, and author_id are required");
         };
 
-        let article = self.articles.insert(title, body, author_id);
+        let article =
+            self.articles
+                .insert(title.to_string(), body.to_string(), author_id.to_string());
 
         Response::text(201, format!("created \"{}\"", article.title))
     }

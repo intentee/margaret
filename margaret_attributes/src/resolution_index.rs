@@ -6,20 +6,6 @@ use syn::Path;
 use crate::canonical_path::CanonicalPath;
 use crate::resolution::Resolution;
 
-fn normalized_segments(written: &Path, referencing_root: &str) -> Vec<String> {
-    let mut segments: Vec<String> = written
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-
-    if segments.first().map(String::as_str) == Some("crate") {
-        segments[0] = referencing_root.to_string();
-    }
-
-    segments
-}
-
 fn segments_match(written: &[String], candidate: &[String], absolute: bool) -> bool {
     if absolute {
         written == candidate
@@ -62,8 +48,12 @@ impl ResolutionIndex {
         }
     }
 
-    pub fn resolve(&self, written: &Path, referencing_root: &str) -> Resolution {
-        let written_segments = normalized_segments(written, referencing_root);
+    pub fn resolve(&self, written: &Path) -> Resolution {
+        let written_segments: Vec<String> = written
+            .segments
+            .iter()
+            .map(|segment| segment.ident.to_string())
+            .collect();
         let leaf = written_segments
             .last()
             .expect("a written path has at least one segment");
@@ -105,10 +95,10 @@ mod tests {
         CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
     }
 
-    fn outcome(written: Path, candidates: &[CanonicalPath], referencing_root: &str) -> String {
+    fn outcome(written: Path, candidates: &[CanonicalPath]) -> String {
         let index = ResolutionIndex::new(candidates.iter().cloned());
 
-        match index.resolve(&written, referencing_root) {
+        match index.resolve(&written) {
             Resolution::Resolved(path) => path.to_string(),
             Resolution::NotFound => "<not found>".to_string(),
             Resolution::Ambiguous(_) => "<ambiguous>".to_string(),
@@ -120,10 +110,9 @@ mod tests {
         assert_eq!(
             outcome(
                 parse_quote!(Config),
-                &[candidate(&["app", "config", "Config"])],
-                "app",
+                &[candidate(&["crate", "config", "Config"])],
             ),
-            "app::config::Config"
+            "crate::config::Config"
         );
     }
 
@@ -132,8 +121,7 @@ mod tests {
         assert_eq!(
             outcome(
                 parse_quote!(Logger),
-                &[candidate(&["app", "config", "Config"])],
-                "app",
+                &[candidate(&["crate", "config", "Config"])],
             ),
             "<not found>"
         );
@@ -144,22 +132,20 @@ mod tests {
         assert_eq!(
             outcome(
                 parse_quote!(deep::config::Config),
-                &[candidate(&["app", "Config"])],
-                "app",
+                &[candidate(&["crate", "Config"])],
             ),
             "<not found>"
         );
     }
 
     #[test]
-    fn a_crate_anchored_path_matches_the_referencing_crate_in_full() {
+    fn a_crate_anchored_path_matches_the_host_crate_in_full() {
         assert_eq!(
             outcome(
                 parse_quote!(crate::config::Config),
-                &[candidate(&["app", "config", "Config"])],
-                "app",
+                &[candidate(&["crate", "config", "Config"])],
             ),
-            "app::config::Config"
+            "crate::config::Config"
         );
     }
 
@@ -168,55 +154,23 @@ mod tests {
         assert_eq!(
             outcome(
                 parse_quote!(crate::Config),
-                &[candidate(&["app", "config", "Config"])],
-                "app",
+                &[candidate(&["crate", "config", "Config"])],
             ),
             "<not found>"
         );
     }
 
     #[test]
-    fn a_foreign_crate_path_resolves_across_crates() {
-        assert_eq!(
-            outcome(
-                parse_quote!(margaret_http::Response),
-                &[
-                    candidate(&["margaret_http", "Response"]),
-                    candidate(&["crate", "Response"]),
-                ],
-                "crate",
-            ),
-            "margaret_http::Response"
-        );
-    }
-
-    #[test]
-    fn a_bare_suffix_shared_across_crates_is_ambiguous() {
+    fn a_bare_suffix_matching_multiple_modules_is_ambiguous() {
         assert_eq!(
             outcome(
                 parse_quote!(Config),
                 &[
-                    candidate(&["crate", "Config"]),
-                    candidate(&["margaret_plugin", "Config"]),
+                    candidate(&["crate", "routes", "Config"]),
+                    candidate(&["crate", "endpoints", "Config"]),
                 ],
-                "crate",
             ),
             "<ambiguous>"
-        );
-    }
-
-    #[test]
-    fn a_leading_crate_resolves_relative_to_the_referencing_crate() {
-        assert_eq!(
-            outcome(
-                parse_quote!(crate::Config),
-                &[
-                    candidate(&["crate", "Config"]),
-                    candidate(&["margaret_plugin", "Config"]),
-                ],
-                "margaret_plugin",
-            ),
-            "margaret_plugin::Config"
         );
     }
 }

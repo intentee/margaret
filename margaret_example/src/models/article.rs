@@ -5,4 +5,5 @@ pub struct Article {
     pub author_id: String,
     pub body: String,
     pub published: bool,
+    pub created_at: u64,
 }

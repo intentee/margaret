@@ -8,11 +8,11 @@ impl AttributeLocation {
         Self { item, attribute }
     }
 
-    pub(crate) fn item(&self) -> usize {
-        self.item
-    }
-
     pub(crate) fn attribute(&self) -> usize {
         self.attribute
+    }
+
+    pub(crate) fn item(&self) -> usize {
+        self.item
     }
 }

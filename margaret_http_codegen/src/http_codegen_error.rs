@@ -29,9 +29,14 @@ pub enum HttpCodegenError {
     MissingMiddlewareHandles { middleware: String },
 
     #[error(
-        "marker '{marker}' on responder '{responder}' must carry zero or one positional argument"
+        "responder '{responder}' has a #[middleware(...)] attribute that must name exactly one middleware tag"
     )]
-    MalformedMarker { responder: String, marker: String },
+    MalformedMiddleware { responder: String },
+
+    #[error(
+        "responder '{responder}' attaches the middleware tag '{tag}', but no #[handles_middleware_attribute] handles it"
+    )]
+    UnknownMiddleware { responder: String, tag: String },
 
     #[error("responder '{responder}' has no #[responder] method")]
     MissingResponderMethod { responder: String },

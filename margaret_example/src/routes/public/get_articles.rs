@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_macros::constructor;
 use margaret_macros::responder;
@@ -21,11 +22,16 @@ impl GetArticles {
     }
 
     #[responder]
-    pub async fn respond(&self) -> Response {
+    pub async fn respond(&self, request: &Request) -> Response {
+        let author = request.query("author");
         let titles = self
             .articles
             .all()
             .into_iter()
+            .filter(|article| match author {
+                Some(author) => article.author_id.as_str() == author,
+                None => true,
+            })
             .map(|article| article.title)
             .collect::<Vec<String>>()
             .join(", ");

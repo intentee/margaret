@@ -117,7 +117,7 @@ fn resolve_interface(
     trait_resolution: &ResolutionIndex,
     concrete_path: &CanonicalPath,
 ) -> Result<ProvidedType, ContainerError> {
-    match trait_resolution.resolve(written, crate_root(concrete_path)) {
+    match trait_resolution.resolve(written) {
         Resolution::Resolved(path) => Ok(ProvidedType::Interface(path)),
         Resolution::NotFound => Err(ContainerError::ProvidesUnresolvable {
             singleton: concrete_path.to_string(),
@@ -137,7 +137,7 @@ fn resolve_collection(
     concrete_path: &CanonicalPath,
 ) -> Result<Option<CanonicalPath>, ContainerError> {
     match collection {
-        Some(written) => match trait_resolution.resolve(written, crate_root(concrete_path)) {
+        Some(written) => match trait_resolution.resolve(written) {
             Resolution::Resolved(path) => Ok(Some(path)),
             Resolution::NotFound => Err(ContainerError::CollectionUnresolvable {
                 singleton: concrete_path.to_string(),
@@ -280,7 +280,7 @@ fn resolve_reference(
     concrete_path: &CanonicalPath,
     parameter: &str,
 ) -> Result<CanonicalPath, ContainerError> {
-    match resolution.resolve(written, crate_root(concrete_path)) {
+    match resolution.resolve(written) {
         Resolution::Resolved(path) => Ok(path),
         Resolution::NotFound => Err(ContainerError::MissingProvider {
             singleton: concrete_path.to_string(),
@@ -301,12 +301,6 @@ fn parameter_name(pattern: &Pat, position: usize) -> String {
         Pat::Ident(pattern_ident) => pattern_ident.ident.to_string(),
         _ => position.to_string(),
     }
-}
-
-fn crate_root(path: &CanonicalPath) -> &str {
-    path.segments()
-        .first()
-        .expect("a canonical path has at least one segment")
 }
 
 fn singleton_selector() -> AttributeSelector {

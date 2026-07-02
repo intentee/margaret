@@ -5,10 +5,6 @@ edition = "2024"
 
 [dependencies]
 clap = { workspace = true }
-margaret_http = { path = "../margaret_http" }
-
-[dev-dependencies]
-tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }
 
 [lints]
 workspace = true

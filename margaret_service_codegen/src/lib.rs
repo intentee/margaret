@@ -129,8 +129,12 @@ mod tests {
         let source = rendered(SERVICE, &public());
 
         assert!(source.contains(r#"matches.get_one::<String>("public-addr")"#));
+        assert!(source.contains(r#"matches.get_flag("public-uploads")"#));
+        assert!(source.contains(r#"matches.get_one::<String>("public-upload-dir")"#));
+        assert!(source.contains("unwrap_or_else(std::env::temp_dir)"));
+        assert!(source.contains("margaret_http::upload_config::UploadConfig::Disabled"));
         assert!(source.contains(
-            "margaret_service::server_service::ServerService::new(super::http::server_public(container).await,address_public,)"
+            "margaret_service::server_service::ServerService::new(super::http::server_public(container).await,address_public,upload_config_public,)"
         ));
     }
 
@@ -145,12 +149,16 @@ mod tests {
         );
 
         assert!(source.contains(r#"matches.get_one::<String>("public-addr")"#));
+        assert!(source.contains(r#"matches.get_flag("public-uploads")"#));
+        assert!(source.contains(r#"matches.get_one::<String>("public-upload-dir")"#));
         assert!(source.contains(
-            "margaret_service::server_service::ServerService::new(super::http::server_public(container).await,address_public,)"
+            "margaret_service::server_service::ServerService::new(super::http::server_public(container).await,address_public,upload_config_public,)"
         ));
         assert!(source.contains(r#"matches.get_one::<String>("internal-addr")"#));
+        assert!(source.contains(r#"matches.get_flag("internal-uploads")"#));
+        assert!(source.contains(r#"matches.get_one::<String>("internal-upload-dir")"#));
         assert!(source.contains(
-            "margaret_service::server_service::ServerService::new(super::http::server_internal(container).await,address_internal,)"
+            "margaret_service::server_service::ServerService::new(super::http::server_internal(container).await,address_internal,upload_config_internal,)"
         ));
     }
 

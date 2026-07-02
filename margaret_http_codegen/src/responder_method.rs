@@ -27,7 +27,6 @@ fn classify(
     arguments: RouteParameterArguments,
     declared: &Type,
     registries: &Registries,
-    referencing_root: &str,
 ) -> Result<RouteParameterBinding, HttpCodegenError> {
     let RouteParameterArguments { from } = arguments;
 
@@ -36,12 +35,13 @@ fn classify(
     }
 
     let written = declared.to_token_stream().to_string();
-    let model = resolve_struct(declared, registries.struct_resolution, referencing_root)
-        .ok_or_else(|| HttpCodegenError::MissingHttpRouteParameterBinder {
+    let model = resolve_struct(declared, registries.struct_resolution).ok_or_else(|| {
+        HttpCodegenError::MissingHttpRouteParameterBinder {
             responder: responder.to_string(),
             parameter: from.clone(),
             written: written.clone(),
-        })?;
+        }
+    })?;
     let binder = registries.binders.get(&model).cloned().ok_or_else(|| {
         HttpCodegenError::MissingHttpRouteParameterBinder {
             responder: responder.to_string(),
@@ -81,17 +81,12 @@ fn find_responder_method(item: &IndexedItem) -> Option<&IndexedMethod> {
     item.method_matching(&AttributeSelector::parse("responder").expect("a valid selector"))
 }
 
-fn responder_output(
-    method: &IndexedMethod,
-    registries: &Registries,
-    referencing_root: &str,
-) -> ResponderOutput {
+fn responder_output(method: &IndexedMethod, registries: &Registries) -> ResponderOutput {
     let ReturnType::Type(_, declared) = &method.signature().output else {
         return ResponderOutput::Plain;
     };
 
-    let Some(intercepted) = resolve_trait(declared, registries.trait_resolution, referencing_root)
-    else {
+    let Some(intercepted) = resolve_trait(declared, registries.trait_resolution) else {
         return ResponderOutput::Plain;
     };
 
@@ -114,11 +109,6 @@ pub(crate) fn responder_method(
         })?;
     let route_parameter_selector =
         AttributeSelector::parse("route_parameter").expect("a valid selector");
-    let referencing_root = item
-        .canonical_path()
-        .segments()
-        .first()
-        .expect("a canonical path has at least one segment");
     let mut parameters = Vec::new();
 
     for (position, input) in method.signature().inputs.iter().enumerate() {
@@ -144,13 +134,7 @@ pub(crate) fn responder_method(
             let arguments = AttributeArgs::from_attribute(attribute)?;
             let route_arguments = RouteParameterArguments::parse(&arguments, responder, position)?;
 
-            classify(
-                responder,
-                route_arguments,
-                &pattern_type.ty,
-                registries,
-                referencing_root,
-            )?
+            classify(responder, route_arguments, &pattern_type.ty, registries)?
         } else {
             RouteParameterBinding::CurrentRequest
         };
@@ -159,7 +143,7 @@ pub(crate) fn responder_method(
     }
 
     Ok(ResponderSignature {
-        output: responder_output(method, registries, referencing_root),
+        output: responder_output(method, registries),
         parameters,
     })
 }

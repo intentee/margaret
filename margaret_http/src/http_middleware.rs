@@ -2,11 +2,9 @@ use async_trait::async_trait;
 
 use crate::next::Next;
 use crate::request::Request;
-use crate::responded::Responded;
+use crate::response_continuation::ResponseContinuation;
 
 #[async_trait]
 pub trait HttpMiddleware: Send + Sync {
-    type Marker: Clone + Send + Sync + 'static;
-
-    async fn process(&self, request: Request, marker: Self::Marker, next: Next) -> Responded;
+    async fn process(&self, request: &Request, next: Next) -> ResponseContinuation;
 }

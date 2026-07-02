@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use http_body_util::BodyExt;
+use http::request::Parts;
 use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper_util::rt::TokioExecutor;
@@ -15,19 +15,31 @@ use hyper_util::service::TowerToHyperService;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
-use crate::handler::Handler;
 use crate::method::Method;
 use crate::request::Request;
+use crate::request_error::RequestError;
+use crate::request_inputs::RequestInputs;
 use crate::response::Response;
+use crate::router::Router;
+use crate::upload_config::UploadConfig;
 
 pub struct BoundServer {
-    app: Arc<dyn Handler>,
+    app: Arc<Router>,
     listener: TcpListener,
+    upload_config: Arc<UploadConfig>,
 }
 
 impl BoundServer {
-    pub(crate) fn new(app: Arc<dyn Handler>, listener: TcpListener) -> Self {
-        Self { app, listener }
+    pub(crate) fn new(
+        app: Arc<Router>,
+        listener: TcpListener,
+        upload_config: Arc<UploadConfig>,
+    ) -> Self {
+        Self {
+            app,
+            listener,
+            upload_config,
+        }
     }
 
     pub fn local_addr(&self) -> SocketAddr {
@@ -44,8 +56,9 @@ impl BoundServer {
             .run_until_cancelled(self.listener.accept())
             .await
         {
-            let (stream, _remote) = accepted.expect("the listener accepts connections");
+            let (stream, remote_addr) = accepted.expect("the listener accepts connections");
             let app = self.app.clone();
+            let upload_config = self.upload_config.clone();
             let builder = builder.clone();
             let watcher = graceful.watcher();
 
@@ -53,8 +66,13 @@ impl BoundServer {
                 let service = TowerToHyperService::new(tower::service_fn(
                     move |request: http::Request<Incoming>| {
                         let app = app.clone();
+                        let upload_config = upload_config.clone();
 
-                        async move { Ok::<_, Infallible>(dispatch(app, request).await) }
+                        async move {
+                            Ok::<_, Infallible>(
+                                dispatch(app, upload_config, remote_addr, request).await,
+                            )
+                        }
                     },
                 ));
                 let connection = builder.serve_connection(TokioIo::new(stream), service);
@@ -73,26 +91,30 @@ fn report_connection_outcome<Error: Display>(outcome: Result<(), Error>) {
     }
 }
 
+fn error_response(error: RequestError) -> Response {
+    match error {
+        RequestError::PayloadTooLarge { .. } => Response::text(413, "Payload Too Large"),
+        _ => Response::text(400, "Bad Request"),
+    }
+}
+
 async fn dispatch(
-    app: Arc<dyn Handler>,
+    app: Arc<Router>,
+    upload_config: Arc<UploadConfig>,
+    remote_addr: SocketAddr,
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
     let Some(method) = Method::from_http(request.method()) else {
         return Response::text(405, "Method Not Allowed").into_http();
     };
 
-    let path = request.uri().path().to_string();
     let (parts, incoming) = request.into_parts();
-    let body = match incoming.collect().await {
-        Ok(collected) => collected.to_bytes(),
-        Err(source) => return Response::text(400, format!("Bad Request: {source}")).into_http(),
-    };
-    let mut handled = Request::new(method, path);
+    let Parts { headers, uri, .. } = parts;
 
-    handled.set_headers(parts.headers);
-    handled.set_body(body);
-
-    app.handle(handled).await.into_http()
+    match RequestInputs::parse(method, &uri, headers, remote_addr, incoming, &upload_config).await {
+        Ok(inputs) => app.respond(Request::from_inputs(inputs)).await.into_http(),
+        Err(error) => error_response(error).into_http(),
+    }
 }
 
 #[cfg(test)]
@@ -104,8 +126,29 @@ mod tests {
     use tokio::net::TcpStream;
     use tokio_util::sync::CancellationToken;
 
+    use super::error_response;
+    use crate::request_error::RequestError;
     use crate::router::Router;
     use crate::server::Server;
+    use crate::upload_config::UploadConfig;
+
+    #[test]
+    fn maps_request_errors_to_status_codes() {
+        assert_eq!(
+            error_response(RequestError::PayloadTooLarge { limit: 8 })
+                .into_http()
+                .status()
+                .as_u16(),
+            413
+        );
+        assert_eq!(
+            error_response(RequestError::MissingMultipartBoundary)
+                .into_http()
+                .status()
+                .as_u16(),
+            400
+        );
+    }
 
     async fn exchange(address: SocketAddr, request: &[u8], close_write: bool) -> String {
         let mut stream = TcpStream::connect(address)
@@ -131,46 +174,38 @@ mod tests {
         String::from_utf8_lossy(&response).into_owned()
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn serves_connections_until_cancellation() {
         let bound = Server::new(Router::empty())
-            .bind("127.0.0.1:0")
+            .bind("127.0.0.1:0", UploadConfig::Disabled)
             .await
             .expect("the server binds to an ephemeral port");
         let address = bound.local_addr();
         let cancellation_token = CancellationToken::new();
         let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 
-        let interrupted = exchange(
-            address,
-            b"GET /interrupted HTTP/1.1\r\nHost: test\r\n",
-            true,
-        )
-        .await;
+        let (interrupted, unmatched, unsupported, truncated) = tokio::join!(
+            exchange(address, b"GET /interrupted HTTP/1.1\r\nHost: test\r\n", true),
+            exchange(
+                address,
+                b"GET /missing HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+            exchange(
+                address,
+                b"OPTIONS / HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+            exchange(
+                address,
+                b"POST / HTTP/1.1\r\nHost: test\r\nContent-Type: application/json\r\nContent-Length: 64\r\nConnection: close\r\n\r\nshort",
+                true,
+            ),
+        );
+
         assert!(!interrupted.contains(" 200 "));
-
-        let unmatched = exchange(
-            address,
-            b"GET /missing HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-            false,
-        )
-        .await;
         assert!(unmatched.contains(" 404 "));
-
-        let unsupported = exchange(
-            address,
-            b"OPTIONS / HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-            false,
-        )
-        .await;
         assert!(unsupported.contains(" 405 "));
-
-        let truncated = exchange(
-            address,
-            b"POST / HTTP/1.1\r\nHost: test\r\nContent-Length: 64\r\nConnection: close\r\n\r\nshort",
-            true,
-        )
-        .await;
         assert!(truncated.contains(" 400 "));
 
         cancellation_token.cancel();

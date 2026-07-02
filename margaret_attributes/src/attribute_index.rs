@@ -51,16 +51,12 @@ impl AttributeIndex {
         }
     }
 
+    pub fn has(&self, selector: &AttributeSelector) -> bool {
+        !self.select(selector).is_empty()
+    }
+
     pub fn items(&self) -> &[IndexedItem] {
         &self.items
-    }
-
-    pub fn struct_resolution(&self) -> &ResolutionIndex {
-        &self.struct_resolution
-    }
-
-    pub fn trait_resolution(&self) -> &ResolutionIndex {
-        &self.trait_resolution
     }
 
     pub fn select(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'_>> {
@@ -82,7 +78,11 @@ impl AttributeIndex {
             .collect()
     }
 
-    pub fn has(&self, selector: &AttributeSelector) -> bool {
-        !self.select(selector).is_empty()
+    pub fn struct_resolution(&self) -> &ResolutionIndex {
+        &self.struct_resolution
+    }
+
+    pub fn trait_resolution(&self) -> &ResolutionIndex {
+        &self.trait_resolution
     }
 }

@@ -32,21 +32,6 @@ impl IndexedItem {
         }
     }
 
-    pub(crate) fn add_associated_type(&mut self, associated_type: IndexedAssociatedType) {
-        self.associated_types.push(associated_type);
-    }
-
-    pub(crate) fn add_method(&mut self, method: IndexedMethod) {
-        self.methods.push(method);
-    }
-
-    pub(crate) fn sort_members(&mut self) {
-        self.associated_types
-            .sort_by(|left, right| left.name().cmp(right.name()));
-        self.methods
-            .sort_by(|left, right| left.identifier().cmp(right.identifier()));
-    }
-
     pub fn associated_types(&self) -> &[IndexedAssociatedType] {
         &self.associated_types
     }
@@ -67,10 +52,6 @@ impl IndexedItem {
         self.kind
     }
 
-    pub fn methods(&self) -> &[IndexedMethod] {
-        &self.methods
-    }
-
     pub fn method_matching(&self, selector: &AttributeSelector) -> Option<&IndexedMethod> {
         self.methods.iter().find(|method| {
             method
@@ -78,6 +59,25 @@ impl IndexedItem {
                 .iter()
                 .any(|attribute| selector.matches(attribute.path()))
         })
+    }
+
+    pub fn methods(&self) -> &[IndexedMethod] {
+        &self.methods
+    }
+
+    pub(crate) fn add_associated_type(&mut self, associated_type: IndexedAssociatedType) {
+        self.associated_types.push(associated_type);
+    }
+
+    pub(crate) fn add_method(&mut self, method: IndexedMethod) {
+        self.methods.push(method);
+    }
+
+    pub(crate) fn sort_members(&mut self) {
+        self.associated_types
+            .sort_by(|left, right| left.name().cmp(right.name()));
+        self.methods
+            .sort_by(|left, right| left.identifier().cmp(right.identifier()));
     }
 }
 

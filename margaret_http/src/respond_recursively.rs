@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::handler::Handler;
 use crate::request::Request;
-use crate::responded::Responded;
 use crate::response::Response;
+use crate::response_continuation::ResponseContinuation;
 
 pub(crate) async fn respond_recursively(
     by_name: &HashMap<&'static str, Arc<dyn Handler>>,
@@ -14,12 +14,12 @@ pub(crate) async fn respond_recursively(
 ) -> Response {
     let mut visited: HashSet<&'static str> = HashSet::new();
     let mut request = request;
-    let mut outcome = first.handle(request.clone()).await;
+    let mut outcome = first.handle(&request).await;
 
     loop {
         match outcome {
-            Responded::Done(response) => return response,
-            Responded::Forward(forward) => {
+            ResponseContinuation::Done(response) => return response,
+            ResponseContinuation::Forward(forward) => {
                 if !visited.insert(forward.name()) {
                     return Response::text(500, "Internal Server Error");
                 }
@@ -28,11 +28,11 @@ pub(crate) async fn respond_recursively(
                     return Response::not_found();
                 };
 
-                request.clear_path_params();
-                outcome = target.handle(request.clone()).await;
+                request = request.with_path_params(HashMap::new());
+                outcome = target.handle(&request).await;
             }
-            Responded::Intercept(interception) => {
-                return interception.render(&request).await;
+            ResponseContinuation::Intercept(interception) => {
+                outcome = interception.render(&request).await;
             }
         }
     }
@@ -51,15 +51,15 @@ mod tests {
     use crate::handler::Handler;
     use crate::method::Method;
     use crate::request::Request;
-    use crate::responded::Responded;
     use crate::response::Response;
+    use crate::response_continuation::ResponseContinuation;
 
     struct ForwardToTarget;
 
     #[async_trait]
     impl Handler for ForwardToTarget {
-        async fn handle(&self, _request: Request) -> Responded {
-            Responded::from(Forward::to("target"))
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::from(Forward::to("target"))
         }
     }
 
@@ -67,8 +67,8 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardToSelf {
-        async fn handle(&self, _request: Request) -> Responded {
-            Responded::from(Forward::to("origin"))
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::from(Forward::to("origin"))
         }
     }
 
@@ -76,8 +76,8 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardToUnknown {
-        async fn handle(&self, _request: Request) -> Responded {
-            Responded::from(Forward::to("unknown"))
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::from(Forward::to("unknown"))
         }
     }
 
@@ -85,26 +85,26 @@ mod tests {
 
     #[async_trait]
     impl Handler for Target {
-        async fn handle(&self, _request: Request) -> Responded {
-            Responded::Done(Response::text(222, "target"))
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::Done(Response::text(222, "target"))
         }
     }
 
-    struct Rendering;
+    struct ForwardingInterception;
 
     #[async_trait]
-    impl DeferredInterception for Rendering {
-        async fn render(self: Box<Self>, _request: &Request) -> Response {
-            Response::text(244, "rendered")
+    impl DeferredInterception for ForwardingInterception {
+        async fn render(self: Box<Self>, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::from(Forward::to("target"))
         }
     }
 
-    struct Intercepting;
+    struct InterceptsToForward;
 
     #[async_trait]
-    impl Handler for Intercepting {
-        async fn handle(&self, _request: Request) -> Responded {
-            Responded::Intercept(Box::new(Rendering))
+    impl Handler for InterceptsToForward {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::Intercept(Box::new(ForwardingInterception))
         }
     }
 
@@ -146,7 +146,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn applies_an_interception_after_the_response_is_final() {
-        assert_eq!(status_of(HashMap::new(), Arc::new(Intercepting)).await, 244);
+    async fn repeats_the_stack_when_an_interceptor_returns_a_responder() {
+        let mut by_name: HashMap<&'static str, Arc<dyn Handler>> = HashMap::new();
+
+        by_name.insert("target", Arc::new(Target));
+
+        assert_eq!(status_of(by_name, Arc::new(InterceptsToForward)).await, 222);
     }
 }

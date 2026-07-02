@@ -2,6 +2,7 @@ use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
 use margaret_macros::intercepts;
+use margaret_macros::middleware;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
@@ -14,6 +15,7 @@ use margaret_macros::singleton;
 #[responds_to_http(method = Get, path = "/subject", server = "public")]
 #[console_command]
 #[handles_middleware_attribute(attribute = traced)]
+#[middleware(traced)]
 #[intercepts(SomeMarker)]
 struct Subject;
 

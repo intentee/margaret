@@ -24,14 +24,10 @@ fn render_umbrella(has_http: bool, has_console: bool, serves: bool) -> String {
     umbrella
 }
 
-pub fn build(crates: &[CrateRoot]) -> Result<GeneratedCode, CodegenError> {
-    let mut builder = AttributeIndexBuilder::new();
-
-    for crate_root in crates {
-        builder = builder.index_crate(crate_root)?;
-    }
-
-    let index = builder.build();
+pub fn build(crate_root: &CrateRoot) -> Result<GeneratedCode, CodegenError> {
+    let index = AttributeIndexBuilder::new()
+        .index_crate(crate_root)?
+        .build();
 
     let has_http = margaret_http_codegen::has_responders::has_responders(&index);
     let has_services = margaret_service_codegen::has_services::has_services(&index);
@@ -160,7 +156,7 @@ impl Greet {
 
         bootstrap(&directory);
 
-        build(&[CrateRoot::new("crate", directory.path().join("src"))])
+        build(&CrateRoot::new("crate", directory.path().join("src")))
     }
 
     fn module<'code>(code: &'code GeneratedCode, name: &str) -> &'code str {
@@ -217,7 +213,7 @@ impl Greet {
         let source = directory.path().join("src");
         let generated = source.join("margaret");
 
-        build(&[CrateRoot::new("crate", &source)])
+        build(&CrateRoot::new("crate", &source))
             .expect("the first build succeeds")
             .write_to(&generated);
 
@@ -225,7 +221,7 @@ impl Greet {
 
         write_lib(&directory, PLAIN_CRATE);
 
-        build(&[CrateRoot::new("crate", &source)])
+        build(&CrateRoot::new("crate", &source))
             .expect("the second build succeeds")
             .write_to(&generated);
 
@@ -242,33 +238,13 @@ impl Greet {
         let directory = crate_with(WEB_CRATE);
         bootstrap(&directory);
         let source = directory.path().join("src");
-        let generated = source.join("margaret");
 
-        build(&[CrateRoot::new("crate", &source)])
-            .expect("the first build succeeds")
-            .write_to(&generated);
+        let first = build(&CrateRoot::new("crate", &source)).expect("the first build succeeds");
+        let second = build(&CrateRoot::new("crate", &source)).expect("the second build succeeds");
 
-        let umbrella = fs::read_to_string(generated.join("mod.rs")).expect("the umbrella exists");
-        let http = fs::read_to_string(generated.join("http.rs")).expect("the http source exists");
-        let container =
-            fs::read_to_string(generated.join("container.rs")).expect("the container exists");
-
-        build(&[CrateRoot::new("crate", &source)])
-            .expect("the second build succeeds")
-            .write_to(&generated);
-
-        assert_eq!(
-            fs::read_to_string(generated.join("mod.rs")).expect("the umbrella exists"),
-            umbrella
-        );
-        assert_eq!(
-            fs::read_to_string(generated.join("http.rs")).expect("the http source exists"),
-            http
-        );
-        assert_eq!(
-            fs::read_to_string(generated.join("container.rs")).expect("the container exists"),
-            container
-        );
+        assert_eq!(module(&first, "mod"), module(&second, "mod"));
+        assert_eq!(module(&first, "http"), module(&second, "http"));
+        assert_eq!(module(&first, "container"), module(&second, "container"));
     }
 
     #[test]
@@ -330,32 +306,6 @@ impl Greet {
         .to_string();
 
         assert!(message.contains("dependency cycle"));
-    }
-
-    #[test]
-    fn wires_singletons_from_an_explicitly_scanned_crate() {
-        let host = crate_with(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct App;\n\nimpl App {\n    #[constructor]\n    fn create(metrics: Arc<margaret_plugin::Metrics>) -> Self {}\n}\n",
-        );
-        bootstrap(&host);
-        let plugin = tempdir().expect("a plugin crate directory is created");
-        let plugin_source = plugin.path().join("src");
-
-        fs::create_dir_all(&plugin_source).expect("the plugin src directory exists");
-        fs::write(
-            plugin_source.join("lib.rs"),
-            "#[singleton]\nstruct Metrics;\n\nimpl Metrics {\n    #[constructor]\n    fn create() -> Self {}\n}\n",
-        )
-        .expect("the plugin lib is written");
-
-        let code = build(&[
-            CrateRoot::new("crate", host.path().join("src")),
-            CrateRoot::new("margaret_plugin", plugin_source),
-        ])
-        .expect("the build succeeds across crates");
-
-        assert!(module(&code, "container").contains("margaret_plugin::Metrics"));
-        assert!(module(&code, "container").contains("crate::App"));
     }
 
     #[test]
@@ -424,55 +374,10 @@ impl Metrics {
     }
 
     #[test]
-    fn merges_routes_for_the_same_named_server_across_crates() {
-        let host = crate_with(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/\", server = \"internal\")]\nstruct HostPage;\n\nimpl HostPage {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
-        );
-        bootstrap(&host);
-        let plugin = tempdir().expect("a plugin crate directory is created");
-        let plugin_source = plugin.path().join("src");
-
-        fs::create_dir_all(&plugin_source).expect("the plugin src directory exists");
-        fs::write(
-            plugin_source.join("lib.rs"),
-            "#[singleton]\n#[responds_to_http(method = Get, path = \"/plugin\", server = \"internal\")]\nstruct PluginPage;\n\nimpl PluginPage {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+    fn supports_same_struct_name_route_handlers_in_different_modules() {
+        let code = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
         )
-        .expect("the plugin lib is written");
-
-        let code = build(&[
-            CrateRoot::new("crate", host.path().join("src")),
-            CrateRoot::new("margaret_plugin", plugin_source),
-        ])
-        .expect("the build succeeds across crates");
-
-        let http = module(&code, "http");
-
-        assert!(http.contains("async fn server_internal"));
-        assert!(!http.contains("async fn server_public"));
-        assert!(http.contains("\"/plugin\""));
-        assert!(http.contains("margaret_plugin::PluginPage"));
-    }
-
-    #[test]
-    fn supports_same_struct_name_route_handlers_across_crates() {
-        let host = crate_with(
-            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
-        );
-        bootstrap(&host);
-        let plugin = tempdir().expect("a plugin crate directory is created");
-        let plugin_source = plugin.path().join("src");
-
-        fs::create_dir_all(&plugin_source).expect("the plugin src directory exists");
-        fs::write(
-            plugin_source.join("lib.rs"),
-            "mod endpoints {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
-        )
-        .expect("the plugin lib is written");
-
-        let code = build(&[
-            CrateRoot::new("crate", host.path().join("src")),
-            CrateRoot::new("margaret_plugin", plugin_source),
-        ])
         .expect("two `Page` handlers in different modules coexist");
 
         let http = module(&code, "http");
@@ -481,6 +386,6 @@ impl Metrics {
         assert!(http.contains("\"/a\""));
         assert!(http.contains("\"/b\""));
         assert!(http.contains("crate::routes::Page"));
-        assert!(http.contains("margaret_plugin::endpoints::Page"));
+        assert!(http.contains("crate::endpoints::Page"));
     }
 }
