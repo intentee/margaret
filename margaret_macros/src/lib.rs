@@ -15,16 +15,6 @@ pub fn constructor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn provider(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
-pub fn provide(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}
-
-#[proc_macro_attribute]
 pub fn service(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }

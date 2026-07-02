@@ -12,7 +12,6 @@ mod path_text;
 mod peel_target;
 mod provided_type;
 mod provider;
-mod provider_construction;
 mod raw_target;
 mod render;
 pub mod render_container;

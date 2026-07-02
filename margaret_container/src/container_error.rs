@@ -13,18 +13,6 @@ pub enum ContainerError {
     #[error("#[singleton] is only supported on structs, but '{path}' is not a struct")]
     NotASingletonStruct { path: String },
 
-    #[error("#[provider] is only supported on structs, but '{path}' is not a struct")]
-    ProviderNotAStruct { path: String },
-
-    #[error("#[provider] '{provider}' must declare what it provides via 'provides = ...'")]
-    ProviderMissingProvides { provider: String },
-
-    #[error("#[provider] '{provider}' has no #[provide] method")]
-    ProviderMissingProvideMethod { provider: String },
-
-    #[error("#[provider] '{provider}' has more than one #[provide] method: {methods}")]
-    AmbiguousProvideMethod { provider: String, methods: String },
-
     #[error(
         "singleton '{singleton}' has {field_count} field(s) but no #[constructor] method; only fieldless singletons may omit a #[constructor]"
     )]

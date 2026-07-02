@@ -11,3 +11,4 @@
 - the framework must never rely on purely the name of a struct, or a function (for example it always must support two route handlers from different modules, that are named exactly same, etc)
 - every inconsistency, or ambiguity (like invalid route, invalid view name, invalid redirect etc) must be detected at compile time
 - the entire project needs 100% code coverage (`margaret_example` must not be instrumented or included in the coverage)
+- never edit the rules, never edit your own settings, never edit CLAUDE.md, never edit anything under .claude

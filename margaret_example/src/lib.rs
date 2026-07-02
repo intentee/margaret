@@ -10,7 +10,6 @@ pub mod metrics_plugin;
 pub mod middleware;
 pub mod models;
 pub mod plugin;
-pub mod providers;
 pub mod repositories;
 pub mod routes;
 pub mod services;

@@ -25,76 +25,37 @@ use crate::path_text::path_text;
 use crate::peel_target::peel_target;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
-use crate::provider_construction::ProviderConstruction;
 use crate::raw_target::RawTarget;
 use crate::resolve_construction::resolve_construction;
 use crate::type_text::type_text;
 
-enum DraftConstruction<'index> {
-    Direct(ConstructionSource<'index>),
-    Factory {
-        factory: &'index IndexedMethod,
-        own: ConstructionSource<'index>,
-    },
-}
-
-struct ProviderDraft<'index> {
+struct SingletonDraft<'index> {
     collection: Option<CanonicalPath>,
     concrete_path: CanonicalPath,
-    construction: DraftConstruction<'index>,
+    construction: ConstructionSource<'index>,
     field_name: String,
     provided: ProvidedType,
 }
 
-#[derive(Clone, Copy)]
-enum Role {
-    Provider,
-    Singleton,
-}
-
-struct DraftCategory {
-    role: Role,
-    selector: AttributeSelector,
-}
-
-fn draft_categories() -> [DraftCategory; 4] {
+fn managed_selectors() -> [AttributeSelector; 3] {
     [
-        DraftCategory {
-            role: Role::Singleton,
-            selector: singleton_selector(),
-        },
-        DraftCategory {
-            role: Role::Provider,
-            selector: provider_selector(),
-        },
-        DraftCategory {
-            role: Role::Singleton,
-            selector: service_selector(),
-        },
-        DraftCategory {
-            role: Role::Singleton,
-            selector: scheduled_with_tick_timer_selector(),
-        },
+        singleton_selector(),
+        service_selector(),
+        scheduled_with_tick_timer_selector(),
     ]
 }
 
 fn build_drafts<'index>(
     index: &'index AttributeIndex,
     trait_resolution: &ResolutionIndex,
-) -> Result<Vec<ProviderDraft<'index>>, ContainerError> {
-    let mut drafts: Vec<ProviderDraft> = Vec::new();
+) -> Result<Vec<SingletonDraft<'index>>, ContainerError> {
+    let mut drafts: Vec<SingletonDraft> = Vec::new();
     let mut provided_keys: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
     let mut field_names: HashMap<String, CanonicalPath> = HashMap::new();
 
-    for DraftCategory { role, selector } in draft_categories() {
+    for selector in managed_selectors() {
         for matched in index.select(&selector) {
-            let draft = build_draft(
-                &matched,
-                trait_resolution,
-                &provided_keys,
-                &field_names,
-                role,
-            )?;
+            let draft = build_draft(&matched, trait_resolution, &provided_keys, &field_names)?;
 
             provided_keys.insert(draft.provided.key().clone(), draft.concrete_path.clone());
             field_names.insert(draft.field_name.clone(), draft.concrete_path.clone());
@@ -110,11 +71,12 @@ fn build_draft<'index>(
     trait_resolution: &ResolutionIndex,
     provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
     field_names: &HashMap<String, CanonicalPath>,
-    role: Role,
-) -> Result<ProviderDraft<'index>, ContainerError> {
+) -> Result<SingletonDraft<'index>, ContainerError> {
     let item = matched.item();
     let ItemKind::Struct(shape) = item.kind() else {
-        return Err(not_a_struct(role, item.canonical_path().to_string()));
+        return Err(ContainerError::NotASingletonStruct {
+            path: item.canonical_path().to_string(),
+        });
     };
 
     let concrete_path = item.canonical_path().clone();
@@ -122,22 +84,15 @@ fn build_draft<'index>(
         collection,
         provides,
     } = ManagedArguments::parse(&matched.args()?)?;
-    let provided = resolve_provided(provides.as_ref(), trait_resolution, &concrete_path, role)?;
+    let provided = resolve_provided(provides.as_ref(), trait_resolution, &concrete_path)?;
 
     check_unique_provided(provided_keys, &provided, &concrete_path)?;
 
     let field_name = field_name(field_names, &provided, &concrete_path)?;
-    let own = resolve_construction(item.methods(), &concrete_path, shape)?;
+    let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
     let collection = resolve_collection(collection.as_ref(), trait_resolution, &concrete_path)?;
-    let construction = match role {
-        Role::Singleton => DraftConstruction::Direct(own),
-        Role::Provider => DraftConstruction::Factory {
-            factory: resolve_factory(item.methods(), &concrete_path)?,
-            own,
-        },
-    };
 
-    Ok(ProviderDraft {
+    Ok(SingletonDraft {
         collection,
         concrete_path,
         construction,
@@ -146,27 +101,14 @@ fn build_draft<'index>(
     })
 }
 
-fn not_a_struct(role: Role, path: String) -> ContainerError {
-    match role {
-        Role::Singleton => ContainerError::NotASingletonStruct { path },
-        Role::Provider => ContainerError::ProviderNotAStruct { path },
-    }
-}
-
 fn resolve_provided(
     provides: Option<&Path>,
     trait_resolution: &ResolutionIndex,
     concrete_path: &CanonicalPath,
-    role: Role,
 ) -> Result<ProvidedType, ContainerError> {
     match provides {
         Some(written) => resolve_interface(written, trait_resolution, concrete_path),
-        None => match role {
-            Role::Singleton => Ok(ProvidedType::Concrete(concrete_path.clone())),
-            Role::Provider => Err(ContainerError::ProviderMissingProvides {
-                provider: concrete_path.to_string(),
-            }),
-        },
+        None => Ok(ProvidedType::Concrete(concrete_path.clone())),
     }
 }
 
@@ -243,43 +185,6 @@ fn field_name(
     }
 
     Ok(field_name)
-}
-
-fn resolve_factory<'index>(
-    methods: &'index [IndexedMethod],
-    concrete_path: &CanonicalPath,
-) -> Result<&'index IndexedMethod, ContainerError> {
-    let mut found: Vec<&IndexedMethod> = methods
-        .iter()
-        .filter(|method| has_provide_attribute(method))
-        .collect();
-
-    if found.len() > 1 {
-        return Err(ContainerError::AmbiguousProvideMethod {
-            provider: concrete_path.to_string(),
-            methods: found
-                .iter()
-                .map(|method| method.identifier().to_string())
-                .collect::<Vec<String>>()
-                .join(", "),
-        });
-    }
-
-    found
-        .pop()
-        .ok_or_else(|| ContainerError::ProviderMissingProvideMethod {
-            provider: concrete_path.to_string(),
-        })
-}
-
-fn has_provide_attribute(method: &IndexedMethod) -> bool {
-    method.attributes().iter().any(|attribute| {
-        attribute
-            .path()
-            .segments
-            .last()
-            .is_some_and(|segment| segment.ident == "provide")
-    })
 }
 
 fn resolve_direct(
@@ -408,10 +313,6 @@ fn singleton_selector() -> AttributeSelector {
     AttributeSelector::parse("singleton").expect("the singleton selector is valid")
 }
 
-fn provider_selector() -> AttributeSelector {
-    AttributeSelector::parse("provider").expect("the provider selector is valid")
-}
-
 fn service_selector() -> AttributeSelector {
     AttributeSelector::parse("service").expect("the service selector is valid")
 }
@@ -434,7 +335,7 @@ pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, Contai
     let mut providers = Vec::new();
 
     for draft in drafts {
-        let ProviderDraft {
+        let SingletonDraft {
             collection,
             concrete_path,
             construction,
@@ -446,24 +347,12 @@ pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, Contai
             collections.add(trait_path, provided.key().clone());
         }
 
-        let construction = match construction {
-            DraftConstruction::Direct(source) => ProviderConstruction::Direct(resolve_direct(
-                source,
-                &concrete_path,
-                &provider_resolution,
-                trait_resolution,
-            )?),
-            DraftConstruction::Factory { factory, own } => ProviderConstruction::Factory {
-                factory_is_async: factory.signature().asyncness.is_some(),
-                factory_method: factory.identifier().to_string(),
-                provider: resolve_direct(
-                    own,
-                    &concrete_path,
-                    &provider_resolution,
-                    trait_resolution,
-                )?,
-            },
-        };
+        let construction = resolve_direct(
+            construction,
+            &concrete_path,
+            &provider_resolution,
+            trait_resolution,
+        )?;
 
         providers.push(Provider {
             concrete_path,

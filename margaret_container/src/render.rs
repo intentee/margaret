@@ -12,7 +12,6 @@ use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
-use crate::provider_construction::ProviderConstruction;
 
 fn field_declaration(provider: &Provider) -> TokenStream {
     let name = field_ident(provider);
@@ -62,34 +61,9 @@ fn accessor(provider: &Provider, plan: &ContainerPlan) -> TokenStream {
 }
 
 fn construction(provider: &Provider, plan: &ContainerPlan) -> TokenStream {
-    match &provider.construction {
-        ProviderConstruction::Direct(direct) => {
-            let value = direct_value(direct, &provider.concrete_path, plan);
+    let value = direct_value(&provider.construction, &provider.concrete_path, plan);
 
-            quote! { std::sync::Arc::new(#value) }
-        }
-        ProviderConstruction::Factory {
-            factory_is_async,
-            factory_method,
-            provider: own,
-        } => {
-            let value = direct_value(own, &provider.concrete_path, plan);
-            let factory = format_ident!("{}", factory_method);
-            let call = if *factory_is_async {
-                quote! { provider.#factory().await }
-            } else {
-                quote! { provider.#factory() }
-            };
-
-            quote! {
-                {
-                    let provider = #value;
-
-                    #call
-                }
-            }
-        }
-    }
+    quote! { std::sync::Arc::new(#value) }
 }
 
 fn direct_value(

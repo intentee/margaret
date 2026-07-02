@@ -2,8 +2,6 @@ use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
 use margaret_macros::intercepts;
-use margaret_macros::provide;
-use margaret_macros::provider;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
@@ -36,16 +34,6 @@ impl Subject {
     }
 }
 
-#[provider]
-struct Catalog;
-
-impl Catalog {
-    #[provide]
-    fn provide(&self) -> u8 {
-        7
-    }
-}
-
 #[provides_route_parameter]
 struct Binder;
 
@@ -65,7 +53,6 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
 
     assert_eq!(subject.respond("path-id".to_string()), "path-id");
     assert_eq!(subject.run("typed-name".to_string()), "typed-name");
-    assert_eq!(Catalog.provide(), 7);
     assert_eq!(Binder.bind("bound".to_string()), "bound");
 
     let _worker = Worker;
