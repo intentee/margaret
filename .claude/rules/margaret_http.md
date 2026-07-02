@@ -48,6 +48,9 @@ Specific attribute rules:
 - uploaded files must be streamed into temporary directory, and only stored as a pointer (similar to PHP)
 - temporary directory for uploads must be configurable per-server through CLI server flag (defaults to system TMP dir)
 - request object must not be clone-able, and most not be cloned, or copied at any point; its properties must not be cloned or copied at any point in the framework
+- request object must not be mutable in any way
+- all the request fields that are keyed (equivalents to $_POST, $_GET, $_COOKIE, $_SERVER, $_FILES, path params etc), must be accessible with O(1) complexity
+- make sure there are no aliases; specific information needs to be reachable in exactly one way (for example if $_SERVER has 'remote_addr' do not expose the same field again in Request)
 
 # `margaret_http` lifecycle algorithm
 

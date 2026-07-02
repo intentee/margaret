@@ -13,6 +13,8 @@
 - the entire project needs 100% code coverage (`margaret_example` must not be instrumented or included in the coverage)
 - never edit the rules, never edit your own settings, never edit CLAUDE.md, never edit anything under .claude
 - the attributes must be read only once during the entire application lifecycle, then reused from memory through attribute selector
+- never create aliases, make sure that a specific information is only achievable in a single way (and code is never duplicated)
+- there must always be exactly as single correct, single available way to do any specific thing
 
 ## Dependency Injection Container
 

@@ -17,6 +17,7 @@ paths:
 Imports/uses must not be mixed with other kinds of rust syntax. 
 
 Each file needs to follow this order: 
+
 1. `pub mod`/`mod` exports 
 2. vendor crate `use` 
 3. project crate `use` 
@@ -25,3 +26,8 @@ Each file needs to follow this order:
 6. private struct helpers
 7. single public export
 
+All the method within `impl` block must be sorted like so:
+1. builder/constructor/`new`/`new_*` methods first (alphabetically)
+2. `pub` methods (alphabetically)
+3. `pub(crate)` methods (alphabetically)
+4. private methods (alphabetically)
