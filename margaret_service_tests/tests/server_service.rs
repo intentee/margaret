@@ -1,9 +1,9 @@
 use tokio_util::sync::CancellationToken;
+use trzcina::Service;
 
 use margaret_http::router::Router;
 use margaret_http::server::Server;
 use margaret_http::upload_config::UploadConfig;
-use margaret_service::Service;
 use margaret_service::server_service::ServerService;
 
 #[tokio::test]

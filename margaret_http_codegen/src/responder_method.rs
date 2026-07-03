@@ -14,24 +14,26 @@ use margaret_attributes::resolve_struct::resolve_struct;
 use margaret_attributes::resolve_trait::resolve_trait;
 use margaret_attributes::type_leaf_ident::type_leaf_ident;
 
+use crate::form_request_arguments::FormRequestArguments;
+use crate::form_request_extraction::FormRequestExtraction;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::registries::Registries;
+use crate::responder_argument::ResponderArgument;
+use crate::responder_argument_binding::ResponderArgumentBinding;
 use crate::responder_output::ResponderOutput;
 use crate::responder_signature::ResponderSignature;
-use crate::route_parameter::RouteParameter;
 use crate::route_parameter_arguments::RouteParameterArguments;
-use crate::route_parameter_binding::RouteParameterBinding;
 
 fn classify(
     responder: &str,
     arguments: RouteParameterArguments,
     declared: &Type,
     registries: &Registries,
-) -> Result<RouteParameterBinding, HttpCodegenError> {
+) -> Result<ResponderArgumentBinding, HttpCodegenError> {
     let RouteParameterArguments { from } = arguments;
 
     if is_string(declared) {
-        return Ok(RouteParameterBinding::Raw { path_key: from });
+        return Ok(ResponderArgumentBinding::Raw { path_key: from });
     }
 
     let written = declared.to_token_stream().to_string();
@@ -50,10 +52,28 @@ fn classify(
         }
     })?;
 
-    Ok(RouteParameterBinding::Bound {
+    Ok(ResponderArgumentBinding::Bound {
         binder,
         path_key: from,
     })
+}
+
+fn classify_form_request(
+    attribute: &Attribute,
+    declared: &Type,
+    responder: &str,
+    position: usize,
+) -> Result<ResponderArgumentBinding, HttpCodegenError> {
+    let arguments = AttributeArgs::from_attribute(attribute)?;
+    let FormRequestArguments { source } =
+        FormRequestArguments::parse(&arguments, responder, position)?;
+    let extraction = if is_validation_result(declared) {
+        FormRequestExtraction::Result
+    } else {
+        FormRequestExtraction::Model
+    };
+
+    Ok(ResponderArgumentBinding::FormRequest { source, extraction })
 }
 
 fn is_string(declared: &Type) -> bool {
@@ -66,6 +86,10 @@ fn is_request(declared: &Type) -> bool {
     };
 
     type_leaf_ident(&reference.elem).is_some_and(|ident| ident == "Request")
+}
+
+fn is_validation_result(declared: &Type) -> bool {
+    type_leaf_ident(declared).is_some_and(|ident| ident == "ValidationResult")
 }
 
 fn find_marker<'attribute>(
@@ -109,7 +133,8 @@ pub(crate) fn responder_method(
         })?;
     let route_parameter_selector =
         AttributeSelector::parse("route_parameter").expect("a valid selector");
-    let mut parameters = Vec::new();
+    let form_request_selector = AttributeSelector::parse("form_request").expect("a valid selector");
+    let mut arguments = Vec::new();
 
     for (position, input) in method.signature().inputs.iter().enumerate() {
         let FnArg::Typed(pattern_type) = input else {
@@ -117,9 +142,17 @@ pub(crate) fn responder_method(
         };
 
         let route_parameter = find_marker(&pattern_type.attrs, &route_parameter_selector);
+        let form_request = find_marker(&pattern_type.attrs, &form_request_selector);
         let is_current_request = is_request(&pattern_type.ty);
 
-        if route_parameter.is_none() && !is_current_request {
+        if route_parameter.is_some() && form_request.is_some() {
+            return Err(HttpCodegenError::ConflictingArgumentMarkers {
+                responder: responder.to_string(),
+                parameter: position.to_string(),
+            });
+        }
+
+        if route_parameter.is_none() && form_request.is_none() && !is_current_request {
             return Err(HttpCodegenError::UnmarkedResponderParameter {
                 responder: responder.to_string(),
                 parameter: position.to_string(),
@@ -130,20 +163,22 @@ pub(crate) fn responder_method(
             Pat::Ident(pattern_ident) => pattern_ident.ident.clone(),
             _ => format_ident!("argument_{position}"),
         };
-        let binding = if let Some(attribute) = route_parameter {
+        let binding = if let Some(attribute) = form_request {
+            classify_form_request(attribute, &pattern_type.ty, responder, position)?
+        } else if let Some(attribute) = route_parameter {
             let arguments = AttributeArgs::from_attribute(attribute)?;
             let route_arguments = RouteParameterArguments::parse(&arguments, responder, position)?;
 
             classify(responder, route_arguments, &pattern_type.ty, registries)?
         } else {
-            RouteParameterBinding::CurrentRequest
+            ResponderArgumentBinding::CurrentRequest
         };
 
-        parameters.push(RouteParameter { holder, binding });
+        arguments.push(ResponderArgument { holder, binding });
     }
 
     Ok(ResponderSignature {
         output: responder_output(method, registries),
-        parameters,
+        arguments,
     })
 }

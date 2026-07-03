@@ -120,7 +120,7 @@ mod tests {
             &[],
         );
 
-        assert!(source.contains("_cancellation_token:margaret_service::CancellationToken"));
+        assert!(source.contains("_cancellation_token:tokio_util::sync::CancellationToken"));
         assert!(source.contains("self.inner.run().await?;Ok(())"));
     }
 

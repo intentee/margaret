@@ -97,8 +97,8 @@ pub(crate) fn http_routes(
         layers.reverse();
 
         let ResponderSignature {
+            arguments,
             output: responder_output,
-            parameters: route_parameters,
         } = responder_method(item, &responder, &registries)?;
         let path_parameters =
             path_parameter_names(&path).map_err(|source| HttpCodegenError::InvalidRoutePath {
@@ -107,8 +107,8 @@ pub(crate) fn http_routes(
                 source,
             })?;
 
-        for route_parameter in &route_parameters {
-            if let Some(path_key) = route_parameter.binding.path_key()
+        for argument in &arguments {
+            if let Some(path_key) = argument.binding.path_key()
                 && !path_parameters.iter().any(|name| name == path_key)
             {
                 return Err(HttpCodegenError::RouteParameterNotInPath {
@@ -144,7 +144,7 @@ pub(crate) fn http_routes(
             responder_field: format_ident!("{}", item.canonical_path().field_name()),
             responder_output,
             responder_path: item.canonical_path().clone(),
-            route_parameters,
+            arguments,
             server,
         });
     }

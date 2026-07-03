@@ -1,0 +1,18 @@
+[package]
+name = "margaret_http_validation"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+margaret_http = { path = "../margaret_http" }
+margaret_validation = { path = "../margaret_validation" }
+serde = { workspace = true }
+validator = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+validator = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

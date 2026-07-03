@@ -1,0 +1,92 @@
+use serde::de::DeserializeOwned;
+use validator::Validate;
+
+use margaret_http::request::Request;
+use margaret_validation::validation_result::ValidationResult;
+
+use crate::request_input::RequestInput;
+
+pub fn validate_input<Model>(request: &Request, source: RequestInput) -> ValidationResult<Model>
+where
+    Model: DeserializeOwned + Validate,
+{
+    match source {
+        RequestInput::Form => margaret_validation::validate::validate(&request.inputs.form),
+        RequestInput::Query => margaret_validation::validate::validate(&request.inputs.query),
+        RequestInput::Json => {
+            margaret_validation::validate_json::validate_json(request.inputs.json.as_ref())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde_json::json;
+
+    use margaret_http::method::Method;
+    use margaret_http::request::Request;
+    use margaret_validation::validation_result::ValidationResult;
+
+    use super::validate_input;
+    use crate::request_input::RequestInput;
+
+    #[derive(Debug, serde::Deserialize, validator::Validate)]
+    struct Sample {
+        #[validate(length(min = 1))]
+        value: String,
+    }
+
+    fn value(result: ValidationResult<Sample>) -> Option<String> {
+        match result {
+            ValidationResult::Valid(sample) => Some(sample.value),
+            ValidationResult::Invalid(_) | ValidationResult::Malformed(_) => None,
+        }
+    }
+
+    fn request() -> Request {
+        Request::new(Method::Get, "/".to_string())
+    }
+
+    #[test]
+    fn validates_the_form_source() {
+        let mut request = request();
+        request.inputs.form = HashMap::from([("value".to_string(), "formed".to_string())]);
+
+        assert_eq!(
+            value(validate_input(&request, RequestInput::Form)),
+            Some("formed".to_string())
+        );
+    }
+
+    #[test]
+    fn validates_the_query_source() {
+        let mut request = request();
+        request.inputs.query = HashMap::from([("value".to_string(), "queried".to_string())]);
+
+        assert_eq!(
+            value(validate_input(&request, RequestInput::Query)),
+            Some("queried".to_string())
+        );
+    }
+
+    #[test]
+    fn validates_the_json_source() {
+        let mut request = request();
+        request.inputs.json = Some(json!({ "value": "jsoned" }));
+
+        assert_eq!(
+            value(validate_input(&request, RequestInput::Json)),
+            Some("jsoned".to_string())
+        );
+    }
+
+    #[test]
+    fn reports_invalid_source_data() {
+        let mut request = request();
+        request.inputs.form = HashMap::from([("value".to_string(), String::new())]);
+
+        assert_eq!(value(validate_input(&request, RequestInput::Form)), None);
+    }
+}

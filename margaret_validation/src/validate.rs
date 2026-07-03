@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use serde::de::DeserializeOwned;
-use serde::de::value::Error as DeserializeError;
-use serde::de::value::MapDeserializer;
+use serde_json::Value;
 use validator::Validate;
 
 use crate::validation_result::ValidationResult;
@@ -11,22 +10,18 @@ pub fn validate<Model>(data: &HashMap<String, String>) -> ValidationResult<Model
 where
     Model: DeserializeOwned + Validate,
 {
-    let deserialized: Result<Model, DeserializeError> = Model::deserialize(MapDeserializer::new(
+    let value = Value::Object(
         data.iter()
-            .map(|(name, value)| (name.as_str(), value.as_str())),
-    ));
+            .map(|(name, value)| (name.clone(), Value::String(value.clone())))
+            .collect(),
+    );
 
-    match deserialized {
-        Ok(model) => ValidationResult::from_model(model),
-        Err(source) => ValidationResult::from_deserialize_error(source),
-    }
+    ValidationResult::from_value(&value)
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-
-    use validator::ValidationErrors;
 
     use super::validate;
     use crate::validation_result::ValidationResult;
@@ -34,39 +29,49 @@ mod tests {
     #[derive(Debug, serde::Deserialize, validator::Validate)]
     struct Sample {
         #[validate(length(min = 1))]
-        value: String,
+        required: String,
+        #[validate(length(min = 1))]
+        optional: Option<String>,
     }
 
-    fn outcome(data: &HashMap<String, String>) -> Result<Sample, ValidationErrors> {
+    fn outcome(data: &HashMap<String, String>) -> Result<Sample, &'static str> {
         match validate::<Sample>(data) {
             ValidationResult::Valid(sample) => Ok(sample),
-            ValidationResult::Invalid(errors) => Err(errors),
+            ValidationResult::Invalid(_) => Err("invalid"),
+            ValidationResult::Malformed(_) => Err("malformed"),
         }
     }
 
     #[test]
-    fn maps_and_accepts_a_valid_form() {
-        let data = HashMap::from([("value".to_string(), "hello".to_string())]);
+    fn accepts_valid_fields() {
+        let data = HashMap::from([
+            ("required".to_string(), "here".to_string()),
+            ("optional".to_string(), "present".to_string()),
+        ]);
+        let sample = outcome(&data).expect("a valid form");
 
-        assert_eq!(outcome(&data).expect("a valid form").value, "hello");
+        assert_eq!(sample.required, "here");
+        assert_eq!(sample.optional.as_deref(), Some("present"));
+    }
+
+    #[test]
+    fn treats_a_missing_optional_field_as_absent() {
+        let data = HashMap::from([("required".to_string(), "here".to_string())]);
+
+        assert_eq!(outcome(&data).expect("a valid form").optional, None);
     }
 
     #[test]
     fn reports_a_rule_violation_as_invalid() {
-        let data = HashMap::from([("value".to_string(), String::new())]);
+        let data = HashMap::from([("required".to_string(), String::new())]);
 
-        assert!(
-            outcome(&data)
-                .expect_err("an invalid form")
-                .errors()
-                .contains_key("value")
-        );
+        assert_eq!(outcome(&data).expect_err("an invalid form"), "invalid");
     }
 
     #[test]
-    fn reports_a_missing_field_as_invalid() {
+    fn reports_missing_required_data_as_malformed() {
         let data = HashMap::new();
 
-        assert!(!outcome(&data).expect_err("an invalid form").is_empty());
+        assert_eq!(outcome(&data).expect_err("a malformed form"), "malformed");
     }
 }

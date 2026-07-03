@@ -31,7 +31,7 @@ pub fn runner(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn responder(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, &["route_parameter"])
+    strip_parameter_markers(item, &["route_parameter", "form_request"])
 }
 
 #[proc_macro_attribute]
@@ -126,18 +126,21 @@ mod tests {
                 pub async fn respond(
                     &self,
                     #[route_parameter] id: String,
+                    #[form_request(from = Form)] form: ValidationResult<Data>,
                     #[console_argument] name: String,
                 ) -> Response {
                     Response::text(200, id)
                 }
             },
-            &["route_parameter", "console_argument"],
+            &["route_parameter", "form_request", "console_argument"],
         )
         .to_string();
 
         assert!(!stripped.contains("route_parameter"));
+        assert!(!stripped.contains("form_request"));
         assert!(!stripped.contains("console_argument"));
         assert!(stripped.contains("id"));
+        assert!(stripped.contains("form"));
         assert!(stripped.contains("name"));
     }
 

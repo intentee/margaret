@@ -42,11 +42,36 @@ pub enum HttpCodegenError {
     MissingResponderMethod { responder: String },
 
     #[error(
-        "parameter '{parameter}' of responder '{responder}' must be a route parameter or the current request"
+        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a form request, or the current request"
     )]
     UnmarkedResponderParameter {
         responder: String,
         parameter: String,
+    },
+
+    #[error(
+        "argument #{parameter} of responder '{responder}' has both #[route_parameter] and #[form_request]; a responder argument may use at most one"
+    )]
+    ConflictingArgumentMarkers {
+        responder: String,
+        parameter: String,
+    },
+
+    #[error(
+        "form request argument #{parameter} of responder '{responder}' is missing `from = <source>`; it must name the request input source it validates"
+    )]
+    FormRequestMissingSource {
+        responder: String,
+        parameter: String,
+    },
+
+    #[error(
+        "form request argument #{parameter} of responder '{responder}' names an unknown request input source '{written}'; expected Form, Query, or Json"
+    )]
+    UnknownRequestInput {
+        responder: String,
+        parameter: String,
+        written: String,
     },
 
     #[error(

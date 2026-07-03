@@ -1,6 +1,9 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
-pub(crate) enum RouteParameterBinding {
+use crate::form_request_extraction::FormRequestExtraction;
+use crate::request_input_source::RequestInputSource;
+
+pub(crate) enum ResponderArgumentBinding {
     CurrentRequest,
     Raw {
         path_key: String,
@@ -9,9 +12,13 @@ pub(crate) enum RouteParameterBinding {
         binder: CanonicalPath,
         path_key: String,
     },
+    FormRequest {
+        source: RequestInputSource,
+        extraction: FormRequestExtraction,
+    },
 }
 
-impl RouteParameterBinding {
+impl ResponderArgumentBinding {
     pub(crate) fn is_bound(&self) -> bool {
         matches!(self, Self::Bound { .. })
     }

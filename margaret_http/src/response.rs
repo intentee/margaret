@@ -40,6 +40,10 @@ impl Response {
         self.header("set-cookie", cookie.to_string())
     }
 
+    pub fn status(&self) -> u16 {
+        self.status
+    }
+
     pub fn text(status: u16, body: impl Into<String>) -> Self {
         Self {
             body: body.into(),
@@ -69,12 +73,14 @@ mod tests {
 
     #[test]
     fn builds_an_http_response_with_status_and_headers() {
-        let response = Response::text(201, "created")
-            .header("x-marker", "on")
-            .into_http();
+        let response = Response::text(201, "created").header("x-marker", "on");
 
-        assert_eq!(response.status().as_u16(), 201);
-        assert!(response.headers().contains_key("x-marker"));
+        assert_eq!(response.status(), 201);
+
+        let http = response.into_http();
+
+        assert_eq!(http.status().as_u16(), 201);
+        assert!(http.headers().contains_key("x-marker"));
     }
 
     #[test]

@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_macros::constructor;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
-use margaret_validation::ValidationResult;
-use margaret_validation::validate;
 
 use crate::forms::post_article_form::PostArticleForm;
 use crate::repositories::article_repository::ArticleRepository;
@@ -25,16 +22,14 @@ impl PostArticle {
     }
 
     #[responder]
-    pub async fn respond(&self, request: &Request) -> Response {
-        let PostArticleForm {
+    pub async fn respond(
+        &self,
+        #[form_request(from = Form)] PostArticleForm {
             title,
             body,
             author_id,
-        } = match validate::<PostArticleForm>(&request.inputs.form) {
-            ValidationResult::Valid(form) => form,
-            ValidationResult::Invalid(errors) => return Response::text(422, errors.to_string()),
-        };
-
+        }: PostArticleForm,
+    ) -> Response {
         let article = self.articles.insert(title, body, author_id);
 
         Response::text(201, format!("created \"{}\"", article.title))

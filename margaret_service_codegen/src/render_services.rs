@@ -67,10 +67,10 @@ fn adapter(unit: &ServiceUnit) -> TokenStream {
         }
 
         #[async_trait::async_trait]
-        impl margaret_service::Service for #name {
+        impl trzcina::Service for #name {
             async fn run(
                 self: Box<Self>,
-                #token_binding: margaret_service::CancellationToken,
+                #token_binding: tokio_util::sync::CancellationToken,
             ) -> anyhow::Result<()> {
                 #body
             }
@@ -165,9 +165,9 @@ pub fn render_services(
         pub async fn serve(
             container: &Container,
             #matches_binding: &clap::ArgMatches,
-            cancellation_token: margaret_service::CancellationToken,
+            cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret_console::command_outcome::CommandOutcome {
-            let mut manager = margaret_service::ServiceManager::default();
+            let mut manager = trzcina::ServiceManager::default();
 
             #server_registration
             #(#registrations)*
@@ -175,7 +175,7 @@ pub fn render_services(
             margaret_service::run::run(
                 manager,
                 cancellation_token,
-                margaret_service::ServiceShutdownOptions::default(),
+                trzcina::ServiceShutdownOptions::default(),
             )
             .await
         }

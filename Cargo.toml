@@ -9,6 +9,7 @@ members = [
     "margaret_example",
     "margaret_http",
     "margaret_http_codegen",
+    "margaret_http_validation",
     "margaret_macros",
     "margaret_service",
     "margaret_service_codegen",

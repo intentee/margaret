@@ -2,11 +2,11 @@ use anyhow::Result;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use tokio_util::sync::CancellationToken;
+use trzcina::Service;
+use trzcina::ServiceManager;
+use trzcina::ServiceShutdownOptions;
 
 use margaret_console::command_outcome::CommandOutcome;
-use margaret_service::Service;
-use margaret_service::ServiceManager;
-use margaret_service::ServiceShutdownOptions;
 use margaret_service::run::run;
 
 struct Completes;

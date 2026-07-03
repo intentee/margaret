@@ -619,12 +619,14 @@ dependencies = [
  "margaret_codegen",
  "margaret_console",
  "margaret_http",
+ "margaret_http_validation",
  "margaret_macros",
  "margaret_service",
  "margaret_validation",
  "serde",
  "tokio",
  "tokio-util",
+ "trzcina",
  "validator",
 ]
 
@@ -665,6 +667,17 @@ dependencies = [
  "syn",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "margaret_http_validation"
+version = "0.1.0"
+dependencies = [
+ "margaret_http",
+ "margaret_validation",
+ "serde",
+ "serde_json",
+ "validator",
 ]
 
 [[package]]
@@ -716,6 +729,7 @@ dependencies = [
  "margaret_service",
  "tokio",
  "tokio-util",
+ "trzcina",
 ]
 
 [[package]]

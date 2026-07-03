@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
-use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_macros::constructor;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
-use margaret_validation::ValidationResult;
-use margaret_validation::validate_json;
+use margaret_validation::validation_result::ValidationResult;
 
 use crate::forms::post_article_form::PostArticleForm;
 use crate::repositories::article_repository::ArticleRepository;
@@ -25,18 +23,20 @@ impl PostArticleImport {
     }
 
     #[responder]
-    pub async fn respond(&self, request: &Request) -> Response {
-        let Some(payload) = &request.inputs.json else {
-            return Response::text(415, "a JSON request body is required");
-        };
-
+    pub async fn respond(
+        &self,
+        #[form_request(from = Json)] form: ValidationResult<PostArticleForm>,
+    ) -> Response {
         let PostArticleForm {
             title,
             body,
             author_id,
-        } = match validate_json::<PostArticleForm>(payload) {
+        } = match form {
             ValidationResult::Valid(form) => form,
             ValidationResult::Invalid(errors) => return Response::text(422, errors.to_string()),
+            ValidationResult::Malformed(malformation) => {
+                return Response::text(400, malformation.to_string());
+            }
         };
 
         let article = self.articles.insert(title, body, author_id);

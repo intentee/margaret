@@ -1,5 +1,7 @@
 mod active_servers;
 mod build_registry;
+mod form_request_arguments;
+mod form_request_extraction;
 pub mod generate_http_source;
 pub mod has_responders;
 pub mod http_artifacts;
@@ -17,12 +19,13 @@ mod path_parameter_names;
 mod registries;
 mod render;
 pub mod render_http;
+mod request_input_source;
+mod responder_argument;
+mod responder_argument_binding;
 mod responder_method;
 mod responder_output;
 mod responder_signature;
-mod route_parameter;
 mod route_parameter_arguments;
-mod route_parameter_binding;
 
 #[cfg(test)]
 mod tests {
@@ -652,5 +655,94 @@ impl GetMetrics {
         );
 
         assert!(message.contains("failed to index"));
+    }
+
+    #[test]
+    fn injects_a_form_request_from_the_form_source() {
+        let source = source_for(
+            "#[responds_to_http(method = Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[responder]\n    fn respond(&self, #[form_request(from = Form)] data: ValidationResult<Data>) -> Response {}\n}\n",
+        );
+
+        assert!(
+            source.contains("margaret_http_validation::validate_input::validate_input(request,")
+        );
+        assert!(source.contains("margaret_http_validation::request_input::RequestInput::Form"));
+        assert!(source.contains("responder.respond(data).await"));
+    }
+
+    #[test]
+    fn injects_a_form_request_from_the_query_source() {
+        let source = source_for(
+            "#[responds_to_http(method = Get, path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[responder]\n    fn respond(&self, #[form_request(from = Query)] data: ValidationResult<Data>) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("margaret_http_validation::request_input::RequestInput::Query"));
+    }
+
+    #[test]
+    fn injects_a_form_request_from_the_json_source() {
+        let source = source_for(
+            "#[responds_to_http(method = Post, path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[responder]\n    fn respond(&self, #[form_request(from = Json)] data: ValidationResult<Data>) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("margaret_http_validation::request_input::RequestInput::Json"));
+    }
+
+    #[test]
+    fn rejects_a_form_request_without_a_source() {
+        let message = error_for(
+            "#[responds_to_http(method = Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[responder]\n    fn respond(&self, #[form_request] data: ValidationResult<Data>) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("must name the request input source it validates"));
+    }
+
+    #[test]
+    fn rejects_a_form_request_with_an_unknown_source() {
+        let message = error_for(
+            "#[responds_to_http(method = Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[responder]\n    fn respond(&self, #[form_request(from = Cookies)] data: ValidationResult<Data>) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("unknown request input source 'Cookies'"));
+    }
+
+    #[test]
+    fn rejects_an_argument_with_conflicting_markers() {
+        let message = error_for(
+            "#[responds_to_http(method = Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[responder]\n    fn respond(&self, #[route_parameter(from = \"x\")] #[form_request(from = Form)] data: ValidationResult<Data>) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("both #[route_parameter] and #[form_request]"));
+    }
+
+    #[test]
+    fn rejects_a_non_path_form_request_source() {
+        let message = error_for(
+            "#[responds_to_http(method = Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[responder]\n    fn respond(&self, #[form_request(from = 5)] data: ValidationResult<Data>) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("failed to index"));
+    }
+
+    #[test]
+    fn propagates_malformed_form_request_arguments() {
+        let message = error_for(
+            "#[responds_to_http(method = Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[responder]\n    fn respond(&self, #[form_request(= 5)] data: ValidationResult<Data>) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("failed to index"));
+    }
+
+    #[test]
+    fn injects_a_guarded_form_request_as_a_bare_model() {
+        let source = source_for(
+            "#[responds_to_http(method = Post, path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[responder]\n    fn respond(&self, #[form_request(from = Form)] data: Data) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("margaret_http_validation::require_input::require_input(request,"));
+        assert!(source.contains("margaret_http_validation::request_input::RequestInput::Form"));
+        assert!(source.contains("Ok(model)=>model"));
+        assert!(source.contains("Err(response)=>returnresponse.into()"));
+        assert!(source.contains("responder.respond(data).await"));
     }
 }

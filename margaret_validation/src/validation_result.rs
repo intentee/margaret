@@ -1,38 +1,26 @@
-use std::borrow::Cow;
-use std::fmt::Display;
-
+use serde::de::DeserializeOwned;
+use serde_json::Value;
 use validator::Validate;
-use validator::ValidationError;
 use validator::ValidationErrors;
 
-const DESERIALIZE_FIELD: &str = "_input";
-
-fn deserialize_errors<Source>(source: Source) -> ValidationErrors
-where
-    Source: Display,
-{
-    let mut errors = ValidationErrors::new();
-
-    errors.add(
-        DESERIALIZE_FIELD,
-        ValidationError::new("deserialize").with_message(Cow::Owned(source.to_string())),
-    );
-
-    errors
-}
+use crate::malformation::Malformation;
 
 #[derive(Debug)]
 pub enum ValidationResult<Model> {
     Valid(Model),
     Invalid(ValidationErrors),
+    Malformed(Malformation),
 }
 
-impl<Model> ValidationResult<Model> {
-    pub(crate) fn from_deserialize_error<Source>(source: Source) -> Self
-    where
-        Source: Display,
-    {
-        Self::Invalid(deserialize_errors(source))
+impl<Model> ValidationResult<Model>
+where
+    Model: DeserializeOwned + Validate,
+{
+    pub(crate) fn from_value(value: &Value) -> Self {
+        match Model::deserialize(value) {
+            Ok(model) => Self::from_model(model),
+            Err(_) => Self::Malformed(Malformation::Unreadable),
+        }
     }
 }
 

@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_macros::constructor;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
+use crate::forms::get_articles_form::GetArticlesForm;
 use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
@@ -22,8 +22,11 @@ impl GetArticles {
     }
 
     #[responder]
-    pub async fn respond(&self, request: &Request) -> Response {
-        let author = request.inputs.query.get("author").map(String::as_str);
+    pub async fn respond(
+        &self,
+        #[form_request(from = Query)] GetArticlesForm { author }: GetArticlesForm,
+    ) -> Response {
+        let author = author.as_deref();
         let titles = self
             .articles
             .all()

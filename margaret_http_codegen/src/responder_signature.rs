@@ -1,7 +1,7 @@
+use crate::responder_argument::ResponderArgument;
 use crate::responder_output::ResponderOutput;
-use crate::route_parameter::RouteParameter;
 
 pub(crate) struct ResponderSignature {
+    pub(crate) arguments: Vec<ResponderArgument>,
     pub(crate) output: ResponderOutput,
-    pub(crate) parameters: Vec<RouteParameter>,
 }

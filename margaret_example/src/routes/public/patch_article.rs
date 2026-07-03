@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_macros::constructor;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
-use margaret_validation::ValidationResult;
-use margaret_validation::validate;
 
 use crate::forms::patch_article_form::PatchArticleForm;
 use crate::models::article::Article;
@@ -28,7 +25,6 @@ impl PatchArticle {
     #[responder]
     pub async fn respond(
         &self,
-        request: &Request,
         #[route_parameter(from = "article")] Article {
             id,
             title: current_title,
@@ -37,15 +33,8 @@ impl PatchArticle {
             published,
             created_at,
         }: Article,
+        #[form_request(from = Form)] PatchArticleForm { title, body }: PatchArticleForm,
     ) -> Response {
-        let PatchArticleForm { title, body } =
-            match validate::<PatchArticleForm>(&request.inputs.form) {
-                ValidationResult::Valid(form) => form,
-                ValidationResult::Invalid(errors) => {
-                    return Response::text(422, errors.to_string());
-                }
-            };
-
         let title = title.unwrap_or(current_title);
         let body = body.unwrap_or(current_body);
 

@@ -7,11 +7,12 @@ use quote::quote;
 
 use margaret_attributes::path_tokens::path_tokens;
 
+use crate::form_request_extraction::FormRequestExtraction;
 use crate::http_route::HttpRoute;
 use crate::http_server::HttpServer;
+use crate::responder_argument::ResponderArgument;
+use crate::responder_argument_binding::ResponderArgumentBinding;
 use crate::responder_output::ResponderOutput;
-use crate::route_parameter::RouteParameter;
-use crate::route_parameter_binding::RouteParameterBinding;
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
@@ -21,20 +22,17 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let responder = &route.responder_field;
     let responder_type = path_tokens(&route.responder_path);
     let responder_access = access(quote! { container.#responder() });
-    let request_binding = if route.route_parameters.is_empty() {
+    let request_binding = if route.arguments.is_empty() {
         format_ident!("_request")
     } else {
         format_ident!("request")
     };
 
     let bindings = route
-        .route_parameters
+        .arguments
         .iter()
-        .map(|route_parameter| parameter_binding(route_parameter, &request_binding));
-    let arguments = route
-        .route_parameters
-        .iter()
-        .map(|route_parameter| &route_parameter.holder);
+        .map(|argument| argument_binding(argument, &request_binding));
+    let arguments = route.arguments.iter().map(|argument| &argument.holder);
     let respond_call = quote! { responder.respond(#(#arguments),*).await };
     let body_tail = match &route.responder_output {
         ResponderOutput::Plain => quote! {
@@ -120,18 +118,18 @@ fn onion(route: &HttpRoute) -> TokenStream {
     handler
 }
 
-fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> TokenStream {
-    let holder = &route_parameter.holder;
+fn argument_binding(argument: &ResponderArgument, request: &Ident) -> TokenStream {
+    let holder = &argument.holder;
 
-    match &route_parameter.binding {
-        RouteParameterBinding::Raw { path_key } => {
+    match &argument.binding {
+        ResponderArgumentBinding::Raw { path_key } => {
             let message = format!("the route guarantees the '{path_key}' path parameter");
 
             quote! {
                 let #holder = #request.path_param(#path_key).expect(#message).to_string();
             }
         }
-        RouteParameterBinding::CurrentRequest => {
+        ResponderArgumentBinding::CurrentRequest => {
             if holder == request {
                 TokenStream::new()
             } else {
@@ -140,7 +138,7 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
                 }
             }
         }
-        RouteParameterBinding::Bound { binder, path_key } => {
+        ResponderArgumentBinding::Bound { binder, path_key } => {
             let binder_field = format_ident!("{}", binder.field_name());
             let message = format!("the route guarantees the '{path_key}' path parameter");
 
@@ -154,14 +152,35 @@ fn parameter_binding(route_parameter: &RouteParameter, request: &Ident) -> Token
                 };
             }
         }
+        ResponderArgumentBinding::FormRequest { source, extraction } => {
+            let variant = source.variant();
+
+            match extraction {
+                FormRequestExtraction::Result => quote! {
+                    let #holder = margaret_http_validation::validate_input::validate_input(
+                        #request,
+                        margaret_http_validation::request_input::RequestInput::#variant,
+                    );
+                },
+                FormRequestExtraction::Model => quote! {
+                    let #holder = match margaret_http_validation::require_input::require_input(
+                        #request,
+                        margaret_http_validation::request_input::RequestInput::#variant,
+                    ) {
+                        Ok(model) => model,
+                        Err(response) => return response.into(),
+                    };
+                },
+            }
+        }
     }
 }
 
 fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
     let mut fields: BTreeSet<String> = BTreeSet::new();
 
-    for route_parameter in &route.route_parameters {
-        if let RouteParameterBinding::Bound { binder, .. } = &route_parameter.binding {
+    for argument in &route.arguments {
+        if let ResponderArgumentBinding::Bound { binder, .. } = &argument.binding {
             fields.insert(binder.field_name());
         }
     }
