@@ -18,6 +18,8 @@
 - never add syntax sugar of any kind; optimize the base architecture instead
 - the codebase must never panic (panics are only allowed in the tests)
 - generated code must never panic
+- generated code must also follow all the local, and global rules (including module organization, rust code structure, and such)
+- generate code must be minimal; if anything can be a part of a framework (and unit tested), it must be
 
 ## Dependency Injection Container
 

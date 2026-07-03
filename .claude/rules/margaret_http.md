@@ -48,12 +48,24 @@ Specific attribute rules:
 - temporary directory for uploads must be configurable per-server through CLI server flag (defaults to system TMP dir)
 - request object must not be clone-able, and most not be cloned, or copied at any point; its properties must not be cloned or copied at any point in the framework
 - request object must not be mutable in any way
+- request object must carry the `Server` struct with the information about the server (`margaret_http/src/server.rs`)
 - all the request fields that are keyed (equivalents to $_POST, $_GET, $_COOKIE, $_SERVER, $_FILES, path params etc), must be accessible with O(1) complexity
 - make sure there are no aliases; specific information needs to be reachable in exactly one way (for example if $_SERVER has 'remote_addr' do not expose the same field again in Request)
 
-# `margaret_http` middleware
+# `margaret_http` routes object
 
-- middleware handlers must unconditionally have a signature of `process(request, next)`, where `request` is the current request, and `next` invokes the next handler; they need to return ResponseContinuation
+Routes object must be generated so linking between routes must be validated during compile time.
+
+It must be usable with this API: `router.<server_name>.<route_name>.<action>()`. Notice that only `action` is a method, prior chain members are regular properties.
+
+- supported `<action>`:
+    - `forward_to(<route_name>)`, for example `router.public.get_article.forward_to(GetArticleRouteProps{ ... })` (`GetArticleRouteProps` also must be generated at compile time)
+    - `forward_to` should only work for GET routes (because it doesn't carry over any data for different kinds of routes)
+- routes object is generated out of all the named routes at compile time
+- cross-server redirects and references must be supported
+- routes object must be constructed exactly once during the entire application lifecycle
+- routes, and servers within routes object must be accessible with O(1) complexity
+
 
 # `margaret_http` lifecycle algorithm
 
