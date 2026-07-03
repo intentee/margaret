@@ -6,7 +6,10 @@ use margaret_macros::constructor;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
+use margaret_validation::ValidationResult;
+use margaret_validation::validate_json;
 
+use crate::forms::post_article_form::PostArticleForm;
 use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
@@ -23,21 +26,20 @@ impl PostArticleImport {
 
     #[responder]
     pub async fn respond(&self, request: &Request) -> Response {
-        let Some(payload) = request.json() else {
+        let Some(payload) = &request.inputs.json else {
             return Response::text(415, "a JSON request body is required");
         };
 
-        let (Some(title), Some(body), Some(author_id)) = (
-            payload["title"].as_str(),
-            payload["body"].as_str(),
-            payload["author_id"].as_str(),
-        ) else {
-            return Response::text(422, "title, body, and author_id are required");
+        let PostArticleForm {
+            title,
+            body,
+            author_id,
+        } = match validate_json::<PostArticleForm>(payload) {
+            ValidationResult::Valid(form) => form,
+            ValidationResult::Invalid(errors) => return Response::text(422, errors.to_string()),
         };
 
-        let article =
-            self.articles
-                .insert(title.to_string(), body.to_string(), author_id.to_string());
+        let article = self.articles.insert(title, body, author_id);
 
         Response::text(201, format!("imported \"{}\"", article.title))
     }

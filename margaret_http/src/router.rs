@@ -45,8 +45,8 @@ impl Router {
     }
 
     pub async fn respond(&self, request: Request) -> Response {
-        let path = request.server().path().to_string();
-        let method = request.server().method();
+        let path = request.inputs.server.path().to_string();
+        let method = request.inputs.server.method();
 
         let matched = match self.matcher.at(&path) {
             Ok(matched) => matched,

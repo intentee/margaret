@@ -30,8 +30,8 @@ impl HttpMiddleware for RequestLog {
     async fn process(&self, request: &Request, next: Next) -> ResponseContinuation {
         let line = format!(
             "{:?} {}",
-            request.server().method(),
-            request.server().path()
+            request.inputs.server.method(),
+            request.inputs.server.path()
         );
 
         for sink in &self.sinks {

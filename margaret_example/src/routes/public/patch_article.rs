@@ -6,7 +6,10 @@ use margaret_macros::constructor;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
+use margaret_validation::ValidationResult;
+use margaret_validation::validate;
 
+use crate::forms::patch_article_form::PatchArticleForm;
 use crate::models::article::Article;
 use crate::repositories::article_repository::ArticleRepository;
 
@@ -35,14 +38,16 @@ impl PatchArticle {
             created_at,
         }: Article,
     ) -> Response {
-        let title = match request.form("title") {
-            Some(title) => title.to_string(),
-            None => current_title,
-        };
-        let body = match request.form("body") {
-            Some(body) => body.to_string(),
-            None => current_body,
-        };
+        let PatchArticleForm { title, body } =
+            match validate::<PatchArticleForm>(&request.inputs.form) {
+                ValidationResult::Valid(form) => form,
+                ValidationResult::Invalid(errors) => {
+                    return Response::text(422, errors.to_string());
+                }
+            };
+
+        let title = title.unwrap_or(current_title);
+        let body = body.unwrap_or(current_body);
 
         self.articles.save(Article {
             id,

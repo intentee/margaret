@@ -13,6 +13,7 @@ members = [
     "margaret_service",
     "margaret_service_codegen",
     "margaret_service_tests",
+    "margaret_validation",
 ]
 
 [workspace.dependencies]
@@ -35,6 +36,7 @@ multer = "=3.1.0"
 prettyplease = "=0.2.37"
 proc-macro2 = "=1.0.106"
 quote = "=1.0.46"
+serde = "=1.0.228"
 serde_json = "=1.0.150"
 syn = { version = "=2.0.118", features = ["full", "extra-traits"] }
 tempfile = "=3.20.0"
@@ -43,6 +45,7 @@ tokio = "=1.52.3"
 tokio-util = "=0.7.18"
 tower = "=0.5.3"
 trzcina = "=0.3.0"
+validator = "=0.20.0"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }

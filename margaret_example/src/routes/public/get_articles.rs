@@ -23,7 +23,7 @@ impl GetArticles {
 
     #[responder]
     pub async fn respond(&self, request: &Request) -> Response {
-        let author = request.query("author");
+        let author = request.inputs.query.get("author").map(String::as_str);
         let titles = self
             .articles
             .all()

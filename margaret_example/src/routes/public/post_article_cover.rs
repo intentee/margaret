@@ -17,7 +17,7 @@ impl PostArticleCover {
         request: &Request,
         #[route_parameter(from = "article")] Article { title, .. }: Article,
     ) -> Response {
-        let Some(cover) = request.file("cover") else {
+        let Some(cover) = request.inputs.files.get("cover") else {
             return Response::text(422, "a \"cover\" file upload is required");
         };
 
@@ -27,7 +27,7 @@ impl PostArticleCover {
                 "stored {} byte {} cover for \"{title}\" from {}",
                 cover.size(),
                 cover.content_type(),
-                request.server().remote_addr(),
+                request.inputs.server.remote_addr(),
             ),
         )
     }

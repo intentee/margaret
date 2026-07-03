@@ -6,7 +6,10 @@ use margaret_macros::constructor;
 use margaret_macros::responder;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
+use margaret_validation::ValidationResult;
+use margaret_validation::validate;
 
+use crate::forms::post_article_form::PostArticleForm;
 use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
@@ -23,17 +26,16 @@ impl PostArticle {
 
     #[responder]
     pub async fn respond(&self, request: &Request) -> Response {
-        let (Some(title), Some(body), Some(author_id)) = (
-            request.form("title"),
-            request.form("body"),
-            request.form("author_id"),
-        ) else {
-            return Response::text(422, "title, body, and author_id are required");
+        let PostArticleForm {
+            title,
+            body,
+            author_id,
+        } = match validate::<PostArticleForm>(&request.inputs.form) {
+            ValidationResult::Valid(form) => form,
+            ValidationResult::Invalid(errors) => return Response::text(422, errors.to_string()),
         };
 
-        let article =
-            self.articles
-                .insert(title.to_string(), body.to_string(), author_id.to_string());
+        let article = self.articles.insert(title, body, author_id);
 
         Response::text(201, format!("created \"{}\"", article.title))
     }

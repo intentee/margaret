@@ -62,13 +62,13 @@ fn index_files(files: Vec<UploadedFile>) -> HashMap<String, UploadedFile> {
     indexed
 }
 
-pub(crate) struct RequestInputs {
-    pub(crate) cookies: HashMap<String, String>,
-    pub(crate) files: HashMap<String, UploadedFile>,
-    pub(crate) json: Option<serde_json::Value>,
-    pub(crate) post: HashMap<String, String>,
-    pub(crate) query: HashMap<String, String>,
-    pub(crate) server: ServerParams,
+pub struct RequestInputs {
+    pub cookies: HashMap<String, String>,
+    pub files: HashMap<String, UploadedFile>,
+    pub json: Option<serde_json::Value>,
+    pub form: HashMap<String, String>,
+    pub query: HashMap<String, String>,
+    pub server: ServerParams,
 }
 
 impl RequestInputs {
@@ -77,7 +77,7 @@ impl RequestInputs {
             cookies: HashMap::new(),
             files: HashMap::new(),
             json: None,
-            post: HashMap::new(),
+            form: HashMap::new(),
             query: HashMap::new(),
             server: ServerParams::new(
                 method,
@@ -105,7 +105,7 @@ impl RequestInputs {
         let query = index_fields(form_fields(uri.query().unwrap_or_default().as_bytes()));
         let mut files = HashMap::new();
         let mut json: Option<serde_json::Value> = None;
-        let mut post = HashMap::new();
+        let mut form = HashMap::new();
 
         match BodyClass::from_headers(&headers)? {
             BodyClass::Multipart { boundary } => {
@@ -115,10 +115,10 @@ impl RequestInputs {
                 } = MultipartBody::parse(body, boundary, upload_config).await?;
 
                 files = index_files(parsed_files);
-                post = index_fields(parsed_post);
+                form = index_fields(parsed_post);
             }
             BodyClass::UrlEncoded => {
-                post = index_fields(form_fields(
+                form = index_fields(form_fields(
                     &collect_limited(body, upload_config.max_body_size()).await?,
                 ));
             }
@@ -145,7 +145,7 @@ impl RequestInputs {
             cookies,
             files,
             json,
-            post,
+            form,
             query,
             server,
         })
@@ -297,7 +297,7 @@ mod tests {
         .expect("the request parses");
 
         assert_eq!(
-            inputs.post.get("username").map(String::as_str),
+            inputs.form.get("username").map(String::as_str),
             Some("margaret")
         );
     }
@@ -381,7 +381,7 @@ mod tests {
         .await
         .expect("the request parses");
 
-        assert_eq!(inputs.post.get("title").map(String::as_str), Some("hello"));
+        assert_eq!(inputs.form.get("title").map(String::as_str), Some("hello"));
         assert_eq!(inputs.files.len(), 2);
 
         let avatar = inputs
@@ -486,7 +486,7 @@ mod tests {
             .await
             .expect("the request parses");
 
-        assert!(inputs.post.is_empty());
+        assert!(inputs.form.is_empty());
         assert!(inputs.files.is_empty());
         assert!(inputs.json.is_none());
     }
