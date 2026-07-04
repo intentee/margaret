@@ -17,37 +17,46 @@ use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio_util::sync::CancellationToken;
 
+use crate::body_limit::BodyLimit;
+use crate::forward_targets::ForwardTargets;
 use crate::request::Request;
 use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
 use crate::response::Response;
 use crate::router::Router;
-use crate::servers::Servers;
+use crate::server_registry::ServerRegistry;
 use crate::upload_config::UploadConfig;
 
 pub struct BoundServer {
+    body_limit: BodyLimit,
+    forward_targets: Arc<ForwardTargets>,
     listener: TcpListener,
     router: Arc<Router>,
-    servers: Arc<Servers>,
     upload_config: Arc<UploadConfig>,
 }
 
 impl BoundServer {
-    pub async fn bind(servers: Arc<Servers>, name: Arc<str>) -> std::io::Result<Self> {
-        let Some(server) = servers.server(&name) else {
+    pub async fn bind(
+        server_registry: Arc<ServerRegistry>,
+        forward_targets: Arc<ForwardTargets>,
+        name: Arc<str>,
+    ) -> std::io::Result<Self> {
+        let Some(server) = server_registry.server(&name) else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "the server is not registered",
             ));
         };
+        let body_limit = server.body_limit();
         let router = server.router().clone();
         let upload_config = server.upload_config().clone();
         let listener = TcpListener::bind(server.address()).await?;
 
         Ok(Self {
+            body_limit,
+            forward_targets,
             listener,
             router,
-            servers,
             upload_config,
         })
     }
@@ -71,8 +80,9 @@ impl BoundServer {
                      remote_addr,
                      stream,
                  }| {
+                    let body_limit = self.body_limit;
+                    let forward_targets = self.forward_targets.clone();
                     let router = self.router.clone();
-                    let servers = self.servers.clone();
                     let upload_config = self.upload_config.clone();
                     let builder = builder.clone();
                     let watcher = graceful.watcher();
@@ -80,8 +90,8 @@ impl BoundServer {
                     tokio::spawn(async move {
                         let service = TowerToHyperService::new(tower::service_fn(
                             move |request: http::Request<Incoming>| {
+                                let forward_targets = forward_targets.clone();
                                 let router = router.clone();
-                                let servers = servers.clone();
                                 let upload_config = upload_config.clone();
 
                                 async move {
@@ -89,7 +99,8 @@ impl BoundServer {
                                         dispatch(
                                             router,
                                             upload_config,
-                                            servers,
+                                            body_limit,
+                                            forward_targets,
                                             remote_addr,
                                             request,
                                         )
@@ -147,7 +158,8 @@ fn error_response(error: RequestError) -> Response {
 async fn dispatch(
     router: Arc<Router>,
     upload_config: Arc<UploadConfig>,
-    servers: Arc<Servers>,
+    body_limit: BodyLimit,
+    forward_targets: Arc<ForwardTargets>,
     remote_addr: SocketAddr,
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
@@ -160,9 +172,19 @@ async fn dispatch(
     } = parts;
     let body = incoming.map_err(std::io::Error::other).boxed_unsync();
 
-    match RequestInputs::parse(method, &uri, headers, remote_addr, body, &upload_config).await {
+    match RequestInputs::parse(
+        method,
+        &uri,
+        headers,
+        remote_addr,
+        body,
+        &body_limit,
+        &upload_config,
+    )
+    .await
+    {
         Ok(inputs) => router
-            .respond(Request::from_inputs(inputs), &servers)
+            .respond(Request::from_inputs(inputs), &forward_targets)
             .await
             .into_http(),
         Err(error) => error_response(error).into_http(),
@@ -183,6 +205,8 @@ mod tests {
     use super::BoundServer;
     use super::accept_outcome;
     use super::error_response;
+    use crate::body_limit::BodyLimit;
+    use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
     use crate::request::Request;
     use crate::request_error::RequestError;
@@ -190,7 +214,7 @@ mod tests {
     use crate::response_continuation::ResponseContinuation;
     use crate::router_builder::RouterBuilder;
     use crate::server::Server;
-    use crate::servers::Servers;
+    use crate::server_registry::ServerRegistry;
     use crate::upload_config::UploadConfig;
 
     struct PlainOk;
@@ -202,19 +226,21 @@ mod tests {
         }
     }
 
-    fn servers_with_one() -> Arc<Servers> {
-        Arc::new(Servers::new(
-            vec![Server::new(
-                "test",
-                "127.0.0.1:0".to_string(),
-                "http://127.0.0.1",
-                UploadConfig::Disabled,
-                RouterBuilder::empty()
-                    .route("GET", "/", Arc::new(PlainOk))
-                    .build(),
-            )],
-            Vec::new(),
-        ))
+    fn registry_with_one() -> Arc<ServerRegistry> {
+        Arc::new(ServerRegistry::new(vec![Server::new(
+            "test",
+            "127.0.0.1:0".to_string(),
+            "http://127.0.0.1",
+            UploadConfig::Disabled,
+            BodyLimit::default(),
+            RouterBuilder::empty()
+                .route("GET", "/", Arc::new(PlainOk))
+                .build(),
+        )]))
+    }
+
+    fn empty_forward_targets() -> Arc<ForwardTargets> {
+        Arc::new(ForwardTargets::new(Vec::new()))
     }
 
     #[test]
@@ -248,26 +274,32 @@ mod tests {
     #[tokio::test]
     async fn fails_to_bind_an_unregistered_server() {
         assert!(
-            BoundServer::bind(servers_with_one(), Arc::from("missing"))
-                .await
-                .is_err()
+            BoundServer::bind(
+                registry_with_one(),
+                empty_forward_targets(),
+                Arc::from("missing")
+            )
+            .await
+            .is_err()
         );
     }
 
     #[tokio::test]
     async fn fails_to_bind_an_invalid_address() {
-        let servers = Arc::new(Servers::new(
-            vec![Server::new(
-                "test",
-                "this is not an address".to_string(),
-                "http://127.0.0.1",
-                UploadConfig::Disabled,
-                RouterBuilder::empty().build(),
-            )],
-            Vec::new(),
-        ));
+        let server_registry = Arc::new(ServerRegistry::new(vec![Server::new(
+            "test",
+            "this is not an address".to_string(),
+            "http://127.0.0.1",
+            UploadConfig::Disabled,
+            BodyLimit::default(),
+            RouterBuilder::empty().build(),
+        )]));
 
-        assert!(BoundServer::bind(servers, Arc::from("test")).await.is_err());
+        assert!(
+            BoundServer::bind(server_registry, empty_forward_targets(), Arc::from("test"))
+                .await
+                .is_err()
+        );
     }
 
     async fn exchange(address: SocketAddr, request: &[u8], close_write: bool) -> String {
@@ -296,9 +328,13 @@ mod tests {
 
     #[tokio::test]
     async fn serves_connections_until_cancellation() {
-        let bound = BoundServer::bind(servers_with_one(), Arc::from("test"))
-            .await
-            .expect("the server binds to an ephemeral port");
+        let bound = BoundServer::bind(
+            registry_with_one(),
+            empty_forward_targets(),
+            Arc::from("test"),
+        )
+        .await
+        .expect("the server binds to an ephemeral port");
         let address = bound.local_addr();
         let cancellation_token = CancellationToken::new();
         let serving = tokio::spawn(bound.serve(cancellation_token.clone()));

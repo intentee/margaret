@@ -32,16 +32,8 @@ impl Response {
         Self::text(404, "Not Found")
     }
 
-    pub fn see_other(location: impl Into<String>) -> Self {
-        Self::text(303, "").header("location", location)
-    }
-
     pub fn set_cookie(self, cookie: Cookie<'static>) -> Self {
         self.header("set-cookie", cookie.to_string())
-    }
-
-    pub fn status(&self) -> u16 {
-        self.status
     }
 
     pub fn text(status: u16, body: impl Into<String>) -> Self {
@@ -50,6 +42,10 @@ impl Response {
             headers: Vec::new(),
             status,
         }
+    }
+
+    pub fn status(&self) -> u16 {
+        self.status
     }
 
     pub(crate) fn into_http(self) -> http::Response<Full<Bytes>> {
@@ -97,20 +93,6 @@ mod tests {
     }
 
     #[test]
-    fn builds_a_see_other_redirect_with_a_location() {
-        let response = Response::see_other("/profile").into_http();
-
-        assert_eq!(response.status().as_u16(), 303);
-        assert_eq!(
-            response
-                .headers()
-                .get("location")
-                .expect("the location header is present"),
-            "/profile"
-        );
-    }
-
-    #[test]
     fn builds_a_forbidden_response() {
         let response = Response::forbidden().into_http();
 
@@ -119,7 +101,7 @@ mod tests {
 
     #[test]
     fn attaches_a_set_cookie_header() {
-        let response = Response::see_other("/profile")
+        let response = Response::text(200, "")
             .set_cookie(Cookie::new("session", "abc"))
             .into_http();
 

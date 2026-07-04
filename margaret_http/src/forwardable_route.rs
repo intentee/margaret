@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::build_url::build_url;
 use crate::forward::Forward;
+use crate::redirect::Redirect;
 use crate::url_segment::UrlSegment;
 
 pub struct ForwardableRoute {
@@ -39,6 +40,18 @@ impl ForwardableRoute {
             .collect();
 
         Forward::new(self.name, path_params)
+    }
+
+    pub fn permanent_redirect(&self) -> Redirect {
+        Redirect::permanent(self.url())
+    }
+
+    pub fn see_other(&self) -> Redirect {
+        Redirect::see_other(self.url())
+    }
+
+    pub fn temporary_redirect(&self) -> Redirect {
+        Redirect::temporary(self.url())
     }
 
     pub fn url(&self) -> String {
@@ -81,6 +94,54 @@ mod tests {
                 .get("article")
                 .map(String::as_str),
             Some("rust")
+        );
+    }
+
+    #[test]
+    fn sees_other_to_the_route_url() {
+        let response = article_route().see_other().into_response().into_http();
+
+        assert_eq!(response.status().as_u16(), 303);
+        assert_eq!(
+            response
+                .headers()
+                .get("location")
+                .expect("the location header is present"),
+            "http://localhost/articles/rust"
+        );
+    }
+
+    #[test]
+    fn temporarily_redirects_to_the_route_url() {
+        let response = article_route()
+            .temporary_redirect()
+            .into_response()
+            .into_http();
+
+        assert_eq!(response.status().as_u16(), 307);
+        assert_eq!(
+            response
+                .headers()
+                .get("location")
+                .expect("the location header is present"),
+            "http://localhost/articles/rust"
+        );
+    }
+
+    #[test]
+    fn permanently_redirects_to_the_route_url() {
+        let response = article_route()
+            .permanent_redirect()
+            .into_response()
+            .into_http();
+
+        assert_eq!(response.status().as_u16(), 308);
+        assert_eq!(
+            response
+                .headers()
+                .get("location")
+                .expect("the location header is present"),
+            "http://localhost/articles/rust"
         );
     }
 }

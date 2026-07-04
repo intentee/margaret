@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::forward_targets::ForwardTargets;
 use crate::handler::Handler;
 use crate::request::Request;
 use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
-use crate::servers::Servers;
 
 pub struct Router {
     matcher: matchit::Router<usize>,
@@ -20,7 +20,11 @@ impl Router {
         Self { matcher, routes }
     }
 
-    pub(crate) async fn respond(&self, request: Request, servers: &Arc<Servers>) -> Response {
+    pub(crate) async fn respond(
+        &self,
+        request: Request,
+        forward_targets: &Arc<ForwardTargets>,
+    ) -> Response {
         let path = request.inputs.server.path().to_string();
         let method = request.inputs.server.method();
 
@@ -40,7 +44,7 @@ impl Router {
             .collect();
         let request = request.with_path_params(path_params);
 
-        respond_recursively(servers, request, handler).await
+        respond_recursively(forward_targets, request, handler).await
     }
 }
 
@@ -51,12 +55,12 @@ mod tests {
     use async_trait::async_trait;
     use http::Method;
 
+    use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
     use crate::request::Request;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
     use crate::router_builder::RouterBuilder;
-    use crate::servers::Servers;
 
     struct EchoId;
 
@@ -91,10 +95,10 @@ mod tests {
     }
 
     async fn status_of(method: Method, path: &str) -> u16 {
-        let servers = Arc::new(Servers::new(Vec::new(), Vec::new()));
+        let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
 
         router()
-            .respond(Request::new(method, path.to_string()), &servers)
+            .respond(Request::new(method, path.to_string()), &forward_targets)
             .await
             .into_http()
             .status()

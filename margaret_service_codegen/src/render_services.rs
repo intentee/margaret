@@ -73,6 +73,7 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
                 #address_variable,
                 #origin_variable,
                 #upload_config_variable,
+                margaret_http::body_limit::BodyLimit::default(),
                 #routes_variable.router,
             ));
         }
@@ -83,7 +84,11 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
 
         quote! {
             manager.register_service(
-                margaret_service::server_service::ServerService::new(servers.clone(), #name),
+                margaret_service::server_service::ServerService::new(
+                    server_registry.clone(),
+                    forward_target_registry.clone(),
+                    #name,
+                ),
             );
         }
     });
@@ -100,8 +105,11 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
 
         #(#builds)*
 
-        let servers = ::std::sync::Arc::new(
-            margaret_http::servers::Servers::new(server_models, forward_targets),
+        let server_registry = ::std::sync::Arc::new(
+            margaret_http::server_registry::ServerRegistry::new(server_models),
+        );
+        let forward_target_registry = ::std::sync::Arc::new(
+            margaret_http::forward_targets::ForwardTargets::new(forward_targets),
         );
 
         #(#registrations)*

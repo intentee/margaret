@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use crate::forward_targets::ForwardTargets;
 use crate::handler::Handler;
 use crate::request::Request;
 use crate::response::Response;
 use crate::response_continuation::ResponseContinuation;
-use crate::servers::Servers;
 
 pub(crate) async fn respond_recursively(
-    servers: &Arc<Servers>,
+    forward_targets: &Arc<ForwardTargets>,
     request: Request,
     first: Arc<dyn Handler>,
 ) -> Response {
@@ -26,7 +26,7 @@ pub(crate) async fn respond_recursively(
                     return Response::text(500, "Internal Server Error");
                 }
 
-                let Some(target) = servers.forward_target(name) else {
+                let Some(target) = forward_targets.resolve(name) else {
                     return Response::not_found();
                 };
 
@@ -36,6 +36,7 @@ pub(crate) async fn respond_recursively(
             ResponseContinuation::Intercept(interception) => {
                 outcome = interception.render(&request).await;
             }
+            ResponseContinuation::Redirect(redirect) => return redirect.into_response(),
         }
     }
 }
@@ -52,12 +53,13 @@ mod tests {
     use super::respond_recursively;
     use crate::deferred_interception::DeferredInterception;
     use crate::forward::Forward;
+    use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
     use crate::named_handler::NamedHandler;
+    use crate::redirect::Redirect;
     use crate::request::Request;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
-    use crate::servers::Servers;
 
     struct ForwardToTarget;
 
@@ -140,52 +142,98 @@ mod tests {
         }
     }
 
-    fn servers_with(targets: Vec<NamedHandler>) -> Arc<Servers> {
-        Arc::new(Servers::new(Vec::new(), targets))
+    struct RedirectingResponder;
+
+    #[async_trait]
+    impl Handler for RedirectingResponder {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::from(Redirect::see_other("http://localhost/greeting".to_string()))
+        }
     }
 
-    async fn status_of(servers: Arc<Servers>, first: Arc<dyn Handler>) -> u16 {
-        respond_recursively(&servers, Request::new(Method::GET, "/".to_string()), first)
-            .await
-            .into_http()
-            .status()
-            .as_u16()
+    fn forward_targets_with(targets: Vec<NamedHandler>) -> Arc<ForwardTargets> {
+        Arc::new(ForwardTargets::new(targets))
+    }
+
+    async fn status_of(forward_targets: Arc<ForwardTargets>, first: Arc<dyn Handler>) -> u16 {
+        respond_recursively(
+            &forward_targets,
+            Request::new(Method::GET, "/".to_string()),
+            first,
+        )
+        .await
+        .into_http()
+        .status()
+        .as_u16()
     }
 
     #[tokio::test]
     async fn forwards_to_the_target_responder() {
-        let servers = servers_with(vec![NamedHandler::new("target", Arc::new(Target))]);
+        let forward_targets =
+            forward_targets_with(vec![NamedHandler::new("target", Arc::new(Target))]);
 
-        assert_eq!(status_of(servers, Arc::new(ForwardToTarget)).await, 222);
+        assert_eq!(
+            status_of(forward_targets, Arc::new(ForwardToTarget)).await,
+            222
+        );
     }
 
     #[tokio::test]
     async fn returns_a_server_error_on_a_forward_cycle() {
-        let servers = servers_with(vec![NamedHandler::new("origin", Arc::new(ForwardToSelf))]);
+        let forward_targets =
+            forward_targets_with(vec![NamedHandler::new("origin", Arc::new(ForwardToSelf))]);
 
-        assert_eq!(status_of(servers, Arc::new(ForwardToSelf)).await, 500);
+        assert_eq!(
+            status_of(forward_targets, Arc::new(ForwardToSelf)).await,
+            500
+        );
     }
 
     #[tokio::test]
     async fn returns_not_found_when_forwarding_to_an_unknown_name() {
         assert_eq!(
-            status_of(servers_with(Vec::new()), Arc::new(ForwardToUnknown)).await,
+            status_of(forward_targets_with(Vec::new()), Arc::new(ForwardToUnknown)).await,
             404
         );
     }
 
     #[tokio::test]
     async fn repeats_the_stack_when_an_interceptor_returns_a_responder() {
-        let servers = servers_with(vec![NamedHandler::new("target", Arc::new(Target))]);
+        let forward_targets =
+            forward_targets_with(vec![NamedHandler::new("target", Arc::new(Target))]);
 
-        assert_eq!(status_of(servers, Arc::new(InterceptsToForward)).await, 222);
+        assert_eq!(
+            status_of(forward_targets, Arc::new(InterceptsToForward)).await,
+            222
+        );
+    }
+
+    #[tokio::test]
+    async fn returns_a_redirect_response() {
+        let response = respond_recursively(
+            &forward_targets_with(Vec::new()),
+            Request::new(Method::GET, "/".to_string()),
+            Arc::new(RedirectingResponder),
+        )
+        .await
+        .into_http();
+
+        assert_eq!(response.status().as_u16(), 303);
+        assert_eq!(
+            response
+                .headers()
+                .get("location")
+                .expect("the location header is present"),
+            "http://localhost/greeting"
+        );
     }
 
     #[tokio::test]
     async fn installs_forwarded_path_parameters_for_the_target() {
-        let servers = servers_with(vec![NamedHandler::new("article", Arc::new(EchoArticle))]);
+        let forward_targets =
+            forward_targets_with(vec![NamedHandler::new("article", Arc::new(EchoArticle))]);
         let response = respond_recursively(
-            &servers,
+            &forward_targets,
             Request::new(Method::GET, "/".to_string()),
             Arc::new(ForwardToArticle),
         )

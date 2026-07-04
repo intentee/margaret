@@ -8,6 +8,7 @@ use http::Uri;
 use http::header::COOKIE;
 
 use crate::body_class::BodyClass;
+use crate::body_limit::BodyLimit;
 use crate::collect_limited::collect_limited;
 use crate::form_field::FormField;
 use crate::form_fields::form_fields;
@@ -94,6 +95,7 @@ impl RequestInputs {
         headers: HeaderMap,
         remote_addr: SocketAddr,
         body: RequestBody,
+        body_limit: &BodyLimit,
         upload_config: &UploadConfig,
     ) -> Result<Self, RequestError> {
         let cookies = parse_cookies(&headers)?;
@@ -107,18 +109,18 @@ impl RequestInputs {
                 let MultipartBody {
                     files: parsed_files,
                     post: parsed_post,
-                } = MultipartBody::parse(body, boundary, upload_config).await?;
+                } = MultipartBody::parse(body, boundary, body_limit, upload_config).await?;
 
                 files = index_files(parsed_files);
                 form = index_fields(parsed_post);
             }
             BodyClass::UrlEncoded => {
                 form = index_fields(form_fields(
-                    &collect_limited(body, upload_config.max_body_size()).await?,
+                    &collect_limited(body, body_limit.max_bytes()).await?,
                 ));
             }
             BodyClass::Json => {
-                let bytes = collect_limited(body, upload_config.max_body_size()).await?;
+                let bytes = collect_limited(body, body_limit.max_bytes()).await?;
 
                 json = Some(
                     serde_json::from_slice(&bytes)
@@ -165,6 +167,7 @@ mod tests {
 
     use super::RequestInputs;
     use super::unspecified_addr;
+    use crate::body_limit::BodyLimit;
     use crate::request_body::RequestBody;
     use crate::request_error::RequestError;
     use crate::upload_config::UploadConfig;
@@ -187,6 +190,23 @@ mod tests {
         body: &'static [u8],
         upload_config: &UploadConfig,
     ) -> Result<RequestInputs, RequestError> {
+        parse_inputs_with_limit(
+            content_type,
+            target,
+            body,
+            &BodyLimit::default(),
+            upload_config,
+        )
+        .await
+    }
+
+    async fn parse_inputs_with_limit(
+        content_type: Option<&str>,
+        target: &str,
+        body: &'static [u8],
+        body_limit: &BodyLimit,
+        upload_config: &UploadConfig,
+    ) -> Result<RequestInputs, RequestError> {
         let mut headers = HeaderMap::new();
 
         if let Some(value) = content_type {
@@ -204,6 +224,7 @@ mod tests {
             headers,
             unspecified_addr(),
             boxed(body),
+            body_limit,
             upload_config,
         )
         .await
@@ -225,6 +246,7 @@ mod tests {
             headers,
             unspecified_addr(),
             boxed(b""),
+            &BodyLimit::default(),
             &UploadConfig::Disabled,
         )
         .await
@@ -445,15 +467,12 @@ mod tests {
     #[tokio::test]
     async fn rejects_an_oversized_multipart_stream() {
         let directory = tempdir().expect("a temporary directory");
-        let upload_config = UploadConfig::Enabled {
-            directory: directory.path().to_path_buf(),
-            max_size: 8,
-        };
-        let message = parse_inputs(
+        let message = parse_inputs_with_limit(
             Some("multipart/form-data; boundary=X"),
             "/upload",
             MULTIPART,
-            &upload_config,
+            &BodyLimit::new(8),
+            &upload_in(&directory),
         )
         .await
         .err()
@@ -465,16 +484,12 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_an_oversized_buffered_body() {
-        let directory = tempdir().expect("a temporary directory");
-        let upload_config = UploadConfig::Enabled {
-            directory: directory.path().to_path_buf(),
-            max_size: 8,
-        };
-        let message = parse_inputs(
+        let message = parse_inputs_with_limit(
             Some("application/x-www-form-urlencoded"),
             "/login",
             b"field=0123456789",
-            &upload_config,
+            &BodyLimit::new(8),
+            &UploadConfig::Disabled,
         )
         .await
         .err()

@@ -40,6 +40,7 @@ mod tests {
     use http::Method;
 
     use super::layer;
+    use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
     use crate::http_middleware::HttpMiddleware;
     use crate::next::Next;
@@ -47,7 +48,6 @@ mod tests {
     use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
-    use crate::servers::Servers;
 
     struct Inner;
 
@@ -80,10 +80,10 @@ mod tests {
     where
         Middleware: HttpMiddleware + Send + Sync + 'static,
     {
-        let servers = Arc::new(Servers::new(Vec::new(), Vec::new()));
+        let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
 
         respond_recursively(
-            &servers,
+            &forward_targets,
             Request::new(Method::GET, "/".to_string()),
             layer(Arc::new(middleware), Arc::new(Inner)),
         )

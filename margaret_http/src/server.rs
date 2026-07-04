@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+use crate::body_limit::BodyLimit;
 use crate::router::Router;
 use crate::upload_config::UploadConfig;
 
 pub struct Server {
     address: String,
+    body_limit: BodyLimit,
     name: Arc<str>,
     origin: Arc<str>,
     router: Arc<Router>,
@@ -17,10 +19,12 @@ impl Server {
         address: String,
         origin: impl Into<Arc<str>>,
         upload_config: UploadConfig,
+        body_limit: BodyLimit,
         router: Router,
     ) -> Self {
         Self {
             address,
+            body_limit,
             name: name.into(),
             origin: origin.into(),
             router: Arc::new(router),
@@ -30,6 +34,10 @@ impl Server {
 
     pub fn address(&self) -> &str {
         &self.address
+    }
+
+    pub(crate) fn body_limit(&self) -> BodyLimit {
+        self.body_limit
     }
 
     pub(crate) fn name(&self) -> &Arc<str> {

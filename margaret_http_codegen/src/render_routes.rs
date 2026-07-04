@@ -118,7 +118,7 @@ fn route_type_tokens(route: &HttpRoute) -> TokenStream {
     if is_get(route) {
         quote! { margaret_http::forwardable_route::ForwardableRoute }
     } else {
-        quote! { margaret_http::url_reference::UrlReference }
+        quote! { margaret_http::route_reference::RouteReference }
     }
 }
 
@@ -133,7 +133,7 @@ fn route_constructor(route: &HttpRoute, origin: TokenStream, values: TokenStream
         }
     } else {
         quote! {
-            margaret_http::url_reference::UrlReference::new(#origin, #segments, #values)
+            margaret_http::route_reference::RouteReference::new(#origin, #segments, #values)
         }
     }
 }

@@ -249,12 +249,12 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     }
 
     #[test]
-    fn renders_a_named_non_get_route_as_a_plain_url_reference() {
+    fn renders_a_named_non_get_route_as_a_plain_route_reference() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
-        assert!(source.contains("pubpost_ping:margaret_http::url_reference::UrlReference,"));
+        assert!(source.contains("pubpost_ping:margaret_http::route_reference::RouteReference,"));
         assert!(source.contains(
-            "pubfnpatch_article(&self,article:String,)->margaret_http::url_reference::UrlReference"
+            "pubfnpatch_article(&self,article:String,)->margaret_http::route_reference::RouteReference"
         ));
         assert!(!source.contains("forward_to"));
     }

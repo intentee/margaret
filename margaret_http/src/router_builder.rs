@@ -19,10 +19,6 @@ impl RouterBuilder {
         }
     }
 
-    pub fn build(self) -> Router {
-        Router::new(self.matcher, self.routes)
-    }
-
     pub fn route(mut self, method: &'static str, path: &str, handler: Arc<dyn Handler>) -> Self {
         let index = match self.paths.get(path) {
             Some(&index) => index,
@@ -42,5 +38,9 @@ impl RouterBuilder {
         self.routes[index].insert(method, handler);
 
         self
+    }
+
+    pub fn build(self) -> Router {
+        Router::new(self.matcher, self.routes)
     }
 }

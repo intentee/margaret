@@ -139,13 +139,16 @@ mod tests {
         assert!(source.contains("margaret_http::upload_config::UploadConfig::Disabled"));
         assert!(source.contains("forward_targets.extend(routes_public.named_handlers)"));
         assert!(source.contains(
-            r#"margaret_http::server::Server::new("public",address_public,origin_public,upload_config_public,routes_public.router,)"#
+            r#"margaret_http::server::Server::new("public",address_public,origin_public,upload_config_public,margaret_http::body_limit::BodyLimit::default(),routes_public.router,)"#
         ));
         assert!(
-            source.contains("margaret_http::servers::Servers::new(server_models,forward_targets)")
+            source.contains("margaret_http::server_registry::ServerRegistry::new(server_models)")
+        );
+        assert!(
+            source.contains("margaret_http::forward_targets::ForwardTargets::new(forward_targets)")
         );
         assert!(source.contains(
-            r#"margaret_service::server_service::ServerService::new(servers.clone(),"public",)"#
+            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_target_registry.clone(),"public",)"#
         ));
     }
 
@@ -184,14 +187,14 @@ mod tests {
         assert!(source.contains(r#"matches.get_flag("public-uploads")"#));
         assert!(source.contains(r#"matches.get_one::<String>("public-upload-dir")"#));
         assert!(source.contains(
-            r#"margaret_service::server_service::ServerService::new(servers.clone(),"public",)"#
+            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_target_registry.clone(),"public",)"#
         ));
         assert!(source.contains(r#"matches.get_one::<String>("internal-addr")"#));
         assert!(source.contains(r#"matches.get_one::<String>("internal-url")"#));
         assert!(source.contains(r#"matches.get_flag("internal-uploads")"#));
         assert!(source.contains(r#"matches.get_one::<String>("internal-upload-dir")"#));
         assert!(source.contains(
-            r#"margaret_service::server_service::ServerService::new(servers.clone(),"internal",)"#
+            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_target_registry.clone(),"internal",)"#
         ));
     }
 

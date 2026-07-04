@@ -50,6 +50,7 @@ mod tests {
     use http::Method;
 
     use super::Interception;
+    use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
     use crate::http_interceptable::HttpInterceptable;
     use crate::http_interceptor::HttpInterceptor;
@@ -57,7 +58,6 @@ mod tests {
     use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
-    use crate::servers::Servers;
 
     struct Payload {
         status: u16,
@@ -94,9 +94,9 @@ mod tests {
 
     #[tokio::test]
     async fn renders_the_intercepted_value_through_its_interceptor() {
-        let servers = Arc::new(Servers::new(Vec::new(), Vec::new()));
+        let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
         let status = respond_recursively(
-            &servers,
+            &forward_targets,
             Request::new(Method::GET, "/".to_string()),
             Arc::new(YieldsInterception),
         )

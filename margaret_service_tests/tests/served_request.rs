@@ -6,14 +6,16 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio_util::sync::CancellationToken;
 
+use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
+use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::handler::Handler;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::router_builder::RouterBuilder;
 use margaret_http::server::Server;
-use margaret_http::servers::Servers;
+use margaret_http::server_registry::ServerRegistry;
 use margaret_http::upload_config::UploadConfig;
 
 struct Accepts;
@@ -25,22 +27,26 @@ impl Handler for Accepts {
     }
 }
 
-async fn exchange(request: &[u8], upload_config: UploadConfig, close_write: bool) -> String {
+async fn exchange(
+    request: &[u8],
+    body_limit: BodyLimit,
+    upload_config: UploadConfig,
+    close_write: bool,
+) -> String {
     let router = RouterBuilder::empty()
         .route("POST", "/submit", Arc::new(Accepts))
         .route("QUERY", "/search", Arc::new(Accepts))
         .build();
-    let servers = Arc::new(Servers::new(
-        vec![Server::new(
-            "public",
-            "127.0.0.1:0".to_string(),
-            "http://127.0.0.1",
-            upload_config,
-            router,
-        )],
-        Vec::new(),
-    ));
-    let bound = BoundServer::bind(servers, Arc::from("public"))
+    let server_registry = Arc::new(ServerRegistry::new(vec![Server::new(
+        "public",
+        "127.0.0.1:0".to_string(),
+        "http://127.0.0.1",
+        upload_config,
+        body_limit,
+        router,
+    )]));
+    let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
+    let bound = BoundServer::bind(server_registry, forward_targets, Arc::from("public"))
         .await
         .expect("the server binds");
     let address = bound.local_addr();
@@ -77,6 +83,7 @@ async fn exchange(request: &[u8], upload_config: UploadConfig, close_write: bool
 async fn accepts_a_form_body_within_the_limit() {
     let response = exchange(
         b"POST /submit HTTP/1.1\r\nHost: test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 7\r\nConnection: close\r\n\r\nname=hi",
+        BodyLimit::default(),
         UploadConfig::Disabled,
         false,
     )
@@ -89,10 +96,8 @@ async fn accepts_a_form_body_within_the_limit() {
 async fn rejects_a_form_body_that_exceeds_the_limit() {
     let response = exchange(
         b"POST /submit HTTP/1.1\r\nHost: test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 7\r\nConnection: close\r\n\r\nname=hi",
-        UploadConfig::Enabled {
-            directory: std::env::temp_dir(),
-            max_size: 4,
-        },
+        BodyLimit::new(4),
+        UploadConfig::Disabled,
         false,
     )
     .await;
@@ -104,6 +109,7 @@ async fn rejects_a_form_body_that_exceeds_the_limit() {
 async fn rejects_a_truncated_form_body() {
     let response = exchange(
         b"POST /submit HTTP/1.1\r\nHost: test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 64\r\nConnection: close\r\n\r\nshort",
+        BodyLimit::default(),
         UploadConfig::Disabled,
         true,
     )
@@ -116,6 +122,7 @@ async fn rejects_a_truncated_form_body() {
 async fn dispatches_a_request_using_an_extension_verb() {
     let response = exchange(
         b"QUERY /search HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        BodyLimit::default(),
         UploadConfig::Disabled,
         false,
     )
@@ -128,6 +135,7 @@ async fn dispatches_a_request_using_an_extension_verb() {
 async fn rejects_a_known_path_reached_with_an_unhandled_method() {
     let response = exchange(
         b"GET /submit HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        BodyLimit::default(),
         UploadConfig::Disabled,
         false,
     )

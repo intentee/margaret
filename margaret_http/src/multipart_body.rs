@@ -8,6 +8,7 @@ use multer::SizeLimit;
 use tempfile::NamedTempFile;
 use tokio::io::AsyncWriteExt;
 
+use crate::body_limit::BodyLimit;
 use crate::form_field::FormField;
 use crate::request_body::RequestBody;
 use crate::request_error::RequestError;
@@ -72,10 +73,11 @@ impl MultipartBody {
     pub(crate) async fn parse(
         body: RequestBody,
         boundary: String,
+        body_limit: &BodyLimit,
         upload_config: &UploadConfig,
     ) -> Result<Self, RequestError> {
-        let constraints = Constraints::new()
-            .size_limit(SizeLimit::new().whole_stream(upload_config.max_body_size()));
+        let constraints =
+            Constraints::new().size_limit(SizeLimit::new().whole_stream(body_limit.max_bytes()));
         let mut multipart =
             Multipart::with_constraints(BodyDataStream::new(body), boundary, constraints);
         let mut files = Vec::new();
