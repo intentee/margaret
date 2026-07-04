@@ -4,14 +4,27 @@ use crate::active_servers::active_servers;
 use crate::http_artifacts::HttpArtifacts;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_routes::http_routes;
-use crate::middleware_bindings::middleware_bindings;
+use crate::interceptor_plans::interceptor_plans;
+use crate::interceptor_references::interceptor_references;
+use crate::middleware_plans::middleware_plans;
 use crate::render::render;
+use crate::render_routes::render_routes;
 
 pub fn render_http(index: &AttributeIndex) -> Result<HttpArtifacts, HttpCodegenError> {
-    let bindings = middleware_bindings(index)?;
-    let routes = http_routes(index, &bindings)?;
+    let middleware_plans = middleware_plans(index)?;
+    let interceptor_plans = interceptor_plans(index, index.trait_resolution())?;
+    let interceptors = interceptor_references(&interceptor_plans)?;
+    let routes = http_routes(index, &middleware_plans, &interceptors)?;
     let servers = active_servers(&routes);
-    let source = render(&routes, &servers);
+    let mut modules = render(
+        &routes,
+        &servers,
+        &interceptor_plans,
+        &middleware_plans,
+        index,
+    );
 
-    Ok(HttpArtifacts::new(source, servers))
+    modules.extend(render_routes(&routes, &servers));
+
+    Ok(HttpArtifacts::new(modules, servers))
 }

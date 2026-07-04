@@ -34,13 +34,6 @@ pub enum ContainerError {
         second: String,
     },
 
-    #[error("two singletons map to the same container field '{field}': '{first}' and '{second}'")]
-    DuplicateFieldName {
-        field: String,
-        first: String,
-        second: String,
-    },
-
     #[error("the provided interface '{written}' of singleton '{singleton}' matches no trait")]
     ProvidesUnresolvable { singleton: String, written: String },
 

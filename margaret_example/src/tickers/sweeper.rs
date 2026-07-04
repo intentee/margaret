@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::sync::Arc;
 
 use margaret_macros::constructor;
-use margaret_macros::runner;
+use margaret_macros::process;
 use margaret_macros::scheduled_with_tick_timer;
 
 use crate::metrics::Metrics;
@@ -21,7 +21,7 @@ impl Sweeper {
         Self { metrics }
     }
 
-    #[runner]
+    #[process]
     pub async fn run(&self) -> Result<(), Infallible> {
         self.metrics.record_sweep();
 

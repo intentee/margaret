@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
+margaret_generated_module = { path = "../margaret_generated_module" }
+margaret_injection_codegen = { path = "../margaret_injection_codegen" }
 heck = { workspace = true }
 matchit = { workspace = true }
 prettyplease = { workspace = true }

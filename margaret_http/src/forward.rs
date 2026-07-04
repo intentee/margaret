@@ -1,26 +1,20 @@
+use std::collections::HashMap;
+
 pub struct Forward {
     name: &'static str,
+    path_params: HashMap<String, String>,
 }
 
 impl Forward {
-    pub fn to(name: &'static str) -> Self {
-        Self { name }
+    pub(crate) fn new(name: &'static str, path_params: HashMap<String, String>) -> Self {
+        Self { name, path_params }
+    }
+
+    pub(crate) fn into_path_params(self) -> HashMap<String, String> {
+        self.path_params
     }
 
     pub(crate) fn name(&self) -> &'static str {
         self.name
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Forward;
-
-    #[test]
-    fn carries_the_target_route_name() {
-        assert_eq!(
-            Forward::to("crate::routes::get_login::GetLogin").name(),
-            "crate::routes::get_login::GetLogin"
-        );
     }
 }

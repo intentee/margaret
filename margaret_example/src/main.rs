@@ -1,9 +1,8 @@
 use margaret_console::command_outcome::CommandOutcome;
-use margaret_example::margaret::container::Container;
 
 #[tokio::main]
 async fn main() -> CommandOutcome {
-    let container = Container::build();
+    let container = margaret_example::margaret::container::build::build();
 
     margaret_example::margaret::console::run(&container, std::env::args_os()).await
 }

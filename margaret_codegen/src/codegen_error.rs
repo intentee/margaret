@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
@@ -36,5 +38,29 @@ pub enum CodegenError {
     Services {
         #[from]
         source: ServiceCodegenError,
+    },
+
+    #[error("failed to create the generated directory '{path}': {source}")]
+    CreateDirectory {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("failed to read the generated directory '{path}': {source}")]
+    ReadDirectory {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("failed to write the generated source '{path}': {source}")]
+    WriteSource {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("failed to remove the stale generated entry '{path}': {source}")]
+    RemoveEntry {
+        path: PathBuf,
+        source: std::io::Error,
     },
 }

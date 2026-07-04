@@ -7,8 +7,7 @@ use margaret_container::generate_container_source::generate_container_source;
 fn reports_constructor_return_type_mismatch() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bad_return");
     let error = generate_container_source("bad_return", &directory)
-        .err()
-        .expect("a #[constructor] that does not return Self must be rejected");
+        .expect_err("a #[constructor] that does not return Self must be rejected");
 
     assert!(matches!(
         error,

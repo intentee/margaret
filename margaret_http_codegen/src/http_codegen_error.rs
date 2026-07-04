@@ -2,6 +2,7 @@ use matchit::InsertError;
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_injection_codegen::injection_error::InjectionError;
 
 #[derive(Debug, Error)]
 pub enum HttpCodegenError {
@@ -9,6 +10,12 @@ pub enum HttpCodegenError {
     Index {
         #[from]
         source: AttributeError,
+    },
+
+    #[error(transparent)]
+    Injection {
+        #[from]
+        source: InjectionError,
     },
 
     #[error("#[responds_to_http] is only supported on structs, but '{target}' is not a struct")]
@@ -38,11 +45,8 @@ pub enum HttpCodegenError {
     )]
     UnknownMiddleware { responder: String, tag: String },
 
-    #[error("responder '{responder}' has no #[responder] method")]
-    MissingResponderMethod { responder: String },
-
     #[error(
-        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a form request, or the current request"
+        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a form request, the current request, or the routes"
     )]
     UnmarkedResponderParameter {
         responder: String,
@@ -130,9 +134,27 @@ pub enum HttpCodegenError {
     },
 
     #[error(
-        "#[intercepts] '{interceptor}' has no `type Intercepted = dyn <marker trait>` associated type that resolves to a known marker trait"
+        "responder '{responder}' declares the route name '{name}', which must be a snake_case identifier usable as a `routes` accessor"
     )]
-    MissingInterceptedType { interceptor: String },
+    InvalidRouteName { name: String, responder: String },
+
+    #[error(
+        "#[interceptor] '{interceptor}' has no `Box<dyn <marker trait>>` parameter on its #[process] method that resolves to a known marker trait"
+    )]
+    MissingInterceptedParameter { interceptor: String },
+
+    #[error(
+        "#[interceptor] '{interceptor}' has more than one intercepted `Box<dyn <marker trait>>` parameter on its #[process] method"
+    )]
+    MultipleInterceptedParameters { interceptor: String },
+
+    #[error(
+        "parameter '{parameter}' of #[interceptor] '{interceptor}' must be the intercepted value, the current request, or the routes"
+    )]
+    UnclassifiableInterceptorParameter {
+        interceptor: String,
+        parameter: String,
+    },
 
     #[error("marker trait '{intercepted}' has more than one interceptor: '{first}' and '{second}'")]
     AmbiguousInterceptor {
@@ -141,6 +163,19 @@ pub enum HttpCodegenError {
         second: String,
     },
 
+    #[error(
+        "parameter '{parameter}' of middleware '{middleware}' must be the current request, the next handler, or the routes"
+    )]
+    UnclassifiableMiddlewareParameter {
+        middleware: String,
+        parameter: String,
+    },
+
     #[error("responder '{responder}' is missing the 'server' argument")]
     MissingHttpServer { responder: String },
+
+    #[error(
+        "responder '{responder}' names the server '{server}', which must be a snake_case identifier usable as a `routes` accessor"
+    )]
+    InvalidServerName { responder: String, server: String },
 }

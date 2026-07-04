@@ -1,4 +1,3 @@
-use heck::ToUpperCamelCase;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -14,19 +13,48 @@ use crate::service_unit::ServiceUnit;
 use crate::service_units::service_units;
 
 fn server_registrations(servers: &[HttpServer]) -> TokenStream {
-    let registrations = servers.iter().map(|server| {
-        let function_name = server.function_name();
+    if servers.is_empty() {
+        return quote! {};
+    }
+
+    let origins = servers.iter().map(|server| {
+        let name = server.name();
         let address_argument = server.address_argument();
-        let uploads_argument = server.uploads_argument();
-        let upload_dir_argument = server.upload_dir_argument();
-        let address_variable = format_ident!("address_{}", server.name());
-        let upload_config_variable = format_ident!("upload_config_{}", server.name());
+        let url_argument = server.url_argument();
+        let address_variable = format_ident!("address_{}", name);
+        let origin_variable = format_ident!("origin_{}", name);
 
         quote! {
-            let #address_variable = matches
-                .get_one::<String>(#address_argument)
-                .expect("a required console argument is present")
-                .clone();
+            let #address_variable = match matches.get_one::<String>(#address_argument) {
+                Some(value) => value.clone(),
+                None => return margaret_console::command_outcome::CommandOutcome::Failed,
+            };
+            let #origin_variable: ::std::sync::Arc<str> = matches
+                .get_one::<String>(#url_argument)
+                .cloned()
+                .unwrap_or_else(|| ::std::format!("http://{}", #address_variable))
+                .into();
+        }
+    });
+
+    let origin_arguments = servers.iter().map(|server| {
+        let origin_variable = format_ident!("origin_{}", server.name());
+
+        quote! { #origin_variable.clone() }
+    });
+
+    let builds = servers.iter().map(|server| {
+        let function_name = server.function_name();
+        let name = server.name();
+        let uploads_argument = server.uploads_argument();
+        let upload_dir_argument = server.upload_dir_argument();
+        let routes_variable = format_ident!("routes_{}", name);
+        let address_variable = format_ident!("address_{}", name);
+        let origin_variable = format_ident!("origin_{}", name);
+        let upload_config_variable = format_ident!("upload_config_{}", name);
+
+        quote! {
+            let #routes_variable = super::http::#function_name::#function_name(container, &routes).await;
             let #upload_config_variable = if matches.get_flag(#uploads_argument) {
                 margaret_http::upload_config::UploadConfig::enabled(
                     matches
@@ -38,17 +66,45 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
                 margaret_http::upload_config::UploadConfig::Disabled
             };
 
+            forward_targets.extend(#routes_variable.named_handlers);
+            server_models.push(margaret_http::server::Server::new(
+                #name,
+                #address_variable,
+                #origin_variable,
+                #upload_config_variable,
+                #routes_variable.router,
+            ));
+        }
+    });
+
+    let registrations = servers.iter().map(|server| {
+        let name = server.name();
+
+        quote! {
             manager.register_service(
-                margaret_service::server_service::ServerService::new(
-                    super::http::#function_name(container).await,
-                    #address_variable,
-                    #upload_config_variable,
-                ),
+                margaret_service::server_service::ServerService::new(servers.clone(), #name),
             );
         }
     });
 
-    quote! { #(#registrations)* }
+    quote! {
+        let mut server_models = Vec::new();
+        let mut forward_targets = Vec::new();
+
+        #(#origins)*
+
+        let routes = ::std::sync::Arc::new(
+            super::routes::Routes::from_origins(#(#origin_arguments),*),
+        );
+
+        #(#builds)*
+
+        let servers = ::std::sync::Arc::new(
+            margaret_http::servers::Servers::new(server_models, forward_targets),
+        );
+
+        #(#registrations)*
+    }
 }
 
 fn adapter(unit: &ServiceUnit) -> TokenStream {
@@ -135,12 +191,7 @@ fn registration(unit: &ServiceUnit) -> TokenStream {
 }
 
 fn adapter_ident(unit: &ServiceUnit) -> Ident {
-    let suffix = match unit.kind {
-        ServiceKind::Service => "Service",
-        ServiceKind::Ticker { .. } => "Ticker",
-    };
-
-    format_ident!("{}{}", unit.field_name.to_upper_camel_case(), suffix)
+    format_ident!("{}", unit.type_name)
 }
 
 pub fn render_services(
@@ -158,12 +209,10 @@ pub fn render_services(
     };
 
     let tokens = quote! {
-        use super::container::Container;
-
         #(#adapters)*
 
         pub async fn serve(
-            container: &Container,
+            container: &super::container::Container,
             #matches_binding: &clap::ArgMatches,
             cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret_console::command_outcome::CommandOutcome {

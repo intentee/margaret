@@ -64,6 +64,7 @@ mod tests {
     use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
+    use crate::servers::Servers;
 
     struct Echo;
 
@@ -96,8 +97,9 @@ mod tests {
         );
         let request = Request::new(Method::Get, "/echo/7".to_string())
             .with_path_params(HashMap::from([("id".to_string(), "7".to_string())]));
+        let servers = Arc::new(Servers::new(Vec::new(), Vec::new()));
 
-        let response = respond_recursively(&HashMap::new(), request, handler)
+        let response = respond_recursively(&servers, request, handler)
             .await
             .into_http();
 

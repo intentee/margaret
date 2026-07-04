@@ -8,8 +8,7 @@ use margaret_container::generate_container_source::generate_container_source;
 fn propagates_index_failure() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/index_failure");
     let error = generate_container_source("index_failure", &directory)
-        .err()
-        .expect("an indexing failure must surface through container generation");
+        .expect_err("an indexing failure must surface through container generation");
 
     assert!(matches!(
         error,

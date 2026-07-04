@@ -1,12 +1,11 @@
 use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
-use margaret_macros::intercepts;
+use margaret_macros::interceptor;
 use margaret_macros::middleware;
+use margaret_macros::process;
 use margaret_macros::provides_route_parameter;
-use margaret_macros::responder;
 use margaret_macros::responds_to_http;
-use margaret_macros::runner;
 use margaret_macros::scheduled_with_tick_timer;
 use margaret_macros::service;
 use margaret_macros::singleton;
@@ -16,7 +15,7 @@ use margaret_macros::singleton;
 #[console_command]
 #[handles_middleware_attribute(attribute = traced)]
 #[middleware(traced)]
-#[intercepts(SomeMarker)]
+#[interceptor]
 struct Subject;
 
 impl Subject {
@@ -25,12 +24,12 @@ impl Subject {
         Self
     }
 
-    #[responder]
+    #[process]
     fn respond(&self, #[route_parameter] id: String) -> String {
         id
     }
 
-    #[runner]
+    #[process]
     fn run(&self, #[console_argument] name: String) -> String {
         name
     }

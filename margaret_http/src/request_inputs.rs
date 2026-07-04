@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-use bytes::Bytes;
 use cookie::Cookie;
 use http::HeaderMap;
 use http::Uri;
 use http::header::COOKIE;
-use http_body::Body;
 
 use crate::body_class::BodyClass;
 use crate::collect_limited::collect_limited;
@@ -14,6 +12,7 @@ use crate::form_field::FormField;
 use crate::form_fields::form_fields;
 use crate::method::Method;
 use crate::multipart_body::MultipartBody;
+use crate::request_body::RequestBody;
 use crate::request_error::RequestError;
 use crate::server_params::ServerParams;
 use crate::upload_config::UploadConfig;
@@ -89,18 +88,14 @@ impl RequestInputs {
         }
     }
 
-    pub(crate) async fn parse<RequestBody>(
+    pub(crate) async fn parse(
         method: Method,
         uri: &Uri,
         headers: HeaderMap,
         remote_addr: SocketAddr,
         body: RequestBody,
         upload_config: &UploadConfig,
-    ) -> Result<Self, RequestError>
-    where
-        RequestBody: Body<Data = Bytes> + Send + Unpin,
-        RequestBody::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-    {
+    ) -> Result<Self, RequestError> {
         let cookies = parse_cookies(&headers)?;
         let query = index_fields(form_fields(uri.query().unwrap_or_default().as_bytes()));
         let mut files = HashMap::new();
@@ -154,12 +149,15 @@ impl RequestInputs {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::Infallible;
+
     use bytes::Bytes;
     use http::HeaderMap;
     use http::HeaderValue;
     use http::Uri;
     use http::header::CONTENT_TYPE;
     use http::header::COOKIE;
+    use http_body_util::BodyExt;
     use http_body_util::Full;
     use tempfile::TempDir;
     use tempfile::tempdir;
@@ -167,8 +165,15 @@ mod tests {
     use super::RequestInputs;
     use super::unspecified_addr;
     use crate::method::Method;
+    use crate::request_body::RequestBody;
     use crate::request_error::RequestError;
     use crate::upload_config::UploadConfig;
+
+    fn boxed(bytes: &'static [u8]) -> RequestBody {
+        Full::new(Bytes::from_static(bytes))
+            .map_err(|error: Infallible| match error {})
+            .boxed_unsync()
+    }
 
     const MULTIPART: &[u8] = b"--X\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nhello\r\n--X\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"face.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n--X\r\nContent-Disposition: form-data; name=\"raw\"; filename=\"raw.bin\"\r\n\r\nDATA\r\n--X--\r\n";
 
@@ -198,7 +203,7 @@ mod tests {
             &uri,
             headers,
             unspecified_addr(),
-            Full::new(Bytes::from_static(body)),
+            boxed(body),
             upload_config,
         )
         .await
@@ -219,7 +224,7 @@ mod tests {
             &uri,
             headers,
             unspecified_addr(),
-            Full::new(Bytes::from_static(b"")),
+            boxed(b""),
             &UploadConfig::Disabled,
         )
         .await

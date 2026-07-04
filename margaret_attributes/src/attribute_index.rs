@@ -2,16 +2,37 @@ use std::collections::HashMap;
 
 use crate::attribute_location::AttributeLocation;
 use crate::attribute_selector::AttributeSelector;
+use crate::canonical_path::CanonicalPath;
+use crate::identifier::Identifier;
 use crate::indexed_item::IndexedItem;
 use crate::item_kind::ItemKind;
 use crate::matched_attribute::MatchedAttribute;
+use crate::name_allocator::NameAllocator;
 use crate::resolution_index::ResolutionIndex;
 
 pub struct AttributeIndex {
+    identifiers: HashMap<CanonicalPath, Identifier>,
     items: Vec<IndexedItem>,
     locations_by_leaf: HashMap<String, Vec<AttributeLocation>>,
     struct_resolution: ResolutionIndex,
     trait_resolution: ResolutionIndex,
+}
+
+fn allocate_identifiers(items: &[IndexedItem]) -> HashMap<CanonicalPath, Identifier> {
+    let mut paths: Vec<&CanonicalPath> = items
+        .iter()
+        .filter(|item| item.kind().is_struct())
+        .map(IndexedItem::canonical_path)
+        .collect();
+
+    paths.sort();
+
+    let mut allocator = NameAllocator::new();
+
+    paths
+        .into_iter()
+        .map(|path| (path.clone(), allocator.allocate(&path.field_name())))
+        .collect()
 }
 
 impl AttributeIndex {
@@ -44,11 +65,20 @@ impl AttributeIndex {
         }
 
         Self {
+            identifiers: allocate_identifiers(&items),
             items,
             locations_by_leaf,
             struct_resolution: ResolutionIndex::new(struct_candidates),
             trait_resolution: ResolutionIndex::new(trait_candidates),
         }
+    }
+
+    pub fn field_name(&self, path: &CanonicalPath) -> &str {
+        self.identifier(path).field()
+    }
+
+    pub fn type_name(&self, path: &CanonicalPath) -> &str {
+        self.identifier(path).type_name()
     }
 
     pub fn has(&self, selector: &AttributeSelector) -> bool {
@@ -84,5 +114,11 @@ impl AttributeIndex {
 
     pub fn trait_resolution(&self) -> &ResolutionIndex {
         &self.trait_resolution
+    }
+
+    fn identifier(&self, path: &CanonicalPath) -> &Identifier {
+        self.identifiers
+            .get(path)
+            .expect("every indexed struct is assigned an identifier")
     }
 }

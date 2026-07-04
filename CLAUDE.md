@@ -20,6 +20,7 @@
 - generated code must never panic
 - generated code must also follow all the local, and global rules (including module organization, rust code structure, and such)
 - generate code must be minimal; if anything can be a part of a framework (and unit tested), it must be
+- framework must never limit the user with naming their components, routes, and services (besides forcing conventions like snake case or such, but there must never be a list of reserved words that users can't choose)
 
 ## Dependency Injection Container
 

@@ -37,7 +37,7 @@ impl Demo {
     #[constructor]
     fn create(greeter: Arc<dyn Greeter>) -> Self {}
 
-    #[runner]
+    #[process]
     fn run(
         &self,
         #[console_argument(from = "name")] name: String,
@@ -51,7 +51,7 @@ impl Demo {
 struct Farewell;
 
 impl Farewell {
-    #[runner]
+    #[process]
     fn run(&self) -> CommandOutcome {}
 }
 "#;
@@ -133,6 +133,9 @@ impl Farewell {
         assert!(
             source.contains(r#"clap::Arg::new("public-addr").long("public-addr").required(true)"#)
         );
+        assert!(
+            source.contains(r#"clap::Arg::new("public-url").long("public-url").required(false)"#)
+        );
         assert!(source.contains(
             r#"clap::Arg::new("public-uploads").long("public-uploads").action(clap::ArgAction::SetTrue)"#
         ));
@@ -182,18 +185,18 @@ impl Farewell {
     #[test]
     fn injects_the_cancellation_token_into_a_command_runner() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[runner]\n    fn run(&self, #[console_argument(from = \"target\")] target: String, token: CancellationToken) -> CommandOutcome {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[process]\n    fn run(&self, #[console_argument(from = \"target\")] target: String, token: CancellationToken) -> CommandOutcome {}\n}\n",
             false,
         );
 
         assert!(source.contains("letcancellation_token=margaret_service::install::install();"));
-        assert!(source.contains(".clone(),cancellation_token"));
+        assert!(source.contains("cancellation_token,).await"));
     }
 
     #[test]
     fn ignores_a_receiver_in_a_runner() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged;\n\nimpl Flagged {\n    #[runner]\n    fn run(&self, #[console_argument(from = \"loud\")] loud: bool) -> CommandOutcome {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged;\n\nimpl Flagged {\n    #[process]\n    fn run(&self, #[console_argument(from = \"loud\")] loud: bool) -> CommandOutcome {}\n}\n",
             false,
         );
 
@@ -239,7 +242,7 @@ impl Farewell {
     #[test]
     fn dispatches_a_fieldless_command_without_a_constructor() {
         let source = source_for(
-            "#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[runner]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            "#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
             false,
         );
 
@@ -251,13 +254,13 @@ impl Farewell {
     fn reports_a_missing_command_runner() {
         let message = error_for("#[console_command(name = \"bad\")]\nstruct Bad;\n");
 
-        assert!(message.contains("no #[runner] method"));
+        assert!(message.contains("no #[process] method"));
     }
 
     #[test]
     fn rejects_an_unmarked_runner_parameter() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, value: String) -> CommandOutcome {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> CommandOutcome {}\n}\n",
         );
 
         assert!(message.contains("must be a console argument"));
@@ -266,7 +269,7 @@ impl Farewell {
     #[test]
     fn binds_a_destructured_console_argument_named_by_from() {
         let source = source_for(
-            "#[console_command(name = \"plot\")]\nstruct Plot;\n\nimpl Plot {\n    #[runner]\n    fn run(&self, #[console_argument(from = \"point\")] Point { x, y }: Point) -> CommandOutcome {}\n}\n",
+            "#[console_command(name = \"plot\")]\nstruct Plot;\n\nimpl Plot {\n    #[process]\n    fn run(&self, #[console_argument(from = \"point\")] Point { x, y }: Point) -> CommandOutcome {}\n}\n",
             false,
         );
 
@@ -277,7 +280,7 @@ impl Farewell {
     #[test]
     fn rejects_a_console_argument_without_from() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, #[console_argument] flag: bool) -> CommandOutcome {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[console_argument] flag: bool) -> CommandOutcome {}\n}\n",
         );
 
         assert!(message.contains("must name the command-line argument it binds"));
@@ -286,7 +289,7 @@ impl Farewell {
     #[test]
     fn rejects_a_non_string_argument_source() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, #[console_argument(from = 5)] value: String) -> CommandOutcome {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[console_argument(from = 5)] value: String) -> CommandOutcome {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -295,7 +298,7 @@ impl Farewell {
     #[test]
     fn rejects_a_malformed_argument() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[runner]\n    fn run(&self, #[console_argument(= 5)] value: String) -> CommandOutcome {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[console_argument(= 5)] value: String) -> CommandOutcome {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));

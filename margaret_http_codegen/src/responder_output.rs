@@ -1,6 +1,9 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
 pub(crate) enum ResponderOutput {
-    Intercepted { interceptor: CanonicalPath },
+    Intercepted {
+        interceptor: CanonicalPath,
+        injects_routes: bool,
+    },
     Plain,
 }

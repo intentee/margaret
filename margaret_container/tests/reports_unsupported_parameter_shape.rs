@@ -7,8 +7,7 @@ use margaret_container::generate_container_source::generate_container_source;
 fn reports_unsupported_parameter_shape() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/unsupported_param");
     let error = generate_container_source("unsupported_param", &directory)
-        .err()
-        .expect("a constructor parameter outside the wrapper allowlist must be rejected");
+        .expect_err("a constructor parameter outside the wrapper allowlist must be rejected");
 
     assert!(matches!(
         error,

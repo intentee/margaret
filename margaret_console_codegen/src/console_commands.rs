@@ -1,13 +1,15 @@
 use quote::format_ident;
-use syn::FnArg;
 use syn::Type;
 
 use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::type_leaf_ident::type_leaf_ident;
+use margaret_injection_codegen::marker::marker;
+use margaret_injection_codegen::parameter_view::ParameterView;
+use margaret_injection_codegen::parameters::parameters;
+use margaret_injection_codegen::process_method::process_method;
 
 use crate::console_argument::ConsoleArgument;
 use crate::console_argument_arguments::ConsoleArgumentArguments;
@@ -23,21 +25,19 @@ fn command_arguments(
 ) -> Result<Vec<ConsoleArgument>, ConsoleCodegenError> {
     let mut arguments = Vec::new();
 
-    for (position, input) in runner.signature().inputs.iter().enumerate() {
-        let FnArg::Typed(pattern_type) = input else {
-            continue;
-        };
-
-        if is_cancellation_token(&pattern_type.ty) {
+    for ParameterView {
+        attributes,
+        declared,
+        position,
+        ..
+    } in parameters(runner.signature())
+    {
+        if is_cancellation_token(declared) {
             continue;
         }
 
-        let Some(attribute) = pattern_type
-            .attrs
-            .iter()
-            .find(|attribute| argument_selector.matches(attribute.path()))
-        else {
-            return Err(ConsoleCodegenError::UnmarkedRunnerParameter {
+        let Some(attribute) = marker(attributes, argument_selector) else {
+            return Err(ConsoleCodegenError::UnmarkedProcessParameter {
                 command: command.to_string(),
                 parameter: position.to_string(),
             });
@@ -47,7 +47,7 @@ fn command_arguments(
         let ConsoleArgumentArguments { from } =
             ConsoleArgumentArguments::parse(&attribute_arguments, command, position)?;
 
-        arguments.push(console_argument(from, &pattern_type.ty));
+        arguments.push(console_argument(from, declared));
     }
 
     Ok(arguments)
@@ -87,13 +87,9 @@ fn is_cancellation_token(declared: &Type) -> bool {
 }
 
 fn runner_takes_token(runner: &IndexedMethod) -> bool {
-    runner.signature().inputs.iter().any(|input| {
-        matches!(input, FnArg::Typed(pattern_type) if is_cancellation_token(&pattern_type.ty))
-    })
-}
-
-fn command_runner(item: &IndexedItem) -> Option<&IndexedMethod> {
-    item.method_matching(&AttributeSelector::parse("runner").expect("a valid selector"))
+    parameters(runner.signature())
+        .iter()
+        .any(|view| is_cancellation_token(view.declared))
 }
 
 pub(crate) fn console_commands(
@@ -115,11 +111,8 @@ pub(crate) fn console_commands(
         let command = item.canonical_path().to_string();
         let ConsoleCommandArguments { name, description } =
             ConsoleCommandArguments::parse(&matched.args()?, &command)?;
-        let accessor = format_ident!("{}", item.canonical_path().field_name());
-        let runner =
-            command_runner(item).ok_or_else(|| ConsoleCodegenError::MissingCommandRunner {
-                command: command.clone(),
-            })?;
+        let accessor = format_ident!("{}", index.field_name(item.canonical_path()));
+        let runner = process_method(item)?;
         let arguments = command_arguments(runner, &argument_selector, &command)?;
 
         commands.push(ConsoleCommand {

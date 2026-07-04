@@ -140,27 +140,54 @@ fn field_ident(provider: &Provider) -> Ident {
     format_ident!("{}", provider.field_name)
 }
 
+fn ordered_providers(plan: &ContainerPlan) -> Vec<&Provider> {
+    let mut ordered: Vec<&Provider> = plan.providers.iter().collect();
+
+    ordered.sort_by(|first, second| first.field_name.cmp(&second.field_name));
+
+    ordered
+}
+
 pub(crate) fn render(plan: &ContainerPlan) -> String {
-    let fields = plan.providers.iter().map(field_declaration);
-    let initializers = plan.providers.iter().map(field_initializer);
-    let accessors = plan
-        .providers
+    let ordered = ordered_providers(plan);
+    let fields = ordered.iter().copied().map(field_declaration);
+    let accessors = ordered
         .iter()
+        .copied()
         .map(|provider| accessor(provider, plan));
+    let accessor_impl = (!ordered.is_empty()).then(|| {
+        quote! {
+            impl Container {
+                #(#accessors)*
+            }
+        }
+    });
 
     let tokens = quote! {
+        #[rustfmt::skip]
+        pub mod build;
+
         pub struct Container {
             #(#fields,)*
         }
 
-        impl Container {
-            pub fn build() -> Self {
-                Self {
-                    #(#initializers,)*
-                }
-            }
+        #accessor_impl
+    };
+    let file =
+        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
 
-            #(#accessors)*
+    prettyplease::unparse(&file)
+}
+
+pub(crate) fn render_build(plan: &ContainerPlan) -> String {
+    let ordered = ordered_providers(plan);
+    let initializers = ordered.iter().copied().map(field_initializer);
+
+    let tokens = quote! {
+        pub fn build() -> super::Container {
+            super::Container {
+                #(#initializers,)*
+            }
         }
     };
     let file =

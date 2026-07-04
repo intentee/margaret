@@ -8,8 +8,7 @@ fn reports_singleton_requires_constructor() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/missing_constructor");
     let error = generate_container_source("missing_constructor", &directory)
-        .err()
-        .expect("a singleton with fields but no #[constructor] method must be rejected");
+        .expect_err("a singleton with fields but no #[constructor] method must be rejected");
 
     assert!(matches!(
         error,

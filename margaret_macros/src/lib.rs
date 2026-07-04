@@ -25,13 +25,11 @@ pub fn scheduled_with_tick_timer(_attributes: TokenStream, item: TokenStream) ->
 }
 
 #[proc_macro_attribute]
-pub fn runner(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, &["console_argument"])
-}
-
-#[proc_macro_attribute]
-pub fn responder(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, &["route_parameter", "form_request"])
+pub fn process(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    strip_parameter_markers(
+        item,
+        &["route_parameter", "form_request", "console_argument"],
+    )
 }
 
 #[proc_macro_attribute]
@@ -60,7 +58,7 @@ pub fn console_command(_attributes: TokenStream, item: TokenStream) -> TokenStre
 }
 
 #[proc_macro_attribute]
-pub fn intercepts(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn interceptor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 

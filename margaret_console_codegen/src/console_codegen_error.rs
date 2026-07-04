@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_injection_codegen::injection_error::InjectionError;
 
 #[derive(Debug, Error)]
 pub enum ConsoleCodegenError {
@@ -10,19 +11,22 @@ pub enum ConsoleCodegenError {
         source: AttributeError,
     },
 
+    #[error(transparent)]
+    Injection {
+        #[from]
+        source: InjectionError,
+    },
+
     #[error("#[console_command] is only supported on structs, but '{target}' is not a struct")]
     ConsoleCommandNotOnStruct { target: String },
 
     #[error("console command '{command}' is missing the 'name' argument")]
     MissingCommandName { command: String },
 
-    #[error("console command '{command}' has no #[runner] method")]
-    MissingCommandRunner { command: String },
-
     #[error(
-        "parameter '{parameter}' of console command '{command}' is not marked #[console_argument]; every runner parameter must be a console argument"
+        "parameter '{parameter}' of console command '{command}' is not marked #[console_argument]; every process parameter must be a console argument"
     )]
-    UnmarkedRunnerParameter { command: String, parameter: String },
+    UnmarkedProcessParameter { command: String, parameter: String },
 
     #[error(
         "console argument #{parameter} of console command '{command}' is missing `from = \"...\"`; it must name the command-line argument it binds"

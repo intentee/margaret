@@ -1,16 +1,17 @@
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_generated_module::generated_module::GeneratedModule;
 use margaret_http_codegen::http_server::HttpServer;
 
 use crate::codegen_error::CodegenError;
 use crate::generated_code::GeneratedCode;
-use crate::generated_module::GeneratedModule;
 
 fn render_umbrella(has_http: bool, has_console: bool, serves: bool) -> String {
     let mut umbrella = String::from("#[rustfmt::skip]\npub mod container;\n");
 
     if has_http {
         umbrella.push_str("#[rustfmt::skip]\npub mod http;\n");
+        umbrella.push_str("#[rustfmt::skip]\npub mod routes;\n");
     }
 
     if serves {
@@ -44,13 +45,10 @@ pub fn build(crate_root: &CrateRoot) -> Result<GeneratedCode, CodegenError> {
         None => &[],
     };
 
-    let mut modules = vec![GeneratedModule::new(
-        "container",
-        margaret_container::render_container::render_container(&index)?.source(),
-    )];
+    let mut modules = margaret_container::render_container::render_container(&index)?;
 
     if let Some(artifacts) = &http {
-        modules.push(GeneratedModule::new("http", artifacts.source().to_string()));
+        modules.extend(artifacts.modules().iter().cloned());
     }
 
     if serves {
@@ -97,7 +95,7 @@ pub mod margaret;
 struct Page;
 
 impl Page {
-    #[responder]
+    #[process]
     fn respond(&self) -> Response {}
 }
 ";
@@ -124,7 +122,7 @@ pub mod margaret;
 struct Greet;
 
 impl Greet {
-    #[runner]
+    #[process]
     fn run(&self) -> CommandOutcome {}
 }
 ";
@@ -171,15 +169,25 @@ impl Greet {
         code.modules().iter().any(|module| module.name() == name)
     }
 
+    fn concatenated(code: &GeneratedCode) -> String {
+        code.modules()
+            .iter()
+            .map(|module| module.source())
+            .collect::<Vec<&str>>()
+            .join("\n")
+    }
+
     #[test]
     fn generates_container_and_server_when_responders_exist() {
         let code = generate(WEB_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod container;"));
         assert!(module(&code, "mod").contains("pub mod http;"));
+        assert!(module(&code, "mod").contains("pub mod routes;"));
         assert!(module(&code, "mod").contains("pub mod console;"));
-        assert!(module(&code, "http").contains("use super::container::Container"));
-        assert!(module(&code, "http").contains("async fn server"));
+        assert!(concatenated(&code).contains("container: &super::super::container::Container"));
+        assert!(concatenated(&code).contains("async fn server"));
+        assert!(module(&code, "routes").contains("pub struct Routes"));
         assert!(module(&code, "container").contains("struct Container"));
         assert!(module(&code, "console").contains("\"serve\""));
     }
@@ -200,8 +208,10 @@ impl Greet {
 
         assert!(module(&code, "mod").contains("pub mod container;"));
         assert!(!module(&code, "mod").contains("pub mod http;"));
+        assert!(!module(&code, "mod").contains("pub mod routes;"));
         assert!(!module(&code, "mod").contains("pub mod console;"));
         assert!(!has_module(&code, "http"));
+        assert!(!has_module(&code, "routes"));
         assert!(!has_module(&code, "console"));
         assert!(module(&code, "container").contains("struct Container"));
     }
@@ -215,7 +225,8 @@ impl Greet {
 
         build(&CrateRoot::new("crate", &source))
             .expect("the first build succeeds")
-            .write_to(&generated);
+            .write_to(&generated)
+            .expect("the first sources are written");
 
         assert!(generated.join("http.rs").exists());
 
@@ -223,13 +234,16 @@ impl Greet {
 
         build(&CrateRoot::new("crate", &source))
             .expect("the second build succeeds")
-            .write_to(&generated);
+            .write_to(&generated)
+            .expect("the second sources are written");
 
         let umbrella = fs::read_to_string(generated.join("mod.rs")).expect("the umbrella exists");
 
         assert!(!generated.join("http.rs").exists());
+        assert!(!generated.join("routes.rs").exists());
         assert!(!generated.join("console.rs").exists());
         assert!(!umbrella.contains("pub mod http;"));
+        assert!(!umbrella.contains("pub mod routes;"));
         assert!(!umbrella.contains("pub mod console;"));
     }
 
@@ -244,6 +258,7 @@ impl Greet {
 
         assert_eq!(module(&first, "mod"), module(&second, "mod"));
         assert_eq!(module(&first, "http"), module(&second, "http"));
+        assert_eq!(module(&first, "routes"), module(&second, "routes"));
         assert_eq!(module(&first, "container"), module(&second, "container"));
     }
 
@@ -311,13 +326,15 @@ impl Greet {
     #[test]
     fn awaits_an_async_constructor_in_the_container() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         )
         .expect("the async build succeeds");
 
+        let services: String = module(&code, "services").split_whitespace().collect();
+
         assert!(module(&code, "container").contains("Pool::create().await"));
-        assert!(module(&code, "http").contains("async fn server_public"));
-        assert!(module(&code, "services").contains("super::http::server_public(container).await"));
+        assert!(concatenated(&code).contains("async fn server_public"));
+        assert!(services.contains("super::http::server_public::server_public(container,"));
     }
 
     const MULTI_SERVER_CRATE: &str = "\
@@ -329,7 +346,7 @@ pub mod margaret;
 struct Index;
 
 impl Index {
-    #[responder]
+    #[process]
     fn respond(&self) -> Response {}
 }
 
@@ -338,7 +355,7 @@ impl Index {
 struct Metrics;
 
 impl Metrics {
-    #[responder]
+    #[process]
     fn respond(&self) -> Response {}
 }
 ";
@@ -347,13 +364,13 @@ impl Metrics {
     fn generates_a_server_function_and_address_argument_per_active_server() {
         let code = generate(MULTI_SERVER_CRATE).expect("the build succeeds");
 
-        let http = module(&code, "http");
+        let http = concatenated(&code);
         assert!(http.contains("async fn server_public"));
         assert!(http.contains("async fn server_internal"));
 
-        let services = module(&code, "services");
-        assert!(services.contains("super::http::server_public(container).await"));
-        assert!(services.contains("super::http::server_internal(container).await"));
+        let services: String = module(&code, "services").split_whitespace().collect();
+        assert!(services.contains("super::http::server_public::server_public(container,"));
+        assert!(services.contains("super::http::server_internal::server_internal(container,"));
         assert!(services.contains(r#"get_one::<String>("public-addr")"#));
         assert!(services.contains(r#"get_one::<String>("internal-addr")"#));
 
@@ -365,7 +382,7 @@ impl Metrics {
     #[test]
     fn rejects_a_non_string_server() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -376,16 +393,74 @@ impl Metrics {
     #[test]
     fn supports_same_struct_name_route_handlers_in_different_modules() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[responder]\n    fn respond(&self) -> Response {}\n}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n}\n",
         )
         .expect("two `Page` handlers in different modules coexist");
 
-        let http = module(&code, "http");
+        let http = concatenated(&code);
 
         assert!(!http.contains("enum RouteName"));
         assert!(http.contains("\"/a\""));
         assert!(http.contains("\"/b\""));
         assert!(http.contains("crate::routes::Page"));
         assert!(http.contains("crate::endpoints::Page"));
+    }
+
+    const FRAMEWORK_NAMED_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+struct Build;
+
+#[singleton]
+struct Container;
+
+#[singleton]
+struct Routes;
+
+#[singleton]
+#[responds_to_http(method = Get, name = \"origin\", path = \"/o\", server = \"routes\")]
+struct Origin;
+
+impl Origin {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[responds_to_http(method = Get, name = \"new\", path = \"/n/{id}\", server = \"routes\")]
+struct New;
+
+impl New {
+    #[process]
+    fn respond(&self, #[route_parameter(from = \"id\")] id: String) -> Response {}
+}
+";
+
+    #[test]
+    fn generates_without_reserving_names_for_components_named_after_framework_identifiers() {
+        let code = generate(FRAMEWORK_NAMED_CRATE).expect("the build succeeds");
+
+        let container: String = module(&code, "container").split_whitespace().collect();
+        let build: String = module(&code, "container/build")
+            .split_whitespace()
+            .collect();
+        let routes: String = module(&code, "routes").split_whitespace().collect();
+        let http: String = concatenated(&code).split_whitespace().collect();
+
+        assert!(build.contains("pubfnbuild()->super::Container"));
+        assert!(container.contains("pubasyncfnbuild(&self)"));
+        assert!(container.contains("pubasyncfncontainer(&self)"));
+        assert!(container.contains("pubasyncfnroutes(&self)"));
+        assert!(!container.contains("build_2"));
+        assert!(!container.contains("container_2"));
+        assert!(!container.contains("routes_2"));
+
+        assert!(routes.contains("pubstructRoutes{pubroutes:servers::routes::Routes,}"));
+        assert!(module(&code, "routes/servers/routes").contains("pub struct Routes"));
+
+        assert!(http.contains("container:&super::super::container::Container"));
+        assert!(!http.contains("usesuper::container::Container"));
     }
 }

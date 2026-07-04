@@ -34,7 +34,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use std::sync::Arc;
 
     use async_trait::async_trait;
@@ -48,6 +47,7 @@ mod tests {
     use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
+    use crate::servers::Servers;
 
     struct Inner;
 
@@ -80,8 +80,10 @@ mod tests {
     where
         Middleware: HttpMiddleware + Send + Sync + 'static,
     {
+        let servers = Arc::new(Servers::new(Vec::new(), Vec::new()));
+
         respond_recursively(
-            &HashMap::new(),
+            &servers,
             Request::new(Method::Get, "/".to_string()),
             layer(Arc::new(middleware), Arc::new(Inner)),
         )

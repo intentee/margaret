@@ -29,14 +29,6 @@ use crate::raw_target::RawTarget;
 use crate::resolve_construction::resolve_construction;
 use crate::type_text::type_text;
 
-struct SingletonDraft<'index> {
-    collection: Option<CanonicalPath>,
-    concrete_path: CanonicalPath,
-    construction: ConstructionSource<'index>,
-    field_name: String,
-    provided: ProvidedType,
-}
-
 fn managed_selectors() -> [AttributeSelector; 3] {
     [
         singleton_selector(),
@@ -51,14 +43,12 @@ fn build_drafts<'index>(
 ) -> Result<Vec<SingletonDraft<'index>>, ContainerError> {
     let mut drafts: Vec<SingletonDraft> = Vec::new();
     let mut provided_keys: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
-    let mut field_names: HashMap<String, CanonicalPath> = HashMap::new();
 
     for selector in managed_selectors() {
         for matched in index.select(&selector) {
-            let draft = build_draft(&matched, trait_resolution, &provided_keys, &field_names)?;
+            let draft = build_draft(&matched, index, trait_resolution, &provided_keys)?;
 
             provided_keys.insert(draft.provided.key().clone(), draft.concrete_path.clone());
-            field_names.insert(draft.field_name.clone(), draft.concrete_path.clone());
             drafts.push(draft);
         }
     }
@@ -68,9 +58,9 @@ fn build_drafts<'index>(
 
 fn build_draft<'index>(
     matched: &MatchedAttribute<'index>,
+    index: &AttributeIndex,
     trait_resolution: &ResolutionIndex,
     provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
-    field_names: &HashMap<String, CanonicalPath>,
 ) -> Result<SingletonDraft<'index>, ContainerError> {
     let item = matched.item();
     let ItemKind::Struct(shape) = item.kind() else {
@@ -88,7 +78,7 @@ fn build_draft<'index>(
 
     check_unique_provided(provided_keys, &provided, &concrete_path)?;
 
-    let field_name = field_name(field_names, &provided, &concrete_path)?;
+    let field_name = index.field_name(&concrete_path).to_string();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
     let collection = resolve_collection(collection.as_ref(), trait_resolution, &concrete_path)?;
 
@@ -167,24 +157,6 @@ fn check_unique_provided(
     }
 
     Ok(())
-}
-
-fn field_name(
-    field_names: &HashMap<String, CanonicalPath>,
-    provided: &ProvidedType,
-    concrete_path: &CanonicalPath,
-) -> Result<String, ContainerError> {
-    let field_name = provided.key().field_name();
-
-    if let Some(existing) = field_names.get(&field_name) {
-        return Err(ContainerError::DuplicateFieldName {
-            field: field_name,
-            first: existing.to_string(),
-            second: concrete_path.to_string(),
-        });
-    }
-
-    Ok(field_name)
 }
 
 fn resolve_direct(
@@ -314,6 +286,14 @@ fn service_selector() -> AttributeSelector {
 fn scheduled_with_tick_timer_selector() -> AttributeSelector {
     AttributeSelector::parse("scheduled_with_tick_timer")
         .expect("the scheduled_with_tick_timer selector is valid")
+}
+
+struct SingletonDraft<'index> {
+    collection: Option<CanonicalPath>,
+    concrete_path: CanonicalPath,
+    construction: ConstructionSource<'index>,
+    field_name: String,
+    provided: ProvidedType,
 }
 
 pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {

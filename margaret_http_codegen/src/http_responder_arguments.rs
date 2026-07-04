@@ -1,4 +1,3 @@
-use heck::ToSnakeCase;
 use syn::Path;
 
 use margaret_attributes::attribute_args::AttributeArgs;
@@ -29,12 +28,12 @@ impl HttpResponderArguments {
                 responder: responder.to_string(),
             })?;
         let name = arguments.string("name")?;
-        let server = arguments
-            .string("server")?
-            .ok_or_else(|| HttpCodegenError::MissingHttpServer {
-                responder: responder.to_string(),
-            })?
-            .to_snake_case();
+        let server =
+            arguments
+                .string("server")?
+                .ok_or_else(|| HttpCodegenError::MissingHttpServer {
+                    responder: responder.to_string(),
+                })?;
 
         Ok(Self {
             method,

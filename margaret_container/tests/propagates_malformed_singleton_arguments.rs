@@ -9,8 +9,7 @@ fn propagates_malformed_singleton_arguments() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/malformed_singleton_args");
     let error = generate_container_source("malformed_singleton_args", &directory)
-        .err()
-        .expect("malformed #[singleton] arguments must surface through container generation");
+        .expect_err("malformed #[singleton] arguments must surface through container generation");
 
     assert!(matches!(
         error,

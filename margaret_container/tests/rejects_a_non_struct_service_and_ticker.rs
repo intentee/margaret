@@ -8,8 +8,7 @@ fn rejects_a_non_struct_service() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/service_not_a_struct");
     let error = generate_container_source("crate", &directory)
-        .err()
-        .expect("a #[service] on a non-struct must be rejected");
+        .expect_err("a #[service] on a non-struct must be rejected");
 
     assert!(matches!(error, ContainerError::NotASingletonStruct { .. }));
 }
@@ -19,8 +18,7 @@ fn rejects_a_non_struct_ticker() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ticker_not_a_struct");
     let error = generate_container_source("crate", &directory)
-        .err()
-        .expect("a #[scheduled_with_tick_timer] on a non-struct must be rejected");
+        .expect_err("a #[scheduled_with_tick_timer] on a non-struct must be rejected");
 
     assert!(matches!(error, ContainerError::NotASingletonStruct { .. }));
 }

@@ -96,10 +96,10 @@ fn argument_value(argument: &ConsoleArgument) -> TokenStream {
 fn value_expression(id: &str, required: bool, value_type: &Type) -> TokenStream {
     if required {
         quote! {
-            matches
-                .get_one::<#value_type>(#id)
-                .expect("a required console argument is present")
-                .clone()
+            match matches.get_one::<#value_type>(#id) {
+                Some(value) => value.clone(),
+                None => return margaret_console::command_outcome::CommandOutcome::Failed,
+            }
         }
     } else {
         quote! { matches.get_one::<#value_type>(#id).cloned() }
@@ -113,11 +113,13 @@ pub(crate) fn render(commands: &[ConsoleCommand], serves: bool, servers: &[HttpS
     let serve_registration = if serves {
         let server_arguments = servers.iter().map(|server| {
             let address_argument = server.address_argument();
+            let url_argument = server.url_argument();
             let uploads_argument = server.uploads_argument();
             let upload_dir_argument = server.upload_dir_argument();
 
             quote! {
                 .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
+                .arg(clap::Arg::new(#url_argument).long(#url_argument).required(false))
                 .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
                 .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
             }

@@ -5,6 +5,7 @@ use crate::request_input_source::RequestInputSource;
 
 pub(crate) enum ResponderArgumentBinding {
     CurrentRequest,
+    Routes,
     Raw {
         path_key: String,
     },

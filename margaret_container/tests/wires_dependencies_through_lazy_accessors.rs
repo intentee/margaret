@@ -10,5 +10,5 @@ fn wires_dependencies_through_lazy_accessors() {
     let source: String = generated.source().split_whitespace().collect();
 
     assert!(source.contains("crate::EnglishGreeter::new(self.config().await)"));
-    assert!(source.contains("crate::App::new(self.greeter().await,"));
+    assert!(source.contains("crate::App::new(self.english_greeter().await,"));
 }

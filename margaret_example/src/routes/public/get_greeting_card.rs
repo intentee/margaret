@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use margaret_macros::constructor;
-use margaret_macros::responder;
+use margaret_macros::process;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
@@ -21,7 +21,7 @@ impl GetGreetingCard {
         Self { greeter }
     }
 
-    #[responder]
+    #[process]
     pub async fn respond(&self) -> Box<dyn View> {
         Box::new(GreetingView {
             greeting: self.greeter.greet(),

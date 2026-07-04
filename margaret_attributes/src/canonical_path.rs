@@ -14,7 +14,7 @@ impl CanonicalPath {
         Self { segments }
     }
 
-    pub fn field_name(&self) -> String {
+    pub(crate) fn field_name(&self) -> String {
         self.segments
             .iter()
             .skip(1)

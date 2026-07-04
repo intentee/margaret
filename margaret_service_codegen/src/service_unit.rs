@@ -8,6 +8,7 @@ pub(crate) struct ServiceUnit {
     pub(crate) kind: ServiceKind,
     pub(crate) runner: String,
     pub(crate) takes_token: bool,
+    pub(crate) type_name: String,
 }
 
 impl ServiceUnit {

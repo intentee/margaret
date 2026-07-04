@@ -29,4 +29,8 @@ impl HttpServer {
     pub fn uploads_argument(&self) -> String {
         format!("{}-uploads", self.name)
     }
+
+    pub fn url_argument(&self) -> String {
+        format!("{}-url", self.name)
+    }
 }

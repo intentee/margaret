@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use http::request::Parts;
+use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper_util::rt::TokioExecutor;
@@ -13,6 +14,7 @@ use hyper_util::server::conn::auto::Builder;
 use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::service::TowerToHyperService;
 use tokio::net::TcpListener;
+use tokio::net::TcpStream;
 use tokio_util::sync::CancellationToken;
 
 use crate::method::Method;
@@ -21,25 +23,34 @@ use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
 use crate::response::Response;
 use crate::router::Router;
+use crate::servers::Servers;
 use crate::upload_config::UploadConfig;
 
 pub struct BoundServer {
-    app: Arc<Router>,
     listener: TcpListener,
+    router: Arc<Router>,
+    servers: Arc<Servers>,
     upload_config: Arc<UploadConfig>,
 }
 
 impl BoundServer {
-    pub(crate) fn new(
-        app: Arc<Router>,
-        listener: TcpListener,
-        upload_config: Arc<UploadConfig>,
-    ) -> Self {
-        Self {
-            app,
+    pub async fn bind(servers: Arc<Servers>, name: Arc<str>) -> std::io::Result<Self> {
+        let Some(server) = servers.server(&name) else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "the server is not registered",
+            ));
+        };
+        let router = server.router().clone();
+        let upload_config = server.upload_config().clone();
+        let listener = TcpListener::bind(server.address()).await?;
+
+        Ok(Self {
             listener,
+            router,
+            servers,
             upload_config,
-        }
+        })
     }
 
     pub fn local_addr(&self) -> SocketAddr {
@@ -56,32 +67,68 @@ impl BoundServer {
             .run_until_cancelled(self.listener.accept())
             .await
         {
-            let (stream, remote_addr) = accepted.expect("the listener accepts connections");
-            let app = self.app.clone();
-            let upload_config = self.upload_config.clone();
-            let builder = builder.clone();
-            let watcher = graceful.watcher();
+            accept_outcome(accepted).map(
+                |AcceptedConnection {
+                     remote_addr,
+                     stream,
+                 }| {
+                    let router = self.router.clone();
+                    let servers = self.servers.clone();
+                    let upload_config = self.upload_config.clone();
+                    let builder = builder.clone();
+                    let watcher = graceful.watcher();
 
-            tokio::spawn(async move {
-                let service = TowerToHyperService::new(tower::service_fn(
-                    move |request: http::Request<Incoming>| {
-                        let app = app.clone();
-                        let upload_config = upload_config.clone();
+                    tokio::spawn(async move {
+                        let service = TowerToHyperService::new(tower::service_fn(
+                            move |request: http::Request<Incoming>| {
+                                let router = router.clone();
+                                let servers = servers.clone();
+                                let upload_config = upload_config.clone();
 
-                        async move {
-                            Ok::<_, Infallible>(
-                                dispatch(app, upload_config, remote_addr, request).await,
-                            )
-                        }
-                    },
-                ));
-                let connection = builder.serve_connection(TokioIo::new(stream), service);
+                                async move {
+                                    Ok::<_, Infallible>(
+                                        dispatch(
+                                            router,
+                                            upload_config,
+                                            servers,
+                                            remote_addr,
+                                            request,
+                                        )
+                                        .await,
+                                    )
+                                }
+                            },
+                        ));
+                        let connection = builder.serve_connection(TokioIo::new(stream), service);
 
-                report_connection_outcome(watcher.watch(connection).await);
-            });
+                        report_connection_outcome(watcher.watch(connection).await);
+                    })
+                },
+            );
         }
 
         graceful.shutdown().await;
+    }
+}
+
+struct AcceptedConnection {
+    remote_addr: SocketAddr,
+    stream: TcpStream,
+}
+
+fn accept_outcome(
+    accepted: std::io::Result<(TcpStream, SocketAddr)>,
+) -> Option<AcceptedConnection> {
+    match accepted {
+        Ok((stream, remote_addr)) => Some(AcceptedConnection {
+            remote_addr,
+            stream,
+        }),
+        Err(error) => {
+            eprintln!("margaret_http: accept error: {error}");
+
+            None
+        }
     }
 }
 
@@ -99,8 +146,9 @@ fn error_response(error: RequestError) -> Response {
 }
 
 async fn dispatch(
-    app: Arc<Router>,
+    router: Arc<Router>,
     upload_config: Arc<UploadConfig>,
+    servers: Arc<Servers>,
     remote_addr: SocketAddr,
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
@@ -110,9 +158,13 @@ async fn dispatch(
 
     let (parts, incoming) = request.into_parts();
     let Parts { headers, uri, .. } = parts;
+    let body = incoming.map_err(std::io::Error::other).boxed_unsync();
 
-    match RequestInputs::parse(method, &uri, headers, remote_addr, incoming, &upload_config).await {
-        Ok(inputs) => app.respond(Request::from_inputs(inputs)).await.into_http(),
+    match RequestInputs::parse(method, &uri, headers, remote_addr, body, &upload_config).await {
+        Ok(inputs) => router
+            .respond(Request::from_inputs(inputs), &servers)
+            .await
+            .into_http(),
         Err(error) => error_response(error).into_http(),
     }
 }
@@ -120,17 +172,34 @@ async fn dispatch(
 #[cfg(test)]
 mod tests {
     use std::net::SocketAddr;
+    use std::sync::Arc;
 
     use tokio::io::AsyncReadExt;
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpStream;
     use tokio_util::sync::CancellationToken;
 
+    use super::BoundServer;
+    use super::accept_outcome;
     use super::error_response;
     use crate::request_error::RequestError;
-    use crate::router::Router;
+    use crate::router_builder::RouterBuilder;
     use crate::server::Server;
+    use crate::servers::Servers;
     use crate::upload_config::UploadConfig;
+
+    fn servers_with_one() -> Arc<Servers> {
+        Arc::new(Servers::new(
+            vec![Server::new(
+                "test",
+                "127.0.0.1:0".to_string(),
+                "http://127.0.0.1",
+                UploadConfig::Disabled,
+                RouterBuilder::empty().build(),
+            )],
+            Vec::new(),
+        ))
+    }
 
     #[test]
     fn maps_request_errors_to_status_codes() {
@@ -148,6 +217,41 @@ mod tests {
                 .as_u16(),
             400
         );
+    }
+
+    #[test]
+    fn skips_a_failed_accept() {
+        assert!(
+            accept_outcome(Err(std::io::Error::from(
+                std::io::ErrorKind::ConnectionAborted
+            )))
+            .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn fails_to_bind_an_unregistered_server() {
+        assert!(
+            BoundServer::bind(servers_with_one(), Arc::from("missing"))
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn fails_to_bind_an_invalid_address() {
+        let servers = Arc::new(Servers::new(
+            vec![Server::new(
+                "test",
+                "this is not an address".to_string(),
+                "http://127.0.0.1",
+                UploadConfig::Disabled,
+                RouterBuilder::empty().build(),
+            )],
+            Vec::new(),
+        ));
+
+        assert!(BoundServer::bind(servers, Arc::from("test")).await.is_err());
     }
 
     async fn exchange(address: SocketAddr, request: &[u8], close_write: bool) -> String {
@@ -176,8 +280,7 @@ mod tests {
 
     #[tokio::test]
     async fn serves_connections_until_cancellation() {
-        let bound = Server::new(Router::empty())
-            .bind("127.0.0.1:0", UploadConfig::Disabled)
+        let bound = BoundServer::bind(servers_with_one(), Arc::from("test"))
             .await
             .expect("the server binds to an ephemeral port");
         let address = bound.local_addr();

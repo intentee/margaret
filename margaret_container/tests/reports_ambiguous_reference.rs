@@ -8,8 +8,7 @@ fn reports_ambiguous_reference() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ambiguous_reference");
     let error = generate_container_source("ambiguous_reference", &directory)
-        .err()
-        .expect("a dependency matching more than one provider must be rejected");
+        .expect_err("a dependency matching more than one provider must be rejected");
 
     assert!(matches!(error, ContainerError::AmbiguousReference { .. }));
 }

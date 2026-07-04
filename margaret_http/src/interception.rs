@@ -44,7 +44,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use std::sync::Arc;
 
     use async_trait::async_trait;
@@ -58,6 +57,7 @@ mod tests {
     use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
+    use crate::servers::Servers;
 
     struct Payload {
         status: u16,
@@ -94,8 +94,9 @@ mod tests {
 
     #[tokio::test]
     async fn renders_the_intercepted_value_through_its_interceptor() {
+        let servers = Arc::new(Servers::new(Vec::new(), Vec::new()));
         let status = respond_recursively(
-            &HashMap::new(),
+            &servers,
             Request::new(Method::Get, "/".to_string()),
             Arc::new(YieldsInterception),
         )

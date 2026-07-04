@@ -7,6 +7,7 @@ edition = "2024"
 heck = { workspace = true }
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_http_codegen = { path = "../margaret_http_codegen" }
+margaret_injection_codegen = { path = "../margaret_injection_codegen" }
 proc-macro2 = { workspace = true }
 prettyplease = { workspace = true }
 quote = { workspace = true }

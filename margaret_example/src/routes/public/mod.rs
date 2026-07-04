@@ -2,6 +2,7 @@ pub mod delete_article;
 pub mod get_article;
 pub mod get_articles;
 pub mod get_farewell_card;
+pub mod get_featured;
 pub mod get_greeting;
 pub mod get_greeting_card;
 pub mod get_health;

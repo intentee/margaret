@@ -1,0 +1,72 @@
+use quote::format_ident;
+
+use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_injection_codegen::leaf_matches::leaf_matches;
+use margaret_injection_codegen::parameter_view::ParameterView;
+use margaret_injection_codegen::parameters::parameters;
+use margaret_injection_codegen::process_method::process_method;
+use margaret_injection_codegen::reference_leaf_matches::reference_leaf_matches;
+
+use crate::http_codegen_error::HttpCodegenError;
+use crate::middleware_argument::MiddlewareArgument;
+use crate::middleware_attribute_arguments::MiddlewareAttributeArguments;
+use crate::middleware_plan::MiddlewarePlan;
+
+pub(crate) fn middleware_plans(
+    index: &AttributeIndex,
+) -> Result<Vec<MiddlewarePlan>, HttpCodegenError> {
+    let selector =
+        AttributeSelector::parse("handles_middleware_attribute").expect("a valid selector");
+    let mut plans = Vec::new();
+
+    for matched in index.select(&selector) {
+        let item = matched.item();
+
+        if !item.kind().is_struct() {
+            return Err(HttpCodegenError::HttpMiddlewareNotOnStruct {
+                target: item.canonical_path().to_string(),
+            });
+        }
+
+        let middleware = item.canonical_path().to_string();
+        let MiddlewareAttributeArguments { handles } =
+            MiddlewareAttributeArguments::parse(&matched.args()?, &middleware)?;
+        let method = process_method(item)?;
+        let mut arguments = Vec::new();
+        let mut injects_routes = false;
+
+        for ParameterView {
+            declared, position, ..
+        } in parameters(method.signature())
+        {
+            let argument = if reference_leaf_matches(declared, "Request") {
+                MiddlewareArgument::CurrentRequest
+            } else if leaf_matches(declared, "Next") {
+                MiddlewareArgument::Next
+            } else if reference_leaf_matches(declared, "Routes") {
+                injects_routes = true;
+
+                MiddlewareArgument::Routes
+            } else {
+                return Err(HttpCodegenError::UnclassifiableMiddlewareParameter {
+                    middleware,
+                    parameter: position.to_string(),
+                });
+            };
+
+            arguments.push(argument);
+        }
+
+        plans.push(MiddlewarePlan {
+            arguments,
+            concrete: item.canonical_path().clone(),
+            field: format_ident!("{}", index.field_name(item.canonical_path())),
+            injects_routes,
+            selector: AttributeSelector::from_path(handles),
+            wrapper: format_ident!("{}", index.type_name(item.canonical_path())),
+        });
+    }
+
+    Ok(plans)
+}

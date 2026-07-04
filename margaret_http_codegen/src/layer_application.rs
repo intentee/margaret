@@ -1,5 +1,7 @@
 use proc_macro2::Ident;
 
 pub(crate) struct LayerApplication {
-    pub(crate) middleware_field: Ident,
+    pub(crate) field: Ident,
+    pub(crate) injects_routes: bool,
+    pub(crate) wrapper: Ident,
 }

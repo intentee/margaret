@@ -568,6 +568,7 @@ dependencies = [
  "margaret_attributes",
  "margaret_console_codegen",
  "margaret_container",
+ "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_service_codegen",
  "tempfile",
@@ -587,6 +588,7 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "margaret_http_codegen",
+ "margaret_injection_codegen",
  "prettyplease",
  "proc-macro2",
  "quote",
@@ -600,6 +602,7 @@ name = "margaret_container"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_generated_module",
  "prettyplease",
  "proc-macro2",
  "quote",
@@ -628,6 +631,13 @@ dependencies = [
  "tokio-util",
  "trzcina",
  "validator",
+]
+
+[[package]]
+name = "margaret_generated_module"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]
@@ -660,6 +670,8 @@ version = "0.1.0"
 dependencies = [
  "heck",
  "margaret_attributes",
+ "margaret_generated_module",
+ "margaret_injection_codegen",
  "matchit",
  "prettyplease",
  "proc-macro2",
@@ -678,6 +690,18 @@ dependencies = [
  "serde",
  "serde_json",
  "validator",
+]
+
+[[package]]
+name = "margaret_injection_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -709,6 +733,7 @@ dependencies = [
  "heck",
  "margaret_attributes",
  "margaret_http_codegen",
+ "margaret_injection_codegen",
  "prettyplease",
  "proc-macro2",
  "quote",

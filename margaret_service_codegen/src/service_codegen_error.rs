@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_injection_codegen::injection_error::InjectionError;
 
 #[derive(Debug, Error)]
 pub enum ServiceCodegenError {
@@ -8,6 +9,12 @@ pub enum ServiceCodegenError {
     Index {
         #[from]
         source: AttributeError,
+    },
+
+    #[error(transparent)]
+    Injection {
+        #[from]
+        source: InjectionError,
     },
 
     #[error("#[service] is only supported on structs, but '{path}' is not a struct")]
@@ -23,16 +30,10 @@ pub enum ServiceCodegenError {
     )]
     ConflictingRoles { path: String },
 
-    #[error("'{unit}' has no #[runner] method")]
-    MissingRunner { unit: String },
-
-    #[error("'{unit}' has more than one #[runner] method: {methods}")]
-    AmbiguousRunner { unit: String, methods: String },
-
     #[error(
-        "#[runner] parameter '{parameter}' of '{unit}' is unsupported; a service/ticker runner takes only &self and an optional CancellationToken"
+        "#[process] parameter '{parameter}' of '{unit}' is unsupported; a service/ticker process method takes only &self and an optional CancellationToken"
     )]
-    UnexpectedRunnerParameter { unit: String, parameter: String },
+    UnexpectedProcessParameter { unit: String, parameter: String },
 
     #[error("#[scheduled_with_tick_timer] '{ticker}' is missing the 'interval' argument")]
     TickerMissingInterval { ticker: String },

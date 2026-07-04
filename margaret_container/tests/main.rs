@@ -1,3 +1,5 @@
+mod accepts_singletons_named_after_framework_identifiers;
+mod disambiguates_colliding_field_names;
 mod generates_async_accessors;
 mod generates_collection_dependency_as_vector;
 mod generates_concrete_and_interface_fields;
@@ -18,7 +20,6 @@ mod reports_ambiguous_provides;
 mod reports_ambiguous_reference;
 mod reports_constructor_return_type_mismatch;
 mod reports_dependency_cycle;
-mod reports_duplicate_field_name;
 mod reports_duplicate_provider;
 mod reports_missing_provider;
 mod reports_receiver_parameter;

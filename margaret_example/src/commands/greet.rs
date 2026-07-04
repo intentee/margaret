@@ -3,7 +3,7 @@ use std::sync::Arc;
 use margaret_console::command_outcome::CommandOutcome;
 use margaret_macros::console_command;
 use margaret_macros::constructor;
-use margaret_macros::runner;
+use margaret_macros::process;
 use margaret_macros::singleton;
 
 use crate::greeter::Greeter;
@@ -20,7 +20,7 @@ impl Greet {
         Self { greeter }
     }
 
-    #[runner]
+    #[process]
     pub async fn run(
         &self,
         #[console_argument(from = "name")] name: String,

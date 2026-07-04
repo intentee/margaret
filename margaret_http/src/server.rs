@@ -1,52 +1,50 @@
 use std::sync::Arc;
 
-use tokio::net::TcpListener;
-
-use crate::bound_server::BoundServer;
 use crate::router::Router;
 use crate::upload_config::UploadConfig;
 
 pub struct Server {
-    app: Arc<Router>,
+    address: String,
+    name: Arc<str>,
+    origin: Arc<str>,
+    router: Arc<Router>,
+    upload_config: Arc<UploadConfig>,
 }
 
 impl Server {
-    pub fn new(router: Router) -> Self {
+    pub fn new(
+        name: impl Into<Arc<str>>,
+        address: String,
+        origin: impl Into<Arc<str>>,
+        upload_config: UploadConfig,
+        router: Router,
+    ) -> Self {
         Self {
-            app: Arc::new(router),
+            address,
+            name: name.into(),
+            origin: origin.into(),
+            router: Arc::new(router),
+            upload_config: Arc::new(upload_config),
         }
     }
 
-    pub async fn bind(
-        self,
-        address: &str,
-        upload_config: UploadConfig,
-    ) -> std::io::Result<BoundServer> {
-        let listener = TcpListener::bind(address).await?;
-
-        Ok(BoundServer::new(
-            self.app,
-            listener,
-            Arc::new(upload_config),
-        ))
+    pub fn address(&self) -> &str {
+        &self.address
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::Server;
-    use crate::router::Router;
-    use crate::upload_config::UploadConfig;
+    pub(crate) fn name(&self) -> &Arc<str> {
+        &self.name
+    }
 
-    #[tokio::test]
-    async fn bind_fails_for_an_invalid_address() {
-        let server = Server::new(Router::empty());
+    pub(crate) fn origin(&self) -> &Arc<str> {
+        &self.origin
+    }
 
-        assert!(
-            server
-                .bind("this is not an address", UploadConfig::Disabled)
-                .await
-                .is_err()
-        );
+    pub(crate) fn router(&self) -> &Arc<Router> {
+        &self.router
+    }
+
+    pub(crate) fn upload_config(&self) -> &Arc<UploadConfig> {
+        &self.upload_config
     }
 }

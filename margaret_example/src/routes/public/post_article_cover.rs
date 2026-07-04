@@ -1,6 +1,6 @@
 use margaret_http::request::Request;
 use margaret_http::response::Response;
-use margaret_macros::responder;
+use margaret_macros::process;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
@@ -11,7 +11,7 @@ use crate::models::article::Article;
 pub struct PostArticleCover;
 
 impl PostArticleCover {
-    #[responder]
+    #[process]
     pub async fn respond(
         &self,
         request: &Request,

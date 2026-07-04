@@ -21,7 +21,8 @@ fn generate_into(manifest_directory: &Path) {
 
     build(&crate_root)
         .expect("the crate is generated")
-        .write_to(&generated_directory);
+        .write_to(&generated_directory)
+        .expect("the generated sources are written");
 
     println!(
         "cargo:rerun-if-changed={}",

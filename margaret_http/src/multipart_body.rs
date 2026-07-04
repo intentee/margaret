@@ -1,7 +1,5 @@
 use std::path::Path;
 
-use bytes::Bytes;
-use http_body::Body;
 use http_body_util::BodyDataStream;
 use multer::Constraints;
 use multer::Field;
@@ -11,6 +9,7 @@ use tempfile::NamedTempFile;
 use tokio::io::AsyncWriteExt;
 
 use crate::form_field::FormField;
+use crate::request_body::RequestBody;
 use crate::request_error::RequestError;
 use crate::upload_config::UploadConfig;
 use crate::uploaded_file::UploadedFile;
@@ -70,15 +69,11 @@ pub(crate) struct MultipartBody {
 }
 
 impl MultipartBody {
-    pub(crate) async fn parse<RequestBody>(
+    pub(crate) async fn parse(
         body: RequestBody,
         boundary: String,
         upload_config: &UploadConfig,
-    ) -> Result<Self, RequestError>
-    where
-        RequestBody: Body<Data = Bytes> + Send + Unpin,
-        RequestBody::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-    {
+    ) -> Result<Self, RequestError> {
         let constraints = Constraints::new()
             .size_limit(SizeLimit::new().whole_stream(upload_config.max_body_size()));
         let mut multipart =
