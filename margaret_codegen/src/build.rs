@@ -1,97 +1,56 @@
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_generated_module::generated_module::GeneratedModule;
-use margaret_http_codegen::http_server::HttpServer;
 
+use crate::build_context::BuildContext;
 use crate::codegen_error::CodegenError;
+use crate::console_pass::console_pass;
+use crate::container_pass::container_pass;
 use crate::generated_code::GeneratedCode;
-
-fn render_umbrella(has_http: bool, has_console: bool, serves: bool) -> String {
-    let mut umbrella = String::from("#[rustfmt::skip]\npub mod container;\n");
-
-    if has_http {
-        umbrella.push_str("#[rustfmt::skip]\npub mod http;\n");
-        umbrella.push_str("#[rustfmt::skip]\npub mod routes;\n");
-    }
-
-    if serves {
-        umbrella.push_str("#[rustfmt::skip]\npub mod services;\n");
-    }
-
-    if has_console {
-        umbrella.push_str("#[rustfmt::skip]\npub mod console;\n");
-    }
-
-    umbrella
-}
+use crate::http_pass::http_pass;
+use crate::services_pass::services_pass;
 
 pub fn build(crate_root: &CrateRoot) -> Result<GeneratedCode, CodegenError> {
     let index = AttributeIndexBuilder::new()
         .index_crate(crate_root)?
         .build();
+    let mut context = BuildContext::new(&index);
 
-    let has_http = margaret_http_codegen::has_responders::has_responders(&index);
-    let has_services = margaret_service_codegen::has_services::has_services(&index);
-    let serves = has_http || has_services;
-    let has_console = margaret_console_codegen::has_commands::has_commands(&index) || serves;
+    container_pass(&mut context)?;
+    http_pass(&mut context)?;
+    services_pass(&mut context)?;
+    console_pass(&mut context)?;
 
-    let http = if has_http {
-        Some(margaret_http_codegen::render_http::render_http(&index)?)
-    } else {
-        None
-    };
-    let servers: &[HttpServer] = match &http {
-        Some(artifacts) => artifacts.servers(),
-        None => &[],
-    };
-
-    let mut modules = margaret_container::render_container::render_container(&index)?;
-
-    if let Some(artifacts) = &http {
-        modules.extend(artifacts.modules().iter().cloned());
-    }
-
-    if serves {
-        modules.push(GeneratedModule::new(
-            "services",
-            margaret_service_codegen::render_services::render_services(&index, servers)?,
-        ));
-    }
-
-    if has_console {
-        modules.push(GeneratedModule::new(
-            "console",
-            margaret_console_codegen::render_console::render_console(&index, serves, servers)?,
-        ));
-    }
-
-    modules.push(GeneratedModule::new(
-        "mod",
-        render_umbrella(has_http, has_console, serves),
-    ));
-
-    Ok(GeneratedCode::new(modules))
+    Ok(context.into_generated_code())
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::Path;
 
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_generated_module::generated_module::GeneratedModule;
 
     use super::build;
+    use crate::build_context::BuildContext;
     use crate::codegen_error::CodegenError;
+    use crate::console_pass::console_pass;
+    use crate::container_pass::container_pass;
     use crate::generated_code::GeneratedCode;
+    use crate::http_pass::http_pass;
+    use crate::services_pass::services_pass;
+    use crate::umbrella::umbrella;
 
     const WEB_CRATE: &str = "\
 #[rustfmt::skip]
 pub mod margaret;
 
 #[singleton]
-#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]
+#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
 struct Page;
 
 impl Page {
@@ -155,6 +114,29 @@ impl Greet {
         bootstrap(&directory);
 
         build(&CrateRoot::new("crate", directory.path().join("src")))
+    }
+
+    fn generate_unformatted(source: &Path) -> GeneratedCode {
+        let index = AttributeIndexBuilder::new()
+            .index_crate(&CrateRoot::new("crate", source))
+            .expect("the crate is indexed")
+            .build();
+        let mut context = BuildContext::new(&index);
+
+        container_pass(&mut context).expect("the container pass succeeds");
+        http_pass(&mut context).expect("the http pass succeeds");
+        services_pass(&mut context).expect("the services pass succeeds");
+        console_pass(&mut context).expect("the console pass succeeds");
+
+        let mut modules: Vec<GeneratedModule> = context
+            .module_tokens()
+            .iter()
+            .map(|module| GeneratedModule::new(module.name(), module.to_source()))
+            .collect();
+
+        modules.push(umbrella(context.capabilities()));
+
+        GeneratedCode::new(modules)
     }
 
     fn module<'code>(code: &'code GeneratedCode, name: &str) -> &'code str {
@@ -223,8 +205,7 @@ impl Greet {
         let source = directory.path().join("src");
         let generated = source.join("margaret");
 
-        build(&CrateRoot::new("crate", &source))
-            .expect("the first build succeeds")
+        generate_unformatted(&source)
             .write_to(&generated)
             .expect("the first sources are written");
 
@@ -232,19 +213,19 @@ impl Greet {
 
         write_lib(&directory, PLAIN_CRATE);
 
-        build(&CrateRoot::new("crate", &source))
-            .expect("the second build succeeds")
+        generate_unformatted(&source)
             .write_to(&generated)
             .expect("the second sources are written");
 
-        let umbrella = fs::read_to_string(generated.join("mod.rs")).expect("the umbrella exists");
+        let umbrella_source =
+            fs::read_to_string(generated.join("mod.rs")).expect("the umbrella exists");
 
         assert!(!generated.join("http.rs").exists());
         assert!(!generated.join("routes.rs").exists());
         assert!(!generated.join("console.rs").exists());
-        assert!(!umbrella.contains("pub mod http;"));
-        assert!(!umbrella.contains("pub mod routes;"));
-        assert!(!umbrella.contains("pub mod console;"));
+        assert!(!umbrella_source.contains("pub mod http;"));
+        assert!(!umbrella_source.contains("pub mod routes;"));
+        assert!(!umbrella_source.contains("pub mod console;"));
     }
 
     #[test]
@@ -253,8 +234,8 @@ impl Greet {
         bootstrap(&directory);
         let source = directory.path().join("src");
 
-        let first = build(&CrateRoot::new("crate", &source)).expect("the first build succeeds");
-        let second = build(&CrateRoot::new("crate", &source)).expect("the second build succeeds");
+        let first = generate_unformatted(&source);
+        let second = generate_unformatted(&source);
 
         assert_eq!(module(&first, "mod"), module(&second, "mod"));
         assert_eq!(module(&first, "http"), module(&second, "http"));
@@ -326,7 +307,7 @@ impl Greet {
     #[test]
     fn awaits_an_async_constructor_in_the_container() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         )
         .expect("the async build succeeds");
 
@@ -342,7 +323,7 @@ impl Greet {
 pub mod margaret;
 
 #[singleton]
-#[responds_to_http(method = Get, path = \"/\", server = \"public\")]
+#[responds_to_http(method = \"get\", path = \"/\", server = \"public\")]
 struct Index;
 
 impl Index {
@@ -351,7 +332,7 @@ impl Index {
 }
 
 #[singleton]
-#[responds_to_http(method = Get, path = \"/metrics\", server = \"internal\")]
+#[responds_to_http(method = \"get\", path = \"/metrics\", server = \"internal\")]
 struct Metrics;
 
 impl Metrics {
@@ -382,7 +363,7 @@ impl Metrics {
     #[test]
     fn rejects_a_non_string_server() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = Get, path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -393,7 +374,7 @@ impl Metrics {
     #[test]
     fn supports_same_struct_name_route_handlers_in_different_modules() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = Get, path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n}\n",
         )
         .expect("two `Page` handlers in different modules coexist");
 
@@ -420,7 +401,7 @@ struct Container;
 struct Routes;
 
 #[singleton]
-#[responds_to_http(method = Get, name = \"origin\", path = \"/o\", server = \"routes\")]
+#[responds_to_http(method = \"get\", name = \"origin\", path = \"/o\", server = \"routes\")]
 struct Origin;
 
 impl Origin {
@@ -429,7 +410,7 @@ impl Origin {
 }
 
 #[singleton]
-#[responds_to_http(method = Get, name = \"new\", path = \"/n/{id}\", server = \"routes\")]
+#[responds_to_http(method = \"get\", name = \"new\", path = \"/n/{id}\", server = \"routes\")]
 struct New;
 
 impl New {

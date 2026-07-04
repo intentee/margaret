@@ -1,5 +1,3 @@
-use syn::Attribute;
-
 use crate::attribute_args::AttributeArgs;
 use crate::attribute_error::AttributeError;
 use crate::attribute_selector::AttributeSelector;
@@ -7,17 +5,20 @@ use crate::format_path::format_path;
 use crate::indexed_item::IndexedItem;
 
 pub struct MatchedAttribute<'index> {
-    attribute: &'index Attribute,
+    attribute_index: usize,
     item: &'index IndexedItem,
 }
 
 impl<'index> MatchedAttribute<'index> {
-    pub(crate) fn new(item: &'index IndexedItem, attribute: &'index Attribute) -> Self {
-        Self { attribute, item }
+    pub(crate) fn new(item: &'index IndexedItem, attribute_index: usize) -> Self {
+        Self {
+            attribute_index,
+            item,
+        }
     }
 
-    pub fn args(&self) -> Result<AttributeArgs, AttributeError> {
-        AttributeArgs::from_attribute(self.attribute)
+    pub fn args(&self) -> Result<&'index AttributeArgs, AttributeError> {
+        self.item.attribute_args(self.attribute_index)
     }
 
     pub fn item(&self) -> &'index IndexedItem {
@@ -25,11 +26,11 @@ impl<'index> MatchedAttribute<'index> {
     }
 
     pub fn matches(&self, selector: &AttributeSelector) -> bool {
-        selector.matches(self.attribute.path())
+        selector.matches(self.item.attributes()[self.attribute_index].path())
     }
 
     pub fn path(&self) -> String {
-        format_path(self.attribute.path())
+        format_path(self.item.attributes()[self.attribute_index].path())
     }
 }
 
@@ -57,7 +58,7 @@ mod tests {
     #[test]
     fn path_is_the_attributes_written_path() {
         let item = item_bearing(parse_quote!(#[ns::tagged]));
-        let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
+        let matched = MatchedAttribute::new(&item, 0);
 
         assert_eq!(matched.path(), "ns::tagged");
     }
@@ -65,15 +66,26 @@ mod tests {
     #[test]
     fn args_parse_the_matched_attribute() {
         let item = item_bearing(parse_quote!(#[singleton]));
-        let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
+        let matched = MatchedAttribute::new(&item, 0);
 
         assert!(matched.args().expect("the arguments parse").is_empty());
     }
 
     #[test]
+    fn args_are_parsed_once_and_reused() {
+        let item = item_bearing(parse_quote!(#[responds_to_http(method = "get")]));
+        let matched = MatchedAttribute::new(&item, 0);
+
+        let first = matched.args().expect("the arguments parse");
+        let second = matched.args().expect("the arguments parse");
+
+        assert!(std::ptr::eq(first, second));
+    }
+
+    #[test]
     fn matches_tests_the_attribute_against_a_selector() {
         let item = item_bearing(parse_quote!(#[intercepts(crate::markers::View)]));
-        let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
+        let matched = MatchedAttribute::new(&item, 0);
 
         assert!(
             matched.matches(&AttributeSelector::parse("intercepts").expect("a valid selector"))

@@ -6,7 +6,12 @@ use margaret_macros::singleton;
 use crate::models::article::Article;
 
 #[singleton]
-#[responds_to_http(method = Get, name = "get_article", path = "/articles/{article}", server = "public")]
+#[responds_to_http(
+    method = "get",
+    name = "get_article",
+    path = "/articles/{article}",
+    server = "public"
+)]
 pub struct GetArticle;
 
 impl GetArticle {

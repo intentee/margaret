@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::handler::Handler;
-use crate::method::Method;
 use crate::request::Request;
 use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
@@ -10,13 +9,13 @@ use crate::servers::Servers;
 
 pub struct Router {
     matcher: matchit::Router<usize>,
-    routes: Vec<HashMap<Method, Arc<dyn Handler>>>,
+    routes: Vec<HashMap<&'static str, Arc<dyn Handler>>>,
 }
 
 impl Router {
     pub(crate) fn new(
         matcher: matchit::Router<usize>,
-        routes: Vec<HashMap<Method, Arc<dyn Handler>>>,
+        routes: Vec<HashMap<&'static str, Arc<dyn Handler>>>,
     ) -> Self {
         Self { matcher, routes }
     }
@@ -30,7 +29,7 @@ impl Router {
             Err(matchit::MatchError::NotFound) => return Response::not_found(),
         };
 
-        let Some(handler) = self.routes[*matched.value].get(&method).cloned() else {
+        let Some(handler) = self.routes[*matched.value].get(method).cloned() else {
             return Response::text(405, "Method Not Allowed");
         };
 
@@ -50,9 +49,9 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use http::Method;
 
     use crate::handler::Handler;
-    use crate::method::Method;
     use crate::request::Request;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
@@ -85,9 +84,9 @@ mod tests {
 
     fn router() -> super::Router {
         RouterBuilder::empty()
-            .route(Method::Get, "/items", Arc::new(PlainOk))
-            .route(Method::Post, "/items", Arc::new(PlainOk))
-            .route(Method::Get, "/items/{id}", Arc::new(EchoId))
+            .route("GET", "/items", Arc::new(PlainOk))
+            .route("POST", "/items", Arc::new(PlainOk))
+            .route("GET", "/items/{id}", Arc::new(EchoId))
             .build()
     }
 
@@ -104,21 +103,21 @@ mod tests {
 
     #[tokio::test]
     async fn routes_a_matching_request() {
-        assert_eq!(status_of(Method::Get, "/items").await, 200);
+        assert_eq!(status_of(Method::GET, "/items").await, 200);
     }
 
     #[tokio::test]
     async fn extracts_path_parameters_for_the_handler() {
-        assert_eq!(status_of(Method::Get, "/items/7").await, 200);
+        assert_eq!(status_of(Method::GET, "/items/7").await, 200);
     }
 
     #[tokio::test]
     async fn returns_404_for_an_unknown_path() {
-        assert_eq!(status_of(Method::Get, "/missing").await, 404);
+        assert_eq!(status_of(Method::GET, "/missing").await, 404);
     }
 
     #[tokio::test]
     async fn returns_405_for_an_unregistered_method() {
-        assert_eq!(status_of(Method::Delete, "/items").await, 405);
+        assert_eq!(status_of(Method::DELETE, "/items").await, 405);
     }
 }

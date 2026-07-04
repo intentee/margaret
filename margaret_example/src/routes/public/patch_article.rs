@@ -11,7 +11,7 @@ use crate::models::article::Article;
 use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
-#[responds_to_http(method = Patch, path = "/articles/{article}", server = "public")]
+#[responds_to_http(method = "patch", path = "/articles/{article}", server = "public")]
 pub struct PatchArticle {
     articles: Arc<ArticleRepository>,
 }

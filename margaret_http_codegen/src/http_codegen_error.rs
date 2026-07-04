@@ -24,6 +24,13 @@ pub enum HttpCodegenError {
     #[error("responder '{responder}' is missing the 'method' argument")]
     MissingHttpMethod { responder: String },
 
+    #[error("responder '{responder}' has an invalid HTTP method '{method}': {source}")]
+    InvalidHttpMethod {
+        responder: String,
+        method: String,
+        source: http::method::InvalidMethod,
+    },
+
     #[error("responder '{responder}' is missing the 'path' argument")]
     MissingHttpPath { responder: String },
 

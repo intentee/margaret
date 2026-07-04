@@ -44,6 +44,8 @@ mod tests {
     fn rendered(lib_source: &str, servers: &[HttpServer]) -> String {
         render_services(&index_for(lib_source), servers)
             .expect("the services source is generated")
+            .format()
+            .source()
             .split_whitespace()
             .collect()
     }

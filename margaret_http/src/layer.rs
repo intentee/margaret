@@ -37,11 +37,11 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use http::Method;
 
     use super::layer;
     use crate::handler::Handler;
     use crate::http_middleware::HttpMiddleware;
-    use crate::method::Method;
     use crate::next::Next;
     use crate::request::Request;
     use crate::respond_recursively::respond_recursively;
@@ -84,7 +84,7 @@ mod tests {
 
         respond_recursively(
             &servers,
-            Request::new(Method::Get, "/".to_string()),
+            Request::new(Method::GET, "/".to_string()),
             layer(Arc::new(middleware), Arc::new(Inner)),
         )
         .await

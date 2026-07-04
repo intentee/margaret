@@ -23,9 +23,9 @@ where
 mod tests {
     use std::collections::HashMap;
 
+    use http::Method;
     use serde_json::json;
 
-    use margaret_http::method::Method;
     use margaret_http::request::Request;
     use margaret_validation::validation_result::ValidationResult;
 
@@ -46,7 +46,7 @@ mod tests {
     }
 
     fn request() -> Request {
-        Request::new(Method::Get, "/".to_string())
+        Request::new(Method::GET, "/".to_string())
     }
 
     #[test]

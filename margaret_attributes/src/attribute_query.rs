@@ -31,9 +31,9 @@ impl<'index> AttributeQuery<'index> {
     pub fn find_all(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'index>> {
         let mut matches = Vec::new();
 
-        for attribute in self.item.attributes() {
+        for (attribute_index, attribute) in self.item.attributes().iter().enumerate() {
             if selector.matches(attribute.path()) {
-                matches.push(MatchedAttribute::new(self.item, attribute));
+                matches.push(MatchedAttribute::new(self.item, attribute_index));
             }
         }
 
@@ -41,10 +41,8 @@ impl<'index> AttributeQuery<'index> {
     }
 
     pub fn matched_attributes(&self) -> Vec<MatchedAttribute<'index>> {
-        self.item
-            .attributes()
-            .iter()
-            .map(|attribute| MatchedAttribute::new(self.item, attribute))
+        (0..self.item.attributes().len())
+            .map(|attribute_index| MatchedAttribute::new(self.item, attribute_index))
             .collect()
     }
 }

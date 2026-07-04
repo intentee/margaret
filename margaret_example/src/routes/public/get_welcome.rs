@@ -8,7 +8,7 @@ use crate::margaret::routes::Routes;
 
 #[singleton]
 #[middleware(logged)]
-#[responds_to_http(method = Get, path = "/welcome", server = "public")]
+#[responds_to_http(method = "get", path = "/welcome", server = "public")]
 pub struct GetWelcome;
 
 impl GetWelcome {

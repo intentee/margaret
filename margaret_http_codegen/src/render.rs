@@ -8,7 +8,7 @@ use quote::quote;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_attributes::path_tokens::path_tokens;
-use margaret_generated_module::generated_module::GeneratedModule;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::http_route::HttpRoute;
@@ -234,9 +234,12 @@ fn argument_binding(
     match &argument.binding {
         ResponderArgumentBinding::Raw { path_key } => {
             quote! {
-                let #holder = match #request.path_param(#path_key) {
-                    Some(value) => value.to_string(),
-                    None => return margaret_http::response::Response::not_found().into(),
+                let #holder = match margaret_http::require_route_parameter::require_route_parameter(
+                    #request,
+                    #path_key,
+                ) {
+                    Ok(value) => value,
+                    Err(response) => return response.into(),
                 };
             }
         }
@@ -254,12 +257,13 @@ fn argument_binding(
             let binder_field = format_ident!("{}", index.field_name(binder));
 
             quote! {
-                let #holder = match #request.path_param(#path_key) {
-                    Some(value) => match #binder_field.bind(value.to_string()).await {
-                        Some(value) => value,
-                        None => return margaret_http::response::Response::not_found().into(),
-                    },
-                    None => return margaret_http::response::Response::not_found().into(),
+                let #holder = match margaret_http::require_bound_route_parameter::require_bound_route_parameter(
+                    #request,
+                    #path_key,
+                    #binder_field.as_ref(),
+                ).await {
+                    Ok(value) => value,
+                    Err(response) => return response.into(),
                 };
             }
         }
@@ -413,11 +417,6 @@ fn server_module(routes: &[HttpRoute], server: &HttpServer, index: &AttributeInd
         .iter()
         .filter(|route| route.server == server.name())
         .collect();
-    let binder_import = if server_routes.iter().copied().any(HttpRoute::is_bound) {
-        quote! { use margaret_http::http_route_parameter_binder::HttpRouteParameterBinder; }
-    } else {
-        quote! {}
-    };
     let routes_param = if server_routes.iter().copied().any(route_references_routes) {
         format_ident!("routes")
     } else {
@@ -446,7 +445,7 @@ fn server_module(routes: &[HttpRoute], server: &HttpServer, index: &AttributeInd
         };
 
         quote! {
-            .route(margaret_http::method::Method::#method, #path, #handler)
+            .route(#method, #path, #handler)
         }
     });
 
@@ -459,8 +458,6 @@ fn server_module(routes: &[HttpRoute], server: &HttpServer, index: &AttributeInd
     });
 
     quote! {
-        #binder_import
-
         pub async fn #function_name(
             container: &super::super::container::Container,
             #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
@@ -476,20 +473,13 @@ fn server_module(routes: &[HttpRoute], server: &HttpServer, index: &AttributeInd
     }
 }
 
-pub(crate) fn unparse(tokens: TokenStream) -> String {
-    let file =
-        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
-
-    prettyplease::unparse(&file)
-}
-
 pub(crate) fn render(
     routes: &[HttpRoute],
     servers: &[HttpServer],
     interceptor_plans: &[InterceptorPlan],
     middleware_plans: &[MiddlewarePlan],
     index: &AttributeIndex,
-) -> Vec<GeneratedModule> {
+) -> Vec<GeneratedModuleTokens> {
     let interceptor_wrappers = interceptor_plans
         .iter()
         .map(|plan| interceptor_wrapper(plan, index));
@@ -509,12 +499,12 @@ pub(crate) fn render(
         #(#middleware_wrappers)*
     };
 
-    let mut modules = vec![GeneratedModule::new("http", unparse(http_tokens))];
+    let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];
 
     for server in servers {
-        modules.push(GeneratedModule::new(
+        modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
-            unparse(server_module(routes, server, index)),
+            server_module(routes, server, index),
         ));
     }
 

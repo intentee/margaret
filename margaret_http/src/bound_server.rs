@@ -17,7 +17,6 @@ use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio_util::sync::CancellationToken;
 
-use crate::method::Method;
 use crate::request::Request;
 use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
@@ -152,12 +151,13 @@ async fn dispatch(
     remote_addr: SocketAddr,
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
-    let Some(method) = Method::from_http(request.method()) else {
-        return Response::text(405, "Method Not Allowed").into_http();
-    };
-
     let (parts, incoming) = request.into_parts();
-    let Parts { headers, uri, .. } = parts;
+    let Parts {
+        method,
+        headers,
+        uri,
+        ..
+    } = parts;
     let body = incoming.map_err(std::io::Error::other).boxed_unsync();
 
     match RequestInputs::parse(method, &uri, headers, remote_addr, body, &upload_config).await {
@@ -174,6 +174,7 @@ mod tests {
     use std::net::SocketAddr;
     use std::sync::Arc;
 
+    use async_trait::async_trait;
     use tokio::io::AsyncReadExt;
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpStream;
@@ -182,11 +183,24 @@ mod tests {
     use super::BoundServer;
     use super::accept_outcome;
     use super::error_response;
+    use crate::handler::Handler;
+    use crate::request::Request;
     use crate::request_error::RequestError;
+    use crate::response::Response;
+    use crate::response_continuation::ResponseContinuation;
     use crate::router_builder::RouterBuilder;
     use crate::server::Server;
     use crate::servers::Servers;
     use crate::upload_config::UploadConfig;
+
+    struct PlainOk;
+
+    #[async_trait]
+    impl Handler for PlainOk {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+            ResponseContinuation::Done(Response::text(200, "ok"))
+        }
+    }
 
     fn servers_with_one() -> Arc<Servers> {
         Arc::new(Servers::new(
@@ -195,7 +209,9 @@ mod tests {
                 "127.0.0.1:0".to_string(),
                 "http://127.0.0.1",
                 UploadConfig::Disabled,
-                RouterBuilder::empty().build(),
+                RouterBuilder::empty()
+                    .route("GET", "/", Arc::new(PlainOk))
+                    .build(),
             )],
             Vec::new(),
         ))
@@ -287,7 +303,12 @@ mod tests {
         let cancellation_token = CancellationToken::new();
         let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 
-        let (interrupted, unmatched, unsupported, truncated) = tokio::join!(
+        let (served, interrupted, unmatched, unsupported, truncated) = tokio::join!(
+            exchange(
+                address,
+                b"GET / HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
             exchange(address, b"GET /interrupted HTTP/1.1\r\nHost: test\r\n", true),
             exchange(
                 address,
@@ -306,6 +327,7 @@ mod tests {
             ),
         );
 
+        assert!(served.contains(" 200 "));
         assert!(!interrupted.contains(" 200 "));
         assert!(unmatched.contains(" 404 "));
         assert!(unsupported.contains(" 405 "));

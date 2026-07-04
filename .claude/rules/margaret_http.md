@@ -22,7 +22,7 @@ Specific attribute rules:
 
 - `#[middleware(<name>)]` - `<name>` is the name of the actual middleware tag
 - `#[responds_to_http(method = <method>, name = <name>, path = <path>, server = <marker>)]` 
-    * `<method>` must map directly into `Method` enum
+    * `<method>` is a compile-time validate HTTP verb (lowercase): "get", "post", "put", "delete", "patch", "query"
     * `<name>` is optional and must be a globally unique route name string (validated at compile time)
     * `<path>` must be `matchit`-compatible string 
     * `<server>`  must be a string with a server name

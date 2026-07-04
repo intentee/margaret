@@ -14,10 +14,6 @@ impl NameAllocator {
         Self::default()
     }
 
-    pub fn reserve(&mut self, base: &str) {
-        self.taken.insert(base.to_upper_camel_case());
-    }
-
     pub fn allocate(&mut self, base: &str) -> Identifier {
         let mut candidate = base.to_string();
         let mut ordinal = 1;
@@ -32,6 +28,10 @@ impl NameAllocator {
             ordinal += 1;
             candidate = format!("{base}_{ordinal}");
         }
+    }
+
+    pub fn reserve(&mut self, base: &str) {
+        self.taken.insert(base.to_upper_camel_case());
     }
 }
 

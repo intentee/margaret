@@ -1,11 +1,16 @@
+use std::cell::OnceCell;
+
 use syn::Attribute;
 
+use crate::attribute_args::AttributeArgs;
+use crate::attribute_error::AttributeError;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_associated_type::IndexedAssociatedType;
 use crate::indexed_method::IndexedMethod;
 use crate::item_kind::ItemKind;
 
 pub struct IndexedItem {
+    argument_cache: Vec<OnceCell<AttributeArgs>>,
     associated_types: Vec<IndexedAssociatedType>,
     attributes: Vec<Attribute>,
     canonical_path: CanonicalPath,
@@ -21,7 +26,10 @@ impl IndexedItem {
         canonical_path: CanonicalPath,
         attributes: Vec<Attribute>,
     ) -> Self {
+        let argument_cache = attributes.iter().map(|_| OnceCell::new()).collect();
+
         Self {
+            argument_cache,
             associated_types: Vec::new(),
             attributes,
             canonical_path,
@@ -61,6 +69,16 @@ impl IndexedItem {
 
     pub(crate) fn add_method(&mut self, method: IndexedMethod) {
         self.methods.push(method);
+    }
+
+    pub(crate) fn attribute_args(&self, index: usize) -> Result<&AttributeArgs, AttributeError> {
+        if let Some(cached) = self.argument_cache[index].get() {
+            return Ok(cached);
+        }
+
+        let parsed = AttributeArgs::from_attribute(&self.attributes[index])?;
+
+        Ok(self.argument_cache[index].get_or_init(|| parsed))
     }
 
     pub(crate) fn sort_members(&mut self) {

@@ -10,7 +10,7 @@ use crate::views::farewell_view::FarewellView;
 use crate::views::view::View;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/farewell-card", server = "public")]
+#[responds_to_http(method = "get", path = "/farewell-card", server = "public")]
 pub struct GetFarewellCard {
     config: Arc<Config>,
 }

@@ -4,7 +4,6 @@ use syn::ReturnType;
 use syn::Type;
 
 use margaret_attributes::attribute_args::AttributeArgs;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::resolve_struct::resolve_struct;
@@ -23,6 +22,7 @@ use crate::registries::Registries;
 use crate::responder_argument::ResponderArgument;
 use crate::responder_argument_binding::ResponderArgumentBinding;
 use crate::responder_output::ResponderOutput;
+use crate::responder_selectors::ResponderSelectors;
 use crate::responder_signature::ResponderSignature;
 use crate::route_parameter_arguments::RouteParameterArguments;
 
@@ -104,11 +104,9 @@ pub(crate) fn responder_method(
     item: &IndexedItem,
     responder: &str,
     registries: &Registries,
+    selectors: &ResponderSelectors,
 ) -> Result<ResponderSignature, HttpCodegenError> {
     let method = process_method(item)?;
-    let route_parameter_selector =
-        AttributeSelector::parse("route_parameter").expect("a valid selector");
-    let form_request_selector = AttributeSelector::parse("form_request").expect("a valid selector");
     let mut arguments = Vec::new();
 
     for ParameterView {
@@ -118,8 +116,8 @@ pub(crate) fn responder_method(
         position,
     } in parameters(method.signature())
     {
-        let route_parameter = marker(attributes, &route_parameter_selector);
-        let form_request = marker(attributes, &form_request_selector);
+        let route_parameter = marker(attributes, &selectors.route_parameter);
+        let form_request = marker(attributes, &selectors.form_request);
         let is_current_request = reference_leaf_matches(declared, "Request");
         let is_routes = reference_leaf_matches(declared, "Routes");
 

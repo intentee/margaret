@@ -2,13 +2,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::handler::Handler;
-use crate::method::Method;
 use crate::router::Router;
 
 pub struct RouterBuilder {
     matcher: matchit::Router<usize>,
     paths: HashMap<String, usize>,
-    routes: Vec<HashMap<Method, Arc<dyn Handler>>>,
+    routes: Vec<HashMap<&'static str, Arc<dyn Handler>>>,
 }
 
 impl RouterBuilder {
@@ -24,7 +23,7 @@ impl RouterBuilder {
         Router::new(self.matcher, self.routes)
     }
 
-    pub fn route(mut self, method: Method, path: &str, handler: Arc<dyn Handler>) -> Self {
+    pub fn route(mut self, method: &'static str, path: &str, handler: Arc<dyn Handler>) -> Self {
         let index = match self.paths.get(path) {
             Some(&index) => index,
             None => {

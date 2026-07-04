@@ -587,9 +587,9 @@ name = "margaret_console_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_injection_codegen",
- "prettyplease",
  "proc-macro2",
  "quote",
  "syn",
@@ -603,7 +603,6 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "margaret_generated_module",
- "prettyplease",
  "proc-macro2",
  "quote",
  "syn",
@@ -637,6 +636,10 @@ dependencies = [
 name = "margaret_generated_module"
 version = "0.1.0"
 dependencies = [
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "syn",
  "tempfile",
 ]
 
@@ -669,11 +672,11 @@ name = "margaret_http_codegen"
 version = "0.1.0"
 dependencies = [
  "heck",
+ "http",
  "margaret_attributes",
  "margaret_generated_module",
  "margaret_injection_codegen",
  "matchit",
- "prettyplease",
  "proc-macro2",
  "quote",
  "syn",
@@ -685,6 +688,7 @@ dependencies = [
 name = "margaret_http_validation"
 version = "0.1.0"
 dependencies = [
+ "http",
  "margaret_http",
  "margaret_validation",
  "serde",
@@ -732,9 +736,9 @@ version = "0.1.0"
 dependencies = [
  "heck",
  "margaret_attributes",
+ "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_injection_codegen",
- "prettyplease",
  "proc-macro2",
  "quote",
  "syn",

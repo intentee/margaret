@@ -106,7 +106,11 @@ fn value_expression(id: &str, required: bool, value_type: &Type) -> TokenStream 
     }
 }
 
-pub(crate) fn render(commands: &[ConsoleCommand], serves: bool, servers: &[HttpServer]) -> String {
+pub(crate) fn render(
+    commands: &[ConsoleCommand],
+    serves: bool,
+    servers: &[HttpServer],
+) -> TokenStream {
     let subcommands = commands.iter().map(subcommand_registration);
     let arms = commands.iter().map(command_arm);
 
@@ -144,7 +148,7 @@ pub(crate) fn render(commands: &[ConsoleCommand], serves: bool, servers: &[HttpS
         quote! {}
     };
 
-    let tokens = quote! {
+    quote! {
         pub async fn run<Arguments, Argument>(
             container: &super::container::Container,
             args: Arguments,
@@ -168,9 +172,5 @@ pub(crate) fn render(commands: &[ConsoleCommand], serves: bool, servers: &[HttpS
                 }
             }
         }
-    };
-    let file =
-        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
-
-    prettyplease::unparse(&file)
+    }
 }

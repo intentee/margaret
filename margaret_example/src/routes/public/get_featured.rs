@@ -6,7 +6,7 @@ use margaret_macros::singleton;
 use crate::margaret::routes::Routes;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/featured", server = "public")]
+#[responds_to_http(method = "get", path = "/featured", server = "public")]
 pub struct GetFeatured;
 
 impl GetFeatured {

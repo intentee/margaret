@@ -1,8 +1,8 @@
 use std::net::SocketAddr;
 
 use http::HeaderMap;
+use http::Method;
 
-use crate::method::Method;
 use crate::request_error::RequestError;
 
 pub struct ServerParams {
@@ -37,8 +37,8 @@ impl ServerParams {
         }
     }
 
-    pub fn method(&self) -> Method {
-        self.method
+    pub fn method(&self) -> &str {
+        self.method.as_str()
     }
 
     pub fn path(&self) -> &str {
@@ -62,8 +62,9 @@ mod tests {
     use http::HeaderName;
     use http::HeaderValue;
 
+    use http::Method;
+
     use super::ServerParams;
-    use crate::method::Method;
 
     fn params_with_header(name: &str, value: &[u8]) -> ServerParams {
         let mut headers = HeaderMap::new();
@@ -74,7 +75,7 @@ mod tests {
         );
 
         ServerParams::new(
-            Method::Get,
+            Method::GET,
             "/".to_string(),
             String::new(),
             SocketAddr::from(([127, 0, 0, 1], 0)),

@@ -10,7 +10,12 @@ use crate::forms::post_article_form::PostArticleForm;
 use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
-#[responds_to_http(method = Post, name = "post_article", path = "/articles", server = "public")]
+#[responds_to_http(
+    method = "post",
+    name = "post_article",
+    path = "/articles",
+    server = "public"
+)]
 pub struct PostArticle {
     articles: Arc<ArticleRepository>,
 }

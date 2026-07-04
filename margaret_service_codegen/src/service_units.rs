@@ -46,7 +46,7 @@ fn build_unit(
         Role::Service => ServiceKind::Service,
         Role::Ticker => {
             let TickTimerArguments { behavior, interval } =
-                TickTimerArguments::parse(&matched.args()?, &path)?;
+                TickTimerArguments::parse(matched.args()?, &path)?;
 
             ServiceKind::Ticker { behavior, interval }
         }

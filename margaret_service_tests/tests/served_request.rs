@@ -8,7 +8,6 @@ use tokio_util::sync::CancellationToken;
 
 use margaret_http::bound_server::BoundServer;
 use margaret_http::handler::Handler;
-use margaret_http::method::Method;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
@@ -28,7 +27,8 @@ impl Handler for Accepts {
 
 async fn exchange(request: &[u8], upload_config: UploadConfig, close_write: bool) -> String {
     let router = RouterBuilder::empty()
-        .route(Method::Post, "/submit", Arc::new(Accepts))
+        .route("POST", "/submit", Arc::new(Accepts))
+        .route("QUERY", "/search", Arc::new(Accepts))
         .build();
     let servers = Arc::new(Servers::new(
         vec![Server::new(
@@ -110,4 +110,28 @@ async fn rejects_a_truncated_form_body() {
     .await;
 
     assert!(response.contains(" 400 "));
+}
+
+#[tokio::test]
+async fn dispatches_a_request_using_an_extension_verb() {
+    let response = exchange(
+        b"QUERY /search HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        UploadConfig::Disabled,
+        false,
+    )
+    .await;
+
+    assert!(response.contains(" 200 "));
+}
+
+#[tokio::test]
+async fn rejects_a_known_path_reached_with_an_unhandled_method() {
+    let response = exchange(
+        b"GET /submit HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        UploadConfig::Disabled,
+        false,
+    )
+    .await;
+
+    assert!(response.contains(" 405 "));
 }

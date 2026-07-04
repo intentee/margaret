@@ -1,6 +1,7 @@
 use proc_macro2::Ident;
 use quote::format_ident;
 
+#[derive(Clone)]
 pub struct HttpServer {
     name: String,
 }

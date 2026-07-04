@@ -1,4 +1,5 @@
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 
 use crate::console_codegen_error::ConsoleCodegenError;
@@ -9,8 +10,11 @@ pub fn render_console(
     index: &AttributeIndex,
     serves: bool,
     servers: &[HttpServer],
-) -> Result<String, ConsoleCodegenError> {
+) -> Result<GeneratedModuleTokens, ConsoleCodegenError> {
     let commands = console_commands(index)?;
 
-    Ok(render(&commands, serves, servers))
+    Ok(GeneratedModuleTokens::new(
+        "console",
+        render(&commands, serves, servers),
+    ))
 }

@@ -11,6 +11,7 @@ pub mod identifier;
 pub mod indexed_associated_type;
 pub mod indexed_item;
 pub mod indexed_method;
+pub mod is_snake_case_identifier;
 pub mod item_kind;
 pub mod join_candidates;
 pub mod matched_attribute;
@@ -20,7 +21,6 @@ pub mod resolution;
 pub mod resolution_index;
 pub mod resolve_struct;
 pub mod resolve_trait;
-pub mod snake_case_identifier;
 pub mod struct_shape;
 pub mod type_leaf_ident;
 

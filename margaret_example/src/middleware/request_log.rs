@@ -31,7 +31,7 @@ impl RequestLog {
         routes: &Routes,
     ) -> ResponseContinuation {
         let line = format!(
-            "{:?} {} (home: {})",
+            "{} {} (home: {})",
             request.inputs.server.method(),
             request.inputs.server.path(),
             routes.public.get_greeting.url(),

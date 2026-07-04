@@ -10,6 +10,8 @@ use margaret_attributes::struct_shape::StructShape;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
+use crate::field_ident::field_ident;
+use crate::ordered_providers::ordered_providers;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 
@@ -18,12 +20,6 @@ fn field_declaration(provider: &Provider) -> TokenStream {
     let field_type = field_type(provider);
 
     quote! { #name: tokio::sync::OnceCell<#field_type> }
-}
-
-fn field_initializer(provider: &Provider) -> TokenStream {
-    let name = field_ident(provider);
-
-    quote! { #name: tokio::sync::OnceCell::new() }
 }
 
 fn field_type(provider: &Provider) -> TokenStream {
@@ -136,19 +132,7 @@ fn provider_by_key<'plan>(plan: &'plan ContainerPlan, key: &CanonicalPath) -> &'
         .expect("a resolved key maps to a provider")
 }
 
-fn field_ident(provider: &Provider) -> Ident {
-    format_ident!("{}", provider.field_name)
-}
-
-fn ordered_providers(plan: &ContainerPlan) -> Vec<&Provider> {
-    let mut ordered: Vec<&Provider> = plan.providers.iter().collect();
-
-    ordered.sort_by(|first, second| first.field_name.cmp(&second.field_name));
-
-    ordered
-}
-
-pub(crate) fn render(plan: &ContainerPlan) -> String {
+pub(crate) fn render(plan: &ContainerPlan) -> TokenStream {
     let ordered = ordered_providers(plan);
     let fields = ordered.iter().copied().map(field_declaration);
     let accessors = ordered
@@ -163,7 +147,7 @@ pub(crate) fn render(plan: &ContainerPlan) -> String {
         }
     });
 
-    let tokens = quote! {
+    quote! {
         #[rustfmt::skip]
         pub mod build;
 
@@ -172,26 +156,5 @@ pub(crate) fn render(plan: &ContainerPlan) -> String {
         }
 
         #accessor_impl
-    };
-    let file =
-        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
-
-    prettyplease::unparse(&file)
-}
-
-pub(crate) fn render_build(plan: &ContainerPlan) -> String {
-    let ordered = ordered_providers(plan);
-    let initializers = ordered.iter().copied().map(field_initializer);
-
-    let tokens = quote! {
-        pub fn build() -> super::Container {
-            super::Container {
-                #(#initializers,)*
-            }
-        }
-    };
-    let file =
-        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
-
-    prettyplease::unparse(&file)
+    }
 }

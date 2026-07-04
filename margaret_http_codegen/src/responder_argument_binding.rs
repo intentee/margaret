@@ -20,10 +20,6 @@ pub(crate) enum ResponderArgumentBinding {
 }
 
 impl ResponderArgumentBinding {
-    pub(crate) fn is_bound(&self) -> bool {
-        matches!(self, Self::Bound { .. })
-    }
-
     pub(crate) fn path_key(&self) -> Option<&str> {
         match self {
             Self::Raw { path_key } | Self::Bound { path_key, .. } => Some(path_key),

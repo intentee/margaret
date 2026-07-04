@@ -47,12 +47,12 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use http::Method;
 
     use super::Interception;
     use crate::handler::Handler;
     use crate::http_interceptable::HttpInterceptable;
     use crate::http_interceptor::HttpInterceptor;
-    use crate::method::Method;
     use crate::request::Request;
     use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
@@ -97,7 +97,7 @@ mod tests {
         let servers = Arc::new(Servers::new(Vec::new(), Vec::new()));
         let status = respond_recursively(
             &servers,
-            Request::new(Method::Get, "/".to_string()),
+            Request::new(Method::GET, "/".to_string()),
             Arc::new(YieldsInterception),
         )
         .await

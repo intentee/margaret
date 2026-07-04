@@ -77,12 +77,15 @@ impl AttributeIndex {
         self.identifier(path).field()
     }
 
-    pub fn type_name(&self, path: &CanonicalPath) -> &str {
-        self.identifier(path).type_name()
-    }
-
     pub fn has(&self, selector: &AttributeSelector) -> bool {
-        !self.select(selector).is_empty()
+        let leaf = selector.leaf_ident().to_string();
+        let Some(locations) = self.locations_by_leaf.get(&leaf) else {
+            return false;
+        };
+
+        locations.iter().any(|location| {
+            selector.matches(self.items[location.item()].attributes()[location.attribute()].path())
+        })
     }
 
     pub fn items(&self) -> &[IndexedItem] {
@@ -99,11 +102,11 @@ impl AttributeIndex {
             .iter()
             .filter_map(|location| {
                 let item = &self.items[location.item()];
-                let attribute = &item.attributes()[location.attribute()];
+                let attribute_index = location.attribute();
 
                 selector
-                    .matches(attribute.path())
-                    .then(|| MatchedAttribute::new(item, attribute))
+                    .matches(item.attributes()[attribute_index].path())
+                    .then(|| MatchedAttribute::new(item, attribute_index))
             })
             .collect()
     }
@@ -114,6 +117,10 @@ impl AttributeIndex {
 
     pub fn trait_resolution(&self) -> &ResolutionIndex {
         &self.trait_resolution
+    }
+
+    pub fn type_name(&self, path: &CanonicalPath) -> &str {
+        self.identifier(path).type_name()
     }
 
     fn identifier(&self, path: &CanonicalPath) -> &Identifier {

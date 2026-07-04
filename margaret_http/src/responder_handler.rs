@@ -56,10 +56,10 @@ mod tests {
     use std::pin::Pin;
     use std::sync::Arc;
 
+    use http::Method;
     use http_body_util::BodyExt;
 
     use super::responder_handler;
-    use crate::method::Method;
     use crate::request::Request;
     use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
@@ -95,7 +95,7 @@ mod tests {
                 })
             },
         );
-        let request = Request::new(Method::Get, "/echo/7".to_string())
+        let request = Request::new(Method::GET, "/echo/7".to_string())
             .with_path_params(HashMap::from([("id".to_string(), "7".to_string())]));
         let servers = Arc::new(Servers::new(Vec::new(), Vec::new()));
 

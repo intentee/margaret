@@ -12,7 +12,7 @@ use crate::greeter::Greeter;
 #[singleton]
 #[middleware(logged)]
 #[responds_to_http(
-    method = Get,
+    method = "get",
     name = "get_greeting",
     path = "/greeting",
     server = "public"

@@ -73,7 +73,7 @@ fn build_draft<'index>(
     let ManagedArguments {
         collection,
         provides,
-    } = ManagedArguments::parse(&matched.args()?)?;
+    } = ManagedArguments::parse(matched.args()?)?;
     let provided = resolve_provided(provides.as_ref(), trait_resolution, &concrete_path)?;
 
     check_unique_provided(provided_keys, &provided, &concrete_path)?;

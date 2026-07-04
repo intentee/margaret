@@ -88,6 +88,8 @@ impl Farewell {
 
         render_console(&index_for(lib_source), has_http, &servers)
             .expect("the console source is generated")
+            .format()
+            .source()
             .split_whitespace()
             .collect()
     }
@@ -157,6 +159,8 @@ impl Farewell {
             ],
         )
         .expect("the console source is generated")
+        .format()
+        .source()
         .split_whitespace()
         .collect();
 
@@ -174,6 +178,8 @@ impl Farewell {
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
         let source: String = render_console(&index_for("struct App;\n"), true, &[])
             .expect("the console source is generated")
+            .format()
+            .source()
             .split_whitespace()
             .collect();
 

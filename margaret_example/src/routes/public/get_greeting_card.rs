@@ -10,7 +10,7 @@ use crate::views::greeting_view::GreetingView;
 use crate::views::view::View;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/greeting-card", server = "public")]
+#[responds_to_http(method = "get", path = "/greeting-card", server = "public")]
 pub struct GetGreetingCard {
     greeter: Arc<dyn Greeter>,
 }

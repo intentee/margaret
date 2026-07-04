@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use crate::method::Method;
+use http::Method;
+
 use crate::request_inputs::RequestInputs;
 
 pub struct Request {
@@ -41,9 +42,9 @@ mod tests {
     use std::net::SocketAddr;
 
     use http::HeaderMap;
+    use http::Method;
 
     use super::Request;
-    use crate::method::Method;
     use crate::request_inputs::RequestInputs;
     use crate::server_params::ServerParams;
 
@@ -56,7 +57,7 @@ mod tests {
             form: HashMap::from([("title".to_string(), "hello".to_string())]),
             query: HashMap::from([("page".to_string(), "2".to_string())]),
             server: ServerParams::new(
-                Method::Post,
+                Method::POST,
                 "/articles".to_string(),
                 "page=2".to_string(),
                 SocketAddr::from(([203, 0, 113, 7], 4000)),
@@ -73,7 +74,7 @@ mod tests {
             request.inputs.query.get("page").map(String::as_str),
             Some("2")
         );
-        assert_eq!(request.inputs.server.method(), Method::Post);
+        assert_eq!(request.inputs.server.method(), "POST");
         assert_eq!(request.inputs.server.path(), "/articles");
         assert_eq!(request.inputs.server.query_string(), "page=2");
         assert_eq!(

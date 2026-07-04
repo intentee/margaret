@@ -46,13 +46,13 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use http::Method;
     use http_body_util::BodyExt;
 
     use super::respond_recursively;
     use crate::deferred_interception::DeferredInterception;
     use crate::forward::Forward;
     use crate::handler::Handler;
-    use crate::method::Method;
     use crate::named_handler::NamedHandler;
     use crate::request::Request;
     use crate::response::Response;
@@ -145,7 +145,7 @@ mod tests {
     }
 
     async fn status_of(servers: Arc<Servers>, first: Arc<dyn Handler>) -> u16 {
-        respond_recursively(&servers, Request::new(Method::Get, "/".to_string()), first)
+        respond_recursively(&servers, Request::new(Method::GET, "/".to_string()), first)
             .await
             .into_http()
             .status()
@@ -186,7 +186,7 @@ mod tests {
         let servers = servers_with(vec![NamedHandler::new("article", Arc::new(EchoArticle))]);
         let response = respond_recursively(
             &servers,
-            Request::new(Method::Get, "/".to_string()),
+            Request::new(Method::GET, "/".to_string()),
             Arc::new(ForwardToArticle),
         )
         .await

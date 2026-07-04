@@ -25,7 +25,8 @@ where
 mod tests {
     use std::collections::HashMap;
 
-    use margaret_http::method::Method;
+    use http::Method;
+
     use margaret_http::request::Request;
 
     use super::require_input;
@@ -38,7 +39,7 @@ mod tests {
     }
 
     fn request_with_form(form: HashMap<String, String>) -> Request {
-        let mut request = Request::new(Method::Post, "/".to_string());
+        let mut request = Request::new(Method::POST, "/".to_string());
         request.inputs.form = form;
         request
     }

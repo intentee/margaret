@@ -110,7 +110,7 @@ pub(crate) fn console_commands(
 
         let command = item.canonical_path().to_string();
         let ConsoleCommandArguments { name, description } =
-            ConsoleCommandArguments::parse(&matched.args()?, &command)?;
+            ConsoleCommandArguments::parse(matched.args()?, &command)?;
         let accessor = format_ident!("{}", index.field_name(item.canonical_path()));
         let runner = process_method(item)?;
         let arguments = command_arguments(runner, &argument_selector, &command)?;

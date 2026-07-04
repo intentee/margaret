@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 
 use cookie::Cookie;
 use http::HeaderMap;
+use http::Method;
 use http::Uri;
 use http::header::COOKIE;
 
@@ -10,7 +11,6 @@ use crate::body_class::BodyClass;
 use crate::collect_limited::collect_limited;
 use crate::form_field::FormField;
 use crate::form_fields::form_fields;
-use crate::method::Method;
 use crate::multipart_body::MultipartBody;
 use crate::request_body::RequestBody;
 use crate::request_error::RequestError;
@@ -154,6 +154,7 @@ mod tests {
     use bytes::Bytes;
     use http::HeaderMap;
     use http::HeaderValue;
+    use http::Method;
     use http::Uri;
     use http::header::CONTENT_TYPE;
     use http::header::COOKIE;
@@ -164,7 +165,6 @@ mod tests {
 
     use super::RequestInputs;
     use super::unspecified_addr;
-    use crate::method::Method;
     use crate::request_body::RequestBody;
     use crate::request_error::RequestError;
     use crate::upload_config::UploadConfig;
@@ -199,7 +199,7 @@ mod tests {
         let uri: Uri = target.parse().expect("a valid uri");
 
         RequestInputs::parse(
-            Method::Post,
+            Method::POST,
             &uri,
             headers,
             unspecified_addr(),
@@ -220,7 +220,7 @@ mod tests {
         let uri: Uri = "/".parse().expect("a valid uri");
 
         RequestInputs::parse(
-            Method::Get,
+            Method::GET,
             &uri,
             headers,
             unspecified_addr(),

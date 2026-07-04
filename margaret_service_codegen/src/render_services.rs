@@ -5,6 +5,7 @@ use quote::quote;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::path_tokens::path_tokens;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 
 use crate::service_codegen_error::ServiceCodegenError;
@@ -197,7 +198,7 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
 pub fn render_services(
     index: &AttributeIndex,
     servers: &[HttpServer],
-) -> Result<String, ServiceCodegenError> {
+) -> Result<GeneratedModuleTokens, ServiceCodegenError> {
     let units = service_units(index)?;
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(registration);
@@ -230,8 +231,5 @@ pub fn render_services(
         }
     };
 
-    let file =
-        syn::parse2::<syn::File>(tokens).expect("the generated tokens form a valid Rust file");
-
-    Ok(prettyplease::unparse(&file))
+    Ok(GeneratedModuleTokens::new("services", tokens))
 }

@@ -6,7 +6,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::snake_case_identifier::is_snake_case_identifier;
+use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 
 use crate::build_registry::build_registry;
 use crate::http_codegen_error::HttpCodegenError;
@@ -18,6 +18,7 @@ use crate::middleware_plan::MiddlewarePlan;
 use crate::path_parameter_names::path_parameter_names;
 use crate::registries::Registries;
 use crate::responder_method::responder_method;
+use crate::responder_selectors::ResponderSelectors;
 use crate::responder_signature::ResponderSignature;
 
 pub(crate) fn http_routes(
@@ -46,6 +47,8 @@ pub(crate) fn http_routes(
         struct_resolution,
         trait_resolution,
     };
+    let middleware_selector = AttributeSelector::parse("middleware").expect("a valid selector");
+    let responder_selectors = ResponderSelectors::new();
     let mut routes = Vec::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
 
@@ -64,7 +67,7 @@ pub(crate) fn http_routes(
             name,
             path,
             server,
-        } = HttpResponderArguments::parse(&matched.args()?, &responder)?;
+        } = HttpResponderArguments::parse(matched.args()?, &responder)?;
 
         if !is_snake_case_identifier(&server) {
             return Err(HttpCodegenError::InvalidServerName {
@@ -73,7 +76,6 @@ pub(crate) fn http_routes(
             });
         }
 
-        let middleware_selector = AttributeSelector::parse("middleware").expect("a valid selector");
         let mut layers = Vec::new();
 
         for matched in AttributeQuery::new(item).find_all(&middleware_selector) {
@@ -110,7 +112,7 @@ pub(crate) fn http_routes(
         let ResponderSignature {
             arguments,
             output: responder_output,
-        } = responder_method(item, &responder, &registries)?;
+        } = responder_method(item, &responder, &registries, &responder_selectors)?;
         let path_parameters =
             path_parameter_names(&path).map_err(|source| HttpCodegenError::InvalidRoutePath {
                 responder: responder.clone(),
@@ -151,12 +153,7 @@ pub(crate) fn http_routes(
 
         routes.push(HttpRoute {
             layers,
-            method: method
-                .segments
-                .last()
-                .expect("an attribute path has at least one segment")
-                .ident
-                .clone(),
+            method,
             name,
             path,
             responder_field: format_ident!("{}", index.field_name(item.canonical_path())),

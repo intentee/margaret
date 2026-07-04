@@ -10,7 +10,7 @@ use crate::models::article::Article;
 use crate::repositories::article_repository::ArticleRepository;
 
 #[singleton]
-#[responds_to_http(method = Delete, path = "/articles/{article}", server = "public")]
+#[responds_to_http(method = "delete", path = "/articles/{article}", server = "public")]
 pub struct DeleteArticle {
     articles: Arc<ArticleRepository>,
 }

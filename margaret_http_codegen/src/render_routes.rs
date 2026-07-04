@@ -6,12 +6,11 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
-use margaret_generated_module::generated_module::GeneratedModule;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::http_route::HttpRoute;
 use crate::http_server::HttpServer;
 use crate::path_parameter_names::path_parameter_names;
-use crate::render::unparse;
 use crate::route_url_template::route_url_template;
 use crate::url_segment::UrlSegment;
 
@@ -45,7 +44,7 @@ fn placeholders(route: &HttpRoute) -> Vec<String> {
 }
 
 fn is_get(route: &HttpRoute) -> bool {
-    route.method == "Get"
+    route.method == "GET"
 }
 
 fn named_routes_for<'route>(
@@ -234,7 +233,10 @@ fn server_struct(routes: &[HttpRoute], server: &HttpServer, layout: &ServerLayou
     }
 }
 
-pub(crate) fn render_routes(routes: &[HttpRoute], servers: &[HttpServer]) -> Vec<GeneratedModule> {
+pub(crate) fn render_routes(
+    routes: &[HttpRoute],
+    servers: &[HttpServer],
+) -> Vec<GeneratedModuleTokens> {
     let layouts = server_layouts(routes, servers);
     let server_fields = servers.iter().map(|server| {
         let field = server_field_ident(server);
@@ -286,14 +288,14 @@ pub(crate) fn render_routes(routes: &[HttpRoute], servers: &[HttpServer]) -> Vec
     };
 
     let mut modules = vec![
-        GeneratedModule::new("routes", unparse(routes_tokens)),
-        GeneratedModule::new("routes/servers", unparse(servers_tokens)),
+        GeneratedModuleTokens::new("routes", routes_tokens),
+        GeneratedModuleTokens::new("routes/servers", servers_tokens),
     ];
 
     for server in servers {
-        modules.push(GeneratedModule::new(
+        modules.push(GeneratedModuleTokens::new(
             format!("routes/servers/{}", server_field_ident(server)),
-            unparse(server_struct(routes, server, &layouts[server.name()])),
+            server_struct(routes, server, &layouts[server.name()]),
         ));
     }
 

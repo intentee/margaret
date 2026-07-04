@@ -16,9 +16,9 @@ pub fn generate_container_source(
         .build();
 
     let source = render_container(&index)?
-        .iter()
-        .map(GeneratedModule::source)
-        .collect::<Vec<&str>>()
+        .into_iter()
+        .map(|module| module.format().source().to_string())
+        .collect::<Vec<String>>()
         .join("\n");
 
     Ok(GeneratedModule::new("container", source))

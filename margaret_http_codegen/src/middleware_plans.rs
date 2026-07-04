@@ -31,7 +31,7 @@ pub(crate) fn middleware_plans(
 
         let middleware = item.canonical_path().to_string();
         let MiddlewareAttributeArguments { handles } =
-            MiddlewareAttributeArguments::parse(&matched.args()?, &middleware)?;
+            MiddlewareAttributeArguments::parse(matched.args()?, &middleware)?;
         let method = process_method(item)?;
         let mut arguments = Vec::new();
         let mut injects_routes = false;

@@ -1,4 +1,12 @@
 pub mod build;
+mod build_context;
+mod capabilities;
 pub mod codegen_error;
+mod console_pass;
+mod container_pass;
+mod format_pass;
 pub mod generate;
 pub mod generated_code;
+mod http_pass;
+mod services_pass;
+mod umbrella;
