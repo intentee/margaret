@@ -12,16 +12,20 @@ members = [
     "margaret_http_codegen",
     "margaret_http_validation",
     "margaret_injection_codegen",
+    "margaret_jwks_key_gen",
+    "margaret_jwks_key_gen_tests",
     "margaret_macros",
     "margaret_service",
     "margaret_service_codegen",
     "margaret_service_tests",
+    "margaret_sync_holder",
     "margaret_validation",
 ]
 
 [workspace.dependencies]
 anyhow = "=1.0.102"
 async-trait = "=0.1.89"
+base64ct = "=1.8.3"
 bytes = "=1.12.0"
 clap = { version = "=4.5.47", default-features = false, features = ["std", "help", "usage", "error-context"] }
 cookie = "=0.18.1"
@@ -36,6 +40,8 @@ hyper-util = "=0.1.20"
 matchit = "=0.8.6"
 mime = "=0.3.17"
 multer = "=3.1.0"
+p256 = "=0.13.2"
+p384 = "=0.13.1"
 prettyplease = "=0.2.37"
 proc-macro2 = "=1.0.106"
 quote = "=1.0.46"
@@ -48,7 +54,14 @@ tokio = "=1.52.3"
 tokio-util = "=0.7.18"
 tower = "=0.5.3"
 trzcina = "=0.3.0"
+uuid = "=1.18.1"
 validator = "=0.20.0"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev.package.margaret_jwks_key_gen]
+opt-level = 3

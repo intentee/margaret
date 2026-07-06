@@ -9,9 +9,12 @@ COVERAGE_PACKAGES := \
 	-p margaret_http_codegen \
 	-p margaret_http_validation \
 	-p margaret_injection_codegen \
+	-p margaret_jwks_key_gen \
+	-p margaret_jwks_key_gen_tests \
 	-p margaret_macros \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
+	-p margaret_sync_holder \
 	-p margaret_validation
 
 node_modules: package.json
@@ -41,10 +44,13 @@ coverage: node_modules
 		--gated margaret_http_codegen=100 \
 		--gated margaret_http_validation=100 \
 		--gated margaret_injection_codegen=100 \
+		--gated margaret_jwks_key_gen=100 \
+		--gated margaret_jwks_key_gen_tests=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
+		--gated margaret_sync_holder=100 \
 		--gated margaret_validation=100
 
 .PHONY: fmt

@@ -1,0 +1,24 @@
+[package]
+name = "margaret_jwks_key_gen_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+base64ct = { workspace = true }
+margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
+p256 = { workspace = true }
+p384 = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true
