@@ -11,6 +11,7 @@ members = [
     "margaret_http",
     "margaret_http_codegen",
     "margaret_http_validation",
+    "margaret_identity_session",
     "margaret_injection_codegen",
     "margaret_jwks_key_gen",
     "margaret_jwks_key_gen_tests",
