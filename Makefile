@@ -15,6 +15,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_macros \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
+	-p margaret_spiffe_svid_manager \
+	-p margaret_spiffe_svid_manager_tests \
 	-p margaret_sync_holder \
 	-p margaret_validation
 
@@ -52,6 +54,8 @@ coverage: node_modules
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
+		--gated margaret_spiffe_svid_manager=100 \
+		--gated margaret_spiffe_svid_manager_tests=100 \
 		--gated margaret_sync_holder=100 \
 		--gated margaret_validation=100
 

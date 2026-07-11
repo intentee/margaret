@@ -1,3 +1,5 @@
+use chrono::DateTime;
+use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
@@ -15,26 +17,34 @@ pub struct RefreshTokenClaims {
 
 impl RefreshTokenClaims {
     #[must_use]
-    pub fn is_expired(&self, now: i64) -> bool {
-        self.exp < now
+    pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
+        self.exp < now.timestamp()
     }
 
     #[must_use]
-    pub fn mint_access_token_clams(&self, now: i64) -> AccessTokenClaims {
+    pub fn mint_access_token_claims(&self, now: DateTime<Utc>) -> AccessTokenClaims {
+        let timestamp = now.timestamp();
+
         AccessTokenClaims {
             sub: self.sub,
-            exp: now + ACCESS_TOKEN_LIFETIME_SECS,
-            iat: now,
+            exp: timestamp + ACCESS_TOKEN_LIFETIME_SECS,
+            iat: timestamp,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use chrono::DateTime;
+    use chrono::Utc;
     use uuid::Uuid;
 
     use super::RefreshTokenClaims;
     use crate::ACCESS_TOKEN_LIFETIME_SECS;
+
+    fn at(secs: i64) -> DateTime<Utc> {
+        DateTime::from_timestamp(secs, 0).expect("a valid timestamp")
+    }
 
     fn claims(exp: i64) -> RefreshTokenClaims {
         RefreshTokenClaims {
@@ -47,20 +57,19 @@ mod tests {
 
     #[test]
     fn reports_expiry_relative_to_now() {
-        assert!(!claims(101).is_expired(100));
-        assert!(claims(99).is_expired(100));
-        assert!(!claims(100).is_expired(100));
+        assert!(!claims(101).is_expired(at(100)));
+        assert!(claims(99).is_expired(at(100)));
+        assert!(!claims(100).is_expired(at(100)));
     }
 
     #[test]
     fn mints_access_token_claims_for_the_same_subject() {
         let refresh = claims(10_000);
-        let now = 1_000;
 
-        let access = refresh.mint_access_token_clams(now);
+        let access = refresh.mint_access_token_claims(at(1_000));
 
         assert_eq!(access.sub, refresh.sub);
-        assert_eq!(access.iat, now);
-        assert_eq!(access.exp, now + ACCESS_TOKEN_LIFETIME_SECS);
+        assert_eq!(access.iat, 1_000);
+        assert_eq!(access.exp, 1_000 + ACCESS_TOKEN_LIFETIME_SECS);
     }
 }
