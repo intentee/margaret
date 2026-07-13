@@ -1,0 +1,11 @@
+[package]
+name = "margaret_identity"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+margaret_console = { path = "../margaret_console" }
+tokio-util = { workspace = true }
+
+[lints]
+workspace = true

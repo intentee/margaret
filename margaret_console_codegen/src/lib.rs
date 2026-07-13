@@ -149,6 +149,15 @@ impl Farewell {
     }
 
     #[test]
+    fn always_registers_an_identity_command() {
+        let source = source_for("struct App;\n", false);
+
+        assert!(source.contains(r#"clap::Command::new("identity")"#));
+        assert!(source.contains(r#"Some(("identity",_matches))"#));
+        assert!(source.contains("margaret_identity::run::run(cancellation_token).await"));
+    }
+
+    #[test]
     fn registers_one_address_argument_per_active_server() {
         let source: String = render_console(
             &index_for("struct App;\n"),

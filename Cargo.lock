@@ -1292,6 +1292,7 @@ dependencies = [
  "margaret_console",
  "margaret_http",
  "margaret_http_validation",
+ "margaret_identity",
  "margaret_macros",
  "margaret_service",
  "margaret_validation",
@@ -1364,6 +1365,14 @@ dependencies = [
  "serde",
  "serde_json",
  "validator",
+]
+
+[[package]]
+name = "margaret_identity"
+version = "0.1.0"
+dependencies = [
+ "margaret_console",
+ "tokio-util",
 ]
 
 [[package]]

@@ -159,12 +159,18 @@ pub(crate) fn render(
         {
             let mut command = clap::Command::new(env!("CARGO_PKG_NAME"))
                 #(#subcommands)*
-                #serve_registration;
+                #serve_registration
+                .subcommand(clap::Command::new("identity"));
 
             match command.try_get_matches_from_mut(args) {
                 Ok(matches) => match matches.subcommand() {
                     #(#arms)*
                     #serve_arm
+                    Some(("identity", _matches)) => {
+                        let cancellation_token = margaret_service::install::install();
+
+                        margaret_identity::run::run(cancellation_token).await
+                    }
                     _ => margaret_console::print_help::print_help(&mut command),
                 },
                 Err(error) => {
