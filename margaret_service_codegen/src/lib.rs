@@ -58,7 +58,10 @@ mod tests {
     }
 
     fn public() -> Vec<HttpServer> {
-        vec![HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable)]
+        vec![HttpServer::new(
+            "public".to_string(),
+            ServerTransportPolicy::Negotiable,
+        )]
     }
 
     const SERVICE: &str = "#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
@@ -188,9 +191,7 @@ mod tests {
         assert!(source.contains(
             r#"Some("spiffe_mtls")=>{margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
         ));
-        assert!(source.contains(
-            "_=>margaret_http::transport_config::TransportConfig::Plain,"
-        ));
+        assert!(source.contains("_=>margaret_http::transport_config::TransportConfig::Plain,"));
         assert!(source.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret_console::report_failure::report_failure(error);}"
         ));

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use margaret_spiffe_svid_manager_tests::parse_join_token::parse_join_token;
 use margaret_spiffe_svid_manager_tests::run_spire_command::run_spire_command;
-use margaret_spiffe_svid_manager_tests::scenario_fixture_paths::spire_server_outputs_unparseable_join_token;
+use margaret_spiffe_svid_manager_tests::spire_server_outputs_unparseable_join_token::spire_server_outputs_unparseable_join_token;
 
 #[tokio::test]
 async fn unparseable_join_token_fixture_output_fails_to_parse() {

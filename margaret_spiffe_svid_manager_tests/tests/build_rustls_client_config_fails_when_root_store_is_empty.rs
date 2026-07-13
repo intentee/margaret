@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
+use rustls::RootCertStore;
+
 use margaret_spiffe_svid_manager::build_rustls_client_config::build_rustls_client_config;
 use margaret_spiffe_svid_manager_tests::build_workload_credentials::build_workload_credentials;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
-use rustls::RootCertStore;
 
 #[test]
 fn fails_when_root_store_is_empty() {

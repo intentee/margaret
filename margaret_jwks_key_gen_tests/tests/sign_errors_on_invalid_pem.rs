@@ -1,9 +1,10 @@
 use anyhow::Result;
+use serde_json::json;
+
 use margaret_jwks_key_gen::curve::Curve;
 use margaret_jwks_key_gen::jwk_signing::JwkSigning;
 use margaret_jwks_key_gen::jwks_key_error::JwksKeyError;
 use margaret_jwks_key_gen::signs_claims::SignsClaims;
-use serde_json::json;
 
 #[tokio::test]
 async fn sign_errors_on_invalid_pem() -> Result<()> {

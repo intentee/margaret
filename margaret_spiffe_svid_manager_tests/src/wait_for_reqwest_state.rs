@@ -1,6 +1,7 @@
+use reqwest::Client;
+
 use margaret_spiffe_svid_manager::reqwest_client_holder::ReqwestClientHolder;
 use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
-use reqwest::Client;
 
 pub async fn wait_for_reqwest_state(
     subscription: &mut SyncHolderSubscription<Client>,

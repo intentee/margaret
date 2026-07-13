@@ -1,15 +1,10 @@
-use margaret_http::http_interceptable::HttpInterceptable;
+use crate::views::card_layout::card_layout;
+use crate::views::card_layout_props::CardLayoutProps;
+use crate::views::farewell_view_props::FarewellViewProps;
 
-use crate::views::view::View;
-
-pub struct FarewellView {
-    pub name: String,
-}
-
-impl HttpInterceptable for FarewellView {}
-
-impl View for FarewellView {
-    fn body(&self) -> String {
-        format!("goodbye, {}", self.name)
-    }
+pub fn farewell_view(FarewellViewProps { home_url, name }: FarewellViewProps) -> String {
+    card_layout(CardLayoutProps {
+        body_text: format!("goodbye, {name}"),
+        home_url,
+    })
 }

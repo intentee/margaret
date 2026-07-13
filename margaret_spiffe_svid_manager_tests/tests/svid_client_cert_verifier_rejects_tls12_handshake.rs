@@ -1,5 +1,13 @@
 use std::sync::Arc;
 
+use rustls::ClientConfig;
+use rustls::ClientConnection;
+use rustls::ServerConfig;
+use rustls::ServerConnection;
+use rustls::pki_types::CertificateDer;
+use rustls::pki_types::PrivateKeyDer;
+use rustls::pki_types::ServerName;
+
 use margaret_spiffe_svid_manager::svid_client_cert_verifier::SvidClientCertVerifier;
 use margaret_spiffe_svid_manager_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 use margaret_spiffe_svid_manager_tests::build_webpki_client_verifier::build_webpki_client_verifier;
@@ -9,13 +17,6 @@ use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_C
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_KEY_DER;
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER;
-use rustls::ClientConfig;
-use rustls::ClientConnection;
-use rustls::ServerConfig;
-use rustls::ServerConnection;
-use rustls::pki_types::CertificateDer;
-use rustls::pki_types::PrivateKeyDer;
-use rustls::pki_types::ServerName;
 
 #[tokio::test]
 async fn rejects_tls12_when_used_as_server_client_verifier() {

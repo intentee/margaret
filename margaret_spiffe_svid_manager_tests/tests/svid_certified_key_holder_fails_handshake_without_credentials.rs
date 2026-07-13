@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use margaret_spiffe_svid_manager::svid_certified_key_holder::SvidCertifiedKeyHolder;
-use margaret_spiffe_svid_manager_tests::build_client_config_with_svid_server_verifier::build_client_config_with_svid_server_verifier;
-use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
-use margaret_spiffe_svid_manager_tests::pump_tls_handshake::pump_tls_handshake;
 use rustls::ClientConnection;
 use rustls::ServerConfig;
 use rustls::ServerConnection;
 use rustls::pki_types::ServerName;
+
+use margaret_spiffe_svid_manager::svid_certified_key_holder::SvidCertifiedKeyHolder;
+use margaret_spiffe_svid_manager_tests::build_client_config_with_svid_server_verifier::build_client_config_with_svid_server_verifier;
+use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
+use margaret_spiffe_svid_manager_tests::pump_tls_handshake::pump_tls_handshake;
 
 #[test]
 fn server_fails_when_holder_has_no_cert() {

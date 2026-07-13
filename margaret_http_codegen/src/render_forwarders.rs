@@ -34,8 +34,8 @@ fn forwardable_routes_for<'route>(
 fn forward_method(route: &HttpRoute) -> TokenStream {
     let method = format_ident!("{}", route_name(route));
     let name = route_name(route);
-    let placeholders =
-        path_parameter_names(&route.path).expect("the route path was validated during http codegen");
+    let placeholders = path_parameter_names(&route.path)
+        .expect("the route path was validated during http codegen");
     let parameters = placeholders.iter().map(|placeholder| {
         let parameter = format_ident!("{}", placeholder);
 

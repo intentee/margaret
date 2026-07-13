@@ -82,7 +82,10 @@ impl Farewell {
 
     fn rendered(lib_source: &str, has_http: bool) -> String {
         let servers = if has_http {
-            vec![HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable)]
+            vec![HttpServer::new(
+                "public".to_string(),
+                ServerTransportPolicy::Negotiable,
+            )]
         } else {
             Vec::new()
         };

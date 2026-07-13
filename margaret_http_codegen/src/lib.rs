@@ -10,11 +10,6 @@ mod http_responder_arguments;
 mod http_route;
 mod http_routes;
 pub mod http_server;
-mod interceptor_argument;
-mod interceptor_plan;
-mod interceptor_plans;
-mod interceptor_reference;
-mod interceptor_references;
 mod layer_application;
 mod middleware_argument;
 mod middleware_attribute_arguments;
@@ -30,9 +25,7 @@ mod request_input_source;
 mod responder_argument;
 mod responder_argument_binding;
 mod responder_method;
-mod responder_output;
 mod responder_selectors;
-mod responder_signature;
 mod route_parameter_arguments;
 mod route_url_template;
 pub mod server_transport_policy;
@@ -301,9 +294,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, peer: &SpiffeId) -> Response {}\n}\n",
         );
 
-        assert!(
-            source.contains("margaret_http::require_peer_spiffe_id::require_peer_spiffe_id(")
-        );
+        assert!(source.contains("margaret_http::require_peer_spiffe_id::require_peer_spiffe_id("));
     }
 
     #[test]
@@ -861,49 +852,6 @@ impl GetGreeting {
     }
 
     #[test]
-    fn routes_an_interceptable_return_through_its_marker_interceptor() {
-        let source = source_for(
-            "trait View {}\n\n#[interceptor]\nstruct ViewInterceptor;\nimpl ViewInterceptor {\n    #[process]\n    fn process(&self, view: Box<dyn View>) -> Response {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/greeting\", server = \"public\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[process]\n    fn respond(&self) -> Box<dyn View> {}\n}\n",
-        );
-
-        assert!(source.contains("container.view_interceptor().await"));
-        assert!(source.contains(
-            "implmargaret_http::http_interceptor::HttpInterceptorforViewInterceptor{typeIntercepted=dyncrate::View;"
-        ));
-        assert!(source.contains("self.inner.process(intercepted).await"));
-        assert!(source.contains(
-            "margaret_http::response_continuation::ResponseContinuation::Intercept(Box::new(margaret_http::interception::Interception::new(std::sync::Arc::new(super::ViewInterceptor{inner:view_interceptor,}),responder.respond().await"
-        ));
-    }
-
-    #[test]
-    fn injects_the_routes_reference_into_an_interceptor_process_method() {
-        let source = source_for(
-            "trait View {}\n\n#[interceptor]\nstruct ViewInterceptor;\nimpl ViewInterceptor {\n    #[process]\n    fn process(&self, view: Box<dyn View>, routes: &Routes) -> Response {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/greeting\", server = \"public\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[process]\n    fn respond(&self) -> Box<dyn View> {}\n}\n",
-        );
-
-        assert!(source.contains(
-            "structViewInterceptor{inner:std::sync::Arc<crate::ViewInterceptor>,routes:std::sync::Arc<super::routes::Routes>,}"
-        ));
-        assert!(source.contains("self.inner.process(intercepted,&self.routes).await"));
-        assert!(source.contains(
-            "std::sync::Arc::new(super::ViewInterceptor{inner:view_interceptor,routes:routes.clone(),})"
-        ));
-    }
-
-    #[test]
-    fn passes_the_current_request_into_an_interceptor_process_method() {
-        let source = source_for(
-            "trait View {}\n\n#[interceptor]\nstruct ViewInterceptor;\nimpl ViewInterceptor {\n    #[process]\n    fn process(&self, request: &Request, view: Box<dyn View>) -> Response {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/greeting\", server = \"public\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[process]\n    fn respond(&self) -> Box<dyn View> {}\n}\n",
-        );
-
-        assert!(source.contains(
-            "asyncfnintercept(&self,request:&margaret_http::request::Request,intercepted:std::boxed::Box<dyncrate::View>,)"
-        ));
-        assert!(source.contains("self.inner.process(request,intercepted).await"));
-    }
-
-    #[test]
     fn omits_the_request_from_a_middleware_that_only_delegates() {
         let source = source_for(
             "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
@@ -928,52 +876,6 @@ impl GetGreeting {
     }
 
     #[test]
-    fn rejects_an_interceptor_without_a_process_method() {
-        let message = error_for("#[interceptor]\nstruct Bare;\n");
-
-        assert!(message.contains("no #[process] method"));
-    }
-
-    #[test]
-    fn reports_an_interceptor_without_an_intercepted_parameter() {
-        let message = error_for(
-            "#[interceptor]\nstruct Bare;\nimpl Bare {\n    #[process]\n    fn process(&self, request: &Request) -> Response {}\n}\n",
-        );
-
-        assert!(message.contains("Box<dyn"));
-    }
-
-    #[test]
-    fn reports_an_interceptor_with_multiple_intercepted_parameters() {
-        let message = error_for(
-            "trait View {}\ntrait Page {}\n\n#[interceptor]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, view: Box<dyn View>, page: Box<dyn Page>) -> Response {}\n}\n",
-        );
-
-        assert!(message.contains("more than one intercepted"));
-    }
-
-    #[test]
-    fn reports_an_unclassifiable_interceptor_parameter() {
-        let message = error_for(
-            "trait View {}\n\n#[interceptor]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, view: Box<dyn View>, flag: bool) -> Response {}\n}\n",
-        );
-
-        assert!(
-            message.contains("must be the intercepted value, the current request, or the routes")
-        );
-    }
-
-    #[test]
-    fn disambiguates_interceptors_that_derive_the_same_wrapper_name() {
-        let source = source_for(
-            "trait A {}\ntrait B {}\n\n#[interceptor]\nstruct V2;\nimpl V2 {\n    #[process]\n    fn process(&self, view: Box<dyn A>) -> Response {}\n}\n\n#[interceptor]\nstruct V_2;\nimpl V_2 {\n    #[process]\n    fn process(&self, view: Box<dyn B>) -> Response {}\n}\n",
-        );
-
-        assert!(source.contains("structV2{inner:std::sync::Arc<crate::V2>,}"));
-        assert!(source.contains("structV22{inner:std::sync::Arc<crate::V_2>,}"));
-    }
-
-    #[test]
     fn disambiguates_middlewares_that_derive_the_same_wrapper_name() {
         let source = source_for(
             "#[handles_middleware_attribute(attribute = one)]\nstruct V2;\nimpl V2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n\n#[handles_middleware_attribute(attribute = two)]\nstruct V_2;\nimpl V_2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
@@ -984,40 +886,9 @@ impl GetGreeting {
     }
 
     #[test]
-    fn rejects_two_interceptors_for_the_same_marker_trait() {
-        let message = error_for(
-            "trait View {}\n\n#[interceptor]\nstruct First;\nimpl First {\n    #[process]\n    fn process(&self, view: Box<dyn View>) -> Response {}\n}\n\n#[interceptor]\nstruct Second;\nimpl Second {\n    #[process]\n    fn process(&self, view: Box<dyn View>) -> Response {}\n}\n",
-        );
-
-        assert!(message.contains("more than one interceptor"));
-    }
-
-    #[test]
-    fn treats_a_responder_without_a_return_type_as_plain() {
+    fn wraps_the_responder_return_in_a_response_continuation() {
         let source = source_for(
-            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) {}\n}\n",
-        );
-
-        assert!(
-            source.contains("margaret_http::response_continuation::ResponseContinuation::from(responder.respond().await,)")
-        );
-    }
-
-    #[test]
-    fn treats_an_unregistered_struct_return_as_plain() {
-        let source = source_for(
-            "struct Card;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetCard;\nimpl GetCard {\n    #[process]\n    fn respond(&self) -> Card {}\n}\n",
-        );
-
-        assert!(
-            source.contains("margaret_http::response_continuation::ResponseContinuation::from(responder.respond().await,)")
-        );
-    }
-
-    #[test]
-    fn treats_a_trait_object_return_without_an_interceptor_as_plain() {
-        let source = source_for(
-            "trait Widget {}\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetWidget;\nimpl GetWidget {\n    #[process]\n    fn respond(&self) -> Box<dyn Widget> {}\n}\n",
+            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
         assert!(

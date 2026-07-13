@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use margaret_spiffe_svid_manager::svid_server_cert_verifier::SvidServerCertVerifier;
 use rustls::ClientConfig;
+
+use margaret_spiffe_svid_manager::svid_server_cert_verifier::SvidServerCertVerifier;
 
 use crate::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 

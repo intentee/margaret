@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::Sender;
+
 use margaret_spiffe_svid_manager::ca_bundle::CaBundle;
 use margaret_spiffe_svid_manager::svid_certified_key_holder::SvidCertifiedKeyHolder;
 use margaret_spiffe_svid_manager::svid_converter_service::SvidConverterService;
-use tokio::sync::broadcast;
-use tokio::sync::broadcast::Sender;
 
 #[must_use]
 pub fn build_converter_service(

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use margaret_spiffe_svid_manager_tests::run_spire_command::run_spire_command;
-use margaret_spiffe_svid_manager_tests::scenario_fixture_paths::spire_server_exits_non_zero;
+use margaret_spiffe_svid_manager_tests::spire_server_exits_non_zero::spire_server_exits_non_zero;
 
 #[tokio::test]
 async fn exits_non_zero_fixture_surfaces_as_command_error() {

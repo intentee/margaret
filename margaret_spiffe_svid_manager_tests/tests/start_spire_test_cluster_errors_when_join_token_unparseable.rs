@@ -1,4 +1,4 @@
-use margaret_spiffe_svid_manager_tests::scenario_fixture_paths::spire_server_real_daemon_with_unparseable_token_cli;
+use margaret_spiffe_svid_manager_tests::spire_server_real_daemon_with_unparseable_token_cli::spire_server_real_daemon_with_unparseable_token_cli;
 use margaret_spiffe_svid_manager_tests::spire_test_cluster::SpireTestCluster;
 use margaret_spiffe_svid_manager_tests::spire_test_cluster_params::SpireTestClusterParams;
 

@@ -1,8 +1,9 @@
-use margaret_http_tests::mtls_fixture::MtlsFixture;
-use margaret_http_tests::running_mtls_server::RunningMtlsServer;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+
+use margaret_http_tests::mtls_fixture::MtlsFixture;
+use margaret_http_tests::running_mtls_server::RunningMtlsServer;
 
 #[tokio::test]
 async fn rejects_a_plaintext_connection_to_an_mtls_server() {

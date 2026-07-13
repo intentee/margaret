@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use margaret_spiffe_svid_manager_tests::scenario_fixture_paths::spire_server_exits_immediately;
+use margaret_spiffe_svid_manager_tests::spire_server_exits_immediately::spire_server_exits_immediately;
 use margaret_spiffe_svid_manager_tests::spire_test_cluster::SpireTestCluster;
 use margaret_spiffe_svid_manager_tests::spire_test_cluster_params::SpireTestClusterParams;
 

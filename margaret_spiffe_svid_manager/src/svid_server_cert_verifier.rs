@@ -57,9 +57,7 @@ impl ServerCertVerifier for SvidServerCertVerifier {
         &self,
         end_entity: &CertificateDer<'_>,
         intermediates: &[CertificateDer<'_>],
-        // Ignored for SPIFFE
         _server_name: &ServerName<'_>,
-        // Ignored for SPIFFE
         _ocsp_response: &[u8],
         now: UnixTime,
     ) -> Result<ServerCertVerified, Error> {

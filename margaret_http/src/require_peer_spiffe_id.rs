@@ -1,5 +1,6 @@
-use margaret_peer_identity::peer_identity::PeerIdentity;
 use spiffe::spiffe_id::SpiffeId;
+
+use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::request::Request;
 use crate::response::Response;

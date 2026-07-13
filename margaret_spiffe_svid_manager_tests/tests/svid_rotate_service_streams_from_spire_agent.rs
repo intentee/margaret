@@ -1,9 +1,10 @@
-use margaret_spiffe_svid_manager::svid_rotate_service::SvidRotateService;
-use margaret_spiffe_svid_manager_tests::spire_test_cluster::SpireTestCluster;
-use margaret_spiffe_svid_manager_tests::spire_test_cluster_params::SpireTestClusterParams;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service as _;
+
+use margaret_spiffe_svid_manager::svid_rotate_service::SvidRotateService;
+use margaret_spiffe_svid_manager_tests::spire_test_cluster::SpireTestCluster;
+use margaret_spiffe_svid_manager_tests::spire_test_cluster_params::SpireTestClusterParams;
 
 #[tokio::test]
 async fn streams_x509_context_from_running_spire_agent() {

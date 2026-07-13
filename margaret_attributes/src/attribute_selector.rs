@@ -112,8 +112,8 @@ mod tests {
 
     #[test]
     fn from_path_builds_a_matching_selector() {
-        let selector = AttributeSelector::from_path(parse_quote!(intercepts));
+        let selector = AttributeSelector::from_path(parse_quote!(tagged));
 
-        assert!(selector.matches(&parse_quote!(crate::markers::intercepts)));
+        assert!(selector.matches(&parse_quote!(crate::markers::tagged)));
     }
 }

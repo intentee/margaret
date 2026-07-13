@@ -1,13 +1,10 @@
 use quote::ToTokens;
 use syn::Attribute;
-use syn::ReturnType;
 use syn::Type;
 
 use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::indexed_item::IndexedItem;
-use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::resolve_struct::resolve_struct;
-use margaret_attributes::resolve_trait::resolve_trait;
 use margaret_injection_codegen::leaf_matches::leaf_matches;
 use margaret_injection_codegen::marker::marker;
 use margaret_injection_codegen::parameter_view::ParameterView;
@@ -21,9 +18,7 @@ use crate::http_codegen_error::HttpCodegenError;
 use crate::registries::Registries;
 use crate::responder_argument::ResponderArgument;
 use crate::responder_argument_binding::ResponderArgumentBinding;
-use crate::responder_output::ResponderOutput;
 use crate::responder_selectors::ResponderSelectors;
-use crate::responder_signature::ResponderSignature;
 use crate::route_parameter_arguments::RouteParameterArguments;
 
 fn classify(
@@ -82,30 +77,12 @@ fn is_string(declared: &Type) -> bool {
     matches!(declared, Type::Path(type_path) if type_path.path.is_ident("String"))
 }
 
-fn responder_output(method: &IndexedMethod, registries: &Registries) -> ResponderOutput {
-    let ReturnType::Type(_, declared) = &method.signature().output else {
-        return ResponderOutput::Plain;
-    };
-
-    let Some(intercepted) = resolve_trait(declared, registries.trait_resolution) else {
-        return ResponderOutput::Plain;
-    };
-
-    match registries.interceptors.get(&intercepted) {
-        Some(reference) => ResponderOutput::Intercepted {
-            interceptor: reference.interceptor.clone(),
-            injects_routes: reference.injects_routes,
-        },
-        None => ResponderOutput::Plain,
-    }
-}
-
 pub(crate) fn responder_method(
     item: &IndexedItem,
     responder: &str,
     registries: &Registries,
     selectors: &ResponderSelectors,
-) -> Result<ResponderSignature, HttpCodegenError> {
+) -> Result<Vec<ResponderArgument>, HttpCodegenError> {
     let method = process_method(item)?;
     let mut arguments = Vec::new();
 
@@ -181,8 +158,5 @@ pub(crate) fn responder_method(
         });
     }
 
-    Ok(ResponderSignature {
-        output: responder_output(method, registries),
-        arguments,
-    })
+    Ok(arguments)
 }

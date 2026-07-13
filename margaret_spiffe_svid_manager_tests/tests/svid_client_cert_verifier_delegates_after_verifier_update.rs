@@ -1,10 +1,11 @@
+use rustls::pki_types::CertificateDer;
+use rustls::pki_types::UnixTime;
+use rustls::server::danger::ClientCertVerifier as _;
+
 use margaret_spiffe_svid_manager::svid_client_cert_verifier::SvidClientCertVerifier;
 use margaret_spiffe_svid_manager_tests::build_webpki_client_verifier::build_webpki_client_verifier;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
-use rustls::pki_types::CertificateDer;
-use rustls::pki_types::UnixTime;
-use rustls::server::danger::ClientCertVerifier as _;
 
 #[test]
 fn delegates_after_verifier_update() {

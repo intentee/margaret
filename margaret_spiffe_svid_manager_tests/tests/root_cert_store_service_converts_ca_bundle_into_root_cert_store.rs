@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use margaret_spiffe_svid_manager::ca_bundle::CaBundle;
-use margaret_spiffe_svid_manager::root_cert_store_holder::RootCertStoreHolder;
-use margaret_spiffe_svid_manager::root_cert_store_service::RootCertStoreService;
-use margaret_spiffe_svid_manager_tests::test_fixtures::CA_DER;
 use rustls::pki_types::CertificateDer;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
+
+use margaret_spiffe_svid_manager::ca_bundle::CaBundle;
+use margaret_spiffe_svid_manager::root_cert_store_holder::RootCertStoreHolder;
+use margaret_spiffe_svid_manager::root_cert_store_service::RootCertStoreService;
+use margaret_spiffe_svid_manager_tests::test_fixtures::CA_DER;
 
 #[tokio::test]
 async fn converts_ca_bundle_into_root_cert_store() {

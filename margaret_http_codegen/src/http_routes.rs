@@ -5,26 +5,22 @@ use quote::format_ident;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 
 use crate::build_registry::build_registry;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_responder_arguments::HttpResponderArguments;
 use crate::http_route::HttpRoute;
-use crate::interceptor_reference::InterceptorReference;
 use crate::layer_application::LayerApplication;
 use crate::middleware_plan::MiddlewarePlan;
 use crate::path_parameter_names::path_parameter_names;
 use crate::registries::Registries;
 use crate::responder_method::responder_method;
 use crate::responder_selectors::ResponderSelectors;
-use crate::responder_signature::ResponderSignature;
 
 pub(crate) fn http_routes(
     index: &AttributeIndex,
     middleware_plans: &[MiddlewarePlan],
-    interceptors: &HashMap<CanonicalPath, InterceptorReference>,
 ) -> Result<Vec<HttpRoute>, HttpCodegenError> {
     let selector = AttributeSelector::parse("responds_to_http").expect("a valid selector");
     let struct_resolution = index.struct_resolution();
@@ -40,12 +36,9 @@ pub(crate) fn http_routes(
             second,
         },
     )?;
-    let trait_resolution = index.trait_resolution();
     let registries = Registries {
         binders: &binders,
-        interceptors,
         struct_resolution,
-        trait_resolution,
     };
     let middleware_selector = AttributeSelector::parse("middleware").expect("a valid selector");
     let responder_selectors = ResponderSelectors::new();
@@ -109,10 +102,7 @@ pub(crate) fn http_routes(
 
         layers.reverse();
 
-        let ResponderSignature {
-            arguments,
-            output: responder_output,
-        } = responder_method(item, &responder, &registries, &responder_selectors)?;
+        let arguments = responder_method(item, &responder, &registries, &responder_selectors)?;
         let path_parameters =
             path_parameter_names(&path).map_err(|source| HttpCodegenError::InvalidRoutePath {
                 responder: responder.clone(),
@@ -157,7 +147,6 @@ pub(crate) fn http_routes(
             name,
             path,
             responder_field: format_ident!("{}", index.field_name(item.canonical_path())),
-            responder_output,
             responder_path: item.canonical_path().clone(),
             arguments,
             server,

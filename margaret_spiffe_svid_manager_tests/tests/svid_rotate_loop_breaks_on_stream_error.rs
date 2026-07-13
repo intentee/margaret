@@ -2,11 +2,12 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use futures_util::stream;
-use margaret_spiffe_svid_manager::svid_rotate_loop::svid_rotate_loop;
 use spiffe::X509Context;
 use tokio::sync::broadcast;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
+
+use margaret_spiffe_svid_manager::svid_rotate_loop::svid_rotate_loop;
 
 #[tokio::test]
 async fn breaks_on_stream_error() {

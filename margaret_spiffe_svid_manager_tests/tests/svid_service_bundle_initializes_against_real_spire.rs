@@ -1,11 +1,12 @@
+use tokio_util::sync::CancellationToken;
+use trzcina::ServiceManager;
+use trzcina::ServiceShutdownOptions;
+
 use margaret_spiffe_svid_manager::SvidServiceBundle;
 use margaret_spiffe_svid_manager::SvidServiceBundleParams;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
 use margaret_spiffe_svid_manager_tests::spire_test_cluster::SpireTestCluster;
 use margaret_spiffe_svid_manager_tests::spire_test_cluster_params::SpireTestClusterParams;
-use tokio_util::sync::CancellationToken;
-use trzcina::ServiceManager;
-use trzcina::ServiceShutdownOptions;
 
 #[tokio::test]
 async fn populates_reqwest_client_holder_from_real_spire() {

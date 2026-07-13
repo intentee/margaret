@@ -1,5 +1,9 @@
 use std::sync::Arc;
 
+use rustls::ClientConnection;
+use rustls::ServerConnection;
+use rustls::pki_types::ServerName;
+
 use margaret_spiffe_svid_manager_tests::build_mtls_client_config::build_mtls_client_config;
 use margaret_spiffe_svid_manager_tests::build_mtls_server_config::build_mtls_server_config;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
@@ -8,9 +12,6 @@ use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_C
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_KEY_DER;
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER;
-use rustls::ClientConnection;
-use rustls::ServerConnection;
-use rustls::pki_types::ServerName;
 
 #[test]
 fn mtls_handshake_completes_with_matching_trust_domain() {

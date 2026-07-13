@@ -159,31 +159,6 @@ pub enum HttpCodegenError {
     InvalidRouteName { name: String, responder: String },
 
     #[error(
-        "#[interceptor] '{interceptor}' has no `Box<dyn <marker trait>>` parameter on its #[process] method that resolves to a known marker trait"
-    )]
-    MissingInterceptedParameter { interceptor: String },
-
-    #[error(
-        "#[interceptor] '{interceptor}' has more than one intercepted `Box<dyn <marker trait>>` parameter on its #[process] method"
-    )]
-    MultipleInterceptedParameters { interceptor: String },
-
-    #[error(
-        "parameter '{parameter}' of #[interceptor] '{interceptor}' must be the intercepted value, the current request, or the routes"
-    )]
-    UnclassifiableInterceptorParameter {
-        interceptor: String,
-        parameter: String,
-    },
-
-    #[error("marker trait '{intercepted}' has more than one interceptor: '{first}' and '{second}'")]
-    AmbiguousInterceptor {
-        intercepted: String,
-        first: String,
-        second: String,
-    },
-
-    #[error(
         "parameter '{parameter}' of middleware '{middleware}' must be the current request, the next handler, or the routes"
     )]
     UnclassifiableMiddlewareParameter {

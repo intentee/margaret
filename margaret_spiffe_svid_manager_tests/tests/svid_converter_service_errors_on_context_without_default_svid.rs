@@ -1,7 +1,8 @@
-use margaret_spiffe_svid_manager_tests::build_converter_service::build_converter_service;
 use spiffe::X509BundleSet;
 use spiffe::X509Context;
 use tokio::sync::broadcast;
+
+use margaret_spiffe_svid_manager_tests::build_converter_service::build_converter_service;
 
 #[tokio::test]
 async fn errors_on_context_without_default_svid() {

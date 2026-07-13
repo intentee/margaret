@@ -1,7 +1,8 @@
 use anyhow::Result;
+use serde_json::to_value;
+
 use margaret_jwks_key_gen::curve::Curve;
 use margaret_jwks_key_gen::jwks_secret::JwksSecret;
-use serde_json::to_value;
 
 #[test]
 fn jwks_secret_serializes_with_signing_material() -> Result<()> {

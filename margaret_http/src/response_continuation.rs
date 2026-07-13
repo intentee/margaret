@@ -1,4 +1,3 @@
-use crate::deferred_interception::DeferredInterception;
 use crate::forward::Forward;
 use crate::redirect::Redirect;
 use crate::response::Response;
@@ -6,7 +5,6 @@ use crate::response::Response;
 pub enum ResponseContinuation {
     Done(Response),
     Forward(Forward),
-    Intercept(Box<dyn DeferredInterception>),
     Redirect(Redirect),
 }
 

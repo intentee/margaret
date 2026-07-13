@@ -1,5 +1,6 @@
-use margaret_spiffe_svid_manager::ca_bundle::CaBundle;
 use rustls::pki_types::CertificateDer;
+
+use margaret_spiffe_svid_manager::ca_bundle::CaBundle;
 
 #[test]
 fn rejects_invalid_der() {

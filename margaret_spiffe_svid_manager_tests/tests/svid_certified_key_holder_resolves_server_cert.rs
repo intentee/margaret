@@ -1,5 +1,11 @@
 use std::sync::Arc;
 
+use rustls::ClientConnection;
+use rustls::ServerConfig;
+use rustls::ServerConnection;
+use rustls::pki_types::ServerName;
+use spiffe::X509Svid;
+
 use margaret_spiffe_svid_manager::extract_server_credentials::extract_server_credentials;
 use margaret_spiffe_svid_manager::svid_certified_key_holder::SvidCertifiedKeyHolder;
 use margaret_spiffe_svid_manager_tests::build_client_config_with_svid_server_verifier::build_client_config_with_svid_server_verifier;
@@ -8,11 +14,6 @@ use margaret_spiffe_svid_manager_tests::pump_tls_handshake::pump_tls_handshake;
 use margaret_spiffe_svid_manager_tests::test_fixtures::CA_DER;
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER;
-use rustls::ClientConnection;
-use rustls::ServerConfig;
-use rustls::ServerConnection;
-use rustls::pki_types::ServerName;
-use spiffe::X509Svid;
 
 #[tokio::test]
 async fn server_serves_cert_resolved_through_holder() {

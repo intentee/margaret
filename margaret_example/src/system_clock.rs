@@ -20,7 +20,7 @@ impl Clock for SystemClock {
     fn now(&self) -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("the system clock is set after the unix epoch")
+            .unwrap_or_default()
             .as_secs()
     }
 }

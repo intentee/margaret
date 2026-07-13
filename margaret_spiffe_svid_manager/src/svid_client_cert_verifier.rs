@@ -22,6 +22,13 @@ impl SvidClientCertVerifier {
             .write()
             .expect("SVID client cert verifier lock is poisoned") = Some(verifier);
     }
+
+    fn current_verifier(&self) -> Option<Arc<dyn ClientCertVerifier>> {
+        self.current_verifier
+            .read()
+            .expect("SVID client cert verifier lock is poisoned")
+            .clone()
+    }
 }
 
 impl ClientCertVerifier for SvidClientCertVerifier {
@@ -30,13 +37,7 @@ impl ClientCertVerifier for SvidClientCertVerifier {
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        let current_verifier = self
-            .current_verifier
-            .read()
-            .expect("SVID client cert verifier lock is poisoned")
-            .clone();
-
-        current_verifier
+        self.current_verifier()
             .map(|current_verifier| current_verifier.supported_verify_schemes())
             .unwrap_or_default()
     }
@@ -47,13 +48,7 @@ impl ClientCertVerifier for SvidClientCertVerifier {
         intermediates: &[CertificateDer<'_>],
         now: rustls::pki_types::UnixTime,
     ) -> std::result::Result<ClientCertVerified, rustls::Error> {
-        let current_verifier = self
-            .current_verifier
-            .read()
-            .expect("SVID client cert verifier lock is poisoned")
-            .clone();
-
-        current_verifier
+        self.current_verifier()
             .ok_or_else(|| {
                 error!(
                     "Client request came in, but the server is not ready yet to verify client cert."
@@ -83,13 +78,7 @@ impl ClientCertVerifier for SvidClientCertVerifier {
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> std::result::Result<HandshakeSignatureValid, rustls::Error> {
-        let current_verifier = self
-            .current_verifier
-            .read()
-            .expect("SVID client cert verifier lock is poisoned")
-            .clone();
-
-        current_verifier
+        self.current_verifier()
             .ok_or_else(|| {
                 error!("Client request came in, but the server is not ready yet to verify TLS 1.3 signature.");
 

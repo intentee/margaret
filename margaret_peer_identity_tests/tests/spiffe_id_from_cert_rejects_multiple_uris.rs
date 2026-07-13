@@ -1,8 +1,9 @@
+use rcgen::SanType;
+use rcgen::string::Ia5String;
+
 use margaret_peer_identity::peer_identity_error::PeerIdentityError;
 use margaret_peer_identity::spiffe_id_from_cert::spiffe_id_from_cert;
 use margaret_peer_identity_tests::self_signed_certificate_der::self_signed_certificate_der;
-use rcgen::SanType;
-use rcgen::string::Ia5String;
 
 #[test]
 fn spiffe_id_from_cert_rejects_multiple_uris() {

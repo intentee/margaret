@@ -16,6 +16,9 @@ mod tests {
 
     #[test]
     fn reports_a_failed_outcome() {
-        assert_eq!(report_failure("service registration failed"), CommandOutcome::Failed);
+        assert_eq!(
+            report_failure("service registration failed"),
+            CommandOutcome::Failed
+        );
     }
 }

@@ -1,7 +1,8 @@
-use margaret_spiffe_svid_manager::extract_spiffe_trust_domain::extract_spiffe_trust_domain;
-use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_WITH_USERINFO_DER;
 use rustls::CertificateError;
 use rustls::Error;
+
+use margaret_spiffe_svid_manager::extract_spiffe_trust_domain::extract_spiffe_trust_domain;
+use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_WITH_USERINFO_DER;
 
 #[test]
 fn rejects_spiffe_uri_with_userinfo() {

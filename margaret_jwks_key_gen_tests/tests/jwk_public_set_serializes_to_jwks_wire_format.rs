@@ -1,9 +1,10 @@
 use anyhow::Result;
+use serde_json::to_value;
+
 use margaret_jwks_key_gen::curve::Curve;
 use margaret_jwks_key_gen::generate_keypair::generate_keypair;
 use margaret_jwks_key_gen::generate_keypair_params::GenerateKeypairParams;
 use margaret_jwks_key_gen::jwk_public_set::JwkPublicSet;
-use serde_json::to_value;
 
 #[test]
 fn jwk_public_set_serializes_to_jwks_wire_format() -> Result<()> {

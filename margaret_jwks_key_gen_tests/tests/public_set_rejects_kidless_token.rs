@@ -1,6 +1,7 @@
 use anyhow::Result;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
+
 use margaret_jwks_key_gen::curve::Curve;
 use margaret_jwks_key_gen::generate_keypair::generate_keypair;
 use margaret_jwks_key_gen::generate_keypair_params::GenerateKeypairParams;

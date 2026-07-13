@@ -1,8 +1,9 @@
-use margaret_spiffe_svid_manager::svid_client_cert_verifier::SvidClientCertVerifier;
 use rustls::Error;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::UnixTime;
 use rustls::server::danger::ClientCertVerifier as _;
+
+use margaret_spiffe_svid_manager::svid_client_cert_verifier::SvidClientCertVerifier;
 
 #[test]
 fn returns_error_when_not_ready() {

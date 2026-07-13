@@ -1,12 +1,12 @@
 use anyhow::Result;
+use serde::Serialize;
+
 use margaret_jwks_key_gen::curve::Curve;
 use margaret_jwks_key_gen::generate_keypair::generate_keypair;
 use margaret_jwks_key_gen::generate_keypair_params::GenerateKeypairParams;
 use margaret_jwks_key_gen::jwks_key_error::JwksKeyError;
 use margaret_jwks_key_gen::signs_claims::SignsClaims;
 use margaret_jwks_key_gen::verifies_token::VerifiesToken;
-use serde::Serialize;
-
 use margaret_jwks_key_gen_tests::test_claims::TestClaims;
 
 #[derive(Serialize)]

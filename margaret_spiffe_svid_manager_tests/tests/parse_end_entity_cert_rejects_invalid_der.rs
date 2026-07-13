@@ -1,7 +1,8 @@
-use margaret_spiffe_svid_manager::parse_end_entity_cert::parse_end_entity_cert;
 use rustls::CertificateError;
 use rustls::Error;
 use rustls::pki_types::CertificateDer;
+
+use margaret_spiffe_svid_manager::parse_end_entity_cert::parse_end_entity_cert;
 
 #[test]
 fn rejects_invalid_der() {

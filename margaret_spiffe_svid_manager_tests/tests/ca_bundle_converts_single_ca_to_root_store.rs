@@ -1,6 +1,7 @@
+use rustls::pki_types::CertificateDer;
+
 use margaret_spiffe_svid_manager::ca_bundle::CaBundle;
 use margaret_spiffe_svid_manager_tests::test_fixtures::CA_DER;
-use rustls::pki_types::CertificateDer;
 
 #[test]
 fn converts_single_ca_to_root_store() {

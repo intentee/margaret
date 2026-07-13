@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use margaret_spiffe_svid_manager::ca_bundle::CaBundle;
-use margaret_spiffe_svid_manager::root_cert_store_holder::RootCertStoreHolder;
-use margaret_spiffe_svid_manager::root_cert_store_service::RootCertStoreService;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
+
+use margaret_spiffe_svid_manager::ca_bundle::CaBundle;
+use margaret_spiffe_svid_manager::root_cert_store_holder::RootCertStoreHolder;
+use margaret_spiffe_svid_manager::root_cert_store_service::RootCertStoreService;
 
 #[tokio::test]
 async fn run_propagates_error_when_channel_closes_without_cancellation() {

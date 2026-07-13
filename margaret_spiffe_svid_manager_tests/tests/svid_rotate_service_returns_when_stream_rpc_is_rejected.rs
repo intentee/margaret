@@ -1,8 +1,9 @@
+use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
+
 use margaret_spiffe_svid_manager::svid_rotate_service::SvidRotateService;
 use margaret_spiffe_svid_manager_tests::spire_test_cluster::SpireTestCluster;
 use margaret_spiffe_svid_manager_tests::spire_test_cluster_params::SpireTestClusterParams;
-use tokio::sync::broadcast;
-use tokio_util::sync::CancellationToken;
 
 #[tokio::test]
 async fn stream_from_agent_returns_when_stream_rpc_is_rejected() {

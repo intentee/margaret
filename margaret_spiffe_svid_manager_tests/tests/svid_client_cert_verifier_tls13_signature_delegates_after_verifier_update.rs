@@ -1,11 +1,12 @@
+use rustls::SignatureScheme;
+use rustls::pki_types::CertificateDer;
+use rustls::server::danger::ClientCertVerifier as _;
+
 use margaret_spiffe_svid_manager::svid_client_cert_verifier::SvidClientCertVerifier;
 use margaret_spiffe_svid_manager_tests::build_digitally_signed_struct::build_digitally_signed_struct;
 use margaret_spiffe_svid_manager_tests::build_webpki_client_verifier::build_webpki_client_verifier;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
 use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
-use rustls::SignatureScheme;
-use rustls::pki_types::CertificateDer;
-use rustls::server::danger::ClientCertVerifier as _;
 
 #[test]
 fn tls13_signature_delegates_after_verifier_update() {

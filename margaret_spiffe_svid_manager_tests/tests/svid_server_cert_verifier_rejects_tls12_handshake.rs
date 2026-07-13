@@ -1,11 +1,5 @@
 use std::sync::Arc;
 
-use margaret_spiffe_svid_manager::svid_server_cert_verifier::SvidServerCertVerifier;
-use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
-use margaret_spiffe_svid_manager_tests::pump_tls_handshake::pump_tls_handshake;
-use margaret_spiffe_svid_manager_tests::test_fixtures::CA_DER;
-use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
-use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER;
 use rustls::ClientConfig;
 use rustls::ClientConnection;
 use rustls::RootCertStore;
@@ -14,6 +8,13 @@ use rustls::ServerConnection;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::PrivateKeyDer;
 use rustls::pki_types::ServerName;
+
+use margaret_spiffe_svid_manager::svid_server_cert_verifier::SvidServerCertVerifier;
+use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
+use margaret_spiffe_svid_manager_tests::pump_tls_handshake::pump_tls_handshake;
+use margaret_spiffe_svid_manager_tests::test_fixtures::CA_DER;
+use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
+use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER;
 
 #[test]
 fn rejects_tls12_when_used_as_client_server_verifier() {

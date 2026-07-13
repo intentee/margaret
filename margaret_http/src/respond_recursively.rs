@@ -39,9 +39,6 @@ pub(crate) async fn respond_recursively(
                 request = request.with_path_params(forward.into_path_params());
                 outcome = target.handle(&request).await;
             }
-            ResponseContinuation::Intercept(interception) => {
-                outcome = interception.render(&request).await;
-            }
             ResponseContinuation::Redirect(redirect) => return redirect.into_response(),
         }
     }
@@ -57,7 +54,6 @@ mod tests {
     use http_body_util::BodyExt;
 
     use super::respond_recursively;
-    use crate::deferred_interception::DeferredInterception;
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
@@ -130,24 +126,6 @@ mod tests {
         }
     }
 
-    struct ForwardingInterception;
-
-    #[async_trait]
-    impl DeferredInterception for ForwardingInterception {
-        async fn render(self: Box<Self>, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::from(Forward::new("target", HashMap::new()))
-        }
-    }
-
-    struct InterceptsToForward;
-
-    #[async_trait]
-    impl Handler for InterceptsToForward {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::Intercept(Box::new(ForwardingInterception))
-        }
-    }
-
     struct RedirectingResponder;
 
     #[async_trait]
@@ -200,17 +178,6 @@ mod tests {
         assert_eq!(
             status_of(forward_targets_with(Vec::new()), Arc::new(ForwardToUnknown)).await,
             500
-        );
-    }
-
-    #[tokio::test]
-    async fn repeats_the_stack_when_an_interceptor_returns_a_responder() {
-        let forward_targets =
-            forward_targets_with(vec![NamedHandler::new("target", Arc::new(Target))]);
-
-        assert_eq!(
-            status_of(forward_targets, Arc::new(InterceptsToForward)).await,
-            222
         );
     }
 

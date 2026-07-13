@@ -1,7 +1,8 @@
+use rustls::server::danger::ClientCertVerifier as _;
+
 use margaret_spiffe_svid_manager::svid_client_cert_verifier::SvidClientCertVerifier;
 use margaret_spiffe_svid_manager_tests::build_webpki_client_verifier::build_webpki_client_verifier;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
-use rustls::server::danger::ClientCertVerifier as _;
 
 #[test]
 fn returns_inner_supported_verify_schemes_when_ready() {

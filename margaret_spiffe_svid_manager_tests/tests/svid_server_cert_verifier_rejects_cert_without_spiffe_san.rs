@@ -1,13 +1,14 @@
-use margaret_spiffe_svid_manager::svid_server_cert_verifier::SvidServerCertVerifier;
-use margaret_spiffe_svid_manager_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
-use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
-use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_DNS_ONLY_DER;
 use rustls::CertificateError;
 use rustls::Error;
 use rustls::client::danger::ServerCertVerifier as _;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::ServerName;
 use rustls::pki_types::UnixTime;
+
+use margaret_spiffe_svid_manager::svid_server_cert_verifier::SvidServerCertVerifier;
+use margaret_spiffe_svid_manager_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
+use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
+use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_DNS_ONLY_DER;
 
 #[test]
 fn rejects_cert_without_spiffe_san() {

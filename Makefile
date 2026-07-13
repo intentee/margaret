@@ -17,6 +17,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_macros \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
+	-p margaret_service \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
 	-p margaret_spiffe_svid_manager \

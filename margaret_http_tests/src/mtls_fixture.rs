@@ -59,8 +59,10 @@ impl MtlsFixture {
         let certificate_authority_key = KeyPair::generate().expect("the CA key pair generates");
         let mut certificate_authority_params = CertificateParams::default();
         certificate_authority_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-        certificate_authority_params.key_usages =
-            vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::DigitalSignature];
+        certificate_authority_params.key_usages = vec![
+            KeyUsagePurpose::KeyCertSign,
+            KeyUsagePurpose::DigitalSignature,
+        ];
         let certificate_authority = certificate_authority_params
             .self_signed(&certificate_authority_key)
             .expect("the CA certificate self-signs");

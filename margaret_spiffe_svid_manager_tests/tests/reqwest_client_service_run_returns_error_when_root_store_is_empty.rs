@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
+use rustls::RootCertStore;
+use tokio_util::sync::CancellationToken;
+use trzcina::Service as _;
+
 use margaret_spiffe_svid_manager::reqwest_client_holder::ReqwestClientHolder;
 use margaret_spiffe_svid_manager::reqwest_client_service::ReqwestClientService;
 use margaret_spiffe_svid_manager::root_cert_store_holder::RootCertStoreHolder;
 use margaret_spiffe_svid_manager::svid_certified_key_holder::SvidCertifiedKeyHolder;
 use margaret_spiffe_svid_manager_tests::build_workload_credentials::build_workload_credentials;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
-use rustls::RootCertStore;
-use tokio_util::sync::CancellationToken;
-use trzcina::Service as _;
 
 #[tokio::test]
 async fn run_returns_error_when_root_store_is_empty() {

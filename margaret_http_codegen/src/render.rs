@@ -13,13 +13,10 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::http_route::HttpRoute;
 use crate::http_server::HttpServer;
-use crate::interceptor_argument::InterceptorArgument;
-use crate::interceptor_plan::InterceptorPlan;
 use crate::middleware_argument::MiddlewareArgument;
 use crate::middleware_plan::MiddlewarePlan;
 use crate::responder_argument::ResponderArgument;
 use crate::responder_argument_binding::ResponderArgumentBinding;
-use crate::responder_output::ResponderOutput;
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
@@ -49,22 +46,8 @@ fn responder_injects_routes(route: &HttpRoute) -> bool {
         .any(|argument| matches!(argument.binding, ResponderArgumentBinding::Routes))
 }
 
-fn interceptor_injects_routes(route: &HttpRoute) -> bool {
-    matches!(
-        route.responder_output,
-        ResponderOutput::Intercepted {
-            injects_routes: true,
-            ..
-        }
-    )
-}
-
-fn closure_captures_routes(route: &HttpRoute) -> bool {
-    responder_injects_routes(route) || interceptor_injects_routes(route)
-}
-
 fn route_references_routes(route: &HttpRoute) -> bool {
-    closure_captures_routes(route) || route.layers.iter().any(|layer| layer.injects_routes)
+    responder_injects_routes(route) || route.layers.iter().any(|layer| layer.injects_routes)
 }
 
 fn handler_binding(route: &HttpRoute) -> Ident {
@@ -114,35 +97,12 @@ fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
         .iter()
         .map(|argument| argument_value(argument, &routes_local, &server));
     let respond_call = quote! { #responder_binding.respond(#(#argument_values),*).await };
-    let body_tail = match &route.responder_output {
-        ResponderOutput::Plain => quote! {
-            margaret_http::response_continuation::ResponseContinuation::from(#respond_call)
-        },
-        ResponderOutput::Intercepted {
-            interceptor,
-            injects_routes,
-        } => {
-            let wrapper = format_ident!("{}", index.type_name(interceptor));
-            let field = format_ident!("{}", index.field_name(interceptor));
-            let interceptor_expr = if *injects_routes {
-                quote! { std::sync::Arc::new(super::#wrapper { inner: #field, routes: #routes_local.clone() }) }
-            } else {
-                quote! { std::sync::Arc::new(super::#wrapper { inner: #field }) }
-            };
-
-            quote! {
-                margaret_http::response_continuation::ResponseContinuation::Intercept(Box::new(
-                    margaret_http::interception::Interception::new(#interceptor_expr, #respond_call),
-                ))
-            }
-        }
-    };
     let body = quote! {
         #(#bindings)*
-        #body_tail
+        margaret_http::response_continuation::ResponseContinuation::from(#respond_call)
     };
 
-    let captures_routes = closure_captures_routes(route);
+    let captures_routes = responder_injects_routes(route);
     let outcome_future = quote! {
         std::pin::Pin<
             std::boxed::Box<
@@ -324,63 +284,10 @@ fn capture_fields(route: &HttpRoute, index: &AttributeIndex) -> Vec<Ident> {
         }
     }
 
-    if let ResponderOutput::Intercepted { interceptor, .. } = &route.responder_output {
-        fields.insert(index.field_name(interceptor).to_string());
-    }
-
     fields
         .iter()
         .map(|field| format_ident!("{}", field))
         .collect()
-}
-
-fn interceptor_wrapper(plan: &InterceptorPlan, index: &AttributeIndex) -> TokenStream {
-    let InterceptorPlan {
-        arguments,
-        injects_routes,
-        interceptor,
-        marker,
-    } = plan;
-    let wrapper = format_ident!("{}", index.type_name(interceptor));
-    let concrete = path_tokens(interceptor);
-    let marker = path_tokens(marker);
-    let routes_field =
-        injects_routes.then(|| quote! { routes: std::sync::Arc<super::routes::Routes>, });
-    let request_binding = if arguments
-        .iter()
-        .any(|argument| matches!(argument, InterceptorArgument::CurrentRequest))
-    {
-        format_ident!("request")
-    } else {
-        format_ident!("_request")
-    };
-    let call_arguments = arguments.iter().map(|argument| match argument {
-        InterceptorArgument::CurrentRequest => quote! { request },
-        InterceptorArgument::Intercepted => quote! { intercepted },
-        InterceptorArgument::Routes => quote! { &self.routes },
-    });
-
-    quote! {
-        struct #wrapper {
-            inner: std::sync::Arc<#concrete>,
-            #routes_field
-        }
-
-        #[async_trait::async_trait]
-        impl margaret_http::http_interceptor::HttpInterceptor for #wrapper {
-            type Intercepted = dyn #marker;
-
-            async fn intercept(
-                &self,
-                #request_binding: &margaret_http::request::Request,
-                intercepted: std::boxed::Box<dyn #marker>,
-            ) -> margaret_http::response_continuation::ResponseContinuation {
-                margaret_http::response_continuation::ResponseContinuation::from(
-                    self.inner.process(#(#call_arguments),*).await,
-                )
-            }
-        }
-    }
 }
 
 fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
@@ -500,13 +407,9 @@ fn server_module(routes: &[HttpRoute], server: &HttpServer, index: &AttributeInd
 pub(crate) fn render(
     routes: &[HttpRoute],
     servers: &[HttpServer],
-    interceptor_plans: &[InterceptorPlan],
     middleware_plans: &[MiddlewarePlan],
     index: &AttributeIndex,
 ) -> Vec<GeneratedModuleTokens> {
-    let interceptor_wrappers = interceptor_plans
-        .iter()
-        .map(|plan| interceptor_wrapper(plan, index));
     let middleware_wrappers = middleware_plans.iter().map(middleware_wrapper);
     let server_declarations = servers.iter().map(|server| {
         let function_name = server.function_name();
@@ -519,7 +422,6 @@ pub(crate) fn render(
 
     let http_tokens = quote! {
         #(#server_declarations)*
-        #(#interceptor_wrappers)*
         #(#middleware_wrappers)*
     };
 

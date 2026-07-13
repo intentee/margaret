@@ -1,7 +1,8 @@
-use margaret_spiffe_svid_manager_tests::build_converter_service::build_converter_service;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
+
+use margaret_spiffe_svid_manager_tests::build_converter_service::build_converter_service;
 
 #[tokio::test]
 async fn run_propagates_error_when_channel_closes_without_cancellation() {

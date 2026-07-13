@@ -84,12 +84,10 @@ mod tests {
 
     #[test]
     fn matches_tests_the_attribute_against_a_selector() {
-        let item = item_bearing(parse_quote!(#[intercepts(crate::markers::View)]));
+        let item = item_bearing(parse_quote!(#[tagged(crate::markers::Tag)]));
         let matched = MatchedAttribute::new(&item, 0);
 
-        assert!(
-            matched.matches(&AttributeSelector::parse("intercepts").expect("a valid selector"))
-        );
+        assert!(matched.matches(&AttributeSelector::parse("tagged").expect("a valid selector")));
         assert!(!matched.matches(&AttributeSelector::parse("traced").expect("a valid selector")));
     }
 }

@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+use tokio_util::sync::CancellationToken;
+use trzcina::Service as _;
+
 use margaret_spiffe_svid_manager::reqwest_client_holder::ReqwestClientHolder;
 use margaret_spiffe_svid_manager::reqwest_client_service::ReqwestClientService;
 use margaret_spiffe_svid_manager::root_cert_store_holder::RootCertStoreHolder;
@@ -7,8 +10,6 @@ use margaret_spiffe_svid_manager::svid_certified_key_holder::SvidCertifiedKeyHol
 use margaret_spiffe_svid_manager_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 use margaret_spiffe_svid_manager_tests::build_workload_credentials::build_workload_credentials;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
-use tokio_util::sync::CancellationToken;
-use trzcina::Service as _;
 
 #[tokio::test]
 async fn builds_client_when_both_holders_populated_at_startup() {

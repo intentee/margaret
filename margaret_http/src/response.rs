@@ -1,8 +1,17 @@
 use bytes::Bytes;
 use cookie::Cookie;
+use http::StatusCode;
 use http_body_util::Full;
 
 use crate::header::Header;
+
+fn internal_server_error() -> http::Response<Full<Bytes>> {
+    let mut response = http::Response::new(Full::new(Bytes::from_static(b"Internal Server Error")));
+
+    *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+
+    response
+}
 
 pub struct Response {
     body: String,
@@ -49,15 +58,23 @@ impl Response {
     }
 
     pub(crate) fn into_http(self) -> http::Response<Full<Bytes>> {
-        let mut builder = http::Response::builder().status(self.status);
+        let status = self.status;
+        let mut builder = http::Response::builder().status(status);
 
         for header in self.headers {
             builder = builder.header(header.name, header.value);
         }
 
-        builder
-            .body(Full::new(Bytes::from(self.body)))
-            .expect("a well-formed response is built")
+        match builder.body(Full::new(Bytes::from(self.body))) {
+            Ok(response) => response,
+            Err(error) => {
+                eprintln!(
+                    "margaret_http: the responder produced a response that is not a valid HTTP response (status `{status}`): {error}"
+                );
+
+                internal_server_error()
+            }
+        }
     }
 }
 
@@ -97,6 +114,13 @@ mod tests {
         let response = Response::forbidden().into_http();
 
         assert_eq!(response.status().as_u16(), 403);
+    }
+
+    #[test]
+    fn serves_an_internal_server_error_when_the_response_is_not_a_valid_http_response() {
+        let response = Response::text(9999, "unreachable status").into_http();
+
+        assert_eq!(response.status().as_u16(), 500);
     }
 
     #[test]

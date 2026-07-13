@@ -1,6 +1,7 @@
-use margaret_spiffe_svid_manager::extract_spiffe_trust_domain::extract_spiffe_trust_domain;
 use rustls::CertificateError;
 use rustls::Error;
+
+use margaret_spiffe_svid_manager::extract_spiffe_trust_domain::extract_spiffe_trust_domain;
 
 #[test]
 fn rejects_invalid_der() {

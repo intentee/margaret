@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use http::Method;
+
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::request_inputs::RequestInputs;

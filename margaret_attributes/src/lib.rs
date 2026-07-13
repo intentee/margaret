@@ -20,7 +20,6 @@ pub mod path_tokens;
 pub mod resolution;
 pub mod resolution_index;
 pub mod resolve_struct;
-pub mod resolve_trait;
 pub mod struct_shape;
 pub mod type_leaf_ident;
 

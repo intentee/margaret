@@ -1,7 +1,6 @@
 use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
-use margaret_macros::interceptor;
 use margaret_macros::middleware;
 use margaret_macros::process;
 use margaret_macros::provides_route_parameter;
@@ -15,7 +14,6 @@ use margaret_macros::singleton;
 #[console_command]
 #[handles_middleware_attribute(attribute = traced)]
 #[middleware(traced)]
-#[interceptor]
 struct Subject;
 
 impl Subject {

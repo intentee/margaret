@@ -3,15 +3,13 @@ use rustls::ServerConnection;
 
 use crate::handshake_error::HandshakeError;
 
-// A TLS handshake settles in a handful of round trips; this generous ceiling
-// only ever trips on a genuinely stuck handshake, keeping tests from hanging CI.
-const MAX_HANDSHAKE_ROUNDS: usize = 100;
+const ROUNDS_BEFORE_THE_HANDSHAKE_IS_CONSIDERED_STUCK: usize = 100;
 
 pub fn pump_tls_handshake(
     server_connection: &mut ServerConnection,
     client_connection: &mut ClientConnection,
 ) -> Result<(), HandshakeError> {
-    for _ in 0..MAX_HANDSHAKE_ROUNDS {
+    for _ in 0..ROUNDS_BEFORE_THE_HANDSHAKE_IS_CONSIDERED_STUCK {
         let mut server_to_client = Vec::new();
         let mut client_to_server = Vec::new();
 
