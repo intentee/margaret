@@ -12,6 +12,7 @@ pub(crate) fn umbrella(
     let mut source = String::from("#[rustfmt::skip]\npub mod container;\n");
 
     if has_http {
+        source.push_str("#[rustfmt::skip]\npub mod forwarders;\n");
         source.push_str("#[rustfmt::skip]\npub mod http;\n");
         source.push_str("#[rustfmt::skip]\npub mod routes;\n");
     }

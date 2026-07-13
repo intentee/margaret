@@ -26,7 +26,10 @@ fn access(call: TokenStream) -> TokenStream {
 }
 
 fn argument_needs_request(argument: &ResponderArgument) -> bool {
-    !matches!(argument.binding, ResponderArgumentBinding::Routes)
+    !matches!(
+        argument.binding,
+        ResponderArgumentBinding::Routes | ResponderArgumentBinding::Forwarder
+    )
 }
 
 fn holder_shadows_request(binding: &ResponderArgumentBinding) -> bool {
@@ -35,6 +38,7 @@ fn holder_shadows_request(binding: &ResponderArgumentBinding) -> bool {
         ResponderArgumentBinding::Raw { .. }
             | ResponderArgumentBinding::Bound { .. }
             | ResponderArgumentBinding::FormRequest { .. }
+            | ResponderArgumentBinding::PeerSpiffeId
     )
 }
 
@@ -104,10 +108,11 @@ fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
         .arguments
         .iter()
         .map(|argument| argument_binding(argument, &request_binding, index));
+    let server = format_ident!("{}", route.server);
     let argument_values = route
         .arguments
         .iter()
-        .map(|argument| argument_value(argument, &routes_local));
+        .map(|argument| argument_value(argument, &routes_local, &server));
     let respond_call = quote! { #responder_binding.respond(#(#argument_values),*).await };
     let body_tail = match &route.responder_output {
         ResponderOutput::Plain => quote! {
@@ -213,9 +218,16 @@ fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
     handler
 }
 
-fn argument_value(argument: &ResponderArgument, routes_binding: &Ident) -> TokenStream {
+fn argument_value(
+    argument: &ResponderArgument,
+    routes_binding: &Ident,
+    server: &Ident,
+) -> TokenStream {
     match &argument.binding {
         ResponderArgumentBinding::Routes => quote! { #routes_binding.as_ref() },
+        ResponderArgumentBinding::Forwarder => {
+            quote! { super::super::forwarders::#server::Forwarder }
+        }
         _ => {
             let holder = &argument.holder;
 
@@ -252,7 +264,19 @@ fn argument_binding(
                 }
             }
         }
-        ResponderArgumentBinding::Routes => TokenStream::new(),
+        ResponderArgumentBinding::Routes | ResponderArgumentBinding::Forwarder => {
+            TokenStream::new()
+        }
+        ResponderArgumentBinding::PeerSpiffeId => {
+            quote! {
+                let #holder = match margaret_http::require_peer_spiffe_id::require_peer_spiffe_id(
+                    #request,
+                ) {
+                    Ok(value) => value,
+                    Err(response) => return response.into(),
+                };
+            }
+        }
         ResponderArgumentBinding::Bound { binder, path_key } => {
             let binder_field = format_ident!("{}", index.field_name(binder));
 

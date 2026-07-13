@@ -1,12 +1,15 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use http::Method;
+use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::request_inputs::RequestInputs;
 
 pub struct Request {
     pub inputs: RequestInputs,
     path_params: HashMap<String, String>,
+    peer_identity: Arc<PeerIdentity>,
 }
 
 impl Request {
@@ -14,6 +17,7 @@ impl Request {
         Self {
             inputs,
             path_params: HashMap::new(),
+            peer_identity: Arc::new(PeerIdentity::Anonymous),
         }
     }
 
@@ -21,6 +25,7 @@ impl Request {
         Self {
             inputs: RequestInputs::empty(method, path),
             path_params: HashMap::new(),
+            peer_identity: Arc::new(PeerIdentity::Anonymous),
         }
     }
 
@@ -28,7 +33,20 @@ impl Request {
         Self {
             inputs: self.inputs,
             path_params,
+            peer_identity: self.peer_identity,
         }
+    }
+
+    pub(crate) fn with_peer_identity(self, peer_identity: Arc<PeerIdentity>) -> Self {
+        Self {
+            inputs: self.inputs,
+            path_params: self.path_params,
+            peer_identity,
+        }
+    }
+
+    pub fn peer_identity(&self) -> &PeerIdentity {
+        &self.peer_identity
     }
 
     pub fn path_param(&self, name: &str) -> Option<&str> {

@@ -126,10 +126,8 @@ fn route_constructor(route: &HttpRoute, origin: TokenStream, values: TokenStream
     let segments = segments_tokens(route);
 
     if is_get(route) {
-        let name = route_name(route);
-
         quote! {
-            margaret_http::forwardable_route::ForwardableRoute::new(#name, #origin, #segments, #values)
+            margaret_http::forwardable_route::ForwardableRoute::new(#origin, #segments, #values)
         }
     } else {
         quote! {

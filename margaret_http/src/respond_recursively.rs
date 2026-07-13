@@ -23,11 +23,17 @@ pub(crate) async fn respond_recursively(
                 let name = forward.name();
 
                 if !visited.insert(name) {
+                    eprintln!("margaret_http: forward cycle re-entered the responder `{name}`");
+
                     return Response::text(500, "Internal Server Error");
                 }
 
                 let Some(target) = forward_targets.resolve(name) else {
-                    return Response::not_found();
+                    eprintln!(
+                        "margaret_http: no forward target is registered for `{name}` on this server"
+                    );
+
+                    return Response::text(500, "Internal Server Error");
                 };
 
                 request = request.with_path_params(forward.into_path_params());
@@ -190,10 +196,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn returns_not_found_when_forwarding_to_an_unknown_name() {
+    async fn returns_a_server_error_when_forwarding_to_an_unregistered_name() {
         assert_eq!(
             status_of(forward_targets_with(Vec::new()), Arc::new(ForwardToUnknown)).await,
-            404
+            500
         );
     }
 

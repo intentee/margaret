@@ -12,9 +12,14 @@ use hyper_util::rt::TokioExecutor;
 use hyper_util::rt::TokioIo;
 use hyper_util::server::conn::auto::Builder;
 use hyper_util::server::graceful::GracefulShutdown;
+use hyper_util::server::graceful::Watcher;
 use hyper_util::service::TowerToHyperService;
+use margaret_peer_identity::peer_identity::PeerIdentity;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
+use tokio::task::JoinHandle;
+use tokio_rustls::TlsAcceptor;
+use tokio_rustls::server::TlsStream;
 use tokio_util::sync::CancellationToken;
 
 use crate::body_limit::BodyLimit;
@@ -25,13 +30,31 @@ use crate::request_inputs::RequestInputs;
 use crate::response::Response;
 use crate::router::Router;
 use crate::server_registry::ServerRegistry;
+use crate::transport_config::TransportConfig;
 use crate::upload_config::UploadConfig;
+
+#[derive(Clone)]
+enum BoundTransport {
+    Plain,
+    MutualTls { acceptor: TlsAcceptor },
+}
+
+#[derive(Clone)]
+struct ConnectionContext {
+    body_limit: BodyLimit,
+    forward_targets: Arc<ForwardTargets>,
+    peer_identity: Arc<PeerIdentity>,
+    remote_addr: SocketAddr,
+    router: Arc<Router>,
+    upload_config: Arc<UploadConfig>,
+}
 
 pub struct BoundServer {
     body_limit: BodyLimit,
     forward_targets: Arc<ForwardTargets>,
     listener: TcpListener,
     router: Arc<Router>,
+    transport: BoundTransport,
     upload_config: Arc<UploadConfig>,
 }
 
@@ -49,6 +72,12 @@ impl BoundServer {
         };
         let body_limit = server.body_limit();
         let router = server.router().clone();
+        let transport = match server.transport().as_ref() {
+            TransportConfig::Plain => BoundTransport::Plain,
+            TransportConfig::MutualTls { server_config } => BoundTransport::MutualTls {
+                acceptor: TlsAcceptor::from(server_config.clone()),
+            },
+        };
         let upload_config = server.upload_config().clone();
         let listener = TcpListener::bind(server.address()).await?;
 
@@ -57,6 +86,7 @@ impl BoundServer {
             forward_targets,
             listener,
             router,
+            transport,
             upload_config,
         })
     }
@@ -75,49 +105,76 @@ impl BoundServer {
             .run_until_cancelled(self.listener.accept())
             .await
         {
-            accept_outcome(accepted).map(
-                |AcceptedConnection {
-                     remote_addr,
-                     stream,
-                 }| {
-                    let body_limit = self.body_limit;
-                    let forward_targets = self.forward_targets.clone();
-                    let router = self.router.clone();
-                    let upload_config = self.upload_config.clone();
-                    let builder = builder.clone();
-                    let watcher = graceful.watcher();
-
-                    tokio::spawn(async move {
-                        let service = TowerToHyperService::new(tower::service_fn(
-                            move |request: http::Request<Incoming>| {
-                                let forward_targets = forward_targets.clone();
-                                let router = router.clone();
-                                let upload_config = upload_config.clone();
-
-                                async move {
-                                    Ok::<_, Infallible>(
-                                        dispatch(
-                                            router,
-                                            upload_config,
-                                            body_limit,
-                                            forward_targets,
-                                            remote_addr,
-                                            request,
-                                        )
-                                        .await,
-                                    )
-                                }
-                            },
-                        ));
-                        let connection = builder.serve_connection(TokioIo::new(stream), service);
-
-                        report_connection_outcome(watcher.watch(connection).await);
-                    })
-                },
-            );
+            accept_outcome(accepted)
+                .map(|connection| self.spawn_connection(&builder, &graceful, connection));
         }
 
         graceful.shutdown().await;
+    }
+
+    fn spawn_connection(
+        &self,
+        builder: &Arc<Builder<TokioExecutor>>,
+        graceful: &GracefulShutdown,
+        AcceptedConnection {
+            remote_addr,
+            stream,
+        }: AcceptedConnection,
+    ) -> JoinHandle<()> {
+        let builder = builder.clone();
+        let watcher = graceful.watcher();
+        let transport = self.transport.clone();
+        let router = self.router.clone();
+        let upload_config = self.upload_config.clone();
+        let forward_targets = self.forward_targets.clone();
+        let body_limit = self.body_limit;
+
+        tokio::spawn(async move {
+            match transport {
+                BoundTransport::Plain => {
+                    serve_connection(
+                        builder,
+                        watcher,
+                        TokioIo::new(stream),
+                        ConnectionContext {
+                            body_limit,
+                            forward_targets,
+                            peer_identity: Arc::new(PeerIdentity::from_peer_certificate(None)),
+                            remote_addr,
+                            router,
+                            upload_config,
+                        },
+                    )
+                    .await;
+                }
+                BoundTransport::MutualTls { acceptor } => {
+                    let tls_stream = match acceptor.accept(stream).await {
+                        Ok(tls_stream) => tls_stream,
+                        Err(error) => {
+                            eprintln!("margaret_http: tls handshake error: {error}");
+
+                            return;
+                        }
+                    };
+                    let peer_identity = Arc::new(peer_identity_from_tls_stream(&tls_stream));
+
+                    serve_connection(
+                        builder,
+                        watcher,
+                        TokioIo::new(tls_stream),
+                        ConnectionContext {
+                            body_limit,
+                            forward_targets,
+                            peer_identity,
+                            remote_addr,
+                            router,
+                            upload_config,
+                        },
+                    )
+                    .await;
+                }
+            }
+        })
     }
 }
 
@@ -142,6 +199,17 @@ fn accept_outcome(
     }
 }
 
+fn peer_identity_from_tls_stream(tls_stream: &TlsStream<TcpStream>) -> PeerIdentity {
+    PeerIdentity::from_peer_certificate(
+        tls_stream
+            .get_ref()
+            .1
+            .peer_certificates()
+            .and_then(|certificates| certificates.first())
+            .map(|certificate| certificate.as_ref()),
+    )
+}
+
 fn report_connection_outcome<Error: Display>(outcome: Result<(), Error>) {
     if let Err(error) = outcome {
         eprintln!("margaret_http: connection error: {error}");
@@ -155,12 +223,34 @@ fn error_response(error: RequestError) -> Response {
     }
 }
 
+async fn serve_connection<Io>(
+    builder: Arc<Builder<TokioExecutor>>,
+    watcher: Watcher,
+    io: Io,
+    connection_context: ConnectionContext,
+) where
+    Io: hyper::rt::Read + hyper::rt::Write + Unpin + Send + 'static,
+{
+    let service = TowerToHyperService::new(tower::service_fn(
+        move |request: http::Request<Incoming>| {
+            let connection_context = connection_context.clone();
+
+            async move { Ok::<_, Infallible>(dispatch(connection_context, request).await) }
+        },
+    ));
+
+    report_connection_outcome(watcher.watch(builder.serve_connection(io, service)).await);
+}
+
 async fn dispatch(
-    router: Arc<Router>,
-    upload_config: Arc<UploadConfig>,
-    body_limit: BodyLimit,
-    forward_targets: Arc<ForwardTargets>,
-    remote_addr: SocketAddr,
+    ConnectionContext {
+        body_limit,
+        forward_targets,
+        peer_identity,
+        remote_addr,
+        router,
+        upload_config,
+    }: ConnectionContext,
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
     let (parts, incoming) = request.into_parts();
@@ -184,7 +274,10 @@ async fn dispatch(
     .await
     {
         Ok(inputs) => router
-            .respond(Request::from_inputs(inputs), &forward_targets)
+            .respond(
+                Request::from_inputs(inputs).with_peer_identity(peer_identity),
+                &forward_targets,
+            )
             .await
             .into_http(),
         Err(error) => error_response(error).into_http(),
@@ -215,6 +308,7 @@ mod tests {
     use crate::router_builder::RouterBuilder;
     use crate::server::Server;
     use crate::server_registry::ServerRegistry;
+    use crate::transport_config::TransportConfig;
     use crate::upload_config::UploadConfig;
 
     struct PlainOk;
@@ -231,6 +325,7 @@ mod tests {
             "test",
             "127.0.0.1:0".to_string(),
             "http://127.0.0.1",
+            TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
             RouterBuilder::empty()
@@ -290,6 +385,7 @@ mod tests {
             "test",
             "this is not an address".to_string(),
             "http://127.0.0.1",
+            TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
             RouterBuilder::empty().build(),

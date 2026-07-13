@@ -5,6 +5,7 @@ pub mod extract_ca_bundle;
 pub mod extract_server_credentials;
 pub mod extract_spiffe_trust_domain;
 pub mod extract_spiffe_trust_domain_from_uri;
+pub mod install_default_crypto_provider;
 pub mod parse_end_entity_cert;
 pub mod reqwest_client_holder;
 pub mod reqwest_client_service;

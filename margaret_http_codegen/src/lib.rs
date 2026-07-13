@@ -23,6 +23,7 @@ mod middleware_plans;
 mod path_parameter_names;
 mod registries;
 mod render;
+mod render_forwarders;
 pub mod render_http;
 mod render_routes;
 mod request_input_source;
@@ -34,6 +35,8 @@ mod responder_selectors;
 mod responder_signature;
 mod route_parameter_arguments;
 mod route_url_template;
+pub mod server_transport_policy;
+pub mod serves_spiffe;
 mod url_segment;
 
 #[cfg(test)]
@@ -231,7 +234,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             source.contains("pubget_greeting:margaret_http::forwardable_route::ForwardableRoute,")
         );
         assert!(source.contains(
-            "get_greeting:margaret_http::forwardable_route::ForwardableRoute::new(\"get_greeting\",origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/greeting\")],::std::vec::Vec::new(),)"
+            "get_greeting:margaret_http::forwardable_route::ForwardableRoute::new(origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/greeting\")],::std::vec::Vec::new(),)"
         ));
     }
 
@@ -243,7 +246,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "pubfnget_article(&self,article:String,)->margaret_http::forwardable_route::ForwardableRoute"
         ));
         assert!(source.contains(
-            "margaret_http::forwardable_route::ForwardableRoute::new(\"get_article\",self.origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/articles/\"),margaret_http::url_segment::UrlSegment::Parameter(\"article\"),],::std::vec![article],)"
+            "margaret_http::forwardable_route::ForwardableRoute::new(self.origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/articles/\"),margaret_http::url_segment::UrlSegment::Parameter(\"article\"),],::std::vec![article],)"
         ));
         assert!(!source.contains("Params"));
     }
@@ -290,6 +293,44 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         assert!(source.contains("&::std::sync::Arc<super::super::routes::Routes>"));
         assert!(source.contains("letroutes=routes.clone();"));
         assert!(source.contains("responder.respond(routes.as_ref()).await"));
+    }
+
+    #[test]
+    fn injects_the_peer_spiffe_id_into_a_responder_by_type() {
+        let source = source_for(
+            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, peer: &SpiffeId) -> Response {}\n}\n",
+        );
+
+        assert!(
+            source.contains("margaret_http::require_peer_spiffe_id::require_peer_spiffe_id(")
+        );
+    }
+
+    #[test]
+    fn injects_the_scoped_forwarder_into_a_responder_by_type() {
+        let source = source_for(
+            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> Forward {}\n}\n",
+        );
+
+        assert!(source.contains("responder.respond(super::super::forwarders::public::Forwarder)"));
+    }
+
+    #[test]
+    fn rejects_a_peer_spiffe_id_parameter_that_also_carries_a_marker() {
+        let message = error_for(
+            "#[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] peer: &SpiffeId) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("peer SPIFFE id and must not"));
+    }
+
+    #[test]
+    fn rejects_a_responder_with_multiple_peer_spiffe_id_parameters() {
+        let message = error_for(
+            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, first: &SpiffeId, second: &SpiffeId) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("more than one peer SPIFFE id"));
     }
 
     #[test]

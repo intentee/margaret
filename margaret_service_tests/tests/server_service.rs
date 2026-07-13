@@ -8,6 +8,7 @@ use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::router_builder::RouterBuilder;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
+use margaret_http::transport_config::TransportConfig;
 use margaret_http::upload_config::UploadConfig;
 use margaret_service::server_service::ServerService;
 
@@ -21,6 +22,7 @@ async fn binds_and_drains_on_cancellation() {
         "public",
         "127.0.0.1:0".to_string(),
         "http://127.0.0.1",
+        TransportConfig::Plain,
         UploadConfig::Disabled,
         BodyLimit::default(),
         RouterBuilder::empty().build(),

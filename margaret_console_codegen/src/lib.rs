@@ -20,6 +20,7 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_http_codegen::http_server::HttpServer;
+    use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 
     use crate::has_commands::has_commands;
     use crate::render_console::render_console;
@@ -81,7 +82,7 @@ impl Farewell {
 
     fn rendered(lib_source: &str, has_http: bool) -> String {
         let servers = if has_http {
-            vec![HttpServer::new("public".to_string())]
+            vec![HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable)]
         } else {
             Vec::new()
         };
@@ -149,6 +150,47 @@ impl Farewell {
     }
 
     #[test]
+    fn emits_spiffe_transport_flags_when_a_server_is_pinned() {
+        let source: String = render_console(
+            &index_for("struct App;\n"),
+            true,
+            &[
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
+                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+            ],
+        )
+        .expect("the console source is generated")
+        .format()
+        .source()
+        .split_whitespace()
+        .collect();
+
+        assert!(source.contains(
+            r#"clap::Arg::new("internal-transport").long("internal-transport").required(true).value_parser(["spiffe_mtls"])"#
+        ));
+        assert!(source.contains(
+            r#"clap::Arg::new("public-transport").long("public-transport").required(true).value_parser(["plain","spiffe_mtls"])"#
+        ));
+        assert!(source.contains(
+            r#"clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true)"#
+        ));
+        assert!(source.contains(
+            r#"clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true)"#
+        ));
+    }
+
+    #[test]
+    fn omits_transport_flags_when_no_server_is_pinned() {
+        let source = source_for("struct App;\n", true);
+
+        assert!(!source.contains("public-transport"));
+        assert!(!source.contains("spiffe-trust-domain"));
+    }
+
+    #[test]
     fn always_registers_an_identity_command() {
         let source = source_for("struct App;\n", false);
 
@@ -163,8 +205,8 @@ impl Farewell {
             &index_for("struct App;\n"),
             true,
             &[
-                HttpServer::new("public".to_string()),
-                HttpServer::new("internal".to_string()),
+                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
             ],
         )
         .expect("the console source is generated")

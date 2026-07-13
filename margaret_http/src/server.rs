@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::body_limit::BodyLimit;
 use crate::router::Router;
+use crate::transport_config::TransportConfig;
 use crate::upload_config::UploadConfig;
 
 pub struct Server {
@@ -10,6 +11,7 @@ pub struct Server {
     name: Arc<str>,
     origin: Arc<str>,
     router: Arc<Router>,
+    transport: Arc<TransportConfig>,
     upload_config: Arc<UploadConfig>,
 }
 
@@ -18,6 +20,7 @@ impl Server {
         name: impl Into<Arc<str>>,
         address: String,
         origin: impl Into<Arc<str>>,
+        transport: TransportConfig,
         upload_config: UploadConfig,
         body_limit: BodyLimit,
         router: Router,
@@ -28,6 +31,7 @@ impl Server {
             name: name.into(),
             origin: origin.into(),
             router: Arc::new(router),
+            transport: Arc::new(transport),
             upload_config: Arc::new(upload_config),
         }
     }
@@ -50,6 +54,10 @@ impl Server {
 
     pub(crate) fn router(&self) -> &Arc<Router> {
         &self.router
+    }
+
+    pub(crate) fn transport(&self) -> &Arc<TransportConfig> {
+        &self.transport
     }
 
     pub(crate) fn upload_config(&self) -> &Arc<UploadConfig> {

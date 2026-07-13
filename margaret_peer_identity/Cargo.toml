@@ -1,0 +1,13 @@
+[package]
+name = "margaret_peer_identity"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+log = { workspace = true }
+spiffe = { workspace = true, features = ["spiffe-types"] }
+thiserror = { workspace = true }
+x509-parser = { workspace = true }
+
+[lints]
+workspace = true

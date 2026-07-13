@@ -14,8 +14,10 @@ margaret_http_validation = { path = "../margaret_http_validation" }
 margaret_identity = { path = "../margaret_identity" }
 margaret_macros = { path = "../margaret_macros" }
 margaret_service = { path = "../margaret_service" }
+margaret_spiffe_svid_manager = { path = "../margaret_spiffe_svid_manager" }
 margaret_validation = { path = "../margaret_validation" }
 serde = { workspace = true, features = ["derive"] }
+spiffe = { workspace = true, features = ["spiffe-types"] }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }

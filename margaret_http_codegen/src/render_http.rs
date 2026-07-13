@@ -8,6 +8,7 @@ use crate::interceptor_plans::interceptor_plans;
 use crate::interceptor_references::interceptor_references;
 use crate::middleware_plans::middleware_plans;
 use crate::render::render;
+use crate::render_forwarders::render_forwarders;
 use crate::render_routes::render_routes;
 
 pub fn render_http(index: &AttributeIndex) -> Result<HttpArtifacts, HttpCodegenError> {
@@ -25,6 +26,7 @@ pub fn render_http(index: &AttributeIndex) -> Result<HttpArtifacts, HttpCodegenE
     );
 
     modules.extend(render_routes(&routes, &servers));
+    modules.extend(render_forwarders(&routes, &servers));
 
     Ok(HttpArtifacts::new(modules, servers))
 }

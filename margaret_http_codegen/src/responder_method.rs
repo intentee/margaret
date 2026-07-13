@@ -119,6 +119,8 @@ pub(crate) fn responder_method(
         let route_parameter = marker(attributes, &selectors.route_parameter);
         let form_request = marker(attributes, &selectors.form_request);
         let is_current_request = reference_leaf_matches(declared, "Request");
+        let is_forwarder = leaf_matches(declared, "Forwarder");
+        let is_peer_spiffe_id = reference_leaf_matches(declared, "SpiffeId");
         let is_routes = reference_leaf_matches(declared, "Routes");
 
         if route_parameter.is_some() && form_request.is_some() {
@@ -128,7 +130,19 @@ pub(crate) fn responder_method(
             });
         }
 
-        if route_parameter.is_none() && form_request.is_none() && !is_current_request && !is_routes
+        if is_peer_spiffe_id && (route_parameter.is_some() || form_request.is_some()) {
+            return Err(HttpCodegenError::MarkedPeerSpiffeIdParameter {
+                responder: responder.to_string(),
+                parameter: position.to_string(),
+            });
+        }
+
+        if route_parameter.is_none()
+            && form_request.is_none()
+            && !is_current_request
+            && !is_forwarder
+            && !is_peer_spiffe_id
+            && !is_routes
         {
             return Err(HttpCodegenError::UnmarkedResponderParameter {
                 responder: responder.to_string(),
@@ -143,6 +157,10 @@ pub(crate) fn responder_method(
             let route_arguments = RouteParameterArguments::parse(&arguments, responder, position)?;
 
             classify(responder, route_arguments, declared, registries)?
+        } else if is_forwarder {
+            ResponderArgumentBinding::Forwarder
+        } else if is_peer_spiffe_id {
+            ResponderArgumentBinding::PeerSpiffeId
         } else if is_routes {
             ResponderArgumentBinding::Routes
         } else {
@@ -150,6 +168,17 @@ pub(crate) fn responder_method(
         };
 
         arguments.push(ResponderArgument { holder, binding });
+    }
+
+    let peer_spiffe_id_count = arguments
+        .iter()
+        .filter(|argument| matches!(argument.binding, ResponderArgumentBinding::PeerSpiffeId))
+        .count();
+
+    if peer_spiffe_id_count > 1 {
+        return Err(HttpCodegenError::MultiplePeerSpiffeIdParameters {
+            responder: responder.to_string(),
+        });
     }
 
     Ok(ResponderSignature {

@@ -16,6 +16,7 @@ use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::router_builder::RouterBuilder;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
+use margaret_http::transport_config::TransportConfig;
 use margaret_http::upload_config::UploadConfig;
 
 struct Accepts;
@@ -41,6 +42,7 @@ async fn exchange(
         "public",
         "127.0.0.1:0".to_string(),
         "http://127.0.0.1",
+        TransportConfig::Plain,
         upload_config,
         body_limit,
         router,

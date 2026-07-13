@@ -1,0 +1,21 @@
+[package]
+name = "margaret_http_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dependencies]
+async-trait = { workspace = true }
+margaret_http = { path = "../margaret_http" }
+rcgen = { workspace = true }
+rustls = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread"] }
+tokio-rustls = { workspace = true }
+tokio-util = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

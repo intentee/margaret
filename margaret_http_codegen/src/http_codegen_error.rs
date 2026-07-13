@@ -53,12 +53,25 @@ pub enum HttpCodegenError {
     UnknownMiddleware { responder: String, tag: String },
 
     #[error(
-        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a form request, the current request, or the routes"
+        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a form request, the current request, the peer SPIFFE id, the forwarder, or the routes"
     )]
     UnmarkedResponderParameter {
         responder: String,
         parameter: String,
     },
+
+    #[error(
+        "argument #{parameter} of responder '{responder}' is the peer SPIFFE id and must not also carry #[route_parameter] or #[form_request]"
+    )]
+    MarkedPeerSpiffeIdParameter {
+        responder: String,
+        parameter: String,
+    },
+
+    #[error(
+        "responder '{responder}' declares more than one peer SPIFFE id parameter; a request has exactly one peer identity"
+    )]
+    MultiplePeerSpiffeIdParameters { responder: String },
 
     #[error(
         "argument #{parameter} of responder '{responder}' has both #[route_parameter] and #[form_request]; a responder argument may use at most one"

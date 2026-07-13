@@ -1,14 +1,20 @@
 use proc_macro2::Ident;
 use quote::format_ident;
 
+use crate::server_transport_policy::ServerTransportPolicy;
+
 #[derive(Clone)]
 pub struct HttpServer {
     name: String,
+    transport_policy: ServerTransportPolicy,
 }
 
 impl HttpServer {
-    pub fn new(name: String) -> Self {
-        Self { name }
+    pub fn new(name: String, transport_policy: ServerTransportPolicy) -> Self {
+        Self {
+            name,
+            transport_policy,
+        }
     }
 
     pub fn address_argument(&self) -> String {
@@ -21,6 +27,14 @@ impl HttpServer {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn transport_argument(&self) -> String {
+        format!("{}-transport", self.name)
+    }
+
+    pub fn transport_policy(&self) -> ServerTransportPolicy {
+        self.transport_policy
     }
 
     pub fn upload_dir_argument(&self) -> String {

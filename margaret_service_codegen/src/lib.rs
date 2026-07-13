@@ -18,6 +18,7 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_http_codegen::http_server::HttpServer;
+    use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 
     use crate::has_services::has_services;
     use crate::render_services::render_services;
@@ -57,7 +58,7 @@ mod tests {
     }
 
     fn public() -> Vec<HttpServer> {
-        vec![HttpServer::new("public".to_string())]
+        vec![HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable)]
     }
 
     const SERVICE: &str = "#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
@@ -137,18 +138,61 @@ mod tests {
         assert!(source.contains(r#"matches.get_one::<String>("public-upload-dir")"#));
         assert!(source.contains("unwrap_or_else(std::env::temp_dir)"));
         assert!(source.contains("margaret_http::upload_config::UploadConfig::Disabled"));
-        assert!(source.contains("forward_targets.extend(routes_public.named_handlers)"));
         assert!(source.contains(
-            r#"margaret_http::server::Server::new("public",address_public,origin_public,upload_config_public,margaret_http::body_limit::BodyLimit::default(),routes_public.router,)"#
+            "letforward_targets_public=::std::sync::Arc::new(margaret_http::forward_targets::ForwardTargets::new(routes_public.named_handlers),);"
+        ));
+        assert!(source.contains(
+            "lettransport_public=margaret_http::transport_config::TransportConfig::Plain;"
+        ));
+        assert!(source.contains(
+            r#"margaret_http::server::Server::new("public",address_public,origin_public,transport_public,upload_config_public,margaret_http::body_limit::BodyLimit::default(),routes_public.router,)"#
         ));
         assert!(
             source.contains("margaret_http::server_registry::ServerRegistry::new(server_models)")
         );
-        assert!(
-            source.contains("margaret_http::forward_targets::ForwardTargets::new(forward_targets)")
-        );
         assert!(source.contains(
-            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_target_registry.clone(),"public",)"#
+            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_targets_public,"public",)"#
+        ));
+    }
+
+    #[test]
+    fn wires_the_spiffe_bundle_and_pins_transports_when_a_server_is_pinned() {
+        let source = rendered(
+            SERVICE,
+            &[
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
+                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+            ],
+        );
+
+        assert!(source.contains(
+            "margaret_spiffe_svid_manager::install_default_crypto_provider::install_default_crypto_provider();"
+        ));
+        assert!(source.contains(
+            "margaret_spiffe_svid_manager::SvidServiceBundle::new(margaret_spiffe_svid_manager::SvidServiceBundleParams{"
+        ));
+        assert!(source.contains(r#"matches.get_one::<String>("spiffe-trust-domain")"#));
+        assert!(source.contains(r#"matches.get_one::<String>("spire-agent-addr")"#));
+        assert!(source.contains(
+            "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
+        ));
+        assert!(source.contains(
+            "lettransport_internal=margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),};"
+        ));
+        assert!(source.contains(
+            r#"lettransport_public=matchmatches.get_one::<String>("public-transport").map(String::as_str)"#
+        ));
+        assert!(source.contains(
+            r#"Some("spiffe_mtls")=>{margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
+        ));
+        assert!(source.contains(
+            "_=>margaret_http::transport_config::TransportConfig::Plain,"
+        ));
+        assert!(source.contains(
+            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret_console::report_failure::report_failure(error);}"
         ));
     }
 
@@ -157,8 +201,8 @@ mod tests {
         let source = rendered(
             SERVICE,
             &[
-                HttpServer::new("internal".to_string()),
-                HttpServer::new("public".to_string()),
+                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
             ],
         );
 
@@ -177,8 +221,8 @@ mod tests {
         let source = rendered(
             SERVICE,
             &[
-                HttpServer::new("public".to_string()),
-                HttpServer::new("internal".to_string()),
+                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
             ],
         );
 
@@ -187,14 +231,14 @@ mod tests {
         assert!(source.contains(r#"matches.get_flag("public-uploads")"#));
         assert!(source.contains(r#"matches.get_one::<String>("public-upload-dir")"#));
         assert!(source.contains(
-            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_target_registry.clone(),"public",)"#
+            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_targets_public,"public",)"#
         ));
         assert!(source.contains(r#"matches.get_one::<String>("internal-addr")"#));
         assert!(source.contains(r#"matches.get_one::<String>("internal-url")"#));
         assert!(source.contains(r#"matches.get_flag("internal-uploads")"#));
         assert!(source.contains(r#"matches.get_one::<String>("internal-upload-dir")"#));
         assert!(source.contains(
-            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_target_registry.clone(),"internal",)"#
+            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_targets_internal,"internal",)"#
         ));
     }
 

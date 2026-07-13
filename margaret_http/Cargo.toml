@@ -13,13 +13,17 @@ http-body = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server", "server-auto", "server-graceful", "service", "tokio"] }
+margaret_peer_identity = { path = "../margaret_peer_identity" }
 matchit = { workspace = true }
 mime = { workspace = true }
 multer = { workspace = true }
+rustls = { workspace = true }
 serde_json = { workspace = true }
+spiffe = { workspace = true, features = ["spiffe-types"] }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "rt"] }
+tokio-rustls = { workspace = true }
 tokio-util = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 

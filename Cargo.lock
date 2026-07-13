@@ -176,6 +176,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
 
 [[package]]
+name = "bit-vec"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b71798fca2c1fe1086445a7258a4bc81e6e49dcd24c8d0dd9a1e57395b603f51"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1295,8 +1304,10 @@ dependencies = [
  "margaret_identity",
  "margaret_macros",
  "margaret_service",
+ "margaret_spiffe_svid_manager",
  "margaret_validation",
  "serde",
+ "spiffe",
  "tokio",
  "tokio-util",
  "trzcina",
@@ -1327,13 +1338,17 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "margaret_peer_identity",
  "matchit",
  "mime",
  "multer",
+ "rustls",
  "serde_json",
+ "spiffe",
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-rustls",
  "tokio-util",
  "tower",
 ]
@@ -1353,6 +1368,19 @@ dependencies = [
  "syn",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "margaret_http_tests"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "margaret_http",
+ "rcgen",
+ "rustls",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
 ]
 
 [[package]]
@@ -1437,6 +1465,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_peer_identity"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "spiffe",
+ "thiserror",
+ "x509-parser 0.17.0",
+]
+
+[[package]]
+name = "margaret_peer_identity_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_peer_identity",
+ "rcgen",
+ "spiffe",
+]
+
+[[package]]
 name = "margaret_service"
 version = "0.1.0"
 dependencies = [
@@ -1497,7 +1544,7 @@ dependencies = [
  "tokio-util",
  "trzcina",
  "url",
- "x509-parser",
+ "x509-parser 0.17.0",
 ]
 
 [[package]]
@@ -2154,6 +2201,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "rcgen"
+version = "0.14.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57f6d249aad744e274e682777a50283a225a32705394ee6d5fcc01efa25e4055"
+dependencies = [
+ "pem",
+ "ring",
+ "rustls-pki-types",
+ "time",
+ "x509-parser 0.18.1",
+ "yasna",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2558,7 +2619,7 @@ dependencies = [
  "tonic-prost-build",
  "tower",
  "url",
- "x509-parser",
+ "x509-parser 0.17.0",
  "zeroize",
 ]
 
@@ -3338,6 +3399,34 @@ dependencies = [
  "oid-registry",
  "rusticata-macros",
  "thiserror",
+ "time",
+]
+
+[[package]]
+name = "x509-parser"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d43b0f71ce057da06bc0851b23ee24f3f86190b07203dd8f567d0b706a185202"
+dependencies = [
+ "asn1-rs",
+ "data-encoding",
+ "der-parser",
+ "lazy_static",
+ "nom",
+ "oid-registry",
+ "ring",
+ "rusticata-macros",
+ "thiserror",
+ "time",
+]
+
+[[package]]
+name = "yasna"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5f6765e852b9b4dc8e2a76843e4d64d1cea8e79bcde0b6901aea8e7c7f08282"
+dependencies = [
+ "bit-vec",
  "time",
 ]
 

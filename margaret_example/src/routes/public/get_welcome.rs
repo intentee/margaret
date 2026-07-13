@@ -4,7 +4,7 @@ use margaret_macros::process;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
-use crate::margaret::routes::Routes;
+use crate::margaret::forwarders::public::Forwarder;
 
 #[singleton]
 #[middleware(logged)]
@@ -13,7 +13,7 @@ pub struct GetWelcome;
 
 impl GetWelcome {
     #[process]
-    pub async fn respond(&self, routes: &Routes) -> Forward {
-        routes.public.get_greeting.forward_to()
+    pub async fn respond(&self, forward: Forwarder) -> Forward {
+        forward.get_greeting()
     }
 }

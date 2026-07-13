@@ -1,0 +1,19 @@
+[package]
+name = "margaret_peer_identity_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dependencies]
+rcgen = { workspace = true }
+
+[dev-dependencies]
+margaret_peer_identity = { path = "../margaret_peer_identity" }
+spiffe = { workspace = true, features = ["spiffe-types"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

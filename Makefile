@@ -7,6 +7,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_generated_module \
 	-p margaret_http \
 	-p margaret_http_codegen \
+	-p margaret_http_tests \
 	-p margaret_http_validation \
 	-p margaret_identity \
 	-p margaret_identity_session \
@@ -14,6 +15,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_jwks_key_gen \
 	-p margaret_jwks_key_gen_tests \
 	-p margaret_macros \
+	-p margaret_peer_identity \
+	-p margaret_peer_identity_tests \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
 	-p margaret_spiffe_svid_manager \
@@ -46,6 +49,7 @@ coverage: node_modules
 		--gated margaret_generated_module=100 \
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \
+		--gated margaret_http_tests=100 \
 		--gated margaret_http_validation=100 \
 		--gated margaret_identity=100 \
 		--gated margaret_identity_session=100 \
@@ -53,6 +57,8 @@ coverage: node_modules
 		--gated margaret_jwks_key_gen=100 \
 		--gated margaret_jwks_key_gen_tests=100 \
 		--gated margaret_macros=100 \
+		--gated margaret_peer_identity=100 \
+		--gated margaret_peer_identity_tests=100 \
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
@@ -68,13 +74,3 @@ fmt:
 .PHONY: test
 test:
 	cargo nextest run --workspace
-
-.PHONY: bench-http
-bench-http:
-	cargo build --release -p margaret_example
-	@addr=127.0.0.1:8079; \
-	target/release/margaret_example serve --public-addr $$addr --internal-addr 127.0.0.1:8078 & \
-	server=$$!; \
-	until curl -sf "http://$$addr/health" >/dev/null 2>&1; do :; done; \
-	wrk -t4 -c64 -d10s "http://$$addr/health"; \
-	kill $$server

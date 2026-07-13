@@ -32,6 +32,7 @@ mod tests {
     use crate::body_limit::BodyLimit;
     use crate::router_builder::RouterBuilder;
     use crate::server::Server;
+    use crate::transport_config::TransportConfig;
     use crate::upload_config::UploadConfig;
 
     fn registry() -> ServerRegistry {
@@ -39,6 +40,7 @@ mod tests {
             "public",
             "127.0.0.1:8080".to_string(),
             "https://example.test",
+            TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
             RouterBuilder::empty().build(),
