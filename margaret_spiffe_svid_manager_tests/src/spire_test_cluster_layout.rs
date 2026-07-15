@@ -6,6 +6,9 @@ use anyhow::Result;
 use crate::parse_join_token::parse_join_token;
 use crate::run_spire_command::run_spire_command;
 
+const AGENT_ENTRY_SYNC_INTERVAL: &str = "100ms";
+const SERVER_ENTRY_CACHE_RELOAD_INTERVAL: &str = "100ms";
+
 pub struct SpireTestClusterLayout {
     pub agent_conf_path: PathBuf,
     pub agent_data_dir: PathBuf,
@@ -19,7 +22,6 @@ pub struct SpireTestClusterLayout {
 }
 
 impl SpireTestClusterLayout {
-    #[must_use]
     pub fn new(data_dir: &Path, trust_domain: &str, server_port: u16) -> Self {
         Self {
             agent_conf_path: data_dir.join("agent.conf"),
@@ -34,88 +36,6 @@ impl SpireTestClusterLayout {
         }
     }
 
-    pub async fn prepare_data_dirs(&self) -> Result<()> {
-        tokio::fs::create_dir_all(&self.server_data_dir).await?;
-        tokio::fs::create_dir_all(&self.agent_data_dir).await?;
-
-        Ok(())
-    }
-
-    #[must_use]
-    pub fn render_server_config(&self) -> String {
-        format!(
-            r#"server {{
-    bind_address = "127.0.0.1"
-    bind_port = "{bind_port}"
-    socket_path = "{socket_path}"
-    trust_domain = "{trust_domain}"
-    data_dir = "{data_dir}"
-    log_level = "ERROR"
-    ca_ttl = "10m"
-    default_x509_svid_ttl = "5m"
-}}
-
-plugins {{
-    DataStore "sql" {{
-        plugin_data {{
-            database_type = "sqlite3"
-            connection_string = "{data_dir}/datastore.sqlite3"
-        }}
-    }}
-
-    KeyManager "memory" {{
-        plugin_data {{}}
-    }}
-
-    NodeAttestor "join_token" {{
-        plugin_data {{}}
-    }}
-}}
-"#,
-            bind_port = self.server_port,
-            socket_path = self.server_socket_path.display(),
-            trust_domain = self.trust_domain,
-            data_dir = self.server_data_dir.display(),
-        )
-    }
-
-    #[must_use]
-    pub fn render_agent_config(&self) -> String {
-        format!(
-            r#"agent {{
-    data_dir = "{data_dir}"
-    log_level = "ERROR"
-    server_address = "127.0.0.1"
-    server_port = {server_port}
-    socket_path = "{socket_path}"
-    trust_bundle_path = "{trust_bundle_path}"
-    trust_domain = "{trust_domain}"
-}}
-
-plugins {{
-    KeyManager "memory" {{
-        plugin_data {{}}
-    }}
-
-    NodeAttestor "join_token" {{
-        plugin_data {{}}
-    }}
-
-    WorkloadAttestor "unix" {{
-        plugin_data {{
-            discover_workload_path = true
-        }}
-    }}
-}}
-"#,
-            data_dir = self.agent_data_dir.display(),
-            server_port = self.server_port,
-            socket_path = self.agent_socket_path.display(),
-            trust_bundle_path = self.trust_bundle_path.display(),
-            trust_domain = self.trust_domain,
-        )
-    }
-
     pub async fn obtain_join_token(&self, server_binary_path: &Path) -> Result<String> {
         let output = run_spire_command(
             server_binary_path,
@@ -125,6 +45,8 @@ plugins {{
                 "generate",
                 "-spiffeID",
                 &format!("spiffe://{}/agent", self.trust_domain),
+                "-output",
+                "json",
             ],
         )
         .await?;
@@ -143,6 +65,13 @@ plugins {{
         tokio::fs::write(&self.trust_bundle_path, &trust_bundle).await?;
 
         Ok(trust_bundle)
+    }
+
+    pub async fn prepare_data_dirs(&self) -> Result<()> {
+        tokio::fs::create_dir_all(&self.server_data_dir).await?;
+        tokio::fs::create_dir_all(&self.agent_data_dir).await?;
+
+        Ok(())
     }
 
     pub async fn register_workload_entry(&self, server_binary_path: &Path) -> Result<()> {
@@ -165,6 +94,89 @@ plugins {{
         .await?;
 
         Ok(())
+    }
+
+    pub fn render_agent_config(&self) -> String {
+        format!(
+            r#"agent {{
+    data_dir = "{data_dir}"
+    log_level = "ERROR"
+    server_address = "127.0.0.1"
+    server_port = {server_port}
+    socket_path = "{socket_path}"
+    trust_bundle_path = "{trust_bundle_path}"
+    trust_domain = "{trust_domain}"
+
+    experimental {{
+        sync_interval = "{sync_interval}"
+    }}
+}}
+
+plugins {{
+    KeyManager "memory" {{
+        plugin_data {{}}
+    }}
+
+    NodeAttestor "join_token" {{
+        plugin_data {{}}
+    }}
+
+    WorkloadAttestor "unix" {{
+        plugin_data {{
+            discover_workload_path = true
+        }}
+    }}
+}}
+"#,
+            data_dir = self.agent_data_dir.display(),
+            server_port = self.server_port,
+            socket_path = self.agent_socket_path.display(),
+            sync_interval = AGENT_ENTRY_SYNC_INTERVAL,
+            trust_bundle_path = self.trust_bundle_path.display(),
+            trust_domain = self.trust_domain,
+        )
+    }
+
+    pub fn render_server_config(&self) -> String {
+        format!(
+            r#"server {{
+    bind_address = "127.0.0.1"
+    bind_port = "{bind_port}"
+    socket_path = "{socket_path}"
+    trust_domain = "{trust_domain}"
+    data_dir = "{data_dir}"
+    log_level = "ERROR"
+    ca_ttl = "10m"
+    default_x509_svid_ttl = "5m"
+
+    experimental {{
+        cache_reload_interval = "{cache_reload_interval}"
+    }}
+}}
+
+plugins {{
+    DataStore "sql" {{
+        plugin_data {{
+            database_type = "sqlite3"
+            connection_string = "{data_dir}/datastore.sqlite3"
+        }}
+    }}
+
+    KeyManager "memory" {{
+        plugin_data {{}}
+    }}
+
+    NodeAttestor "join_token" {{
+        plugin_data {{}}
+    }}
+}}
+"#,
+            bind_port = self.server_port,
+            cache_reload_interval = SERVER_ENTRY_CACHE_RELOAD_INTERVAL,
+            socket_path = self.server_socket_path.display(),
+            trust_domain = self.trust_domain,
+            data_dir = self.server_data_dir.display(),
+        )
     }
 }
 

@@ -1,11 +1,15 @@
+use std::collections::BTreeMap;
+
 use quote::format_ident;
 use syn::Type;
 
 use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
-use margaret_attributes::type_leaf_ident::type_leaf_ident;
+use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::marker::marker;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
@@ -19,6 +23,8 @@ use crate::console_command_arguments::ConsoleCommandArguments;
 use crate::optional_parameter::OptionalParameter;
 
 fn command_arguments(
+    index: &AttributeIndex,
+    item: &IndexedItem,
     runner: &IndexedMethod,
     argument_selector: &AttributeSelector,
     command: &str,
@@ -32,7 +38,7 @@ fn command_arguments(
         ..
     } in parameters(runner.signature())
     {
-        if is_cancellation_token(declared) {
+        if is_cancellation_token(index, item, declared) {
             continue;
         }
 
@@ -47,14 +53,19 @@ fn command_arguments(
         let ConsoleArgumentArguments { from } =
             ConsoleArgumentArguments::parse(&attribute_arguments, command, position)?;
 
-        arguments.push(console_argument(from, declared));
+        arguments.push(console_argument(index, item, from, declared));
     }
 
     Ok(arguments)
 }
 
-fn console_argument(from: String, declared: &Type) -> ConsoleArgument {
-    if is_bool(declared) {
+fn console_argument(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    from: String,
+    declared: &Type,
+) -> ConsoleArgument {
+    if is_bool(index, item, declared) {
         return ConsoleArgument::Flag { name: from };
     }
 
@@ -78,18 +89,14 @@ fn console_argument(from: String, declared: &Type) -> ConsoleArgument {
     }
 }
 
-fn is_bool(declared: &Type) -> bool {
-    matches!(declared, Type::Path(type_path) if type_path.path.is_ident("bool"))
+fn is_bool(index: &AttributeIndex, item: &IndexedItem, declared: &Type) -> bool {
+    index.resolve_item_type(item, declared) == Some(CanonicalPath::new(vec!["bool".to_string()]))
 }
 
-fn is_cancellation_token(declared: &Type) -> bool {
-    type_leaf_ident(declared).is_some_and(|ident| ident == "CancellationToken")
-}
-
-fn runner_takes_token(runner: &IndexedMethod) -> bool {
+fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, runner: &IndexedMethod) -> bool {
     parameters(runner.signature())
         .iter()
-        .any(|view| is_cancellation_token(view.declared))
+        .any(|view| is_cancellation_token(index, item, view.declared))
 }
 
 pub(crate) fn console_commands(
@@ -97,7 +104,7 @@ pub(crate) fn console_commands(
 ) -> Result<Vec<ConsoleCommand>, ConsoleCodegenError> {
     let command_selector = AttributeSelector::parse("console_command").expect("a valid selector");
     let argument_selector = AttributeSelector::parse("console_argument").expect("a valid selector");
-    let mut commands = Vec::new();
+    let mut commands: BTreeMap<String, ConsoleCommand> = BTreeMap::new();
 
     for matched in index.select(&command_selector) {
         let item = matched.item();
@@ -113,16 +120,28 @@ pub(crate) fn console_commands(
             ConsoleCommandArguments::parse(matched.args()?, &command)?;
         let accessor = format_ident!("{}", index.field_name(item.canonical_path()));
         let runner = process_method(item)?;
-        let arguments = command_arguments(runner, &argument_selector, &command)?;
+        let arguments = command_arguments(index, item, runner, &argument_selector, &command)?;
 
-        commands.push(ConsoleCommand {
-            accessor,
-            arguments,
-            description,
-            name,
-            takes_token: runner_takes_token(runner),
-        });
+        let existing = commands.insert(
+            name.clone(),
+            ConsoleCommand {
+                accessor,
+                arguments,
+                command_path: command.clone(),
+                description,
+                name: name.clone(),
+                takes_token: runner_takes_token(index, item, runner),
+            },
+        );
+
+        if let Some(existing) = existing {
+            return Err(ConsoleCodegenError::DuplicateCommandName {
+                command,
+                existing_command: existing.command_path,
+                name,
+            });
+        }
     }
 
-    Ok(commands)
+    Ok(commands.into_values().collect())
 }

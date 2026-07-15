@@ -84,7 +84,12 @@ fn command_arm(command: &ConsoleCommand) -> TokenStream {
     if command.takes_token {
         quote! {
             Some((#name, #matches_binding)) => {
-                let cancellation_token = margaret_service::install::install();
+                let cancellation_token = match margaret_service::install::install() {
+                    Ok(cancellation_token) => cancellation_token,
+                    Err(error) => {
+                        return margaret_console::report_failure::report_failure(error);
+                    }
+                };
 
                 #accessor_access.run(#(#values,)* cancellation_token).await
             }
@@ -145,7 +150,7 @@ pub(crate) fn render(
 
             quote! {
                 .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
-                .arg(clap::Arg::new(#url_argument).long(#url_argument).required(false))
+                .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
                 .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
                 .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
                 #transport_argument
@@ -168,9 +173,14 @@ pub(crate) fn render(
     let serve_arm = if serves {
         quote! {
             Some(("serve", matches)) => {
-                let cancellation_token = margaret_service::install::install();
+                let cancellation_token = match margaret_service::install::install() {
+                    Ok(cancellation_token) => cancellation_token,
+                    Err(error) => {
+                        return margaret_console::report_failure::report_failure(error);
+                    }
+                };
 
-                super::services::serve(container, matches, cancellation_token).await
+                super::serve::serve(container, matches, cancellation_token).await
             }
         }
     } else {
@@ -188,18 +198,12 @@ pub(crate) fn render(
         {
             let mut command = clap::Command::new(env!("CARGO_PKG_NAME"))
                 #(#subcommands)*
-                #serve_registration
-                .subcommand(clap::Command::new("identity"));
+                #serve_registration;
 
             match command.try_get_matches_from_mut(args) {
                 Ok(matches) => match matches.subcommand() {
                     #(#arms)*
                     #serve_arm
-                    Some(("identity", _matches)) => {
-                        let cancellation_token = margaret_service::install::install();
-
-                        margaret_identity::run::run(cancellation_token).await
-                    }
                     _ => margaret_console::print_help::print_help(&mut command),
                 },
                 Err(error) => {

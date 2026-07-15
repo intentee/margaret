@@ -5,7 +5,7 @@ use spiffe::X509Context;
 
 use margaret_spiffe_svid_manager::extract_ca_bundle::extract_ca_bundle;
 use margaret_spiffe_svid_manager_tests::build_workload_svid::build_workload_svid;
-use margaret_spiffe_svid_manager_tests::test_fixtures::CA_DER;
+use margaret_spiffe_svid_manager_tests::ca_der::CA_DER;
 
 #[test]
 fn extracts_ca_certs_from_x509_context() {

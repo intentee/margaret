@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use anyhow::anyhow;
 use async_trait::async_trait;
 use rustls::RootCertStore;
 use rustls::server::WebPkiClientVerifier;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 
+use crate::svid_error::SvidError;
 use crate::root_cert_store_holder::RootCertStoreHolder;
 use crate::svid_client_cert_verifier::SvidClientCertVerifier;
 
@@ -24,7 +24,7 @@ impl SvidClientCertVerifierService {
         if let Some(root_store) = root_cert_store {
             let verifier = WebPkiClientVerifier::builder(Arc::new(root_store))
                 .build()
-                .map_err(|err| anyhow!("Failed to build client verifier: {err:#?}"))?;
+                .map_err(|source| SvidError::ClientVerifier { source })?;
 
             self.svid_client_cert_verifier
                 .update_internal_verifier(verifier);

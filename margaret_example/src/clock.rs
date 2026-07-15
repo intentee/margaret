@@ -1,3 +1,5 @@
+use std::time::SystemTimeError;
+
 pub trait Clock: Send + Sync {
-    fn now(&self) -> u64;
+    fn now(&self) -> Result<u64, SystemTimeError>;
 }

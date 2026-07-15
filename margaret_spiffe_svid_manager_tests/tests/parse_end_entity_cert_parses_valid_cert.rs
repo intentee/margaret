@@ -1,7 +1,7 @@
 use rustls::pki_types::CertificateDer;
 
 use margaret_spiffe_svid_manager::parse_end_entity_cert::parse_end_entity_cert;
-use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
+use margaret_spiffe_svid_manager_tests::leaf_spiffe_example_org_server_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
 
 #[test]
 fn parses_valid_cert() {

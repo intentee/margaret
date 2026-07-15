@@ -81,8 +81,9 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use margaret_generated_module::generated_module::GeneratedModule;
     use tempfile::tempdir;
+
+    use margaret_generated_module::generated_module::GeneratedModule;
 
     use super::GeneratedCode;
     use super::remove_stale_sources;

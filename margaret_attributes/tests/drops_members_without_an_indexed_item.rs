@@ -24,4 +24,11 @@ fn drops_members_without_an_indexed_item() {
             .flat_map(|item| item.methods())
             .any(|method| method.identifier() == "orphaned_method")
     );
+    assert!(
+        !index
+            .items()
+            .iter()
+            .flat_map(|item| item.methods())
+            .any(|method| method.identifier() == "skipped_imported_method")
+    );
 }

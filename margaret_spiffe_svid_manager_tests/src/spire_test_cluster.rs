@@ -75,6 +75,8 @@ impl SpireTestCluster {
         layout.obtain_trust_bundle(&server_binary_path).await?;
         let join_token = layout.obtain_join_token(&server_binary_path).await?;
 
+        layout.register_workload_entry(&server_binary_path).await?;
+
         write_spire_config(&layout.agent_conf_path, layout.render_agent_config()).await?;
 
         let agent_run_args: [&OsStr; 5] = [
@@ -88,8 +90,6 @@ impl SpireTestCluster {
 
         wait_until_unix_socket_ready(&layout.agent_socket_path, agent_socket_readiness_timeout)
             .await?;
-
-        layout.register_workload_entry(&server_binary_path).await?;
 
         wait_until_workload_api_ready(&layout.agent_socket_path, workload_api_readiness_timeout)
             .await?;

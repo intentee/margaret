@@ -9,7 +9,7 @@ use margaret_jwks_key_gen::key_type::KeyType;
 use margaret_jwks_key_gen::key_use::KeyUse;
 use margaret_jwks_key_gen::signs_claims::SignsClaims;
 use margaret_jwks_key_gen::verifies_token::VerifiesToken;
-use margaret_jwks_key_gen_tests::test_claims::FAR_FUTURE_EXPIRY;
+use margaret_jwks_key_gen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_key_gen_tests::test_claims::TestClaims;
 
 #[tokio::test]

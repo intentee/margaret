@@ -13,7 +13,9 @@ use margaret_http::handler::Handler;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
-use margaret_http::router_builder::RouterBuilder;
+use margaret_http::method_handler::MethodHandler;
+use margaret_http::route_entry::RouteEntry;
+use margaret_http::router::Router;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
 use margaret_http::transport_config::TransportConfig;
@@ -34,14 +36,20 @@ async fn exchange(
     upload_config: UploadConfig,
     close_write: bool,
 ) -> String {
-    let router = RouterBuilder::empty()
-        .route("POST", "/submit", Arc::new(Accepts))
-        .route("QUERY", "/search", Arc::new(Accepts))
-        .build();
+    let router = Router::build(vec![
+        RouteEntry::new(
+            "/submit",
+            vec![MethodHandler::new("POST", Arc::new(Accepts))],
+        ),
+        RouteEntry::new(
+            "/search",
+            vec![MethodHandler::new("QUERY", Arc::new(Accepts))],
+        ),
+    ])
+    .expect("the route entries register cleanly");
     let server_registry = Arc::new(ServerRegistry::new(vec![Server::new(
         "public",
         "127.0.0.1:0".to_string(),
-        "http://127.0.0.1",
         TransportConfig::Plain,
         upload_config,
         body_limit,
@@ -51,7 +59,7 @@ async fn exchange(
     let bound = BoundServer::bind(server_registry, forward_targets, Arc::from("public"))
         .await
         .expect("the server binds");
-    let address = bound.local_addr();
+    let address = bound.local_addr().expect("the bound listener reports its address");
     let cancellation_token = CancellationToken::new();
     let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 

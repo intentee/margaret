@@ -11,12 +11,12 @@ use crate::render_routes::render_routes;
 
 pub fn render_http(index: &AttributeIndex) -> Result<HttpArtifacts, HttpCodegenError> {
     let middleware_plans = middleware_plans(index)?;
-    let routes = http_routes(index, &middleware_plans)?;
-    let servers = active_servers(&routes);
-    let mut modules = render(&routes, &servers, &middleware_plans, index);
+    let table = http_routes(index, &middleware_plans)?;
+    let servers = active_servers(&table);
+    let mut modules = render(&table, &servers, &middleware_plans, index);
 
-    modules.extend(render_routes(&routes, &servers));
-    modules.extend(render_forwarders(&routes, &servers));
+    modules.extend(render_routes(&table, &servers));
+    modules.extend(render_forwarders(&table, &servers));
 
     Ok(HttpArtifacts::new(modules, servers))
 }

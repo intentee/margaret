@@ -11,6 +11,8 @@ margaret_spiffe_svid_manager = { path = "../margaret_spiffe_svid_manager" }
 margaret_sync_holder = { path = "../margaret_sync_holder" }
 reqwest = { workspace = true }
 rustls = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 spiffe = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }

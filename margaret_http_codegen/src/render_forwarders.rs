@@ -4,38 +4,14 @@ use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
-use crate::http_route::HttpRoute;
+use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
-use crate::path_parameter_names::path_parameter_names;
+use crate::named_route::NamedRoute;
 
-fn route_name(route: &HttpRoute) -> &str {
-    route
-        .name
-        .as_deref()
-        .expect("only named routes reach the forwarders module")
-}
-
-fn forwardable_routes_for<'route>(
-    routes: &'route [HttpRoute],
-    server: &HttpServer,
-) -> Vec<&'route HttpRoute> {
-    let mut forwardable: Vec<&HttpRoute> = routes
-        .iter()
-        .filter(|route| {
-            route.server == server.name() && route.name.is_some() && route.method == "GET"
-        })
-        .collect();
-
-    forwardable.sort_by(|first, second| route_name(first).cmp(route_name(second)));
-
-    forwardable
-}
-
-fn forward_method(route: &HttpRoute) -> TokenStream {
-    let method = format_ident!("{}", route_name(route));
-    let name = route_name(route);
-    let placeholders = path_parameter_names(&route.path)
-        .expect("the route path was validated during http codegen");
+fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
+    let method = format_ident!("{}", named.name);
+    let name = named.name;
+    let placeholders: Vec<&str> = named.path.parameters().collect();
     let parameters = placeholders.iter().map(|placeholder| {
         let parameter = format_ident!("{}", placeholder);
 
@@ -60,10 +36,13 @@ fn forward_method(route: &HttpRoute) -> TokenStream {
     }
 }
 
-fn server_forwarder(routes: &[HttpRoute], server: &HttpServer) -> TokenStream {
-    let methods = forwardable_routes_for(routes, server)
-        .into_iter()
-        .map(forward_method);
+fn server_forwarder(table: &HttpRouteTable, server: &HttpServer) -> TokenStream {
+    let methods: Vec<TokenStream> = table
+        .named_routes(server.name())
+        .iter()
+        .filter(|named| named.route.method == "GET")
+        .map(forward_method)
+        .collect();
 
     quote! {
         pub struct Forwarder;
@@ -75,7 +54,7 @@ fn server_forwarder(routes: &[HttpRoute], server: &HttpServer) -> TokenStream {
 }
 
 pub(crate) fn render_forwarders(
-    routes: &[HttpRoute],
+    table: &HttpRouteTable,
     servers: &[HttpServer],
 ) -> Vec<GeneratedModuleTokens> {
     let server_declarations = servers.iter().map(|server| {
@@ -95,7 +74,7 @@ pub(crate) fn render_forwarders(
     for server in servers {
         modules.push(GeneratedModuleTokens::new(
             format!("forwarders/{}", server.name()),
-            server_forwarder(routes, server),
+            server_forwarder(table, server),
         ));
     }
 

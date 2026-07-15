@@ -46,12 +46,12 @@ impl Request {
         }
     }
 
-    pub fn peer_identity(&self) -> &PeerIdentity {
-        &self.peer_identity
-    }
-
     pub fn path_param(&self, name: &str) -> Option<&str> {
         self.path_params.get(name).map(String::as_str)
+    }
+
+    pub fn peer_identity(&self) -> &PeerIdentity {
+        &self.peer_identity
     }
 }
 

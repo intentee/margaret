@@ -37,26 +37,8 @@ pub enum ContainerError {
     #[error("the provided interface '{written}' of singleton '{singleton}' matches no trait")]
     ProvidesUnresolvable { singleton: String, written: String },
 
-    #[error(
-        "the provided interface '{written}' of singleton '{singleton}' is ambiguous: {candidates}"
-    )]
-    ProvidesAmbiguous {
-        singleton: String,
-        written: String,
-        candidates: String,
-    },
-
     #[error("the collection trait '{written}' of singleton '{singleton}' matches no trait")]
     CollectionUnresolvable { singleton: String, written: String },
-
-    #[error(
-        "the collection trait '{written}' of singleton '{singleton}' is ambiguous: {candidates}"
-    )]
-    CollectionAmbiguous {
-        singleton: String,
-        written: String,
-        candidates: String,
-    },
 
     #[error(
         "parameter '{parameter}' of singleton '{singleton}' has an unsupported type '{written}'"
@@ -74,16 +56,6 @@ pub enum ContainerError {
         singleton: String,
         parameter: String,
         written: String,
-    },
-
-    #[error(
-        "parameter '{parameter}' of singleton '{singleton}' depends on '{written}', which is ambiguous: {candidates}"
-    )]
-    AmbiguousReference {
-        singleton: String,
-        parameter: String,
-        written: String,
-        candidates: String,
     },
 
     #[error("dependency cycle detected: {path}")]

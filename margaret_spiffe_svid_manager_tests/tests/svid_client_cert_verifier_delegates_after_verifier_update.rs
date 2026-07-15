@@ -5,7 +5,7 @@ use rustls::server::danger::ClientCertVerifier as _;
 use margaret_spiffe_svid_manager::svid_client_cert_verifier::SvidClientCertVerifier;
 use margaret_spiffe_svid_manager_tests::build_webpki_client_verifier::build_webpki_client_verifier;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
-use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
+use margaret_spiffe_svid_manager_tests::leaf_spiffe_example_org_client_der::LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER;
 
 #[test]
 fn delegates_after_verifier_update() {

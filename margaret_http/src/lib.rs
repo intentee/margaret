@@ -1,3 +1,5 @@
+pub use matchit;
+
 pub(crate) mod body_class;
 pub mod body_limit;
 pub mod bound_server;
@@ -13,6 +15,7 @@ pub mod header;
 pub mod http_middleware;
 pub mod http_route_parameter_binder;
 pub mod layer;
+pub mod method_handler;
 pub(crate) mod multipart_body;
 pub mod named_handler;
 pub mod next;
@@ -28,9 +31,9 @@ pub mod respond_recursively;
 pub mod responder_handler;
 pub mod response;
 pub mod response_continuation;
+pub mod route_entry;
 pub mod route_reference;
 pub mod router;
-pub mod router_builder;
 pub mod server;
 pub mod server_params;
 pub mod server_registry;

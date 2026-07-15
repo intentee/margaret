@@ -124,6 +124,27 @@ pub enum HttpCodegenError {
     },
 
     #[error(
+        "responder '{responder}' registers route path '{path}' on server '{server}', which conflicts with the already registered route path '{conflicting_path}'"
+    )]
+    ConflictingRoutePaths {
+        conflicting_path: String,
+        path: String,
+        responder: String,
+        server: String,
+    },
+
+    #[error(
+        "responder '{responder}' registers '{method} {path}' on server '{server}', which is already registered by responder '{existing_responder}'"
+    )]
+    DuplicateRoute {
+        existing_responder: String,
+        method: String,
+        path: String,
+        responder: String,
+        server: String,
+    },
+
+    #[error(
         "#[provides_route_parameter] '{binder}' has no `type Model = <struct>` associated type that resolves to a known model"
     )]
     HttpRouteParameterBinderModel { binder: String },

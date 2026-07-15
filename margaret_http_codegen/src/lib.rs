@@ -6,8 +6,10 @@ pub mod generate_http_source;
 pub mod has_responders;
 pub mod http_artifacts;
 pub mod http_codegen_error;
+mod http_injectable;
 mod http_responder_arguments;
 mod http_route;
+mod http_route_table;
 mod http_routes;
 pub mod http_server;
 mod layer_application;
@@ -15,8 +17,7 @@ mod middleware_argument;
 mod middleware_attribute_arguments;
 mod middleware_plan;
 mod middleware_plans;
-mod path_parameter_names;
-mod registries;
+mod named_route;
 mod render;
 mod render_forwarders;
 pub mod render_http;
@@ -26,8 +27,11 @@ mod responder_argument;
 mod responder_argument_binding;
 mod responder_method;
 mod responder_selectors;
+mod route_group;
 mod route_parameter_arguments;
+mod route_path;
 mod route_url_template;
+mod server_route_group;
 pub mod server_transport_policy;
 pub mod serves_spiffe;
 mod url_segment;
@@ -47,6 +51,9 @@ mod tests {
     use crate::has_responders::has_responders;
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"
+use margaret_http::next::Next;
+use margaret_http::request::Request;
+
 #[responds_to_http(method = "get", path = "/resource", server = "public")]
 #[middleware(traced)]
 #[middleware(guard)]
@@ -133,6 +140,8 @@ impl GetUser {
 "#;
 
     const CURRENT_REQUEST: &str = r#"
+use margaret_http::request::Request;
+
 #[responds_to_http(method = "get", path = "/echo/{id}", server = "public")]
 struct Echo;
 
@@ -280,7 +289,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn injects_the_routes_reference_into_a_responder_by_type() {
         let source = source_for(
-            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, routes: &Routes) -> Response {}\n}\n",
+            "use crate::margaret::routes::Routes;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, routes: &Routes) -> Response {}\n}\n",
         );
 
         assert!(source.contains("&::std::sync::Arc<super::super::routes::Routes>"));
@@ -291,7 +300,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn injects_the_peer_spiffe_id_into_a_responder_by_type() {
         let source = source_for(
-            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, peer: &SpiffeId) -> Response {}\n}\n",
+            "use spiffe::spiffe_id::SpiffeId;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, peer: &SpiffeId) -> Response {}\n}\n",
         );
 
         assert!(source.contains("margaret_http::require_peer_spiffe_id::require_peer_spiffe_id("));
@@ -300,16 +309,34 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn injects_the_scoped_forwarder_into_a_responder_by_type() {
         let source = source_for(
-            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> Forward {}\n}\n",
+            "use crate::margaret::forwarders::public::Forwarder;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> Forward {}\n}\n",
         );
 
         assert!(source.contains("responder.respond(super::super::forwarders::public::Forwarder)"));
     }
 
     #[test]
+    fn rejects_a_user_type_named_routes_that_shadows_the_injectable() {
+        let message = error_for(
+            "mod app {\n    pub struct Routes;\n}\n\nuse crate::app::Routes;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, routes: &Routes) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("must be a route parameter"));
+    }
+
+    #[test]
+    fn rejects_a_forwarder_imported_from_a_foreign_server() {
+        let message = error_for(
+            "use crate::margaret::forwarders::public::Forwarder;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("must be a route parameter"));
+    }
+
+    #[test]
     fn rejects_a_peer_spiffe_id_parameter_that_also_carries_a_marker() {
         let message = error_for(
-            "#[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] peer: &SpiffeId) -> Response {}\n}\n",
+            "use spiffe::spiffe_id::SpiffeId;\n\n#[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] peer: &SpiffeId) -> Response {}\n}\n",
         );
 
         assert!(message.contains("peer SPIFFE id and must not"));
@@ -318,7 +345,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn rejects_a_responder_with_multiple_peer_spiffe_id_parameters() {
         let message = error_for(
-            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, first: &SpiffeId, second: &SpiffeId) -> Response {}\n}\n",
+            "use spiffe::spiffe_id::SpiffeId;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, first: &SpiffeId, second: &SpiffeId) -> Response {}\n}\n",
         );
 
         assert!(message.contains("more than one peer SPIFFE id"));
@@ -331,6 +358,44 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         );
 
         assert!(message.contains("must be a snake_case identifier"));
+    }
+
+    #[test]
+    fn rejects_route_paths_that_conflict_on_the_same_server() {
+        let message = error_for(
+            "#[responds_to_http(method = \"get\", path = \"/articles/{article}\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/articles/{id}\", server = \"public\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("conflicts with"));
+    }
+
+    #[test]
+    fn rejects_two_responders_registering_the_same_method_and_path() {
+        let message = error_for(
+            "#[responds_to_http(method = \"get\", path = \"/articles\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/articles\", server = \"public\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("already registered"));
+    }
+
+    #[test]
+    fn accepts_the_same_route_path_with_different_methods() {
+        let source = source_for(
+            "#[responds_to_http(method = \"get\", path = \"/articles/{article}\", server = \"public\")]\nstruct Read;\nimpl Read {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[responds_to_http(method = \"delete\", path = \"/articles/{article}\", server = \"public\")]\nstruct Remove;\nimpl Remove {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("\"GET\""));
+        assert!(source.contains("\"DELETE\""));
+    }
+
+    #[test]
+    fn accepts_the_same_route_path_on_different_servers() {
+        let source = source_for(
+            "#[responds_to_http(method = \"get\", path = \"/articles/{article}\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/articles/{id}\", server = \"internal\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("\"/articles/{article}\""));
+        assert!(source.contains("\"/articles/{id}\""));
     }
 
     #[test]
@@ -348,10 +413,10 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         ));
         assert!(source.contains("responder.respond().await"));
         assert!(source.contains(
-            "margaret_http::layer::layer(std::sync::Arc::new(super::Guard{inner:container.guard().await,}),margaret_http::responder_handler::responder_handler(container.resource().await"
+            "margaret_http::layer::layer(std::sync::Arc::new(super::Guard{inner:container.guard().await}),margaret_http::responder_handler::responder_handler(container.resource().await"
         ));
         assert!(source.contains(
-            "margaret_http::layer::layer(std::sync::Arc::new(super::Tracer{inner:container.tracer().await,}),margaret_http::layer::layer(std::sync::Arc::new(super::Guard{"
+            "margaret_http::layer::layer(std::sync::Arc::new(super::Tracer{inner:container.tracer().await}),margaret_http::layer::layer(std::sync::Arc::new(super::Guard{"
         ));
 
         let guard = source.find("container.guard").expect("the guard is wired");
@@ -374,7 +439,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn injects_the_routes_reference_into_a_middleware_process_method() {
         let source = source_for(
-            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, request: &Request, next: Next, routes: &Routes) -> ResponseContinuation {}\n}\n",
+            "use crate::margaret::routes::Routes;\nuse margaret_http::next::Next;\nuse margaret_http::request::Request;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, request: &Request, next: Next, routes: &Routes) -> ResponseContinuation {}\n}\n",
         );
 
         assert!(source.contains(
@@ -382,7 +447,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         ));
         assert!(source.contains("self.inner.process(request,next,&self.routes).await"));
         assert!(source.contains(
-            "std::sync::Arc::new(super::Tracer{inner:container.tracer().await,routes:routes.clone(),})"
+            "std::sync::Arc::new(super::Tracer{inner:container.tracer().await,routes:routes.clone()"
         ));
     }
 
@@ -418,7 +483,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn binds_a_current_request_parameter_under_a_custom_name() {
         let source = source_for(
-            "#[responds_to_http(method = \"get\", path = \"/echo\", server = \"public\")]\nstruct Echo;\n\nimpl Echo {\n    #[process]\n    fn respond(&self, incoming: &Request) -> Response {}\n}\n",
+            "use margaret_http::request::Request;\n\n#[responds_to_http(method = \"get\", path = \"/echo\", server = \"public\")]\nstruct Echo;\n\nimpl Echo {\n    #[process]\n    fn respond(&self, incoming: &Request) -> Response {}\n}\n",
         );
 
         assert!(source.contains("letincoming=request;"));
@@ -485,6 +550,15 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     fn reports_a_binder_with_a_non_struct_model() {
         let message = error_for(
             "#[provides_route_parameter]\nstruct UnitBinder;\nimpl HttpRouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> Option<()> {}\n}\n",
+        );
+
+        assert!(message.contains("type Model"));
+    }
+
+    #[test]
+    fn reports_a_binder_whose_model_resolves_to_a_non_struct() {
+        let message = error_for(
+            "trait Marker {}\n\n#[provides_route_parameter]\nstruct MarkerBinder;\nimpl HttpRouteParameterBinder for MarkerBinder {\n    type Model = Marker;\n    async fn bind(&self, value: String) -> Option<Marker> {}\n}\n",
         );
 
         assert!(message.contains("type Model"));
@@ -626,7 +700,9 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "#[responds_to_http(method = \"query\", path = \"/search\", server = \"public\")]\nstruct Search;\nimpl Search {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
-        assert!(source.contains(".route(\"QUERY\",\"/search\","));
+        assert!(source.contains(
+            "margaret_http::route_entry::RouteEntry::new(\"/search\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"QUERY\","
+        ));
     }
 
     #[test]
@@ -751,7 +827,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains(".route(\"GET\",\"/open\","));
+        assert!(source.contains("margaret_http::route_entry::RouteEntry::new(\"/open\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"GET\","));
     }
 
     const NAMED_ROUTE: &str = r#"
@@ -775,7 +851,7 @@ impl GetGreeting {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains(".route(\"GET\",\"/greeting\","));
+        assert!(source.contains("margaret_http::route_entry::RouteEntry::new(\"/greeting\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"GET\","));
         assert!(
             source.contains("margaret_http::named_handler::NamedHandler::new(\"get_greeting\",")
         );
@@ -854,7 +930,7 @@ impl GetGreeting {
     #[test]
     fn omits_the_request_from_a_middleware_that_only_delegates() {
         let source = source_for(
-            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
+            "use margaret_http::next::Next;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
         );
 
         assert!(source.contains(
@@ -866,7 +942,7 @@ impl GetGreeting {
     #[test]
     fn omits_the_next_handler_from_a_short_circuiting_middleware() {
         let source = source_for(
-            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(guard)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, request: &Request) -> ResponseContinuation {}\n}\n",
+            "use margaret_http::request::Request;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(guard)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, request: &Request) -> ResponseContinuation {}\n}\n",
         );
 
         assert!(source.contains(
@@ -878,7 +954,7 @@ impl GetGreeting {
     #[test]
     fn disambiguates_middlewares_that_derive_the_same_wrapper_name() {
         let source = source_for(
-            "#[handles_middleware_attribute(attribute = one)]\nstruct V2;\nimpl V2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n\n#[handles_middleware_attribute(attribute = two)]\nstruct V_2;\nimpl V_2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
+            "use margaret_http::next::Next;\n\n#[handles_middleware_attribute(attribute = one)]\nstruct V2;\nimpl V2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n\n#[handles_middleware_attribute(attribute = two)]\nstruct V_2;\nimpl V_2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
         );
 
         assert!(source.contains("structV2{inner:std::sync::Arc<crate::V2>,}"));
@@ -892,7 +968,7 @@ impl GetGreeting {
         );
 
         assert!(
-            source.contains("margaret_http::response_continuation::ResponseContinuation::from(responder.respond().await,)")
+            source.contains("margaret_http::response_continuation::ResponseContinuation::from(responder.respond().await)")
         );
     }
 
@@ -928,10 +1004,10 @@ impl GetMetrics {
         let source = source_for(MULTIPLE_SERVERS);
 
         assert!(source.contains(
-            "server_public(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->margaret_http::server_routes::ServerRoutes{letrouter=margaret_http::router_builder::RouterBuilder::empty().route(\"GET\",\"/\","
+            "server_public(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret_http::server_routes::ServerRoutes,margaret_http::matchit::InsertError,>{letrouter=margaret_http::router::Router::build(::std::vec![margaret_http::route_entry::RouteEntry::new(\"/\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"GET\","
         ));
         assert!(source.contains(
-            "server_internal(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->margaret_http::server_routes::ServerRoutes{letrouter=margaret_http::router_builder::RouterBuilder::empty().route(\"GET\",\"/metrics\","
+            "server_internal(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret_http::server_routes::ServerRoutes,margaret_http::matchit::InsertError,>{letrouter=margaret_http::router::Router::build(::std::vec![margaret_http::route_entry::RouteEntry::new(\"/metrics\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"GET\","
         ));
     }
 
@@ -947,7 +1023,7 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_form_source() {
         let source = source_for(
-            "#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Form)] data: ValidationResult<Data>) -> Response {}\n}\n",
+            "use margaret_validation::validation_result::ValidationResult;\n\n#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Form)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
         assert!(
@@ -960,7 +1036,7 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_query_source() {
         let source = source_for(
-            "#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = Query)] data: ValidationResult<Data>) -> Response {}\n}\n",
+            "use margaret_validation::validation_result::ValidationResult;\n\n#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = Query)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
         assert!(source.contains("margaret_http_validation::request_input::RequestInput::Query"));
@@ -969,7 +1045,7 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_json_source() {
         let source = source_for(
-            "#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = Json)] data: ValidationResult<Data>) -> Response {}\n}\n",
+            "use margaret_validation::validation_result::ValidationResult;\n\n#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = Json)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
         assert!(source.contains("margaret_http_validation::request_input::RequestInput::Json"));

@@ -23,9 +23,9 @@ pub fn build_x509_context(
 
 #[cfg(test)]
 mod tests {
-    use crate::test_fixtures::CA_DER;
-    use crate::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_DER;
-    use crate::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_KEY_DER;
+    use crate::ca_der::CA_DER;
+    use crate::leaf_spiffe_example_org_workload_der::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_DER;
+    use crate::leaf_spiffe_example_org_workload_key_der::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_KEY_DER;
 
     use super::build_x509_context;
 

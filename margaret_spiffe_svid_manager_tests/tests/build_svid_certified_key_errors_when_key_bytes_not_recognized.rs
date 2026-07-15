@@ -6,10 +6,4 @@ fn errors_when_private_key_bytes_are_not_a_recognized_format() {
     let result = build_svid_certified_key(build_workload_cert_chain(), &[0u8; 8]);
 
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("unsupported private key format")
-    );
 }

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::http_route::HttpRoute;
+use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::responder_argument_binding::ResponderArgumentBinding;
 use crate::server_transport_policy::ServerTransportPolicy;
@@ -12,10 +13,10 @@ fn requires_peer_spiffe_id(route: &HttpRoute) -> bool {
         .any(|argument| matches!(argument.binding, ResponderArgumentBinding::PeerSpiffeId))
 }
 
-pub(crate) fn active_servers(routes: &[HttpRoute]) -> Vec<HttpServer> {
+pub(crate) fn active_servers(table: &HttpRouteTable) -> Vec<HttpServer> {
     let mut policies: BTreeMap<&str, ServerTransportPolicy> = BTreeMap::new();
 
-    for route in routes {
+    for route in table.routes() {
         let policy = policies
             .entry(route.server.as_str())
             .or_insert(ServerTransportPolicy::Negotiable);

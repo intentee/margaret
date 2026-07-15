@@ -1,11 +1,9 @@
-use syn::Type;
-
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::matched_attribute::MatchedAttribute;
-use margaret_attributes::type_leaf_ident::type_leaf_ident;
+use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
@@ -41,7 +39,7 @@ fn build_unit(
     }
 
     let runner = process_method(item)?;
-    let takes_token = runner_takes_token(runner, &path)?;
+    let takes_token = runner_takes_token(index, item, runner, &path)?;
     let kind = match role {
         Role::Service => ServiceKind::Service,
         Role::Ticker => {
@@ -77,14 +75,19 @@ fn has_conflicting_roles(item: &IndexedItem, role: Role) -> bool {
     })
 }
 
-fn runner_takes_token(method: &IndexedMethod, path: &str) -> Result<bool, ServiceCodegenError> {
+fn runner_takes_token(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    method: &IndexedMethod,
+    path: &str,
+) -> Result<bool, ServiceCodegenError> {
     let mut takes_token = false;
 
     for ParameterView {
         declared, position, ..
     } in parameters(method.signature())
     {
-        if is_cancellation_token(declared) {
+        if is_cancellation_token(index, item, declared) {
             takes_token = true;
         } else {
             return Err(ServiceCodegenError::UnexpectedProcessParameter {
@@ -95,10 +98,6 @@ fn runner_takes_token(method: &IndexedMethod, path: &str) -> Result<bool, Servic
     }
 
     Ok(takes_token)
-}
-
-fn is_cancellation_token(declared: &Type) -> bool {
-    type_leaf_ident(declared).is_some_and(|ident| ident == "CancellationToken")
 }
 
 fn selector(name: &str) -> AttributeSelector {

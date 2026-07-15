@@ -10,6 +10,8 @@ use margaret_macros::constructor;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::singleton;
 
+use std::time::SystemTimeError;
+
 use crate::clock::Clock;
 use crate::models::article::Article;
 
@@ -84,7 +86,12 @@ impl ArticleRepository {
         self.articles.get(id).map(|article| article.value().clone())
     }
 
-    pub fn insert(&self, title: String, body: String, author_id: String) -> Article {
+    pub fn insert(
+        &self,
+        title: String,
+        body: String,
+        author_id: String,
+    ) -> Result<Article, SystemTimeError> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed).to_string();
         let article = Article {
             id: id.clone(),
@@ -92,12 +99,12 @@ impl ArticleRepository {
             author_id,
             body,
             published: false,
-            created_at: self.clock.now(),
+            created_at: self.clock.now()?,
         };
 
         self.articles.insert(id, article.clone());
 
-        article
+        Ok(article)
     }
 
     pub fn remove(&self, id: &str) {

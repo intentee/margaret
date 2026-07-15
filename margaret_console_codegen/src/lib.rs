@@ -140,7 +140,7 @@ impl Farewell {
             source.contains(r#"clap::Arg::new("public-addr").long("public-addr").required(true)"#)
         );
         assert!(
-            source.contains(r#"clap::Arg::new("public-url").long("public-url").required(false)"#)
+            source.contains(r#"clap::Arg::new("public-url").long("public-url").required(true)"#)
         );
         assert!(source.contains(
             r#"clap::Arg::new("public-uploads").long("public-uploads").action(clap::ArgAction::SetTrue)"#
@@ -148,7 +148,7 @@ impl Farewell {
         assert!(source.contains(
             r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(false).requires("public-uploads")"#
         ));
-        assert!(source.contains("super::services::serve(container,matches,cancellation_token)"));
+        assert!(source.contains("super::serve::serve(container,matches,cancellation_token)"));
         assert!(source.contains("margaret_service::install::install()"));
     }
 
@@ -194,15 +194,6 @@ impl Farewell {
     }
 
     #[test]
-    fn always_registers_an_identity_command() {
-        let source = source_for("struct App;\n", false);
-
-        assert!(source.contains(r#"clap::Command::new("identity")"#));
-        assert!(source.contains(r#"Some(("identity",_matches))"#));
-        assert!(source.contains("margaret_identity::run::run(cancellation_token).await"));
-    }
-
-    #[test]
     fn registers_one_address_argument_per_active_server() {
         let source: String = render_console(
             &index_for("struct App;\n"),
@@ -245,11 +236,11 @@ impl Farewell {
     #[test]
     fn injects_the_cancellation_token_into_a_command_runner() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[process]\n    fn run(&self, #[console_argument(from = \"target\")] target: String, token: CancellationToken) -> CommandOutcome {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[process]\n    fn run(&self, #[console_argument(from = \"target\")] target: String, token: CancellationToken) -> CommandOutcome {}\n}\n",
             false,
         );
 
-        assert!(source.contains("letcancellation_token=margaret_service::install::install();"));
+        assert!(source.contains("letcancellation_token=matchmargaret_service::install::install()"));
         assert!(source.contains("cancellation_token,).await"));
     }
 
@@ -276,6 +267,15 @@ impl Farewell {
         let message = error_for("#[console_command]\nstruct Bad;\n");
 
         assert!(message.contains("missing the 'name'"));
+    }
+
+    #[test]
+    fn rejects_two_commands_registering_the_same_name() {
+        let message = error_for(
+            "#[console_command(name = \"greet\")]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n\n#[console_command(name = \"greet\")]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+        );
+
+        assert!(message.contains("already registered"));
     }
 
     #[test]

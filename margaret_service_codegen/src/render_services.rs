@@ -86,11 +86,11 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
                 Some(value) => value.clone(),
                 None => return margaret_console::command_outcome::CommandOutcome::Failed,
             };
-            let #origin_variable: ::std::sync::Arc<str> = matches
-                .get_one::<String>(#url_argument)
-                .cloned()
-                .unwrap_or_else(|| ::std::format!("http://{}", #address_variable))
-                .into();
+            let #origin_variable: ::std::sync::Arc<str> =
+                match matches.get_one::<String>(#url_argument) {
+                    Some(value) => value.clone().into(),
+                    None => return margaret_console::command_outcome::CommandOutcome::Failed,
+                };
         }
     });
 
@@ -107,14 +107,19 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
         let upload_dir_argument = server.upload_dir_argument();
         let routes_variable = format_ident!("routes_{}", name);
         let address_variable = format_ident!("address_{}", name);
-        let origin_variable = format_ident!("origin_{}", name);
         let upload_config_variable = format_ident!("upload_config_{}", name);
         let transport_variable = format_ident!("transport_{}", name);
         let forward_targets_variable = format_ident!("forward_targets_{}", name);
         let transport = transport_expression(server, spiffe_secured);
 
         quote! {
-            let #routes_variable = super::http::#function_name::#function_name(container, &routes).await;
+            let #routes_variable = match super::http::#function_name::#function_name(
+                container,
+                &routes,
+            ).await {
+                Ok(server_routes) => server_routes,
+                Err(error) => return margaret_console::report_failure::report_failure(error),
+            };
             let #upload_config_variable = if matches.get_flag(#uploads_argument) {
                 margaret_http::upload_config::UploadConfig::enabled(
                     matches
@@ -133,7 +138,6 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
             server_models.push(margaret_http::server::Server::new(
                 #name,
                 #address_variable,
-                #origin_variable,
                 #transport_variable,
                 #upload_config_variable,
                 margaret_http::body_limit::BodyLimit::default(),
@@ -303,5 +307,5 @@ pub fn render_services(
         }
     };
 
-    Ok(GeneratedModuleTokens::new("services", tokens))
+    Ok(GeneratedModuleTokens::new("serve", tokens))
 }

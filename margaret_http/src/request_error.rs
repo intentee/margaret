@@ -16,6 +16,12 @@ pub enum RequestError {
         source: ParseError,
     },
 
+    #[error("the request content type is not a valid media type: {source}")]
+    MalformedContentType {
+        #[source]
+        source: mime::FromStrError,
+    },
+
     #[error("the request body is not valid JSON: {source}")]
     MalformedJson {
         #[source]

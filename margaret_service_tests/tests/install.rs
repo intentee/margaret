@@ -2,7 +2,7 @@ use margaret_service::install::install;
 
 #[tokio::test]
 async fn cancels_the_token_on_sigint() {
-    let token = install();
+    let token = install().expect("the shutdown signal handlers install");
 
     unsafe {
         libc::raise(libc::SIGINT);
@@ -15,7 +15,7 @@ async fn cancels_the_token_on_sigint() {
 
 #[tokio::test]
 async fn cancels_the_token_on_sigterm() {
-    let token = install();
+    let token = install().expect("the shutdown signal handlers install");
 
     unsafe {
         libc::raise(libc::SIGTERM);

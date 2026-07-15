@@ -9,7 +9,6 @@ pub struct Server {
     address: String,
     body_limit: BodyLimit,
     name: Arc<str>,
-    origin: Arc<str>,
     router: Arc<Router>,
     transport: Arc<TransportConfig>,
     upload_config: Arc<UploadConfig>,
@@ -19,7 +18,6 @@ impl Server {
     pub fn new(
         name: impl Into<Arc<str>>,
         address: String,
-        origin: impl Into<Arc<str>>,
         transport: TransportConfig,
         upload_config: UploadConfig,
         body_limit: BodyLimit,
@@ -29,7 +27,6 @@ impl Server {
             address,
             body_limit,
             name: name.into(),
-            origin: origin.into(),
             router: Arc::new(router),
             transport: Arc::new(transport),
             upload_config: Arc::new(upload_config),
@@ -46,10 +43,6 @@ impl Server {
 
     pub(crate) fn name(&self) -> &Arc<str> {
         &self.name
-    }
-
-    pub(crate) fn origin(&self) -> &Arc<str> {
-        &self.origin
     }
 
     pub(crate) fn router(&self) -> &Arc<Router> {

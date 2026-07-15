@@ -10,7 +10,6 @@ pub(crate) struct HttpRoute {
     pub(crate) layers: Vec<LayerApplication>,
     pub(crate) method: String,
     pub(crate) name: Option<String>,
-    pub(crate) path: String,
     pub(crate) responder_field: Ident,
     pub(crate) responder_path: CanonicalPath,
     pub(crate) server: String,

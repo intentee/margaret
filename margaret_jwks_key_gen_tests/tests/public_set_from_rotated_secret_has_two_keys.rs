@@ -6,7 +6,7 @@ use margaret_jwks_key_gen::jwks_secret::JwksSecret;
 
 #[test]
 fn public_set_from_rotated_secret_has_two_keys() -> Result<()> {
-    let rotated = JwksSecret::fresh(Curve::P256)?.rotate(Curve::P256)?;
+    let rotated = JwksSecret::fresh(Curve::P256)?.rotate()?;
     let current_kid = rotated.current.signing.kid.clone();
     let previous_kid = rotated.previous.signing.kid.clone();
 

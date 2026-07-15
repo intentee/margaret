@@ -2,8 +2,8 @@ use cookie::Cookie;
 use cookie::SameSite;
 use cookie::time::OffsetDateTime;
 
-use crate::COOKIE_NAME_ACCESS_TOKEN;
-use crate::COOKIE_NAME_REFRESH_TOKEN;
+use crate::cookie_name_access_token::COOKIE_NAME_ACCESS_TOKEN;
+use crate::cookie_name_refresh_token::COOKIE_NAME_REFRESH_TOKEN;
 use crate::access_token_claims_signed::AccessTokenClaimsSigned;
 use crate::identity_session_error::IdentitySessionError;
 use crate::refresh_token_claims_signed::RefreshTokenClaimsSigned;
@@ -89,8 +89,8 @@ mod tests {
     use cookie::time::Duration;
 
     use super::SessionCookieManager;
-    use crate::COOKIE_NAME_ACCESS_TOKEN;
-    use crate::COOKIE_NAME_REFRESH_TOKEN;
+    use crate::cookie_name_access_token::COOKIE_NAME_ACCESS_TOKEN;
+    use crate::cookie_name_refresh_token::COOKIE_NAME_REFRESH_TOKEN;
     use crate::access_token_claims_signed::AccessTokenClaimsSigned;
     use crate::identity_session_error::IdentitySessionError;
     use crate::refresh_token_claims_signed::RefreshTokenClaimsSigned;

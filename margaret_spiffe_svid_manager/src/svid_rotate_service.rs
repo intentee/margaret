@@ -13,7 +13,7 @@ use trzcina::Service;
 
 use crate::svid_rotate_loop::svid_rotate_loop;
 
-const ARBITRARY_DELAY_BETWEEN_RETRIES: Duration = Duration::from_secs(1);
+const SPIRE_AGENT_RECONNECT_INTERVAL: Duration = Duration::from_secs(1);
 
 pub struct SvidRotateService {
     pub spire_agent_addr: String,
@@ -58,7 +58,7 @@ impl Service for SvidRotateService {
                 () = self.stream_from_agent(cancellation_token.clone()) => {
                     tokio::select! {
                         () = cancellation_token.cancelled() => return Ok(()),
-                        () = sleep(ARBITRARY_DELAY_BETWEEN_RETRIES) => continue,
+                        () = sleep(SPIRE_AGENT_RECONNECT_INTERVAL) => continue,
                     }
                 },
             }

@@ -14,7 +14,7 @@ pub fn render_console(
     let commands = console_commands(index)?;
 
     Ok(GeneratedModuleTokens::new(
-        "console",
+        "run",
         render(&commands, serves, servers),
     ))
 }

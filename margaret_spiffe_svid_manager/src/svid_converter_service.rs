@@ -14,6 +14,7 @@ use tokio::sync::broadcast::error::RecvError;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 
+use crate::svid_error::SvidError;
 use crate::ca_bundle::CaBundle;
 use crate::extract_ca_bundle::extract_ca_bundle;
 use crate::extract_server_credentials::extract_server_credentials;
@@ -27,9 +28,9 @@ pub struct SvidConverterService {
 
 impl SvidConverterService {
     pub async fn convert_x509_context(&self, x509_context: X509Context) -> Result<()> {
-        let default_svid: &X509Svid = x509_context.default_svid().ok_or_else(|| {
-            anyhow!("Received X509 SVID context, but it does not have a default SVID")
-        })?;
+        let default_svid: &X509Svid = x509_context
+            .default_svid()
+            .ok_or(SvidError::MissingDefaultSvid)?;
 
         self.svid_certified_key_holder
             .set(Some(Arc::new(extract_server_credentials(default_svid)?)));

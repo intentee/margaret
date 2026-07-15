@@ -11,7 +11,6 @@ dashmap = { workspace = true }
 margaret_console = { path = "../margaret_console" }
 margaret_http = { path = "../margaret_http" }
 margaret_http_validation = { path = "../margaret_http_validation" }
-margaret_identity = { path = "../margaret_identity" }
 margaret_macros = { path = "../margaret_macros" }
 margaret_service = { path = "../margaret_service" }
 margaret_spiffe_svid_manager = { path = "../margaret_spiffe_svid_manager" }

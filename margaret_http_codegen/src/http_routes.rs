@@ -11,22 +11,20 @@ use crate::build_registry::build_registry;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_responder_arguments::HttpResponderArguments;
 use crate::http_route::HttpRoute;
+use crate::http_route_table::HttpRouteTable;
 use crate::layer_application::LayerApplication;
 use crate::middleware_plan::MiddlewarePlan;
-use crate::path_parameter_names::path_parameter_names;
-use crate::registries::Registries;
 use crate::responder_method::responder_method;
 use crate::responder_selectors::ResponderSelectors;
+use crate::route_path::RoutePath;
 
 pub(crate) fn http_routes(
     index: &AttributeIndex,
     middleware_plans: &[MiddlewarePlan],
-) -> Result<Vec<HttpRoute>, HttpCodegenError> {
+) -> Result<HttpRouteTable, HttpCodegenError> {
     let selector = AttributeSelector::parse("responds_to_http").expect("a valid selector");
-    let struct_resolution = index.struct_resolution();
     let binders = build_registry(
         index,
-        struct_resolution,
         "provides_route_parameter",
         "Model",
         |binder| HttpCodegenError::HttpRouteParameterBinderModel { binder },
@@ -36,13 +34,9 @@ pub(crate) fn http_routes(
             second,
         },
     )?;
-    let registries = Registries {
-        binders: &binders,
-        struct_resolution,
-    };
     let middleware_selector = AttributeSelector::parse("middleware").expect("a valid selector");
     let responder_selectors = ResponderSelectors::new();
-    let mut routes = Vec::new();
+    let mut table = HttpRouteTable::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
 
     for matched in index.select(&selector) {
@@ -102,17 +96,13 @@ pub(crate) fn http_routes(
 
         layers.reverse();
 
-        let arguments = responder_method(item, &responder, &registries, &responder_selectors)?;
-        let path_parameters =
-            path_parameter_names(&path).map_err(|source| HttpCodegenError::InvalidRoutePath {
-                responder: responder.clone(),
-                path: path.clone(),
-                source,
-            })?;
+        let arguments =
+            responder_method(index, item, &responder, &server, &binders, &responder_selectors)?;
+        let route_path = RoutePath::parse(&path);
 
         for argument in &arguments {
             if let Some(path_key) = argument.binding.path_key()
-                && !path_parameters.iter().any(|name| name == path_key)
+                && !route_path.parameters().any(|name| name == path_key)
             {
                 return Err(HttpCodegenError::RouteParameterNotInPath {
                     responder: responder.clone(),
@@ -141,17 +131,19 @@ pub(crate) fn http_routes(
             seen_names.insert(name.clone(), responder.clone());
         }
 
-        routes.push(HttpRoute {
-            layers,
-            method,
-            name,
-            path,
-            responder_field: format_ident!("{}", index.field_name(item.canonical_path())),
-            responder_path: item.canonical_path().clone(),
-            arguments,
-            server,
-        });
+        table.insert(
+            route_path,
+            HttpRoute {
+                layers,
+                method,
+                name,
+                responder_field: format_ident!("{}", index.field_name(item.canonical_path())),
+                responder_path: item.canonical_path().clone(),
+                arguments,
+                server,
+            },
+        )?;
     }
 
-    Ok(routes)
+    Ok(table)
 }

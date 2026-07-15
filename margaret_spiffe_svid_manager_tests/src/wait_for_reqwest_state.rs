@@ -23,8 +23,9 @@ mod tests {
     use std::task::Context;
     use std::task::Waker;
 
-    use margaret_spiffe_svid_manager::reqwest_client_holder::ReqwestClientHolder;
     use reqwest::Client;
+
+    use margaret_spiffe_svid_manager::reqwest_client_holder::ReqwestClientHolder;
 
     use super::wait_for_reqwest_state;
 

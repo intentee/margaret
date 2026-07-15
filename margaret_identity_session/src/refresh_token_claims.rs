@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::ACCESS_TOKEN_LIFETIME_SECS;
+use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
 use crate::access_token_claims::AccessTokenClaims;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -40,7 +40,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::RefreshTokenClaims;
-    use crate::ACCESS_TOKEN_LIFETIME_SECS;
+    use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
 
     fn at(secs: i64) -> DateTime<Utc> {
         DateTime::from_timestamp(secs, 0).expect("a valid timestamp")

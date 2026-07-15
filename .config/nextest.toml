@@ -3,12 +3,12 @@ slow-timeout = { period = "10ms", terminate-after = 2 }
 
 [[profile.default.overrides]]
 filter = 'package(margaret_http_tests)'
-slow-timeout = { period = "5s", terminate-after = 2 }
+slow-timeout = { period = "200ms", terminate-after = 2 }
 
 [[profile.default.overrides]]
 filter = 'package(margaret_spiffe_svid_manager)'
-slow-timeout = { period = "5s", terminate-after = 2 }
+slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]
 filter = 'package(margaret_spiffe_svid_manager_tests)'
-slow-timeout = { period = "5s", terminate-after = 2 }
+slow-timeout = { period = "1s", terminate-after = 2 }

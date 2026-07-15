@@ -7,7 +7,7 @@ use margaret_jwks_key_gen::generate_keypair::generate_keypair;
 use margaret_jwks_key_gen::generate_keypair_params::GenerateKeypairParams;
 use margaret_jwks_key_gen::jwks_key_error::JwksKeyError;
 use margaret_jwks_key_gen::verifies_token::VerifiesToken;
-use margaret_jwks_key_gen_tests::test_claims::FAR_FUTURE_EXPIRY;
+use margaret_jwks_key_gen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_key_gen_tests::test_claims::TestClaims;
 
 #[test]

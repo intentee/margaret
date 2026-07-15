@@ -3,8 +3,8 @@ use std::path::Path;
 use syn::parse_quote;
 
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_attributes::resolution::Resolution;
 
 #[test]
 fn indexes_associated_types() {
@@ -27,16 +27,14 @@ fn indexes_associated_types() {
 
     assert_eq!(names, ["Extra", "Output"]);
 
-    let resolution = index.struct_resolution();
-    let resolved = |written: syn::Path| match resolution.resolve(&written) {
-        Resolution::Resolved(path) => path.to_string(),
-        Resolution::NotFound => "<not found>".to_string(),
-        Resolution::Ambiguous(_) => "<ambiguous>".to_string(),
-    };
+    let model = index
+        .resolve_item_path(producer, &parse_quote!(Model))
+        .expect("a same-module reference resolves");
 
-    assert_eq!(resolved(parse_quote!(Model)), "associated_types::Model");
-    assert_eq!(
-        resolved(parse_quote!(Producer)),
-        "associated_types::Producer"
-    );
+    assert_eq!(model.to_string(), "associated_types::Model");
+    assert!(index.is_indexed_struct(&model));
+    assert!(index.is_indexed_struct(&CanonicalPath::new(vec![
+        "associated_types".to_string(),
+        "Producer".to_string(),
+    ])));
 }

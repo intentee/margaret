@@ -32,4 +32,13 @@ pub enum ConsoleCodegenError {
         "console argument #{parameter} of console command '{command}' is missing `from = \"...\"`; it must name the command-line argument it binds"
     )]
     ConsoleArgumentMissingFrom { command: String, parameter: String },
+
+    #[error(
+        "command '{command}' registers the console command name '{name}', which is already registered by command '{existing_command}'"
+    )]
+    DuplicateCommandName {
+        command: String,
+        existing_command: String,
+        name: String,
+    },
 }

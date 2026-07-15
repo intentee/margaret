@@ -25,8 +25,8 @@ impl JwksSecret {
         })
     }
 
-    pub fn rotate(&self, crv: Curve) -> Result<Self, JwksKeyError> {
-        generate_keypair_random_kid(crv).map(|current| Self {
+    pub fn rotate(&self) -> Result<Self, JwksKeyError> {
+        generate_keypair_random_kid(self.current.signing.crv).map(|current| Self {
             current,
             previous: self.current.clone(),
         })

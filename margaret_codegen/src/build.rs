@@ -166,22 +166,22 @@ impl Greet {
         assert!(module(&code, "mod").contains("pub mod container;"));
         assert!(module(&code, "mod").contains("pub mod http;"));
         assert!(module(&code, "mod").contains("pub mod routes;"));
-        assert!(module(&code, "mod").contains("pub mod console;"));
+        assert!(module(&code, "mod").contains("pub mod run;"));
         assert!(concatenated(&code).contains("container: &super::super::container::Container"));
         assert!(concatenated(&code).contains("async fn server"));
         assert!(module(&code, "routes").contains("pub struct Routes"));
         assert!(module(&code, "container").contains("struct Container"));
-        assert!(module(&code, "console").contains("\"serve\""));
+        assert!(module(&code, "run").contains("\"serve\""));
     }
 
     #[test]
     fn generates_a_console_for_commands_without_http() {
         let code = generate(COMMAND_CRATE).expect("the build succeeds");
 
-        assert!(module(&code, "mod").contains("pub mod console;"));
+        assert!(module(&code, "mod").contains("pub mod run;"));
         assert!(!module(&code, "mod").contains("pub mod http;"));
         assert!(!has_module(&code, "http"));
-        assert!(module(&code, "console").contains("\"greet\""));
+        assert!(module(&code, "run").contains("\"greet\""));
     }
 
     #[test]
@@ -191,10 +191,10 @@ impl Greet {
         assert!(module(&code, "mod").contains("pub mod container;"));
         assert!(!module(&code, "mod").contains("pub mod http;"));
         assert!(!module(&code, "mod").contains("pub mod routes;"));
-        assert!(!module(&code, "mod").contains("pub mod console;"));
+        assert!(!module(&code, "mod").contains("pub mod run;"));
         assert!(!has_module(&code, "http"));
         assert!(!has_module(&code, "routes"));
-        assert!(!has_module(&code, "console"));
+        assert!(!has_module(&code, "run"));
         assert!(module(&code, "container").contains("struct Container"));
     }
 
@@ -222,10 +222,10 @@ impl Greet {
 
         assert!(!generated.join("http.rs").exists());
         assert!(!generated.join("routes.rs").exists());
-        assert!(!generated.join("console.rs").exists());
+        assert!(!generated.join("run.rs").exists());
         assert!(!umbrella_source.contains("pub mod http;"));
         assert!(!umbrella_source.contains("pub mod routes;"));
-        assert!(!umbrella_source.contains("pub mod console;"));
+        assert!(!umbrella_source.contains("pub mod run;"));
     }
 
     #[test]
@@ -311,11 +311,11 @@ impl Greet {
         )
         .expect("the async build succeeds");
 
-        let services: String = module(&code, "services").split_whitespace().collect();
+        let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(module(&code, "container").contains("Pool::create().await"));
         assert!(concatenated(&code).contains("async fn server_public"));
-        assert!(services.contains("super::http::server_public::server_public(container,"));
+        assert!(serve.contains("super::http::server_public::server_public(container,"));
     }
 
     const MULTI_SERVER_CRATE: &str = "\
@@ -349,15 +349,15 @@ impl Metrics {
         assert!(http.contains("async fn server_public"));
         assert!(http.contains("async fn server_internal"));
 
-        let services: String = module(&code, "services").split_whitespace().collect();
-        assert!(services.contains("super::http::server_public::server_public(container,"));
-        assert!(services.contains("super::http::server_internal::server_internal(container,"));
-        assert!(services.contains(r#"get_one::<String>("public-addr")"#));
-        assert!(services.contains(r#"get_one::<String>("internal-addr")"#));
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+        assert!(serve.contains("super::http::server_public::server_public(container,"));
+        assert!(serve.contains("super::http::server_internal::server_internal(container,"));
+        assert!(serve.contains(r#"get_one::<String>("public-addr")"#));
+        assert!(serve.contains(r#"get_one::<String>("internal-addr")"#));
 
-        let console = module(&code, "console");
-        assert!(console.contains(r#"clap::Arg::new("public-addr")"#));
-        assert!(console.contains(r#"clap::Arg::new("internal-addr")"#));
+        let run = module(&code, "run");
+        assert!(run.contains(r#"clap::Arg::new("public-addr")"#));
+        assert!(run.contains(r#"clap::Arg::new("internal-addr")"#));
     }
 
     #[test]

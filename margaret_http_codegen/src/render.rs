@@ -12,11 +12,13 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::http_route::HttpRoute;
+use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::middleware_argument::MiddlewareArgument;
 use crate::middleware_plan::MiddlewarePlan;
 use crate::responder_argument::ResponderArgument;
 use crate::responder_argument_binding::ResponderArgumentBinding;
+use crate::route_group::RouteGroup;
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
@@ -342,11 +344,15 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     }
 }
 
-fn server_module(routes: &[HttpRoute], server: &HttpServer, index: &AttributeIndex) -> TokenStream {
+fn server_module(
+    table: &HttpRouteTable,
+    server: &HttpServer,
+    index: &AttributeIndex,
+) -> TokenStream {
     let function_name = server.function_name();
-    let server_routes: Vec<&HttpRoute> = routes
-        .iter()
-        .filter(|route| route.server == server.name())
+    let server_routes: Vec<&HttpRoute> = table
+        .route_groups(server.name())
+        .flat_map(RouteGroup::method_routes)
         .collect();
     let routes_param = if server_routes.iter().copied().any(route_references_routes) {
         format_ident!("routes")
@@ -364,19 +370,28 @@ fn server_module(routes: &[HttpRoute], server: &HttpServer, index: &AttributeInd
             quote! { let #binding = #handler; }
         });
 
-    let route_calls = server_routes.iter().map(|route| {
-        let method = &route.method;
-        let path = &route.path;
-        let handler = if route.name.is_some() {
-            let binding = handler_binding(route);
+    let route_entries = table.route_groups(server.name()).map(|group| {
+        let path = group.path().pattern();
+        let method_handlers = group.method_routes().map(|route| {
+            let method = &route.method;
+            let handler = if route.name.is_some() {
+                let binding = handler_binding(route);
 
-            quote! { #binding.clone() }
-        } else {
-            onion(route, index)
-        };
+                quote! { #binding.clone() }
+            } else {
+                onion(route, index)
+            };
+
+            quote! {
+                margaret_http::method_handler::MethodHandler::new(#method, #handler)
+            }
+        });
 
         quote! {
-            .route(#method, #path, #handler)
+            margaret_http::route_entry::RouteEntry::new(
+                #path,
+                ::std::vec![#(#method_handlers),*],
+            )
         }
     });
 
@@ -392,20 +407,28 @@ fn server_module(routes: &[HttpRoute], server: &HttpServer, index: &AttributeInd
         pub async fn #function_name(
             container: &super::super::container::Container,
             #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
-        ) -> margaret_http::server_routes::ServerRoutes {
+        ) -> ::std::result::Result<
+            margaret_http::server_routes::ServerRoutes,
+            margaret_http::matchit::InsertError,
+        > {
             #(#handler_bindings)*
 
-            let router = margaret_http::router_builder::RouterBuilder::empty()
-                #(#route_calls)*
-                .build();
+            let router = margaret_http::router::Router::build(
+                ::std::vec![#(#route_entries),*],
+            )?;
 
-            margaret_http::server_routes::ServerRoutes::new(router, ::std::vec![#(#named_handlers),*])
+            ::std::result::Result::Ok(
+                margaret_http::server_routes::ServerRoutes::new(
+                    router,
+                    ::std::vec![#(#named_handlers),*],
+                ),
+            )
         }
     }
 }
 
 pub(crate) fn render(
-    routes: &[HttpRoute],
+    table: &HttpRouteTable,
     servers: &[HttpServer],
     middleware_plans: &[MiddlewarePlan],
     index: &AttributeIndex,
@@ -430,7 +453,7 @@ pub(crate) fn render(
     for server in servers {
         modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
-            server_module(routes, server, index),
+            server_module(table, server, index),
         ));
     }
 

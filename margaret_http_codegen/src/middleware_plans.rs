@@ -1,14 +1,14 @@
 use quote::format_ident;
+use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_injection_codegen::leaf_matches::leaf_matches;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
-use margaret_injection_codegen::reference_leaf_matches::reference_leaf_matches;
 
 use crate::http_codegen_error::HttpCodegenError;
+use crate::http_injectable::HttpInjectable;
 use crate::middleware_argument::MiddlewareArgument;
 use crate::middleware_attribute_arguments::MiddlewareAttributeArguments;
 use crate::middleware_plan::MiddlewarePlan;
@@ -40,11 +40,14 @@ pub(crate) fn middleware_plans(
             declared, position, ..
         } in parameters(method.signature())
         {
-            let argument = if reference_leaf_matches(declared, "Request") {
+            let resolved = index.resolve_item_type(item, declared);
+            let is_reference = matches!(declared, Type::Reference(_));
+            let argument = if HttpInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference)
+            {
                 MiddlewareArgument::CurrentRequest
-            } else if leaf_matches(declared, "Next") {
+            } else if HttpInjectable::Next.matches(resolved.as_ref(), is_reference) {
                 MiddlewareArgument::Next
-            } else if reference_leaf_matches(declared, "Routes") {
+            } else if HttpInjectable::Routes.matches(resolved.as_ref(), is_reference) {
                 injects_routes = true;
 
                 MiddlewareArgument::Routes

@@ -8,23 +8,15 @@ use quote::quote;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
-use crate::http_route::HttpRoute;
+use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
-use crate::path_parameter_names::path_parameter_names;
-use crate::route_url_template::route_url_template;
+use crate::named_route::NamedRoute;
 use crate::url_segment::UrlSegment;
 
 struct ServerLayout {
     constructor: Ident,
     origin: Ident,
     struct_ident: Ident,
-}
-
-fn route_name(route: &HttpRoute) -> &str {
-    route
-        .name
-        .as_deref()
-        .expect("only named routes reach the routes module")
 }
 
 fn server_field_ident(server: &HttpServer) -> Ident {
@@ -35,33 +27,19 @@ fn origin_param_ident(server: &HttpServer) -> Ident {
     format_ident!("origin_{}", server.name())
 }
 
-fn route_field_ident(route: &HttpRoute) -> Ident {
-    format_ident!("{}", route_name(route))
+fn route_field_ident(named: &NamedRoute<'_>) -> Ident {
+    format_ident!("{}", named.name)
 }
 
-fn placeholders(route: &HttpRoute) -> Vec<String> {
-    path_parameter_names(&route.path).expect("the route path was validated during http codegen")
+fn placeholders<'route>(named: &NamedRoute<'route>) -> Vec<&'route str> {
+    named.path.parameters().collect()
 }
 
-fn is_get(route: &HttpRoute) -> bool {
-    route.method == "GET"
+fn is_get(named: &NamedRoute<'_>) -> bool {
+    named.route.method == "GET"
 }
 
-fn named_routes_for<'route>(
-    routes: &'route [HttpRoute],
-    server: &HttpServer,
-) -> Vec<&'route HttpRoute> {
-    let mut named: Vec<&HttpRoute> = routes
-        .iter()
-        .filter(|route| route.server == server.name() && route.name.is_some())
-        .collect();
-
-    named.sort_by(|first, second| route_name(first).cmp(route_name(second)));
-
-    named
-}
-
-fn server_layouts(routes: &[HttpRoute], servers: &[HttpServer]) -> HashMap<String, ServerLayout> {
+fn server_layouts(table: &HttpRouteTable, servers: &[HttpServer]) -> HashMap<String, ServerLayout> {
     let mut type_allocator = NameAllocator::new();
 
     servers
@@ -69,20 +47,20 @@ fn server_layouts(routes: &[HttpRoute], servers: &[HttpServer]) -> HashMap<Strin
         .map(|server| {
             let struct_ident =
                 format_ident!("{}", type_allocator.allocate(server.name()).type_name());
-            let named = named_routes_for(routes, server);
+            let named = table.named_routes(server.name());
 
             let mut field_allocator = NameAllocator::new();
 
-            for route in named.iter().filter(|route| placeholders(route).is_empty()) {
-                field_allocator.reserve(route_name(route));
+            for route in named.iter().filter(|named| placeholders(named).is_empty()) {
+                field_allocator.reserve(route.name);
             }
 
             let origin = format_ident!("{}", field_allocator.allocate("origin").field());
 
             let mut method_allocator = NameAllocator::new();
 
-            for route in named.iter().filter(|route| !placeholders(route).is_empty()) {
-                method_allocator.reserve(route_name(route));
+            for route in named.iter().filter(|named| !placeholders(named).is_empty()) {
+                method_allocator.reserve(route.name);
             }
 
             let constructor = format_ident!("{}", method_allocator.allocate("new").field());
@@ -99,33 +77,35 @@ fn server_layouts(routes: &[HttpRoute], servers: &[HttpServer]) -> HashMap<Strin
         .collect()
 }
 
-fn segments_tokens(route: &HttpRoute) -> TokenStream {
-    let segments = route_url_template(&route.path)
-        .into_iter()
-        .map(|segment| match segment {
-            UrlSegment::Literal(text) => {
-                quote! { margaret_http::url_segment::UrlSegment::Literal(#text) }
-            }
-            UrlSegment::Parameter(name) => {
-                quote! { margaret_http::url_segment::UrlSegment::Parameter(#name) }
-            }
-        });
+fn segments_tokens(named: &NamedRoute<'_>) -> TokenStream {
+    let segments = named.path.segments().iter().map(|segment| match segment {
+        UrlSegment::Literal(text) => {
+            quote! { margaret_http::url_segment::UrlSegment::Literal(#text) }
+        }
+        UrlSegment::Parameter(name) => {
+            quote! { margaret_http::url_segment::UrlSegment::Parameter(#name) }
+        }
+    });
 
     quote! { &[#(#segments),*] }
 }
 
-fn route_type_tokens(route: &HttpRoute) -> TokenStream {
-    if is_get(route) {
+fn route_type_tokens(named: &NamedRoute<'_>) -> TokenStream {
+    if is_get(named) {
         quote! { margaret_http::forwardable_route::ForwardableRoute }
     } else {
         quote! { margaret_http::route_reference::RouteReference }
     }
 }
 
-fn route_constructor(route: &HttpRoute, origin: TokenStream, values: TokenStream) -> TokenStream {
-    let segments = segments_tokens(route);
+fn route_constructor(
+    named: &NamedRoute<'_>,
+    origin: TokenStream,
+    values: TokenStream,
+) -> TokenStream {
+    let segments = segments_tokens(named);
 
-    if is_get(route) {
+    if is_get(named) {
         quote! {
             margaret_http::forwardable_route::ForwardableRoute::new(#origin, #segments, #values)
         }
@@ -136,10 +116,10 @@ fn route_constructor(route: &HttpRoute, origin: TokenStream, values: TokenStream
     }
 }
 
-fn route_method(route: &HttpRoute, origin: &Ident) -> TokenStream {
-    let method = route_field_ident(route);
-    let return_type = route_type_tokens(route);
-    let placeholders = placeholders(route);
+fn route_method(named: &NamedRoute<'_>, origin: &Ident) -> TokenStream {
+    let method = route_field_ident(named);
+    let return_type = route_type_tokens(named);
+    let placeholders = placeholders(named);
     let parameters = placeholders.iter().map(|placeholder| {
         let parameter = format_ident!("{}", placeholder);
 
@@ -151,7 +131,7 @@ fn route_method(route: &HttpRoute, origin: &Ident) -> TokenStream {
         quote! { #parameter }
     });
     let constructor = route_constructor(
-        route,
+        named,
         quote! { self.#origin.clone() },
         quote! { ::std::vec![#(#values),*] },
     );
@@ -163,31 +143,33 @@ fn route_method(route: &HttpRoute, origin: &Ident) -> TokenStream {
     }
 }
 
-fn server_struct(routes: &[HttpRoute], server: &HttpServer, layout: &ServerLayout) -> TokenStream {
+fn server_struct(
+    table: &HttpRouteTable,
+    server: &HttpServer,
+    layout: &ServerLayout,
+) -> TokenStream {
     let ServerLayout {
         constructor,
         origin,
         struct_ident,
     } = layout;
-    let named = named_routes_for(routes, server);
-    let paramless: Vec<&HttpRoute> = named
+    let named = table.named_routes(server.name());
+    let paramless: Vec<&NamedRoute<'_>> = named
         .iter()
-        .filter(|route| placeholders(route).is_empty())
-        .copied()
+        .filter(|named| placeholders(named).is_empty())
         .collect();
-    let parameterized: Vec<&HttpRoute> = named
+    let parameterized: Vec<&NamedRoute<'_>> = named
         .iter()
-        .filter(|route| !placeholders(route).is_empty())
-        .copied()
+        .filter(|named| !placeholders(named).is_empty())
         .collect();
 
     let has_named = !named.is_empty();
     let has_parameterized = !parameterized.is_empty();
 
     let origin_field = has_parameterized.then(|| quote! { #origin: ::std::sync::Arc<str>, });
-    let paramless_field_decls = paramless.iter().map(|route| {
-        let field = route_field_ident(route);
-        let return_type = route_type_tokens(route);
+    let paramless_field_decls = paramless.iter().map(|named| {
+        let field = route_field_ident(named);
+        let return_type = route_type_tokens(named);
 
         quote! { pub #field: #return_type, }
     });
@@ -197,10 +179,10 @@ fn server_struct(routes: &[HttpRoute], server: &HttpServer, layout: &ServerLayou
     } else {
         format_ident!("_origin")
     };
-    let paramless_inits = paramless.iter().map(|route| {
-        let field = route_field_ident(route);
+    let paramless_inits = paramless.iter().map(|named| {
+        let field = route_field_ident(named);
         let route_construction = route_constructor(
-            route,
+            named,
             quote! { #origin.clone() },
             quote! { ::std::vec::Vec::new() },
         );
@@ -210,7 +192,7 @@ fn server_struct(routes: &[HttpRoute], server: &HttpServer, layout: &ServerLayou
     let origin_init = has_parameterized.then(|| quote! { #origin, });
     let methods = parameterized
         .iter()
-        .map(|route| route_method(route, origin));
+        .map(|named| route_method(named, origin));
 
     quote! {
         pub struct #struct_ident {
@@ -232,10 +214,10 @@ fn server_struct(routes: &[HttpRoute], server: &HttpServer, layout: &ServerLayou
 }
 
 pub(crate) fn render_routes(
-    routes: &[HttpRoute],
+    table: &HttpRouteTable,
     servers: &[HttpServer],
 ) -> Vec<GeneratedModuleTokens> {
-    let layouts = server_layouts(routes, servers);
+    let layouts = server_layouts(table, servers);
     let server_fields = servers.iter().map(|server| {
         let field = server_field_ident(server);
         let struct_ident = &layouts[server.name()].struct_ident;
@@ -293,7 +275,7 @@ pub(crate) fn render_routes(
     for server in servers {
         modules.push(GeneratedModuleTokens::new(
             format!("routes/servers/{}", server_field_ident(server)),
-            server_struct(routes, server, &layouts[server.name()]),
+            server_struct(table, server, &layouts[server.name()]),
         ));
     }
 

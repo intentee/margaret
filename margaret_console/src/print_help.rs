@@ -3,7 +3,7 @@ use clap::Command;
 use crate::command_outcome::CommandOutcome;
 
 pub fn print_help(command: &mut Command) -> CommandOutcome {
-    command.print_help().expect("the help is rendered");
+    println!("{}", command.render_help());
 
     CommandOutcome::Failed
 }

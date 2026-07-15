@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::RwLock;
 
 use log::error;
 use rustls::DigitallySignedStruct;
@@ -10,24 +9,20 @@ use rustls::pki_types::CertificateDer;
 use rustls::server::danger::ClientCertVerified;
 use rustls::server::danger::ClientCertVerifier;
 
+use margaret_sync_holder::sync_holder::SyncHolder;
+
 #[derive(Debug, Default)]
 pub struct SvidClientCertVerifier {
-    current_verifier: Arc<RwLock<Option<Arc<dyn ClientCertVerifier>>>>,
+    current_verifier: SyncHolder<Arc<dyn ClientCertVerifier>>,
 }
 
 impl SvidClientCertVerifier {
     pub fn update_internal_verifier(&self, verifier: Arc<dyn ClientCertVerifier>) {
-        *self
-            .current_verifier
-            .write()
-            .expect("SVID client cert verifier lock is poisoned") = Some(verifier);
+        self.current_verifier.set(Some(verifier));
     }
 
     fn current_verifier(&self) -> Option<Arc<dyn ClientCertVerifier>> {
-        self.current_verifier
-            .read()
-            .expect("SVID client cert verifier lock is poisoned")
-            .clone()
+        self.current_verifier.get()
     }
 }
 

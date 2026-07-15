@@ -11,9 +11,9 @@ use margaret_spiffe_svid_manager::svid_certified_key_holder::SvidCertifiedKeyHol
 use margaret_spiffe_svid_manager_tests::build_client_config_with_svid_server_verifier::build_client_config_with_svid_server_verifier;
 use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
 use margaret_spiffe_svid_manager_tests::pump_tls_handshake::pump_tls_handshake;
-use margaret_spiffe_svid_manager_tests::test_fixtures::CA_DER;
-use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
-use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER;
+use margaret_spiffe_svid_manager_tests::ca_der::CA_DER;
+use margaret_spiffe_svid_manager_tests::leaf_spiffe_example_org_server_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
+use margaret_spiffe_svid_manager_tests::leaf_spiffe_example_org_server_key_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER;
 
 #[tokio::test]
 async fn server_serves_cert_resolved_through_holder() {

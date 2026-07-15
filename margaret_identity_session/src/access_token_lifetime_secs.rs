@@ -1,0 +1,1 @@
+pub const ACCESS_TOKEN_LIFETIME_SECS: i64 = 15 * 60;

@@ -1301,7 +1301,6 @@ dependencies = [
  "margaret_console",
  "margaret_http",
  "margaret_http_validation",
- "margaret_identity",
  "margaret_macros",
  "margaret_service",
  "margaret_spiffe_svid_manager",
@@ -1396,14 +1395,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_identity"
-version = "0.1.0"
-dependencies = [
- "margaret_console",
- "tokio-util",
-]
-
-[[package]]
 name = "margaret_identity_session"
 version = "0.1.0"
 dependencies = [
@@ -1489,6 +1480,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "libc",
  "margaret_console",
  "margaret_http",
  "tokio",
@@ -1540,6 +1532,7 @@ dependencies = [
  "rustls",
  "rustls-webpki",
  "spiffe",
+ "thiserror",
  "tokio",
  "tokio-util",
  "trzcina",
@@ -1558,6 +1551,8 @@ dependencies = [
  "margaret_sync_holder",
  "reqwest",
  "rustls",
+ "serde",
+ "serde_json",
  "spiffe",
  "tempfile",
  "tokio",
@@ -2385,9 +2380,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.8"
+version = "0.103.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ffdfa2f5286e2247234e03f680868ac2815974dc39e00ea15adc445d0aafe52"
+checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
 dependencies = [
  "aws-lc-rs",
  "ring",

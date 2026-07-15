@@ -1,18 +1,11 @@
 use anyhow::Result;
-use anyhow::anyhow;
+
+use crate::join_token_output::JoinTokenOutput;
 
 pub fn parse_join_token(output: &[u8]) -> Result<String> {
-    let text = std::str::from_utf8(output)?;
+    let JoinTokenOutput { value } = serde_json::from_slice(output)?;
 
-    for line in text.lines() {
-        if let Some(rest) = line.trim().strip_prefix("Token:") {
-            return Ok(rest.trim().to_string());
-        }
-    }
-
-    Err(anyhow!(
-        "could not parse join token from spire-server output: {text}"
-    ))
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -20,29 +13,18 @@ mod tests {
     use super::parse_join_token;
 
     #[test]
-    fn extracts_token_from_output() {
-        let output = b"Token: abc123def456\n";
+    fn extracts_the_token_value_from_the_json_output() {
+        let output = br#"{"expires_at":"1784066656","value":"abc123def456"}"#;
 
-        let result = parse_join_token(output).unwrap();
+        let token = parse_join_token(output).expect("the join token is parsed");
 
-        assert_eq!(result, "abc123def456");
+        assert_eq!(token, "abc123def456");
     }
 
     #[test]
-    fn errors_when_token_line_is_missing() {
-        let output = b"some other output\nno token here\n";
+    fn errors_when_the_output_carries_no_token_value() {
+        let output = br#"{"expires_at":"1784066656"}"#;
 
-        let result = parse_join_token(output);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn errors_when_output_is_invalid_utf8() {
-        let output: &[u8] = &[0xff, 0xfe, 0xfd];
-
-        let result = parse_join_token(output);
-
-        assert!(result.is_err());
+        assert!(parse_join_token(output).is_err());
     }
 }

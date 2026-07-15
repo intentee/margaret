@@ -14,7 +14,9 @@ use margaret_http::request::Request;
 use margaret_http::require_peer_spiffe_id::require_peer_spiffe_id;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
-use margaret_http::router_builder::RouterBuilder;
+use margaret_http::method_handler::MethodHandler;
+use margaret_http::route_entry::RouteEntry;
+use margaret_http::router::Router;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
 use margaret_http::transport_config::TransportConfig;
@@ -46,20 +48,21 @@ impl RunningMtlsServer {
         let server = Server::new(
             "mtls",
             "127.0.0.1:0".to_string(),
-            "https://127.0.0.1",
             TransportConfig::MutualTls { server_config },
             UploadConfig::Disabled,
             BodyLimit::default(),
-            RouterBuilder::empty()
-                .route("GET", "/", Arc::new(EchoPeer))
-                .build(),
+            Router::build(vec![RouteEntry::new(
+                "/",
+                vec![MethodHandler::new("GET", Arc::new(EchoPeer))],
+            )])
+            .expect("the route entries register cleanly"),
         );
         let server_registry = Arc::new(ServerRegistry::new(vec![server]));
         let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
         let bound = BoundServer::bind(server_registry, forward_targets, Arc::from("mtls"))
             .await
             .expect("the mTLS server binds");
-        let address = bound.local_addr();
+        let address = bound.local_addr().expect("the bound listener reports its address");
         let cancellation_token = CancellationToken::new();
         let join_handle = tokio::spawn(bound.serve(cancellation_token.clone()));
 

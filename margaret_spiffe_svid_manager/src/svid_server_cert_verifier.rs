@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use log::warn;
 use rustls::CertificateError;
 use rustls::DigitallySignedStruct;
@@ -22,6 +21,7 @@ use webpki::ring::ECDSA_P384_SHA256;
 use webpki::ring::ECDSA_P384_SHA384;
 use webpki::ring::ED25519;
 
+use crate::svid_error::SvidError;
 use crate::extract_spiffe_trust_domain::extract_spiffe_trust_domain;
 use crate::parse_end_entity_cert::parse_end_entity_cert;
 
@@ -33,16 +33,20 @@ pub struct SvidServerCertVerifier {
 }
 
 impl SvidServerCertVerifier {
-    pub fn new(root_store: RootCertStore, spiffe_trust_domain: String) -> anyhow::Result<Self> {
-        let default_crypto_provider = CryptoProvider::get_default()
-            .ok_or_else(|| anyhow!("Default rustls crypto provider is not set"))?;
+    pub fn new(
+        root_store: RootCertStore,
+        spiffe_trust_domain: String,
+    ) -> Result<Self, SvidError> {
+        let default_crypto_provider =
+            CryptoProvider::get_default().ok_or(SvidError::CryptoProviderNotInstalled)?;
 
         let inner_verifier: Arc<WebPkiServerVerifier> =
             WebPkiServerVerifier::builder_with_provider(
                 Arc::new(root_store.clone()),
                 default_crypto_provider.clone(),
             )
-            .build()?;
+            .build()
+            .map_err(|source| SvidError::ServerVerifier { source })?;
 
         Ok(Self {
             inner_verifier,
@@ -53,6 +57,10 @@ impl SvidServerCertVerifier {
 }
 
 impl ServerCertVerifier for SvidServerCertVerifier {
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.inner_verifier.supported_verify_schemes()
+    }
+
     fn verify_server_cert(
         &self,
         end_entity: &CertificateDer<'_>,
@@ -114,9 +122,5 @@ impl ServerCertVerifier for SvidServerCertVerifier {
     ) -> Result<HandshakeSignatureValid, Error> {
         self.inner_verifier
             .verify_tls13_signature(message, cert, dss)
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        self.inner_verifier.supported_verify_schemes()
     }
 }

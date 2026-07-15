@@ -15,11 +15,15 @@ use syn::UseTree;
 
 use crate::attribute_error::AttributeError;
 use crate::canonical_path::CanonicalPath;
+use crate::flatten_use_tree::flatten_use_tree;
 use crate::indexed_associated_type::IndexedAssociatedType;
 use crate::indexed_item::IndexedItem;
 use crate::indexed_method::IndexedMethod;
 use crate::item_kind::ItemKind;
+use crate::module_imports::ModuleImports;
+use crate::resolve_type::resolve_type;
 use crate::struct_shape::StructShape;
+use crate::walk_output::WalkOutput;
 
 struct Recordable<'item> {
     attributes: &'item [Attribute],
@@ -34,14 +38,8 @@ enum PendingMemberKind {
 
 struct PendingMember {
     kind: PendingMemberKind,
-    self_type_path: CanonicalPath,
-}
-
-fn self_type_identifier(self_type: &Type) -> Option<&Ident> {
-    match self_type {
-        Type::Path(type_path) => type_path.path.segments.last().map(|segment| &segment.ident),
-        _ => None,
-    }
+    module_path: Vec<String>,
+    self_type: Type,
 }
 
 fn has_path_attribute(attributes: &[Attribute]) -> bool {
@@ -97,6 +95,7 @@ fn resolve_module_file(directory: &Path, identifier: &Ident) -> Result<PathBuf, 
 }
 
 pub(crate) struct ModuleWalker {
+    imports: HashMap<CanonicalPath, ModuleImports>,
     items: Vec<IndexedItem>,
     pending_members: Vec<PendingMember>,
     seen_paths: HashSet<CanonicalPath>,
@@ -106,8 +105,9 @@ impl ModuleWalker {
     pub(crate) fn walk_crate(
         crate_name: &str,
         source_directory: &Path,
-    ) -> Result<Vec<IndexedItem>, AttributeError> {
+    ) -> Result<WalkOutput, AttributeError> {
         let mut walker = Self {
+            imports: HashMap::new(),
             items: Vec::new(),
             pending_members: Vec::new(),
             seen_paths: HashSet::new(),
@@ -117,16 +117,22 @@ impl ModuleWalker {
 
         walker.walk_file(&root_file, &module_path, source_directory)?;
 
-        Ok(walker.into_items())
+        Ok(walker.into_output())
     }
 
-    fn into_items(self) -> Vec<IndexedItem> {
+    fn into_output(self) -> WalkOutput {
         let Self {
+            imports,
             mut items,
             pending_members,
             seen_paths: _,
         } = self;
 
+        let item_paths: HashSet<CanonicalPath> = items
+            .iter()
+            .map(|item| item.canonical_path().clone())
+            .collect();
+        let empty_imports = ModuleImports::default();
         let index_by_path: HashMap<CanonicalPath, usize> = items
             .iter()
             .enumerate()
@@ -135,9 +141,17 @@ impl ModuleWalker {
 
         for PendingMember {
             kind,
-            self_type_path,
+            module_path,
+            self_type,
         } in pending_members
         {
+            let module = CanonicalPath::new(module_path.clone());
+            let module_imports = imports.get(&module).unwrap_or(&empty_imports);
+            let Some(self_type_path) =
+                resolve_type(&self_type, &module_path, module_imports, &item_paths)
+            else {
+                continue;
+            };
             let Some(&index) = index_by_path.get(&self_type_path) else {
                 continue;
             };
@@ -158,7 +172,7 @@ impl ModuleWalker {
             item.sort_members();
         }
 
-        items
+        WalkOutput { imports, items }
     }
 
     fn record(
@@ -217,15 +231,6 @@ impl ModuleWalker {
     }
 
     fn walk_impl(&mut self, item_impl: &ItemImpl, module_path: &[String]) {
-        let Some(self_identifier) = self_type_identifier(&item_impl.self_ty) else {
-            return;
-        };
-
-        let mut segments = module_path.to_vec();
-        segments.push(self_identifier.to_string());
-
-        let self_type_path = CanonicalPath::new(segments);
-
         if item_impl.trait_.is_some() {
             for impl_item in &item_impl.items {
                 if let ImplItem::Type(associated_type) = impl_item {
@@ -234,7 +239,8 @@ impl ModuleWalker {
                             associated_type.ident.to_string(),
                             associated_type.ty.clone(),
                         )),
-                        self_type_path: self_type_path.clone(),
+                        module_path: module_path.to_vec(),
+                        self_type: (*item_impl.self_ty).clone(),
                     });
                 }
             }
@@ -250,7 +256,8 @@ impl ModuleWalker {
                         method.attrs.clone(),
                         method.sig.clone(),
                     )),
-                    self_type_path: self_type_path.clone(),
+                    module_path: module_path.to_vec(),
+                    self_type: (*item_impl.self_ty).clone(),
                 });
             }
         }
@@ -295,6 +302,13 @@ impl ModuleWalker {
             }
             Item::Use(item_use) => {
                 check_use(item_use, file_path)?;
+
+                for (name, path) in flatten_use_tree(&item_use.tree, module_path) {
+                    self.imports
+                        .entry(CanonicalPath::new(module_path.to_vec()))
+                        .or_default()
+                        .insert(name, path);
+                }
 
                 None
             }

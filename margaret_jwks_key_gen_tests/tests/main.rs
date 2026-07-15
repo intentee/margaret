@@ -9,6 +9,7 @@ mod jwks_secret_holder_subscription_reads_current;
 mod jwks_secret_propagates_previous_key_error;
 mod jwks_secret_rejects_malformed_token;
 mod jwks_secret_reports_invalid_for_stranger_token;
+mod jwks_secret_rotation_preserves_the_curve;
 mod jwks_secret_serializes_with_signing_material;
 mod jwks_secret_verifies_token_signed_with_current;
 mod public_set_from_fresh_secret_has_single_key;

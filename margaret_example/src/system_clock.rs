@@ -1,4 +1,5 @@
 use std::time::SystemTime;
+use std::time::SystemTimeError;
 use std::time::UNIX_EPOCH;
 
 use margaret_macros::constructor;
@@ -17,10 +18,7 @@ impl SystemClock {
 }
 
 impl Clock for SystemClock {
-    fn now(&self) -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs()
+    fn now(&self) -> Result<u64, SystemTimeError> {
+        Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
     }
 }

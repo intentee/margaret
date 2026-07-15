@@ -64,7 +64,7 @@ mod tests {
         )]
     }
 
-    const SERVICE: &str = "#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
+    const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
     const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n";
 
     #[test]
@@ -99,7 +99,7 @@ mod tests {
     #[test]
     fn renders_a_ticker_that_passes_the_token() {
         let source = rendered(
-            "#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
             &[],
         );
 
@@ -134,9 +134,7 @@ mod tests {
 
         assert!(source.contains(r#"matches.get_one::<String>("public-addr")"#));
         assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
-        assert!(
-            source.contains(r#".unwrap_or_else(||::std::format!("http://{}",address_public))"#)
-        );
+        assert!(!source.contains(r#"::std::format!("http://{}""#));
         assert!(source.contains(r#"matches.get_flag("public-uploads")"#));
         assert!(source.contains(r#"matches.get_one::<String>("public-upload-dir")"#));
         assert!(source.contains("unwrap_or_else(std::env::temp_dir)"));
@@ -148,7 +146,7 @@ mod tests {
             "lettransport_public=margaret_http::transport_config::TransportConfig::Plain;"
         ));
         assert!(source.contains(
-            r#"margaret_http::server::Server::new("public",address_public,origin_public,transport_public,upload_config_public,margaret_http::body_limit::BodyLimit::default(),routes_public.router,)"#
+            r#"margaret_http::server::Server::new("public",address_public,transport_public,upload_config_public,margaret_http::body_limit::BodyLimit::default(),routes_public.router,)"#
         ));
         assert!(
             source.contains("margaret_http::server_registry::ServerRegistry::new(server_models)")
@@ -208,7 +206,7 @@ mod tests {
         );
 
         assert!(source.contains(
-            r#"letorigin_public:::std::sync::Arc<str>=matches.get_one::<String>("public-url").cloned().unwrap_or_else(||::std::format!("http://{}",address_public)).into();"#
+            r#"letorigin_public:::std::sync::Arc<str>=matchmatches.get_one::<String>("public-url"){Some(value)=>value.clone().into(),None=>returnmargaret_console::command_outcome::CommandOutcome::Failed,};"#
         ));
         assert!(source.contains(
             "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(origin_internal.clone(),origin_public.clone(),),);"
@@ -319,6 +317,15 @@ mod tests {
     fn rejects_an_unexpected_runner_parameter() {
         let message = error_for(
             "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> Result<(), Infallible> {}\n}\n",
+        );
+
+        assert!(message.contains("unsupported"));
+    }
+
+    #[test]
+    fn rejects_a_cancellation_token_passed_by_reference() {
+        let message = error_for(
+            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> Result<(), Infallible> {}\n}\n",
         );
 
         assert!(message.contains("unsupported"));

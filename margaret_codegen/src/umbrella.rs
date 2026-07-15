@@ -18,11 +18,11 @@ pub(crate) fn umbrella(
     }
 
     if serves {
-        source.push_str("#[rustfmt::skip]\npub mod services;\n");
+        source.push_str("#[rustfmt::skip]\npub mod serve;\n");
     }
 
     if has_console {
-        source.push_str("#[rustfmt::skip]\npub mod console;\n");
+        source.push_str("#[rustfmt::skip]\npub mod run;\n");
     }
 
     GeneratedModule::new("mod", source)

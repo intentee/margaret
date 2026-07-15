@@ -70,3 +70,7 @@ impl (RootStruct, RootEnum) {
 impl Undeclared {
     fn orphaned_method() {}
 }
+
+impl HashMap {
+    fn skipped_imported_method(&self) {}
+}

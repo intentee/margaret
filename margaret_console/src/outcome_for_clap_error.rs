@@ -3,11 +3,13 @@ use clap::Error;
 use crate::command_outcome::CommandOutcome;
 
 pub fn outcome_for_clap_error(error: Error) -> CommandOutcome {
-    error.print().expect("the clap error is rendered");
-
     if error.use_stderr() {
+        eprintln!("{}", error.render());
+
         CommandOutcome::Failed
     } else {
+        println!("{}", error.render());
+
         CommandOutcome::Succeeded
     }
 }

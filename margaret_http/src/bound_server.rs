@@ -92,10 +92,8 @@ impl BoundServer {
         })
     }
 
-    pub fn local_addr(&self) -> SocketAddr {
-        self.listener
-            .local_addr()
-            .expect("a bound listener has a local address")
+    pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
+        self.listener.local_addr()
     }
 
     pub async fn serve(self, cancellation_token: CancellationToken) {
@@ -306,7 +304,9 @@ mod tests {
     use crate::request_error::RequestError;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
-    use crate::router_builder::RouterBuilder;
+    use crate::method_handler::MethodHandler;
+    use crate::route_entry::RouteEntry;
+    use crate::router::Router;
     use crate::server::Server;
     use crate::server_registry::ServerRegistry;
     use crate::transport_config::TransportConfig;
@@ -325,13 +325,14 @@ mod tests {
         Arc::new(ServerRegistry::new(vec![Server::new(
             "test",
             "127.0.0.1:0".to_string(),
-            "http://127.0.0.1",
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
-            RouterBuilder::empty()
-                .route("GET", "/", Arc::new(PlainOk))
-                .build(),
+            Router::build(vec![RouteEntry::new(
+                "/",
+                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+            )])
+            .expect("the route entries register cleanly"),
         )]))
     }
 
@@ -385,11 +386,10 @@ mod tests {
         let server_registry = Arc::new(ServerRegistry::new(vec![Server::new(
             "test",
             "this is not an address".to_string(),
-            "http://127.0.0.1",
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
-            RouterBuilder::empty().build(),
+            Router::build(Vec::new()).expect("an empty router builds"),
         )]));
 
         assert!(
@@ -432,7 +432,7 @@ mod tests {
         )
         .await
         .expect("the server binds to an ephemeral port");
-        let address = bound.local_addr();
+        let address = bound.local_addr().expect("the bound listener reports its address");
         let cancellation_token = CancellationToken::new();
         let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 

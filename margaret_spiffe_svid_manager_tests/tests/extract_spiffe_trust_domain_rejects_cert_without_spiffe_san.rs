@@ -2,7 +2,7 @@ use rustls::CertificateError;
 use rustls::Error;
 
 use margaret_spiffe_svid_manager::extract_spiffe_trust_domain::extract_spiffe_trust_domain;
-use margaret_spiffe_svid_manager_tests::test_fixtures::LEAF_DNS_ONLY_DER;
+use margaret_spiffe_svid_manager_tests::leaf_dns_only_der::LEAF_DNS_ONLY_DER;
 
 #[test]
 fn rejects_cert_without_spiffe_san() {

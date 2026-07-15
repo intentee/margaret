@@ -13,6 +13,7 @@ pub mod root_cert_store_holder;
 pub mod root_cert_store_service;
 pub mod svid_certified_key;
 pub mod svid_certified_key_holder;
+pub mod svid_error;
 pub mod svid_client_cert_verifier;
 pub mod svid_client_cert_verifier_service;
 pub mod svid_converter_service;

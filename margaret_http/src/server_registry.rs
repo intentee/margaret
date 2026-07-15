@@ -17,10 +17,6 @@ impl ServerRegistry {
         Self { by_name }
     }
 
-    pub fn origin(&self, name: &str) -> Option<Arc<str>> {
-        self.by_name.get(name).map(|server| server.origin().clone())
-    }
-
     pub fn server(&self, name: &str) -> Option<&Server> {
         self.by_name.get(name)
     }
@@ -30,7 +26,7 @@ impl ServerRegistry {
 mod tests {
     use super::ServerRegistry;
     use crate::body_limit::BodyLimit;
-    use crate::router_builder::RouterBuilder;
+    use crate::router::Router;
     use crate::server::Server;
     use crate::transport_config::TransportConfig;
     use crate::upload_config::UploadConfig;
@@ -39,25 +35,24 @@ mod tests {
         ServerRegistry::new(vec![Server::new(
             "public",
             "127.0.0.1:8080".to_string(),
-            "https://example.test",
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
-            RouterBuilder::empty().build(),
+            Router::build(Vec::new()).expect("an empty router builds"),
         )])
     }
 
     #[test]
-    fn resolves_a_registered_server_origin() {
+    fn resolves_a_registered_server() {
         assert_eq!(
-            registry().origin("public").as_deref(),
-            Some("https://example.test")
+            registry().server("public").map(Server::address),
+            Some("127.0.0.1:8080")
         );
     }
 
     #[test]
-    fn reports_no_origin_for_an_unknown_server() {
-        assert!(registry().origin("missing").is_none());
+    fn reports_no_server_for_an_unknown_name() {
+        assert!(registry().server("missing").is_none());
     }
 
     #[test]

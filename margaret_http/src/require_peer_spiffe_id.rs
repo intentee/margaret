@@ -17,8 +17,9 @@ mod tests {
     use std::sync::Arc;
 
     use http::Method;
-    use margaret_peer_identity::peer_identity::PeerIdentity;
     use spiffe::spiffe_id::SpiffeId;
+
+    use margaret_peer_identity::peer_identity::PeerIdentity;
 
     use super::require_peer_spiffe_id;
     use crate::request::Request;
