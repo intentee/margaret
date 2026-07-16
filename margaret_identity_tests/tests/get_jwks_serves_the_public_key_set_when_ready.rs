@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use margaret_identity::stores::signing_key_store::SigningKeyStore;
 use margaret_identity::routes::public::get_jwks::GetJwks;
+use margaret_identity::stores::signing_key_store::SigningKeyStore;
 use margaret_jwks_key_gen::curve::Curve;
 use margaret_jwks_key_gen::jwks_secret::JwksSecret;
 

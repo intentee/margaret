@@ -4,6 +4,7 @@ members = [
     "margaret_attributes",
     "margaret_console_argument_codegen",
     "margaret_codegen",
+    "margaret_codegen_tokens",
     "margaret_console",
     "margaret_console_codegen",
     "margaret_container",

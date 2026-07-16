@@ -1,8 +1,8 @@
 pub mod argument_registration;
 pub mod argument_value;
-pub mod console_argument_codegen_error;
 pub mod console_argument;
 pub mod console_argument_arguments;
+pub mod console_argument_codegen_error;
 pub mod ensure_unique;
 pub mod optional_parameter;
 pub mod process_arguments;

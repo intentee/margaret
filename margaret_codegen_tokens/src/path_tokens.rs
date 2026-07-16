@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use crate::canonical_path::CanonicalPath;
+use margaret_attributes::canonical_path::CanonicalPath;
 
 pub fn path_tokens(path: &CanonicalPath) -> TokenStream {
     let mut segments = path.segments().iter();
@@ -22,8 +22,9 @@ pub fn path_tokens(path: &CanonicalPath) -> TokenStream {
 
 #[cfg(test)]
 mod tests {
+    use margaret_attributes::canonical_path::CanonicalPath;
+
     use super::path_tokens;
-    use crate::canonical_path::CanonicalPath;
 
     fn rendered(segments: &[&str]) -> String {
         let path = CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect());

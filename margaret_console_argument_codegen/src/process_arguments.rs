@@ -6,14 +6,14 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
+use margaret_attributes::marker::marker;
 use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
-use margaret_injection_codegen::marker::marker;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
 
-use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument::ConsoleArgument;
 use crate::console_argument_arguments::ConsoleArgumentArguments;
+use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::optional_parameter::OptionalParameter;
 use crate::required_argument_style::RequiredArgumentStyle;
 

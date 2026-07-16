@@ -1,6 +1,7 @@
 COVERAGE_PACKAGES := \
 	-p margaret_attributes \
 	-p margaret_codegen \
+	-p margaret_codegen_tokens \
 	-p margaret_console \
 	-p margaret_console_argument_codegen \
 	-p margaret_console_codegen \
@@ -49,6 +50,7 @@ coverage: node_modules
 		--workspace-root $(CURDIR) \
 		--gated margaret_attributes=100 \
 		--gated margaret_codegen=100 \
+		--gated margaret_codegen_tokens=100 \
 		--gated margaret_console=100 \
 		--gated margaret_console_argument_codegen=100 \
 		--gated margaret_console_codegen=100 \

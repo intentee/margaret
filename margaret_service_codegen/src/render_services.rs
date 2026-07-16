@@ -5,13 +5,13 @@ use quote::quote;
 use syn::Path;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::path_tokens::path_tokens;
+use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::ensure_unique::ensure_unique;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-use margaret_generated_module::vec_literal_tokens::vec_literal_tokens;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use margaret_identity::forms::mint_request::MintRequest;
-use margaret_identity::stores::signing_key_store::SigningKeyStore;
 use margaret_identity::routes::internal::post_mint::PostMint;
+use margaret_identity::stores::signing_key_store::SigningKeyStore;
 use margaret_identity_tests::fixed_clock::FixedClock;
 use margaret_identity_tests::peer::peer;
 use margaret_jwks_key_gen::curve::Curve;

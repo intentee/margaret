@@ -6,8 +6,8 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
+use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-use margaret_generated_module::vec_literal_tokens::vec_literal_tokens;
 
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;

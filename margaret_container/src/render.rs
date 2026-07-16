@@ -4,8 +4,8 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::path_tokens::path_tokens;
 use margaret_attributes::struct_shape::StructShape;
+use margaret_codegen_tokens::path_tokens::path_tokens;
 
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;

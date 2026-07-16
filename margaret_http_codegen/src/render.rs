@@ -7,9 +7,9 @@ use quote::quote;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::name_allocator::NameAllocator;
-use margaret_attributes::path_tokens::path_tokens;
+use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-use margaret_generated_module::vec_literal_tokens::vec_literal_tokens;
 
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::http_route::HttpRoute;

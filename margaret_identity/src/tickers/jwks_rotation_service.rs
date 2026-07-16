@@ -7,8 +7,8 @@ use margaret_macros::process;
 use margaret_macros::scheduled_with_tick_timer;
 
 use crate::identity_error::IdentityError;
-use crate::stores::signing_key_store::SigningKeyStore;
 use crate::signing_curve::SIGNING_CURVE;
+use crate::stores::signing_key_store::SigningKeyStore;
 
 #[scheduled_with_tick_timer(
     interval = crate::rotation_interval::ROTATION_INTERVAL,

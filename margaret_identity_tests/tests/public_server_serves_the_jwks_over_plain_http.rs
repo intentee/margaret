@@ -12,9 +12,7 @@ use margaret_jwks_key_gen::jwks_secret::JwksSecret;
 #[tokio::test(flavor = "multi_thread")]
 async fn public_server_serves_the_jwks_over_plain_http() {
     let container = build();
-    let store = container
-        .stores_signing_key_store_signing_key_store()
-        .await;
+    let store = container.stores_signing_key_store_signing_key_store().await;
     let secret = JwksSecret::fresh(Curve::P256).expect("a fresh secret is generated");
     store.holder().set(Some(Arc::new(secret)));
     let routes = Arc::new(Routes::from_origins(

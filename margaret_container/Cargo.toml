@@ -6,6 +6,7 @@ autotests = false
 
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
+margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
 margaret_generated_module = { path = "../margaret_generated_module" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }

@@ -1,6 +1,6 @@
 use syn::Attribute;
 
-use margaret_attributes::attribute_selector::AttributeSelector;
+use crate::attribute_selector::AttributeSelector;
 
 pub fn marker<'attributes>(
     attributes: &'attributes [Attribute],
@@ -16,7 +16,7 @@ mod tests {
     use syn::Attribute;
     use syn::parse_quote;
 
-    use margaret_attributes::attribute_selector::AttributeSelector;
+    use crate::attribute_selector::AttributeSelector;
 
     use super::marker;
 

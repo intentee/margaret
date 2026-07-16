@@ -16,9 +16,7 @@ use margaret_token_signer_tests::sign_refresh_token::sign_refresh_token;
 async fn internal_server_mints_tokens_over_mtls() {
     let fixture = MtlsFixture::new();
     let container = build();
-    let store = container
-        .stores_signing_key_store_signing_key_store()
-        .await;
+    let store = container.stores_signing_key_store_signing_key_store().await;
     let secret = JwksSecret::fresh(Curve::P256).expect("a fresh secret is generated");
     let refresh_token =
         sign_refresh_token(&secret.current.signing, &refresh_claims(32_503_680_000)).await;

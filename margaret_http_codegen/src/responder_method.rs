@@ -8,7 +8,7 @@ use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
-use margaret_injection_codegen::marker::marker;
+use margaret_attributes::marker::marker;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;

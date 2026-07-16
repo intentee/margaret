@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument::ConsoleArgument;
+use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 
 pub fn ensure_unique(
     declarations: &[(String, Vec<ConsoleArgument>)],

@@ -1291,6 +1291,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_codegen_tokens"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "margaret_console"
 version = "0.1.0"
 dependencies = [
@@ -1330,6 +1340,7 @@ name = "margaret_container"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_codegen_tokens",
  "margaret_generated_module",
  "proc-macro2",
  "quote",
@@ -1409,6 +1420,7 @@ dependencies = [
  "heck",
  "http",
  "margaret_attributes",
+ "margaret_codegen_tokens",
  "margaret_generated_module",
  "margaret_injection_codegen",
  "matchit",
@@ -1614,6 +1626,7 @@ version = "0.1.0"
 dependencies = [
  "heck",
  "margaret_attributes",
+ "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_generated_module",
  "margaret_http_codegen",
