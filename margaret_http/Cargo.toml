@@ -17,6 +17,7 @@ margaret_peer_identity = { path = "../margaret_peer_identity" }
 matchit = { workspace = true }
 mime = { workspace = true }
 multer = { workspace = true }
+serde = { workspace = true }
 rustls = { workspace = true }
 serde_json = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types"] }

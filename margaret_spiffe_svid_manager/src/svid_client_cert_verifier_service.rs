@@ -7,9 +7,9 @@ use rustls::server::WebPkiClientVerifier;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 
-use crate::svid_error::SvidError;
 use crate::root_cert_store_holder::RootCertStoreHolder;
 use crate::svid_client_cert_verifier::SvidClientCertVerifier;
+use crate::svid_error::SvidError;
 
 pub struct SvidClientCertVerifierService {
     pub root_cert_store_holder: RootCertStoreHolder,

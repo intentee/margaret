@@ -30,7 +30,10 @@ mod tests {
     #[test]
     fn resolves_an_inserted_name_to_its_path() {
         let mut imports = ModuleImports::default();
-        imports.insert("Routes".to_string(), path(&["crate", "margaret", "routes", "Routes"]));
+        imports.insert(
+            "Routes".to_string(),
+            path(&["crate", "margaret", "routes", "Routes"]),
+        );
 
         assert_eq!(
             imports.resolve("Routes"),

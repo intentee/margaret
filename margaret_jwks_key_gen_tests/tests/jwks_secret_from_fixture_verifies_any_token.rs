@@ -7,6 +7,7 @@ use margaret_jwks_key_gen::generate_keypair::generate_keypair;
 use margaret_jwks_key_gen::generate_keypair_params::GenerateKeypairParams;
 use margaret_jwks_key_gen::jwks_secret::JwksSecret;
 use margaret_jwks_key_gen::jwks_secret_verification_result::JwksSecretVerificationResult;
+use margaret_jwks_key_gen::persisted_jwks_secret::PersistedJwksSecret;
 use margaret_jwks_key_gen::signs_claims::SignsClaims;
 use margaret_jwks_key_gen::verifies_any_token::VerifiesAnyToken;
 use margaret_jwks_key_gen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
@@ -24,7 +25,7 @@ async fn jwks_secret_from_fixture_verifies_any_token() -> Result<()> {
     };
     let token = keypair.signing.sign(&claims).await?;
 
-    let pem = keypair.signing.pem.clone();
+    let pem = keypair.signing.pem.as_str().to_owned();
     let x = keypair.public.x.clone();
     let y = keypair.public.y.clone();
     let pair_json = || {
@@ -42,7 +43,7 @@ async fn jwks_secret_from_fixture_verifies_any_token() -> Result<()> {
     };
     let fixture = json!({ "current": pair_json(), "previous": pair_json() });
 
-    let secret: JwksSecret = from_value(fixture)?;
+    let secret: JwksSecret = from_value::<PersistedJwksSecret>(fixture)?.into_secret();
     let result = secret.verify_any::<TestClaims>(&token)?;
 
     assert!(matches!(

@@ -3,8 +3,9 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::matched_attribute::MatchedAttribute;
+use margaret_console_argument_codegen::process_arguments::process_arguments;
+use margaret_console_argument_codegen::required_argument_style::RequiredArgumentStyle;
 use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
-use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
 
@@ -39,7 +40,8 @@ fn build_unit(
     }
 
     let runner = process_method(item)?;
-    let takes_token = runner_takes_token(index, item, runner, &path)?;
+    let arguments = process_arguments(index, item, runner, &path, RequiredArgumentStyle::Named)?;
+    let takes_token = runner_takes_token(index, item, runner);
     let kind = match role {
         Role::Service => ServiceKind::Service,
         Role::Ticker => {
@@ -51,6 +53,7 @@ fn build_unit(
     };
 
     Ok(ServiceUnit {
+        arguments,
         concrete_path: item.canonical_path().clone(),
         field_name: index.field_name(item.canonical_path()).to_string(),
         kind,
@@ -75,29 +78,10 @@ fn has_conflicting_roles(item: &IndexedItem, role: Role) -> bool {
     })
 }
 
-fn runner_takes_token(
-    index: &AttributeIndex,
-    item: &IndexedItem,
-    method: &IndexedMethod,
-    path: &str,
-) -> Result<bool, ServiceCodegenError> {
-    let mut takes_token = false;
-
-    for ParameterView {
-        declared, position, ..
-    } in parameters(method.signature())
-    {
-        if is_cancellation_token(index, item, declared) {
-            takes_token = true;
-        } else {
-            return Err(ServiceCodegenError::UnexpectedProcessParameter {
-                unit: path.to_string(),
-                parameter: position.to_string(),
-            });
-        }
-    }
-
-    Ok(takes_token)
+fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, method: &IndexedMethod) -> bool {
+    parameters(method.signature())
+        .iter()
+        .any(|view| is_cancellation_token(index, item, view.declared))
 }
 
 fn selector(name: &str) -> AttributeSelector {

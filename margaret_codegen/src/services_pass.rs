@@ -6,12 +6,13 @@ pub(crate) fn services_pass(context: &mut BuildContext) -> Result<(), CodegenErr
         return Ok(());
     }
 
-    let module = margaret_service_codegen::render_services::render_services(
+    let rendered = margaret_service_codegen::render_services::render_services(
         context.index(),
         context.servers(),
     )?;
 
-    context.extend_modules(vec![module]);
+    context.set_serve_arguments(rendered.serve_arguments);
+    context.extend_modules(vec![rendered.module]);
 
     Ok(())
 }

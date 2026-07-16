@@ -10,11 +10,11 @@ use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::handler::Handler;
+use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;
 use margaret_http::require_peer_spiffe_id::require_peer_spiffe_id;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
-use margaret_http::method_handler::MethodHandler;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::router::Router;
 use margaret_http::server::Server;
@@ -62,7 +62,9 @@ impl RunningMtlsServer {
         let bound = BoundServer::bind(server_registry, forward_targets, Arc::from("mtls"))
             .await
             .expect("the mTLS server binds");
-        let address = bound.local_addr().expect("the bound listener reports its address");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
         let cancellation_token = CancellationToken::new();
         let join_handle = tokio::spawn(bound.serve(cancellation_token.clone()));
 

@@ -1,12 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Type;
 
+use margaret_console_argument_codegen::argument_registration::argument_registration;
+use margaret_console_argument_codegen::argument_value::argument_value;
+use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
-use crate::console_argument::ConsoleArgument;
 use crate::console_command::ConsoleCommand;
 
 fn transport_argument_registration(server: &HttpServer) -> TokenStream {
@@ -36,37 +37,6 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
 
     quote! {
         .subcommand(clap::Command::new(#name)#about #(#arguments)*)
-    }
-}
-
-fn argument_registration(argument: &ConsoleArgument) -> TokenStream {
-    match argument {
-        ConsoleArgument::Flag { name } => quote! {
-            .arg(clap::Arg::new(#name).long(#name).action(clap::ArgAction::SetTrue))
-        },
-        ConsoleArgument::Named {
-            name,
-            required,
-            value_type,
-        } => quote! {
-            .arg(
-                clap::Arg::new(#name)
-                    .long(#name)
-                    .required(#required)
-                    .value_parser(clap::value_parser!(#value_type)),
-            )
-        },
-        ConsoleArgument::Positional {
-            id,
-            required,
-            value_type,
-        } => quote! {
-            .arg(
-                clap::Arg::new(#id)
-                    .required(#required)
-                    .value_parser(clap::value_parser!(#value_type)),
-            )
-        },
     }
 }
 
@@ -101,45 +71,18 @@ fn command_arm(command: &ConsoleCommand) -> TokenStream {
     }
 }
 
-fn argument_value(argument: &ConsoleArgument) -> TokenStream {
-    match argument {
-        ConsoleArgument::Flag { name } => quote! { matches.get_flag(#name) },
-        ConsoleArgument::Named {
-            name,
-            required,
-            value_type,
-        } => value_expression(name, *required, value_type),
-        ConsoleArgument::Positional {
-            id,
-            required,
-            value_type,
-        } => value_expression(id, *required, value_type),
-    }
-}
-
-fn value_expression(id: &str, required: bool, value_type: &Type) -> TokenStream {
-    if required {
-        quote! {
-            match matches.get_one::<#value_type>(#id) {
-                Some(value) => value.clone(),
-                None => return margaret_console::command_outcome::CommandOutcome::Failed,
-            }
-        }
-    } else {
-        quote! { matches.get_one::<#value_type>(#id).cloned() }
-    }
-}
-
 pub(crate) fn render(
     commands: &[ConsoleCommand],
     serves: bool,
     servers: &[HttpServer],
+    serve_arguments: &[ConsoleArgument],
 ) -> TokenStream {
     let subcommands = commands.iter().map(subcommand_registration);
     let arms = commands.iter().map(command_arm);
 
     let serve_registration = if serves {
         let spiffe_secured = serves_spiffe(servers);
+        let service_arguments = serve_arguments.iter().map(argument_registration);
         let server_arguments = servers.iter().map(|server| {
             let address_argument = server.address_argument();
             let url_argument = server.url_argument();
@@ -164,7 +107,7 @@ pub(crate) fn render(
         });
 
         quote! {
-            .subcommand(clap::Command::new("serve")#(#server_arguments)*#spiffe_arguments)
+            .subcommand(clap::Command::new("serve")#(#server_arguments)*#spiffe_arguments #(#service_arguments)*)
         }
     } else {
         quote! {}
@@ -173,14 +116,11 @@ pub(crate) fn render(
     let serve_arm = if serves {
         quote! {
             Some(("serve", matches)) => {
-                let cancellation_token = match margaret_service::install::install() {
-                    Ok(cancellation_token) => cancellation_token,
-                    Err(error) => {
-                        return margaret_console::report_failure::report_failure(error);
-                    }
-                };
-
-                super::serve::serve(container, matches, cancellation_token).await
+                margaret_service::dispatch_serve::dispatch_serve(
+                    margaret_service::install::install,
+                    |cancellation_token| super::serve::serve(container, matches, cancellation_token),
+                )
+                .await
             }
         }
     } else {

@@ -77,7 +77,10 @@ mod tests {
     use super::flatten_use_tree;
 
     fn entries(tree: syn::ItemUse, module_path: &[&str]) -> Vec<(String, String)> {
-        let module: Vec<String> = module_path.iter().map(|segment| segment.to_string()).collect();
+        let module: Vec<String> = module_path
+            .iter()
+            .map(|segment| segment.to_string())
+            .collect();
 
         flatten_use_tree(&tree.tree, &module)
             .into_iter()
@@ -88,7 +91,12 @@ mod tests {
     #[test]
     fn resolves_an_external_crate_import_as_written() {
         assert_eq!(
-            entries(parse_quote!(use margaret_http::request::Request;), &["crate"]),
+            entries(
+                parse_quote!(
+                    use margaret_http::request::Request;
+                ),
+                &["crate"]
+            ),
             vec![(
                 "Request".to_string(),
                 "margaret_http::request::Request".to_string()
@@ -99,7 +107,12 @@ mod tests {
     #[test]
     fn resolves_a_crate_rooted_import_as_written() {
         assert_eq!(
-            entries(parse_quote!(use crate::margaret::routes::Routes;), &["crate", "routes"]),
+            entries(
+                parse_quote!(
+                    use crate::margaret::routes::Routes;
+                ),
+                &["crate", "routes"]
+            ),
             vec![(
                 "Routes".to_string(),
                 "crate::margaret::routes::Routes".to_string()
@@ -110,7 +123,12 @@ mod tests {
     #[test]
     fn resolves_a_self_import_against_the_current_module() {
         assert_eq!(
-            entries(parse_quote!(use self::User;), &["crate", "models"]),
+            entries(
+                parse_quote!(
+                    use self::User;
+                ),
+                &["crate", "models"]
+            ),
             vec![("User".to_string(), "crate::models::User".to_string())]
         );
     }
@@ -118,7 +136,12 @@ mod tests {
     #[test]
     fn resolves_a_super_import_against_the_parent_module() {
         assert_eq!(
-            entries(parse_quote!(use super::Shared;), &["crate", "models", "user"]),
+            entries(
+                parse_quote!(
+                    use super::Shared;
+                ),
+                &["crate", "models", "user"]
+            ),
             vec![("Shared".to_string(), "crate::models::Shared".to_string())]
         );
     }
@@ -126,7 +149,12 @@ mod tests {
     #[test]
     fn resolves_nested_super_imports_against_the_grandparent_module() {
         assert_eq!(
-            entries(parse_quote!(use super::super::Root;), &["crate", "models", "user"]),
+            entries(
+                parse_quote!(
+                    use super::super::Root;
+                ),
+                &["crate", "models", "user"]
+            ),
             vec![("Root".to_string(), "crate::Root".to_string())]
         );
     }
@@ -134,7 +162,12 @@ mod tests {
     #[test]
     fn flattens_a_rename_under_its_alias() {
         assert_eq!(
-            entries(parse_quote!(use foo::Bar as Renamed;), &["crate"]),
+            entries(
+                parse_quote!(
+                    use foo::Bar as Renamed;
+                ),
+                &["crate"]
+            ),
             vec![("Renamed".to_string(), "foo::Bar".to_string())]
         );
     }
@@ -142,7 +175,12 @@ mod tests {
     #[test]
     fn flattens_a_group() {
         assert_eq!(
-            entries(parse_quote!(use foo::{Bar, baz::Qux};), &["crate"]),
+            entries(
+                parse_quote!(
+                    use foo::{Bar, baz::Qux};
+                ),
+                &["crate"]
+            ),
             vec![
                 ("Bar".to_string(), "foo::Bar".to_string()),
                 ("Qux".to_string(), "foo::baz::Qux".to_string()),
@@ -153,13 +191,26 @@ mod tests {
     #[test]
     fn skips_the_self_group_member() {
         assert_eq!(
-            entries(parse_quote!(use foo::{self, Bar};), &["crate"]),
+            entries(
+                parse_quote!(
+                    use foo::{self, Bar};
+                ),
+                &["crate"]
+            ),
             vec![("Bar".to_string(), "foo::Bar".to_string())]
         );
     }
 
     #[test]
     fn ignores_a_glob() {
-        assert!(entries(parse_quote!(use foo::*;), &["crate"]).is_empty());
+        assert!(
+            entries(
+                parse_quote!(
+                    use foo::*;
+                ),
+                &["crate"]
+            )
+            .is_empty()
+        );
     }
 }

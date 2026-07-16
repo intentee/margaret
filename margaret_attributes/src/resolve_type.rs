@@ -47,7 +47,10 @@ mod tests {
     #[test]
     fn peels_a_shared_reference() {
         let mut imports = ModuleImports::default();
-        imports.insert("Routes".to_string(), path(&["crate", "margaret", "routes", "Routes"]));
+        imports.insert(
+            "Routes".to_string(),
+            path(&["crate", "margaret", "routes", "Routes"]),
+        );
 
         assert_eq!(
             resolved(parse_quote!(&Routes), &imports, &HashSet::new()),
@@ -69,7 +72,11 @@ mod tests {
     #[test]
     fn returns_none_for_a_non_path_type() {
         assert_eq!(
-            resolved(parse_quote!((u8, u8)), &ModuleImports::default(), &HashSet::new()),
+            resolved(
+                parse_quote!((u8, u8)),
+                &ModuleImports::default(),
+                &HashSet::new()
+            ),
             None
         );
     }

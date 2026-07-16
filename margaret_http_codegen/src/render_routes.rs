@@ -7,6 +7,7 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::vec_literal_tokens::vec_literal_tokens;
 
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
@@ -133,7 +134,7 @@ fn route_method(named: &NamedRoute<'_>, origin: &Ident) -> TokenStream {
     let constructor = route_constructor(
         named,
         quote! { self.#origin.clone() },
-        quote! { ::std::vec![#(#values),*] },
+        vec_literal_tokens(values),
     );
 
     quote! {
@@ -256,7 +257,7 @@ pub(crate) fn render_routes(
         }
 
         impl Routes {
-            pub(crate) fn from_origins(#(#origin_params)*) -> Self {
+            pub fn from_origins(#(#origin_params)*) -> Self {
                 Self {
                     #(#server_inits)*
                 }

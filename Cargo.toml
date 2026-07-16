@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "margaret_attributes",
+    "margaret_console_argument_codegen",
     "margaret_codegen",
     "margaret_console",
     "margaret_console_codegen",
@@ -12,10 +13,13 @@ members = [
     "margaret_http_codegen",
     "margaret_http_tests",
     "margaret_http_validation",
+    "margaret_identity",
     "margaret_identity_session",
+    "margaret_identity_tests",
     "margaret_injection_codegen",
     "margaret_jwks_key_gen",
     "margaret_jwks_key_gen_tests",
+    "margaret_jwks_roller",
     "margaret_macros",
     "margaret_peer_identity",
     "margaret_peer_identity_tests",
@@ -25,6 +29,8 @@ members = [
     "margaret_spiffe_svid_manager",
     "margaret_spiffe_svid_manager_tests",
     "margaret_sync_holder",
+    "margaret_token_signer",
+    "margaret_token_signer_tests",
     "margaret_validation",
 ]
 
@@ -74,6 +80,7 @@ url = "=2.5.7"
 uuid = "=1.18.1"
 validator = "=0.20.0"
 x509-parser = "=0.17.0"
+zeroize = "=1.9.0"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }

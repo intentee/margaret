@@ -352,8 +352,8 @@ impl Metrics {
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains("super::http::server_public::server_public(container,"));
         assert!(serve.contains("super::http::server_internal::server_internal(container,"));
-        assert!(serve.contains(r#"get_one::<String>("public-addr")"#));
-        assert!(serve.contains(r#"get_one::<String>("internal-addr")"#));
+        assert!(serve.contains(r#"address_argument:"public-addr""#));
+        assert!(serve.contains(r#"address_argument:"internal-addr""#));
 
         let run = module(&code, "run");
         assert!(run.contains(r#"clap::Arg::new("public-addr")"#));

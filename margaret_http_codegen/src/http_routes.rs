@@ -96,8 +96,14 @@ pub(crate) fn http_routes(
 
         layers.reverse();
 
-        let arguments =
-            responder_method(index, item, &responder, &server, &binders, &responder_selectors)?;
+        let arguments = responder_method(
+            index,
+            item,
+            &responder,
+            &server,
+            &binders,
+            &responder_selectors,
+        )?;
         let route_path = RoutePath::parse(&path);
 
         for argument in &arguments {

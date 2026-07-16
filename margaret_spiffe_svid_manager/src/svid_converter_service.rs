@@ -14,11 +14,11 @@ use tokio::sync::broadcast::error::RecvError;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 
-use crate::svid_error::SvidError;
 use crate::ca_bundle::CaBundle;
 use crate::extract_ca_bundle::extract_ca_bundle;
 use crate::extract_server_credentials::extract_server_credentials;
 use crate::svid_certified_key_holder::SvidCertifiedKeyHolder;
+use crate::svid_error::SvidError;
 
 pub struct SvidConverterService {
     pub ca_bundle_tx: Sender<Arc<CaBundle<'static>>>,

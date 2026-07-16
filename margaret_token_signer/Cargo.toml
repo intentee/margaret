@@ -1,0 +1,15 @@
+[package]
+name = "margaret_token_signer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = { workspace = true }
+futures-util = { workspace = true }
+margaret_identity_session = { path = "../margaret_identity_session" }
+margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

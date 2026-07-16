@@ -300,11 +300,11 @@ mod tests {
     use crate::body_limit::BodyLimit;
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
+    use crate::method_handler::MethodHandler;
     use crate::request::Request;
     use crate::request_error::RequestError;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
-    use crate::method_handler::MethodHandler;
     use crate::route_entry::RouteEntry;
     use crate::router::Router;
     use crate::server::Server;
@@ -432,7 +432,9 @@ mod tests {
         )
         .await
         .expect("the server binds to an ephemeral port");
-        let address = bound.local_addr().expect("the bound listener reports its address");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
         let cancellation_token = CancellationToken::new();
         let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 

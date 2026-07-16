@@ -9,6 +9,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_attributes::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::vec_literal_tokens::vec_literal_tokens;
 
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::http_route::HttpRoute;
@@ -386,14 +387,13 @@ fn server_module(
                 margaret_http::method_handler::MethodHandler::new(#method, #handler)
             }
         });
+        let method_handlers = vec_literal_tokens(method_handlers);
 
         quote! {
-            margaret_http::route_entry::RouteEntry::new(
-                #path,
-                ::std::vec![#(#method_handlers),*],
-            )
+            margaret_http::route_entry::RouteEntry::new(#path, #method_handlers)
         }
     });
+    let route_entries = vec_literal_tokens(route_entries);
 
     let named_handlers = server_routes.iter().filter_map(|route| {
         route.name.as_ref().map(|name| {
@@ -402,6 +402,7 @@ fn server_module(
             quote! { margaret_http::named_handler::NamedHandler::new(#name, #binding) }
         })
     });
+    let named_handlers = vec_literal_tokens(named_handlers);
 
     quote! {
         pub async fn #function_name(
@@ -413,16 +414,9 @@ fn server_module(
         > {
             #(#handler_bindings)*
 
-            let router = margaret_http::router::Router::build(
-                ::std::vec![#(#route_entries),*],
-            )?;
-
-            ::std::result::Result::Ok(
-                margaret_http::server_routes::ServerRoutes::new(
-                    router,
-                    ::std::vec![#(#named_handlers),*],
-                ),
-            )
+            margaret_http::router::Router::build(#route_entries).map(|router| {
+                margaret_http::server_routes::ServerRoutes::new(router, #named_handlers)
+            })
         }
     }
 }

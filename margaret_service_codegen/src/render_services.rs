@@ -2,14 +2,21 @@ use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
+use syn::Path;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::path_tokens::path_tokens;
+use margaret_console_argument_codegen::argument_value::argument_value;
+use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_console_argument_codegen::ensure_unique::ensure_unique;
+use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_generated_module::vec_literal_tokens::vec_literal_tokens;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
+use crate::rendered_services::RenderedServices;
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
@@ -41,56 +48,43 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
     }
 }
 
-fn server_registrations(servers: &[HttpServer]) -> TokenStream {
+fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
     if servers.is_empty() {
-        return quote! {};
+        return quote! {
+            let mut manager = trzcina::ServiceManager::default();
+        };
     }
 
     let spiffe_secured = serves_spiffe(servers);
     let spiffe_prelude = spiffe_secured.then(|| {
+        let spiffe_trust_domain =
+            required_flag_read(&quote! { String }, "spiffe-trust-domain", &quote! { value.clone() });
+        let spire_agent_addr =
+            required_flag_read(&quote! { String }, "spire-agent-addr", &quote! { value.clone() });
+
         quote! {
             margaret_spiffe_svid_manager::install_default_crypto_provider::install_default_crypto_provider();
 
             let spiffe_bundle = margaret_spiffe_svid_manager::SvidServiceBundle::new(
                 margaret_spiffe_svid_manager::SvidServiceBundleParams {
-                    spiffe_trust_domain: match matches.get_one::<String>("spiffe-trust-domain") {
-                        Some(value) => value.clone(),
-                        None => return margaret_console::command_outcome::CommandOutcome::Failed,
-                    },
-                    spire_agent_addr: match matches.get_one::<String>("spire-agent-addr") {
-                        Some(value) => value.clone(),
-                        None => return margaret_console::command_outcome::CommandOutcome::Failed,
-                    },
+                    spiffe_trust_domain: #spiffe_trust_domain,
+                    spire_agent_addr: #spire_agent_addr,
                 },
             );
             let spiffe_server_config = ::std::sync::Arc::new(spiffe_bundle.server_config());
         }
     });
-    let spiffe_bundle_registration = spiffe_secured.then(|| {
-        quote! {
-            if let Err(error) = manager.register_bundle(spiffe_bundle).await {
-                return margaret_console::report_failure::report_failure(error);
-            }
-        }
-    });
 
     let origins = servers.iter().map(|server| {
-        let name = server.name();
-        let address_argument = server.address_argument();
-        let url_argument = server.url_argument();
-        let address_variable = format_ident!("address_{}", name);
-        let origin_variable = format_ident!("origin_{}", name);
+        let origin_variable = format_ident!("origin_{}", server.name());
+        let origin_read = required_flag_read(
+            &quote! { String },
+            &server.url_argument(),
+            &quote! { value.clone().into() },
+        );
 
         quote! {
-            let #address_variable = match matches.get_one::<String>(#address_argument) {
-                Some(value) => value.clone(),
-                None => return margaret_console::command_outcome::CommandOutcome::Failed,
-            };
-            let #origin_variable: ::std::sync::Arc<str> =
-                match matches.get_one::<String>(#url_argument) {
-                    Some(value) => value.clone().into(),
-                    None => return margaret_console::command_outcome::CommandOutcome::Failed,
-                };
+            let #origin_variable: ::std::sync::Arc<str> = #origin_read;
         }
     });
 
@@ -100,70 +94,34 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
         quote! { #origin_variable.clone() }
     });
 
-    let builds = servers.iter().map(|server| {
+    let assemblies = servers.iter().map(|server| {
         let function_name = server.function_name();
         let name = server.name();
+        let address_argument = server.address_argument();
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
-        let routes_variable = format_ident!("routes_{}", name);
-        let address_variable = format_ident!("address_{}", name);
-        let upload_config_variable = format_ident!("upload_config_{}", name);
-        let transport_variable = format_ident!("transport_{}", name);
-        let forward_targets_variable = format_ident!("forward_targets_{}", name);
         let transport = transport_expression(server, spiffe_secured);
 
         quote! {
-            let #routes_variable = match super::http::#function_name::#function_name(
-                container,
-                &routes,
-            ).await {
-                Ok(server_routes) => server_routes,
-                Err(error) => return margaret_console::report_failure::report_failure(error),
-            };
-            let #upload_config_variable = if matches.get_flag(#uploads_argument) {
-                margaret_http::upload_config::UploadConfig::enabled(
-                    matches
-                        .get_one::<String>(#upload_dir_argument)
-                        .map(std::path::PathBuf::from)
-                        .unwrap_or_else(std::env::temp_dir),
-                )
-            } else {
-                margaret_http::upload_config::UploadConfig::Disabled
-            };
-            let #transport_variable = #transport;
-            let #forward_targets_variable = ::std::sync::Arc::new(
-                margaret_http::forward_targets::ForwardTargets::new(#routes_variable.named_handlers),
-            );
-
-            server_models.push(margaret_http::server::Server::new(
-                #name,
-                #address_variable,
-                #transport_variable,
-                #upload_config_variable,
-                margaret_http::body_limit::BodyLimit::default(),
-                #routes_variable.router,
-            ));
+            margaret_service::server_assembly::ServerAssembly {
+                address_argument: #address_argument,
+                name: #name,
+                routes: super::http::#function_name::#function_name(container, &routes).await,
+                transport: #transport,
+                upload_dir_argument: #upload_dir_argument,
+                uploads_argument: #uploads_argument,
+            }
         }
     });
+    let assemblies = vec_literal_tokens(assemblies);
 
-    let registrations = servers.iter().map(|server| {
-        let name = server.name();
-        let forward_targets_variable = format_ident!("forward_targets_{}", name);
-
-        quote! {
-            manager.register_service(
-                margaret_service::server_service::ServerService::new(
-                    server_registry.clone(),
-                    #forward_targets_variable,
-                    #name,
-                ),
-            );
-        }
-    });
+    let bundle = if spiffe_secured {
+        quote! { ::std::option::Option::Some(spiffe_bundle) }
+    } else {
+        quote! { ::std::option::Option::<margaret_service::no_bundle::NoBundle>::None }
+    };
 
     quote! {
-        let mut server_models = Vec::new();
-
         #spiffe_prelude
 
         #(#origins)*
@@ -171,20 +129,43 @@ fn server_registrations(servers: &[HttpServer]) -> TokenStream {
         let routes = ::std::sync::Arc::new(
             super::routes::Routes::from_origins(#(#origin_arguments),*),
         );
+        let servers = #assemblies;
 
-        #(#builds)*
+        let mut manager = match margaret_service::serve_application::serve_application(
+            matches,
+            servers,
+            #bundle,
+        )
+        .await
+        {
+            Ok(manager) => manager,
+            Err(outcome) => return outcome,
+        };
+    }
+}
 
-        let server_registry = ::std::sync::Arc::new(
-            margaret_http::server_registry::ServerRegistry::new(server_models),
-        );
+fn argument_field_idents(unit: &ServiceUnit) -> Vec<Ident> {
+    (0..unit.arguments.len())
+        .map(|position| format_ident!("argument_{position}"))
+        .collect()
+}
 
-        #spiffe_bundle_registration
-
-        #(#registrations)*
+fn missed_tick_behavior(behavior: &Option<Path>) -> TokenStream {
+    match behavior {
+        Some(behavior) => quote! { #behavior },
+        None => quote! { tokio::time::MissedTickBehavior::default() },
     }
 }
 
 fn adapter(unit: &ServiceUnit) -> TokenStream {
+    if unit.arguments.is_empty() {
+        adapter_without_arguments(unit)
+    } else {
+        adapter_with_arguments(unit)
+    }
+}
+
+fn adapter_without_arguments(unit: &ServiceUnit) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
     let token_binding = if unit.uses_token() {
@@ -193,6 +174,7 @@ fn adapter(unit: &ServiceUnit) -> TokenStream {
         quote! { _cancellation_token }
     };
     let body = adapter_body(unit);
+    let tick_runner_impl = tick_runner_impl(unit);
 
     quote! {
         struct #name {
@@ -208,14 +190,15 @@ fn adapter(unit: &ServiceUnit) -> TokenStream {
                 #body
             }
         }
+
+        #tick_runner_impl
     }
 }
 
 fn adapter_body(unit: &ServiceUnit) -> TokenStream {
-    let runner = format_ident!("{}", unit.runner);
-
     match &unit.kind {
         ServiceKind::Service => {
+            let runner = format_ident!("{}", unit.runner);
             let call = if unit.takes_token {
                 quote! { self.inner.#runner(cancellation_token).await? }
             } else {
@@ -229,29 +212,147 @@ fn adapter_body(unit: &ServiceUnit) -> TokenStream {
             }
         }
         ServiceKind::Ticker { behavior, interval } => {
-            let set_behavior = match behavior {
-                Some(behavior) => quote! { interval.set_missed_tick_behavior(#behavior); },
-                None => quote! {},
-            };
-            let tick = if unit.takes_token {
-                quote! { self.inner.#runner(cancellation_token.clone()).await? }
+            let missed_tick_behavior = missed_tick_behavior(behavior);
+
+            quote! {
+                margaret_service::run_scheduled_service::run_scheduled_service(
+                    #interval,
+                    #missed_tick_behavior,
+                    cancellation_token,
+                    self.inner,
+                )
+                .await
+            }
+        }
+    }
+}
+
+fn tick_runner_impl(unit: &ServiceUnit) -> TokenStream {
+    let ServiceKind::Ticker { .. } = &unit.kind else {
+        return quote! {};
+    };
+
+    let concrete = path_tokens(&unit.concrete_path);
+    let runner = format_ident!("{}", unit.runner);
+    let (token_binding, call) = if unit.takes_token {
+        (
+            quote! { cancellation_token },
+            quote! { self.#runner(cancellation_token).await },
+        )
+    } else {
+        (
+            quote! { _cancellation_token },
+            quote! { self.#runner().await },
+        )
+    };
+
+    quote! {
+        #[async_trait::async_trait]
+        impl margaret_service::tick_runner::TickRunner for #concrete {
+            async fn tick(
+                &self,
+                #token_binding: tokio_util::sync::CancellationToken,
+            ) -> anyhow::Result<()> {
+                #call.map_err(anyhow::Error::from)
+            }
+        }
+    }
+}
+
+fn adapter_with_arguments(unit: &ServiceUnit) -> TokenStream {
+    let name = adapter_ident(unit);
+    let concrete = path_tokens(&unit.concrete_path);
+    let fields = unit
+        .arguments
+        .iter()
+        .enumerate()
+        .map(|(position, argument)| {
+            let field = format_ident!("argument_{position}");
+            let field_type = argument.field_type();
+
+            quote! { #field: #field_type, }
+        });
+    let body = adapter_with_arguments_body(unit);
+    let scheduled_runner = scheduled_argument_runner_impl(unit);
+
+    quote! {
+        struct #name {
+            inner: std::sync::Arc<#concrete>,
+            #(#fields)*
+        }
+
+        #[async_trait::async_trait]
+        impl trzcina::Service for #name {
+            async fn run(
+                self: Box<Self>,
+                cancellation_token: tokio_util::sync::CancellationToken,
+            ) -> anyhow::Result<()> {
+                #body
+            }
+        }
+
+        #scheduled_runner
+    }
+}
+
+fn adapter_with_arguments_body(unit: &ServiceUnit) -> TokenStream {
+    let name = adapter_ident(unit);
+    let runner = format_ident!("{}", unit.runner);
+    let fields = argument_field_idents(unit);
+    let destructure = quote! { let #name { inner, #(#fields),* } = *self; };
+
+    match &unit.kind {
+        ServiceKind::Service => {
+            let call = if unit.takes_token {
+                quote! { inner.#runner(#(#fields,)* cancellation_token).await? }
             } else {
-                quote! { self.inner.#runner().await? }
+                quote! { inner.#runner(#(#fields),*).await? }
             };
 
             quote! {
-                let mut interval = tokio::time::interval(#interval);
+                #destructure
 
-                #set_behavior
+                #call;
 
-                loop {
-                    tokio::select! {
-                        _ = cancellation_token.cancelled() => return Ok(()),
-                        _ = interval.tick() => {
-                            #tick;
-                        }
-                    }
-                }
+                Ok(())
+            }
+        }
+        ServiceKind::Ticker { behavior, interval } => {
+            let missed_tick_behavior = missed_tick_behavior(behavior);
+            let argument = &fields[0];
+
+            quote! {
+                #destructure
+
+                margaret_service::run_scheduled_service_with_argument::run_scheduled_service_with_argument(
+                    #interval,
+                    #missed_tick_behavior,
+                    cancellation_token,
+                    inner,
+                    #argument,
+                )
+                .await
+            }
+        }
+    }
+}
+
+fn scheduled_argument_runner_impl(unit: &ServiceUnit) -> TokenStream {
+    let ServiceKind::Ticker { .. } = &unit.kind else {
+        return quote! {};
+    };
+
+    let concrete = path_tokens(&unit.concrete_path);
+    let runner = format_ident!("{}", unit.runner);
+    let argument_type = unit.arguments[0].field_type();
+
+    quote! {
+        #[async_trait::async_trait]
+        impl margaret_service::scheduled_argument_runner::ScheduledArgumentRunner<#argument_type>
+            for #concrete
+        {
+            async fn run_scheduled_tick(&self, argument: #argument_type) -> anyhow::Result<()> {
+                self.#runner(argument).await.map_err(anyhow::Error::from)
             }
         }
     }
@@ -260,10 +361,29 @@ fn adapter_body(unit: &ServiceUnit) -> TokenStream {
 fn registration(unit: &ServiceUnit) -> TokenStream {
     let name = adapter_ident(unit);
     let accessor = format_ident!("{}", unit.field_name);
-    let inner = quote! { container.#accessor().await };
+
+    if unit.arguments.is_empty() {
+        return quote! {
+            manager.register_service(#name { inner: container.#accessor().await });
+        };
+    }
+
+    let field_assignments = unit
+        .arguments
+        .iter()
+        .enumerate()
+        .map(|(position, argument)| {
+            let field = format_ident!("argument_{position}");
+            let value = argument_value(argument);
+
+            quote! { #field: #value, }
+        });
 
     quote! {
-        manager.register_service(#name { inner: #inner });
+        manager.register_service(#name {
+            inner: container.#accessor().await,
+            #(#field_assignments)*
+        });
     }
 }
 
@@ -271,15 +391,30 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
     format_ident!("{}", unit.type_name)
 }
 
+fn serve_arguments(units: &[ServiceUnit]) -> Result<Vec<ConsoleArgument>, ServiceCodegenError> {
+    let declarations: Vec<(String, Vec<ConsoleArgument>)> = units
+        .iter()
+        .map(|unit| (unit.concrete_path.to_string(), unit.arguments.clone()))
+        .collect();
+
+    ensure_unique(&declarations)?;
+
+    Ok(units
+        .iter()
+        .flat_map(|unit| unit.arguments.clone())
+        .collect())
+}
+
 pub fn render_services(
     index: &AttributeIndex,
     servers: &[HttpServer],
-) -> Result<GeneratedModuleTokens, ServiceCodegenError> {
+) -> Result<RenderedServices, ServiceCodegenError> {
     let units = service_units(index)?;
+    let serve_arguments = serve_arguments(&units)?;
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(registration);
-    let server_registration = server_registrations(servers);
-    let matches_binding = if servers.is_empty() {
+    let manager_setup = server_manager_setup(servers);
+    let matches_binding = if servers.is_empty() && serve_arguments.is_empty() {
         quote! { _matches }
     } else {
         quote! { matches }
@@ -293,9 +428,8 @@ pub fn render_services(
             #matches_binding: &clap::ArgMatches,
             cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret_console::command_outcome::CommandOutcome {
-            let mut manager = trzcina::ServiceManager::default();
+            #manager_setup
 
-            #server_registration
             #(#registrations)*
 
             margaret_service::run::run(
@@ -307,5 +441,8 @@ pub fn render_services(
         }
     };
 
-    Ok(GeneratedModuleTokens::new("serve", tokens))
+    Ok(RenderedServices {
+        module: GeneratedModuleTokens::new("serve", tokens),
+        serve_arguments,
+    })
 }

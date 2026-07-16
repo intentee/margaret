@@ -1,6 +1,6 @@
 use proc_macro2::Ident;
 
-use crate::console_argument::ConsoleArgument;
+use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 
 pub(crate) struct ConsoleCommand {
     pub(crate) accessor: Ident,

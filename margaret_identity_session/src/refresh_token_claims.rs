@@ -4,8 +4,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
 use crate::access_token_claims::AccessTokenClaims;
+use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct RefreshTokenClaims {

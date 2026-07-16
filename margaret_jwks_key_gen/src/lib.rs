@@ -15,6 +15,7 @@ pub mod jws_algorithm;
 mod jws_header;
 pub mod key_type;
 pub mod key_use;
+pub mod persisted_jwks_secret;
 mod sign_signing_input;
 pub mod signs_claims;
 pub mod token_verification;

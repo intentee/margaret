@@ -4,6 +4,7 @@ use p256::elliptic_curve::rand_core::OsRng;
 use p256::elliptic_curve::sec1::ToEncodedPoint;
 use p256::pkcs8::EncodePrivateKey;
 use p256::pkcs8::LineEnding;
+use zeroize::Zeroizing;
 
 use crate::curve::Curve;
 use crate::generate_keypair_params::GenerateKeypairParams;
@@ -32,7 +33,11 @@ fn build_jwk_pair(
             x: encode_coordinate(x.as_deref(), "x")?,
             y: encode_coordinate(y.as_deref(), "y")?,
         },
-        signing: JwkSigning { crv, kid, pem },
+        signing: JwkSigning {
+            crv,
+            kid,
+            pem: Zeroizing::new(pem),
+        },
     })
 }
 

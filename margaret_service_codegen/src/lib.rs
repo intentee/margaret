@@ -1,5 +1,6 @@
 pub mod has_services;
 pub mod render_services;
+pub mod rendered_services;
 pub mod service_codegen_error;
 
 mod service_kind;
@@ -45,6 +46,7 @@ mod tests {
     fn rendered(lib_source: &str, servers: &[HttpServer]) -> String {
         render_services(&index_for(lib_source), servers)
             .expect("the services source is generated")
+            .module
             .format()
             .source()
             .split_whitespace()
@@ -53,7 +55,8 @@ mod tests {
 
     fn error_for(lib_source: &str) -> String {
         render_services(&index_for(lib_source), &[])
-            .expect_err("the services source fails to generate")
+            .err()
+            .expect("the services source fails to generate")
             .to_string()
     }
 
@@ -88,12 +91,11 @@ mod tests {
         let source = rendered(TICKER, &[]);
 
         assert!(source.contains("structFlusher{"));
-        assert!(source.contains("letmutinterval=tokio::time::interval(crate::schedule::PERIOD);"));
         assert!(source.contains(
-            "interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);"
+            "margaret_service::run_scheduled_service::run_scheduled_service(crate::schedule::PERIOD,tokio::time::MissedTickBehavior::Delay,cancellation_token,self.inner,)"
         ));
-        assert!(source.contains("_=interval.tick()=>{self.inner.run().await?;}"));
-        assert!(source.contains("_=cancellation_token.cancelled()=>returnOk(())"));
+        assert!(source.contains("implmargaret_service::tick_runner::TickRunnerfor"));
+        assert!(source.contains("self.run().await.map_err(anyhow::Error::from)"));
     }
 
     #[test]
@@ -103,7 +105,7 @@ mod tests {
             &[],
         );
 
-        assert!(source.contains("self.inner.run(cancellation_token.clone()).await?"));
+        assert!(source.contains("self.run(cancellation_token).await.map_err(anyhow::Error::from)"));
     }
 
     #[test]
@@ -113,7 +115,9 @@ mod tests {
             &[],
         );
 
-        assert!(source.contains("tokio::time::interval(crate::PERIOD)"));
+        assert!(source.contains(
+            "run_scheduled_service(crate::PERIOD,tokio::time::MissedTickBehavior::default(),cancellation_token,self.inner,)"
+        ));
         assert!(!source.contains("set_missed_tick_behavior"));
     }
 
@@ -132,27 +136,15 @@ mod tests {
     fn registers_the_http_server_when_responders_exist() {
         let source = rendered(SERVICE, &public());
 
-        assert!(source.contains(r#"matches.get_one::<String>("public-addr")"#));
         assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
-        assert!(!source.contains(r#"::std::format!("http://{}""#));
-        assert!(source.contains(r#"matches.get_flag("public-uploads")"#));
-        assert!(source.contains(r#"matches.get_one::<String>("public-upload-dir")"#));
-        assert!(source.contains("unwrap_or_else(std::env::temp_dir)"));
-        assert!(source.contains("margaret_http::upload_config::UploadConfig::Disabled"));
         assert!(source.contains(
-            "letforward_targets_public=::std::sync::Arc::new(margaret_http::forward_targets::ForwardTargets::new(routes_public.named_handlers),);"
+            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
-            "lettransport_public=margaret_http::transport_config::TransportConfig::Plain;"
+            r#"transport:margaret_http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            r#"margaret_http::server::Server::new("public",address_public,transport_public,upload_config_public,margaret_http::body_limit::BodyLimit::default(),routes_public.router,)"#
-        ));
-        assert!(
-            source.contains("margaret_http::server_registry::ServerRegistry::new(server_models)")
-        );
-        assert!(source.contains(
-            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_targets_public,"public",)"#
+            "margaret_service::serve_application::serve_application(matches,servers,::std::option::Option::<margaret_service::no_bundle::NoBundle>::None,)"
         ));
     }
 
@@ -181,17 +173,17 @@ mod tests {
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
         ));
         assert!(source.contains(
-            "lettransport_internal=margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),};"
+            "transport:margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
         ));
         assert!(source.contains(
-            r#"lettransport_public=matchmatches.get_one::<String>("public-transport").map(String::as_str)"#
+            r#"transport:matchmatches.get_one::<String>("public-transport").map(String::as_str)"#
         ));
         assert!(source.contains(
             r#"Some("spiffe_mtls")=>{margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
         ));
         assert!(source.contains("_=>margaret_http::transport_config::TransportConfig::Plain,"));
         assert!(source.contains(
-            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret_console::report_failure::report_failure(error);}"
+            "margaret_service::serve_application::serve_application(matches,servers,::std::option::Option::Some(spiffe_bundle),)"
         ));
     }
 
@@ -225,20 +217,23 @@ mod tests {
             ],
         );
 
-        assert!(source.contains(r#"matches.get_one::<String>("public-addr")"#));
-        assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
-        assert!(source.contains(r#"matches.get_flag("public-uploads")"#));
-        assert!(source.contains(r#"matches.get_one::<String>("public-upload-dir")"#));
         assert!(source.contains(
-            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_targets_public,"public",)"#
+            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
-        assert!(source.contains(r#"matches.get_one::<String>("internal-addr")"#));
-        assert!(source.contains(r#"matches.get_one::<String>("internal-url")"#));
-        assert!(source.contains(r#"matches.get_flag("internal-uploads")"#));
-        assert!(source.contains(r#"matches.get_one::<String>("internal-upload-dir")"#));
         assert!(source.contains(
-            r#"margaret_service::server_service::ServerService::new(server_registry.clone(),forward_targets_internal,"internal",)"#
+            r#"upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
+        assert!(source.contains(
+            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
+        ));
+        assert!(source.contains(
+            r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#
+        ));
+        assert!(
+            source.contains(
+                "margaret_service::serve_application::serve_application(matches,servers,"
+            )
+        );
     }
 
     #[test]
@@ -314,12 +309,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_unexpected_runner_parameter() {
+    fn rejects_an_unmarked_runner_parameter() {
         let message = error_for(
             "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> Result<(), Infallible> {}\n}\n",
         );
 
-        assert!(message.contains("unsupported"));
+        assert!(message.contains("must be a console argument"));
     }
 
     #[test]
@@ -328,7 +323,66 @@ mod tests {
             "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> Result<(), Infallible> {}\n}\n",
         );
 
-        assert!(message.contains("unsupported"));
+        assert!(message.contains("must be a console argument"));
+    }
+
+    #[test]
+    fn threads_a_console_argument_into_a_ticker() {
+        let source = rendered(
+            "use std::path::PathBuf;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Roller;\n\nimpl Roller {\n    #[process]\n    fn run(&self, #[console_argument(from = \"secret-path\")] secret_path: PathBuf) -> Result<(), Infallible> {}\n}\n",
+            &[],
+        );
+
+        assert!(
+            source
+                .contains("structRoller{inner:std::sync::Arc<crate::Roller>,argument_0:PathBuf,}")
+        );
+        assert!(source.contains("letRoller{inner,argument_0}=*self;"));
+        assert!(source.contains(
+            "margaret_service::run_scheduled_service_with_argument::run_scheduled_service_with_argument(crate::P,tokio::time::MissedTickBehavior::default(),cancellation_token,inner,argument_0,)"
+        ));
+        assert!(source.contains(
+            "implmargaret_service::scheduled_argument_runner::ScheduledArgumentRunner<PathBuf>forcrate::Roller"
+        ));
+        assert!(source.contains("self.run(argument).await.map_err(anyhow::Error::from)"));
+        assert!(!source.contains("TickRunner"));
+        assert!(source.contains(r#"argument_0:matchmatches.get_one::<PathBuf>("secret-path")"#));
+    }
+
+    #[test]
+    fn threads_a_console_argument_into_a_service_with_a_token() {
+        let source = rendered(
+            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Worker;\n\nimpl Worker {\n    #[process]\n    fn run(&self, #[console_argument(from = \"label\")] label: String, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            &[],
+        );
+
+        assert!(source.contains("letWorker{inner,argument_0}=*self;"));
+        assert!(source.contains("inner.run(argument_0,cancellation_token).await?;Ok(())"));
+    }
+
+    #[test]
+    fn threads_a_console_argument_into_a_service() {
+        let source = rendered(
+            "#[service]\nstruct Worker;\n\nimpl Worker {\n    #[process]\n    fn run(&self, #[console_argument(from = \"label\")] label: String) -> Result<(), Infallible> {}\n}\n",
+            &[],
+        );
+
+        assert!(
+            source.contains("structWorker{inner:std::sync::Arc<crate::Worker>,argument_0:String,}")
+        );
+        assert!(
+            source
+                .contains("letWorker{inner,argument_0}=*self;inner.run(argument_0).await?;Ok(())")
+        );
+    }
+
+    #[test]
+    fn rejects_two_components_declaring_the_same_console_argument() {
+        let message = error_for(
+            "#[service]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self, #[console_argument(from = \"shared\")] a: String) -> Result<(), Infallible> {}\n}\n\n#[service]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self, #[console_argument(from = \"shared\")] b: String) -> Result<(), Infallible> {}\n}\n",
+        );
+
+        assert!(message.contains("already declared"));
     }
 
     #[test]

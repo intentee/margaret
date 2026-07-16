@@ -8,17 +8,17 @@ use margaret_macros::singleton;
 
 use crate::forms::get_articles_form::GetArticlesForm;
 use crate::margaret::routes::Routes;
-use crate::repositories::article_repository::ArticleRepository;
+use crate::stores::article_store::ArticleStore;
 
 #[singleton]
 #[responds_to_http(method = "get", path = "/articles", server = "public")]
 pub struct GetArticles {
-    articles: Arc<ArticleRepository>,
+    articles: Arc<ArticleStore>,
 }
 
 impl GetArticles {
     #[constructor]
-    pub fn create(articles: Arc<ArticleRepository>) -> Self {
+    pub fn create(articles: Arc<ArticleStore>) -> Self {
         Self { articles }
     }
 

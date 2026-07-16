@@ -8,17 +8,17 @@ use margaret_macros::singleton;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::forms::post_article_form::PostArticleForm;
-use crate::repositories::article_repository::ArticleRepository;
+use crate::stores::article_store::ArticleStore;
 
 #[singleton]
 #[responds_to_http(method = "post", path = "/articles/import", server = "public")]
 pub struct PostArticleImport {
-    articles: Arc<ArticleRepository>,
+    articles: Arc<ArticleStore>,
 }
 
 impl PostArticleImport {
     #[constructor]
-    pub fn create(articles: Arc<ArticleRepository>) -> Self {
+    pub fn create(articles: Arc<ArticleStore>) -> Self {
         Self { articles }
     }
 

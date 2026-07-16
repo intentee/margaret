@@ -2,6 +2,7 @@ use bytes::Bytes;
 use cookie::Cookie;
 use http::StatusCode;
 use http_body_util::Full;
+use serde::Serialize;
 
 use crate::header::Header;
 
@@ -35,6 +36,13 @@ impl Response {
 
     pub fn html(status: u16, body: impl Into<String>) -> Self {
         Self::text(status, body).header("content-type", "text/html; charset=utf-8")
+    }
+
+    pub fn json<Value: Serialize>(status: u16, value: &Value) -> Self {
+        match serde_json::to_string(value) {
+            Ok(body) => Self::text(status, body).header("content-type", "application/json"),
+            Err(error) => Self::text(500, error.to_string()),
+        }
     }
 
     pub fn not_found() -> Self {
@@ -81,8 +89,43 @@ impl Response {
 #[cfg(test)]
 mod tests {
     use cookie::Cookie;
+    use serde::Serialize;
+    use serde::Serializer;
+    use serde::ser::Error;
 
     use super::Response;
+
+    struct Unserializable;
+
+    impl Serialize for Unserializable {
+        fn serialize<Target: Serializer>(
+            &self,
+            _serializer: Target,
+        ) -> Result<Target::Ok, Target::Error> {
+            Err(Target::Error::custom("this value cannot be serialized"))
+        }
+    }
+
+    #[test]
+    fn builds_a_json_response_with_a_content_type() {
+        let response = Response::json(200, &vec!["ok"]).into_http();
+
+        assert_eq!(response.status().as_u16(), 200);
+        assert_eq!(
+            response
+                .headers()
+                .get("content-type")
+                .expect("the content type header is present"),
+            "application/json"
+        );
+    }
+
+    #[test]
+    fn serves_an_error_when_the_value_cannot_be_serialized() {
+        let response = Response::json(200, &Unserializable);
+
+        assert_eq!(response.status(), 500);
+    }
 
     #[test]
     fn builds_an_http_response_with_status_and_headers() {

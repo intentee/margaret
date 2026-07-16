@@ -1,5 +1,6 @@
 use anyhow::Result;
 use serde_json::json;
+use zeroize::Zeroizing;
 
 use margaret_jwks_key_gen::curve::Curve;
 use margaret_jwks_key_gen::jwk_signing::JwkSigning;
@@ -11,7 +12,7 @@ async fn sign_errors_on_invalid_pem() -> Result<()> {
     let signing = JwkSigning {
         crv: Curve::P256,
         kid: "kid".to_string(),
-        pem: "not a valid pem".to_string(),
+        pem: Zeroizing::new("not a valid pem".to_string()),
     };
 
     let result = signing.sign(&json!({})).await;

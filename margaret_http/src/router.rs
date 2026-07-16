@@ -71,10 +71,10 @@ mod tests {
 
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
+    use crate::method_handler::MethodHandler;
     use crate::request::Request;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
-    use crate::method_handler::MethodHandler;
     use crate::route_entry::RouteEntry;
 
     struct EchoId;

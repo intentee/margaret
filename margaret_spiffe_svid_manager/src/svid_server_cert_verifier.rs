@@ -21,9 +21,9 @@ use webpki::ring::ECDSA_P384_SHA256;
 use webpki::ring::ECDSA_P384_SHA384;
 use webpki::ring::ED25519;
 
-use crate::svid_error::SvidError;
 use crate::extract_spiffe_trust_domain::extract_spiffe_trust_domain;
 use crate::parse_end_entity_cert::parse_end_entity_cert;
+use crate::svid_error::SvidError;
 
 #[derive(Debug)]
 pub struct SvidServerCertVerifier {
@@ -33,10 +33,7 @@ pub struct SvidServerCertVerifier {
 }
 
 impl SvidServerCertVerifier {
-    pub fn new(
-        root_store: RootCertStore,
-        spiffe_trust_domain: String,
-    ) -> Result<Self, SvidError> {
+    pub fn new(root_store: RootCertStore, spiffe_trust_domain: String) -> Result<Self, SvidError> {
         let default_crypto_provider =
             CryptoProvider::get_default().ok_or(SvidError::CryptoProviderNotInstalled)?;
 

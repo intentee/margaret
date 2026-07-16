@@ -248,7 +248,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "pubfnget_article(&self,article:String,)->margaret_http::forwardable_route::ForwardableRoute"
         ));
         assert!(source.contains(
-            "margaret_http::forwardable_route::ForwardableRoute::new(self.origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/articles/\"),margaret_http::url_segment::UrlSegment::Parameter(\"article\"),],::std::vec![article],)"
+            "margaret_http::forwardable_route::ForwardableRoute::new(self.origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/articles/\"),margaret_http::url_segment::UrlSegment::Parameter(\"article\"),],::std::vec::Vec::from([article]),)"
         ));
         assert!(!source.contains("Params"));
     }
@@ -279,7 +279,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "pub(crate)fnfrom_origins(origin_internal:::std::sync::Arc<str>,origin_public:::std::sync::Arc<str>,)->Self"
+            "pubfnfrom_origins(origin_internal:::std::sync::Arc<str>,origin_public:::std::sync::Arc<str>,)->Self"
         ));
         assert!(source.contains(
             "internal:servers::internal::Internal::new(origin_internal),public:servers::public::Public::new(origin_public),"
@@ -413,10 +413,10 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         ));
         assert!(source.contains("responder.respond().await"));
         assert!(source.contains(
-            "margaret_http::layer::layer(std::sync::Arc::new(super::Guard{inner:container.guard().await}),margaret_http::responder_handler::responder_handler(container.resource().await"
+            "margaret_http::layer::layer(std::sync::Arc::new(super::Guard{inner:container.guard().await,}),margaret_http::responder_handler::responder_handler(container.resource().await"
         ));
         assert!(source.contains(
-            "margaret_http::layer::layer(std::sync::Arc::new(super::Tracer{inner:container.tracer().await}),margaret_http::layer::layer(std::sync::Arc::new(super::Guard{"
+            "margaret_http::layer::layer(std::sync::Arc::new(super::Tracer{inner:container.tracer().await,}),margaret_http::layer::layer(std::sync::Arc::new(super::Guard{"
         ));
 
         let guard = source.find("container.guard").expect("the guard is wired");
@@ -701,7 +701,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         );
 
         assert!(source.contains(
-            "margaret_http::route_entry::RouteEntry::new(\"/search\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"QUERY\","
+            "margaret_http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret_http::method_handler::MethodHandler::new(\"QUERY\","
         ));
     }
 
@@ -827,7 +827,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret_http::route_entry::RouteEntry::new(\"/open\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"GET\","));
+        assert!(source.contains("margaret_http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret_http::method_handler::MethodHandler::new(\"GET\","));
     }
 
     const NAMED_ROUTE: &str = r#"
@@ -851,7 +851,7 @@ impl GetGreeting {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret_http::route_entry::RouteEntry::new(\"/greeting\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"GET\","));
+        assert!(source.contains("margaret_http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret_http::method_handler::MethodHandler::new(\"GET\","));
         assert!(
             source.contains("margaret_http::named_handler::NamedHandler::new(\"get_greeting\",")
         );
@@ -968,7 +968,7 @@ impl GetGreeting {
         );
 
         assert!(
-            source.contains("margaret_http::response_continuation::ResponseContinuation::from(responder.respond().await)")
+            source.contains("margaret_http::response_continuation::ResponseContinuation::from(responder.respond().await,)")
         );
     }
 
@@ -1004,10 +1004,10 @@ impl GetMetrics {
         let source = source_for(MULTIPLE_SERVERS);
 
         assert!(source.contains(
-            "server_public(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret_http::server_routes::ServerRoutes,margaret_http::matchit::InsertError,>{letrouter=margaret_http::router::Router::build(::std::vec![margaret_http::route_entry::RouteEntry::new(\"/\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"GET\","
+            "server_public(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret_http::server_routes::ServerRoutes,margaret_http::matchit::InsertError,>{margaret_http::router::Router::build(::std::vec::Vec::from([margaret_http::route_entry::RouteEntry::new(\"/\",::std::vec::Vec::from([margaret_http::method_handler::MethodHandler::new(\"GET\","
         ));
         assert!(source.contains(
-            "server_internal(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret_http::server_routes::ServerRoutes,margaret_http::matchit::InsertError,>{letrouter=margaret_http::router::Router::build(::std::vec![margaret_http::route_entry::RouteEntry::new(\"/metrics\",::std::vec![margaret_http::method_handler::MethodHandler::new(\"GET\","
+            "server_internal(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret_http::server_routes::ServerRoutes,margaret_http::matchit::InsertError,>{margaret_http::router::Router::build(::std::vec::Vec::from([margaret_http::route_entry::RouteEntry::new(\"/metrics\",::std::vec::Vec::from([margaret_http::method_handler::MethodHandler::new(\"GET\","
         ));
     }
 

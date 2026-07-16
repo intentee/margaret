@@ -10,11 +10,11 @@ use rustls::pki_types::PrivateKeyDer;
 use rustls::pki_types::ServerName;
 
 use margaret_spiffe_svid_manager::svid_server_cert_verifier::SvidServerCertVerifier;
-use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
-use margaret_spiffe_svid_manager_tests::pump_tls_handshake::pump_tls_handshake;
 use margaret_spiffe_svid_manager_tests::ca_der::CA_DER;
+use margaret_spiffe_svid_manager_tests::install_crypto_provider::install_crypto_provider;
 use margaret_spiffe_svid_manager_tests::leaf_spiffe_example_org_server_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_DER;
 use margaret_spiffe_svid_manager_tests::leaf_spiffe_example_org_server_key_der::LEAF_SPIFFE_EXAMPLE_ORG_SERVER_KEY_DER;
+use margaret_spiffe_svid_manager_tests::pump_tls_handshake::pump_tls_handshake;
 
 #[test]
 fn rejects_tls12_when_used_as_client_server_verifier() {

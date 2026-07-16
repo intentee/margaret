@@ -1,11 +1,8 @@
-mod console_argument;
-mod console_argument_arguments;
 pub mod console_codegen_error;
 mod console_command;
 mod console_command_arguments;
 mod console_commands;
 pub mod has_commands;
-mod optional_parameter;
 mod render;
 pub mod render_console;
 
@@ -90,7 +87,7 @@ impl Farewell {
             Vec::new()
         };
 
-        render_console(&index_for(lib_source), has_http, &servers)
+        render_console(&index_for(lib_source), has_http, &servers, &[])
             .expect("the console source is generated")
             .format()
             .source()
@@ -99,7 +96,7 @@ impl Farewell {
     }
 
     fn error_for(lib_source: &str) -> String {
-        render_console(&index_for(lib_source), false, &[])
+        render_console(&index_for(lib_source), false, &[], &[])
             .expect_err("the console source fails to generate")
             .to_string()
     }
@@ -148,8 +145,9 @@ impl Farewell {
         assert!(source.contains(
             r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(false).requires("public-uploads")"#
         ));
-        assert!(source.contains("super::serve::serve(container,matches,cancellation_token)"));
-        assert!(source.contains("margaret_service::install::install()"));
+        assert!(source.contains(
+            "margaret_service::dispatch_serve::dispatch_serve(margaret_service::install::install,|cancellation_token|super::serve::serve(container,matches,cancellation_token,),)"
+        ));
     }
 
     #[test]
@@ -164,6 +162,7 @@ impl Farewell {
                 ),
                 HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
             ],
+            &[],
         )
         .expect("the console source is generated")
         .format()
@@ -202,6 +201,7 @@ impl Farewell {
                 HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
                 HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
             ],
+            &[],
         )
         .expect("the console source is generated")
         .format()
@@ -221,7 +221,7 @@ impl Farewell {
 
     #[test]
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
-        let source: String = render_console(&index_for("struct App;\n"), true, &[])
+        let source: String = render_console(&index_for("struct App;\n"), true, &[], &[])
             .expect("the console source is generated")
             .format()
             .source()

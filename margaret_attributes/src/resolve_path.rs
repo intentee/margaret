@@ -80,7 +80,10 @@ mod tests {
     #[test]
     fn resolves_an_imported_leaf() {
         let mut imports = ModuleImports::default();
-        imports.insert("Greeter".to_string(), path(&["crate", "greeter", "Greeter"]));
+        imports.insert(
+            "Greeter".to_string(),
+            path(&["crate", "greeter", "Greeter"]),
+        );
 
         assert_eq!(
             resolved(parse_quote!(Greeter), &["crate"], &imports, &HashSet::new()),
@@ -106,11 +109,20 @@ mod tests {
         let mut imports = ModuleImports::default();
         imports.insert(
             "ValidationResult".to_string(),
-            path(&["margaret_validation", "validation_result", "ValidationResult"]),
+            path(&[
+                "margaret_validation",
+                "validation_result",
+                "ValidationResult",
+            ]),
         );
 
         assert_eq!(
-            resolved(parse_quote!(ValidationResult<Form>), &["crate"], &imports, &HashSet::new()),
+            resolved(
+                parse_quote!(ValidationResult<Form>),
+                &["crate"],
+                &imports,
+                &HashSet::new()
+            ),
             Some("margaret_validation::validation_result::ValidationResult".to_string())
         );
     }
@@ -120,7 +132,12 @@ mod tests {
         let items = HashSet::from([path(&["crate", "models", "User"])]);
 
         assert_eq!(
-            resolved(parse_quote!(User), &["crate", "models"], &ModuleImports::default(), &items),
+            resolved(
+                parse_quote!(User),
+                &["crate", "models"],
+                &ModuleImports::default(),
+                &items
+            ),
             Some("crate::models::User".to_string())
         );
     }
@@ -130,7 +147,12 @@ mod tests {
         let items = HashSet::from([path(&["crate", "String"])]);
 
         assert_eq!(
-            resolved(parse_quote!(String), &["crate"], &ModuleImports::default(), &items),
+            resolved(
+                parse_quote!(String),
+                &["crate"],
+                &ModuleImports::default(),
+                &items
+            ),
             Some("crate::String".to_string())
         );
     }
@@ -138,7 +160,12 @@ mod tests {
     #[test]
     fn resolves_a_bare_string_to_the_prelude() {
         assert_eq!(
-            resolved(parse_quote!(String), &["crate"], &ModuleImports::default(), &HashSet::new()),
+            resolved(
+                parse_quote!(String),
+                &["crate"],
+                &ModuleImports::default(),
+                &HashSet::new()
+            ),
             Some("std::string::String".to_string())
         );
     }
@@ -146,7 +173,12 @@ mod tests {
     #[test]
     fn resolves_a_bare_bool_to_the_prelude() {
         assert_eq!(
-            resolved(parse_quote!(bool), &["crate"], &ModuleImports::default(), &HashSet::new()),
+            resolved(
+                parse_quote!(bool),
+                &["crate"],
+                &ModuleImports::default(),
+                &HashSet::new()
+            ),
             Some("bool".to_string())
         );
     }
@@ -154,7 +186,12 @@ mod tests {
     #[test]
     fn returns_none_for_an_unresolvable_leaf() {
         assert_eq!(
-            resolved(parse_quote!(Unknown), &["crate"], &ModuleImports::default(), &HashSet::new()),
+            resolved(
+                parse_quote!(Unknown),
+                &["crate"],
+                &ModuleImports::default(),
+                &HashSet::new()
+            ),
             None
         );
     }

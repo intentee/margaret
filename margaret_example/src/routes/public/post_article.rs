@@ -7,7 +7,7 @@ use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
 use crate::forms::post_article_form::PostArticleForm;
-use crate::repositories::article_repository::ArticleRepository;
+use crate::stores::article_store::ArticleStore;
 
 #[singleton]
 #[responds_to_http(
@@ -17,12 +17,12 @@ use crate::repositories::article_repository::ArticleRepository;
     server = "public"
 )]
 pub struct PostArticle {
-    articles: Arc<ArticleRepository>,
+    articles: Arc<ArticleStore>,
 }
 
 impl PostArticle {
     #[constructor]
-    pub fn create(articles: Arc<ArticleRepository>) -> Self {
+    pub fn create(articles: Arc<ArticleStore>) -> Self {
         Self { articles }
     }
 

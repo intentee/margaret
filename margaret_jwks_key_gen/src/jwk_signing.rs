@@ -1,21 +1,21 @@
 use async_trait::async_trait;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
-use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
+use zeroize::Zeroizing;
 
 use crate::curve::Curve;
 use crate::jwks_key_error::JwksKeyError;
 use crate::sign_signing_input::sign_signing_input;
 use crate::signs_claims::SignsClaims;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone)]
 pub struct JwkSigning {
     pub crv: Curve,
     pub kid: String,
-    pub pem: String,
+    pub pem: Zeroizing<String>,
 }
 
 impl JwkSigning {

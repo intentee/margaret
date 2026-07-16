@@ -1,0 +1,18 @@
+use thiserror::Error;
+
+use margaret_jwks_key_gen::jwks_key_error::JwksKeyError;
+
+#[derive(Debug, Error)]
+pub enum TokenSignerError {
+    #[error("the refresh token is expired")]
+    ExpiredRefreshToken,
+
+    #[error("the refresh token signature does not match any known signing key")]
+    InvalidRefreshToken,
+
+    #[error("failed to sign a token with the current signing key: {source}")]
+    Signing { source: JwksKeyError },
+
+    #[error("the refresh token could not be parsed or verified: {source}")]
+    UnverifiableRefreshToken { source: JwksKeyError },
+}

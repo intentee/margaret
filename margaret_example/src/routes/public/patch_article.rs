@@ -8,17 +8,17 @@ use margaret_macros::singleton;
 
 use crate::forms::patch_article_form::PatchArticleForm;
 use crate::models::article::Article;
-use crate::repositories::article_repository::ArticleRepository;
+use crate::stores::article_store::ArticleStore;
 
 #[singleton]
 #[responds_to_http(method = "patch", path = "/articles/{article}", server = "public")]
 pub struct PatchArticle {
-    articles: Arc<ArticleRepository>,
+    articles: Arc<ArticleStore>,
 }
 
 impl PatchArticle {
     #[constructor]
-    pub fn create(articles: Arc<ArticleRepository>) -> Self {
+    pub fn create(articles: Arc<ArticleStore>) -> Self {
         Self { articles }
     }
 

@@ -77,7 +77,8 @@ mod tests {
 
     #[test]
     fn reports_a_content_type_that_is_not_a_media_type() {
-        let result = BodyClass::from_headers(&headers(HeaderValue::from_static("not/a/media/type")));
+        let result =
+            BodyClass::from_headers(&headers(HeaderValue::from_static("not/a/media/type")));
 
         assert!(result.is_err());
     }

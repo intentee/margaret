@@ -8,7 +8,7 @@ pub mod log_sink;
 pub mod metrics;
 pub mod middleware;
 pub mod models;
-pub mod repositories;
+pub mod stores;
 pub mod routes;
 pub mod services;
 pub mod stderr_sink;

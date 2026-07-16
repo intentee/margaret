@@ -10,6 +10,7 @@ pub(crate) fn console_pass(context: &mut BuildContext) -> Result<(), CodegenErro
         context.index(),
         context.capabilities().serves,
         context.servers(),
+        context.serve_arguments(),
     )?;
 
     context.extend_modules(vec![module]);

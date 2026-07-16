@@ -1,5 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::curve::Curve;
@@ -11,7 +9,7 @@ use crate::token_verification::TokenVerification;
 use crate::verifies_any_token::VerifiesAnyToken;
 use crate::verifies_token::VerifiesToken;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone)]
 pub struct JwksSecret {
     pub current: JwkPair,
     pub previous: JwkPair,

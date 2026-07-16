@@ -1,0 +1,24 @@
+[package]
+name = "margaret_token_signer_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dependencies]
+chrono = { workspace = true }
+margaret_identity_session = { path = "../margaret_identity_session" }
+margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
+uuid = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+margaret_token_signer = { path = "../margaret_token_signer" }
+tokio = { workspace = true, features = ["macros", "rt"] }
+zeroize = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

@@ -7,17 +7,17 @@ use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
 use crate::models::article::Article;
-use crate::repositories::article_repository::ArticleRepository;
+use crate::stores::article_store::ArticleStore;
 
 #[singleton]
 #[responds_to_http(method = "delete", path = "/articles/{article}", server = "public")]
 pub struct DeleteArticle {
-    articles: Arc<ArticleRepository>,
+    articles: Arc<ArticleStore>,
 }
 
 impl DeleteArticle {
     #[constructor]
-    pub fn create(articles: Arc<ArticleRepository>) -> Self {
+    pub fn create(articles: Arc<ArticleStore>) -> Self {
         Self { articles }
     }
 

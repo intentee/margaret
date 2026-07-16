@@ -1,0 +1,20 @@
+use zeroize::Zeroizing;
+
+use margaret_token_signer::mint_access_token::mint_access_token;
+use margaret_token_signer::token_signer_error::TokenSignerError;
+use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
+use margaret_token_signer_tests::refresh_claims::refresh_claims;
+use margaret_token_signer_tests::sign_refresh_token::sign_refresh_token;
+use margaret_token_signer_tests::unix_time::unix_time;
+
+#[tokio::test]
+async fn reports_a_signing_failure_when_the_current_key_is_corrupt() {
+    let mut secret = fresh_p256_secret();
+    let refresh_token = sign_refresh_token(&secret.current.signing, &refresh_claims(10_000)).await;
+
+    secret.current.signing.pem = Zeroizing::new("not a valid pkcs8 pem".to_string());
+
+    let result = mint_access_token(&secret, &refresh_token, unix_time(1_000)).await;
+
+    assert!(matches!(result, Err(TokenSignerError::Signing { .. })));
+}
