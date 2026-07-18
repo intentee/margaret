@@ -150,31 +150,110 @@ fn argument_field_idents(unit: &ServiceUnit) -> Vec<Ident> {
         .collect()
 }
 
-fn missed_tick_behavior(behavior: &Option<Path>) -> TokenStream {
+fn argument_fields(unit: &ServiceUnit) -> Vec<TokenStream> {
+    unit.arguments
+        .iter()
+        .enumerate()
+        .map(|(position, argument)| {
+            let field = format_ident!("argument_{position}");
+            let field_type = argument.field_type();
+
+            quote! { #field: #field_type, }
+        })
+        .collect()
+}
+
+fn missed_tick_behavior_method(behavior: &Option<Path>) -> TokenStream {
     match behavior {
-        Some(behavior) => quote! { #behavior },
-        None => quote! { tokio::time::MissedTickBehavior::default() },
+        Some(behavior) => quote! {
+            fn missed_tick_behavior(&self) -> tokio::time::MissedTickBehavior {
+                #behavior
+            }
+        },
+        None => quote! {},
     }
 }
 
 fn adapter(unit: &ServiceUnit) -> TokenStream {
-    if unit.arguments.is_empty() {
-        adapter_without_arguments(unit)
-    } else {
-        adapter_with_arguments(unit)
+    match &unit.kind {
+        ServiceKind::Service => service_adapter(unit),
+        ServiceKind::Ticker { behavior, interval } => ticker_adapter(unit, behavior, interval),
     }
 }
 
-fn adapter_without_arguments(unit: &ServiceUnit) -> TokenStream {
+fn service_adapter(unit: &ServiceUnit) -> TokenStream {
+    if unit.arguments.is_empty() {
+        service_adapter_without_arguments(unit)
+    } else {
+        service_adapter_with_arguments(unit)
+    }
+}
+
+fn ticker_call(unit: &ServiceUnit) -> TokenStream {
+    let runner = format_ident!("{}", unit.runner);
+    let arguments = argument_field_idents(unit)
+        .into_iter()
+        .map(|field| quote! { self.#field.clone() });
+
+    if unit.takes_token {
+        quote! { self.inner.#runner(#(#arguments,)* cancellation_token).await }
+    } else {
+        quote! { self.inner.#runner(#(#arguments),*).await }
+    }
+}
+
+fn ticker_adapter(unit: &ServiceUnit, behavior: &Option<Path>, interval: &Path) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
-    let token_binding = if unit.uses_token() {
+    let fields = argument_fields(unit);
+    let missed_tick_behavior_method = missed_tick_behavior_method(behavior);
+    let token_binding = if unit.takes_token {
         quote! { cancellation_token }
     } else {
         quote! { _cancellation_token }
     };
-    let body = adapter_body(unit);
-    let tick_runner_impl = tick_runner_impl(unit);
+    let call = ticker_call(unit);
+
+    quote! {
+        struct #name {
+            inner: std::sync::Arc<#concrete>,
+            #(#fields)*
+        }
+
+        #[async_trait::async_trait]
+        impl trzcina::Ticker for #name {
+            fn tick_interval(&self) -> std::time::Duration {
+                #interval
+            }
+
+            #missed_tick_behavior_method
+
+            async fn handle_tick(
+                &mut self,
+                #token_binding: tokio_util::sync::CancellationToken,
+                _tick_context: trzcina::TickContext,
+            ) -> anyhow::Result<()> {
+                #call.map_err(anyhow::Error::from)
+            }
+        }
+    }
+}
+
+fn service_adapter_without_arguments(unit: &ServiceUnit) -> TokenStream {
+    let name = adapter_ident(unit);
+    let concrete = path_tokens(&unit.concrete_path);
+    let runner = format_ident!("{}", unit.runner);
+    let (token_binding, call) = if unit.takes_token {
+        (
+            quote! { cancellation_token },
+            quote! { self.inner.#runner(cancellation_token).await? },
+        )
+    } else {
+        (
+            quote! { _cancellation_token },
+            quote! { self.inner.#runner().await? },
+        )
+    };
 
     quote! {
         struct #name {
@@ -187,93 +266,31 @@ fn adapter_without_arguments(unit: &ServiceUnit) -> TokenStream {
                 self: Box<Self>,
                 #token_binding: tokio_util::sync::CancellationToken,
             ) -> anyhow::Result<()> {
-                #body
-            }
-        }
-
-        #tick_runner_impl
-    }
-}
-
-fn adapter_body(unit: &ServiceUnit) -> TokenStream {
-    match &unit.kind {
-        ServiceKind::Service => {
-            let runner = format_ident!("{}", unit.runner);
-            let call = if unit.takes_token {
-                quote! { self.inner.#runner(cancellation_token).await? }
-            } else {
-                quote! { self.inner.#runner().await? }
-            };
-
-            quote! {
                 #call;
 
                 Ok(())
             }
         }
-        ServiceKind::Ticker { behavior, interval } => {
-            let missed_tick_behavior = missed_tick_behavior(behavior);
-
-            quote! {
-                margaret_service::run_scheduled_service::run_scheduled_service(
-                    #interval,
-                    #missed_tick_behavior,
-                    cancellation_token,
-                    self.inner,
-                )
-                .await
-            }
-        }
     }
 }
 
-fn tick_runner_impl(unit: &ServiceUnit) -> TokenStream {
-    let ServiceKind::Ticker { .. } = &unit.kind else {
-        return quote! {};
-    };
-
+fn service_adapter_with_arguments(unit: &ServiceUnit) -> TokenStream {
+    let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
+    let fields = argument_fields(unit);
+    let field_idents = argument_field_idents(unit);
     let runner = format_ident!("{}", unit.runner);
     let (token_binding, call) = if unit.takes_token {
         (
             quote! { cancellation_token },
-            quote! { self.#runner(cancellation_token).await },
+            quote! { inner.#runner(#(#field_idents,)* cancellation_token).await? },
         )
     } else {
         (
             quote! { _cancellation_token },
-            quote! { self.#runner().await },
+            quote! { inner.#runner(#(#field_idents),*).await? },
         )
     };
-
-    quote! {
-        #[async_trait::async_trait]
-        impl margaret_service::tick_runner::TickRunner for #concrete {
-            async fn tick(
-                &self,
-                #token_binding: tokio_util::sync::CancellationToken,
-            ) -> anyhow::Result<()> {
-                #call.map_err(anyhow::Error::from)
-            }
-        }
-    }
-}
-
-fn adapter_with_arguments(unit: &ServiceUnit) -> TokenStream {
-    let name = adapter_ident(unit);
-    let concrete = path_tokens(&unit.concrete_path);
-    let fields = unit
-        .arguments
-        .iter()
-        .enumerate()
-        .map(|(position, argument)| {
-            let field = format_ident!("argument_{position}");
-            let field_type = argument.field_type();
-
-            quote! { #field: #field_type, }
-        });
-    let body = adapter_with_arguments_body(unit);
-    let scheduled_runner = scheduled_argument_runner_impl(unit);
 
     quote! {
         struct #name {
@@ -285,74 +302,13 @@ fn adapter_with_arguments(unit: &ServiceUnit) -> TokenStream {
         impl trzcina::Service for #name {
             async fn run(
                 self: Box<Self>,
-                cancellation_token: tokio_util::sync::CancellationToken,
+                #token_binding: tokio_util::sync::CancellationToken,
             ) -> anyhow::Result<()> {
-                #body
-            }
-        }
-
-        #scheduled_runner
-    }
-}
-
-fn adapter_with_arguments_body(unit: &ServiceUnit) -> TokenStream {
-    let name = adapter_ident(unit);
-    let runner = format_ident!("{}", unit.runner);
-    let fields = argument_field_idents(unit);
-    let destructure = quote! { let #name { inner, #(#fields),* } = *self; };
-
-    match &unit.kind {
-        ServiceKind::Service => {
-            let call = if unit.takes_token {
-                quote! { inner.#runner(#(#fields,)* cancellation_token).await? }
-            } else {
-                quote! { inner.#runner(#(#fields),*).await? }
-            };
-
-            quote! {
-                #destructure
+                let #name { inner, #(#field_idents),* } = *self;
 
                 #call;
 
                 Ok(())
-            }
-        }
-        ServiceKind::Ticker { behavior, interval } => {
-            let missed_tick_behavior = missed_tick_behavior(behavior);
-            let argument = &fields[0];
-
-            quote! {
-                #destructure
-
-                margaret_service::run_scheduled_service_with_argument::run_scheduled_service_with_argument(
-                    #interval,
-                    #missed_tick_behavior,
-                    cancellation_token,
-                    inner,
-                    #argument,
-                )
-                .await
-            }
-        }
-    }
-}
-
-fn scheduled_argument_runner_impl(unit: &ServiceUnit) -> TokenStream {
-    let ServiceKind::Ticker { .. } = &unit.kind else {
-        return quote! {};
-    };
-
-    let concrete = path_tokens(&unit.concrete_path);
-    let runner = format_ident!("{}", unit.runner);
-    let argument_type = unit.arguments[0].field_type();
-
-    quote! {
-        #[async_trait::async_trait]
-        impl margaret_service::scheduled_argument_runner::ScheduledArgumentRunner<#argument_type>
-            for #concrete
-        {
-            async fn run_scheduled_tick(&self, argument: #argument_type) -> anyhow::Result<()> {
-                self.#runner(argument).await.map_err(anyhow::Error::from)
             }
         }
     }

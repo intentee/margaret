@@ -91,11 +91,15 @@ mod tests {
         let source = rendered(TICKER, &[]);
 
         assert!(source.contains("structFlusher{"));
+        assert!(source.contains("impltrzcina::TickerforFlusher"));
+        assert!(
+            source.contains("fntick_interval(&self)->std::time::Duration{crate::schedule::PERIOD}")
+        );
         assert!(source.contains(
-            "margaret_service::run_scheduled_service::run_scheduled_service(crate::schedule::PERIOD,tokio::time::MissedTickBehavior::Delay,cancellation_token,self.inner,)"
+            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
         ));
-        assert!(source.contains("implmargaret_service::tick_runner::TickRunnerfor"));
-        assert!(source.contains("self.run().await.map_err(anyhow::Error::from)"));
+        assert!(source.contains("_tick_context:trzcina::TickContext"));
+        assert!(source.contains("self.inner.run().await.map_err(anyhow::Error::from)"));
     }
 
     #[test]
@@ -105,7 +109,11 @@ mod tests {
             &[],
         );
 
-        assert!(source.contains("self.run(cancellation_token).await.map_err(anyhow::Error::from)"));
+        assert!(
+            source
+                .contains("self.inner.run(cancellation_token).await.map_err(anyhow::Error::from)")
+        );
+        assert!(!source.contains("_cancellation_token"));
     }
 
     #[test]
@@ -115,10 +123,9 @@ mod tests {
             &[],
         );
 
-        assert!(source.contains(
-            "run_scheduled_service(crate::PERIOD,tokio::time::MissedTickBehavior::default(),cancellation_token,self.inner,)"
-        ));
-        assert!(!source.contains("set_missed_tick_behavior"));
+        assert!(source.contains("fntick_interval(&self)->std::time::Duration{crate::PERIOD}"));
+        assert!(!source.contains("missed_tick_behavior"));
+        assert!(!source.contains("impltrzcina::Servicefor"));
     }
 
     #[test]
@@ -337,16 +344,25 @@ mod tests {
             source
                 .contains("structRoller{inner:std::sync::Arc<crate::Roller>,argument_0:PathBuf,}")
         );
-        assert!(source.contains("letRoller{inner,argument_0}=*self;"));
+        assert!(source.contains("impltrzcina::TickerforRoller"));
         assert!(source.contains(
-            "margaret_service::run_scheduled_service_with_argument::run_scheduled_service_with_argument(crate::P,tokio::time::MissedTickBehavior::default(),cancellation_token,inner,argument_0,)"
+            "self.inner.run(self.argument_0.clone()).await.map_err(anyhow::Error::from)"
         ));
-        assert!(source.contains(
-            "implmargaret_service::scheduled_argument_runner::ScheduledArgumentRunner<PathBuf>forcrate::Roller"
-        ));
-        assert!(source.contains("self.run(argument).await.map_err(anyhow::Error::from)"));
-        assert!(!source.contains("TickRunner"));
+        assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains(r#"argument_0:matchmatches.get_one::<PathBuf>("secret-path")"#));
+    }
+
+    #[test]
+    fn threads_a_console_argument_and_the_token_into_a_ticker() {
+        let source = rendered(
+            "use std::path::PathBuf;\nuse tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Roller;\n\nimpl Roller {\n    #[process]\n    fn run(&self, #[console_argument(from = \"secret-path\")] secret_path: PathBuf, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            &[],
+        );
+
+        assert!(source.contains(
+            "self.inner.run(self.argument_0.clone(),cancellation_token).await.map_err(anyhow::Error::from)"
+        ));
+        assert!(!source.contains("_cancellation_token"));
     }
 
     #[test]

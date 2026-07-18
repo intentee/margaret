@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use log::error;
@@ -7,13 +5,11 @@ use log::info;
 use spiffe::WorkloadApiClient;
 use spiffe::X509Context;
 use tokio::sync::broadcast;
-use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
-use trzcina::Service;
+use trzcina::TickContext;
+use trzcina::Ticker;
 
 use crate::svid_rotate_loop::svid_rotate_loop;
-
-const SPIRE_AGENT_RECONNECT_INTERVAL: Duration = Duration::from_secs(1);
 
 pub struct SvidRotateService {
     pub spire_agent_addr: String,
@@ -50,37 +46,50 @@ impl SvidRotateService {
 }
 
 #[async_trait]
-impl Service for SvidRotateService {
-    async fn run(self: Box<Self>, cancellation_token: CancellationToken) -> Result<()> {
-        loop {
-            tokio::select! {
-                () = cancellation_token.cancelled() => return Ok(()),
-                () = self.stream_from_agent(cancellation_token.clone()) => {
-                    tokio::select! {
-                        () = cancellation_token.cancelled() => return Ok(()),
-                        () = sleep(SPIRE_AGENT_RECONNECT_INTERVAL) => continue,
-                    }
-                },
-            }
-        }
+impl Ticker for SvidRotateService {
+    async fn handle_tick(
+        &mut self,
+        cancellation_token: CancellationToken,
+        _tick_context: TickContext,
+    ) -> Result<()> {
+        self.stream_from_agent(cancellation_token).await;
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use tokio::sync::broadcast;
+    use tokio::time::sleep;
     use tokio_util::sync::CancellationToken;
+    use trzcina::Service as _;
+    use trzcina::Ticker as _;
 
     use super::SvidRotateService;
 
-    #[tokio::test]
-    async fn stream_from_agent_returns_when_socket_path_invalid() {
+    #[tokio::test(start_paused = true)]
+    async fn keeps_reconnecting_until_cancelled_when_agent_is_unreachable() {
         let (x509_context_tx, _x509_context_rx) = broadcast::channel(1);
+        let cancellation_token = CancellationToken::new();
+        let cancellation_token_for_service = cancellation_token.clone();
+
         let service = SvidRotateService {
             spire_agent_addr: "unix:///nonexistent/spire-agent.sock".to_string(),
             x509_context_tx,
         };
+        let tick_interval = service.tick_interval();
 
-        service.stream_from_agent(CancellationToken::new()).await;
+        let service_task =
+            tokio::spawn(
+                async move { Box::new(service).run(cancellation_token_for_service).await },
+            );
+
+        sleep(tick_interval * 3).await;
+
+        assert!(!service_task.is_finished());
+
+        cancellation_token.cancel();
+        service_task.await.unwrap().unwrap();
     }
 }

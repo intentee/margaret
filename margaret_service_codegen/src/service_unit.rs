@@ -12,9 +12,3 @@ pub(crate) struct ServiceUnit {
     pub(crate) takes_token: bool,
     pub(crate) type_name: String,
 }
-
-impl ServiceUnit {
-    pub(crate) fn uses_token(&self) -> bool {
-        matches!(self.kind, ServiceKind::Ticker { .. }) || self.takes_token
-    }
-}

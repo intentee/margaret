@@ -6,14 +6,13 @@ COVERAGE_PACKAGES := \
 	-p margaret_console_argument_codegen \
 	-p margaret_console_codegen \
 	-p margaret_container \
+	-p margaret_container_tests \
 	-p margaret_generated_module \
 	-p margaret_http \
 	-p margaret_http_codegen \
 	-p margaret_http_tests \
 	-p margaret_http_validation \
-	-p margaret_identity \
 	-p margaret_identity_session \
-	-p margaret_identity_tests \
 	-p margaret_injection_codegen \
 	-p margaret_jwks_key_gen \
 	-p margaret_jwks_key_gen_tests \
@@ -60,14 +59,13 @@ coverage: node_modules
 		--gated margaret_console_argument_codegen=100 \
 		--gated margaret_console_codegen=100 \
 		--gated margaret_container=100 \
+		--gated margaret_container_tests=100 \
 		--gated margaret_generated_module=100 \
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \
 		--gated margaret_http_tests=100 \
 		--gated margaret_http_validation=100 \
-		--gated margaret_identity=100 \
 		--gated margaret_identity_session=100 \
-		--gated margaret_identity_tests=100 \
 		--gated margaret_injection_codegen=100 \
 		--gated margaret_jwks_key_gen=100 \
 		--gated margaret_jwks_key_gen_tests=100 \

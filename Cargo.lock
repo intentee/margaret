@@ -12,15 +12,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "android_system_properties"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "anstyle"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -261,9 +252,7 @@ version = "0.4.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
 dependencies = [
- "iana-time-zone",
  "num-traits",
- "windows-link",
 ]
 
 [[package]]
@@ -954,30 +943,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iana-time-zone"
-version = "0.1.65"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e31bc9ad994ba00e440a8aa5c9ef0ec67d5cb5e5cb0cc7f8b744a35b389cc470"
-dependencies = [
- "android_system_properties",
- "core-foundation-sys",
- "iana-time-zone-haiku",
- "js-sys",
- "log",
- "wasm-bindgen",
- "windows-core",
-]
-
-[[package]]
-name = "iana-time-zone-haiku"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "icu_collections"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1345,8 +1310,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "margaret_container_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_container",
+ "margaret_generated_module",
 ]
 
 [[package]]
@@ -1458,37 +1431,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_identity"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "clap",
- "margaret_codegen",
- "margaret_console",
- "margaret_http",
- "margaret_http_validation",
- "margaret_identity_session",
- "margaret_jwks_key_gen",
- "margaret_jwks_roller",
- "margaret_macros",
- "margaret_service",
- "margaret_spiffe_svid",
- "margaret_spiffe_svid_server",
- "margaret_token_signer",
- "margaret_validation",
- "serde",
- "serde_json",
- "spiffe",
- "thiserror",
- "tokio",
- "tokio-util",
- "trzcina",
- "validator",
-]
-
-[[package]]
 name = "margaret_identity_session"
 version = "0.1.0"
 dependencies = [
@@ -1497,32 +1439,6 @@ dependencies = [
  "serde",
  "thiserror",
  "uuid",
-]
-
-[[package]]
-name = "margaret_identity_tests"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "margaret_console",
- "margaret_http",
- "margaret_http_tests",
- "margaret_identity",
- "margaret_jwks_key_gen",
- "margaret_service",
- "margaret_token_signer_tests",
- "margaret_validation",
- "rustls",
- "serde_json",
- "spiffe",
- "tempfile",
- "tokio",
- "tokio-rustls",
- "tokio-util",
- "validator",
- "zeroize",
 ]
 
 [[package]]
@@ -3255,14 +3171,15 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "trzcina"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c58d685f2fd0c04ea9c0dcff193161de5aebf1eba5e1267807e5ae2a8562cd93"
+checksum = "0105cd7bb068e2c2befb3910c55ccf33b07b7ce0592161be5044cc6233366d4f"
 dependencies = [
  "anyhow",
  "async-trait",
  "futures-util",
  "log",
+ "thiserror",
  "tokio",
  "tokio-util",
 ]
@@ -3475,41 +3392,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf85cb06032201fa7c6f829d7db5a7e5aa45bcc0655327713065f6f0576731bf"
 dependencies = [
  "rustls-pki-types",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement",
- "windows-interface",
- "windows-link",
- "windows-result",
- "windows-strings",
-]
-
-[[package]]
-name = "windows-implement"
-version = "0.60.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "windows-interface"
-version = "0.59.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

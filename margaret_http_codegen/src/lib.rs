@@ -2,7 +2,6 @@ mod active_servers;
 mod build_registry;
 mod form_request_arguments;
 mod form_request_extraction;
-pub mod generate_http_source;
 pub mod has_responders;
 pub mod http_artifacts;
 pub mod http_codegen_error;
@@ -39,6 +38,7 @@ mod url_segment;
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::Path;
 
     use tempfile::TempDir;
     use tempfile::tempdir;
@@ -47,8 +47,26 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
 
-    use crate::generate_http_source::generate_http_source;
     use crate::has_responders::has_responders;
+    use crate::http_codegen_error::HttpCodegenError;
+    use crate::render_http::render_http;
+
+    fn generate_http_source(
+        crate_name: &str,
+        source_directory: &Path,
+    ) -> Result<String, HttpCodegenError> {
+        let index = AttributeIndexBuilder::new()
+            .index_crate(&CrateRoot::new(crate_name, source_directory))?
+            .build();
+
+        Ok(render_http(&index)?
+            .into_modules()
+            .into_iter()
+            .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
+            .map(|module| module.format().source().to_string())
+            .collect::<Vec<String>>()
+            .join("\n"))
+    }
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"
 use margaret_http::next::Next;

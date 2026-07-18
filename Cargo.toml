@@ -8,15 +8,14 @@ members = [
     "margaret_console",
     "margaret_console_codegen",
     "margaret_container",
+    "margaret_container_tests",
     "margaret_example",
     "margaret_generated_module",
     "margaret_http",
     "margaret_http_codegen",
     "margaret_http_tests",
     "margaret_http_validation",
-    "margaret_identity",
     "margaret_identity_session",
-    "margaret_identity_tests",
     "margaret_injection_codegen",
     "margaret_jwks_key_gen",
     "margaret_jwks_key_gen_tests",
@@ -81,7 +80,7 @@ tokio = "=1.52.3"
 tokio-rustls = "=0.26.4"
 tokio-util = "=0.7.18"
 tower = "=0.5.3"
-trzcina = "=0.3.0"
+trzcina = "=0.4.0"
 url = "=2.5.7"
 uuid = "=1.18.1"
 validator = "=0.20.0"

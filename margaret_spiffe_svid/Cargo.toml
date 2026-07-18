@@ -12,11 +12,14 @@ log = { workspace = true }
 margaret_sync_holder = { path = "../margaret_sync_holder" }
 rustls = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types", "workload-api"] }
-tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
+tokio = { workspace = true, features = ["macros", "rt", "sync"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
 url = { workspace = true }
 x509-parser = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "time"] }
 
 [lints]
 workspace = true

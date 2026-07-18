@@ -6,7 +6,6 @@ mod container_plan;
 mod dependency_kind;
 mod direct_construction;
 mod field_ident;
-pub mod generate_container_source;
 mod managed_arguments;
 mod ordered_providers;
 mod path_text;
