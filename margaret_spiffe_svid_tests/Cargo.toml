@@ -21,6 +21,9 @@ futures-util = { workspace = true }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
+[features]
+tests_that_use_spire = []
+
 [lints]
 workspace = true
 

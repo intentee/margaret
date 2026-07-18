@@ -15,6 +15,9 @@ tokio = { workspace = true, features = ["fs", "macros", "net", "process", "rt-mu
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
+[features]
+tests_that_use_spire = []
+
 [lints]
 workspace = true
 

@@ -39,18 +39,22 @@ COVERAGE_PACKAGES := \
 	-p margaret_token_signer_tests \
 	-p margaret_validation
 
+SPIRE_FEATURES := \
+	--features margaret_spiffe_svid_tests/tests_that_use_spire \
+	--features margaret_spiffe_svid_integration_tests/tests_that_use_spire
+
 node_modules: package.json
 	npm install
 	touch node_modules
 
 .PHONY: clippy
 clippy:
-	cargo clippy --workspace --all-targets -- -D warnings
+	cargo clippy --workspace --all-targets $(SPIRE_FEATURES) -- -D warnings
 
 .PHONY: coverage
 coverage: node_modules
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest $(COVERAGE_PACKAGES) --no-report
+	cargo llvm-cov nextest $(COVERAGE_PACKAGES) $(SPIRE_FEATURES) --no-report
 	cargo llvm-cov report --json --output-path target/llvm-cov.json
 	cargo llvm-cov report --lcov --output-path target/lcov.info
 	cargo llvm-cov report
@@ -100,6 +104,13 @@ coverage: node_modules
 fmt:
 	cargo fmt
 
-.PHONY: test
-test:
+.PHONY: test.unit
+test.unit:
 	cargo nextest run --workspace
+
+.PHONY: test.integration
+test.integration:
+	cargo nextest run --workspace $(SPIRE_FEATURES)
+
+.PHONY: test
+test: test.integration
