@@ -160,12 +160,15 @@ mod tests {
     }
 
     #[test]
-    fn declares_the_bundle_services_immutable_and_the_manager_immutable_without_units() {
-        let source = rendered("#[singleton]\nstruct S;\n", &public());
+    fn binds_the_manager_immutably_when_no_services_are_registered() {
+        let source = rendered("#[singleton]\nstruct Store;\n", &public());
 
-        assert!(!source.contains("letmutbundle_services"));
+        assert!(
+            source.contains(
+                "letmanager=matchmargaret_service::serve_application::serve_application("
+            )
+        );
         assert!(!source.contains("letmutmanager"));
-        assert!(source.contains("letmanager=match"));
     }
 
     #[test]

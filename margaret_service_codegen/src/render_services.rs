@@ -48,13 +48,16 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
     }
 }
 
-fn server_manager_setup(
-    servers: &[HttpServer],
-    manager_mutability: &Option<TokenStream>,
-) -> TokenStream {
+fn server_manager_setup(servers: &[HttpServer], registers_services: bool) -> TokenStream {
+    let manager_binding = if registers_services {
+        quote! { mut manager }
+    } else {
+        quote! { manager }
+    };
+
     if servers.is_empty() {
         return quote! {
-            let #manager_mutability manager = trzcina::ServiceManager::default();
+            let #manager_binding = trzcina::ServiceManager::default();
         };
     }
 
@@ -118,7 +121,11 @@ fn server_manager_setup(
     });
     let assemblies = vec_literal_tokens(assemblies);
 
-    let bundle_services_mutability = spiffe_secured.then(|| quote! { mut });
+    let bundle_services_binding = if spiffe_secured {
+        quote! { mut bundle_services }
+    } else {
+        quote! { bundle_services }
+    };
     let bundle_services = spiffe_secured.then(|| {
         quote! {
             match margaret_service::bundle_services::bundle_services(spiffe_bundle).await {
@@ -138,13 +145,13 @@ fn server_manager_setup(
         );
         let servers = #assemblies;
 
-        let #bundle_services_mutability bundle_services: ::std::vec::Vec<
+        let #bundle_services_binding: ::std::vec::Vec<
             ::std::boxed::Box<dyn trzcina::Service>,
         > = ::std::vec::Vec::new();
 
         #bundle_services
 
-        let #manager_mutability manager = match margaret_service::serve_application::serve_application(
+        let #manager_binding = match margaret_service::serve_application::serve_application(
             matches,
             servers,
             margaret_service::resolved_services::ResolvedServices {
@@ -384,8 +391,7 @@ pub fn render_services(
     let serve_arguments = serve_arguments(&units)?;
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(registration);
-    let manager_mutability = (!units.is_empty()).then(|| quote! { mut });
-    let manager_setup = server_manager_setup(servers, &manager_mutability);
+    let manager_setup = server_manager_setup(servers, !units.is_empty());
     let matches_binding = if servers.is_empty() && serve_arguments.is_empty() {
         quote! { _matches }
     } else {
