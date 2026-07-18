@@ -20,6 +20,7 @@ where
 
     loop {
         tokio::select! {
+            biased;
             () = cancellation_token.cancelled() => return Ok(()),
             _ = interval.tick() => runner().await?,
         }
