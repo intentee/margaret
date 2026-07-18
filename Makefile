@@ -97,5 +97,12 @@ fmt:
 	cargo fmt
 
 .PHONY: test
-test:
+test: test.integration
+
+.PHONY: test.integration
+test.integration:
 	cargo nextest run --workspace
+
+.PHONY: test.unit
+test.unit:
+	cargo nextest run --workspace --no-default-features

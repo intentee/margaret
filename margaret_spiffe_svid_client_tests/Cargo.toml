@@ -6,7 +6,7 @@ autotests = false
 
 [dependencies]
 margaret_spiffe_svid_client = { path = "../margaret_spiffe_svid_client" }
-margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests" }
+margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests", default-features = false }
 rustls = { workspace = true }
 
 [dev-dependencies]

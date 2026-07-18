@@ -20,7 +20,7 @@ jobs:
           tool: cargo-nextest@0.9.137
 
       - name: run tests
-        run: make test
+        run: make test.unit
 
   clippy:
     name: clippy

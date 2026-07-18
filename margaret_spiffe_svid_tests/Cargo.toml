@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 autotests = false
 
+[features]
+default = ["tests_that_use_spire"]
+tests_that_use_spire = []
+
 [dependencies]
 anyhow = { workspace = true }
 libc = { workspace = true }
