@@ -1,0 +1,20 @@
+[package]
+name = "margaret_jwks_roller_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dependencies]
+margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
+margaret_jwks_roller = { path = "../margaret_jwks_roller" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

@@ -12,20 +12,25 @@ use crate::verifies_token::VerifiesToken;
 #[derive(Clone)]
 pub struct JwksSecret {
     pub current: JwkPair,
+    pub next: JwkPair,
     pub previous: JwkPair,
 }
 
 impl JwksSecret {
     pub fn fresh(crv: Curve) -> Result<Self, JwksKeyError> {
-        generate_keypair_random_kid(crv).map(|jwk_pair| Self {
-            current: jwk_pair.clone(),
-            previous: jwk_pair,
+        generate_keypair_random_kid(crv).and_then(|current| {
+            generate_keypair_random_kid(crv).map(|next| Self {
+                current: current.clone(),
+                next,
+                previous: current,
+            })
         })
     }
 
     pub fn rotate(&self) -> Result<Self, JwksKeyError> {
-        generate_keypair_random_kid(self.current.signing.crv).map(|current| Self {
-            current,
+        generate_keypair_random_kid(self.current.signing.crv).map(|next| Self {
+            current: self.next.clone(),
+            next,
             previous: self.current.clone(),
         })
     }

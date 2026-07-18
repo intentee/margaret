@@ -1,0 +1,62 @@
+use std::sync::Arc;
+
+use anyhow::Result;
+use async_trait::async_trait;
+use bytes::Bytes;
+use trzcina::Service;
+use trzcina::ServiceBundle;
+
+use margaret_jwks_key_gen::jwk_public_set::JwkPublicSet;
+use margaret_jwks_key_gen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
+use margaret_jwks_roller::roll::roll;
+
+use crate::jwk_public_set_handler::JwkPublicSetHandler;
+use crate::jwks_curve::JWKS_CURVE;
+use crate::jwks_document_holder::JwksDocumentHolder;
+use crate::jwks_roll_service::JwksRollService;
+use crate::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
+use crate::jwks_roller_server_error::JwksRollerServerError;
+
+pub struct JwksRollerServerBundle {
+    jwks_document_holder: JwksDocumentHolder,
+    jwks_secret_holder: JwksSecretHolder,
+    storage: Arc<dyn JwksSecretStorage>,
+}
+
+impl JwksRollerServerBundle {
+    #[must_use]
+    pub fn new(JwksRollerServerBundleParams { storage }: JwksRollerServerBundleParams) -> Self {
+        Self {
+            jwks_document_holder: JwksDocumentHolder::default(),
+            jwks_secret_holder: JwksSecretHolder::default(),
+            storage,
+        }
+    }
+
+    #[must_use]
+    pub fn jwk_public_set_handler(&self) -> Arc<JwkPublicSetHandler> {
+        Arc::new(JwkPublicSetHandler::new(self.jwks_document_holder.clone()))
+    }
+
+    #[must_use]
+    pub fn jwks_secret_holder(&self) -> JwksSecretHolder {
+        self.jwks_secret_holder.clone()
+    }
+
+    pub fn roll_and_publish(&self) -> Result<(), JwksRollerServerError> {
+        let rolled = roll(self.storage.as_ref(), &self.jwks_secret_holder, JWKS_CURVE)
+            .map_err(JwksRollerServerError::SecretRoll)?;
+
+        serde_json::to_vec(&JwkPublicSet::from(rolled))
+            .map_err(JwksRollerServerError::DocumentSerialization)
+            .map(|document| self.jwks_document_holder.set(Some(Bytes::from(document))))
+    }
+}
+
+#[async_trait]
+impl ServiceBundle for JwksRollerServerBundle {
+    async fn services(self) -> Result<Vec<Box<dyn Service>>> {
+        Ok(vec![Box::new(JwksRollService { bundle: self })])
+    }
+}

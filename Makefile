@@ -14,9 +14,13 @@ COVERAGE_PACKAGES := \
 	-p margaret_http_validation \
 	-p margaret_identity_session \
 	-p margaret_injection_codegen \
+	-p margaret_jwks_client \
+	-p margaret_jwks_client_tests \
 	-p margaret_jwks_key_gen \
 	-p margaret_jwks_key_gen_tests \
 	-p margaret_jwks_roller \
+	-p margaret_jwks_roller_server \
+	-p margaret_jwks_roller_tests \
 	-p margaret_macros \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
@@ -67,9 +71,13 @@ coverage: node_modules
 		--gated margaret_http_validation=100 \
 		--gated margaret_identity_session=100 \
 		--gated margaret_injection_codegen=100 \
+		--gated margaret_jwks_client=100 \
+		--gated margaret_jwks_client_tests=100 \
 		--gated margaret_jwks_key_gen=100 \
 		--gated margaret_jwks_key_gen_tests=100 \
 		--gated margaret_jwks_roller=100 \
+		--gated margaret_jwks_roller_server=100 \
+		--gated margaret_jwks_roller_tests=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \

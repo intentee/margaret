@@ -2,20 +2,10 @@
 name = "margaret_jwks_roller"
 version = "0.1.0"
 edition = "2024"
-autotests = false
 
 [dependencies]
 margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
-serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-
-[[test]]
-name = "main"
-path = "tests/main.rs"
 
 [lints]
 workspace = true

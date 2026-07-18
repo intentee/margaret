@@ -151,8 +151,9 @@ mod tests {
             r#"transport:margaret_http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            "margaret_service::serve_application::serve_application(matches,servers,::std::option::Option::<margaret_service::no_bundle::NoBundle>::None,)"
+            "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
+        assert!(!source.contains("margaret_service::bundle_services::bundle_services"));
     }
 
     #[test]
@@ -190,7 +191,10 @@ mod tests {
         ));
         assert!(source.contains("_=>margaret_http::transport_config::TransportConfig::Plain,"));
         assert!(source.contains(
-            "margaret_service::serve_application::serve_application(matches,servers,::std::option::Option::Some(spiffe_bundle),)"
+            "matchmargaret_service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
+        ));
+        assert!(source.contains(
+            "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
     }
 

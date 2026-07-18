@@ -30,11 +30,11 @@ pub fn roll(
     storage: &dyn JwksSecretStorage,
     holder: &JwksSecretHolder,
     curve: Curve,
-) -> Result<(), RollerError> {
-    let next = next_secret(storage, holder, curve)?;
+) -> Result<Arc<JwksSecret>, RollerError> {
+    let next = Arc::new(next_secret(storage, holder, curve)?);
 
     storage.persist(&next)?;
-    holder.set(Some(Arc::new(next)));
+    holder.set(Some(next.clone()));
 
-    Ok(())
+    Ok(next)
 }

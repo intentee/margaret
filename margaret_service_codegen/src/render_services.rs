@@ -115,11 +115,14 @@ fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
     });
     let assemblies = vec_literal_tokens(assemblies);
 
-    let bundle = if spiffe_secured {
-        quote! { ::std::option::Option::Some(spiffe_bundle) }
-    } else {
-        quote! { ::std::option::Option::<margaret_service::no_bundle::NoBundle>::None }
-    };
+    let bundle_services = spiffe_secured.then(|| {
+        quote! {
+            match margaret_service::bundle_services::bundle_services(spiffe_bundle).await {
+                Ok(services) => bundle_services.extend(services),
+                Err(outcome) => return outcome,
+            }
+        }
+    });
 
     quote! {
         #spiffe_prelude
@@ -131,10 +134,17 @@ fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
         );
         let servers = #assemblies;
 
+        let mut bundle_services: ::std::vec::Vec<::std::boxed::Box<dyn trzcina::Service>> =
+            ::std::vec::Vec::new();
+
+        #bundle_services
+
         let mut manager = match margaret_service::serve_application::serve_application(
             matches,
             servers,
-            #bundle,
+            margaret_service::resolved_services::ResolvedServices {
+                services: bundle_services,
+            },
         )
         .await
         {

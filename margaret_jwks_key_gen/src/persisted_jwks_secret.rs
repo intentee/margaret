@@ -47,6 +47,7 @@ impl Serialize for PersistedJwksSecret {
         #[derive(Serialize)]
         struct SecretWire<'material> {
             current: PairWire<'material>,
+            next: PairWire<'material>,
             previous: PairWire<'material>,
         }
 
@@ -63,6 +64,7 @@ impl Serialize for PersistedJwksSecret {
 
         SecretWire {
             current: borrow(&self.secret.current),
+            next: borrow(&self.secret.next),
             previous: borrow(&self.secret.previous),
         }
         .serialize(serializer)
@@ -90,6 +92,7 @@ impl<'wire> Deserialize<'wire> for PersistedJwksSecret {
         #[derive(Deserialize)]
         struct SecretWire {
             current: PairWire,
+            next: PairWire,
             previous: PairWire,
         }
 
@@ -104,11 +107,16 @@ impl<'wire> Deserialize<'wire> for PersistedJwksSecret {
             }
         }
 
-        let SecretWire { current, previous } = SecretWire::deserialize(deserializer)?;
+        let SecretWire {
+            current,
+            next,
+            previous,
+        } = SecretWire::deserialize(deserializer)?;
 
         Ok(Self {
             secret: JwksSecret {
                 current: restore(current),
+                next: restore(next),
                 previous: restore(previous),
             },
         })
