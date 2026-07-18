@@ -1,0 +1,29 @@
+[package]
+name = "margaret_spiffe_svid_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dependencies]
+anyhow = { workspace = true }
+libc = { workspace = true }
+margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
+margaret_sync_holder = { path = "../margaret_sync_holder" }
+rustls = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+spiffe = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["fs", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+
+[dev-dependencies]
+futures-util = { workspace = true }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "integration"
+path = "tests/main.rs"

@@ -1363,7 +1363,8 @@ dependencies = [
  "margaret_http_validation",
  "margaret_macros",
  "margaret_service",
- "margaret_spiffe_svid_manager",
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_server",
  "margaret_validation",
  "serde",
  "spiffe",
@@ -1473,7 +1474,8 @@ dependencies = [
  "margaret_jwks_roller",
  "margaret_macros",
  "margaret_service",
- "margaret_spiffe_svid_manager",
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_server",
  "margaret_token_signer",
  "margaret_validation",
  "serde",
@@ -1654,7 +1656,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_spiffe_svid_manager"
+name = "margaret_spiffe_svid"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1662,9 +1664,7 @@ dependencies = [
  "futures-util",
  "log",
  "margaret_sync_holder",
- "reqwest",
  "rustls",
- "rustls-webpki",
  "spiffe",
  "thiserror",
  "tokio",
@@ -1675,15 +1675,90 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_spiffe_svid_manager_tests"
+name = "margaret_spiffe_svid_client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "log",
+ "margaret_spiffe_svid",
+ "margaret_sync_holder",
+ "reqwest",
+ "rustls",
+ "rustls-webpki",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+]
+
+[[package]]
+name = "margaret_spiffe_svid_client_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_client",
+ "margaret_spiffe_svid_tests",
+ "rustls",
+ "spiffe",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+]
+
+[[package]]
+name = "margaret_spiffe_svid_integration_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_client",
+ "margaret_spiffe_svid_server",
+ "margaret_spiffe_svid_tests",
+ "rustls",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+]
+
+[[package]]
+name = "margaret_spiffe_svid_server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "log",
+ "margaret_spiffe_svid",
+ "margaret_sync_holder",
+ "rustls",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+]
+
+[[package]]
+name = "margaret_spiffe_svid_server_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_server",
+ "margaret_spiffe_svid_tests",
+ "rustls",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+]
+
+[[package]]
+name = "margaret_spiffe_svid_tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures-util",
  "libc",
- "margaret_spiffe_svid_manager",
+ "margaret_spiffe_svid",
  "margaret_sync_holder",
- "reqwest",
  "rustls",
  "serde",
  "serde_json",

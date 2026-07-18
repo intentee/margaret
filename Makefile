@@ -24,8 +24,13 @@ COVERAGE_PACKAGES := \
 	-p margaret_service \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
-	-p margaret_spiffe_svid_manager \
-	-p margaret_spiffe_svid_manager_tests \
+	-p margaret_spiffe_svid \
+	-p margaret_spiffe_svid_client \
+	-p margaret_spiffe_svid_client_tests \
+	-p margaret_spiffe_svid_integration_tests \
+	-p margaret_spiffe_svid_server \
+	-p margaret_spiffe_svid_server_tests \
+	-p margaret_spiffe_svid_tests \
 	-p margaret_sync_holder \
 	-p margaret_token_signer \
 	-p margaret_token_signer_tests \
@@ -73,8 +78,13 @@ coverage: node_modules
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
-		--gated margaret_spiffe_svid_manager=100 \
-		--gated margaret_spiffe_svid_manager_tests=100 \
+		--gated margaret_spiffe_svid=100 \
+		--gated margaret_spiffe_svid_client=100 \
+		--gated margaret_spiffe_svid_client_tests=100 \
+		--gated margaret_spiffe_svid_integration_tests=100 \
+		--gated margaret_spiffe_svid_server=100 \
+		--gated margaret_spiffe_svid_server_tests=100 \
+		--gated margaret_spiffe_svid_tests=100 \
 		--gated margaret_sync_holder=100 \
 		--gated margaret_token_signer=100 \
 		--gated margaret_token_signer_tests=100 \

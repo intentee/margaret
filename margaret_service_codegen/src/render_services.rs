@@ -63,10 +63,10 @@ fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
             required_flag_read(&quote! { String }, "spire-agent-addr", &quote! { value.clone() });
 
         quote! {
-            margaret_spiffe_svid_manager::install_default_crypto_provider::install_default_crypto_provider();
+            margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
 
-            let spiffe_bundle = margaret_spiffe_svid_manager::SvidServiceBundle::new(
-                margaret_spiffe_svid_manager::SvidServiceBundleParams {
+            let spiffe_bundle = margaret_spiffe_svid_server::SvidServerBundle::new(
+                margaret_spiffe_svid::SvidServiceBundleParams {
                     spiffe_trust_domain: #spiffe_trust_domain,
                     spire_agent_addr: #spire_agent_addr,
                 },

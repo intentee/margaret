@@ -16,7 +16,8 @@ margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
 margaret_macros = { path = "../margaret_macros" }
 margaret_service = { path = "../margaret_service" }
-margaret_spiffe_svid_manager = { path = "../margaret_spiffe_svid_manager" }
+margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
+margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server" }
 margaret_token_signer = { path = "../margaret_token_signer" }
 margaret_validation = { path = "../margaret_validation" }
 serde = { workspace = true, features = ["derive"] }

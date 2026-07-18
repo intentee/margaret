@@ -162,10 +162,10 @@ mod tests {
         );
 
         assert!(source.contains(
-            "margaret_spiffe_svid_manager::install_default_crypto_provider::install_default_crypto_provider();"
+            "margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
         ));
         assert!(source.contains(
-            "margaret_spiffe_svid_manager::SvidServiceBundle::new(margaret_spiffe_svid_manager::SvidServiceBundleParams{"
+            "margaret_spiffe_svid_server::SvidServerBundle::new(margaret_spiffe_svid::SvidServiceBundleParams{"
         ));
         assert!(source.contains(r#"matches.get_one::<String>("spiffe-trust-domain")"#));
         assert!(source.contains(r#"matches.get_one::<String>("spire-agent-addr")"#));

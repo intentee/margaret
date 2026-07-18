@@ -1,0 +1,19 @@
+[package]
+name = "margaret_spiffe_svid_server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+log = { workspace = true }
+margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
+margaret_sync_holder = { path = "../margaret_sync_holder" }
+rustls = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+
+[lints]
+workspace = true
