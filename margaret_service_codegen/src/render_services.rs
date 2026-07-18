@@ -48,10 +48,13 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
     }
 }
 
-fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
+fn server_manager_setup(
+    servers: &[HttpServer],
+    manager_mutability: &Option<TokenStream>,
+) -> TokenStream {
     if servers.is_empty() {
         return quote! {
-            let mut manager = trzcina::ServiceManager::default();
+            let #manager_mutability manager = trzcina::ServiceManager::default();
         };
     }
 
@@ -115,6 +118,7 @@ fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
     });
     let assemblies = vec_literal_tokens(assemblies);
 
+    let bundle_services_mutability = spiffe_secured.then(|| quote! { mut });
     let bundle_services = spiffe_secured.then(|| {
         quote! {
             match margaret_service::bundle_services::bundle_services(spiffe_bundle).await {
@@ -134,12 +138,13 @@ fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
         );
         let servers = #assemblies;
 
-        let mut bundle_services: ::std::vec::Vec<::std::boxed::Box<dyn trzcina::Service>> =
-            ::std::vec::Vec::new();
+        let #bundle_services_mutability bundle_services: ::std::vec::Vec<
+            ::std::boxed::Box<dyn trzcina::Service>,
+        > = ::std::vec::Vec::new();
 
         #bundle_services
 
-        let mut manager = match margaret_service::serve_application::serve_application(
+        let #manager_mutability manager = match margaret_service::serve_application::serve_application(
             matches,
             servers,
             margaret_service::resolved_services::ResolvedServices {
@@ -379,7 +384,8 @@ pub fn render_services(
     let serve_arguments = serve_arguments(&units)?;
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(registration);
-    let manager_setup = server_manager_setup(servers);
+    let manager_mutability = (!units.is_empty()).then(|| quote! { mut });
+    let manager_setup = server_manager_setup(servers, &manager_mutability);
     let matches_binding = if servers.is_empty() && serve_arguments.is_empty() {
         quote! { _matches }
     } else {

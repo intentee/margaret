@@ -154,6 +154,18 @@ mod tests {
             "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
         assert!(!source.contains("margaret_service::bundle_services::bundle_services"));
+        assert!(!source.contains("letmutbundle_services"));
+        assert!(source.contains("letbundle_services:"));
+        assert!(source.contains("letmutmanager"));
+    }
+
+    #[test]
+    fn declares_the_bundle_services_immutable_and_the_manager_immutable_without_units() {
+        let source = rendered("#[singleton]\nstruct S;\n", &public());
+
+        assert!(!source.contains("letmutbundle_services"));
+        assert!(!source.contains("letmutmanager"));
+        assert!(source.contains("letmanager=match"));
     }
 
     #[test]
@@ -196,6 +208,7 @@ mod tests {
         assert!(source.contains(
             "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
+        assert!(source.contains("letmutbundle_services"));
     }
 
     #[test]
