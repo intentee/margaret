@@ -9,6 +9,9 @@ pub enum CookieJarError {
     #[error("the cookie `{name}` is already set in this request")]
     AlreadySet { name: String },
 
+    #[error("the request carries the cookie `{name}` more than once")]
+    DuplicateInRequest { name: String },
+
     #[error("a cookie in the request header could not be parsed: {source}")]
     MalformedCookie {
         #[source]

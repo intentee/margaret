@@ -30,17 +30,20 @@ impl CookieJar {
     pub fn from_headers(headers: &HeaderMap) -> Result<Self, CookieJarError> {
         let mut incoming = HashMap::new();
 
-        if let Some(raw) = headers.get(COOKIE) {
+        for raw in headers.get_all(COOKIE) {
             let raw = raw
                 .to_str()
                 .map_err(|source| CookieJarError::UnreadableHeader { source })?;
 
             for parsed in Cookie::split_parse_encoded(raw) {
                 let cookie = parsed.map_err(|source| CookieJarError::MalformedCookie { source })?;
+                let name = cookie.name().to_owned();
 
-                incoming
-                    .entry(cookie.name().to_owned())
-                    .or_insert_with(|| cookie.value().to_owned());
+                if incoming.insert(name, cookie.value().to_owned()).is_some() {
+                    return Err(CookieJarError::DuplicateInRequest {
+                        name: cookie.name().to_owned(),
+                    });
+                }
             }
         }
 
@@ -197,11 +200,57 @@ mod tests {
     }
 
     #[test]
-    fn keeps_the_first_of_two_cookies_sharing_a_name() {
-        assert_eq!(
-            jar_from("session=first; session=second").get("session"),
-            Some("first".to_owned())
+    fn reads_cookies_from_every_cookie_header() {
+        let mut headers = HeaderMap::new();
+
+        headers.append(COOKIE, HeaderValue::from_static("session=abc"));
+        headers.append(COOKIE, HeaderValue::from_static("theme=dark"));
+
+        let jar = CookieJar::from_headers(&headers).expect("the cookie headers parse");
+
+        assert_eq!(jar.get("session"), Some("abc".to_owned()));
+        assert_eq!(jar.get("theme"), Some("dark".to_owned()));
+    }
+
+    #[test]
+    fn rejects_a_cookie_name_repeated_within_one_header() {
+        let mut headers = HeaderMap::new();
+
+        headers.insert(
+            COOKIE,
+            HeaderValue::from_static("session=first; session=second"),
         );
+
+        let error =
+            CookieJar::from_headers(&headers).expect_err("a repeated cookie name is rejected");
+
+        assert!(matches!(
+            error,
+            CookieJarError::DuplicateInRequest { ref name } if name == "session"
+        ));
+        assert_eq!(
+            error.to_string(),
+            "the request carries the cookie `session` more than once"
+        );
+    }
+
+    #[test]
+    fn rejects_a_cookie_name_repeated_across_headers() {
+        let mut headers = HeaderMap::new();
+
+        headers.append(COOKIE, HeaderValue::from_static("session=first"));
+        headers.append(
+            COOKIE,
+            HeaderValue::from_static("theme=dark; session=second"),
+        );
+
+        let error = CookieJar::from_headers(&headers)
+            .expect_err("a cookie repeated across headers is rejected");
+
+        assert!(matches!(
+            error,
+            CookieJarError::DuplicateInRequest { ref name } if name == "session"
+        ));
     }
 
     #[test]

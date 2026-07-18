@@ -564,4 +564,40 @@ mod tests {
 
         serving.await.expect("the server task finishes cleanly");
     }
+
+    #[tokio::test]
+    async fn rejects_a_request_repeating_a_cookie_name() {
+        let bound = BoundServer::bind(
+            registry_with_one(),
+            empty_forward_targets(),
+            Arc::from("test"),
+        )
+        .await
+        .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let (within_one_header, across_headers) = tokio::join!(
+            exchange(
+                address,
+                b"GET / HTTP/1.1\r\nHost: test\r\nCookie: session=a; session=b\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+            exchange(
+                address,
+                b"GET / HTTP/1.1\r\nHost: test\r\nCookie: session=a\r\nCookie: session=b\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+        );
+
+        assert!(within_one_header.contains(" 400 "));
+        assert!(across_headers.contains(" 400 "));
+
+        cancellation_token.cancel();
+
+        serving.await.expect("the server task finishes cleanly");
+    }
 }
