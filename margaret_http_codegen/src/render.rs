@@ -87,9 +87,11 @@ fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
     } else {
         format_ident!("_request")
     };
-    let cookie_jar_binding = match route.arguments.iter().find(|argument| {
-        argument_needs_cookie_jar(argument)
-    }) {
+    let cookie_jar_binding = match route
+        .arguments
+        .iter()
+        .find(|argument| argument_needs_cookie_jar(argument))
+    {
         Some(argument) => argument.holder.clone(),
         None => format_ident!("_cookie_jar"),
     };

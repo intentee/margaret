@@ -221,8 +221,8 @@ mod tests {
             HeaderValue::from_bytes(b"session=\xff").expect("the header value is built"),
         );
 
-        let error = CookieJar::from_headers(&headers)
-            .expect_err("a non ASCII cookie header is rejected");
+        let error =
+            CookieJar::from_headers(&headers).expect_err("a non ASCII cookie header is rejected");
 
         assert!(
             error
@@ -237,8 +237,8 @@ mod tests {
 
         headers.insert(COOKIE, HeaderValue::from_static("no-equals-sign"));
 
-        let error = CookieJar::from_headers(&headers)
-            .expect_err("a malformed cookie header is rejected");
+        let error =
+            CookieJar::from_headers(&headers).expect_err("a malformed cookie header is rejected");
 
         assert!(
             error
@@ -272,8 +272,7 @@ mod tests {
         let jar = jar_from("kept=1; dropped=2");
 
         jar.remove("dropped").expect("the removal is staged");
-        jar.add(cookie("added", "3"))
-            .expect("the cookie is staged");
+        jar.add(cookie("added", "3")).expect("the cookie is staged");
 
         let mut current: Vec<(String, String)> = jar.iter().collect();
 

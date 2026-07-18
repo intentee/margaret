@@ -136,7 +136,7 @@ mod tests {
     use http::Method;
     use http::Uri;
     use http::header::CONTENT_TYPE;
-        use http_body_util::BodyExt;
+    use http_body_util::BodyExt;
     use http_body_util::Full;
     use tempfile::TempDir;
     use tempfile::tempdir;

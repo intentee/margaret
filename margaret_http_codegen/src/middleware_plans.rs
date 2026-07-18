@@ -42,23 +42,22 @@ pub(crate) fn middleware_plans(
         {
             let resolved = index.resolve_item_type(item, declared);
             let is_reference = matches!(declared, Type::Reference(_));
-            let argument =
-                if HttpInjectable::CookieJar.matches(resolved.as_ref(), is_reference) {
-                    MiddlewareArgument::CookieJar
-                } else if HttpInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference) {
-                    MiddlewareArgument::CurrentRequest
-                } else if HttpInjectable::Next.matches(resolved.as_ref(), is_reference) {
-                    MiddlewareArgument::Next
-                } else if HttpInjectable::Routes.matches(resolved.as_ref(), is_reference) {
-                    injects_routes = true;
+            let argument = if HttpInjectable::CookieJar.matches(resolved.as_ref(), is_reference) {
+                MiddlewareArgument::CookieJar
+            } else if HttpInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference) {
+                MiddlewareArgument::CurrentRequest
+            } else if HttpInjectable::Next.matches(resolved.as_ref(), is_reference) {
+                MiddlewareArgument::Next
+            } else if HttpInjectable::Routes.matches(resolved.as_ref(), is_reference) {
+                injects_routes = true;
 
-                    MiddlewareArgument::Routes
-                } else {
-                    return Err(HttpCodegenError::UnclassifiableMiddlewareParameter {
-                        middleware,
-                        parameter: position.to_string(),
-                    });
-                };
+                MiddlewareArgument::Routes
+            } else {
+                return Err(HttpCodegenError::UnclassifiableMiddlewareParameter {
+                    middleware,
+                    parameter: position.to_string(),
+                });
+            };
 
             arguments.push(argument);
         }

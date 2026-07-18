@@ -291,7 +291,8 @@ mod tests {
             "target",
             Arc::new(StagesTargetCookie),
         )]);
-        let cookie_jar = CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built");
+        let cookie_jar =
+            CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built");
 
         respond_recursively(
             &forward_targets,
