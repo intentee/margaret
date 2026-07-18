@@ -14,12 +14,16 @@ fn internal_server_error() -> http::Response<Full<Bytes>> {
 }
 
 pub struct Response {
-    body: String,
+    body: Bytes,
     headers: Vec<Header>,
     status: u16,
 }
 
 impl Response {
+    pub fn bytes(status: u16, content_type: impl Into<String>, body: impl Into<Bytes>) -> Self {
+        Self::new(status, body.into()).header("content-type", content_type)
+    }
+
     pub fn forbidden() -> Self {
         Self::text(403, "Forbidden")
     }
@@ -34,13 +38,21 @@ impl Response {
     }
 
     pub fn html(status: u16, body: impl Into<String>) -> Self {
-        Self::text(status, body).header("content-type", "text/html; charset=utf-8")
+        Self::bytes(status, "text/html; charset=utf-8", body.into())
     }
 
     pub fn json<Value: Serialize>(status: u16, value: &Value) -> Self {
         match serde_json::to_string(value) {
-            Ok(body) => Self::text(status, body).header("content-type", "application/json"),
+            Ok(body) => Self::bytes(status, "application/json", body),
             Err(error) => Self::text(500, error.to_string()),
+        }
+    }
+
+    fn new(status: u16, body: Bytes) -> Self {
+        Self {
+            body,
+            headers: Vec::new(),
+            status,
         }
     }
 
@@ -49,11 +61,7 @@ impl Response {
     }
 
     pub fn text(status: u16, body: impl Into<String>) -> Self {
-        Self {
-            body: body.into(),
-            headers: Vec::new(),
-            status,
-        }
+        Self::new(status, Bytes::from(body.into()))
     }
 
     pub fn status(&self) -> u16 {
@@ -68,7 +76,7 @@ impl Response {
             builder = builder.header(header.name, header.value);
         }
 
-        match builder.body(Full::new(Bytes::from(self.body))) {
+        match builder.body(Full::new(self.body)) {
             Ok(response) => response,
             Err(error) => {
                 eprintln!(
@@ -89,11 +97,14 @@ impl Response {
 
 #[cfg(test)]
 mod tests {
+    use http_body_util::BodyExt;
     use serde::Serialize;
     use serde::Serializer;
     use serde::ser::Error;
 
     use super::Response;
+
+    const PNG_MAGIC: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xFF];
 
     struct Unserializable;
 
@@ -104,6 +115,32 @@ mod tests {
         ) -> Result<Target::Ok, Target::Error> {
             Err(Target::Error::custom("this value cannot be serialized"))
         }
+    }
+
+    #[tokio::test]
+    async fn serves_a_binary_body_without_altering_it() {
+        let body = Response::bytes(200, "image/png", PNG_MAGIC)
+            .into_http()
+            .into_body()
+            .collect()
+            .await
+            .expect("the buffered body is collected")
+            .to_bytes();
+
+        assert_eq!(body.as_ref(), PNG_MAGIC);
+    }
+
+    #[test]
+    fn builds_a_bytes_response_with_the_given_content_type() {
+        let response = Response::bytes(200, "image/png", PNG_MAGIC).into_http();
+
+        assert_eq!(
+            response
+                .headers()
+                .get("content-type")
+                .expect("the content type header is present"),
+            "image/png"
+        );
     }
 
     #[test]
