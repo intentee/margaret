@@ -13,6 +13,7 @@ use margaret_console_argument_codegen::ensure_unique::ensure_unique;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
+use margaret_http_codegen::server_cookie_policy::ServerCookiePolicy;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
@@ -21,6 +22,25 @@ use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
 use crate::service_units::service_units;
+
+fn cookies_expression(server: &HttpServer) -> TokenStream {
+    match server.cookie_policy() {
+        ServerCookiePolicy::Cookied => {
+            let cookie_domain_argument = server.cookie_domain_argument();
+            let cookie_insecure_argument = server.cookie_insecure_argument();
+
+            quote! {
+                margaret_service::server_cookies_assembly::ServerCookiesAssembly::Cookied {
+                    cookie_domain_argument: #cookie_domain_argument,
+                    cookie_insecure_argument: #cookie_insecure_argument,
+                }
+            }
+        }
+        ServerCookiePolicy::Cookieless => quote! {
+            margaret_service::server_cookies_assembly::ServerCookiesAssembly::Cookieless
+        },
+    }
+}
 
 fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
     if !spiffe_secured {
@@ -101,10 +121,12 @@ fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
         let transport = transport_expression(server, spiffe_secured);
+        let cookies = cookies_expression(server);
 
         quote! {
             margaret_service::server_assembly::ServerAssembly {
                 address_argument: #address_argument,
+                cookies: #cookies,
                 name: #name,
                 routes: super::http::#function_name::#function_name(container, &routes).await,
                 transport: #transport,

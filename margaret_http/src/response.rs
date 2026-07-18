@@ -1,7 +1,12 @@
 use bytes::Bytes;
+use http::HeaderName;
 use http::StatusCode;
+use http::header::CONTENT_TYPE;
+use http::header::SET_COOKIE;
 use http_body_util::Full;
 use serde::Serialize;
+
+use margaret_response_header_name::response_header_name::ResponseHeaderName;
 
 use crate::header::Header;
 
@@ -13,6 +18,7 @@ fn internal_server_error() -> http::Response<Full<Bytes>> {
     response
 }
 
+#[derive(Debug)]
 pub struct Response {
     body: Bytes,
     headers: Vec<Header>,
@@ -21,20 +27,15 @@ pub struct Response {
 
 impl Response {
     pub fn bytes(status: u16, content_type: impl Into<String>, body: impl Into<Bytes>) -> Self {
-        Self::new(status, body.into()).header("content-type", content_type)
+        Self::new(status, body.into()).reserved_header(CONTENT_TYPE, content_type)
     }
 
     pub fn forbidden() -> Self {
         Self::text(403, "Forbidden")
     }
 
-    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.push(Header {
-            name: name.into(),
-            value: value.into(),
-        });
-
-        self
+    pub fn header(self, name: ResponseHeaderName, value: impl Into<String>) -> Self {
+        self.reserved_header(name.into_header_name(), value)
     }
 
     pub fn html(status: u16, body: impl Into<String>) -> Self {
@@ -88,10 +89,19 @@ impl Response {
         }
     }
 
+    pub(crate) fn reserved_header(mut self, name: HeaderName, value: impl Into<String>) -> Self {
+        self.headers.push(Header {
+            name,
+            value: value.into(),
+        });
+
+        self
+    }
+
     pub(crate) fn with_cookies(self, set_cookie_values: Vec<String>) -> Self {
-        set_cookie_values
-            .into_iter()
-            .fold(self, |response, value| response.header("set-cookie", value))
+        set_cookie_values.into_iter().fold(self, |response, value| {
+            response.reserved_header(SET_COOKIE, value)
+        })
     }
 }
 
@@ -101,6 +111,8 @@ mod tests {
     use serde::Serialize;
     use serde::Serializer;
     use serde::ser::Error;
+
+    use margaret_response_header_name::response_header_name::ResponseHeaderName;
 
     use super::Response;
 
@@ -166,7 +178,10 @@ mod tests {
 
     #[test]
     fn builds_an_http_response_with_status_and_headers() {
-        let response = Response::text(201, "created").header("x-marker", "on");
+        let response = Response::text(201, "created").header(
+            ResponseHeaderName::new("x-marker").expect("a custom header name is accepted"),
+            "on",
+        );
 
         assert_eq!(response.status(), 201);
 

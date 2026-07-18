@@ -7,6 +7,7 @@ autotests = false
 [dependencies]
 chrono = { workspace = true }
 clap = { workspace = true }
+margaret_cookie_jar = { path = "../margaret_cookie_jar" }
 margaret_http = { path = "../margaret_http" }
 margaret_identity = { path = "../margaret_identity" }
 rustls = { workspace = true }

@@ -19,7 +19,11 @@ impl GetCookieForget {
             Err(CookieJarError::NotInRequest { .. }) => {
                 Response::text(200, "there was no visit cookie to clear")
             }
-            Err(_) => Response::text(500, "Internal Server Error"),
+            Err(error) => {
+                eprintln!("margaret_example: the visit cookie could not be cleared: {error}");
+
+                Response::text(500, "Internal Server Error")
+            }
         }
     }
 }

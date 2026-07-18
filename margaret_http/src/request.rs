@@ -3,11 +3,13 @@ use std::sync::Arc;
 
 use http::Method;
 
+use margaret_cookie_jar::request_cookies::RequestCookies;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::request_inputs::RequestInputs;
 
 pub struct Request {
+    cookies: Arc<RequestCookies>,
     pub inputs: RequestInputs,
     path_params: HashMap<String, String>,
     peer_identity: Arc<PeerIdentity>,
@@ -16,6 +18,7 @@ pub struct Request {
 impl Request {
     pub(crate) fn from_inputs(inputs: RequestInputs) -> Self {
         Self {
+            cookies: Arc::new(RequestCookies::Absent),
             inputs,
             path_params: HashMap::new(),
             peer_identity: Arc::new(PeerIdentity::Anonymous),
@@ -24,14 +27,25 @@ impl Request {
 
     pub fn new(method: Method, path: String) -> Self {
         Self {
+            cookies: Arc::new(RequestCookies::Absent),
             inputs: RequestInputs::empty(method, path),
             path_params: HashMap::new(),
             peer_identity: Arc::new(PeerIdentity::Anonymous),
         }
     }
 
+    pub(crate) fn with_cookies(self, cookies: Arc<RequestCookies>) -> Self {
+        Self {
+            cookies,
+            inputs: self.inputs,
+            path_params: self.path_params,
+            peer_identity: self.peer_identity,
+        }
+    }
+
     pub(crate) fn with_path_params(self, path_params: HashMap<String, String>) -> Self {
         Self {
+            cookies: self.cookies,
             inputs: self.inputs,
             path_params,
             peer_identity: self.peer_identity,
@@ -40,10 +54,15 @@ impl Request {
 
     pub(crate) fn with_peer_identity(self, peer_identity: Arc<PeerIdentity>) -> Self {
         Self {
+            cookies: self.cookies,
             inputs: self.inputs,
             path_params: self.path_params,
             peer_identity,
         }
+    }
+
+    pub fn cookies(&self) -> &RequestCookies {
+        &self.cookies
     }
 
     pub fn path_param(&self, name: &str) -> Option<&str> {

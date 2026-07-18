@@ -7,6 +7,9 @@ use trzcina::ServiceManager;
 
 use margaret_console::command_outcome::CommandOutcome;
 use margaret_console::report_failure::report_failure;
+use margaret_cookie_jar::cookie_config::CookieConfig;
+use margaret_cookie_jar::cookie_domain::CookieDomain;
+use margaret_cookie_jar::server_cookies::ServerCookies;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::server::Server;
@@ -14,6 +17,7 @@ use margaret_http::server_registry::ServerRegistry;
 use margaret_http::upload_config::UploadConfig;
 
 use crate::server_assembly::ServerAssembly;
+use crate::server_cookies_assembly::ServerCookiesAssembly;
 use crate::server_service::ServerService;
 
 pub async fn serve_application<Bundle: ServiceBundle>(
@@ -27,6 +31,7 @@ pub async fn serve_application<Bundle: ServiceBundle>(
 
     for ServerAssembly {
         address_argument,
+        cookies,
         name,
         routes,
         transport,
@@ -40,6 +45,27 @@ pub async fn serve_application<Bundle: ServiceBundle>(
         let server_routes = match routes {
             Ok(server_routes) => server_routes,
             Err(error) => return Err(report_failure(error)),
+        };
+        let server_cookies = match cookies {
+            ServerCookiesAssembly::Cookied {
+                cookie_domain_argument,
+                cookie_insecure_argument,
+            } => {
+                let Some(domain) = matches.get_one::<String>(cookie_domain_argument) else {
+                    return Err(CommandOutcome::Failed);
+                };
+
+                ServerCookies::Present {
+                    cookie_config: Arc::new(CookieConfig {
+                        domain: match CookieDomain::parse(domain) {
+                            Ok(domain) => domain,
+                            Err(error) => return Err(report_failure(error)),
+                        },
+                        secure: !matches.get_flag(cookie_insecure_argument),
+                    }),
+                }
+            }
+            ServerCookiesAssembly::Cookieless => ServerCookies::Absent,
         };
         let upload_config = if matches.get_flag(uploads_argument) {
             UploadConfig::enabled(
@@ -63,6 +89,7 @@ pub async fn serve_application<Bundle: ServiceBundle>(
             upload_config,
             BodyLimit::default(),
             server_routes.router,
+            server_cookies,
         ));
     }
 
@@ -106,6 +133,7 @@ mod tests {
     use super::serve_application;
     use crate::no_bundle::NoBundle;
     use crate::server_assembly::ServerAssembly;
+    use crate::server_cookies_assembly::ServerCookiesAssembly;
 
     struct FailingBundle;
 
@@ -125,6 +153,12 @@ mod tests {
                     .action(ArgAction::SetTrue),
             )
             .arg(Arg::new("public-upload-dir").long("public-upload-dir"))
+            .arg(Arg::new("public-cookie-domain").long("public-cookie-domain"))
+            .arg(
+                Arg::new("public-cookie-insecure")
+                    .long("public-cookie-insecure")
+                    .action(ArgAction::SetTrue),
+            )
             .try_get_matches_from(std::iter::once("test").chain(arguments.iter().copied()))
             .expect("the test arguments parse")
     }
@@ -134,8 +168,24 @@ mod tests {
     ) -> ServerAssembly {
         ServerAssembly {
             address_argument: "public-addr",
+            cookies: ServerCookiesAssembly::Cookieless,
             name: "public",
             routes,
+            transport: TransportConfig::Plain,
+            upload_dir_argument: "public-upload-dir",
+            uploads_argument: "public-uploads",
+        }
+    }
+
+    fn cookied_assembly() -> ServerAssembly {
+        ServerAssembly {
+            address_argument: "public-addr",
+            cookies: ServerCookiesAssembly::Cookied {
+                cookie_domain_argument: "public-cookie-domain",
+                cookie_insecure_argument: "public-cookie-insecure",
+            },
+            name: "public",
+            routes: Ok(empty_routes()),
             transport: TransportConfig::Plain,
             upload_dir_argument: "public-upload-dir",
             uploads_argument: "public-uploads",
@@ -201,6 +251,76 @@ mod tests {
         .await;
 
         assert!(outcome.is_ok());
+    }
+
+    #[tokio::test]
+    async fn configures_cookies_from_the_supplied_domain() {
+        let outcome = serve_application(
+            &matches(&[
+                "--public-addr",
+                "127.0.0.1:0",
+                "--public-cookie-domain",
+                "example.test",
+            ]),
+            vec![cookied_assembly()],
+            Option::<NoBundle>::None,
+        )
+        .await;
+
+        assert!(outcome.is_ok());
+    }
+
+    #[tokio::test]
+    async fn configures_insecure_cookies_when_the_insecure_flag_is_set() {
+        let outcome = serve_application(
+            &matches(&[
+                "--public-addr",
+                "127.0.0.1:0",
+                "--public-cookie-domain",
+                "example.test",
+                "--public-cookie-insecure",
+            ]),
+            vec![cookied_assembly()],
+            Option::<NoBundle>::None,
+        )
+        .await;
+
+        assert!(outcome.is_ok());
+    }
+
+    #[tokio::test]
+    async fn reports_failure_when_the_cookie_domain_is_missing() {
+        let outcome = serve_application(
+            &matches(&["--public-addr", "127.0.0.1:0"]),
+            vec![cookied_assembly()],
+            Option::<NoBundle>::None,
+        )
+        .await;
+
+        assert_eq!(
+            outcome.err().expect("a missing cookie domain fails"),
+            CommandOutcome::Failed
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_failure_when_the_cookie_domain_is_invalid() {
+        let outcome = serve_application(
+            &matches(&[
+                "--public-addr",
+                "127.0.0.1:0",
+                "--public-cookie-domain",
+                "127.0.0.1",
+            ]),
+            vec![cookied_assembly()],
+            Option::<NoBundle>::None,
+        )
+        .await;
+
+        assert_eq!(
+            outcome.err().expect("an invalid cookie domain fails"),
+            CommandOutcome::Failed
+        );
     }
 
     #[tokio::test]

@@ -22,6 +22,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_macros \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
+	-p margaret_response_header_name \
 	-p margaret_service \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
@@ -77,6 +78,7 @@ coverage: node_modules
 		--gated margaret_macros=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
+		--gated margaret_response_header_name=100 \
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \

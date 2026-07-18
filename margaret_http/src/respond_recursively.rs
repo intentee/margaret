@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use margaret_cookie_jar::cookie_jar::CookieJar;
-
 use crate::forward_targets::ForwardTargets;
 use crate::handler::Handler;
 use crate::request::Request;
@@ -12,12 +10,11 @@ use crate::response_continuation::ResponseContinuation;
 pub(crate) async fn respond_recursively(
     forward_targets: &Arc<ForwardTargets>,
     request: Request,
-    cookie_jar: &CookieJar,
     first: Arc<dyn Handler>,
 ) -> Response {
     let mut visited: HashSet<&'static str> = HashSet::new();
     let mut request = request;
-    let mut outcome = first.handle(&request, cookie_jar).await;
+    let mut outcome = first.handle(&request).await;
 
     loop {
         match outcome {
@@ -40,7 +37,7 @@ pub(crate) async fn respond_recursively(
                 };
 
                 request = request.with_path_params(forward.into_path_params());
-                outcome = target.handle(&request, cookie_jar).await;
+                outcome = target.handle(&request).await;
             }
             ResponseContinuation::Redirect(redirect) => return redirect.into_response(),
         }
@@ -53,12 +50,17 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use cookie::Cookie;
+    use cookie::Expiration;
+    use cookie::SameSite;
     use http::HeaderMap;
     use http::Method;
     use http_body_util::BodyExt;
 
+    use margaret_cookie_jar::cookie_attributes::CookieAttributes;
+    use margaret_cookie_jar::cookie_config::CookieConfig;
+    use margaret_cookie_jar::cookie_domain::CookieDomain;
     use margaret_cookie_jar::cookie_jar::CookieJar;
+    use margaret_cookie_jar::request_cookies::RequestCookies;
 
     use super::respond_recursively;
     use crate::forward::Forward;
@@ -67,18 +69,23 @@ mod tests {
     use crate::named_handler::NamedHandler;
     use crate::redirect::Redirect;
     use crate::request::Request;
+    use crate::require_cookie_jar::require_cookie_jar;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
+
+    fn session_attributes() -> CookieAttributes {
+        CookieAttributes {
+            expiration: Expiration::Session,
+            http_only: true,
+            same_site: SameSite::Strict,
+        }
+    }
 
     struct ForwardToTarget;
 
     #[async_trait]
     impl Handler for ForwardToTarget {
-        async fn handle(
-            &self,
-            _request: &Request,
-            _cookie_jar: &CookieJar,
-        ) -> ResponseContinuation {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
             ResponseContinuation::from(Forward::new("target", HashMap::new()))
         }
     }
@@ -87,11 +94,7 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardToSelf {
-        async fn handle(
-            &self,
-            _request: &Request,
-            _cookie_jar: &CookieJar,
-        ) -> ResponseContinuation {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
             ResponseContinuation::from(Forward::new("origin", HashMap::new()))
         }
     }
@@ -100,11 +103,7 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardToUnknown {
-        async fn handle(
-            &self,
-            _request: &Request,
-            _cookie_jar: &CookieJar,
-        ) -> ResponseContinuation {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
             ResponseContinuation::from(Forward::new("unknown", HashMap::new()))
         }
     }
@@ -113,11 +112,7 @@ mod tests {
 
     #[async_trait]
     impl Handler for Target {
-        async fn handle(
-            &self,
-            _request: &Request,
-            _cookie_jar: &CookieJar,
-        ) -> ResponseContinuation {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
             ResponseContinuation::Done(Response::text(222, "target"))
         }
     }
@@ -126,11 +121,7 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardToArticle {
-        async fn handle(
-            &self,
-            _request: &Request,
-            _cookie_jar: &CookieJar,
-        ) -> ResponseContinuation {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
             ResponseContinuation::from(Forward::new(
                 "article",
                 HashMap::from([("article".to_string(), "7".to_string())]),
@@ -142,7 +133,7 @@ mod tests {
 
     #[async_trait]
     impl Handler for EchoArticle {
-        async fn handle(&self, request: &Request, _cookie_jar: &CookieJar) -> ResponseContinuation {
+        async fn handle(&self, request: &Request) -> ResponseContinuation {
             ResponseContinuation::Done(Response::text(
                 200,
                 request
@@ -157,11 +148,7 @@ mod tests {
 
     #[async_trait]
     impl Handler for RedirectingResponder {
-        async fn handle(
-            &self,
-            _request: &Request,
-            _cookie_jar: &CookieJar,
-        ) -> ResponseContinuation {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
             ResponseContinuation::from(Redirect::see_other("http://localhost/greeting".to_string()))
         }
     }
@@ -170,9 +157,10 @@ mod tests {
 
     #[async_trait]
     impl Handler for StagesOriginCookie {
-        async fn handle(&self, _request: &Request, cookie_jar: &CookieJar) -> ResponseContinuation {
-            cookie_jar
-                .add(Cookie::build(("origin", "1")).build())
+        async fn handle(&self, request: &Request) -> ResponseContinuation {
+            require_cookie_jar(request)
+                .expect("the jar is available")
+                .add("origin", "1", session_attributes())
                 .expect("the origin cookie is staged");
 
             ResponseContinuation::from(Forward::new("target", HashMap::new()))
@@ -183,9 +171,10 @@ mod tests {
 
     #[async_trait]
     impl Handler for StagesTargetCookie {
-        async fn handle(&self, _request: &Request, cookie_jar: &CookieJar) -> ResponseContinuation {
-            cookie_jar
-                .add(Cookie::build(("target", "1")).build())
+        async fn handle(&self, request: &Request) -> ResponseContinuation {
+            require_cookie_jar(request)
+                .expect("the jar is available")
+                .add("target", "1", session_attributes())
                 .expect("the target cookie is staged");
 
             ResponseContinuation::Done(Response::text(200, "done"))
@@ -200,7 +189,6 @@ mod tests {
         respond_recursively(
             &forward_targets,
             Request::new(Method::GET, "/".to_string()),
-            &CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built"),
             first,
         )
         .await
@@ -244,7 +232,6 @@ mod tests {
         let response = respond_recursively(
             &forward_targets_with(Vec::new()),
             Request::new(Method::GET, "/".to_string()),
-            &CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built"),
             Arc::new(RedirectingResponder),
         )
         .await
@@ -267,7 +254,6 @@ mod tests {
         let response = respond_recursively(
             &forward_targets,
             Request::new(Method::GET, "/".to_string()),
-            &CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built"),
             Arc::new(ForwardToArticle),
         )
         .await
@@ -291,20 +277,27 @@ mod tests {
             "target",
             Arc::new(StagesTargetCookie),
         )]);
-        let cookie_jar =
-            CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built");
+        let cookie_config = Arc::new(CookieConfig {
+            domain: CookieDomain::parse("example.test").expect("the domain parses"),
+            secure: true,
+        });
+        let cookies = Arc::new(RequestCookies::Present {
+            cookie_jar: CookieJar::from_headers(cookie_config, &HeaderMap::new())
+                .expect("an empty cookie jar is built"),
+        });
 
         respond_recursively(
             &forward_targets,
-            Request::new(Method::GET, "/".to_string()),
-            &cookie_jar,
+            Request::new(Method::GET, "/".to_string()).with_cookies(cookies.clone()),
             Arc::new(StagesOriginCookie),
         )
         .await;
 
-        assert_eq!(
-            cookie_jar.into_set_cookie_values(),
-            vec!["origin=1".to_owned(), "target=1".to_owned()]
-        );
+        assert!(matches!(
+            cookies.as_ref(),
+            RequestCookies::Present { cookie_jar }
+                if cookie_jar.get("origin") == Some("1".to_owned())
+                    && cookie_jar.get("target") == Some("1".to_owned())
+        ));
     }
 }

@@ -25,6 +25,7 @@ pub(crate) mod request_body;
 pub mod request_error;
 pub(crate) mod request_inputs;
 pub mod require_bound_route_parameter;
+pub mod require_cookie_jar;
 pub mod require_peer_spiffe_id;
 pub mod require_route_parameter;
 pub mod respond_recursively;

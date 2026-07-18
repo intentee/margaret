@@ -2,8 +2,11 @@ use margaret_http::matchit::InsertError;
 use margaret_http::server_routes::ServerRoutes;
 use margaret_http::transport_config::TransportConfig;
 
+use crate::server_cookies_assembly::ServerCookiesAssembly;
+
 pub struct ServerAssembly {
     pub address_argument: &'static str,
+    pub cookies: ServerCookiesAssembly,
     pub name: &'static str,
     pub routes: Result<ServerRoutes, InsertError>,
     pub transport: TransportConfig,

@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use margaret_cookie_jar::server_cookies::ServerCookies;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
@@ -27,6 +28,7 @@ impl RunningServer {
             UploadConfig::Disabled,
             BodyLimit::default(),
             server_routes.router,
+            ServerCookies::Absent,
         );
         let server_registry = Arc::new(ServerRegistry::new(vec![server]));
         let forward_targets = Arc::new(ForwardTargets::new(server_routes.named_handlers));

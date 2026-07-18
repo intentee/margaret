@@ -1,17 +1,24 @@
 use proc_macro2::Ident;
 use quote::format_ident;
 
+use crate::server_cookie_policy::ServerCookiePolicy;
 use crate::server_transport_policy::ServerTransportPolicy;
 
 #[derive(Clone)]
 pub struct HttpServer {
+    cookie_policy: ServerCookiePolicy,
     name: String,
     transport_policy: ServerTransportPolicy,
 }
 
 impl HttpServer {
-    pub fn new(name: String, transport_policy: ServerTransportPolicy) -> Self {
+    pub fn new(
+        name: String,
+        cookie_policy: ServerCookiePolicy,
+        transport_policy: ServerTransportPolicy,
+    ) -> Self {
         Self {
+            cookie_policy,
             name,
             transport_policy,
         }
@@ -19,6 +26,18 @@ impl HttpServer {
 
     pub fn address_argument(&self) -> String {
         format!("{}-addr", self.name)
+    }
+
+    pub fn cookie_domain_argument(&self) -> String {
+        format!("{}-cookie-domain", self.name)
+    }
+
+    pub fn cookie_insecure_argument(&self) -> String {
+        format!("{}-cookie-insecure", self.name)
+    }
+
+    pub fn cookie_policy(&self) -> ServerCookiePolicy {
+        self.cookie_policy
     }
 
     pub fn function_name(&self) -> Ident {

@@ -19,6 +19,7 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_http_codegen::http_server::HttpServer;
+    use margaret_http_codegen::server_cookie_policy::ServerCookiePolicy;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 
     use crate::has_services::has_services;
@@ -63,6 +64,7 @@ mod tests {
     fn public() -> Vec<HttpServer> {
         vec![HttpServer::new(
             "public".to_string(),
+            ServerCookiePolicy::Cookieless,
             ServerTransportPolicy::Negotiable,
         )]
     }
@@ -138,7 +140,7 @@ mod tests {
 
         assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
         assert!(source.contains(
-            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"public-addr",cookies:margaret_service::server_cookies_assembly::ServerCookiesAssembly::Cookieless,name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"transport:margaret_http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
@@ -155,9 +157,14 @@ mod tests {
             &[
                 HttpServer::new(
                     "internal".to_string(),
+                    ServerCookiePolicy::Cookieless,
                     ServerTransportPolicy::PinnedSpiffeMtls,
                 ),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerCookiePolicy::Cookieless,
+                    ServerTransportPolicy::Negotiable,
+                ),
             ],
         );
 
@@ -192,8 +199,16 @@ mod tests {
         let source = rendered(
             SERVICE,
             &[
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerCookiePolicy::Cookieless,
+                    ServerTransportPolicy::Negotiable,
+                ),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerCookiePolicy::Cookieless,
+                    ServerTransportPolicy::Negotiable,
+                ),
             ],
         );
 
@@ -208,23 +223,47 @@ mod tests {
     }
 
     #[test]
+    fn assembles_the_cookie_arguments_for_a_server_that_uses_the_jar() {
+        let source = rendered(
+            SERVICE,
+            &[HttpServer::new(
+                "public".to_string(),
+                ServerCookiePolicy::Cookied,
+                ServerTransportPolicy::Negotiable,
+            )],
+        );
+
+        assert!(source.contains(
+            r#"cookies:margaret_service::server_cookies_assembly::ServerCookiesAssembly::Cookied{cookie_domain_argument:"public-cookie-domain",cookie_insecure_argument:"public-cookie-insecure",}"#
+        ));
+    }
+
+    #[test]
     fn registers_one_server_service_per_active_server() {
         let source = rendered(
             SERVICE,
             &[
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerCookiePolicy::Cookieless,
+                    ServerTransportPolicy::Negotiable,
+                ),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerCookiePolicy::Cookieless,
+                    ServerTransportPolicy::Negotiable,
+                ),
             ],
         );
 
         assert!(source.contains(
-            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"public-addr",cookies:margaret_service::server_cookies_assembly::ServerCookiesAssembly::Cookieless,name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
+            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"internal-addr",cookies:margaret_service::server_cookies_assembly::ServerCookiesAssembly::Cookieless,name:"internal",routes:super::http::server_internal::server_internal(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#

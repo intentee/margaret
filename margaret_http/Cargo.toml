@@ -14,6 +14,7 @@ hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server", "server-auto", "server-graceful", "service", "tokio"] }
 margaret_cookie_jar = { path = "../margaret_cookie_jar" }
 margaret_peer_identity = { path = "../margaret_peer_identity" }
+margaret_response_header_name = { path = "../margaret_response_header_name" }
 matchit = { workspace = true }
 mime = { workspace = true }
 multer = { workspace = true }

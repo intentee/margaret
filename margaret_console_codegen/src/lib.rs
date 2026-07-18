@@ -17,6 +17,7 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_http_codegen::http_server::HttpServer;
+    use margaret_http_codegen::server_cookie_policy::ServerCookiePolicy;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 
     use crate::has_commands::has_commands;
@@ -81,6 +82,7 @@ impl Farewell {
         let servers = if has_http {
             vec![HttpServer::new(
                 "public".to_string(),
+                ServerCookiePolicy::Cookieless,
                 ServerTransportPolicy::Negotiable,
             )]
         } else {
@@ -151,6 +153,41 @@ impl Farewell {
     }
 
     #[test]
+    fn emits_the_cookie_flags_only_for_a_server_that_uses_the_jar() {
+        let source: String = render_console(
+            &index_for("struct App;\n"),
+            true,
+            &[
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerCookiePolicy::Cookied,
+                    ServerTransportPolicy::Negotiable,
+                ),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerCookiePolicy::Cookieless,
+                    ServerTransportPolicy::Negotiable,
+                ),
+            ],
+            &[],
+        )
+        .expect("the console source is generated")
+        .format()
+        .source()
+        .split_whitespace()
+        .collect();
+
+        assert!(source.contains(
+            r#"clap::Arg::new("public-cookie-domain").long("public-cookie-domain").required(true)"#
+        ));
+        assert!(source.contains(
+            r#"clap::Arg::new("public-cookie-insecure").long("public-cookie-insecure").action(clap::ArgAction::SetTrue)"#
+        ));
+        assert!(!source.contains("internal-cookie-domain"));
+        assert!(!source.contains("internal-cookie-insecure"));
+    }
+
+    #[test]
     fn emits_spiffe_transport_flags_when_a_server_is_pinned() {
         let source: String = render_console(
             &index_for("struct App;\n"),
@@ -158,9 +195,14 @@ impl Farewell {
             &[
                 HttpServer::new(
                     "internal".to_string(),
+                    ServerCookiePolicy::Cookieless,
                     ServerTransportPolicy::PinnedSpiffeMtls,
                 ),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerCookiePolicy::Cookieless,
+                    ServerTransportPolicy::Negotiable,
+                ),
             ],
             &[],
         )
@@ -198,8 +240,16 @@ impl Farewell {
             &index_for("struct App;\n"),
             true,
             &[
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerCookiePolicy::Cookieless,
+                    ServerTransportPolicy::Negotiable,
+                ),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerCookiePolicy::Cookieless,
+                    ServerTransportPolicy::Negotiable,
+                ),
             ],
             &[],
         )

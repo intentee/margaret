@@ -89,6 +89,7 @@ pub(crate) fn http_routes(
 
             layers.push(LayerApplication {
                 field: plan.field.clone(),
+                injects_cookie_jar: plan.injects_cookie_jar,
                 injects_routes: plan.injects_routes,
                 wrapper: plan.wrapper.clone(),
             });

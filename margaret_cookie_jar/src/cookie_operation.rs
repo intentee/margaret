@@ -1,6 +1,9 @@
-use cookie::Cookie;
+use crate::cookie_attributes::CookieAttributes;
 
 pub(crate) enum CookieOperation {
     Remove,
-    Set { cookie: Cookie<'static> },
+    Set {
+        attributes: CookieAttributes,
+        value: String,
+    },
 }

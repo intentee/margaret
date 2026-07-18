@@ -9,6 +9,7 @@ pub(crate) struct MiddlewarePlan {
     pub(crate) arguments: Vec<MiddlewareArgument>,
     pub(crate) concrete: CanonicalPath,
     pub(crate) field: Ident,
+    pub(crate) injects_cookie_jar: bool,
     pub(crate) injects_routes: bool,
     pub(crate) selector: AttributeSelector,
     pub(crate) wrapper: Ident,

@@ -5,10 +5,21 @@ use margaret_console_argument_codegen::argument_registration::argument_registrat
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_http_codegen::http_server::HttpServer;
+use margaret_http_codegen::server_cookie_policy::ServerCookiePolicy;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
 use crate::console_command::ConsoleCommand;
+
+fn cookie_argument_registration(server: &HttpServer) -> TokenStream {
+    let cookie_domain_argument = server.cookie_domain_argument();
+    let cookie_insecure_argument = server.cookie_insecure_argument();
+
+    quote! {
+        .arg(clap::Arg::new(#cookie_domain_argument).long(#cookie_domain_argument).required(true))
+        .arg(clap::Arg::new(#cookie_insecure_argument).long(#cookie_insecure_argument).action(clap::ArgAction::SetTrue))
+    }
+}
 
 fn transport_argument_registration(server: &HttpServer) -> TokenStream {
     let transport_argument = server.transport_argument();
@@ -90,12 +101,15 @@ pub(crate) fn render(
             let upload_dir_argument = server.upload_dir_argument();
             let transport_argument =
                 spiffe_secured.then(|| transport_argument_registration(server));
+            let cookie_arguments = matches!(server.cookie_policy(), ServerCookiePolicy::Cookied)
+                .then(|| cookie_argument_registration(server));
 
             quote! {
                 .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
                 .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
                 .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
                 .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
+                #cookie_arguments
                 #transport_argument
             }
         });

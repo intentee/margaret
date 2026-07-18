@@ -21,7 +21,8 @@ use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 use tokio_util::sync::CancellationToken;
 
-use margaret_cookie_jar::cookie_jar::CookieJar;
+use margaret_cookie_jar::request_cookies::RequestCookies;
+use margaret_cookie_jar::server_cookies::ServerCookies;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::body_limit::BodyLimit;
@@ -48,6 +49,7 @@ struct ConnectionContext {
     peer_identity: Arc<PeerIdentity>,
     remote_addr: SocketAddr,
     router: Arc<Router>,
+    server_cookies: Arc<ServerCookies>,
     upload_config: Arc<UploadConfig>,
 }
 
@@ -56,6 +58,7 @@ pub struct BoundServer {
     forward_targets: Arc<ForwardTargets>,
     listener: TcpListener,
     router: Arc<Router>,
+    server_cookies: Arc<ServerCookies>,
     transport: BoundTransport,
     upload_config: Arc<UploadConfig>,
 }
@@ -80,6 +83,7 @@ impl BoundServer {
                 acceptor: TlsAcceptor::from(server_config.clone()),
             },
         };
+        let server_cookies = server.server_cookies().clone();
         let upload_config = server.upload_config().clone();
         let listener = TcpListener::bind(server.address()).await?;
 
@@ -88,6 +92,7 @@ impl BoundServer {
             forward_targets,
             listener,
             router,
+            server_cookies,
             transport,
             upload_config,
         })
@@ -125,6 +130,7 @@ impl BoundServer {
         let watcher = graceful.watcher();
         let transport = self.transport.clone();
         let router = self.router.clone();
+        let server_cookies = self.server_cookies.clone();
         let upload_config = self.upload_config.clone();
         let forward_targets = self.forward_targets.clone();
         let body_limit = self.body_limit;
@@ -142,6 +148,7 @@ impl BoundServer {
                             peer_identity: Arc::new(PeerIdentity::from_peer_certificate(None)),
                             remote_addr,
                             router,
+                            server_cookies,
                             upload_config,
                         },
                     )
@@ -168,6 +175,7 @@ impl BoundServer {
                             peer_identity,
                             remote_addr,
                             router,
+                            server_cookies,
                             upload_config,
                         },
                     )
@@ -249,6 +257,7 @@ async fn dispatch(
         peer_identity,
         remote_addr,
         router,
+        server_cookies,
         upload_config,
     }: ConnectionContext,
     request: http::Request<Incoming>,
@@ -261,9 +270,11 @@ async fn dispatch(
         ..
     } = parts;
     let body = incoming.map_err(std::io::Error::other).boxed_unsync();
-    let cookie_jar = match CookieJar::from_headers(&headers) {
-        Ok(cookie_jar) => cookie_jar,
-        Err(_) => return Response::text(400, "Bad Request").into_http(),
+    let cookies = match server_cookies.stage(&headers) {
+        Ok(cookies) => Arc::new(cookies),
+        Err(source) => {
+            return error_response(RequestError::CookieJar { source }).into_http();
+        }
     };
 
     match RequestInputs::parse(
@@ -277,14 +288,24 @@ async fn dispatch(
     )
     .await
     {
-        Ok(inputs) => router
-            .respond(
-                Request::from_inputs(inputs).with_peer_identity(peer_identity),
-                cookie_jar,
-                &forward_targets,
-            )
-            .await
-            .into_http(),
+        Ok(inputs) => {
+            let response = router
+                .respond(
+                    Request::from_inputs(inputs)
+                        .with_cookies(cookies.clone())
+                        .with_peer_identity(peer_identity),
+                    &forward_targets,
+                )
+                .await;
+
+            match cookies.as_ref() {
+                RequestCookies::Present { cookie_jar } => {
+                    response.with_cookies(cookie_jar.set_cookie_values())
+                }
+                RequestCookies::Absent => response,
+            }
+            .into_http()
+        }
         Err(error) => error_response(error).into_http(),
     }
 }
@@ -295,13 +316,17 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use cookie::Cookie;
+    use cookie::Expiration;
+    use cookie::SameSite;
     use tokio::io::AsyncReadExt;
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpStream;
     use tokio_util::sync::CancellationToken;
 
-    use margaret_cookie_jar::cookie_jar::CookieJar;
+    use margaret_cookie_jar::cookie_attributes::CookieAttributes;
+    use margaret_cookie_jar::cookie_config::CookieConfig;
+    use margaret_cookie_jar::cookie_domain::CookieDomain;
+    use margaret_cookie_jar::server_cookies::ServerCookies;
 
     use super::BoundServer;
     use super::accept_outcome;
@@ -312,6 +337,7 @@ mod tests {
     use crate::method_handler::MethodHandler;
     use crate::request::Request;
     use crate::request_error::RequestError;
+    use crate::require_cookie_jar::require_cookie_jar;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
     use crate::route_entry::RouteEntry;
@@ -325,11 +351,7 @@ mod tests {
 
     #[async_trait]
     impl Handler for PlainOk {
-        async fn handle(
-            &self,
-            _request: &Request,
-            _cookie_jar: &CookieJar,
-        ) -> ResponseContinuation {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
             ResponseContinuation::Done(Response::text(200, "ok"))
         }
     }
@@ -338,12 +360,22 @@ mod tests {
 
     #[async_trait]
     impl Handler for RotatesSession {
-        async fn handle(&self, _request: &Request, cookie_jar: &CookieJar) -> ResponseContinuation {
+        async fn handle(&self, request: &Request) -> ResponseContinuation {
+            let cookie_jar = require_cookie_jar(request).expect("the jar is available");
+
             cookie_jar
                 .remove("session")
                 .expect("the received session cookie is removed");
             cookie_jar
-                .add(Cookie::build(("issued", "new")).path("/").build())
+                .add(
+                    "issued",
+                    "new",
+                    CookieAttributes {
+                        expiration: Expiration::Session,
+                        http_only: true,
+                        same_site: SameSite::Strict,
+                    },
+                )
                 .expect("the issued cookie is staged");
 
             ResponseContinuation::Done(Response::text(200, "rotated"))
@@ -365,6 +397,12 @@ mod tests {
                 ),
             ])
             .expect("the route entries register cleanly"),
+            ServerCookies::Present {
+                cookie_config: Arc::new(CookieConfig {
+                    domain: CookieDomain::parse("example.test").expect("the domain parses"),
+                    secure: true,
+                }),
+            },
         )]))
     }
 
@@ -422,6 +460,7 @@ mod tests {
             UploadConfig::Disabled,
             BodyLimit::default(),
             Router::build(Vec::new()).expect("an empty router builds"),
+            ServerCookies::Absent,
         )]));
 
         assert!(
@@ -528,8 +567,12 @@ mod tests {
         .await;
 
         assert!(rotated.contains(" 200 "));
-        assert!(rotated.contains("set-cookie: issued=new"));
-        assert!(rotated.contains("set-cookie: session="));
+        assert!(rotated.contains(
+            "set-cookie: issued=new; HttpOnly; SameSite=Strict; Secure; Path=/; Domain=example.test"
+        ));
+        assert!(rotated.contains(
+            "set-cookie: session=; Secure; Path=/; Domain=example.test; Max-Age=0; Expires="
+        ));
 
         cancellation_token.cancel();
 

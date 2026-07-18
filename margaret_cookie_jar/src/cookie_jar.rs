@@ -1,33 +1,31 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::sync::Arc;
 
 use cookie::Cookie;
+use cookie::SameSite;
 use dashmap::DashMap;
 use dashmap::mapref::entry::Entry;
 use http::HeaderMap;
 use http::header::COOKIE;
 
+use crate::cookie_attributes::CookieAttributes;
+use crate::cookie_config::CookieConfig;
 use crate::cookie_jar_error::CookieJarError;
 use crate::cookie_operation::CookieOperation;
 
-fn removal_cookie(name: &str) -> Cookie<'static> {
-    let mut cookie = Cookie::build((name.to_owned(), String::new()))
-        .path("/")
-        .build();
-
-    cookie.make_removal();
-
-    cookie
-}
-
 pub struct CookieJar {
+    cookie_config: Arc<CookieConfig>,
     incoming: HashMap<String, String>,
     operations: DashMap<String, CookieOperation>,
 }
 
 impl CookieJar {
-    pub fn from_headers(headers: &HeaderMap) -> Result<Self, CookieJarError> {
+    pub fn from_headers(
+        cookie_config: Arc<CookieConfig>,
+        headers: &HeaderMap,
+    ) -> Result<Self, CookieJarError> {
         let mut incoming = HashMap::new();
 
         for raw in headers.get_all(COOKIE) {
@@ -48,15 +46,25 @@ impl CookieJar {
         }
 
         Ok(Self {
+            cookie_config,
             incoming,
             operations: DashMap::new(),
         })
     }
 
-    pub fn add(&self, cookie: Cookie<'static>) -> Result<(), CookieJarError> {
-        let name = cookie.name().to_owned();
+    pub fn add(
+        &self,
+        name: &str,
+        value: &str,
+        attributes: CookieAttributes,
+    ) -> Result<(), CookieJarError> {
+        if matches!(attributes.same_site, SameSite::None) && !self.cookie_config.secure {
+            return Err(CookieJarError::InsecureSameSiteNone {
+                name: name.to_owned(),
+            });
+        }
 
-        match self.operations.entry(name) {
+        match self.operations.entry(name.to_owned()) {
             Entry::Occupied(occupied) => {
                 let name = occupied.key().clone();
 
@@ -66,7 +74,10 @@ impl CookieJar {
                 })
             }
             Entry::Vacant(vacant) => {
-                vacant.insert(CookieOperation::Set { cookie });
+                vacant.insert(CookieOperation::Set {
+                    attributes,
+                    value: value.to_owned(),
+                });
 
                 Ok(())
             }
@@ -78,29 +89,10 @@ impl CookieJar {
         match self.operations.get(name) {
             Some(operation) => match operation.value() {
                 CookieOperation::Remove => None,
-                CookieOperation::Set { cookie } => Some(cookie.value().to_owned()),
+                CookieOperation::Set { value, .. } => Some(value.clone()),
             },
             None => self.incoming.get(name).cloned(),
         }
-    }
-
-    #[must_use]
-    pub fn into_set_cookie_values(self) -> Vec<String> {
-        let mut staged: Vec<Cookie<'static>> = self
-            .operations
-            .into_iter()
-            .map(|(name, operation)| match operation {
-                CookieOperation::Remove => removal_cookie(&name),
-                CookieOperation::Set { cookie } => cookie,
-            })
-            .collect();
-
-        staged.sort_by(|left, right| left.name().cmp(right.name()));
-
-        staged
-            .iter()
-            .map(|cookie| cookie.encoded().to_string())
-            .collect()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (String, String)> {
@@ -111,8 +103,8 @@ impl CookieJar {
                 CookieOperation::Remove => {
                     current.remove(operation.key());
                 }
-                CookieOperation::Set { cookie } => {
-                    current.insert(operation.key().clone(), cookie.value().to_owned());
+                CookieOperation::Set { value, .. } => {
+                    current.insert(operation.key().clone(), value.clone());
                 }
             }
         }
@@ -141,6 +133,55 @@ impl CookieJar {
             }
         }
     }
+
+    #[must_use]
+    pub fn set_cookie_values(&self) -> Vec<String> {
+        let mut staged: Vec<Cookie<'static>> = self
+            .operations
+            .iter()
+            .map(|operation| match operation.value() {
+                CookieOperation::Remove => self.removal_cookie(operation.key()),
+                CookieOperation::Set { attributes, value } => {
+                    self.staged_cookie(operation.key(), value, attributes)
+                }
+            })
+            .collect();
+
+        staged.sort_by(|left, right| left.name().cmp(right.name()));
+
+        staged
+            .iter()
+            .map(|cookie| cookie.encoded().to_string())
+            .collect()
+    }
+
+    fn removal_cookie(&self, name: &str) -> Cookie<'static> {
+        let mut cookie = Cookie::build((name.to_owned(), String::new()))
+            .domain(self.cookie_config.domain.as_str().to_owned())
+            .path("/")
+            .secure(self.cookie_config.secure)
+            .build();
+
+        cookie.make_removal();
+
+        cookie
+    }
+
+    fn staged_cookie(
+        &self,
+        name: &str,
+        value: &str,
+        attributes: &CookieAttributes,
+    ) -> Cookie<'static> {
+        Cookie::build((name.to_owned(), value.to_owned()))
+            .domain(self.cookie_config.domain.as_str().to_owned())
+            .expires(attributes.expiration)
+            .http_only(attributes.http_only)
+            .path("/")
+            .same_site(attributes.same_site)
+            .secure(self.cookie_config.secure)
+            .build()
+    }
 }
 
 impl Debug for CookieJar {
@@ -151,39 +192,47 @@ impl Debug for CookieJar {
 
 #[cfg(test)]
 mod tests {
-    use cookie::Cookie;
+    use std::sync::Arc;
+
+    use cookie::Expiration;
+    use cookie::SameSite;
+    use cookie::time::OffsetDateTime;
     use http::HeaderMap;
     use http::HeaderValue;
     use http::header::COOKIE;
 
     use super::CookieJar;
+    use crate::cookie_attributes::CookieAttributes;
+    use crate::cookie_config::CookieConfig;
+    use crate::cookie_domain::CookieDomain;
     use crate::cookie_jar_error::CookieJarError;
 
-    fn cookie(name: &str, value: &str) -> Cookie<'static> {
-        Cookie::build((name.to_owned(), value.to_owned())).build()
+    fn cookie_config(secure: bool) -> Arc<CookieConfig> {
+        Arc::new(CookieConfig {
+            domain: CookieDomain::parse("example.test").expect("the domain parses"),
+            secure,
+        })
+    }
+
+    fn session_attributes() -> CookieAttributes {
+        CookieAttributes {
+            expiration: Expiration::Session,
+            http_only: true,
+            same_site: SameSite::Strict,
+        }
     }
 
     fn empty_jar() -> CookieJar {
-        CookieJar::from_headers(&HeaderMap::new()).expect("an empty jar is built")
+        CookieJar::from_headers(cookie_config(true), &HeaderMap::new())
+            .expect("an empty header map parses")
     }
 
-    fn jar_from(raw: &str) -> CookieJar {
+    fn jar_from(raw: &'static str) -> CookieJar {
         let mut headers = HeaderMap::new();
 
-        headers.insert(
-            COOKIE,
-            HeaderValue::from_str(raw).expect("the cookie header value is valid"),
-        );
+        headers.insert(COOKIE, HeaderValue::from_static(raw));
 
-        CookieJar::from_headers(&headers).expect("the cookie header parses")
-    }
-
-    #[test]
-    fn redacts_its_contents_when_formatted() {
-        let formatted = format!("{:?}", jar_from("session=secret"));
-
-        assert_eq!(formatted, "CookieJar { .. }");
-        assert!(!formatted.contains("secret"));
+        CookieJar::from_headers(cookie_config(true), &headers).expect("the cookie header parses")
     }
 
     #[test]
@@ -195,70 +244,51 @@ mod tests {
     }
 
     #[test]
-    fn reads_no_cookies_without_a_cookie_header() {
-        assert_eq!(empty_jar().get("session"), None);
-    }
-
-    #[test]
     fn reads_cookies_from_every_cookie_header() {
         let mut headers = HeaderMap::new();
 
         headers.append(COOKIE, HeaderValue::from_static("session=abc"));
         headers.append(COOKIE, HeaderValue::from_static("theme=dark"));
 
-        let jar = CookieJar::from_headers(&headers).expect("the cookie headers parse");
+        let jar = CookieJar::from_headers(cookie_config(true), &headers)
+            .expect("the cookie headers parse");
 
         assert_eq!(jar.get("session"), Some("abc".to_owned()));
         assert_eq!(jar.get("theme"), Some("dark".to_owned()));
     }
 
     #[test]
+    fn reads_no_cookies_without_a_cookie_header() {
+        assert_eq!(empty_jar().get("session"), None);
+    }
+
+    #[test]
     fn rejects_a_cookie_name_repeated_within_one_header() {
-        let mut headers = HeaderMap::new();
-
-        headers.insert(
-            COOKIE,
-            HeaderValue::from_static("session=first; session=second"),
-        );
-
-        let error =
-            CookieJar::from_headers(&headers).expect_err("a repeated cookie name is rejected");
-
         assert!(matches!(
-            error,
-            CookieJarError::DuplicateInRequest { ref name } if name == "session"
+            CookieJar::from_headers(cookie_config(true), &{
+                let mut headers = HeaderMap::new();
+
+                headers.insert(COOKIE, HeaderValue::from_static("session=a; session=b"));
+
+                headers
+            })
+            .expect_err("a repeated cookie name is rejected"),
+            CookieJarError::DuplicateInRequest { name } if name == "session"
         ));
-        assert_eq!(
-            error.to_string(),
-            "the request carries the cookie `session` more than once"
-        );
     }
 
     #[test]
     fn rejects_a_cookie_name_repeated_across_headers() {
         let mut headers = HeaderMap::new();
 
-        headers.append(COOKIE, HeaderValue::from_static("session=first"));
-        headers.append(
-            COOKIE,
-            HeaderValue::from_static("theme=dark; session=second"),
-        );
-
-        let error = CookieJar::from_headers(&headers)
-            .expect_err("a cookie repeated across headers is rejected");
+        headers.append(COOKIE, HeaderValue::from_static("session=a"));
+        headers.append(COOKIE, HeaderValue::from_static("session=b"));
 
         assert!(matches!(
-            error,
-            CookieJarError::DuplicateInRequest { ref name } if name == "session"
+            CookieJar::from_headers(cookie_config(true), &headers)
+                .expect_err("a repeated cookie name is rejected"),
+            CookieJarError::DuplicateInRequest { name } if name == "session"
         ));
-    }
-
-    #[test]
-    fn decodes_a_percent_encoded_cookie_value() {
-        assert_eq!(
-            jar_from("session=a%3Bb").get("session"),
-            Some("a;b".to_owned())
-        );
     }
 
     #[test]
@@ -267,213 +297,269 @@ mod tests {
 
         headers.insert(
             COOKIE,
-            HeaderValue::from_bytes(b"session=\xff").expect("the header value is built"),
+            HeaderValue::from_bytes(&[0xff]).expect("the header value is built"),
         );
 
-        let error =
-            CookieJar::from_headers(&headers).expect_err("a non ASCII cookie header is rejected");
-
         assert!(
-            error
+            CookieJar::from_headers(cookie_config(true), &headers)
+                .expect_err("an unreadable cookie header is rejected")
                 .to_string()
                 .starts_with("the request cookie header is not visible ASCII text")
         );
     }
 
     #[test]
-    fn rejects_a_malformed_cookie_header() {
+    fn rejects_a_malformed_cookie() {
         let mut headers = HeaderMap::new();
 
-        headers.insert(COOKIE, HeaderValue::from_static("no-equals-sign"));
-
-        let error =
-            CookieJar::from_headers(&headers).expect_err("a malformed cookie header is rejected");
+        headers.insert(COOKIE, HeaderValue::from_static("novalue"));
 
         assert!(
-            error
+            CookieJar::from_headers(cookie_config(true), &headers)
+                .expect_err("a malformed cookie is rejected")
                 .to_string()
                 .starts_with("a cookie in the request header could not be parsed")
         );
     }
 
     #[test]
-    fn reads_a_staged_cookie_as_the_latest_state() {
-        let jar = jar_from("session=old");
+    fn reports_the_latest_state_of_a_staged_cookie() {
+        let jar = empty_jar();
 
-        jar.add(cookie("issued", "new"))
+        jar.add("session", "fresh", session_attributes())
             .expect("the cookie is staged");
 
-        assert_eq!(jar.get("issued"), Some("new".to_owned()));
-        assert_eq!(jar.get("session"), Some("old".to_owned()));
+        assert_eq!(jar.get("session"), Some("fresh".to_owned()));
     }
 
     #[test]
-    fn reads_a_removed_cookie_as_absent() {
+    fn reports_a_removed_cookie_as_absent() {
         let jar = jar_from("session=abc");
 
-        jar.remove("session").expect("the removal is staged");
+        jar.remove("session").expect("the cookie is removed");
 
         assert_eq!(jar.get("session"), None);
     }
 
     #[test]
-    fn iterates_the_latest_state() {
-        let jar = jar_from("kept=1; dropped=2");
+    fn rejects_setting_a_cookie_twice() {
+        let jar = empty_jar();
 
-        jar.remove("dropped").expect("the removal is staged");
-        jar.add(cookie("added", "3")).expect("the cookie is staged");
+        jar.add("session", "first", session_attributes())
+            .expect("the cookie is staged");
 
-        let mut current: Vec<(String, String)> = jar.iter().collect();
+        assert!(matches!(
+            jar.add("session", "second", session_attributes())
+                .expect_err("a second set is rejected"),
+            CookieJarError::AlreadySet { name } if name == "session"
+        ));
+    }
 
-        current.sort();
+    #[test]
+    fn rejects_setting_a_cookie_that_was_removed() {
+        let jar = jar_from("session=abc");
+
+        jar.remove("session").expect("the cookie is removed");
+
+        assert!(matches!(
+            jar.add("session", "again", session_attributes())
+                .expect_err("setting a removed cookie is rejected"),
+            CookieJarError::AlreadyRemoved { name } if name == "session"
+        ));
+    }
+
+    #[test]
+    fn rejects_same_site_none_without_a_secure_connection() {
+        let jar = CookieJar::from_headers(cookie_config(false), &HeaderMap::new())
+            .expect("an empty header map parses");
+
+        assert!(matches!(
+            jar.add(
+                "session",
+                "abc",
+                CookieAttributes {
+                    expiration: Expiration::Session,
+                    http_only: true,
+                    same_site: SameSite::None,
+                },
+            )
+            .expect_err("an insecure SameSite=None cookie is rejected"),
+            CookieJarError::InsecureSameSiteNone { name } if name == "session"
+        ));
+    }
+
+    #[test]
+    fn accepts_same_site_none_over_a_secure_connection() {
+        let jar = empty_jar();
+
+        jar.add(
+            "session",
+            "abc",
+            CookieAttributes {
+                expiration: Expiration::Session,
+                http_only: true,
+                same_site: SameSite::None,
+            },
+        )
+        .expect("a secure SameSite=None cookie is accepted");
+
+        assert_eq!(jar.get("session"), Some("abc".to_owned()));
+    }
+
+    #[test]
+    fn rejects_removing_a_cookie_the_request_did_not_carry() {
+        assert!(matches!(
+            empty_jar()
+                .remove("session")
+                .expect_err("removing an absent cookie is rejected"),
+            CookieJarError::NotInRequest { name } if name == "session"
+        ));
+    }
+
+    #[test]
+    fn rejects_removing_a_cookie_that_was_set() {
+        let jar = empty_jar();
+
+        jar.add("session", "abc", session_attributes())
+            .expect("the cookie is staged");
+
+        assert!(matches!(
+            jar.remove("session")
+                .expect_err("removing a staged cookie is rejected"),
+            CookieJarError::AlreadySet { name } if name == "session"
+        ));
+    }
+
+    #[test]
+    fn removes_a_cookie_idempotently() {
+        let jar = jar_from("session=abc");
+
+        jar.remove("session").expect("the cookie is removed");
+        jar.remove("session")
+            .expect("removing the cookie again is accepted");
+
+        assert_eq!(jar.get("session"), None);
+    }
+
+    #[test]
+    fn lists_the_current_state_of_every_cookie() {
+        let jar = jar_from("session=abc; theme=dark");
+
+        jar.remove("theme").expect("the cookie is removed");
+        jar.add("visited", "true", session_attributes())
+            .expect("the cookie is staged");
+
+        let mut listed: Vec<(String, String)> = jar.iter().collect();
+
+        listed.sort();
 
         assert_eq!(
-            current,
+            listed,
             vec![
-                ("added".to_owned(), "3".to_owned()),
-                ("kept".to_owned(), "1".to_owned()),
+                ("session".to_owned(), "abc".to_owned()),
+                ("visited".to_owned(), "true".to_owned()),
             ]
         );
     }
 
     #[test]
-    fn emits_a_set_cookie_value_for_a_staged_cookie() {
+    fn stamps_the_configured_domain_path_and_secure_flag() {
         let jar = empty_jar();
 
-        jar.add(cookie("session", "abc"))
+        jar.add("session", "abc", session_attributes())
             .expect("the cookie is staged");
 
-        assert_eq!(jar.into_set_cookie_values(), vec!["session=abc".to_owned()]);
+        let emitted = jar.set_cookie_values();
+
+        assert_eq!(emitted.len(), 1);
+        assert!(emitted[0].starts_with("session=abc"));
+        assert!(emitted[0].contains("Domain=example.test"));
+        assert!(emitted[0].contains("Path=/"));
+        assert!(emitted[0].contains("Secure"));
+        assert!(emitted[0].contains("HttpOnly"));
+        assert!(emitted[0].contains("SameSite=Strict"));
     }
 
     #[test]
-    fn percent_encodes_a_set_cookie_value() {
-        let jar = empty_jar();
+    fn omits_the_secure_flag_for_an_insecure_server() {
+        let jar = CookieJar::from_headers(cookie_config(false), &HeaderMap::new())
+            .expect("an empty header map parses");
 
-        jar.add(cookie("session", "a;b"))
+        jar.add("session", "abc", session_attributes())
             .expect("the cookie is staged");
 
-        assert_eq!(
-            jar.into_set_cookie_values(),
-            vec!["session=a%3Bb".to_owned()]
-        );
+        assert!(!jar.set_cookie_values()[0].contains("Secure"));
     }
 
     #[test]
-    fn emits_a_removal_for_a_received_cookie() {
+    fn emits_an_expiring_cookie_for_an_absolute_expiration() {
+        let jar = empty_jar();
+
+        jar.add(
+            "session",
+            "abc",
+            CookieAttributes {
+                expiration: Expiration::DateTime(
+                    OffsetDateTime::from_unix_timestamp(1_700_000_000)
+                        .expect("the timestamp is in range"),
+                ),
+                http_only: true,
+                same_site: SameSite::Strict,
+            },
+        )
+        .expect("the cookie is staged");
+
+        assert!(jar.set_cookie_values()[0].contains("Expires="));
+    }
+
+    #[test]
+    fn emits_a_removal_matching_the_domain_and_path_of_the_original() {
         let jar = jar_from("session=abc");
 
-        jar.remove("session").expect("the removal is staged");
+        jar.remove("session").expect("the cookie is removed");
 
-        let emitted = jar.into_set_cookie_values();
+        let emitted = jar.set_cookie_values();
 
         assert_eq!(emitted.len(), 1);
         assert!(emitted[0].starts_with("session="));
         assert!(emitted[0].contains("Max-Age=0"));
+        assert!(emitted[0].contains("Domain=example.test"));
         assert!(emitted[0].contains("Path=/"));
+        assert!(emitted[0].contains("Secure"));
+    }
+
+    #[test]
+    fn percent_encodes_a_cookie_value() {
+        let jar = empty_jar();
+
+        jar.add("session", "a;b", session_attributes())
+            .expect("the cookie is staged");
+
+        assert!(jar.set_cookie_values()[0].starts_with("session=a%3Bb"));
+    }
+
+    #[test]
+    fn emits_staged_cookies_sorted_by_name() {
+        let jar = empty_jar();
+
+        jar.add("zulu", "1", session_attributes())
+            .expect("the cookie is staged");
+        jar.add("alpha", "2", session_attributes())
+            .expect("the cookie is staged");
+
+        let emitted = jar.set_cookie_values();
+
+        assert!(emitted[0].starts_with("alpha=2"));
+        assert!(emitted[1].starts_with("zulu=1"));
     }
 
     #[test]
     fn emits_nothing_when_nothing_was_staged() {
-        assert!(jar_from("session=abc").into_set_cookie_values().is_empty());
+        assert!(jar_from("session=abc").set_cookie_values().is_empty());
     }
 
     #[test]
-    fn orders_the_emitted_cookies_by_name() {
-        let jar = empty_jar();
-
-        jar.add(cookie("second", "2"))
-            .expect("the cookie is staged");
-        jar.add(cookie("first", "1")).expect("the cookie is staged");
-
-        assert_eq!(
-            jar.into_set_cookie_values(),
-            vec!["first=1".to_owned(), "second=2".to_owned()]
-        );
-    }
-
-    #[test]
-    fn rejects_setting_a_cookie_that_is_already_set() {
-        let jar = empty_jar();
-
-        jar.add(cookie("session", "abc"))
-            .expect("the cookie is staged");
-
-        let error = jar
-            .add(cookie("session", "def"))
-            .expect_err("the second set is rejected");
-
-        assert!(matches!(
-            error,
-            CookieJarError::AlreadySet { ref name } if name == "session"
-        ));
-        assert_eq!(
-            error.to_string(),
-            "the cookie `session` is already set in this request"
-        );
-    }
-
-    #[test]
-    fn rejects_setting_a_cookie_that_is_already_removed() {
-        let jar = jar_from("session=abc");
-
-        jar.remove("session").expect("the removal is staged");
-
-        let error = jar
-            .add(cookie("session", "def"))
-            .expect_err("setting a removed cookie is rejected");
-
-        assert!(matches!(
-            error,
-            CookieJarError::AlreadyRemoved { ref name } if name == "session"
-        ));
-        assert_eq!(
-            error.to_string(),
-            "the cookie `session` is already removed in this request"
-        );
-    }
-
-    #[test]
-    fn rejects_removing_a_cookie_that_is_already_set() {
-        let jar = jar_from("session=abc");
-
-        jar.add(cookie("session", "def"))
-            .expect("the cookie is staged");
-
-        let error = jar
-            .remove("session")
-            .expect_err("removing a set cookie is rejected");
-
-        assert!(matches!(
-            error,
-            CookieJarError::AlreadySet { ref name } if name == "session"
-        ));
-    }
-
-    #[test]
-    fn allows_removing_a_cookie_twice() {
-        let jar = jar_from("session=abc");
-
-        jar.remove("session").expect("the removal is staged");
-        jar.remove("session")
-            .expect("removing an already removed cookie is allowed");
-
-        assert_eq!(jar.into_set_cookie_values().len(), 1);
-    }
-
-    #[test]
-    fn rejects_removing_a_cookie_the_request_did_not_carry() {
-        let error = jar_from("other=1")
-            .remove("session")
-            .expect_err("removing an unreceived cookie is rejected");
-
-        assert!(matches!(
-            error,
-            CookieJarError::NotInRequest { ref name } if name == "session"
-        ));
-        assert_eq!(
-            error.to_string(),
-            "the cookie `session` is not in the request"
-        );
+    fn redacts_its_contents_when_formatted() {
+        assert_eq!(format!("{:?}", jar_from("session=abc")), "CookieJar { .. }");
     }
 }

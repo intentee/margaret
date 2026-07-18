@@ -75,6 +75,7 @@ pub(crate) fn middleware_plans(
             arguments,
             concrete: item.canonical_path().clone(),
             field: format_ident!("{}", index.field_name(item.canonical_path())),
+            injects_cookie_jar: cookie_jar_count == 1,
             injects_routes,
             selector: AttributeSelector::from_path(handles),
             wrapper: format_ident!("{}", index.type_name(item.canonical_path())),

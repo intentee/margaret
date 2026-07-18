@@ -1,4 +1,5 @@
 use http::StatusCode;
+use http::header::LOCATION;
 
 use crate::response::Response;
 
@@ -30,7 +31,7 @@ impl Redirect {
     }
 
     pub(crate) fn into_response(self) -> Response {
-        Response::text(self.status.as_u16(), "").header("location", self.location)
+        Response::text(self.status.as_u16(), "").reserved_header(LOCATION, self.location)
     }
 }
 

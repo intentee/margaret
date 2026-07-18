@@ -25,6 +25,7 @@ members = [
     "margaret_macros",
     "margaret_peer_identity",
     "margaret_peer_identity_tests",
+    "margaret_response_header_name",
     "margaret_service",
     "margaret_service_codegen",
     "margaret_service_tests",

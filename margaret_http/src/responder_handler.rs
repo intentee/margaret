@@ -4,8 +4,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use margaret_cookie_jar::cookie_jar::CookieJar;
-
 use crate::handler::Handler;
 use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;
@@ -22,15 +20,14 @@ where
     Extract: for<'request> Fn(
             Arc<Responder>,
             &'request Request,
-            &'request CookieJar,
         )
             -> Pin<Box<dyn Future<Output = ResponseContinuation> + Send + 'request>>
         + Send
         + Sync
         + 'static,
 {
-    async fn handle(&self, request: &Request, cookie_jar: &CookieJar) -> ResponseContinuation {
-        (self.extract)(self.responder.clone(), request, cookie_jar).await
+    async fn handle(&self, request: &Request) -> ResponseContinuation {
+        (self.extract)(self.responder.clone(), request).await
     }
 }
 
@@ -43,7 +40,6 @@ where
     Extract: for<'request> Fn(
             Arc<Responder>,
             &'request Request,
-            &'request CookieJar,
         )
             -> Pin<Box<dyn Future<Output = ResponseContinuation> + Send + 'request>>
         + Send
@@ -60,11 +56,8 @@ mod tests {
     use std::pin::Pin;
     use std::sync::Arc;
 
-    use http::HeaderMap;
     use http::Method;
     use http_body_util::BodyExt;
-
-    use margaret_cookie_jar::cookie_jar::CookieJar;
 
     use super::responder_handler;
     use crate::forward_targets::ForwardTargets;
@@ -86,8 +79,7 @@ mod tests {
         let handler = responder_handler(
             Arc::new(Echo),
             |responder: Arc<Echo>,
-             request: &Request,
-             _cookie_jar: &CookieJar|
+             request: &Request|
              -> Pin<Box<dyn Future<Output = ResponseContinuation> + Send + '_>> {
                 Box::pin(async move {
                     ResponseContinuation::from(
@@ -107,14 +99,9 @@ mod tests {
             .with_path_params(HashMap::from([("id".to_string(), "7".to_string())]));
         let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
 
-        let response = respond_recursively(
-            &forward_targets,
-            request,
-            &CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built"),
-            handler,
-        )
-        .await
-        .into_http();
+        let response = respond_recursively(&forward_targets, request, handler)
+            .await
+            .into_http();
 
         assert_eq!(response.status().as_u16(), 200);
         assert_eq!(

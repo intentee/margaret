@@ -8,5 +8,6 @@ pub mod run_scheduled_service_with_argument;
 pub mod scheduled_argument_runner;
 pub mod serve_application;
 pub mod server_assembly;
+pub mod server_cookies_assembly;
 pub mod server_service;
 pub mod tick_runner;

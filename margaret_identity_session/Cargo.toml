@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 chrono = { workspace = true }
 cookie = { workspace = true }
+http = { workspace = true }
+margaret_cookie_jar = { path = "../margaret_cookie_jar" }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }

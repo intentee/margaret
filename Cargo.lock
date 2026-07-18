@@ -1413,6 +1413,7 @@ dependencies = [
  "hyper-util",
  "margaret_cookie_jar",
  "margaret_peer_identity",
+ "margaret_response_header_name",
  "matchit",
  "mime",
  "multer",
@@ -1510,6 +1511,8 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "cookie",
+ "http",
+ "margaret_cookie_jar",
  "serde",
  "thiserror",
  "uuid",
@@ -1523,6 +1526,7 @@ dependencies = [
  "chrono",
  "clap",
  "margaret_console",
+ "margaret_cookie_jar",
  "margaret_http",
  "margaret_http_tests",
  "margaret_identity",
@@ -1624,6 +1628,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_response_header_name"
+version = "0.1.0"
+dependencies = [
+ "http",
+ "thiserror",
+]
+
+[[package]]
 name = "margaret_service"
 version = "0.1.0"
 dependencies = [
@@ -1632,6 +1644,7 @@ dependencies = [
  "clap",
  "libc",
  "margaret_console",
+ "margaret_cookie_jar",
  "margaret_http",
  "tokio",
  "tokio-util",

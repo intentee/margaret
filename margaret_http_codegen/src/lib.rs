@@ -31,6 +31,7 @@ mod route_group;
 mod route_parameter_arguments;
 mod route_path;
 mod route_url_template;
+pub mod server_cookie_policy;
 mod server_route_group;
 pub mod server_transport_policy;
 pub mod serves_spiffe;
@@ -312,17 +313,17 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "use margaret_cookie_jar::cookie_jar::CookieJar;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, cookies: &CookieJar) -> Response {}\n}\n",
         );
 
-        assert!(source.contains("cookies:&margaret_cookie_jar::cookie_jar::CookieJar"));
+        assert!(source.contains("margaret_http::require_cookie_jar::require_cookie_jar("));
         assert!(source.contains("responder.respond(cookies).await"));
     }
 
     #[test]
-    fn marks_the_cookie_jar_unused_when_the_responder_does_not_ask_for_it() {
+    fn never_mentions_the_cookie_jar_when_the_responder_does_not_ask_for_it() {
         let source = source_for(
             "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
-        assert!(source.contains("_cookie_jar:&margaret_cookie_jar::cookie_jar::CookieJar"));
+        assert!(!source.contains("require_cookie_jar"));
     }
 
     #[test]
@@ -331,7 +332,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "use margaret_cookie_jar::cookie_jar::CookieJar;\nuse margaret_http::next::Next;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, cookies: &CookieJar, next: Next) -> ResponseContinuation {}\n}\n",
         );
 
-        assert!(source.contains("cookie_jar:&'jarmargaret_cookie_jar::cookie_jar::CookieJar"));
+        assert!(source.contains("margaret_http::require_cookie_jar::require_cookie_jar("));
         assert!(source.contains("self.inner.process(cookie_jar,next).await"));
     }
 
@@ -342,7 +343,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         );
 
         assert!(source.contains("request_2:&margaret_http::request::Request"));
-        assert!(source.contains("request:&margaret_cookie_jar::cookie_jar::CookieJar"));
+        assert!(source.contains("margaret_http::require_cookie_jar::require_cookie_jar("));
         assert!(source.contains("letincoming=request_2;"));
         assert!(source.contains("responder.respond(request,incoming).await"));
     }
@@ -1041,7 +1042,7 @@ impl GetGreeting {
         );
 
         assert!(source.contains(
-            "asyncfnprocess<'jar>(&self,_request:&margaret_http::request::Request,_cookie_jar:&'jarmargaret_cookie_jar::cookie_jar::CookieJar,next:margaret_http::next::Next<'jar>,)"
+            "asyncfnprocess(&self,_request:&margaret_http::request::Request,next:margaret_http::next::Next,)"
         ));
         assert!(source.contains("self.inner.process(next).await"));
     }
@@ -1053,7 +1054,7 @@ impl GetGreeting {
         );
 
         assert!(source.contains(
-            "asyncfnprocess<'jar>(&self,request:&margaret_http::request::Request,_cookie_jar:&'jarmargaret_cookie_jar::cookie_jar::CookieJar,_next:margaret_http::next::Next<'jar>,)"
+            "asyncfnprocess(&self,request:&margaret_http::request::Request,_next:margaret_http::next::Next,)"
         ));
         assert!(source.contains("self.inner.process(request).await"));
     }

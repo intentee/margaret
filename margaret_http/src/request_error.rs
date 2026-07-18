@@ -1,8 +1,16 @@
 use http::header::ToStrError;
 use thiserror::Error;
 
+use margaret_cookie_jar::cookie_jar_error::CookieJarError;
+
 #[derive(Debug, Error)]
 pub enum RequestError {
+    #[error("the request cookies could not be read: {source}")]
+    CookieJar {
+        #[source]
+        source: CookieJarError,
+    },
+
     #[error("a request header value is not visible ASCII text: {source}")]
     HeaderNotText {
         #[from]

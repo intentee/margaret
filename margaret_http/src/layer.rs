@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use margaret_cookie_jar::cookie_jar::CookieJar;
-
 use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
 use crate::next::Next;
@@ -20,13 +18,9 @@ impl<Middleware> Handler for LayeredHandler<Middleware>
 where
     Middleware: HttpMiddleware + Send + Sync + 'static,
 {
-    async fn handle(&self, request: &Request, cookie_jar: &CookieJar) -> ResponseContinuation {
+    async fn handle(&self, request: &Request) -> ResponseContinuation {
         self.middleware
-            .process(
-                request,
-                cookie_jar,
-                Next::new(self.inner.clone(), cookie_jar),
-            )
+            .process(request, Next::new(self.inner.clone()))
             .await
     }
 }
@@ -43,10 +37,7 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use http::HeaderMap;
     use http::Method;
-
-    use margaret_cookie_jar::cookie_jar::CookieJar;
 
     use super::layer;
     use crate::forward_targets::ForwardTargets;
@@ -62,11 +53,7 @@ mod tests {
 
     #[async_trait]
     impl Handler for Inner {
-        async fn handle(
-            &self,
-            _request: &Request,
-            _cookie_jar: &CookieJar,
-        ) -> ResponseContinuation {
+        async fn handle(&self, _request: &Request) -> ResponseContinuation {
             ResponseContinuation::Done(Response::text(200, "inner"))
         }
     }
@@ -75,12 +62,7 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for PassThrough {
-        async fn process<'jar>(
-            &self,
-            request: &Request,
-            _cookie_jar: &'jar CookieJar,
-            next: Next<'jar>,
-        ) -> ResponseContinuation {
+        async fn process(&self, request: &Request, next: Next) -> ResponseContinuation {
             next.run(request).await
         }
     }
@@ -89,12 +71,7 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for ShortCircuit {
-        async fn process<'jar>(
-            &self,
-            _request: &Request,
-            _cookie_jar: &'jar CookieJar,
-            _next: Next<'jar>,
-        ) -> ResponseContinuation {
+        async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
             ResponseContinuation::Done(Response::text(403, "blocked"))
         }
     }
@@ -108,7 +85,6 @@ mod tests {
         respond_recursively(
             &forward_targets,
             Request::new(Method::GET, "/".to_string()),
-            &CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built"),
             layer(Arc::new(middleware), Arc::new(Inner)),
         )
         .await

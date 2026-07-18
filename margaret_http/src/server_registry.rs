@@ -24,6 +24,8 @@ impl ServerRegistry {
 
 #[cfg(test)]
 mod tests {
+    use margaret_cookie_jar::server_cookies::ServerCookies;
+
     use super::ServerRegistry;
     use crate::body_limit::BodyLimit;
     use crate::router::Router;
@@ -39,6 +41,7 @@ mod tests {
             UploadConfig::Disabled,
             BodyLimit::default(),
             Router::build(Vec::new()).expect("an empty router builds"),
+            ServerCookies::Absent,
         )])
     }
 
