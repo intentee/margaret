@@ -48,10 +48,16 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
     }
 }
 
-fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
+fn server_manager_setup(servers: &[HttpServer], registers_services: bool) -> TokenStream {
+    let manager_binding = if registers_services {
+        quote! { mut manager }
+    } else {
+        quote! { manager }
+    };
+
     if servers.is_empty() {
         return quote! {
-            let mut manager = trzcina::ServiceManager::default();
+            let #manager_binding = trzcina::ServiceManager::default();
         };
     }
 
@@ -131,7 +137,7 @@ fn server_manager_setup(servers: &[HttpServer]) -> TokenStream {
         );
         let servers = #assemblies;
 
-        let mut manager = match margaret_service::serve_application::serve_application(
+        let #manager_binding = match margaret_service::serve_application::serve_application(
             matches,
             servers,
             #bundle,
@@ -369,7 +375,7 @@ pub fn render_services(
     let serve_arguments = serve_arguments(&units)?;
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(registration);
-    let manager_setup = server_manager_setup(servers);
+    let manager_setup = server_manager_setup(servers, !units.is_empty());
     let matches_binding = if servers.is_empty() && serve_arguments.is_empty() {
         quote! { _matches }
     } else {

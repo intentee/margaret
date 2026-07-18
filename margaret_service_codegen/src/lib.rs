@@ -156,6 +156,16 @@ mod tests {
     }
 
     #[test]
+    fn binds_the_manager_immutably_when_no_services_are_registered() {
+        let source = rendered("#[singleton]\nstruct Store;\n", &public());
+
+        assert!(source.contains(
+            "letmanager=matchmargaret_service::serve_application::serve_application("
+        ));
+        assert!(!source.contains("letmutmanager"));
+    }
+
+    #[test]
     fn wires_the_spiffe_bundle_and_pins_transports_when_a_server_is_pinned() {
         let source = rendered(
             SERVICE,
