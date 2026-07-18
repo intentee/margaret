@@ -49,6 +49,14 @@ impl Response {
         }
     }
 
+    fn new(status: u16, body: Bytes) -> Self {
+        Self {
+            body,
+            headers: Vec::new(),
+            status,
+        }
+    }
+
     pub fn not_found() -> Self {
         Self::text(404, "Not Found")
     }
@@ -82,14 +90,6 @@ impl Response {
 
                 internal_server_error()
             }
-        }
-    }
-
-    fn new(status: u16, body: Bytes) -> Self {
-        Self {
-            body,
-            headers: Vec::new(),
-            status,
         }
     }
 }
