@@ -1,11 +1,9 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-use cookie::Cookie;
 use http::HeaderMap;
 use http::Method;
 use http::Uri;
-use http::header::COOKIE;
 
 use crate::body_class::BodyClass;
 use crate::body_limit::BodyLimit;
@@ -21,23 +19,6 @@ use crate::uploaded_file::UploadedFile;
 
 fn unspecified_addr() -> SocketAddr {
     SocketAddr::from(([0, 0, 0, 0], 0))
-}
-
-fn parse_cookies(headers: &HeaderMap) -> Result<HashMap<String, String>, RequestError> {
-    let mut cookies = HashMap::new();
-    let Some(raw) = headers.get(COOKIE) else {
-        return Ok(cookies);
-    };
-
-    for parsed in Cookie::split_parse(raw.to_str()?) {
-        let cookie = parsed?;
-        let name = cookie.name().to_string();
-        let value = cookie.value().to_string();
-
-        cookies.entry(name).or_insert(value);
-    }
-
-    Ok(cookies)
 }
 
 fn index_fields(fields: Vec<FormField>) -> HashMap<String, String> {
@@ -63,7 +44,6 @@ fn index_files(files: Vec<UploadedFile>) -> HashMap<String, UploadedFile> {
 }
 
 pub struct RequestInputs {
-    pub cookies: HashMap<String, String>,
     pub files: HashMap<String, UploadedFile>,
     pub json: Option<serde_json::Value>,
     pub form: HashMap<String, String>,
@@ -74,7 +54,6 @@ pub struct RequestInputs {
 impl RequestInputs {
     pub(crate) fn empty(method: Method, path: String) -> Self {
         Self {
-            cookies: HashMap::new(),
             files: HashMap::new(),
             json: None,
             form: HashMap::new(),
@@ -98,7 +77,6 @@ impl RequestInputs {
         body_limit: &BodyLimit,
         upload_config: &UploadConfig,
     ) -> Result<Self, RequestError> {
-        let cookies = parse_cookies(&headers)?;
         let query = index_fields(form_fields(uri.query().unwrap_or_default().as_bytes()));
         let mut files = HashMap::new();
         let mut json: Option<serde_json::Value> = None;
@@ -139,7 +117,6 @@ impl RequestInputs {
         );
 
         Ok(Self {
-            cookies,
             files,
             json,
             form,
@@ -159,8 +136,7 @@ mod tests {
     use http::Method;
     use http::Uri;
     use http::header::CONTENT_TYPE;
-    use http::header::COOKIE;
-    use http_body_util::BodyExt;
+        use http_body_util::BodyExt;
     use http_body_util::Full;
     use tempfile::TempDir;
     use tempfile::tempdir;
@@ -228,70 +204,6 @@ mod tests {
             upload_config,
         )
         .await
-    }
-
-    async fn parse_with_cookie(value: &[u8]) -> Result<RequestInputs, RequestError> {
-        let mut headers = HeaderMap::new();
-
-        headers.insert(
-            COOKIE,
-            HeaderValue::from_bytes(value).expect("a header value"),
-        );
-
-        let uri: Uri = "/".parse().expect("a valid uri");
-
-        RequestInputs::parse(
-            Method::GET,
-            &uri,
-            headers,
-            unspecified_addr(),
-            boxed(b""),
-            &BodyLimit::default(),
-            &UploadConfig::Disabled,
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn parses_cookies_from_the_header() {
-        let inputs = parse_with_cookie(b"session=abc; theme=dark")
-            .await
-            .expect("the request parses");
-
-        assert_eq!(
-            inputs.cookies.get("session").map(String::as_str),
-            Some("abc")
-        );
-        assert_eq!(
-            inputs.cookies.get("theme").map(String::as_str),
-            Some("dark")
-        );
-    }
-
-    #[tokio::test]
-    async fn has_no_cookies_without_a_cookie_header() {
-        let directory = tempdir().expect("a temporary directory");
-        let inputs = parse_inputs(None, "/", b"", &upload_in(&directory))
-            .await
-            .expect("the request parses");
-
-        assert!(inputs.cookies.is_empty());
-    }
-
-    #[tokio::test]
-    async fn rejects_a_malformed_cookie_header() {
-        let message = parse_with_cookie(b"=nameless")
-            .await
-            .err()
-            .unwrap()
-            .to_string();
-
-        assert!(message.contains("could not be parsed"));
-    }
-
-    #[tokio::test]
-    async fn rejects_a_non_ascii_cookie_header() {
-        assert!(parse_with_cookie(&[0xC0, 0xC1]).await.is_err());
     }
 
     #[tokio::test]

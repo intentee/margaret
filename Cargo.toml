@@ -8,6 +8,7 @@ members = [
     "margaret_console",
     "margaret_console_codegen",
     "margaret_container",
+    "margaret_cookie_jar",
     "margaret_example",
     "margaret_generated_module",
     "margaret_http",

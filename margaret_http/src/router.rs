@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use matchit::InsertError;
 
+use margaret_cookie_jar::cookie_jar::CookieJar;
+
 use crate::forward_targets::ForwardTargets;
 use crate::handler::Handler;
 use crate::method_handler::MethodHandler;
@@ -37,6 +39,7 @@ impl Router {
     pub(crate) async fn respond(
         &self,
         request: Request,
+        cookie_jar: CookieJar,
         forward_targets: &Arc<ForwardTargets>,
     ) -> Response {
         let path = request.inputs.server.path().to_string();
@@ -57,8 +60,9 @@ impl Router {
             .map(|(name, value)| (name.to_string(), value.to_string()))
             .collect();
         let request = request.with_path_params(path_params);
+        let response = respond_recursively(forward_targets, request, &cookie_jar, handler).await;
 
-        respond_recursively(forward_targets, request, handler).await
+        response.with_cookies(cookie_jar.into_set_cookie_values())
     }
 }
 
@@ -67,7 +71,11 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use cookie::Cookie;
+    use http::HeaderMap;
     use http::Method;
+
+    use margaret_cookie_jar::cookie_jar::CookieJar;
 
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
@@ -81,7 +89,7 @@ mod tests {
 
     #[async_trait]
     impl Handler for EchoId {
-        async fn handle(&self, request: &Request) -> ResponseContinuation {
+        async fn handle(&self, request: &Request, _cookie_jar: &CookieJar) -> ResponseContinuation {
             ResponseContinuation::Done(Response::text(
                 200,
                 request
@@ -96,7 +104,24 @@ mod tests {
 
     #[async_trait]
     impl Handler for PlainOk {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+        async fn handle(
+            &self,
+            _request: &Request,
+            _cookie_jar: &CookieJar,
+        ) -> ResponseContinuation {
+            ResponseContinuation::Done(Response::text(200, "ok"))
+        }
+    }
+
+    struct StagesCookie;
+
+    #[async_trait]
+    impl Handler for StagesCookie {
+        async fn handle(&self, _request: &Request, cookie_jar: &CookieJar) -> ResponseContinuation {
+            cookie_jar
+                .add(Cookie::build(("session", "abc")).path("/").build())
+                .expect("the cookie is staged");
+
             ResponseContinuation::Done(Response::text(200, "ok"))
         }
     }
@@ -113,6 +138,10 @@ mod tests {
             RouteEntry::new(
                 "/items/{id}",
                 vec![MethodHandler::new("GET", Arc::new(EchoId))],
+            ),
+            RouteEntry::new(
+                "/session",
+                vec![MethodHandler::new("GET", Arc::new(StagesCookie))],
             ),
         ])
         .expect("the route entries register cleanly")
@@ -138,7 +167,11 @@ mod tests {
         let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
 
         router()
-            .respond(Request::new(method, path.to_string()), &forward_targets)
+            .respond(
+                Request::new(method, path.to_string()),
+                CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built"),
+                &forward_targets,
+            )
             .await
             .into_http()
             .status()
@@ -163,5 +196,29 @@ mod tests {
     #[tokio::test]
     async fn returns_405_for_an_unregistered_method() {
         assert_eq!(status_of(Method::DELETE, "/items").await, 405);
+    }
+
+    #[tokio::test]
+    async fn emits_the_cookies_staged_by_the_responder() {
+        let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
+
+        let response = router()
+            .respond(
+                Request::new(Method::GET, "/session".to_string()),
+                CookieJar::from_headers(&HeaderMap::new()).expect("an empty cookie jar is built"),
+                &forward_targets,
+            )
+            .await
+            .into_http();
+
+        assert_eq!(
+            response
+                .headers()
+                .get("set-cookie")
+                .expect("the set-cookie header is present")
+                .to_str()
+                .expect("the header is valid text"),
+            "session=abc; Path=/"
+        );
     }
 }

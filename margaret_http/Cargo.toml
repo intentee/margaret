@@ -6,13 +6,13 @@ edition = "2024"
 [dependencies]
 async-trait = { workspace = true }
 bytes = { workspace = true }
-cookie = { workspace = true }
 form_urlencoded = { workspace = true }
 http = { workspace = true }
 http-body = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server", "server-auto", "server-graceful", "service", "tokio"] }
+margaret_cookie_jar = { path = "../margaret_cookie_jar" }
 margaret_peer_identity = { path = "../margaret_peer_identity" }
 matchit = { workspace = true }
 mime = { workspace = true }
@@ -29,6 +29,7 @@ tokio-util = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 
 [dev-dependencies]
+cookie = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread"] }
 
 [lints]

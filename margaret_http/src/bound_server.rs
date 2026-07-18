@@ -21,6 +21,7 @@ use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 use tokio_util::sync::CancellationToken;
 
+use margaret_cookie_jar::cookie_jar::CookieJar;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::body_limit::BodyLimit;
@@ -260,6 +261,10 @@ async fn dispatch(
         ..
     } = parts;
     let body = incoming.map_err(std::io::Error::other).boxed_unsync();
+    let cookie_jar = match CookieJar::from_headers(&headers) {
+        Ok(cookie_jar) => cookie_jar,
+        Err(_) => return Response::text(400, "Bad Request").into_http(),
+    };
 
     match RequestInputs::parse(
         method,
@@ -275,6 +280,7 @@ async fn dispatch(
         Ok(inputs) => router
             .respond(
                 Request::from_inputs(inputs).with_peer_identity(peer_identity),
+                cookie_jar,
                 &forward_targets,
             )
             .await
@@ -289,10 +295,13 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use cookie::Cookie;
     use tokio::io::AsyncReadExt;
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpStream;
     use tokio_util::sync::CancellationToken;
+
+    use margaret_cookie_jar::cookie_jar::CookieJar;
 
     use super::BoundServer;
     use super::accept_outcome;
@@ -316,8 +325,28 @@ mod tests {
 
     #[async_trait]
     impl Handler for PlainOk {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
+        async fn handle(
+            &self,
+            _request: &Request,
+            _cookie_jar: &CookieJar,
+        ) -> ResponseContinuation {
             ResponseContinuation::Done(Response::text(200, "ok"))
+        }
+    }
+
+    struct RotatesSession;
+
+    #[async_trait]
+    impl Handler for RotatesSession {
+        async fn handle(&self, _request: &Request, cookie_jar: &CookieJar) -> ResponseContinuation {
+            cookie_jar
+                .remove("session")
+                .expect("the received session cookie is removed");
+            cookie_jar
+                .add(Cookie::build(("issued", "new")).path("/").build())
+                .expect("the issued cookie is staged");
+
+            ResponseContinuation::Done(Response::text(200, "rotated"))
         }
     }
 
@@ -328,10 +357,13 @@ mod tests {
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
-            Router::build(vec![RouteEntry::new(
-                "/",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
-            )])
+            Router::build(vec![
+                RouteEntry::new("/", vec![MethodHandler::new("GET", Arc::new(PlainOk))]),
+                RouteEntry::new(
+                    "/session",
+                    vec![MethodHandler::new("GET", Arc::new(RotatesSession))],
+                ),
+            ])
             .expect("the route entries register cleanly"),
         )]))
     }
@@ -467,6 +499,66 @@ mod tests {
         assert!(unmatched.contains(" 404 "));
         assert!(unsupported.contains(" 405 "));
         assert!(truncated.contains(" 400 "));
+
+        cancellation_token.cancel();
+
+        serving.await.expect("the server task finishes cleanly");
+    }
+
+    #[tokio::test]
+    async fn seeds_the_cookie_jar_from_the_request_and_emits_its_cookies() {
+        let bound = BoundServer::bind(
+            registry_with_one(),
+            empty_forward_targets(),
+            Arc::from("test"),
+        )
+        .await
+        .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let rotated = exchange(
+            address,
+            b"GET /session HTTP/1.1\r\nHost: test\r\nCookie: session=abc\r\nConnection: close\r\n\r\n",
+            false,
+        )
+        .await;
+
+        assert!(rotated.contains(" 200 "));
+        assert!(rotated.contains("set-cookie: issued=new"));
+        assert!(rotated.contains("set-cookie: session="));
+
+        cancellation_token.cancel();
+
+        serving.await.expect("the server task finishes cleanly");
+    }
+
+    #[tokio::test]
+    async fn rejects_a_request_carrying_a_malformed_cookie_header() {
+        let bound = BoundServer::bind(
+            registry_with_one(),
+            empty_forward_targets(),
+            Arc::from("test"),
+        )
+        .await
+        .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let rejected = exchange(
+            address,
+            b"GET / HTTP/1.1\r\nHost: test\r\nCookie: no-equals-sign\r\nConnection: close\r\n\r\n",
+            false,
+        )
+        .await;
+
+        assert!(rejected.contains(" 400 "));
 
         cancellation_token.cancel();
 

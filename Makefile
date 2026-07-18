@@ -6,6 +6,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_console_argument_codegen \
 	-p margaret_console_codegen \
 	-p margaret_container \
+	-p margaret_cookie_jar \
 	-p margaret_generated_module \
 	-p margaret_http \
 	-p margaret_http_codegen \
@@ -60,6 +61,7 @@ coverage: node_modules
 		--gated margaret_console_argument_codegen=100 \
 		--gated margaret_console_codegen=100 \
 		--gated margaret_container=100 \
+		--gated margaret_cookie_jar=100 \
 		--gated margaret_generated_module=100 \
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \

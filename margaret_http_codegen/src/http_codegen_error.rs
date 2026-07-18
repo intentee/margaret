@@ -53,12 +53,30 @@ pub enum HttpCodegenError {
     UnknownMiddleware { responder: String, tag: String },
 
     #[error(
-        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a form request, the current request, the peer SPIFFE id, the forwarder, or the routes"
+        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a form request, the current request, the cookie jar, the peer SPIFFE id, the forwarder, or the routes"
     )]
     UnmarkedResponderParameter {
         responder: String,
         parameter: String,
     },
+
+    #[error(
+        "argument #{parameter} of responder '{responder}' is the cookie jar and must not also carry #[route_parameter] or #[form_request]"
+    )]
+    MarkedCookieJarParameter {
+        responder: String,
+        parameter: String,
+    },
+
+    #[error(
+        "responder '{responder}' declares more than one cookie jar parameter; a request has exactly one cookie jar"
+    )]
+    MultipleCookieJarParameters { responder: String },
+
+    #[error(
+        "middleware '{middleware}' declares more than one cookie jar parameter; a request has exactly one cookie jar"
+    )]
+    MultipleMiddlewareCookieJarParameters { middleware: String },
 
     #[error(
         "argument #{parameter} of responder '{responder}' is the peer SPIFFE id and must not also carry #[route_parameter] or #[form_request]"
@@ -180,7 +198,7 @@ pub enum HttpCodegenError {
     InvalidRouteName { name: String, responder: String },
 
     #[error(
-        "parameter '{parameter}' of middleware '{middleware}' must be the current request, the next handler, or the routes"
+        "parameter '{parameter}' of middleware '{middleware}' must be the current request, the cookie jar, the next handler, or the routes"
     )]
     UnclassifiableMiddlewareParameter {
         middleware: String,

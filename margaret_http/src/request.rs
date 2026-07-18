@@ -70,7 +70,6 @@ mod tests {
     #[test]
     fn exposes_its_inputs_and_path_parameters() {
         let request = Request::from_inputs(RequestInputs {
-            cookies: HashMap::new(),
             files: HashMap::new(),
             json: None,
             form: HashMap::from([("title".to_string(), "hello".to_string())]),

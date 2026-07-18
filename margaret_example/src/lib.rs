@@ -1,6 +1,7 @@
 pub mod clock;
 pub mod commands;
 pub mod config;
+pub mod cookie_name_visited;
 pub mod english_greeter;
 pub mod forms;
 pub mod greeter;

@@ -123,6 +123,7 @@ pub(crate) fn responder_method(
         let form_request = marker(attributes, &selectors.form_request);
         let resolved = index.resolve_item_type(item, declared);
         let is_reference = matches!(declared, Type::Reference(_));
+        let is_cookie_jar = HttpInjectable::CookieJar.matches(resolved.as_ref(), is_reference);
         let is_current_request =
             HttpInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference);
         let is_forwarder = is_forwarder(resolved.as_ref(), is_reference, server);
@@ -137,6 +138,13 @@ pub(crate) fn responder_method(
             });
         }
 
+        if is_cookie_jar && (route_parameter.is_some() || form_request.is_some()) {
+            return Err(HttpCodegenError::MarkedCookieJarParameter {
+                responder: responder.to_string(),
+                parameter: position.to_string(),
+            });
+        }
+
         if is_peer_spiffe_id && (route_parameter.is_some() || form_request.is_some()) {
             return Err(HttpCodegenError::MarkedPeerSpiffeIdParameter {
                 responder: responder.to_string(),
@@ -146,6 +154,7 @@ pub(crate) fn responder_method(
 
         if route_parameter.is_none()
             && form_request.is_none()
+            && !is_cookie_jar
             && !is_current_request
             && !is_forwarder
             && !is_peer_spiffe_id
@@ -164,6 +173,8 @@ pub(crate) fn responder_method(
             let route_arguments = RouteParameterArguments::parse(&arguments, responder, position)?;
 
             classify(index, item, responder, route_arguments, declared, binders)?
+        } else if is_cookie_jar {
+            ResponderArgumentBinding::CookieJar
         } else if is_forwarder {
             ResponderArgumentBinding::Forwarder
         } else if is_peer_spiffe_id {
@@ -175,6 +186,17 @@ pub(crate) fn responder_method(
         };
 
         arguments.push(ResponderArgument { holder, binding });
+    }
+
+    let cookie_jar_count = arguments
+        .iter()
+        .filter(|argument| matches!(argument.binding, ResponderArgumentBinding::CookieJar))
+        .count();
+
+    if cookie_jar_count > 1 {
+        return Err(HttpCodegenError::MultipleCookieJarParameters {
+            responder: responder.to_string(),
+        });
     }
 
     let peer_spiffe_id_count = arguments

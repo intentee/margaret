@@ -6,6 +6,7 @@ autotests = false
 
 [dependencies]
 async-trait = { workspace = true }
+margaret_cookie_jar = { path = "../margaret_cookie_jar" }
 margaret_http = { path = "../margaret_http" }
 rcgen = { workspace = true }
 rustls = { workspace = true }

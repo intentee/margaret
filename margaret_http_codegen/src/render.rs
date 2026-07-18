@@ -25,18 +25,25 @@ fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
 }
 
+fn argument_needs_cookie_jar(argument: &ResponderArgument) -> bool {
+    matches!(argument.binding, ResponderArgumentBinding::CookieJar)
+}
+
 fn argument_needs_request(argument: &ResponderArgument) -> bool {
     !matches!(
         argument.binding,
-        ResponderArgumentBinding::Routes | ResponderArgumentBinding::Forwarder
+        ResponderArgumentBinding::CookieJar
+            | ResponderArgumentBinding::Routes
+            | ResponderArgumentBinding::Forwarder
     )
 }
 
-fn holder_shadows_request(binding: &ResponderArgumentBinding) -> bool {
+fn holder_shadows_injected_binding(binding: &ResponderArgumentBinding) -> bool {
     matches!(
         binding,
         ResponderArgumentBinding::Raw { .. }
             | ResponderArgumentBinding::Bound { .. }
+            | ResponderArgumentBinding::CookieJar
             | ResponderArgumentBinding::FormRequest { .. }
             | ResponderArgumentBinding::PeerSpiffeId
     )
@@ -66,7 +73,7 @@ fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
     let mut allocator = NameAllocator::new();
 
     for argument in &route.arguments {
-        if holder_shadows_request(&argument.binding) {
+        if holder_shadows_injected_binding(&argument.binding) {
             allocator.reserve(&argument.holder.to_string());
         }
     }
@@ -79,6 +86,12 @@ fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
         format_ident!("{}", allocator.allocate("request").field())
     } else {
         format_ident!("_request")
+    };
+    let cookie_jar_binding = match route.arguments.iter().find(|argument| {
+        argument_needs_cookie_jar(argument)
+    }) {
+        Some(argument) => argument.holder.clone(),
+        None => format_ident!("_cookie_jar"),
     };
 
     for argument in &route.arguments {
@@ -122,7 +135,8 @@ fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
             margaret_http::responder_handler::responder_handler(
                 #responder_access,
                 |#responder_binding: std::sync::Arc<#responder_type>,
-                 #request_binding: &margaret_http::request::Request|
+                 #request_binding: &margaret_http::request::Request,
+                 #cookie_jar_binding: &margaret_cookie_jar::cookie_jar::CookieJar|
                  -> #outcome_future {
                     std::boxed::Box::pin(async move {
                         #body
@@ -150,7 +164,8 @@ fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
                 margaret_http::responder_handler::responder_handler(
                     #responder_access,
                     move |#responder_binding: std::sync::Arc<#responder_type>,
-                          #request_binding: &margaret_http::request::Request|
+                          #request_binding: &margaret_http::request::Request,
+                          #cookie_jar_binding: &margaret_cookie_jar::cookie_jar::CookieJar|
                           -> #outcome_future {
                         #(#capture_clones)*
                         #routes_reclone
@@ -207,6 +222,7 @@ fn argument_binding(
     let holder = &argument.holder;
 
     match &argument.binding {
+        ResponderArgumentBinding::CookieJar => TokenStream::new(),
         ResponderArgumentBinding::Raw { path_key } => {
             quote! {
                 let #holder = match margaret_http::require_route_parameter::require_route_parameter(
@@ -312,6 +328,14 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     } else {
         format_ident!("_request")
     };
+    let cookie_jar_binding = if arguments
+        .iter()
+        .any(|argument| matches!(argument, MiddlewareArgument::CookieJar))
+    {
+        format_ident!("cookie_jar")
+    } else {
+        format_ident!("_cookie_jar")
+    };
     let next_binding = if arguments
         .iter()
         .any(|argument| matches!(argument, MiddlewareArgument::Next))
@@ -321,6 +345,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
         format_ident!("_next")
     };
     let call_arguments = arguments.iter().map(|argument| match argument {
+        MiddlewareArgument::CookieJar => quote! { cookie_jar },
         MiddlewareArgument::CurrentRequest => quote! { request },
         MiddlewareArgument::Next => quote! { next },
         MiddlewareArgument::Routes => quote! { &self.routes },
@@ -334,10 +359,11 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
 
         #[async_trait::async_trait]
         impl margaret_http::http_middleware::HttpMiddleware for #wrapper {
-            async fn process(
+            async fn process<'jar>(
                 &self,
                 #request_binding: &margaret_http::request::Request,
-                #next_binding: margaret_http::next::Next,
+                #cookie_jar_binding: &'jar margaret_cookie_jar::cookie_jar::CookieJar,
+                #next_binding: margaret_http::next::Next<'jar>,
             ) -> margaret_http::response_continuation::ResponseContinuation {
                 self.inner.process(#(#call_arguments),*).await
             }

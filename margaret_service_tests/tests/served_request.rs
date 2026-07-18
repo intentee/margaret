@@ -6,6 +6,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio_util::sync::CancellationToken;
 
+use margaret_cookie_jar::cookie_jar::CookieJar;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
@@ -25,7 +26,7 @@ struct Accepts;
 
 #[async_trait]
 impl Handler for Accepts {
-    async fn handle(&self, _request: &Request) -> ResponseContinuation {
+    async fn handle(&self, _request: &Request, _cookie_jar: &CookieJar) -> ResponseContinuation {
         ResponseContinuation::Done(Response::text(200, "accepted"))
     }
 }

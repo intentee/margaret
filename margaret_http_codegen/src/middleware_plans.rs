@@ -43,7 +43,9 @@ pub(crate) fn middleware_plans(
             let resolved = index.resolve_item_type(item, declared);
             let is_reference = matches!(declared, Type::Reference(_));
             let argument =
-                if HttpInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference) {
+                if HttpInjectable::CookieJar.matches(resolved.as_ref(), is_reference) {
+                    MiddlewareArgument::CookieJar
+                } else if HttpInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference) {
                     MiddlewareArgument::CurrentRequest
                 } else if HttpInjectable::Next.matches(resolved.as_ref(), is_reference) {
                     MiddlewareArgument::Next
@@ -59,6 +61,15 @@ pub(crate) fn middleware_plans(
                 };
 
             arguments.push(argument);
+        }
+
+        let cookie_jar_count = arguments
+            .iter()
+            .filter(|argument| matches!(argument, MiddlewareArgument::CookieJar))
+            .count();
+
+        if cookie_jar_count > 1 {
+            return Err(HttpCodegenError::MultipleMiddlewareCookieJarParameters { middleware });
         }
 
         plans.push(MiddlewarePlan {

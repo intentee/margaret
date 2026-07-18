@@ -6,6 +6,7 @@ use rustls::ServerConfig;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+use margaret_cookie_jar::cookie_jar::CookieJar;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
@@ -26,7 +27,7 @@ struct EchoPeer;
 
 #[async_trait]
 impl Handler for EchoPeer {
-    async fn handle(&self, request: &Request) -> ResponseContinuation {
+    async fn handle(&self, request: &Request, _cookie_jar: &CookieJar) -> ResponseContinuation {
         match require_peer_spiffe_id(request) {
             Ok(spiffe_id) => ResponseContinuation::Done(Response::text(
                 200,

@@ -27,7 +27,7 @@ impl RequestLog {
     pub async fn process(
         &self,
         request: &Request,
-        next: Next,
+        next: Next<'_>,
         routes: &Routes,
     ) -> ResponseContinuation {
         let line = format!(

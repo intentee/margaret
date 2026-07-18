@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use cookie::Cookie;
 use http::StatusCode;
 use http_body_util::Full;
 use serde::Serialize;
@@ -49,10 +48,6 @@ impl Response {
         Self::text(404, "Not Found")
     }
 
-    pub fn set_cookie(self, cookie: Cookie<'static>) -> Self {
-        self.header("set-cookie", cookie.to_string())
-    }
-
     pub fn text(status: u16, body: impl Into<String>) -> Self {
         Self {
             body: body.into(),
@@ -84,11 +79,16 @@ impl Response {
             }
         }
     }
+
+    pub(crate) fn with_cookies(self, set_cookie_values: Vec<String>) -> Self {
+        set_cookie_values
+            .into_iter()
+            .fold(self, |response, value| response.header("set-cookie", value))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use cookie::Cookie;
     use serde::Serialize;
     use serde::Serializer;
     use serde::ser::Error;
@@ -167,19 +167,18 @@ mod tests {
     }
 
     #[test]
-    fn attaches_a_set_cookie_header() {
+    fn attaches_one_set_cookie_header_per_staged_cookie() {
         let response = Response::text(200, "")
-            .set_cookie(Cookie::new("session", "abc"))
+            .with_cookies(vec!["first=1".to_owned(), "second=2".to_owned()])
             .into_http();
 
-        assert!(
-            response
-                .headers()
-                .get("set-cookie")
-                .expect("the set-cookie header is present")
-                .to_str()
-                .expect("the header is valid text")
-                .starts_with("session=abc")
-        );
+        let emitted: Vec<&str> = response
+            .headers()
+            .get_all("set-cookie")
+            .iter()
+            .map(|value| value.to_str().expect("the header is valid text"))
+            .collect();
+
+        assert_eq!(emitted, vec!["first=1", "second=2"]);
     }
 }

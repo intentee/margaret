@@ -1,4 +1,3 @@
-use cookie::ParseError;
 use http::header::ToStrError;
 use thiserror::Error;
 
@@ -8,12 +7,6 @@ pub enum RequestError {
     HeaderNotText {
         #[from]
         source: ToStrError,
-    },
-
-    #[error("a request cookie could not be parsed: {source}")]
-    MalformedCookie {
-        #[from]
-        source: ParseError,
     },
 
     #[error("the request content type is not a valid media type: {source}")]

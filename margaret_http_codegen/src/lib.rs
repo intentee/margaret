@@ -307,6 +307,111 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     }
 
     #[test]
+    fn injects_the_cookie_jar_into_a_responder_by_type() {
+        let source = source_for(
+            "use margaret_cookie_jar::cookie_jar::CookieJar;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, cookies: &CookieJar) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("cookies:&margaret_cookie_jar::cookie_jar::CookieJar"));
+        assert!(source.contains("responder.respond(cookies).await"));
+    }
+
+    #[test]
+    fn marks_the_cookie_jar_unused_when_the_responder_does_not_ask_for_it() {
+        let source = source_for(
+            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("_cookie_jar:&margaret_cookie_jar::cookie_jar::CookieJar"));
+    }
+
+    #[test]
+    fn injects_the_cookie_jar_into_a_middleware_process_method() {
+        let source = source_for(
+            "use margaret_cookie_jar::cookie_jar::CookieJar;\nuse margaret_http::next::Next;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, cookies: &CookieJar, next: Next) -> ResponseContinuation {}\n}\n",
+        );
+
+        assert!(source.contains("cookie_jar:&'jarmargaret_cookie_jar::cookie_jar::CookieJar"));
+        assert!(source.contains("self.inner.process(cookie_jar,next).await"));
+    }
+
+    #[test]
+    fn disambiguates_a_cookie_jar_parameter_named_after_the_request_binding() {
+        let source = source_for(
+            "use margaret_cookie_jar::cookie_jar::CookieJar;\nuse margaret_http::request::Request;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, request: &CookieJar, incoming: &Request) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("request_2:&margaret_http::request::Request"));
+        assert!(source.contains("request:&margaret_cookie_jar::cookie_jar::CookieJar"));
+        assert!(source.contains("letincoming=request_2;"));
+        assert!(source.contains("responder.respond(request,incoming).await"));
+    }
+
+    #[test]
+    fn binds_the_cookie_jar_alongside_the_request_and_a_route_parameter() {
+        let source = source_for(
+            "use margaret_cookie_jar::cookie_jar::CookieJar;\nuse margaret_http::request::Request;\n\n#[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, request: &Request, cookies: &CookieJar, #[route_parameter(from = \"id\")] id: String) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("responder.respond(request,cookies,id).await"));
+    }
+
+    #[test]
+    fn disambiguates_a_cookie_jar_parameter_named_after_the_routes_binding() {
+        let source = source_for(
+            "use crate::margaret::routes::Routes;\nuse margaret_cookie_jar::cookie_jar::CookieJar;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, routes: &CookieJar, site: &Routes) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("letroutes_2=routes.clone();"));
+        assert!(source.contains("responder.respond(routes,routes_2.as_ref()).await"));
+    }
+
+    #[test]
+    fn accepts_a_middleware_next_handler_written_with_an_anonymous_lifetime() {
+        let source = source_for(
+            "use margaret_http::next::Next;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next<'_>) -> ResponseContinuation {}\n}\n",
+        );
+
+        assert!(source.contains("self.inner.process(next).await"));
+    }
+
+    #[test]
+    fn rejects_a_middleware_with_multiple_cookie_jar_parameters() {
+        let message = error_for(
+            "use margaret_cookie_jar::cookie_jar::CookieJar;\nuse margaret_http::next::Next;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, first: &CookieJar, second: &CookieJar, next: Next) -> ResponseContinuation {}\n}\n",
+        );
+
+        assert!(message.contains("more than one cookie jar"));
+    }
+
+    #[test]
+    fn rejects_a_user_type_named_cookie_jar_that_shadows_the_injectable() {
+        let message = error_for(
+            "mod app {\n    pub struct CookieJar;\n}\n\nuse crate::app::CookieJar;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, cookies: &CookieJar) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("must be a route parameter"));
+    }
+
+    #[test]
+    fn rejects_a_cookie_jar_parameter_that_also_carries_a_marker() {
+        let message = error_for(
+            "use margaret_cookie_jar::cookie_jar::CookieJar;\n\n#[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] cookies: &CookieJar) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("cookie jar and must not"));
+    }
+
+    #[test]
+    fn rejects_a_responder_with_multiple_cookie_jar_parameters() {
+        let message = error_for(
+            "use margaret_cookie_jar::cookie_jar::CookieJar;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, first: &CookieJar, second: &CookieJar) -> Response {}\n}\n",
+        );
+
+        assert!(message.contains("more than one cookie jar"));
+    }
+
+    #[test]
     fn injects_the_scoped_forwarder_into_a_responder_by_type() {
         let source = source_for(
             "use crate::margaret::forwarders::public::Forwarder;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> Forward {}\n}\n",
@@ -775,7 +880,9 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> ResponseContinuation {}\n}\n",
         );
 
-        assert!(message.contains("must be the current request, the next handler, or the routes"));
+        assert!(message.contains(
+            "must be the current request, the cookie jar, the next handler, or the routes"
+        ));
     }
 
     #[test]
@@ -934,7 +1041,7 @@ impl GetGreeting {
         );
 
         assert!(source.contains(
-            "asyncfnprocess(&self,_request:&margaret_http::request::Request,next:margaret_http::next::Next,)"
+            "asyncfnprocess<'jar>(&self,_request:&margaret_http::request::Request,_cookie_jar:&'jarmargaret_cookie_jar::cookie_jar::CookieJar,next:margaret_http::next::Next<'jar>,)"
         ));
         assert!(source.contains("self.inner.process(next).await"));
     }
@@ -946,7 +1053,7 @@ impl GetGreeting {
         );
 
         assert!(source.contains(
-            "asyncfnprocess(&self,request:&margaret_http::request::Request,_next:margaret_http::next::Next,)"
+            "asyncfnprocess<'jar>(&self,request:&margaret_http::request::Request,_cookie_jar:&'jarmargaret_cookie_jar::cookie_jar::CookieJar,_next:margaret_http::next::Next<'jar>,)"
         ));
         assert!(source.contains("self.inner.process(request).await"));
     }

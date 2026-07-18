@@ -1,6 +1,7 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
 pub(crate) enum HttpInjectable {
+    CookieJar,
     CurrentRequest,
     Next,
     PeerSpiffeId,
@@ -11,6 +12,11 @@ pub(crate) enum HttpInjectable {
 impl HttpInjectable {
     pub(crate) fn canonical_path(&self) -> CanonicalPath {
         match self {
+            Self::CookieJar => CanonicalPath::new(vec![
+                "margaret_cookie_jar".to_string(),
+                "cookie_jar".to_string(),
+                "CookieJar".to_string(),
+            ]),
             Self::CurrentRequest => CanonicalPath::new(vec![
                 "margaret_http".to_string(),
                 "request".to_string(),
@@ -46,7 +52,7 @@ impl HttpInjectable {
 
     fn requires_reference(&self) -> bool {
         match self {
-            Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes => true,
+            Self::CookieJar | Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes => true,
             Self::Next | Self::ValidationResult => false,
         }
     }

@@ -312,6 +312,7 @@ version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ddef33a339a91ea89fb53151bd0a4689cfce27055c291dfa69945475d22c747"
 dependencies = [
+ "percent-encoding",
  "time",
  "version_check",
 ]
@@ -1350,15 +1351,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_cookie_jar"
+version = "0.1.0"
+dependencies = [
+ "cookie",
+ "dashmap",
+ "http",
+ "thiserror",
+]
+
+[[package]]
 name = "margaret_example"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "clap",
+ "cookie",
  "dashmap",
  "margaret_codegen",
  "margaret_console",
+ "margaret_cookie_jar",
  "margaret_http",
  "margaret_http_validation",
  "margaret_macros",
@@ -1398,6 +1411,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "margaret_cookie_jar",
  "margaret_peer_identity",
  "matchit",
  "mime",
@@ -1437,6 +1451,7 @@ name = "margaret_http_tests"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "margaret_cookie_jar",
  "margaret_http",
  "rcgen",
  "rustls",
@@ -1467,6 +1482,7 @@ dependencies = [
  "clap",
  "margaret_codegen",
  "margaret_console",
+ "margaret_cookie_jar",
  "margaret_http",
  "margaret_http_validation",
  "margaret_identity_session",
@@ -1648,6 +1664,7 @@ dependencies = [
  "async-trait",
  "libc",
  "margaret_console",
+ "margaret_cookie_jar",
  "margaret_http",
  "margaret_service",
  "tokio",
