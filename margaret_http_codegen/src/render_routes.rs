@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -40,7 +38,7 @@ fn is_get(named: &NamedRoute<'_>) -> bool {
     named.route.method == "GET"
 }
 
-fn server_layouts(table: &HttpRouteTable, servers: &[HttpServer]) -> HashMap<String, ServerLayout> {
+fn server_layouts(table: &HttpRouteTable, servers: &[HttpServer]) -> Vec<ServerLayout> {
     let mut type_allocator = NameAllocator::new();
 
     servers
@@ -66,14 +64,11 @@ fn server_layouts(table: &HttpRouteTable, servers: &[HttpServer]) -> HashMap<Str
 
             let constructor = format_ident!("{}", method_allocator.allocate("new").field());
 
-            (
-                server.name().to_string(),
-                ServerLayout {
-                    constructor,
-                    origin,
-                    struct_ident,
-                },
-            )
+            ServerLayout {
+                constructor,
+                origin,
+                struct_ident,
+            }
         })
         .collect()
 }
@@ -220,9 +215,9 @@ pub(crate) fn render_routes(
     servers: &[HttpServer],
 ) -> Vec<GeneratedModuleTokens> {
     let layouts = server_layouts(table, servers);
-    let server_fields = servers.iter().map(|server| {
+    let server_fields = servers.iter().zip(&layouts).map(|(server, layout)| {
         let field = server_field_ident(server);
-        let struct_ident = &layouts[server.name()].struct_ident;
+        let struct_ident = &layout.struct_ident;
 
         quote! { pub #field: servers::#field::#struct_ident, }
     });
@@ -231,9 +226,8 @@ pub(crate) fn render_routes(
 
         quote! { #param: ::std::sync::Arc<str>, }
     });
-    let server_inits = servers.iter().map(|server| {
+    let server_inits = servers.iter().zip(&layouts).map(|(server, layout)| {
         let field = server_field_ident(server);
-        let layout = &layouts[server.name()];
         let struct_ident = &layout.struct_ident;
         let constructor = &layout.constructor;
         let param = origin_param_ident(server);
@@ -275,10 +269,10 @@ pub(crate) fn render_routes(
         GeneratedModuleTokens::new("routes/servers", servers_tokens),
     ];
 
-    for server in servers {
+    for (server, layout) in servers.iter().zip(&layouts) {
         modules.push(GeneratedModuleTokens::new(
             format!("routes/servers/{}", server_field_ident(server)),
-            server_struct(table, server, &layouts[server.name()]),
+            server_struct(table, server, layout),
         ));
     }
 

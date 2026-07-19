@@ -14,10 +14,8 @@ fn remove_stale_sources(directory: &Path, written: &BTreeSet<PathBuf>) -> Result
         source,
     })?;
 
-    for entry in entries {
-        let path = entry
-            .expect("a generated directory entry is readable")
-            .path();
+    for entry in entries.flatten() {
+        let path = entry.path();
 
         if path.extension() == Some(OsStr::new("rs")) {
             if !written.contains(&path) {
@@ -55,9 +53,7 @@ impl GeneratedCode {
 
         for module in &self.modules {
             let path = directory.join(format!("{}.rs", module.name()));
-            let parent = path
-                .parent()
-                .expect("a generated module path has a parent directory");
+            let parent = path.parent().unwrap_or(directory);
 
             fs::create_dir_all(parent).map_err(|source| CodegenError::CreateDirectory {
                 path: parent.to_path_buf(),

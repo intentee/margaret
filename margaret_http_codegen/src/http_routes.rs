@@ -5,6 +5,7 @@ use quote::format_ident;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::format_path::format_path;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 
 use crate::build_registry::build_registry;
@@ -22,7 +23,7 @@ pub(crate) fn http_routes(
     index: &AttributeIndex,
     middleware_plans: &[MiddlewarePlan],
 ) -> Result<HttpRouteTable, HttpCodegenError> {
-    let selector = AttributeSelector::parse("responds_to_http").expect("a valid selector");
+    let selector = AttributeSelector::from_marker("responds_to_http");
     let binders = build_registry(
         index,
         "provides_route_parameter",
@@ -34,7 +35,7 @@ pub(crate) fn http_routes(
             second,
         },
     )?;
-    let middleware_selector = AttributeSelector::parse("middleware").expect("a valid selector");
+    let middleware_selector = AttributeSelector::from_marker("middleware");
     let responder_selectors = ResponderSelectors::new();
     let mut table = HttpRouteTable::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
@@ -78,12 +79,7 @@ pub(crate) fn http_routes(
             else {
                 return Err(HttpCodegenError::UnknownMiddleware {
                     responder: responder.clone(),
-                    tag: tag
-                        .segments
-                        .last()
-                        .expect("a path has at least one segment")
-                        .ident
-                        .to_string(),
+                    tag: format_path(tag),
                 });
             };
 

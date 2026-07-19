@@ -48,6 +48,7 @@ mod tests {
             .expect("the services source is generated")
             .module
             .format()
+            .expect("the module formats")
             .source()
             .split_whitespace()
             .collect()

@@ -133,11 +133,6 @@ impl ModuleWalker {
             .map(|item| item.canonical_path().clone())
             .collect();
         let empty_imports = ModuleImports::default();
-        let index_by_path: HashMap<CanonicalPath, usize> = items
-            .iter()
-            .enumerate()
-            .map(|(index, item)| (item.canonical_path().clone(), index))
-            .collect();
 
         for PendingMember {
             kind,
@@ -152,16 +147,19 @@ impl ModuleWalker {
             else {
                 continue;
             };
-            let Some(&index) = index_by_path.get(&self_type_path) else {
+            let Some(item) = items
+                .iter_mut()
+                .find(|item| item.canonical_path() == &self_type_path)
+            else {
                 continue;
             };
 
             match kind {
                 PendingMemberKind::AssociatedType(associated_type) => {
-                    items[index].add_associated_type(associated_type);
+                    item.add_associated_type(associated_type);
                 }
                 PendingMemberKind::Method(method) => {
-                    items[index].add_method(method);
+                    item.add_method(method);
                 }
             }
         }

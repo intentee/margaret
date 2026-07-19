@@ -10,20 +10,13 @@ pub(crate) enum RequestInputSource {
 
 impl RequestInputSource {
     pub(crate) fn from_path(path: &Path) -> Option<Self> {
-        let leaf = &path
-            .segments
-            .last()
-            .expect("a path has at least one segment")
-            .ident;
+        let leaf = path.segments.last().map(|segment| &segment.ident);
 
-        if leaf == "Form" {
-            Some(Self::Form)
-        } else if leaf == "Query" {
-            Some(Self::Query)
-        } else if leaf == "Json" {
-            Some(Self::Json)
-        } else {
-            None
+        match leaf {
+            Some(leaf) if leaf == "Form" => Some(Self::Form),
+            Some(leaf) if leaf == "Query" => Some(Self::Query),
+            Some(leaf) if leaf == "Json" => Some(Self::Json),
+            _ => None,
         }
     }
 

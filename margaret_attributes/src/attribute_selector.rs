@@ -1,3 +1,4 @@
+use proc_macro2::Span;
 use syn::Ident;
 use syn::Path;
 
@@ -9,6 +10,11 @@ pub struct AttributeSelector {
 }
 
 impl AttributeSelector {
+    #[must_use]
+    pub fn from_marker(marker: &str) -> Self {
+        Self::from_path(Path::from(Ident::new(marker, Span::call_site())))
+    }
+
     #[must_use]
     pub fn from_path(path: Path) -> Self {
         Self { path }
@@ -46,15 +52,6 @@ impl AttributeSelector {
 
     pub(crate) fn display_path(&self) -> String {
         format_path(&self.path)
-    }
-
-    pub(crate) fn leaf_ident(&self) -> &Ident {
-        &self
-            .path
-            .segments
-            .last()
-            .expect("a selector path has at least one segment")
-            .ident
     }
 }
 

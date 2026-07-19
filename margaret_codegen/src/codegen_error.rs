@@ -5,6 +5,7 @@ use thiserror::Error;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
+use margaret_generated_module::generated_module_error::GeneratedModuleError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 use margaret_service_codegen::service_codegen_error::ServiceCodegenError;
 
@@ -38,6 +39,18 @@ pub enum CodegenError {
     Services {
         #[from]
         source: ServiceCodegenError,
+    },
+
+    #[error("failed to format a generated module: {source}")]
+    Format {
+        #[from]
+        source: GeneratedModuleError,
+    },
+
+    #[error("the CARGO_MANIFEST_DIR environment variable is not available: {source}")]
+    ManifestDirectory {
+        #[source]
+        source: std::env::VarError,
     },
 
     #[error("failed to create the generated directory '{path}': {source}")]

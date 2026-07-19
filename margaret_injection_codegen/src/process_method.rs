@@ -5,7 +5,7 @@ use margaret_attributes::indexed_method::IndexedMethod;
 use crate::injection_error::InjectionError;
 
 pub fn process_method(item: &IndexedItem) -> Result<&IndexedMethod, InjectionError> {
-    let selector = AttributeSelector::parse("process").expect("a valid selector");
+    let selector = AttributeSelector::from_marker("process");
     let mut found: Vec<&IndexedMethod> = item
         .methods()
         .iter()

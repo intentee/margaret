@@ -29,9 +29,7 @@ pub fn resolve_path(
         .iter()
         .map(|segment| segment.ident.to_string())
         .collect();
-    let leaf = segments
-        .last()
-        .expect("a syn path has at least one segment");
+    let leaf = segments.last()?;
 
     if segments.len() > 1 {
         return Some(CanonicalPath::new(segments));
@@ -193,6 +191,19 @@ mod tests {
                 &ModuleImports::default(),
                 &HashSet::new()
             ),
+            None
+        );
+    }
+
+    #[test]
+    fn a_path_without_segments_is_unresolvable() {
+        let empty = syn::Path {
+            leading_colon: None,
+            segments: syn::punctuated::Punctuated::new(),
+        };
+
+        assert_eq!(
+            resolved(empty, &["crate"], &ModuleImports::default(), &HashSet::new()),
             None
         );
     }

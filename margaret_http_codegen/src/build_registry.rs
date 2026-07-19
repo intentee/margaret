@@ -28,7 +28,7 @@ pub(crate) fn build_registry(
     missing: impl Fn(String) -> HttpCodegenError,
     ambiguous: impl Fn(String, String, String) -> HttpCodegenError,
 ) -> Result<HashMap<CanonicalPath, CanonicalPath>, HttpCodegenError> {
-    let selector = AttributeSelector::parse(marker).expect("a valid selector");
+    let selector = AttributeSelector::from_marker(marker);
     let mut registry: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
 
     for item in index.items() {

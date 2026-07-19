@@ -63,7 +63,7 @@ mod tests {
             .into_modules()
             .into_iter()
             .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
-            .map(|module| module.format().source().to_string())
+            .map(|module| module.format().expect("the module formats").source().to_string())
             .collect::<Vec<String>>()
             .join("\n"))
     }
@@ -217,7 +217,7 @@ impl Echo {
             .into_modules()
             .into_iter()
             .filter(|module| module.name() == "routes" || module.name().starts_with("routes/"))
-            .map(|module| module.format().source().to_string())
+            .map(|module| module.format().expect("the module formats").source().to_string())
             .collect::<Vec<String>>()
             .join("\n")
             .split_whitespace()

@@ -17,7 +17,7 @@ pub(crate) fn middleware_plans(
     index: &AttributeIndex,
 ) -> Result<Vec<MiddlewarePlan>, HttpCodegenError> {
     let selector =
-        AttributeSelector::parse("handles_middleware_attribute").expect("a valid selector");
+        AttributeSelector::from_marker("handles_middleware_attribute");
     let mut plans = Vec::new();
 
     for matched in index.select(&selector) {

@@ -23,7 +23,7 @@ fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, runner: &Index
 }
 
 fn selector(name: &str) -> AttributeSelector {
-    AttributeSelector::parse(name).expect("a marker selector is valid")
+    AttributeSelector::from_marker(name)
 }
 
 pub(crate) fn console_commands(

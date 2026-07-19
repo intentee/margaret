@@ -66,7 +66,7 @@ pub fn process_arguments(
     owner: &str,
     style: RequiredArgumentStyle,
 ) -> Result<Vec<ConsoleArgument>, ConsoleArgumentCodegenError> {
-    let argument_selector = AttributeSelector::parse("console_argument").expect("a valid selector");
+    let argument_selector = AttributeSelector::from_marker("console_argument");
     let mut arguments = Vec::new();
 
     for ParameterView {

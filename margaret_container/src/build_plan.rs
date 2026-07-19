@@ -251,16 +251,15 @@ fn parameter_name(pattern: &Pat, position: usize) -> String {
 }
 
 fn singleton_selector() -> AttributeSelector {
-    AttributeSelector::parse("singleton").expect("the singleton selector is valid")
+    AttributeSelector::from_marker("singleton")
 }
 
 fn service_selector() -> AttributeSelector {
-    AttributeSelector::parse("service").expect("the service selector is valid")
+    AttributeSelector::from_marker("service")
 }
 
 fn scheduled_with_tick_timer_selector() -> AttributeSelector {
-    AttributeSelector::parse("scheduled_with_tick_timer")
-        .expect("the scheduled_with_tick_timer selector is valid")
+    AttributeSelector::from_marker("scheduled_with_tick_timer")
 }
 
 struct SingletonDraft<'index> {
