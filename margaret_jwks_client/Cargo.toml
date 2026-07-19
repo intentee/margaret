@@ -1,0 +1,28 @@
+[package]
+name = "margaret_jwks_client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+margaret_identity_session = { path = "../margaret_identity_session" }
+margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
+margaret_jwks_roller = { path = "../margaret_jwks_roller" }
+margaret_sync_holder = { path = "../margaret_sync_holder" }
+reqwest = { workspace = true }
+rustls = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "test-util"] }
+
+[lints]
+workspace = true

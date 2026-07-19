@@ -22,17 +22,23 @@ impl JwkPublicSet {
     pub fn find_by_kid(&self, kid: &str) -> Option<&JwkPublic> {
         self.keys.iter().find(|key| key.kid == kid)
     }
+
+    fn publish(&mut self, jwk_public: &JwkPublic) {
+        if self.find_by_kid(&jwk_public.kid).is_none() {
+            self.keys.push(jwk_public.clone());
+        }
+    }
 }
 
 impl From<Arc<JwksSecret>> for JwkPublicSet {
     fn from(jwks_secret: Arc<JwksSecret>) -> Self {
-        let mut keys = vec![jwks_secret.current.public.clone()];
+        let mut jwk_public_set = Self { keys: Vec::new() };
 
-        if jwks_secret.current.signing.kid != jwks_secret.previous.signing.kid {
-            keys.push(jwks_secret.previous.public.clone());
-        }
+        jwk_public_set.publish(&jwks_secret.current.public);
+        jwk_public_set.publish(&jwks_secret.previous.public);
+        jwk_public_set.publish(&jwks_secret.next.public);
 
-        Self { keys }
+        jwk_public_set
     }
 }
 

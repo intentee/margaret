@@ -4,6 +4,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
+use crate::is_expired::IsExpired;
+
 #[derive(Clone, Deserialize, Serialize)]
 pub struct AccessTokenClaims {
     pub sub: Uuid,
@@ -11,9 +13,8 @@ pub struct AccessTokenClaims {
     pub iat: i64,
 }
 
-impl AccessTokenClaims {
-    #[must_use]
-    pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
+impl IsExpired for AccessTokenClaims {
+    fn is_expired(&self, now: DateTime<Utc>) -> bool {
         self.exp < now.timestamp()
     }
 }
@@ -25,6 +26,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::AccessTokenClaims;
+    use crate::is_expired::IsExpired;
 
     fn at(secs: i64) -> DateTime<Utc> {
         DateTime::from_timestamp(secs, 0).expect("a valid timestamp")

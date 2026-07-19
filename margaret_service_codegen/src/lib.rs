@@ -151,17 +151,23 @@ mod tests {
             r#"transport:margaret_http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            "margaret_service::serve_application::serve_application(matches,servers,::std::option::Option::<margaret_service::no_bundle::NoBundle>::None,)"
+            "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
+        assert!(!source.contains("margaret_service::bundle_services::bundle_services"));
+        assert!(!source.contains("letmutbundle_services"));
+        assert!(source.contains("letbundle_services:"));
+        assert!(source.contains("letmutmanager"));
     }
 
     #[test]
     fn binds_the_manager_immutably_when_no_services_are_registered() {
         let source = rendered("#[singleton]\nstruct Store;\n", &public());
 
-        assert!(source.contains(
-            "letmanager=matchmargaret_service::serve_application::serve_application("
-        ));
+        assert!(
+            source.contains(
+                "letmanager=matchmargaret_service::serve_application::serve_application("
+            )
+        );
         assert!(!source.contains("letmutmanager"));
     }
 
@@ -200,8 +206,12 @@ mod tests {
         ));
         assert!(source.contains("_=>margaret_http::transport_config::TransportConfig::Plain,"));
         assert!(source.contains(
-            "margaret_service::serve_application::serve_application(matches,servers,::std::option::Option::Some(spiffe_bundle),)"
+            "matchmargaret_service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
         ));
+        assert!(source.contains(
+            "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
+        ));
+        assert!(source.contains("letmutbundle_services"));
     }
 
     #[test]

@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::access_token_claims::AccessTokenClaims;
 use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
+use crate::is_expired::IsExpired;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct RefreshTokenClaims {
@@ -15,12 +16,13 @@ pub struct RefreshTokenClaims {
     pub sub: Uuid,
 }
 
-impl RefreshTokenClaims {
-    #[must_use]
-    pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
+impl IsExpired for RefreshTokenClaims {
+    fn is_expired(&self, now: DateTime<Utc>) -> bool {
         self.exp < now.timestamp()
     }
+}
 
+impl RefreshTokenClaims {
     #[must_use]
     pub fn mint_access_token_claims(&self, now: DateTime<Utc>) -> AccessTokenClaims {
         let timestamp = now.timestamp();
@@ -41,6 +43,7 @@ mod tests {
 
     use super::RefreshTokenClaims;
     use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
+    use crate::is_expired::IsExpired;
 
     fn at(secs: i64) -> DateTime<Utc> {
         DateTime::from_timestamp(secs, 0).expect("a valid timestamp")

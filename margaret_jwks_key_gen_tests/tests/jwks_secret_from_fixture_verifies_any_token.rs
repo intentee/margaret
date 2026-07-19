@@ -41,7 +41,11 @@ async fn jwks_secret_from_fixture_verifies_any_token() -> Result<()> {
             }
         })
     };
-    let fixture = json!({ "current": pair_json(), "previous": pair_json() });
+    let fixture = json!({
+        "current": pair_json(),
+        "next": pair_json(),
+        "previous": pair_json(),
+    });
 
     let secret: JwksSecret = from_value::<PersistedJwksSecret>(fixture)?.into_secret();
     let result = secret.verify_any::<TestClaims>(&token)?;

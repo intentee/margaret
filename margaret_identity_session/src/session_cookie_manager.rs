@@ -95,7 +95,7 @@ mod tests {
     use crate::identity_session_error::IdentitySessionError;
     use crate::refresh_token_claims_signed::RefreshTokenClaimsSigned;
 
-    fn assert_hardened(cookie: &Cookie<'static>) {
+    fn assert_secure_cookie_attributes(cookie: &Cookie<'static>) {
         assert_eq!(cookie.domain(), Some("example.test"));
         assert_eq!(cookie.path(), Some("/"));
         assert_eq!(cookie.http_only(), Some(true));
@@ -122,7 +122,7 @@ mod tests {
         assert_eq!(cookie.name(), COOKIE_NAME_ACCESS_TOKEN);
         assert_eq!(cookie.value(), "signed-access");
         assert!(cookie.expires().is_some());
-        assert_hardened(&cookie);
+        assert_secure_cookie_attributes(&cookie);
     }
 
     #[test]
@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(cookie.name(), COOKIE_NAME_REFRESH_TOKEN);
         assert_eq!(cookie.value(), "signed-refresh");
         assert!(cookie.expires().is_some());
-        assert_hardened(&cookie);
+        assert_secure_cookie_attributes(&cookie);
     }
 
     #[test]
@@ -149,7 +149,7 @@ mod tests {
         assert_eq!(cookie.name(), COOKIE_NAME_ACCESS_TOKEN);
         assert_eq!(cookie.value(), "");
         assert_eq!(cookie.max_age(), Some(Duration::ZERO));
-        assert_hardened(&cookie);
+        assert_secure_cookie_attributes(&cookie);
     }
 
     #[test]
@@ -161,7 +161,7 @@ mod tests {
         assert_eq!(cookie.name(), COOKIE_NAME_REFRESH_TOKEN);
         assert_eq!(cookie.value(), "");
         assert_eq!(cookie.max_age(), Some(Duration::ZERO));
-        assert_hardened(&cookie);
+        assert_secure_cookie_attributes(&cookie);
     }
 
     #[test]

@@ -16,10 +16,10 @@ use margaret_http::upload_config::UploadConfig;
 use crate::server_assembly::ServerAssembly;
 use crate::server_service::ServerService;
 
-pub async fn serve_application<Bundle: ServiceBundle>(
+pub async fn serve_application<TServiceBundle: ServiceBundle>(
     matches: &ArgMatches,
     servers: Vec<ServerAssembly>,
-    bundle: Option<Bundle>,
+    bundle: TServiceBundle,
 ) -> Result<ServiceManager, CommandOutcome> {
     let mut manager = ServiceManager::default();
     let mut server_models = Vec::new();
@@ -66,9 +66,7 @@ pub async fn serve_application<Bundle: ServiceBundle>(
         ));
     }
 
-    if let Some(bundle) = bundle
-        && let Err(error) = manager.register_bundle(bundle).await
-    {
+    if let Err(error) = manager.register_bundle(bundle).await {
         return Err(report_failure(error));
     }
 
@@ -104,7 +102,7 @@ mod tests {
     use margaret_http::transport_config::TransportConfig;
 
     use super::serve_application;
-    use crate::no_bundle::NoBundle;
+    use crate::resolved_services::ResolvedServices;
     use crate::server_assembly::ServerAssembly;
 
     struct FailingBundle;
@@ -154,19 +152,9 @@ mod tests {
         let outcome = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0"]),
             vec![public_assembly(Ok(empty_routes()))],
-            Some(NoBundle),
-        )
-        .await;
-
-        assert!(outcome.is_ok());
-    }
-
-    #[tokio::test]
-    async fn assembles_a_manager_without_a_bundle() {
-        let outcome = serve_application(
-            &matches(&["--public-addr", "127.0.0.1:0"]),
-            vec![public_assembly(Ok(empty_routes()))],
-            Option::<NoBundle>::None,
+            ResolvedServices {
+                services: Vec::new(),
+            },
         )
         .await;
 
@@ -184,7 +172,9 @@ mod tests {
                 "/tmp/margaret-uploads",
             ]),
             vec![public_assembly(Ok(empty_routes()))],
-            Option::<NoBundle>::None,
+            ResolvedServices {
+                services: Vec::new(),
+            },
         )
         .await;
 
@@ -196,7 +186,9 @@ mod tests {
         let outcome = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0", "--public-uploads"]),
             vec![public_assembly(Ok(empty_routes()))],
-            Option::<NoBundle>::None,
+            ResolvedServices {
+                services: Vec::new(),
+            },
         )
         .await;
 
@@ -208,7 +200,9 @@ mod tests {
         let outcome = serve_application(
             &matches(&[]),
             vec![public_assembly(Ok(empty_routes()))],
-            Option::<NoBundle>::None,
+            ResolvedServices {
+                services: Vec::new(),
+            },
         )
         .await;
 
@@ -227,7 +221,9 @@ mod tests {
         let outcome = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0"]),
             vec![public_assembly(Err(conflict))],
-            Option::<NoBundle>::None,
+            ResolvedServices {
+                services: Vec::new(),
+            },
         )
         .await;
 
@@ -239,7 +235,7 @@ mod tests {
         let outcome = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0"]),
             vec![public_assembly(Ok(empty_routes()))],
-            Some(FailingBundle),
+            FailingBundle,
         )
         .await;
 

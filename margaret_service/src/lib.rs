@@ -1,6 +1,7 @@
+pub mod bundle_services;
 pub mod dispatch_serve;
 pub mod install;
-pub mod no_bundle;
+pub mod resolved_services;
 pub mod run;
 pub mod serve_application;
 pub mod server_assembly;

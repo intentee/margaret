@@ -14,9 +14,13 @@ COVERAGE_PACKAGES := \
 	-p margaret_http_validation \
 	-p margaret_identity_session \
 	-p margaret_injection_codegen \
+	-p margaret_jwks_client \
+	-p margaret_jwks_client_tests \
 	-p margaret_jwks_key_gen \
 	-p margaret_jwks_key_gen_tests \
 	-p margaret_jwks_roller \
+	-p margaret_jwks_roller_server \
+	-p margaret_jwks_roller_tests \
 	-p margaret_macros \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
@@ -35,18 +39,22 @@ COVERAGE_PACKAGES := \
 	-p margaret_token_signer_tests \
 	-p margaret_validation
 
+SPIRE_FEATURES := \
+	--features margaret_spiffe_svid_tests/tests_that_use_spire \
+	--features margaret_spiffe_svid_integration_tests/tests_that_use_spire
+
 node_modules: package.json
 	npm install
 	touch node_modules
 
 .PHONY: clippy
 clippy:
-	cargo clippy --workspace --all-targets -- -D warnings
+	cargo clippy --workspace --all-targets $(SPIRE_FEATURES) -- -D warnings
 
 .PHONY: coverage
 coverage: node_modules
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest $(COVERAGE_PACKAGES) --no-report
+	cargo llvm-cov nextest $(COVERAGE_PACKAGES) $(SPIRE_FEATURES) --no-report
 	cargo llvm-cov report --json --output-path target/llvm-cov.json
 	cargo llvm-cov report --lcov --output-path target/lcov.info
 	cargo llvm-cov report
@@ -67,9 +75,13 @@ coverage: node_modules
 		--gated margaret_http_validation=100 \
 		--gated margaret_identity_session=100 \
 		--gated margaret_injection_codegen=100 \
+		--gated margaret_jwks_client=100 \
+		--gated margaret_jwks_client_tests=100 \
 		--gated margaret_jwks_key_gen=100 \
 		--gated margaret_jwks_key_gen_tests=100 \
 		--gated margaret_jwks_roller=100 \
+		--gated margaret_jwks_roller_server=100 \
+		--gated margaret_jwks_roller_tests=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
@@ -92,6 +104,13 @@ coverage: node_modules
 fmt:
 	cargo fmt
 
-.PHONY: test
-test:
+.PHONY: test.unit
+test.unit:
 	cargo nextest run --workspace
+
+.PHONY: test.integration
+test.integration:
+	cargo nextest run --workspace $(SPIRE_FEATURES)
+
+.PHONY: test
+test: test.integration
