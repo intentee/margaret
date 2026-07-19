@@ -43,8 +43,8 @@ mod tests {
             .build()
     }
 
-    fn rendered(lib_source: &str, servers: &[HttpServer]) -> String {
-        render_services(&index_for(lib_source), servers)
+    fn render_source(lib_source: &str, servers: &[HttpServer], has_views: bool) -> String {
+        render_services(&index_for(lib_source), servers, has_views)
             .expect("the services source is generated")
             .module
             .format()
@@ -54,8 +54,16 @@ mod tests {
             .collect()
     }
 
+    fn rendered(lib_source: &str, servers: &[HttpServer]) -> String {
+        render_source(lib_source, servers, false)
+    }
+
+    fn rendered_with_views(lib_source: &str, servers: &[HttpServer]) -> String {
+        render_source(lib_source, servers, true)
+    }
+
     fn error_for(lib_source: &str) -> String {
-        render_services(&index_for(lib_source), &[])
+        render_services(&index_for(lib_source), &[], false)
             .err()
             .expect("the services source fails to generate")
             .to_string()
@@ -170,6 +178,18 @@ mod tests {
             )
         );
         assert!(!source.contains("letmutmanager"));
+    }
+
+    #[test]
+    fn builds_views_once_and_threads_them_into_each_server() {
+        let source = rendered_with_views("#[singleton]\nstruct Store;\n", &public());
+
+        assert!(source.contains(
+            "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
+        ));
+        assert!(source.contains(
+            "super::http::server_public::server_public(container,&routes,&views).await"
+        ));
     }
 
     #[test]

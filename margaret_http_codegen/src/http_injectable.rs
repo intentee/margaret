@@ -6,6 +6,7 @@ pub(crate) enum HttpInjectable {
     PeerSpiffeId,
     Routes,
     ValidationResult,
+    Views,
 }
 
 impl HttpInjectable {
@@ -37,6 +38,12 @@ impl HttpInjectable {
                 "validation_result".to_string(),
                 "ValidationResult".to_string(),
             ]),
+            Self::Views => CanonicalPath::new(vec![
+                "crate".to_string(),
+                "margaret".to_string(),
+                "views".to_string(),
+                "Views".to_string(),
+            ]),
         }
     }
 
@@ -46,7 +53,7 @@ impl HttpInjectable {
 
     fn requires_reference(&self) -> bool {
         match self {
-            Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes => true,
+            Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes | Self::Views => true,
             Self::Next | Self::ValidationResult => false,
         }
     }
@@ -76,6 +83,14 @@ mod tests {
 
         assert!(HttpInjectable::Next.matches(Some(&next), false));
         assert!(!HttpInjectable::Next.matches(Some(&next), true));
+    }
+
+    #[test]
+    fn matches_the_views_injectable_only_when_written_as_a_reference() {
+        let views = path(&["crate", "margaret", "views", "Views"]);
+
+        assert!(HttpInjectable::Views.matches(Some(&views), true));
+        assert!(!HttpInjectable::Views.matches(Some(&views), false));
     }
 
     #[test]

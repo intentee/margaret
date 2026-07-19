@@ -41,6 +41,8 @@ members = [
     "margaret_token_signer",
     "margaret_token_signer_tests",
     "margaret_validation",
+    "margaret_views",
+    "margaret_views_codegen",
 ]
 
 [workspace.dependencies]
@@ -63,6 +65,7 @@ hyper-util = "=0.1.20"
 libc = "=0.2.186"
 log = "=0.4.28"
 matchit = "=0.8.4"
+maud = "=0.27.0"
 mime = "=0.3.17"
 multer = "=3.1.0"
 p256 = "=0.13.2"

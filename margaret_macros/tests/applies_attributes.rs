@@ -4,6 +4,7 @@ use margaret_macros::handles_middleware_attribute;
 use margaret_macros::middleware;
 use margaret_macros::process;
 use margaret_macros::provides_route_parameter;
+use margaret_macros::renders_view;
 use margaret_macros::responds_to_http;
 use margaret_macros::scheduled_with_tick_timer;
 use margaret_macros::service;
@@ -11,6 +12,7 @@ use margaret_macros::singleton;
 
 #[singleton]
 #[responds_to_http(method = Get, path = "/subject", server = "public")]
+#[renders_view(name = "subject")]
 #[console_command]
 #[handles_middleware_attribute(attribute = traced)]
 #[middleware(traced)]

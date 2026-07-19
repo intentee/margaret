@@ -27,7 +27,9 @@ fn access(call: TokenStream) -> TokenStream {
 fn argument_needs_request(argument: &ResponderArgument) -> bool {
     !matches!(
         argument.binding,
-        ResponderArgumentBinding::Routes | ResponderArgumentBinding::Forwarder
+        ResponderArgumentBinding::Routes
+            | ResponderArgumentBinding::Forwarder
+            | ResponderArgumentBinding::Views
     )
 }
 
@@ -46,6 +48,13 @@ fn responder_injects_routes(route: &HttpRoute) -> bool {
         .arguments
         .iter()
         .any(|argument| matches!(argument.binding, ResponderArgumentBinding::Routes))
+}
+
+pub(crate) fn responder_injects_views(route: &HttpRoute) -> bool {
+    route
+        .arguments
+        .iter()
+        .any(|argument| matches!(argument.binding, ResponderArgumentBinding::Views))
 }
 
 fn route_references_routes(route: &HttpRoute) -> bool {
@@ -88,6 +97,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
 
     let responder_binding = format_ident!("{}", allocator.allocate("responder").field());
     let routes_local = format_ident!("{}", allocator.allocate("routes").field());
+    let views_local = format_ident!("{}", allocator.allocate("views").field());
 
     let bindings = route
         .arguments
@@ -97,7 +107,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let argument_values = route
         .arguments
         .iter()
-        .map(|argument| argument_value(argument, &routes_local, &server));
+        .map(|argument| argument_value(argument, &routes_local, &views_local, &server));
     let respond_call = quote! { #responder_binding.respond(#(#argument_values),*).await };
     let body = quote! {
         #(#bindings)*
@@ -105,6 +115,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
     };
 
     let captures_routes = responder_injects_routes(route);
+    let captures_views = responder_injects_views(route);
     let outcome_future = quote! {
         std::pin::Pin<
             std::boxed::Box<
@@ -116,7 +127,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
         >
     };
 
-    let mut handler = if captures.is_empty() && !captures_routes {
+    let mut handler = if captures.is_empty() && !captures_routes && !captures_views {
         quote! {
             margaret_http::responder_handler::responder_handler(
                 #responder_access,
@@ -141,11 +152,15 @@ fn onion(route: &HttpRoute) -> TokenStream {
         let routes_setup = captures_routes.then(|| quote! { let #routes_local = routes.clone(); });
         let routes_reclone =
             captures_routes.then(|| quote! { let #routes_local = #routes_local.clone(); });
+        let views_setup = captures_views.then(|| quote! { let #views_local = views.clone(); });
+        let views_reclone =
+            captures_views.then(|| quote! { let #views_local = #views_local.clone(); });
 
         quote! {
             {
                 #(#capture_bindings)*
                 #routes_setup
+                #views_setup
                 margaret_http::responder_handler::responder_handler(
                     #responder_access,
                     move |#responder_binding: std::sync::Arc<#responder_type>,
@@ -153,6 +168,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
                           -> #outcome_future {
                         #(#capture_clones)*
                         #routes_reclone
+                        #views_reclone
                         std::boxed::Box::pin(async move {
                             #body
                         })
@@ -183,10 +199,12 @@ fn onion(route: &HttpRoute) -> TokenStream {
 fn argument_value(
     argument: &ResponderArgument,
     routes_binding: &Ident,
+    views_binding: &Ident,
     server: &Ident,
 ) -> TokenStream {
     match &argument.binding {
         ResponderArgumentBinding::Routes => quote! { #routes_binding.as_ref() },
+        ResponderArgumentBinding::Views => quote! { #views_binding.as_ref() },
         ResponderArgumentBinding::Forwarder => {
             quote! { super::super::forwarders::#server::Forwarder }
         }
@@ -222,9 +240,9 @@ fn argument_binding(argument: &ResponderArgument, request: &Ident) -> TokenStrea
                 }
             }
         }
-        ResponderArgumentBinding::Routes | ResponderArgumentBinding::Forwarder => {
-            TokenStream::new()
-        }
+        ResponderArgumentBinding::Routes
+        | ResponderArgumentBinding::Forwarder
+        | ResponderArgumentBinding::Views => TokenStream::new(),
         ResponderArgumentBinding::PeerSpiffeId => {
             quote! {
                 let #holder = match margaret_http::require_peer_spiffe_id::require_peer_spiffe_id(
@@ -343,7 +361,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     }
 }
 
-fn server_module(table: &HttpRouteTable, server: &HttpServer) -> TokenStream {
+fn server_module(table: &HttpRouteTable, server: &HttpServer, has_views: bool) -> TokenStream {
     let function_name = server.function_name();
     let server_routes: Vec<&HttpRoute> = table
         .route_groups(server.name())
@@ -354,6 +372,16 @@ fn server_module(table: &HttpRouteTable, server: &HttpServer) -> TokenStream {
     } else {
         format_ident!("_routes")
     };
+    let views_param = if server_routes.iter().copied().any(responder_injects_views) {
+        format_ident!("views")
+    } else {
+        format_ident!("_views")
+    };
+    let views_parameter = has_views.then(|| {
+        quote! {
+            #views_param: &::std::sync::Arc<super::super::views::Views>,
+        }
+    });
 
     let handler_bindings = server_routes
         .iter()
@@ -402,6 +430,7 @@ fn server_module(table: &HttpRouteTable, server: &HttpServer) -> TokenStream {
         pub async fn #function_name(
             container: &super::super::container::Container,
             #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
+            #views_parameter
         ) -> ::std::result::Result<
             margaret_http::server_routes::ServerRoutes,
             margaret_http::matchit::InsertError,
@@ -419,6 +448,7 @@ pub(crate) fn render(
     table: &HttpRouteTable,
     servers: &[HttpServer],
     middleware_plans: &[MiddlewarePlan],
+    has_views: bool,
 ) -> Vec<GeneratedModuleTokens> {
     let middleware_wrappers = middleware_plans.iter().map(middleware_wrapper);
     let server_declarations = servers.iter().map(|server| {
@@ -440,7 +470,7 @@ pub(crate) fn render(
     for server in servers {
         modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
-            server_module(table, server),
+            server_module(table, server, has_views),
         ));
     }
 

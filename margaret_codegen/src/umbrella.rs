@@ -6,6 +6,7 @@ pub(crate) fn umbrella(
     Capabilities {
         has_console,
         has_http,
+        has_views,
         serves,
     }: Capabilities,
 ) -> GeneratedModule {
@@ -15,6 +16,10 @@ pub(crate) fn umbrella(
         source.push_str("#[rustfmt::skip]\npub mod forwarders;\n");
         source.push_str("#[rustfmt::skip]\npub mod http;\n");
         source.push_str("#[rustfmt::skip]\npub mod routes;\n");
+    }
+
+    if has_views && has_http {
+        source.push_str("#[rustfmt::skip]\npub mod views;\n");
     }
 
     if serves {

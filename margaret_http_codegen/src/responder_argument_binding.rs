@@ -6,6 +6,7 @@ pub(crate) enum ResponderArgumentBinding {
     Forwarder,
     PeerSpiffeId,
     Routes,
+    Views,
     Raw {
         path_key: String,
     },

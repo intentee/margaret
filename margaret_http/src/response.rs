@@ -2,6 +2,7 @@ use bytes::Bytes;
 use cookie::Cookie;
 use http::StatusCode;
 use http_body_util::Full;
+use maud::Markup;
 use serde::Serialize;
 
 use crate::header::Header;
@@ -93,6 +94,12 @@ impl Response {
                 internal_server_error()
             }
         }
+    }
+}
+
+impl From<Markup> for Response {
+    fn from(markup: Markup) -> Self {
+        Self::html(200, markup.into_string())
     }
 }
 
@@ -220,5 +227,35 @@ mod tests {
                 .expect("the header is valid text")
                 .starts_with("session=abc")
         );
+    }
+
+    #[tokio::test]
+    async fn converts_maud_markup_into_an_html_response() {
+        let response: Response = maud::html! { p { "hi" } }.into();
+        let http = response.into_http();
+
+        assert_eq!(http.status().as_u16(), 200);
+        assert_eq!(
+            http.headers()
+                .get("content-type")
+                .expect("the content type header is present"),
+            "text/html; charset=utf-8"
+        );
+
+        let body = http
+            .into_body()
+            .collect()
+            .await
+            .expect("the body collects")
+            .to_bytes();
+
+        assert_eq!(body.as_ref(), b"<p>hi</p>");
+    }
+
+    #[test]
+    fn builds_an_html_response_from_markup_directly() {
+        let response = Response::html(201, maud::html! { p { "hi" } });
+
+        assert_eq!(response.status(), 201);
     }
 }

@@ -1,4 +1,6 @@
+use margaret_views::maud::Markup;
+
 pub struct CardLayoutProps {
-    pub body_text: String,
+    pub body: Markup,
     pub home_url: String,
 }

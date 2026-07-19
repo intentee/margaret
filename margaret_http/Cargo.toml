@@ -15,6 +15,7 @@ hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server", "server-auto", "server-graceful", "service", "tokio"] }
 margaret_peer_identity = { path = "../margaret_peer_identity" }
 matchit = { workspace = true }
+maud = { workspace = true }
 mime = { workspace = true }
 multer = { workspace = true }
 serde = { workspace = true }
