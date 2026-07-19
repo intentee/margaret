@@ -59,6 +59,7 @@ impl Ticker for JwkPublicSetPollService {
 
         if self.jwk_public_set_holder.is_ready() {
             tokio::select! {
+                biased;
                 () = cancellation_token.cancelled() => {}
                 () = sleep(JWKS_POLL_INTERVAL_AFTER_READY) => {}
             }
