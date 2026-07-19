@@ -1,4 +1,7 @@
 use std::cell::Cell;
+use std::collections::BTreeMap;
+
+use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::collection_table::CollectionTable;
 use crate::container_error::ContainerError;
@@ -12,90 +15,97 @@ enum Mark {
     Unvisited,
 }
 
-struct Node {
-    adjacency: Vec<usize>,
-    key: String,
+struct Node<'plan> {
+    adjacency: Vec<&'plan CanonicalPath>,
     mark: Cell<Mark>,
 }
 
-fn dependency_indices(provider: &Provider, collections: &CollectionTable) -> Vec<usize> {
-    let mut indices = Vec::new();
+fn dependency_keys<'plan>(
+    provider: &'plan Provider,
+    collections: &'plan CollectionTable,
+) -> Vec<&'plan CanonicalPath> {
+    let mut keys = Vec::new();
 
     for dependency in provider.dependencies() {
         match dependency {
-            DependencyKind::Single { provider_index } => indices.push(*provider_index),
+            DependencyKind::Single { provider_key } => keys.push(provider_key),
             DependencyKind::Collection { trait_path } => {
-                indices.extend(collections.members_of(trait_path).iter().copied());
+                keys.extend(collections.members_of(trait_path));
             }
         }
     }
 
-    indices
+    keys
 }
 
-fn nodes_of(providers: &[Provider], collections: &CollectionTable) -> Vec<Node> {
+fn nodes_of<'plan>(
+    providers: &'plan BTreeMap<CanonicalPath, Provider>,
+    collections: &'plan CollectionTable,
+) -> BTreeMap<&'plan CanonicalPath, Node<'plan>> {
     providers
         .iter()
-        .map(|provider| Node {
-            adjacency: dependency_indices(provider, collections),
-            key: provider.provided.key().to_string(),
-            mark: Cell::new(Mark::Unvisited),
+        .map(|(key, provider)| {
+            (
+                key,
+                Node {
+                    adjacency: dependency_keys(provider, collections),
+                    mark: Cell::new(Mark::Unvisited),
+                },
+            )
         })
         .collect()
 }
 
-fn cycle(node: &Node, index: usize, stack: &[(usize, String)]) -> ContainerError {
+fn cycle(key: &CanonicalPath, stack: &[&CanonicalPath]) -> ContainerError {
     let mut path: Vec<String> = stack
         .iter()
-        .skip_while(|(node_index, _)| *node_index != index)
-        .map(|(_, key)| key.clone())
+        .copied()
+        .skip_while(|entry| *entry != key)
+        .map(CanonicalPath::to_string)
         .collect();
-    path.push(node.key.clone());
+    path.push(key.to_string());
 
     ContainerError::DependencyCycle {
         path: path.join(" -> "),
     }
 }
 
-fn visit(
-    nodes: &[Node],
-    index: usize,
-    stack: &mut Vec<(usize, String)>,
-    order: &mut Vec<usize>,
+fn visit<'plan>(
+    nodes: &BTreeMap<&'plan CanonicalPath, Node<'plan>>,
+    key: &'plan CanonicalPath,
+    stack: &mut Vec<&'plan CanonicalPath>,
 ) -> Result<(), ContainerError> {
-    let node = &nodes[index];
+    let node = &nodes[key];
 
     match node.mark.get() {
         Mark::Done => return Ok(()),
-        Mark::InProgress => return Err(cycle(node, index, stack)),
+        Mark::InProgress => return Err(cycle(key, stack)),
         Mark::Unvisited => {}
     }
 
     node.mark.set(Mark::InProgress);
-    stack.push((index, node.key.clone()));
+    stack.push(key);
 
     for &dependency in &node.adjacency {
-        visit(nodes, dependency, stack, order)?;
+        visit(nodes, dependency, stack)?;
     }
 
     stack.pop();
     node.mark.set(Mark::Done);
-    order.push(index);
 
     Ok(())
 }
 
 pub(crate) fn topological_order(
-    providers: &[Provider],
+    providers: &BTreeMap<CanonicalPath, Provider>,
     collections: &CollectionTable,
-) -> Result<Vec<usize>, ContainerError> {
+) -> Result<(), ContainerError> {
     let nodes = nodes_of(providers, collections);
     let mut stack = Vec::new();
-    let mut order = Vec::new();
 
-    for index in 0..nodes.len() {
-        visit(&nodes, index, &mut stack, &mut order)?;
+    for key in providers.keys() {
+        visit(&nodes, key, &mut stack)?;
     }
 
-    Ok(order)
+    Ok(())
 }

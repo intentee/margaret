@@ -1,17 +1,13 @@
 use crate::url_segment::UrlSegment;
 
 #[must_use]
-pub fn build_url(origin: &str, segments: &[UrlSegment], values: &[String]) -> String {
+pub fn build_url(origin: &str, segments: &[UrlSegment]) -> String {
     let mut url = String::from(origin);
-    let mut value_index = 0;
 
     for segment in segments {
         match segment {
             UrlSegment::Literal(text) => url.push_str(text),
-            UrlSegment::Parameter(_) => {
-                url.push_str(&values[value_index]);
-                value_index += 1;
-            }
+            UrlSegment::Parameter(parameter) => url.push_str(&parameter.value),
         }
     }
 
@@ -21,11 +17,12 @@ pub fn build_url(origin: &str, segments: &[UrlSegment], values: &[String]) -> St
 #[cfg(test)]
 mod tests {
     use super::build_url;
+    use crate::url_parameter::UrlParameter;
     use crate::url_segment::UrlSegment;
 
     #[test]
     fn joins_literal_segments_onto_the_origin() {
-        let url = build_url("http://localhost", &[UrlSegment::Literal("/greeting")], &[]);
+        let url = build_url("http://localhost", &[UrlSegment::Literal("/greeting")]);
 
         assert_eq!(url, "http://localhost/greeting");
     }
@@ -36,11 +33,16 @@ mod tests {
             "http://localhost",
             &[
                 UrlSegment::Literal("/articles/"),
-                UrlSegment::Parameter("article"),
+                UrlSegment::Parameter(UrlParameter {
+                    name: "article",
+                    value: "rust".to_string(),
+                }),
                 UrlSegment::Literal("/comments/"),
-                UrlSegment::Parameter("comment"),
+                UrlSegment::Parameter(UrlParameter {
+                    name: "comment",
+                    value: "42".to_string(),
+                }),
             ],
-            &["rust".to_string(), "42".to_string()],
         );
 
         assert_eq!(url, "http://localhost/articles/rust/comments/42");

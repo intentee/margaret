@@ -6,18 +6,13 @@ use crate::url_segment::UrlSegment;
 
 pub struct ForwardableRoute {
     origin: Arc<str>,
-    segments: &'static [UrlSegment],
-    values: Vec<String>,
+    segments: Vec<UrlSegment>,
 }
 
 impl ForwardableRoute {
     #[must_use]
-    pub fn new(origin: Arc<str>, segments: &'static [UrlSegment], values: Vec<String>) -> Self {
-        Self {
-            origin,
-            segments,
-            values,
-        }
+    pub fn new(origin: Arc<str>, segments: Vec<UrlSegment>) -> Self {
+        Self { origin, segments }
     }
 
     #[must_use]
@@ -37,7 +32,7 @@ impl ForwardableRoute {
 
     #[must_use]
     pub fn url(&self) -> String {
-        build_url(&self.origin, self.segments, &self.values)
+        build_url(&self.origin, &self.segments)
     }
 }
 
@@ -46,16 +41,19 @@ mod tests {
     use std::sync::Arc;
 
     use super::ForwardableRoute;
+    use crate::url_parameter::UrlParameter;
     use crate::url_segment::UrlSegment;
 
     fn article_route() -> ForwardableRoute {
         ForwardableRoute::new(
             Arc::from("http://localhost"),
-            &[
+            vec![
                 UrlSegment::Literal("/articles/"),
-                UrlSegment::Parameter("article"),
+                UrlSegment::Parameter(UrlParameter {
+                    name: "article",
+                    value: "rust".to_string(),
+                }),
             ],
-            vec!["rust".to_string()],
         )
     }
 

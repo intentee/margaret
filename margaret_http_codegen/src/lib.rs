@@ -255,7 +255,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             source.contains("pubget_greeting:margaret_http::forwardable_route::ForwardableRoute,")
         );
         assert!(source.contains(
-            "get_greeting:margaret_http::forwardable_route::ForwardableRoute::new(origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/greeting\")],::std::vec::Vec::new(),)"
+            "get_greeting:margaret_http::forwardable_route::ForwardableRoute::new(origin.clone(),::std::vec::Vec::from([margaret_http::url_segment::UrlSegment::Literal(\"/greeting\"),]),)"
         ));
     }
 
@@ -267,7 +267,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "pubfnget_article(&self,article:String,)->margaret_http::forwardable_route::ForwardableRoute"
         ));
         assert!(source.contains(
-            "margaret_http::forwardable_route::ForwardableRoute::new(self.origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/articles/\"),margaret_http::url_segment::UrlSegment::Parameter(\"article\"),],::std::vec::Vec::from([article]),)"
+            "margaret_http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret_http::url_segment::UrlSegment::Literal(\"/articles/\"),margaret_http::url_segment::UrlSegment::Parameter(margaret_http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
         ));
         assert!(!source.contains("Params"));
     }

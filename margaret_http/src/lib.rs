@@ -41,4 +41,5 @@ pub mod server_routes;
 pub mod transport_config;
 pub mod upload_config;
 pub mod uploaded_file;
+pub mod url_parameter;
 pub mod url_segment;
