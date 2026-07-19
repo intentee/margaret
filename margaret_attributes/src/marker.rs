@@ -2,6 +2,7 @@ use syn::Attribute;
 
 use crate::attribute_selector::AttributeSelector;
 
+#[must_use]
 pub fn marker<'attributes>(
     attributes: &'attributes [Attribute],
     selector: &AttributeSelector,

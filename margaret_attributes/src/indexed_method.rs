@@ -20,14 +20,17 @@ impl IndexedMethod {
         }
     }
 
+    #[must_use]
     pub fn attributes(&self) -> &[Attribute] {
         &self.attributes
     }
 
+    #[must_use]
     pub fn identifier(&self) -> &str {
         &self.identifier
     }
 
+    #[must_use]
     pub fn signature(&self) -> &Signature {
         self.signature.as_ref()
     }

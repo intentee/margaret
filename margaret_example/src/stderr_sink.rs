@@ -8,6 +8,7 @@ pub struct StderrSink;
 
 impl StderrSink {
     #[constructor]
+    #[must_use]
     pub fn create() -> Self {
         Self
     }

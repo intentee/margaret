@@ -39,26 +39,32 @@ impl IndexedItem {
         }
     }
 
+    #[must_use]
     pub fn associated_types(&self) -> &[IndexedAssociatedType] {
         &self.associated_types
     }
 
+    #[must_use]
     pub fn attributes(&self) -> &[Attribute] {
         &self.attributes
     }
 
+    #[must_use]
     pub fn canonical_path(&self) -> &CanonicalPath {
         &self.canonical_path
     }
 
+    #[must_use]
     pub fn identifier(&self) -> &str {
         &self.identifier
     }
 
+    #[must_use]
     pub fn kind(&self) -> ItemKind {
         self.kind
     }
 
+    #[must_use]
     pub fn methods(&self) -> &[IndexedMethod] {
         &self.methods
     }

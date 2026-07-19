@@ -6,6 +6,7 @@ use crate::canonical_path::CanonicalPath;
 use crate::module_imports::ModuleImports;
 use crate::resolve_path::resolve_path;
 
+#[must_use]
 pub fn resolve_type(
     declared: &Type,
     module_path: &[String],

@@ -11,6 +11,7 @@ pub struct RouteReference {
 }
 
 impl RouteReference {
+    #[must_use]
     pub fn new(origin: Arc<str>, segments: &'static [UrlSegment], values: Vec<String>) -> Self {
         Self {
             origin,
@@ -19,14 +20,17 @@ impl RouteReference {
         }
     }
 
+    #[must_use]
     pub fn permanent_redirect(&self) -> Redirect {
         Redirect::permanent(self.url())
     }
 
+    #[must_use]
     pub fn temporary_redirect(&self) -> Redirect {
         Redirect::temporary(self.url())
     }
 
+    #[must_use]
     pub fn url(&self) -> String {
         build_url(&self.origin, self.segments, &self.values)
     }

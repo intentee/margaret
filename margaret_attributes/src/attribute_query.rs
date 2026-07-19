@@ -8,6 +8,7 @@ pub struct AttributeQuery<'index> {
 }
 
 impl<'index> AttributeQuery<'index> {
+    #[must_use]
     pub fn new(item: &'index IndexedItem) -> Self {
         Self { item }
     }
@@ -28,6 +29,7 @@ impl<'index> AttributeQuery<'index> {
         Ok(matches.pop())
     }
 
+    #[must_use]
     pub fn find_all(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'index>> {
         let mut matches = Vec::new();
 
@@ -40,6 +42,7 @@ impl<'index> AttributeQuery<'index> {
         matches
     }
 
+    #[must_use]
     pub fn matched_attributes(&self) -> Vec<MatchedAttribute<'index>> {
         (0..self.item.attributes().len())
             .map(|attribute_index| MatchedAttribute::new(self.item, attribute_index))

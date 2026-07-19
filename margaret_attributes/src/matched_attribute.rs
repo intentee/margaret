@@ -21,14 +21,17 @@ impl<'index> MatchedAttribute<'index> {
         self.item.attribute_args(self.attribute_index)
     }
 
+    #[must_use]
     pub fn item(&self) -> &'index IndexedItem {
         self.item
     }
 
+    #[must_use]
     pub fn matches(&self, selector: &AttributeSelector) -> bool {
         selector.matches(self.item.attributes()[self.attribute_index].path())
     }
 
+    #[must_use]
     pub fn path(&self) -> String {
         format_path(self.item.attributes()[self.attribute_index].path())
     }

@@ -1,5 +1,6 @@
 use crate::url_segment::UrlSegment;
 
+#[must_use]
 pub fn build_url(origin: &str, segments: &[UrlSegment], values: &[String]) -> String {
     let mut values = values.iter();
 

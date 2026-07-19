@@ -10,10 +10,12 @@ impl IndexedAssociatedType {
         Self { name, ty }
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn ty(&self) -> &Type {
         &self.ty
     }

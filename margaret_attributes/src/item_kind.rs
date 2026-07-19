@@ -10,6 +10,7 @@ pub enum ItemKind {
 }
 
 impl ItemKind {
+    #[must_use]
     pub fn is_struct(&self) -> bool {
         matches!(self, ItemKind::Struct(_))
     }

@@ -25,6 +25,7 @@ impl Response {
         Self::new(status, body.into()).header("content-type", content_type)
     }
 
+    #[must_use]
     pub fn forbidden() -> Self {
         Self::text(403, "Forbidden")
     }
@@ -57,6 +58,7 @@ impl Response {
         }
     }
 
+    #[must_use]
     pub fn not_found() -> Self {
         Self::text(404, "Not Found")
     }

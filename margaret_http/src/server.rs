@@ -33,6 +33,7 @@ impl Server {
         }
     }
 
+    #[must_use]
     pub fn address(&self) -> &str {
         &self.address
     }

@@ -9,6 +9,7 @@ pub struct AttributeSelector {
 }
 
 impl AttributeSelector {
+    #[must_use]
     pub fn from_path(path: Path) -> Self {
         Self { path }
     }
@@ -23,6 +24,7 @@ impl AttributeSelector {
         }
     }
 
+    #[must_use]
     pub fn matches(&self, attribute_path: &Path) -> bool {
         let selector_length = self.path.segments.len();
         let attribute_length = attribute_path.segments.len();

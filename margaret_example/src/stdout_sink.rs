@@ -8,6 +8,7 @@ pub struct StdoutSink;
 
 impl StdoutSink {
     #[constructor]
+    #[must_use]
     pub fn create() -> Self {
         Self
     }

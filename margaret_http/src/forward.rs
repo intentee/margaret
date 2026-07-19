@@ -6,6 +6,7 @@ pub struct Forward {
 }
 
 impl Forward {
+    #[must_use]
     pub fn new(name: &'static str, path_params: HashMap<String, String>) -> Self {
         Self { name, path_params }
     }

@@ -22,6 +22,7 @@ impl Request {
         }
     }
 
+    #[must_use]
     pub fn new(method: Method, path: String) -> Self {
         Self {
             inputs: RequestInputs::empty(method, path),
@@ -50,6 +51,7 @@ impl Request {
         self.path_params.get(name).map(String::as_str)
     }
 
+    #[must_use]
     pub fn peer_identity(&self) -> &PeerIdentity {
         &self.peer_identity
     }

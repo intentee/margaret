@@ -4,6 +4,7 @@ use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 
+#[must_use]
 pub fn path_tokens(path: &CanonicalPath) -> TokenStream {
     let mut segments = path.segments().iter();
     let first = segments

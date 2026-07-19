@@ -16,10 +16,12 @@ pub struct AttributeIndexBuilder {
 }
 
 impl AttributeIndexBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn build(self) -> AttributeIndex {
         AttributeIndex::new(self.items, self.imports)
     }

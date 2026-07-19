@@ -8,10 +8,12 @@ impl Identifier {
         Self { field, type_name }
     }
 
+    #[must_use]
     pub fn field(&self) -> &str {
         &self.field
     }
 
+    #[must_use]
     pub fn type_name(&self) -> &str {
         &self.type_name
     }

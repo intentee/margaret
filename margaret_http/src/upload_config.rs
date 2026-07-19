@@ -6,6 +6,7 @@ pub enum UploadConfig {
 }
 
 impl UploadConfig {
+    #[must_use]
     pub fn enabled(directory: PathBuf) -> Self {
         Self::Enabled { directory }
     }

@@ -1,5 +1,6 @@
 use crate::views::card_layout_props::CardLayoutProps;
 
+#[must_use]
 pub fn card_layout(
     CardLayoutProps {
         body_text,

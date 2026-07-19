@@ -95,10 +95,12 @@ impl AttributeArgs {
         }
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.named.is_empty() && self.positional.is_empty()
     }
 
+    #[must_use]
     pub fn named(&self, key: &str) -> Option<&Expr> {
         self.named
             .iter()
@@ -114,10 +116,12 @@ impl AttributeArgs {
         }
     }
 
+    #[must_use]
     pub fn positional(&self, index: usize) -> Option<&Expr> {
         self.positional.get(index)
     }
 
+    #[must_use]
     pub fn positional_path(&self, index: usize) -> Option<&Path> {
         match self.positional.get(index) {
             Some(Expr::Path(expression)) => Some(&expression.path),

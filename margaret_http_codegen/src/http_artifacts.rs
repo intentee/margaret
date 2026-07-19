@@ -12,10 +12,12 @@ impl HttpArtifacts {
         Self { modules, servers }
     }
 
+    #[must_use]
     pub fn into_modules(self) -> Vec<GeneratedModuleTokens> {
         self.modules
     }
 
+    #[must_use]
     pub fn servers(&self) -> &[HttpServer] {
         &self.servers
     }

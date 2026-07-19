@@ -2,6 +2,7 @@ use clap::Error;
 
 use crate::command_outcome::CommandOutcome;
 
+#[must_use]
 pub fn outcome_for_clap_error(error: Error) -> CommandOutcome {
     if error.use_stderr() {
         eprintln!("{}", error.render());

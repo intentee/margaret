@@ -40,10 +40,12 @@ pub struct GeneratedCode {
 }
 
 impl GeneratedCode {
+    #[must_use]
     pub fn new(modules: Vec<GeneratedModule>) -> Self {
         Self { modules }
     }
 
+    #[must_use]
     pub fn modules(&self) -> &[GeneratedModule] {
         &self.modules
     }

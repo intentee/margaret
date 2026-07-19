@@ -13,6 +13,7 @@ pub struct EnglishGreeter {
 
 impl EnglishGreeter {
     #[constructor]
+    #[must_use]
     pub fn create(config: Arc<Config>) -> Self {
         Self { config }
     }

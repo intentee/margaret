@@ -10,10 +10,12 @@ pub struct CanonicalPath {
 }
 
 impl CanonicalPath {
+    #[must_use]
     pub fn new(segments: Vec<String>) -> Self {
         Self { segments }
     }
 
+    #[must_use]
     pub fn segments(&self) -> &[String] {
         &self.segments
     }

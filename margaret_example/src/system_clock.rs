@@ -12,6 +12,7 @@ pub struct SystemClock;
 
 impl SystemClock {
     #[constructor]
+    #[must_use]
     pub fn create() -> Self {
         Self
     }

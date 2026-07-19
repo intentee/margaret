@@ -16,6 +16,7 @@ impl GeneratedModuleTokens {
         }
     }
 
+    #[must_use]
     pub fn format(self) -> GeneratedModule {
         let file = syn::parse2::<syn::File>(self.tokens)
             .expect("the generated tokens form a valid Rust file");
@@ -23,10 +24,12 @@ impl GeneratedModuleTokens {
         GeneratedModule::new(self.name, prettyplease::unparse(&file))
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn to_source(&self) -> String {
         self.tokens.to_string()
     }

@@ -17,6 +17,7 @@ fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
     }
 }
 
+#[must_use]
 pub fn resolve_path(
     path: &Path,
     module_path: &[String],

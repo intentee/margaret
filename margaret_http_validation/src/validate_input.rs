@@ -6,6 +6,7 @@ use margaret_validation::validation_result::ValidationResult;
 
 use crate::request_input::RequestInput;
 
+#[must_use]
 pub fn validate_input<Model>(request: &Request, source: RequestInput) -> ValidationResult<Model>
 where
     Model: DeserializeOwned + Validate,

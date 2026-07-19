@@ -91,10 +91,12 @@ impl AttributeIndex {
         }
     }
 
+    #[must_use]
     pub fn field_name(&self, path: &CanonicalPath) -> &str {
         self.identifier(path).field()
     }
 
+    #[must_use]
     pub fn has(&self, selector: &AttributeSelector) -> bool {
         let leaf = selector.leaf_ident().to_string();
         let Some(locations) = self.locations_by_leaf.get(&leaf) else {
@@ -106,18 +108,22 @@ impl AttributeIndex {
         })
     }
 
+    #[must_use]
     pub fn is_indexed_struct(&self, path: &CanonicalPath) -> bool {
         self.struct_paths.contains(path)
     }
 
+    #[must_use]
     pub fn is_indexed_trait(&self, path: &CanonicalPath) -> bool {
         self.trait_paths.contains(path)
     }
 
+    #[must_use]
     pub fn items(&self) -> &[IndexedItem] {
         &self.items
     }
 
+    #[must_use]
     pub fn resolve_item_path(&self, item: &IndexedItem, path: &Path) -> Option<CanonicalPath> {
         resolve_path(
             path,
@@ -127,6 +133,7 @@ impl AttributeIndex {
         )
     }
 
+    #[must_use]
     pub fn resolve_item_type(&self, item: &IndexedItem, declared: &Type) -> Option<CanonicalPath> {
         resolve_type(
             declared,
@@ -136,6 +143,7 @@ impl AttributeIndex {
         )
     }
 
+    #[must_use]
     pub fn select(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'_>> {
         let leaf = selector.leaf_ident().to_string();
         let Some(locations) = self.locations_by_leaf.get(&leaf) else {
@@ -155,6 +163,7 @@ impl AttributeIndex {
             .collect()
     }
 
+    #[must_use]
     pub fn type_name(&self, path: &CanonicalPath) -> &str {
         self.identifier(path).type_name()
     }

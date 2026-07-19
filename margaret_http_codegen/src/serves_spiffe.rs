@@ -1,6 +1,7 @@
 use crate::http_server::HttpServer;
 use crate::server_transport_policy::ServerTransportPolicy;
 
+#[must_use]
 pub fn serves_spiffe(servers: &[HttpServer]) -> bool {
     servers.iter().any(|server| {
         matches!(

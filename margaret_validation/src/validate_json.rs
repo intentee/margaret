@@ -5,6 +5,7 @@ use validator::Validate;
 use crate::malformation::Malformation;
 use crate::validation_result::ValidationResult;
 
+#[must_use]
 pub fn validate_json<Model>(data: Option<&Value>) -> ValidationResult<Model>
 where
     Model: DeserializeOwned + Validate,

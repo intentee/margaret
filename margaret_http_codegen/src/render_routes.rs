@@ -138,6 +138,7 @@ fn route_method(named: &NamedRoute<'_>, origin: &Ident) -> TokenStream {
     );
 
     quote! {
+        #[must_use]
         pub fn #method(&self, #(#parameters),*) -> #return_type {
             #constructor
         }
@@ -257,6 +258,7 @@ pub(crate) fn render_routes(
         }
 
         impl Routes {
+            #[must_use]
             pub fn from_origins(#(#origin_params)*) -> Self {
                 Self {
                     #(#server_inits)*

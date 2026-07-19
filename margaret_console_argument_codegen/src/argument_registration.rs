@@ -3,6 +3,7 @@ use quote::quote;
 
 use crate::console_argument::ConsoleArgument;
 
+#[must_use]
 pub fn argument_registration(argument: &ConsoleArgument) -> TokenStream {
     match argument {
         ConsoleArgument::Flag { name } => quote! {
