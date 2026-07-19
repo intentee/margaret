@@ -11,8 +11,10 @@ margaret_identity_session = { path = "../margaret_identity_session" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "test-util", "time"] }
 tokio-util = { workspace = true }
+trzcina = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 margaret_http_tests = { path = "../margaret_http_tests" }
@@ -20,8 +22,6 @@ margaret_jwks_client = { path = "../margaret_jwks_client" }
 margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
 margaret_jwks_roller_server = { path = "../margaret_jwks_roller_server" }
 reqwest = { workspace = true }
-trzcina = { workspace = true }
-url = { workspace = true }
 
 [[test]]
 name = "main"

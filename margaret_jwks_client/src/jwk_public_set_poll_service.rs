@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use log::error;
 use reqwest::Client;
 use reqwest::Response;
+use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 use trzcina::TickContext;
 use trzcina::Ticker;
@@ -15,7 +16,8 @@ use margaret_jwks_key_gen::jwk_public_set::JwkPublicSet;
 
 use crate::jwk_public_set_holder::JwkPublicSetHolder;
 use crate::jwks_client_error::JwksClientError;
-use crate::jwks_poll_interval::JWKS_POLL_INTERVAL;
+use crate::jwks_poll_interval_after_ready::JWKS_POLL_INTERVAL_AFTER_READY;
+use crate::jwks_poll_interval_before_ready::JWKS_POLL_INTERVAL_BEFORE_READY;
 
 pub struct JwkPublicSetPollService {
     pub http_client: Client,
@@ -40,16 +42,12 @@ impl JwkPublicSetPollService {
 #[async_trait]
 impl Ticker for JwkPublicSetPollService {
     fn tick_interval(&self) -> Duration {
-        JWKS_POLL_INTERVAL
-    }
-
-    fn tick_time_limit(&self) -> Option<Duration> {
-        Some(JWKS_POLL_INTERVAL)
+        JWKS_POLL_INTERVAL_BEFORE_READY
     }
 
     async fn handle_tick(
         &mut self,
-        _cancellation_token: CancellationToken,
+        cancellation_token: CancellationToken,
         _tick_context: TickContext,
     ) -> Result<()> {
         match self.fetch_jwk_public_set().await {
@@ -57,6 +55,14 @@ impl Ticker for JwkPublicSetPollService {
                 .jwk_public_set_holder
                 .set(Some(Arc::new(jwk_public_set))),
             Err(error) => error!("Unable to fetch the jwks document from the issuer: {error}"),
+        }
+
+        if self.jwk_public_set_holder.is_ready() {
+            tokio::select! {
+                biased;
+                () = cancellation_token.cancelled() => {}
+                () = sleep(JWKS_POLL_INTERVAL_AFTER_READY) => {}
+            }
         }
 
         Ok(())

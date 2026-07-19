@@ -14,6 +14,11 @@ impl JwkPublicSetHolder {
         self.inner.get()
     }
 
+    #[must_use]
+    pub fn is_ready(&self) -> bool {
+        self.inner.get().is_some()
+    }
+
     pub fn set(&self, value: Option<Arc<JwkPublicSet>>) {
         self.inner.set(value);
     }
