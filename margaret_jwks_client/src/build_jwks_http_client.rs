@@ -3,6 +3,7 @@ use reqwest::ClientBuilder;
 use reqwest::redirect::Policy;
 
 use crate::jwks_client_error::JwksClientError;
+use crate::jwks_fetch_timeout::JWKS_FETCH_TIMEOUT;
 
 pub(crate) fn build_jwks_http_client(
     client_builder: ClientBuilder,
@@ -10,6 +11,7 @@ pub(crate) fn build_jwks_http_client(
     client_builder
         .https_only(true)
         .redirect(Policy::none())
+        .timeout(JWKS_FETCH_TIMEOUT)
         .build()
         .map_err(JwksClientError::HttpClientBuild)
 }
