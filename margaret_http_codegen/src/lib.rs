@@ -52,21 +52,29 @@ mod tests {
     use crate::http_codegen_error::HttpCodegenError;
     use crate::render_http::render_http;
 
-    fn generate_http_source(
+    fn http_source(
         crate_name: &str,
         source_directory: &Path,
+        has_views: bool,
     ) -> Result<String, HttpCodegenError> {
         let index = AttributeIndexBuilder::new()
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
 
-        Ok(render_http(&index)?
+        Ok(render_http(&index, has_views)?
             .into_modules()
             .into_iter()
             .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
             .map(|module| module.format().expect("the module formats").source().to_string())
             .collect::<Vec<String>>()
             .join("\n"))
+    }
+
+    fn generate_http_source(
+        crate_name: &str,
+        source_directory: &Path,
+    ) -> Result<String, HttpCodegenError> {
+        http_source(crate_name, source_directory, false)
     }
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"
@@ -198,12 +206,56 @@ impl Echo {
             .collect()
     }
 
+    fn source_for_with_views(lib_source: &str) -> String {
+        let directory = crate_with(lib_source);
+
+        http_source("crate", &directory.path().join("src"), true)
+            .expect("the http source is generated")
+            .split_whitespace()
+            .collect()
+    }
+
     fn error_for(lib_source: &str) -> String {
         let directory = crate_with(lib_source);
 
         generate_http_source("crate", &directory.path().join("src"))
             .expect_err("the http source fails to generate")
             .to_string()
+    }
+
+    const VIEWS_INJECTION: &str = r#"
+#[responds_to_http(method = "get", path = "/card", server = "public")]
+struct GetCard;
+
+impl GetCard {
+    #[process]
+    fn respond(&self, views: &crate::margaret::views::Views) -> Response {}
+}
+
+#[responds_to_http(method = "get", path = "/health", server = "internal")]
+struct GetHealth;
+
+impl GetHealth {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+"#;
+
+    #[test]
+    fn injects_views_into_a_responder() {
+        let source = source_for_with_views(VIEWS_INJECTION);
+
+        assert!(source.contains(",views:&::std::sync::Arc<super::super::views::Views>"));
+        assert!(source.contains(",_views:&::std::sync::Arc<super::super::views::Views>"));
+        assert!(source.contains("views.as_ref()"));
+        assert!(source.contains("letviews=views.clone();"));
+    }
+
+    #[test]
+    fn rejects_views_injection_without_declared_views() {
+        let message = error_for(VIEWS_INJECTION);
+
+        assert!(message.contains("injects &Views, but the crate defines no #[renders_view]"));
     }
 
     fn routes_source_for(lib_source: &str) -> String {
@@ -213,7 +265,7 @@ impl Echo {
             .expect("the crate is indexed")
             .build();
 
-        crate::render_http::render_http(&index)
+        crate::render_http::render_http(&index, false)
             .expect("the http source is generated")
             .into_modules()
             .into_iter()

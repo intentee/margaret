@@ -48,7 +48,11 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
     }
 }
 
-fn server_manager_setup(servers: &[HttpServer], registers_services: bool) -> TokenStream {
+fn server_manager_setup(
+    servers: &[HttpServer],
+    has_views: bool,
+    registers_services: bool,
+) -> TokenStream {
     let manager_binding = if registers_services {
         quote! { mut manager }
     } else {
@@ -100,6 +104,7 @@ fn server_manager_setup(servers: &[HttpServer], registers_services: bool) -> Tok
         quote! { #origin_variable.clone() }
     });
 
+    let views_argument = has_views.then(|| quote! { , &views });
     let assemblies = servers.iter().map(|server| {
         let function_name = server.function_name();
         let name = server.name();
@@ -112,7 +117,7 @@ fn server_manager_setup(servers: &[HttpServer], registers_services: bool) -> Tok
             margaret_service::server_assembly::ServerAssembly {
                 address_argument: #address_argument,
                 name: #name,
-                routes: super::http::#function_name::#function_name(container, &routes).await,
+                routes: super::http::#function_name::#function_name(container, &routes #views_argument).await,
                 transport: #transport,
                 upload_dir_argument: #upload_dir_argument,
                 uploads_argument: #uploads_argument,
@@ -134,6 +139,11 @@ fn server_manager_setup(servers: &[HttpServer], registers_services: bool) -> Tok
             }
         }
     });
+    let views_setup = has_views.then(|| {
+        quote! {
+            let views = ::std::sync::Arc::new(super::views::build::build(container).await);
+        }
+    });
 
     quote! {
         #spiffe_prelude
@@ -143,6 +153,7 @@ fn server_manager_setup(servers: &[HttpServer], registers_services: bool) -> Tok
         let routes = ::std::sync::Arc::new(
             super::routes::Routes::from_origins(#(#origin_arguments),*),
         );
+        #views_setup
         let servers = #assemblies;
 
         let #bundle_services_binding: ::std::vec::Vec<
@@ -386,12 +397,13 @@ fn serve_arguments(units: &[ServiceUnit]) -> Result<Vec<ConsoleArgument>, Servic
 pub fn render_services(
     index: &AttributeIndex,
     servers: &[HttpServer],
+    has_views: bool,
 ) -> Result<RenderedServices, ServiceCodegenError> {
     let units = service_units(index)?;
     let serve_arguments = serve_arguments(&units)?;
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(registration);
-    let manager_setup = server_manager_setup(servers, !units.is_empty());
+    let manager_setup = server_manager_setup(servers, has_views, !units.is_empty());
     let matches_binding = if servers.is_empty() && serve_arguments.is_empty() {
         quote! { _matches }
     } else {

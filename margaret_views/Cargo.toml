@@ -1,0 +1,10 @@
+[package]
+name = "margaret_views"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+maud = { workspace = true }
+
+[lints]
+workspace = true

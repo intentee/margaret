@@ -130,6 +130,7 @@ pub(crate) fn responder_method(
         let is_peer_spiffe_id =
             HttpInjectable::PeerSpiffeId.matches(resolved.as_ref(), is_reference);
         let is_routes = HttpInjectable::Routes.matches(resolved.as_ref(), is_reference);
+        let is_views = HttpInjectable::Views.matches(resolved.as_ref(), is_reference);
 
         if route_parameter.is_some() && form_request.is_some() {
             return Err(HttpCodegenError::ConflictingArgumentMarkers {
@@ -151,6 +152,7 @@ pub(crate) fn responder_method(
             && !is_forwarder
             && !is_peer_spiffe_id
             && !is_routes
+            && !is_views
         {
             return Err(HttpCodegenError::UnmarkedResponderParameter {
                 responder: responder.to_string(),
@@ -171,6 +173,8 @@ pub(crate) fn responder_method(
             ResponderArgumentBinding::PeerSpiffeId
         } else if is_routes {
             ResponderArgumentBinding::Routes
+        } else if is_views {
+            ResponderArgumentBinding::Views
         } else {
             ResponderArgumentBinding::CurrentRequest
         };

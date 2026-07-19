@@ -9,6 +9,7 @@ pub(crate) fn services_pass(context: &mut BuildContext) -> Result<(), CodegenErr
     let rendered = margaret_service_codegen::render_services::render_services(
         context.index(),
         context.servers(),
+        context.capabilities().has_views,
     )?;
 
     context.set_serve_arguments(rendered.serve_arguments);

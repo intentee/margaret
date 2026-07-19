@@ -8,6 +8,7 @@ use crate::container_pass::container_pass;
 use crate::generated_code::GeneratedCode;
 use crate::http_pass::http_pass;
 use crate::services_pass::services_pass;
+use crate::views_pass::views_pass;
 
 pub fn build(crate_root: &CrateRoot) -> Result<GeneratedCode, CodegenError> {
     let index = AttributeIndexBuilder::new()
@@ -16,6 +17,7 @@ pub fn build(crate_root: &CrateRoot) -> Result<GeneratedCode, CodegenError> {
     let mut context = BuildContext::new(&index);
 
     container_pass(&mut context)?;
+    views_pass(&mut context)?;
     http_pass(&mut context)?;
     services_pass(&mut context)?;
     console_pass(&mut context)?;
@@ -44,6 +46,7 @@ mod tests {
     use crate::http_pass::http_pass;
     use crate::services_pass::services_pass;
     use crate::umbrella::umbrella;
+    use crate::views_pass::views_pass;
 
     const WEB_CRATE: &str = "\
 #[rustfmt::skip]
@@ -124,6 +127,7 @@ impl Greet {
         let mut context = BuildContext::new(&index);
 
         container_pass(&mut context).expect("the container pass succeeds");
+        views_pass(&mut context).expect("the views pass succeeds");
         http_pass(&mut context).expect("the http pass succeeds");
         services_pass(&mut context).expect("the services pass succeeds");
         console_pass(&mut context).expect("the console pass succeeds");
@@ -291,6 +295,46 @@ impl Greet {
             .to_string();
 
         assert!(message.contains("failed to generate the services"));
+    }
+
+    const VIEWS_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+#[renders_view(name = \"card\")]
+struct Card;
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/card\", server = \"public\")]
+struct GetCard;
+
+impl GetCard {
+    #[process]
+    fn respond(&self, views: &crate::margaret::views::Views) -> Response {}
+}
+";
+
+    #[test]
+    fn generates_the_views_module_when_views_and_http_exist() {
+        let code = generate(VIEWS_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod views;"));
+        assert!(module(&code, "views").contains("pub struct Views"));
+        assert!(module(&code, "views").contains("card"));
+        assert!(module(&code, "views/build").contains("pub async fn build"));
+        assert!(concatenated(&code).contains("super::views::build::build(container)"));
+    }
+
+    #[test]
+    fn propagates_a_views_failure() {
+        let message = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[renders_view(name = \"CardLayout\")]\nstruct Card;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(message.contains("failed to generate the views"));
     }
 
     #[test]
