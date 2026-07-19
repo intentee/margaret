@@ -28,12 +28,12 @@ fn build_unit(
     let item = matched.item();
     let path = item.canonical_path().to_string();
 
-    if !item.kind().is_struct() {
+    let Some(identifier) = index.struct_identifier(item.canonical_path()) else {
         return Err(match role {
             Role::Service => ServiceCodegenError::ServiceNotAStruct { path },
             Role::Ticker => ServiceCodegenError::TickerNotAStruct { path },
         });
-    }
+    };
 
     if has_conflicting_roles(item, role) {
         return Err(ServiceCodegenError::ConflictingRoles { path });
@@ -55,11 +55,11 @@ fn build_unit(
     Ok(ServiceUnit {
         arguments,
         concrete_path: item.canonical_path().clone(),
-        field_name: index.field_name(item.canonical_path()).to_string(),
+        field_name: identifier.field().to_string(),
         kind,
         runner: runner.identifier().to_string(),
         takes_token,
-        type_name: index.type_name(item.canonical_path()).to_string(),
+        type_name: identifier.type_name().to_string(),
     })
 }
 
@@ -85,7 +85,7 @@ fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, method: &Index
 }
 
 fn selector(name: &str) -> AttributeSelector {
-    AttributeSelector::parse(name).expect("a marker selector is valid")
+    AttributeSelector::from_marker(name)
 }
 
 pub(crate) fn service_units(

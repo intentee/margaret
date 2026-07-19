@@ -8,6 +8,7 @@ pub struct ModuleImports {
 }
 
 impl ModuleImports {
+    #[must_use]
     pub fn resolve(&self, name: &str) -> Option<&CanonicalPath> {
         self.by_name.get(name)
     }

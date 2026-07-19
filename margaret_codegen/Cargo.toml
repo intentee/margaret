@@ -14,6 +14,7 @@ margaret_service_codegen = { path = "../margaret_service_codegen" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+quote = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

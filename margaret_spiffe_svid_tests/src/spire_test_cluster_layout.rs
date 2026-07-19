@@ -22,6 +22,7 @@ pub struct SpireTestClusterLayout {
 }
 
 impl SpireTestClusterLayout {
+    #[must_use]
     pub fn new(data_dir: &Path, trust_domain: &str, server_port: u16) -> Self {
         Self {
             agent_conf_path: data_dir.join("agent.conf"),
@@ -96,6 +97,7 @@ impl SpireTestClusterLayout {
         Ok(())
     }
 
+    #[must_use]
     pub fn render_agent_config(&self) -> String {
         format!(
             r#"agent {{
@@ -137,6 +139,7 @@ plugins {{
         )
     }
 
+    #[must_use]
     pub fn render_server_config(&self) -> String {
         format!(
             r#"server {{

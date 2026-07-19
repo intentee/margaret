@@ -5,6 +5,7 @@ use syn::Signature;
 
 use crate::parameter_view::ParameterView;
 
+#[must_use]
 pub fn parameters(signature: &Signature) -> Vec<ParameterView<'_>> {
     signature
         .inputs

@@ -1,5 +1,3 @@
-use margaret_attributes::canonical_path::CanonicalPath;
-
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::request_input_source::RequestInputSource;
 
@@ -12,7 +10,7 @@ pub(crate) enum ResponderArgumentBinding {
         path_key: String,
     },
     Bound {
-        binder: CanonicalPath,
+        binder_field: String,
         path_key: String,
     },
     FormRequest {

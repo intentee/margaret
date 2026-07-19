@@ -26,11 +26,7 @@ fn peel_collection_inner(inner: &Type) -> Option<Path> {
         .path
         .segments
         .last()
-        .expect("a type path has at least one segment");
-
-    if segment.ident != "Arc" && segment.ident != "Rc" {
-        return None;
-    }
+        .filter(|segment| segment.ident == "Arc" || segment.ident == "Rc")?;
 
     let Type::TraitObject(trait_object) = single_generic_argument(segment)? else {
         return None;
@@ -44,16 +40,10 @@ fn single_generic_argument(segment: &PathSegment) -> Option<&Type> {
         return None;
     };
 
-    if arguments.args.len() != 1 {
-        return None;
-    }
+    let mut arguments = arguments.args.iter();
 
-    match arguments
-        .args
-        .first()
-        .expect("a single-argument list has a first argument")
-    {
-        GenericArgument::Type(generic_type) => Some(generic_type),
+    match (arguments.next(), arguments.next()) {
+        (Some(GenericArgument::Type(generic_type)), None) => Some(generic_type),
         _ => None,
     }
 }
@@ -84,20 +74,15 @@ pub(crate) fn peel_target(parameter_type: &Type) -> Option<RawTarget> {
     let Type::Path(type_path) = parameter_type else {
         return None;
     };
-    let segment = type_path
-        .path
-        .segments
-        .last()
-        .expect("a type path has at least one segment");
 
-    if segment.ident == "Arc" || segment.ident == "Rc" {
-        peel_arc_inner(single_generic_argument(segment)?)
-    } else if segment.ident == "Vec" {
-        Some(RawTarget::Collection(peel_collection_inner(
-            single_generic_argument(segment)?,
-        )?))
-    } else {
-        None
+    match type_path.path.segments.last() {
+        Some(segment) if segment.ident == "Arc" || segment.ident == "Rc" => {
+            peel_arc_inner(single_generic_argument(segment)?)
+        }
+        Some(segment) if segment.ident == "Vec" => Some(RawTarget::Collection(
+            peel_collection_inner(single_generic_argument(segment)?)?,
+        )),
+        _ => None,
     }
 }
 

@@ -84,7 +84,10 @@ impl MultipartBody {
         let mut post = Vec::new();
 
         while let Some(field) = multipart.next_field().await.map_err(map_multipart_error)? {
-            let field_name = field.name().unwrap_or_default().to_string();
+            let field_name = field
+                .name()
+                .ok_or(RequestError::NamelessMultipartField)?
+                .to_string();
             let file_name = field.file_name().map(str::to_string);
             let content_type = field
                 .content_type()

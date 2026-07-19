@@ -16,6 +16,7 @@ pub struct GetMetrics {
 
 impl GetMetrics {
     #[constructor]
+    #[must_use]
     pub fn create(metrics: Arc<Metrics>) -> Self {
         Self { metrics }
     }

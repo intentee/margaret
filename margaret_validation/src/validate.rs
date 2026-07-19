@@ -6,6 +6,7 @@ use validator::Validate;
 
 use crate::validation_result::ValidationResult;
 
+#[must_use]
 pub fn validate<Model>(data: &HashMap<String, String>) -> ValidationResult<Model>
 where
     Model: DeserializeOwned + Validate,

@@ -4,7 +4,6 @@ use std::collections::HashSet;
 use syn::Path;
 use syn::Type;
 
-use crate::attribute_location::AttributeLocation;
 use crate::attribute_selector::AttributeSelector;
 use crate::canonical_path::CanonicalPath;
 use crate::identifier::Identifier;
@@ -22,8 +21,6 @@ pub struct AttributeIndex {
     imports: HashMap<CanonicalPath, ModuleImports>,
     item_paths: HashSet<CanonicalPath>,
     items: Vec<IndexedItem>,
-    locations_by_leaf: HashMap<String, Vec<AttributeLocation>>,
-    struct_paths: HashSet<CanonicalPath>,
     trait_paths: HashSet<CanonicalPath>,
 }
 
@@ -49,32 +46,13 @@ impl AttributeIndex {
         items: Vec<IndexedItem>,
         imports: HashMap<CanonicalPath, ModuleImports>,
     ) -> Self {
-        let mut locations_by_leaf: HashMap<String, Vec<AttributeLocation>> = HashMap::new();
         let mut item_paths = HashSet::new();
-        let mut struct_paths = HashSet::new();
         let mut trait_paths = HashSet::new();
 
-        for (item_index, item) in items.iter().enumerate() {
-            for (attribute_index, attribute) in item.attributes().iter().enumerate() {
-                let leaf = attribute
-                    .path()
-                    .segments
-                    .last()
-                    .expect("an attribute path has at least one segment")
-                    .ident
-                    .to_string();
-
-                locations_by_leaf
-                    .entry(leaf)
-                    .or_default()
-                    .push(AttributeLocation::new(item_index, attribute_index));
-            }
-
+        for item in &items {
             item_paths.insert(item.canonical_path().clone());
 
-            if item.kind().is_struct() {
-                struct_paths.insert(item.canonical_path().clone());
-            } else if item.kind() == ItemKind::Trait {
+            if item.kind() == ItemKind::Trait {
                 trait_paths.insert(item.canonical_path().clone());
             }
         }
@@ -85,39 +63,29 @@ impl AttributeIndex {
             imports,
             item_paths,
             items,
-            locations_by_leaf,
-            struct_paths,
             trait_paths,
         }
     }
 
-    pub fn field_name(&self, path: &CanonicalPath) -> &str {
-        self.identifier(path).field()
-    }
-
+    #[must_use]
     pub fn has(&self, selector: &AttributeSelector) -> bool {
-        let leaf = selector.leaf_ident().to_string();
-        let Some(locations) = self.locations_by_leaf.get(&leaf) else {
-            return false;
-        };
-
-        locations.iter().any(|location| {
-            selector.matches(self.items[location.item()].attributes()[location.attribute()].path())
-        })
+        self.items
+            .iter()
+            .flat_map(|item| item.attributes())
+            .any(|attribute| selector.matches(attribute.path()))
     }
 
-    pub fn is_indexed_struct(&self, path: &CanonicalPath) -> bool {
-        self.struct_paths.contains(path)
-    }
-
+    #[must_use]
     pub fn is_indexed_trait(&self, path: &CanonicalPath) -> bool {
         self.trait_paths.contains(path)
     }
 
+    #[must_use]
     pub fn items(&self) -> &[IndexedItem] {
         &self.items
     }
 
+    #[must_use]
     pub fn resolve_item_path(&self, item: &IndexedItem, path: &Path) -> Option<CanonicalPath> {
         resolve_path(
             path,
@@ -127,6 +95,7 @@ impl AttributeIndex {
         )
     }
 
+    #[must_use]
     pub fn resolve_item_type(&self, item: &IndexedItem, declared: &Type) -> Option<CanonicalPath> {
         resolve_type(
             declared,
@@ -136,33 +105,22 @@ impl AttributeIndex {
         )
     }
 
+    #[must_use]
     pub fn select(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'_>> {
-        let leaf = selector.leaf_ident().to_string();
-        let Some(locations) = self.locations_by_leaf.get(&leaf) else {
-            return Vec::new();
-        };
-
-        locations
+        self.items
             .iter()
-            .filter_map(|location| {
-                let item = &self.items[location.item()];
-                let attribute_index = location.attribute();
-
-                selector
-                    .matches(item.attributes()[attribute_index].path())
-                    .then(|| MatchedAttribute::new(item, attribute_index))
+            .flat_map(|item| {
+                item.attributes()
+                    .iter()
+                    .filter(|attribute| selector.matches(attribute.path()))
+                    .map(move |attribute| MatchedAttribute::new(item, attribute))
             })
             .collect()
     }
 
-    pub fn type_name(&self, path: &CanonicalPath) -> &str {
-        self.identifier(path).type_name()
-    }
-
-    fn identifier(&self, path: &CanonicalPath) -> &Identifier {
-        self.identifiers
-            .get(path)
-            .expect("every indexed struct is assigned an identifier")
+    #[must_use]
+    pub fn struct_identifier(&self, path: &CanonicalPath) -> Option<&Identifier> {
+        self.identifiers.get(path)
     }
 
     fn imports_of(&self, item: &IndexedItem) -> &ModuleImports {
@@ -174,6 +132,6 @@ impl AttributeIndex {
     fn module_of<'index>(&self, item: &'index IndexedItem) -> &'index [String] {
         let segments = item.canonical_path().segments();
 
-        &segments[..segments.len() - 1]
+        &segments[..segments.len().saturating_sub(1)]
     }
 }

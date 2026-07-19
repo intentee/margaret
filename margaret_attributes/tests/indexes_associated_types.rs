@@ -32,9 +32,13 @@ fn indexes_associated_types() {
         .expect("a same-module reference resolves");
 
     assert_eq!(model.to_string(), "associated_types::Model");
-    assert!(index.is_indexed_struct(&model));
-    assert!(index.is_indexed_struct(&CanonicalPath::new(vec![
-        "associated_types".to_string(),
-        "Producer".to_string(),
-    ])));
+    assert!(index.struct_identifier(&model).is_some());
+    assert!(
+        index
+            .struct_identifier(&CanonicalPath::new(vec![
+                "associated_types".to_string(),
+                "Producer".to_string(),
+            ]))
+            .is_some()
+    );
 }

@@ -1,3 +1,3 @@
-fn main() {
-    margaret_codegen::generate::generate();
+fn main() -> Result<(), margaret_codegen::codegen_error::CodegenError> {
+    margaret_codegen::generate::generate()
 }

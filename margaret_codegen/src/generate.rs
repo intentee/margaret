@@ -5,36 +5,42 @@ use std::path::Path;
 use margaret_attributes::crate_root::CrateRoot;
 
 use crate::build::build;
+use crate::codegen_error::CodegenError;
 
-fn generate_into(manifest_directory: &Path) {
+fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
     let host_source = manifest_directory.join("src");
     let generated_directory = host_source.join("margaret");
     let crate_root = CrateRoot::new("crate", host_source);
 
-    fs::create_dir_all(&generated_directory).expect("the generated directory is created");
+    fs::create_dir_all(&generated_directory).map_err(|source| CodegenError::CreateDirectory {
+        path: generated_directory.clone(),
+        source,
+    })?;
 
     let umbrella = generated_directory.join("mod.rs");
 
     if !umbrella.exists() {
-        fs::write(&umbrella, "").expect("the umbrella stub is written");
+        fs::write(&umbrella, "").map_err(|source| CodegenError::WriteSource {
+            path: umbrella.clone(),
+            source,
+        })?;
     }
 
-    build(&crate_root)
-        .expect("the crate is generated")
-        .write_to(&generated_directory)
-        .expect("the generated sources are written");
+    build(&crate_root)?.write_to(&generated_directory)?;
 
     println!(
         "cargo:rerun-if-changed={}",
         crate_root.source_directory.display()
     );
+
+    Ok(())
 }
 
-pub fn generate() {
-    let manifest_directory =
-        env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo");
+pub fn generate() -> Result<(), CodegenError> {
+    let manifest_directory = env::var("CARGO_MANIFEST_DIR")
+        .map_err(|source| CodegenError::ManifestDirectory { source })?;
 
-    generate_into(Path::new(&manifest_directory));
+    generate_into(Path::new(&manifest_directory))
 }
 
 #[cfg(test)]
@@ -42,6 +48,8 @@ mod tests {
     use std::env;
     use std::fs;
     use std::path::Path;
+
+    use std::os::unix::fs::PermissionsExt;
 
     use tempfile::tempdir;
 
@@ -73,12 +81,22 @@ impl Config {
             .expect("the generated module exists")
     }
 
+    const FIELDED_SINGLETON_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+struct Config {
+    name: String,
+}
+";
+
     #[test]
     fn generates_the_container_for_the_manifest_crate() {
         let host = tempdir().expect("a host crate directory");
         write_crate(host.path(), HOST_CRATE);
 
-        generate_into(host.path());
+        generate_into(host.path()).expect("the crate generates");
 
         assert!(read_generated(host.path(), "container.rs").contains("struct Container"));
         assert!(read_generated(host.path(), "mod.rs").contains("pub mod container;"));
@@ -89,8 +107,8 @@ impl Config {
         let host = tempdir().expect("a host crate directory");
         write_crate(host.path(), HOST_CRATE);
 
-        generate_into(host.path());
-        generate_into(host.path());
+        generate_into(host.path()).expect("the first generation succeeds");
+        generate_into(host.path()).expect("the second generation succeeds");
 
         assert!(read_generated(host.path(), "container.rs").contains("struct Container"));
     }
@@ -104,8 +122,71 @@ impl Config {
             env::set_var("CARGO_MANIFEST_DIR", host.path());
         }
 
-        generate();
+        generate().expect("the crate generates from the environment");
 
         assert!(read_generated(host.path(), "container.rs").contains("struct Container"));
+    }
+
+    #[test]
+    fn reports_a_missing_manifest_directory() {
+        unsafe {
+            env::remove_var("CARGO_MANIFEST_DIR");
+        }
+
+        let error = generate().expect_err("a missing manifest directory is reported");
+
+        assert!(error.to_string().contains("CARGO_MANIFEST_DIR"));
+    }
+
+    #[test]
+    fn reports_a_generated_directory_that_cannot_be_created() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), HOST_CRATE);
+        fs::write(host.path().join("src/margaret"), "").expect("the blocking file is written");
+
+        let error =
+            generate_into(host.path()).expect_err("a blocked generated directory is reported");
+
+        assert!(error.to_string().contains("failed to create the generated directory"));
+    }
+
+    #[test]
+    fn reports_an_umbrella_stub_that_cannot_be_written() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), HOST_CRATE);
+        let generated = host.path().join("src/margaret");
+        fs::create_dir_all(&generated).expect("the generated directory exists");
+        fs::set_permissions(&generated, std::fs::Permissions::from_mode(0o555))
+            .expect("the generated directory is made read-only");
+
+        let error = generate_into(host.path()).expect_err("a blocked umbrella stub is reported");
+
+        fs::set_permissions(&generated, std::fs::Permissions::from_mode(0o755))
+            .expect("the generated directory is restored to writable");
+
+        assert!(error.to_string().contains("failed to write the generated source"));
+    }
+
+    #[test]
+    fn propagates_a_crate_that_fails_to_build() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), FIELDED_SINGLETON_CRATE);
+
+        let error = generate_into(host.path()).expect_err("an unbuildable crate is reported");
+
+        assert!(error.to_string().contains("failed to generate the dependency container"));
+    }
+
+    #[test]
+    fn propagates_a_generated_source_that_cannot_be_written() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), HOST_CRATE);
+        fs::create_dir_all(host.path().join("src/margaret/container.rs"))
+            .expect("the blocking directory is created");
+
+        let error =
+            generate_into(host.path()).expect_err("a blocked generated source is reported");
+
+        assert!(error.to_string().contains("failed to write the generated source"));
     }
 }

@@ -1,5 +1,5 @@
+use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use syn::FnArg;
 use syn::Pat;
@@ -38,7 +38,7 @@ fn managed_selectors() -> [AttributeSelector; 3] {
 
 fn build_drafts<'index>(
     index: &'index AttributeIndex,
-) -> Result<Vec<SingletonDraft<'index>>, ContainerError> {
+) -> Result<DraftedProviders<'index>, ContainerError> {
     let mut drafts: Vec<SingletonDraft> = Vec::new();
     let mut provided_keys: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
 
@@ -60,7 +60,10 @@ fn build_drafts<'index>(
         }
     }
 
-    Ok(drafts)
+    Ok(DraftedProviders {
+        drafts,
+        provided_keys,
+    })
 }
 
 fn build_draft<'index>(
@@ -68,20 +71,23 @@ fn build_draft<'index>(
     index: &AttributeIndex,
 ) -> Result<SingletonDraft<'index>, ContainerError> {
     let item = matched.item();
-    let ItemKind::Struct(shape) = item.kind() else {
-        return Err(ContainerError::NotASingletonStruct {
-            path: item.canonical_path().to_string(),
-        });
+    let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
+        (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
+        _ => {
+            return Err(ContainerError::NotASingletonStruct {
+                path: item.canonical_path().to_string(),
+            });
+        }
     };
 
     let concrete_path = item.canonical_path().clone();
+    let field_name = identifier.field().to_string();
     let ManagedArguments {
         collection,
         provides,
     } = ManagedArguments::parse(matched.args()?)?;
     let provided = resolve_provided(index, item, provides.as_ref(), &concrete_path)?;
 
-    let field_name = index.field_name(&concrete_path).to_string();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
     let collection = resolve_collection(index, item, collection.as_ref(), &concrete_path)?;
 
@@ -145,12 +151,12 @@ fn resolve_direct(
     item: &IndexedItem,
     source: ConstructionSource,
     concrete_path: &CanonicalPath,
-    provider_keys: &HashSet<CanonicalPath>,
+    provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
 ) -> Result<DirectConstruction, ContainerError> {
     match source {
         ConstructionSource::Constructor(constructor) => {
             let dependencies =
-                resolve_dependencies(index, item, concrete_path, constructor, provider_keys)?;
+                resolve_dependencies(index, item, concrete_path, constructor, provided_keys)?;
 
             Ok(DirectConstruction::Constructor {
                 dependencies,
@@ -167,7 +173,7 @@ fn resolve_dependencies(
     item: &IndexedItem,
     concrete_path: &CanonicalPath,
     constructor: &IndexedMethod,
-    provider_keys: &HashSet<CanonicalPath>,
+    provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
 ) -> Result<Vec<DependencyKind>, ContainerError> {
     let mut dependencies = Vec::new();
 
@@ -196,7 +202,7 @@ fn resolve_dependencies(
             target,
             concrete_path,
             &parameter,
-            provider_keys,
+            provided_keys,
         )?);
     }
 
@@ -209,13 +215,13 @@ fn resolve_target(
     target: RawTarget,
     concrete_path: &CanonicalPath,
     parameter: &str,
-    provider_keys: &HashSet<CanonicalPath>,
+    provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
 ) -> Result<DependencyKind, ContainerError> {
     match target {
         RawTarget::Single(written) => {
             let provider_key = index
                 .resolve_item_path(item, &written)
-                .filter(|path| provider_keys.contains(path))
+                .filter(|path| provided_keys.contains_key(path))
                 .ok_or_else(|| missing_provider(concrete_path, parameter, &written))?;
 
             Ok(DependencyKind::Single { provider_key })
@@ -251,16 +257,15 @@ fn parameter_name(pattern: &Pat, position: usize) -> String {
 }
 
 fn singleton_selector() -> AttributeSelector {
-    AttributeSelector::parse("singleton").expect("the singleton selector is valid")
+    AttributeSelector::from_marker("singleton")
 }
 
 fn service_selector() -> AttributeSelector {
-    AttributeSelector::parse("service").expect("the service selector is valid")
+    AttributeSelector::from_marker("service")
 }
 
 fn scheduled_with_tick_timer_selector() -> AttributeSelector {
-    AttributeSelector::parse("scheduled_with_tick_timer")
-        .expect("the scheduled_with_tick_timer selector is valid")
+    AttributeSelector::from_marker("scheduled_with_tick_timer")
 }
 
 struct SingletonDraft<'index> {
@@ -272,15 +277,19 @@ struct SingletonDraft<'index> {
     provided: ProvidedType,
 }
 
+struct DraftedProviders<'index> {
+    drafts: Vec<SingletonDraft<'index>>,
+    provided_keys: HashMap<CanonicalPath, CanonicalPath>,
+}
+
 pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
-    let drafts = build_drafts(index)?;
-    let provider_keys: HashSet<CanonicalPath> = drafts
-        .iter()
-        .map(|draft| draft.provided.key().clone())
-        .collect();
+    let DraftedProviders {
+        drafts,
+        provided_keys,
+    } = build_drafts(index)?;
 
     let mut collections = CollectionTable::new();
-    let mut providers = Vec::new();
+    let mut providers = BTreeMap::new();
 
     for draft in drafts {
         let SingletonDraft {
@@ -292,19 +301,24 @@ pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, Contai
             provided,
         } = draft;
 
+        let provider_key = provided.key().clone();
+
         if let Some(trait_path) = collection {
-            collections.add(trait_path, provided.key().clone());
+            collections.add(trait_path, provider_key.clone());
         }
 
         let construction =
-            resolve_direct(index, item, construction, &concrete_path, &provider_keys)?;
+            resolve_direct(index, item, construction, &concrete_path, &provided_keys)?;
 
-        providers.push(Provider {
-            concrete_path,
-            construction,
-            field_name,
-            provided,
-        });
+        providers.insert(
+            provider_key,
+            Provider {
+                concrete_path,
+                construction,
+                field_name,
+                provided,
+            },
+        );
     }
 
     Ok(ContainerPlan {

@@ -17,6 +17,7 @@ pub struct JwksRoller {
 
 impl JwksRoller {
     #[constructor]
+    #[must_use]
     pub fn create(jwks_rolling: Arc<JwksRolling>) -> Self {
         Self { jwks_rolling }
     }

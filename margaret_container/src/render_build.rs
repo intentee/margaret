@@ -17,6 +17,7 @@ pub(crate) fn render_build(plan: &ContainerPlan) -> TokenStream {
     let initializers = ordered.iter().copied().map(field_initializer);
 
     quote! {
+        #[must_use]
         pub fn build() -> super::Container {
             super::Container {
                 #(#initializers,)*

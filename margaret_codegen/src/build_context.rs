@@ -4,6 +4,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 
 use crate::capabilities::Capabilities;
+use crate::codegen_error::CodegenError;
 use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
 use crate::umbrella::umbrella;
@@ -39,12 +40,12 @@ impl<'index> BuildContext<'index> {
         self.index
     }
 
-    pub(crate) fn into_generated_code(self) -> GeneratedCode {
-        let mut modules = format_pass(self.module_tokens);
+    pub(crate) fn into_generated_code(self) -> Result<GeneratedCode, CodegenError> {
+        let mut modules = format_pass(self.module_tokens)?;
 
         modules.push(umbrella(self.capabilities));
 
-        GeneratedCode::new(modules)
+        Ok(GeneratedCode::new(modules))
     }
 
     #[cfg(test)]
@@ -66,5 +67,40 @@ impl<'index> BuildContext<'index> {
 
     pub(crate) fn set_servers(&mut self, servers: Vec<HttpServer>) {
         self.servers = servers;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use quote::quote;
+    use tempfile::tempdir;
+
+    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+
+    use super::BuildContext;
+
+    #[test]
+    fn rejects_a_generated_module_that_is_not_a_valid_file() {
+        let directory = tempdir().expect("a temporary crate directory");
+        let source = directory.path().join("src");
+        fs::create_dir_all(&source).expect("the src directory exists");
+        fs::write(source.join("lib.rs"), "").expect("lib.rs is written");
+
+        let index = AttributeIndexBuilder::new()
+            .index_crate(&CrateRoot::new("crate", source))
+            .expect("the crate is indexed")
+            .build();
+        let mut context = BuildContext::new(&index);
+        context.extend_modules(vec![GeneratedModuleTokens::new("broken", quote! { fn })]);
+
+        let error = context
+            .into_generated_code()
+            .expect_err("an invalid generated module is rejected");
+
+        assert!(error.to_string().contains("failed to format a generated module"));
     }
 }

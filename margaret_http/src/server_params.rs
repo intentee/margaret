@@ -37,18 +37,22 @@ impl ServerParams {
         }
     }
 
+    #[must_use]
     pub fn method(&self) -> &str {
         self.method.as_str()
     }
 
+    #[must_use]
     pub fn path(&self) -> &str {
         &self.path
     }
 
+    #[must_use]
     pub fn query_string(&self) -> &str {
         &self.query_string
     }
 
+    #[must_use]
     pub fn remote_addr(&self) -> SocketAddr {
         self.remote_addr
     }

@@ -10,6 +10,7 @@ pub struct NameAllocator {
 }
 
 impl NameAllocator {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

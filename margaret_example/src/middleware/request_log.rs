@@ -19,6 +19,7 @@ pub struct RequestLog {
 
 impl RequestLog {
     #[constructor]
+    #[must_use]
     pub fn create(sinks: Vec<Arc<dyn LogSink>>) -> Self {
         Self { sinks }
     }

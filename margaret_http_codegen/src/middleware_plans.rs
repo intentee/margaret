@@ -17,17 +17,17 @@ pub(crate) fn middleware_plans(
     index: &AttributeIndex,
 ) -> Result<Vec<MiddlewarePlan>, HttpCodegenError> {
     let selector =
-        AttributeSelector::parse("handles_middleware_attribute").expect("a valid selector");
+        AttributeSelector::from_marker("handles_middleware_attribute");
     let mut plans = Vec::new();
 
     for matched in index.select(&selector) {
         let item = matched.item();
 
-        if !item.kind().is_struct() {
+        let Some(identifier) = index.struct_identifier(item.canonical_path()) else {
             return Err(HttpCodegenError::HttpMiddlewareNotOnStruct {
                 target: item.canonical_path().to_string(),
             });
-        }
+        };
 
         let middleware = item.canonical_path().to_string();
         let MiddlewareAttributeArguments { handles } =
@@ -64,10 +64,10 @@ pub(crate) fn middleware_plans(
         plans.push(MiddlewarePlan {
             arguments,
             concrete: item.canonical_path().clone(),
-            field: format_ident!("{}", index.field_name(item.canonical_path())),
+            field: format_ident!("{}", identifier.field()),
             injects_routes,
             selector: AttributeSelector::from_path(handles),
-            wrapper: format_ident!("{}", index.type_name(item.canonical_path())),
+            wrapper: format_ident!("{}", identifier.type_name()),
         });
     }
 

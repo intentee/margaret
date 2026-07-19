@@ -16,6 +16,7 @@ pub struct GetHealth {
 
 impl GetHealth {
     #[constructor]
+    #[must_use]
     pub fn create(config: Arc<Config>) -> Self {
         Self { config }
     }

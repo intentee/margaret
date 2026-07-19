@@ -19,6 +19,7 @@ pub struct GetFarewellCard {
 
 impl GetFarewellCard {
     #[constructor]
+    #[must_use]
     pub fn create(config: Arc<Config>) -> Self {
         Self { config }
     }

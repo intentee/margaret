@@ -101,7 +101,7 @@ fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream 
 fn dependency_expression(dependency: &DependencyKind, plan: &ContainerPlan) -> TokenStream {
     match dependency {
         DependencyKind::Single { provider_key } => {
-            let accessor = field_ident(provider_by_key(plan, provider_key));
+            let accessor = field_ident(&plan.providers[provider_key]);
 
             access(&accessor)
         }
@@ -110,8 +110,8 @@ fn dependency_expression(dependency: &DependencyKind, plan: &ContainerPlan) -> T
                 .collections
                 .members_of(trait_path)
                 .iter()
-                .map(|member| {
-                    let accessor = field_ident(provider_by_key(plan, member));
+                .map(|member_key| {
+                    let accessor = field_ident(&plan.providers[member_key]);
 
                     access(&accessor)
                 });
@@ -123,13 +123,6 @@ fn dependency_expression(dependency: &DependencyKind, plan: &ContainerPlan) -> T
 
 fn access(accessor: &Ident) -> TokenStream {
     quote! { self.#accessor().await }
-}
-
-fn provider_by_key<'plan>(plan: &'plan ContainerPlan, key: &CanonicalPath) -> &'plan Provider {
-    plan.providers
-        .iter()
-        .find(|provider| provider.provided.key() == key)
-        .expect("a resolved key maps to a provider")
 }
 
 pub(crate) fn render(plan: &ContainerPlan) -> TokenStream {

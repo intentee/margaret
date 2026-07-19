@@ -9,6 +9,7 @@ pub struct ForwardTargets {
 }
 
 impl ForwardTargets {
+    #[must_use]
     pub fn new(targets: Vec<NamedHandler>) -> Self {
         let by_name = targets
             .into_iter()

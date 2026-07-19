@@ -1,3 +1,4 @@
+#[must_use]
 pub fn is_snake_case_identifier(name: &str) -> bool {
     syn::parse_str::<syn::Ident>(name).is_ok()
         && !name.chars().any(|character| character.is_ascii_uppercase())

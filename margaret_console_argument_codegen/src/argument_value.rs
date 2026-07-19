@@ -13,6 +13,7 @@ fn value_expression(id: &str, required: bool, value_type: &Type) -> TokenStream 
     }
 }
 
+#[must_use]
 pub fn argument_value(argument: &ConsoleArgument) -> TokenStream {
     match argument {
         ConsoleArgument::Flag { name } => quote! { matches.get_flag(#name) },

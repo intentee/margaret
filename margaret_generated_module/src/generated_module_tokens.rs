@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 
 use crate::generated_module::GeneratedModule;
+use crate::generated_module_error::GeneratedModuleError;
 
 #[derive(Debug)]
 pub struct GeneratedModuleTokens {
@@ -16,17 +17,23 @@ impl GeneratedModuleTokens {
         }
     }
 
-    pub fn format(self) -> GeneratedModule {
-        let file = syn::parse2::<syn::File>(self.tokens)
-            .expect("the generated tokens form a valid Rust file");
+    pub fn format(self) -> Result<GeneratedModule, GeneratedModuleError> {
+        let file = syn::parse2::<syn::File>(self.tokens).map_err(|source| {
+            GeneratedModuleError::InvalidGeneratedFile {
+                name: self.name.clone(),
+                source,
+            }
+        })?;
 
-        GeneratedModule::new(self.name, prettyplease::unparse(&file))
+        Ok(GeneratedModule::new(self.name, prettyplease::unparse(&file)))
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn to_source(&self) -> String {
         self.tokens.to_string()
     }
@@ -40,11 +47,21 @@ mod tests {
 
     #[test]
     fn formats_tokens_into_pretty_source() {
-        let generated =
-            GeneratedModuleTokens::new("sample", quote! { pub fn answer() -> u8 { 42 } }).format();
+        let generated = GeneratedModuleTokens::new("sample", quote! { pub fn answer() -> u8 { 42 } })
+            .format()
+            .expect("the tokens form a valid file");
 
         assert_eq!(generated.name(), "sample");
         assert_eq!(generated.source(), "pub fn answer() -> u8 {\n    42\n}\n");
+    }
+
+    #[test]
+    fn reports_tokens_that_are_not_a_valid_rust_file() {
+        let error = GeneratedModuleTokens::new("broken", quote! { fn })
+            .format()
+            .expect_err("invalid tokens are rejected");
+
+        assert!(error.to_string().contains("do not form a valid Rust file"));
     }
 
     #[test]

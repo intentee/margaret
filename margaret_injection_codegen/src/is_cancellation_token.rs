@@ -12,6 +12,7 @@ fn cancellation_token_path() -> CanonicalPath {
     ])
 }
 
+#[must_use]
 pub fn is_cancellation_token(index: &AttributeIndex, item: &IndexedItem, declared: &Type) -> bool {
     !matches!(declared, Type::Reference(_))
         && index.resolve_item_type(item, declared) == Some(cancellation_token_path())

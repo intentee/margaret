@@ -16,6 +16,7 @@ pub struct GetWellKnownJwks {
 
 impl GetWellKnownJwks {
     #[constructor]
+    #[must_use]
     pub fn create(jwks_rolling: Arc<JwksRolling>) -> Self {
         Self { jwks_rolling }
     }

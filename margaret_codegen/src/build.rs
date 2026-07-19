@@ -20,7 +20,7 @@ pub fn build(crate_root: &CrateRoot) -> Result<GeneratedCode, CodegenError> {
     services_pass(&mut context)?;
     console_pass(&mut context)?;
 
-    Ok(context.into_generated_code())
+    context.into_generated_code()
 }
 
 #[cfg(test)]

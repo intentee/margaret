@@ -8,6 +8,7 @@ pub struct ServerRegistry {
 }
 
 impl ServerRegistry {
+    #[must_use]
     pub fn new(servers: Vec<Server>) -> Self {
         let by_name = servers
             .into_iter()
@@ -17,6 +18,7 @@ impl ServerRegistry {
         Self { by_name }
     }
 
+    #[must_use]
     pub fn server(&self, name: &str) -> Option<&Server> {
         self.by_name.get(name)
     }

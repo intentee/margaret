@@ -15,6 +15,7 @@ pub struct Metrics {
 
 impl Metrics {
     #[constructor]
+    #[must_use]
     pub fn create() -> Self {
         Self {
             signal: Arc::new(Notify::new()),
@@ -27,6 +28,7 @@ impl Metrics {
         self.signal.notify_one();
     }
 
+    #[must_use]
     pub fn sweeps(&self) -> usize {
         self.sweeps.load(Ordering::SeqCst)
     }

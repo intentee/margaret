@@ -27,22 +27,27 @@ impl UploadedFile {
         }
     }
 
+    #[must_use]
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
 
+    #[must_use]
     pub fn field_name(&self) -> &str {
         &self.field_name
     }
 
+    #[must_use]
     pub fn file_name(&self) -> &str {
         &self.file_name
     }
 
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
 
+    #[must_use]
     pub fn size(&self) -> u64 {
         self.size
     }

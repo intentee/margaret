@@ -9,15 +9,15 @@ use margaret_generated_module::generated_module::GeneratedModule;
 use crate::codegen_error::CodegenError;
 
 fn remove_stale_sources(directory: &Path, written: &BTreeSet<PathBuf>) -> Result<(), CodegenError> {
-    let entries = fs::read_dir(directory).map_err(|source| CodegenError::ReadDirectory {
-        path: directory.to_path_buf(),
-        source,
-    })?;
+    let entries: Vec<fs::DirEntry> = fs::read_dir(directory)
+        .and_then(Iterator::collect)
+        .map_err(|source| CodegenError::ReadDirectory {
+            path: directory.to_path_buf(),
+            source,
+        })?;
 
     for entry in entries {
-        let path = entry
-            .expect("a generated directory entry is readable")
-            .path();
+        let path = entry.path();
 
         if path.extension() == Some(OsStr::new("rs")) {
             if !written.contains(&path) {
@@ -40,10 +40,12 @@ pub struct GeneratedCode {
 }
 
 impl GeneratedCode {
+    #[must_use]
     pub fn new(modules: Vec<GeneratedModule>) -> Self {
         Self { modules }
     }
 
+    #[must_use]
     pub fn modules(&self) -> &[GeneratedModule] {
         &self.modules
     }
@@ -53,9 +55,7 @@ impl GeneratedCode {
 
         for module in &self.modules {
             let path = directory.join(format!("{}.rs", module.name()));
-            let parent = path
-                .parent()
-                .expect("a generated module path has a parent directory");
+            let parent = path.parent().unwrap_or(directory);
 
             fs::create_dir_all(parent).map_err(|source| CodegenError::CreateDirectory {
                 path: parent.to_path_buf(),

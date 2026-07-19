@@ -14,10 +14,12 @@ impl Default for BodyLimit {
 }
 
 impl BodyLimit {
+    #[must_use]
     pub fn new(max_bytes: u64) -> Self {
         Self { max_bytes }
     }
 
+    #[must_use]
     pub fn max_bytes(&self) -> u64 {
         self.max_bytes
     }

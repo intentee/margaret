@@ -17,6 +17,7 @@ pub struct Sweeper {
 
 impl Sweeper {
     #[constructor]
+    #[must_use]
     pub fn create(metrics: Arc<Metrics>) -> Self {
         Self { metrics }
     }

@@ -75,6 +75,7 @@ impl RunningMtlsServer {
         }
     }
 
+    #[must_use]
     pub fn address(&self) -> SocketAddr {
         self.address
     }

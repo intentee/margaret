@@ -16,10 +16,12 @@ impl GeneratedModule {
         }
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }

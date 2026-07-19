@@ -6,33 +6,33 @@ use crate::url_segment::UrlSegment;
 
 pub struct ForwardableRoute {
     origin: Arc<str>,
-    segments: &'static [UrlSegment],
-    values: Vec<String>,
+    segments: Vec<UrlSegment>,
 }
 
 impl ForwardableRoute {
-    pub fn new(origin: Arc<str>, segments: &'static [UrlSegment], values: Vec<String>) -> Self {
-        Self {
-            origin,
-            segments,
-            values,
-        }
+    #[must_use]
+    pub fn new(origin: Arc<str>, segments: Vec<UrlSegment>) -> Self {
+        Self { origin, segments }
     }
 
+    #[must_use]
     pub fn permanent_redirect(&self) -> Redirect {
         Redirect::permanent(self.url())
     }
 
+    #[must_use]
     pub fn see_other(&self) -> Redirect {
         Redirect::see_other(self.url())
     }
 
+    #[must_use]
     pub fn temporary_redirect(&self) -> Redirect {
         Redirect::temporary(self.url())
     }
 
+    #[must_use]
     pub fn url(&self) -> String {
-        build_url(&self.origin, self.segments, &self.values)
+        build_url(&self.origin, &self.segments)
     }
 }
 
@@ -41,16 +41,19 @@ mod tests {
     use std::sync::Arc;
 
     use super::ForwardableRoute;
+    use crate::url_parameter::UrlParameter;
     use crate::url_segment::UrlSegment;
 
     fn article_route() -> ForwardableRoute {
         ForwardableRoute::new(
             Arc::from("http://localhost"),
-            &[
+            vec![
                 UrlSegment::Literal("/articles/"),
-                UrlSegment::Parameter("article"),
+                UrlSegment::Parameter(UrlParameter {
+                    name: "article",
+                    value: "rust".to_string(),
+                }),
             ],
-            vec!["rust".to_string()],
         )
     }
 

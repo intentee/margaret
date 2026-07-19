@@ -10,11 +10,7 @@ fn option_inner(declared: &Type) -> Option<&Type> {
         .path
         .segments
         .last()
-        .expect("a type path has at least one segment");
-
-    if segment.ident != "Option" {
-        return None;
-    }
+        .filter(|segment| segment.ident == "Option")?;
 
     let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
         return None;

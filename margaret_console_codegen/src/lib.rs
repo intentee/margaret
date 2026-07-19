@@ -90,6 +90,7 @@ impl Farewell {
         render_console(&index_for(lib_source), has_http, &servers, &[])
             .expect("the console source is generated")
             .format()
+            .expect("the module formats")
             .source()
             .split_whitespace()
             .collect()
@@ -166,6 +167,7 @@ impl Farewell {
         )
         .expect("the console source is generated")
         .format()
+        .expect("the module formats")
         .source()
         .split_whitespace()
         .collect();
@@ -205,6 +207,7 @@ impl Farewell {
         )
         .expect("the console source is generated")
         .format()
+        .expect("the module formats")
         .source()
         .split_whitespace()
         .collect();
@@ -224,6 +227,7 @@ impl Farewell {
         let source: String = render_console(&index_for("struct App;\n"), true, &[], &[])
             .expect("the console source is generated")
             .format()
+            .expect("the module formats")
             .source()
             .split_whitespace()
             .collect();

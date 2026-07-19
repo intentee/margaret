@@ -149,6 +149,9 @@ pub enum HttpCodegenError {
     )]
     HttpRouteParameterBinderModel { binder: String },
 
+    #[error("#[provides_route_parameter] is only supported on structs, but '{binder}' is not a struct")]
+    HttpRouteParameterBinderNotAStruct { binder: String },
+
     #[error("model '{model}' has more than one route parameter binder: '{first}' and '{second}'")]
     AmbiguousHttpRouteParameterBinder {
         model: String,

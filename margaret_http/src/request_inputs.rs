@@ -465,6 +465,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rejects_a_multipart_part_without_a_name() {
+        let directory = tempdir().expect("a temporary directory");
+        let message = parse_inputs(
+            Some("multipart/form-data; boundary=X"),
+            "/upload",
+            b"--X\r\nContent-Disposition: form-data\r\n\r\nhello\r\n--X--\r\n",
+            &upload_in(&directory),
+        )
+        .await
+        .err()
+        .unwrap()
+        .to_string();
+
+        assert!(message.contains("missing its Content-Disposition name"));
+    }
+
+    #[tokio::test]
     async fn rejects_an_oversized_multipart_stream() {
         let directory = tempdir().expect("a temporary directory");
         let message = parse_inputs_with_limit(

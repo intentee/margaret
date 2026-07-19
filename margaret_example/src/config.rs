@@ -8,12 +8,14 @@ pub struct Config {
 
 impl Config {
     #[constructor]
+    #[must_use]
     pub fn create() -> Self {
         Self {
             app_name: "margaret".to_string(),
         }
     }
 
+    #[must_use]
     pub fn app_name(&self) -> &str {
         &self.app_name
     }

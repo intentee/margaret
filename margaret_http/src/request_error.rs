@@ -37,6 +37,9 @@ pub enum RequestError {
     #[error("the multipart request is missing its Content-Type boundary")]
     MissingMultipartBoundary,
 
+    #[error("a multipart request part is missing its Content-Disposition name")]
+    NamelessMultipartField,
+
     #[error("the request body exceeds the {limit} byte upload limit")]
     PayloadTooLarge { limit: u64 },
 

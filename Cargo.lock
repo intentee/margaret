@@ -1251,6 +1251,7 @@ dependencies = [
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_service_codegen",
+ "quote",
  "tempfile",
  "thiserror",
 ]
@@ -1358,6 +1359,7 @@ dependencies = [
  "quote",
  "syn",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]

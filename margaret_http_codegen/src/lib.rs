@@ -28,6 +28,7 @@ mod responder_method;
 mod responder_selectors;
 mod route_group;
 mod route_parameter_arguments;
+mod route_parameter_binder;
 mod route_path;
 mod route_url_template;
 mod server_route_group;
@@ -63,7 +64,7 @@ mod tests {
             .into_modules()
             .into_iter()
             .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
-            .map(|module| module.format().source().to_string())
+            .map(|module| module.format().expect("the module formats").source().to_string())
             .collect::<Vec<String>>()
             .join("\n"))
     }
@@ -217,7 +218,7 @@ impl Echo {
             .into_modules()
             .into_iter()
             .filter(|module| module.name() == "routes" || module.name().starts_with("routes/"))
-            .map(|module| module.format().source().to_string())
+            .map(|module| module.format().expect("the module formats").source().to_string())
             .collect::<Vec<String>>()
             .join("\n")
             .split_whitespace()
@@ -254,7 +255,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             source.contains("pubget_greeting:margaret_http::forwardable_route::ForwardableRoute,")
         );
         assert!(source.contains(
-            "get_greeting:margaret_http::forwardable_route::ForwardableRoute::new(origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/greeting\")],::std::vec::Vec::new(),)"
+            "get_greeting:margaret_http::forwardable_route::ForwardableRoute::new(origin.clone(),::std::vec::Vec::from([margaret_http::url_segment::UrlSegment::Literal(\"/greeting\"),]),)"
         ));
     }
 
@@ -266,7 +267,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "pubfnget_article(&self,article:String,)->margaret_http::forwardable_route::ForwardableRoute"
         ));
         assert!(source.contains(
-            "margaret_http::forwardable_route::ForwardableRoute::new(self.origin.clone(),&[margaret_http::url_segment::UrlSegment::Literal(\"/articles/\"),margaret_http::url_segment::UrlSegment::Parameter(\"article\"),],::std::vec::Vec::from([article]),)"
+            "margaret_http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret_http::url_segment::UrlSegment::Literal(\"/articles/\"),margaret_http::url_segment::UrlSegment::Parameter(margaret_http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
         ));
         assert!(!source.contains("Params"));
     }
@@ -607,6 +608,15 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         );
 
         assert!(message.contains("more than one route parameter binder"));
+    }
+
+    #[test]
+    fn rejects_a_non_struct_route_parameter_binder() {
+        let message = error_for(
+            "struct User;\n\n#[provides_route_parameter]\nenum Binder {}\nimpl HttpRouteParameterBinder for Binder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n",
+        );
+
+        assert!(message.contains("is only supported on structs"));
     }
 
     #[test]
