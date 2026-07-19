@@ -13,7 +13,7 @@ pub fn render_http(index: &AttributeIndex) -> Result<HttpArtifacts, HttpCodegenE
     let middleware_plans = middleware_plans(index)?;
     let table = http_routes(index, &middleware_plans)?;
     let servers = active_servers(&table);
-    let mut modules = render(&table, &servers, &middleware_plans, index);
+    let mut modules = render(&table, &servers, &middleware_plans);
 
     modules.extend(render_routes(&table, &servers));
     modules.extend(render_forwarders(&table, &servers));

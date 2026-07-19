@@ -9,12 +9,14 @@ use margaret_generated_module::generated_module::GeneratedModule;
 use crate::codegen_error::CodegenError;
 
 fn remove_stale_sources(directory: &Path, written: &BTreeSet<PathBuf>) -> Result<(), CodegenError> {
-    let entries = fs::read_dir(directory).map_err(|source| CodegenError::ReadDirectory {
-        path: directory.to_path_buf(),
-        source,
-    })?;
+    let entries: Vec<fs::DirEntry> = fs::read_dir(directory)
+        .and_then(Iterator::collect)
+        .map_err(|source| CodegenError::ReadDirectory {
+            path: directory.to_path_buf(),
+            source,
+        })?;
 
-    for entry in entries.flatten() {
+    for entry in entries {
         let path = entry.path();
 
         if path.extension() == Some(OsStr::new("rs")) {

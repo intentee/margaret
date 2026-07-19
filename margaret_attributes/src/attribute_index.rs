@@ -21,7 +21,6 @@ pub struct AttributeIndex {
     imports: HashMap<CanonicalPath, ModuleImports>,
     item_paths: HashSet<CanonicalPath>,
     items: Vec<IndexedItem>,
-    struct_paths: HashSet<CanonicalPath>,
     trait_paths: HashSet<CanonicalPath>,
 }
 
@@ -48,15 +47,12 @@ impl AttributeIndex {
         imports: HashMap<CanonicalPath, ModuleImports>,
     ) -> Self {
         let mut item_paths = HashSet::new();
-        let mut struct_paths = HashSet::new();
         let mut trait_paths = HashSet::new();
 
         for item in &items {
             item_paths.insert(item.canonical_path().clone());
 
-            if item.kind().is_struct() {
-                struct_paths.insert(item.canonical_path().clone());
-            } else if item.kind() == ItemKind::Trait {
+            if item.kind() == ItemKind::Trait {
                 trait_paths.insert(item.canonical_path().clone());
             }
         }
@@ -67,16 +63,8 @@ impl AttributeIndex {
             imports,
             item_paths,
             items,
-            struct_paths,
             trait_paths,
         }
-    }
-
-    #[must_use]
-    pub fn field_name(&self, path: &CanonicalPath) -> String {
-        self.identifiers
-            .get(path)
-            .map_or_else(String::new, |identifier| identifier.field().to_string())
     }
 
     #[must_use]
@@ -85,11 +73,6 @@ impl AttributeIndex {
             .iter()
             .flat_map(|item| item.attributes())
             .any(|attribute| selector.matches(attribute.path()))
-    }
-
-    #[must_use]
-    pub fn is_indexed_struct(&self, path: &CanonicalPath) -> bool {
-        self.struct_paths.contains(path)
     }
 
     #[must_use]
@@ -136,10 +119,8 @@ impl AttributeIndex {
     }
 
     #[must_use]
-    pub fn type_name(&self, path: &CanonicalPath) -> String {
-        self.identifiers
-            .get(path)
-            .map_or_else(String::new, |identifier| identifier.type_name().to_string())
+    pub fn struct_identifier(&self, path: &CanonicalPath) -> Option<&Identifier> {
+        self.identifiers.get(path)
     }
 
     fn imports_of(&self, item: &IndexedItem) -> &ModuleImports {
@@ -152,31 +133,5 @@ impl AttributeIndex {
         let segments = item.canonical_path().segments();
 
         &segments[..segments.len().saturating_sub(1)]
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-
-    use crate::attribute_index::AttributeIndex;
-    use crate::canonical_path::CanonicalPath;
-
-    fn unindexed_path() -> CanonicalPath {
-        CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
-    }
-
-    #[test]
-    fn field_name_is_empty_for_an_unindexed_path() {
-        let index = AttributeIndex::new(Vec::new(), HashMap::new());
-
-        assert_eq!(index.field_name(&unindexed_path()), "");
-    }
-
-    #[test]
-    fn type_name_is_empty_for_an_unindexed_path() {
-        let index = AttributeIndex::new(Vec::new(), HashMap::new());
-
-        assert_eq!(index.type_name(&unindexed_path()), "");
     }
 }

@@ -21,6 +21,7 @@ use crate::responder_argument::ResponderArgument;
 use crate::responder_argument_binding::ResponderArgumentBinding;
 use crate::responder_selectors::ResponderSelectors;
 use crate::route_parameter_arguments::RouteParameterArguments;
+use crate::route_parameter_binder::RouteParameterBinder;
 
 fn classify(
     index: &AttributeIndex,
@@ -28,7 +29,7 @@ fn classify(
     responder: &str,
     arguments: RouteParameterArguments,
     declared: &Type,
-    binders: &HashMap<CanonicalPath, CanonicalPath>,
+    binders: &HashMap<CanonicalPath, RouteParameterBinder>,
 ) -> Result<ResponderArgumentBinding, HttpCodegenError> {
     let RouteParameterArguments { from } = arguments;
     let resolved = index.resolve_item_type(item, declared);
@@ -43,7 +44,7 @@ fn classify(
         parameter: from.clone(),
         written: written.clone(),
     })?;
-    let binder = binders.get(&model).cloned().ok_or_else(|| {
+    let binder = binders.get(&model).ok_or_else(|| {
         HttpCodegenError::MissingHttpRouteParameterBinder {
             responder: responder.to_string(),
             parameter: from.clone(),
@@ -52,7 +53,7 @@ fn classify(
     })?;
 
     Ok(ResponderArgumentBinding::Bound {
-        binder,
+        binder_field: binder.field.clone(),
         path_key: from,
     })
 }
@@ -106,7 +107,7 @@ pub(crate) fn responder_method(
     item: &IndexedItem,
     responder: &str,
     server: &str,
-    binders: &HashMap<CanonicalPath, CanonicalPath>,
+    binders: &HashMap<CanonicalPath, RouteParameterBinder>,
     selectors: &ResponderSelectors,
 ) -> Result<Vec<ResponderArgument>, HttpCodegenError> {
     let method = process_method(item)?;

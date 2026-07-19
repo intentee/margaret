@@ -17,6 +17,14 @@ fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
     }
 }
 
+fn rooted(prefix: &[String], rest: &[String]) -> CanonicalPath {
+    let mut segments = prefix.to_vec();
+
+    segments.extend(rest.iter().cloned());
+
+    CanonicalPath::new(segments)
+}
+
 #[must_use]
 pub fn resolve_path(
     path: &Path,
@@ -29,25 +37,37 @@ pub fn resolve_path(
         .iter()
         .map(|segment| segment.ident.to_string())
         .collect();
-    let leaf = segments.last()?;
+    let (leading, trailing) = segments.split_first()?;
 
-    if segments.len() > 1 {
+    if leading == "crate" {
         return Some(CanonicalPath::new(segments));
     }
 
-    if let Some(imported) = imports.resolve(leaf) {
-        return Some(imported.clone());
+    if leading == "self" {
+        return Some(rooted(module_path, trailing));
     }
 
-    let mut local_segments = module_path.to_vec();
-    local_segments.push(leaf.clone());
-    let local = CanonicalPath::new(local_segments);
+    if leading == "super" {
+        let parent = &module_path[..module_path.len().saturating_sub(1)];
+
+        return Some(rooted(parent, trailing));
+    }
+
+    if let Some(imported) = imports.resolve(leading) {
+        return Some(rooted(imported.segments(), trailing));
+    }
+
+    let local = rooted(module_path, &segments);
 
     if item_paths.contains(&local) {
         return Some(local);
     }
 
-    prelude_path(leaf)
+    if !trailing.is_empty() {
+        return Some(CanonicalPath::new(segments));
+    }
+
+    prelude_path(leading)
 }
 
 #[cfg(test)]
@@ -205,6 +225,88 @@ mod tests {
         assert_eq!(
             resolved(empty, &["crate"], &ModuleImports::default(), &HashSet::new()),
             None
+        );
+    }
+
+    #[test]
+    fn resolves_a_crate_rooted_multi_segment_path_as_written() {
+        assert_eq!(
+            resolved(
+                parse_quote!(crate::greeter::Greeter),
+                &["crate", "routes"],
+                &ModuleImports::default(),
+                &HashSet::new()
+            ),
+            Some("crate::greeter::Greeter".to_string())
+        );
+    }
+
+    #[test]
+    fn an_imported_module_prefix_canonicalizes_to_the_direct_spelling() {
+        let mut imports = ModuleImports::default();
+        imports.insert("greeter".to_string(), path(&["crate", "greeter"]));
+
+        let direct = resolved(
+            parse_quote!(crate::greeter::Greeter),
+            &["crate"],
+            &ModuleImports::default(),
+            &HashSet::new(),
+        );
+        let aliased = resolved(parse_quote!(greeter::Greeter), &["crate"], &imports, &HashSet::new());
+
+        assert_eq!(aliased, direct);
+        assert_eq!(aliased, Some("crate::greeter::Greeter".to_string()));
+    }
+
+    #[test]
+    fn a_module_alias_canonicalizes_to_the_underlying_module() {
+        let mut imports = ModuleImports::default();
+        imports.insert("g".to_string(), path(&["crate", "greeter"]));
+
+        assert_eq!(
+            resolved(parse_quote!(g::Greeter), &["crate"], &imports, &HashSet::new()),
+            Some("crate::greeter::Greeter".to_string())
+        );
+    }
+
+    #[test]
+    fn resolves_a_self_prefixed_path_against_the_current_module() {
+        assert_eq!(
+            resolved(
+                parse_quote!(self::User),
+                &["crate", "models"],
+                &ModuleImports::default(),
+                &HashSet::new()
+            ),
+            Some("crate::models::User".to_string())
+        );
+    }
+
+    #[test]
+    fn resolves_a_super_prefixed_path_against_the_parent_module() {
+        assert_eq!(
+            resolved(
+                parse_quote!(super::Shared),
+                &["crate", "models", "user"],
+                &ModuleImports::default(),
+                &HashSet::new()
+            ),
+            Some("crate::models::Shared".to_string())
+        );
+    }
+
+    #[test]
+    fn resolves_a_relative_submodule_path_against_the_current_module() {
+        let items = HashSet::from([path(&["crate", "models", "user", "User"])]);
+
+        assert_eq!(
+            resolved(
+                parse_quote!(user::User),
+                &["crate", "models"],
+                &ModuleImports::default(),
+                &items
+            ),
+            Some("crate::models::user::User".to_string())
         );
     }
 }

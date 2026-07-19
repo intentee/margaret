@@ -28,6 +28,7 @@ pub(crate) fn http_routes(
         index,
         "provides_route_parameter",
         "Model",
+        |binder| HttpCodegenError::HttpRouteParameterBinderNotAStruct { binder },
         |binder| HttpCodegenError::HttpRouteParameterBinderModel { binder },
         |model, first, second| HttpCodegenError::AmbiguousHttpRouteParameterBinder {
             model,
@@ -43,11 +44,11 @@ pub(crate) fn http_routes(
     for matched in index.select(&selector) {
         let item = matched.item();
 
-        if !item.kind().is_struct() {
+        let Some(identifier) = index.struct_identifier(item.canonical_path()) else {
             return Err(HttpCodegenError::RespondsToHttpNotOnStruct {
                 target: item.canonical_path().to_string(),
             });
-        }
+        };
 
         let responder = item.canonical_path().to_string();
         let HttpResponderArguments {
@@ -139,7 +140,7 @@ pub(crate) fn http_routes(
                 layers,
                 method,
                 name,
-                responder_field: format_ident!("{}", index.field_name(item.canonical_path())),
+                responder_field: format_ident!("{}", identifier.field()),
                 responder_path: item.canonical_path().clone(),
                 arguments,
                 server,

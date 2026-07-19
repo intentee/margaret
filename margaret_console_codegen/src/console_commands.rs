@@ -34,16 +34,16 @@ pub(crate) fn console_commands(
     for matched in index.select(&selector("console_command")) {
         let item = matched.item();
 
-        if !item.kind().is_struct() {
+        let Some(identifier) = index.struct_identifier(item.canonical_path()) else {
             return Err(ConsoleCodegenError::ConsoleCommandNotOnStruct {
                 target: item.canonical_path().to_string(),
             });
-        }
+        };
 
         let command = item.canonical_path().to_string();
         let ConsoleCommandArguments { name, description } =
             ConsoleCommandArguments::parse(matched.args()?, &command)?;
-        let accessor = format_ident!("{}", index.field_name(item.canonical_path()));
+        let accessor = format_ident!("{}", identifier.field());
         let runner = process_method(item)?;
         let arguments = process_arguments(
             index,

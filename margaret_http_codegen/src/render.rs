@@ -5,7 +5,6 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
@@ -57,11 +56,11 @@ fn handler_binding(route: &HttpRoute) -> Ident {
     format_ident!("{}_handler", route.responder_field)
 }
 
-fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
+fn onion(route: &HttpRoute) -> TokenStream {
     let responder = &route.responder_field;
     let responder_type = path_tokens(&route.responder_path);
     let responder_access = access(quote! { container.#responder() });
-    let captures = capture_fields(route, index);
+    let captures = capture_fields(route);
 
     let mut allocator = NameAllocator::new();
 
@@ -93,7 +92,7 @@ fn onion(route: &HttpRoute, index: &AttributeIndex) -> TokenStream {
     let bindings = route
         .arguments
         .iter()
-        .map(|argument| argument_binding(argument, &request_binding, index));
+        .map(|argument| argument_binding(argument, &request_binding));
     let server = format_ident!("{}", route.server);
     let argument_values = route
         .arguments
@@ -199,11 +198,7 @@ fn argument_value(
     }
 }
 
-fn argument_binding(
-    argument: &ResponderArgument,
-    request: &Ident,
-    index: &AttributeIndex,
-) -> TokenStream {
+fn argument_binding(argument: &ResponderArgument, request: &Ident) -> TokenStream {
     let holder = &argument.holder;
 
     match &argument.binding {
@@ -240,8 +235,11 @@ fn argument_binding(
                 };
             }
         }
-        ResponderArgumentBinding::Bound { binder, path_key } => {
-            let binder_field = format_ident!("{}", index.field_name(binder));
+        ResponderArgumentBinding::Bound {
+            binder_field,
+            path_key,
+        } => {
+            let binder_field = format_ident!("{}", binder_field);
 
             quote! {
                 let #holder = match margaret_http::require_bound_route_parameter::require_bound_route_parameter(
@@ -278,12 +276,12 @@ fn argument_binding(
     }
 }
 
-fn capture_fields(route: &HttpRoute, index: &AttributeIndex) -> Vec<Ident> {
+fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
     let mut fields: BTreeSet<String> = BTreeSet::new();
 
     for argument in &route.arguments {
-        if let ResponderArgumentBinding::Bound { binder, .. } = &argument.binding {
-            fields.insert(index.field_name(binder).to_string());
+        if let ResponderArgumentBinding::Bound { binder_field, .. } = &argument.binding {
+            fields.insert(binder_field.clone());
         }
     }
 
@@ -345,11 +343,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     }
 }
 
-fn server_module(
-    table: &HttpRouteTable,
-    server: &HttpServer,
-    index: &AttributeIndex,
-) -> TokenStream {
+fn server_module(table: &HttpRouteTable, server: &HttpServer) -> TokenStream {
     let function_name = server.function_name();
     let server_routes: Vec<&HttpRoute> = table
         .route_groups(server.name())
@@ -366,7 +360,7 @@ fn server_module(
         .filter(|route| route.name.is_some())
         .map(|route| {
             let binding = handler_binding(route);
-            let handler = onion(route, index);
+            let handler = onion(route);
 
             quote! { let #binding = #handler; }
         });
@@ -380,7 +374,7 @@ fn server_module(
 
                 quote! { #binding.clone() }
             } else {
-                onion(route, index)
+                onion(route)
             };
 
             quote! {
@@ -425,7 +419,6 @@ pub(crate) fn render(
     table: &HttpRouteTable,
     servers: &[HttpServer],
     middleware_plans: &[MiddlewarePlan],
-    index: &AttributeIndex,
 ) -> Vec<GeneratedModuleTokens> {
     let middleware_wrappers = middleware_plans.iter().map(middleware_wrapper);
     let server_declarations = servers.iter().map(|server| {
@@ -447,7 +440,7 @@ pub(crate) fn render(
     for server in servers {
         modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
-            server_module(table, server, index),
+            server_module(table, server),
         ));
     }
 

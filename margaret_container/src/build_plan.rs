@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use syn::FnArg;
 use syn::Pat;
@@ -68,20 +67,23 @@ fn build_draft<'index>(
     index: &AttributeIndex,
 ) -> Result<SingletonDraft<'index>, ContainerError> {
     let item = matched.item();
-    let ItemKind::Struct(shape) = item.kind() else {
-        return Err(ContainerError::NotASingletonStruct {
-            path: item.canonical_path().to_string(),
-        });
+    let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
+        (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
+        _ => {
+            return Err(ContainerError::NotASingletonStruct {
+                path: item.canonical_path().to_string(),
+            });
+        }
     };
 
     let concrete_path = item.canonical_path().clone();
+    let field_name = identifier.field().to_string();
     let ManagedArguments {
         collection,
         provides,
     } = ManagedArguments::parse(matched.args()?)?;
     let provided = resolve_provided(index, item, provides.as_ref(), &concrete_path)?;
 
-    let field_name = index.field_name(&concrete_path).to_string();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
     let collection = resolve_collection(index, item, collection.as_ref(), &concrete_path)?;
 
@@ -145,12 +147,17 @@ fn resolve_direct(
     item: &IndexedItem,
     source: ConstructionSource,
     concrete_path: &CanonicalPath,
-    provider_keys: &HashSet<CanonicalPath>,
+    provider_index_by_key: &HashMap<CanonicalPath, usize>,
 ) -> Result<DirectConstruction, ContainerError> {
     match source {
         ConstructionSource::Constructor(constructor) => {
-            let dependencies =
-                resolve_dependencies(index, item, concrete_path, constructor, provider_keys)?;
+            let dependencies = resolve_dependencies(
+                index,
+                item,
+                concrete_path,
+                constructor,
+                provider_index_by_key,
+            )?;
 
             Ok(DirectConstruction::Constructor {
                 dependencies,
@@ -167,7 +174,7 @@ fn resolve_dependencies(
     item: &IndexedItem,
     concrete_path: &CanonicalPath,
     constructor: &IndexedMethod,
-    provider_keys: &HashSet<CanonicalPath>,
+    provider_index_by_key: &HashMap<CanonicalPath, usize>,
 ) -> Result<Vec<DependencyKind>, ContainerError> {
     let mut dependencies = Vec::new();
 
@@ -196,7 +203,7 @@ fn resolve_dependencies(
             target,
             concrete_path,
             &parameter,
-            provider_keys,
+            provider_index_by_key,
         )?);
     }
 
@@ -209,16 +216,16 @@ fn resolve_target(
     target: RawTarget,
     concrete_path: &CanonicalPath,
     parameter: &str,
-    provider_keys: &HashSet<CanonicalPath>,
+    provider_index_by_key: &HashMap<CanonicalPath, usize>,
 ) -> Result<DependencyKind, ContainerError> {
     match target {
         RawTarget::Single(written) => {
-            let provider_key = index
+            let provider_index = index
                 .resolve_item_path(item, &written)
-                .filter(|path| provider_keys.contains(path))
+                .and_then(|path| provider_index_by_key.get(&path).copied())
                 .ok_or_else(|| missing_provider(concrete_path, parameter, &written))?;
 
-            Ok(DependencyKind::Single { provider_key })
+            Ok(DependencyKind::Single { provider_index })
         }
         RawTarget::Collection(written) => {
             let trait_path = index
@@ -273,15 +280,16 @@ struct SingletonDraft<'index> {
 
 pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
     let drafts = build_drafts(index)?;
-    let provider_keys: HashSet<CanonicalPath> = drafts
+    let provider_index_by_key: HashMap<CanonicalPath, usize> = drafts
         .iter()
-        .map(|draft| draft.provided.key().clone())
+        .enumerate()
+        .map(|(provider_index, draft)| (draft.provided.key().clone(), provider_index))
         .collect();
 
     let mut collections = CollectionTable::new();
     let mut providers = Vec::new();
 
-    for draft in drafts {
+    for (provider_index, draft) in drafts.into_iter().enumerate() {
         let SingletonDraft {
             collection,
             concrete_path,
@@ -292,11 +300,11 @@ pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, Contai
         } = draft;
 
         if let Some(trait_path) = collection {
-            collections.add(trait_path, provided.key().clone());
+            collections.add(trait_path, provider_index);
         }
 
         let construction =
-            resolve_direct(index, item, construction, &concrete_path, &provider_keys)?;
+            resolve_direct(index, item, construction, &concrete_path, &provider_index_by_key)?;
 
         providers.push(Provider {
             concrete_path,

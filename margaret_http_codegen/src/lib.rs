@@ -28,6 +28,7 @@ mod responder_method;
 mod responder_selectors;
 mod route_group;
 mod route_parameter_arguments;
+mod route_parameter_binder;
 mod route_path;
 mod route_url_template;
 mod server_route_group;
@@ -607,6 +608,15 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         );
 
         assert!(message.contains("more than one route parameter binder"));
+    }
+
+    #[test]
+    fn rejects_a_non_struct_route_parameter_binder() {
+        let message = error_for(
+            "struct User;\n\n#[provides_route_parameter]\nenum Binder {}\nimpl HttpRouteParameterBinder for Binder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n",
+        );
+
+        assert!(message.contains("is only supported on structs"));
     }
 
     #[test]

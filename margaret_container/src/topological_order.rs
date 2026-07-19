@@ -1,7 +1,4 @@
 use std::cell::Cell;
-use std::collections::BTreeMap;
-
-use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::collection_table::CollectionTable;
 use crate::container_error::ContainerError;
@@ -21,26 +18,14 @@ struct Node {
     mark: Cell<Mark>,
 }
 
-fn index_of(index_by_key: &BTreeMap<CanonicalPath, usize>, key: &CanonicalPath) -> usize {
-    index_by_key.get(key).copied().unwrap_or_default()
-}
-
-fn dependency_indices(
-    provider: &Provider,
-    collections: &CollectionTable,
-    index_by_key: &BTreeMap<CanonicalPath, usize>,
-) -> Vec<usize> {
+fn dependency_indices(provider: &Provider, collections: &CollectionTable) -> Vec<usize> {
     let mut indices = Vec::new();
 
     for dependency in provider.dependencies() {
         match dependency {
-            DependencyKind::Single { provider_key } => {
-                indices.push(index_of(index_by_key, provider_key));
-            }
+            DependencyKind::Single { provider_index } => indices.push(*provider_index),
             DependencyKind::Collection { trait_path } => {
-                for member in collections.members_of(trait_path) {
-                    indices.push(index_of(index_by_key, member));
-                }
+                indices.extend(collections.members_of(trait_path).iter().copied());
             }
         }
     }
@@ -49,16 +34,10 @@ fn dependency_indices(
 }
 
 fn nodes_of(providers: &[Provider], collections: &CollectionTable) -> Vec<Node> {
-    let mut index_by_key: BTreeMap<CanonicalPath, usize> = BTreeMap::new();
-
-    for (index, provider) in providers.iter().enumerate() {
-        index_by_key.insert(provider.provided.key().clone(), index);
-    }
-
     providers
         .iter()
         .map(|provider| Node {
-            adjacency: dependency_indices(provider, collections, &index_by_key),
+            adjacency: dependency_indices(provider, collections),
             key: provider.provided.key().to_string(),
             mark: Cell::new(Mark::Unvisited),
         })
@@ -84,9 +63,7 @@ fn visit(
     stack: &mut Vec<(usize, String)>,
     order: &mut Vec<usize>,
 ) -> Result<(), ContainerError> {
-    let Some(node) = nodes.get(index) else {
-        return Ok(());
-    };
+    let node = &nodes[index];
 
     match node.mark.get() {
         Mark::Done => return Ok(()),
@@ -121,27 +98,4 @@ pub(crate) fn topological_order(
     }
 
     Ok(order)
-}
-
-#[cfg(test)]
-mod tests {
-    use std::cell::Cell;
-
-    use super::Mark;
-    use super::Node;
-    use super::visit;
-
-    #[test]
-    fn visiting_an_index_beyond_the_graph_is_a_no_op() {
-        let nodes = vec![Node {
-            adjacency: Vec::new(),
-            key: "crate::Only".to_string(),
-            mark: Cell::new(Mark::Unvisited),
-        }];
-        let mut stack = Vec::new();
-        let mut order = Vec::new();
-
-        assert!(visit(&nodes, 5, &mut stack, &mut order).is_ok());
-        assert!(order.is_empty());
-    }
 }

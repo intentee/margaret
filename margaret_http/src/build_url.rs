@@ -2,18 +2,20 @@ use crate::url_segment::UrlSegment;
 
 #[must_use]
 pub fn build_url(origin: &str, segments: &[UrlSegment], values: &[String]) -> String {
-    let mut values = values.iter();
+    let mut url = String::from(origin);
+    let mut value_index = 0;
 
-    segments
-        .iter()
-        .fold(String::from(origin), |mut url, segment| {
-            match segment {
-                UrlSegment::Literal(text) => url.push_str(text),
-                UrlSegment::Parameter(_) => url.extend(values.next().map(String::as_str)),
+    for segment in segments {
+        match segment {
+            UrlSegment::Literal(text) => url.push_str(text),
+            UrlSegment::Parameter(_) => {
+                url.push_str(&values[value_index]);
+                value_index += 1;
             }
+        }
+    }
 
-            url
-        })
+    url
 }
 
 #[cfg(test)]
