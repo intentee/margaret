@@ -8,6 +8,7 @@ autotests = false
 async-trait = { workspace = true }
 futures-util = { workspace = true }
 margaret_http = { path = "../margaret_http" }
+margaret_http_validation = { path = "../margaret_http_validation" }
 margaret_websocket = { path = "../margaret_websocket" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

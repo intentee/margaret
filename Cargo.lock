@@ -2044,6 +2044,7 @@ dependencies = [
  "async-trait",
  "futures-util",
  "margaret_http",
+ "margaret_http_validation",
  "margaret_websocket",
  "serde",
  "serde_json",

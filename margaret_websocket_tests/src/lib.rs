@@ -20,3 +20,5 @@ pub mod test_session_factory;
 pub mod typing_dispatch;
 pub mod typing_handler;
 pub mod typing_notification;
+pub mod upgrade_query;
+pub mod validating_session_factory;
