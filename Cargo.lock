@@ -1250,6 +1250,7 @@ dependencies = [
  "margaret_container",
  "margaret_generated_module",
  "margaret_http_codegen",
+ "margaret_model_codegen",
  "margaret_service_codegen",
  "margaret_views_codegen",
  "quote",
@@ -1339,6 +1340,7 @@ dependencies = [
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
  "margaret_macros",
+ "margaret_model",
  "margaret_service",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_server",
@@ -1350,6 +1352,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trzcina",
+ "uuid",
  "validator",
 ]
 
@@ -1582,6 +1585,23 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "margaret_model"
+version = "0.1.0"
+
+[[package]]
+name = "margaret_model_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_generated_module",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]

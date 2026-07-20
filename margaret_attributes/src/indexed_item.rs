@@ -3,6 +3,7 @@ use syn::Attribute;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_associated_type::IndexedAssociatedType;
 use crate::indexed_attribute::IndexedAttribute;
+use crate::indexed_field::IndexedField;
 use crate::indexed_method::IndexedMethod;
 use crate::item_kind::ItemKind;
 
@@ -10,6 +11,7 @@ pub struct IndexedItem {
     associated_types: Vec<IndexedAssociatedType>,
     attributes: Vec<IndexedAttribute>,
     canonical_path: CanonicalPath,
+    fields: Vec<IndexedField>,
     identifier: String,
     kind: ItemKind,
     methods: Vec<IndexedMethod>,
@@ -21,11 +23,13 @@ impl IndexedItem {
         identifier: String,
         canonical_path: CanonicalPath,
         attributes: Vec<Attribute>,
+        fields: Vec<IndexedField>,
     ) -> Self {
         Self {
             associated_types: Vec::new(),
             attributes: attributes.into_iter().map(IndexedAttribute::new).collect(),
             canonical_path,
+            fields,
             identifier,
             kind,
             methods: Vec::new(),
@@ -45,6 +49,11 @@ impl IndexedItem {
     #[must_use]
     pub fn canonical_path(&self) -> &CanonicalPath {
         &self.canonical_path
+    }
+
+    #[must_use]
+    pub fn fields(&self) -> &[IndexedField] {
+        &self.fields
     }
 
     #[must_use]

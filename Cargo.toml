@@ -25,6 +25,8 @@ members = [
     "margaret_jwks_roller_server",
     "margaret_jwks_roller_tests",
     "margaret_macros",
+    "margaret_model",
+    "margaret_model_codegen",
     "margaret_peer_identity",
     "margaret_peer_identity_tests",
     "margaret_service",

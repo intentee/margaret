@@ -4,6 +4,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use syn::Attribute;
+use syn::Fields;
 use syn::Ident;
 use syn::ImplItem;
 use syn::Item;
@@ -15,8 +16,10 @@ use syn::UseTree;
 
 use crate::attribute_error::AttributeError;
 use crate::canonical_path::CanonicalPath;
+use crate::field_identifier::FieldIdentifier;
 use crate::flatten_use_tree::flatten_use_tree;
 use crate::indexed_associated_type::IndexedAssociatedType;
+use crate::indexed_field::IndexedField;
 use crate::indexed_item::IndexedItem;
 use crate::indexed_method::IndexedMethod;
 use crate::item_kind::ItemKind;
@@ -27,6 +30,7 @@ use crate::walk_output::WalkOutput;
 
 struct Recordable<'item> {
     attributes: &'item [Attribute],
+    fields: Vec<IndexedField>,
     identifier: &'item Ident,
     kind: ItemKind,
 }
@@ -53,6 +57,21 @@ fn member_path(module_path: &[String], identifier: &Ident) -> String {
     segments.push(identifier.to_string());
 
     segments.join("::")
+}
+
+fn index_fields(fields: &Fields) -> Vec<IndexedField> {
+    fields
+        .iter()
+        .enumerate()
+        .map(|(position, field)| {
+            let identifier = match &field.ident {
+                Some(name) => FieldIdentifier::Named(name.to_string()),
+                None => FieldIdentifier::Positional(position),
+            };
+
+            IndexedField::new(identifier, field.ty.clone(), field.attrs.clone())
+        })
+        .collect()
 }
 
 fn check_use(item_use: &ItemUse, file_path: &Path) -> Result<(), AttributeError> {
@@ -175,11 +194,17 @@ impl ModuleWalker {
 
     fn record(
         &mut self,
-        recordable: &Recordable,
+        recordable: Recordable,
         module_path: &[String],
     ) -> Result<(), AttributeError> {
+        let Recordable {
+            attributes,
+            fields,
+            identifier,
+            kind,
+        } = recordable;
         let mut segments = module_path.to_vec();
-        segments.push(recordable.identifier.to_string());
+        segments.push(identifier.to_string());
 
         let canonical_path = CanonicalPath::new(segments);
 
@@ -191,10 +216,11 @@ impl ModuleWalker {
 
         self.seen_paths.insert(canonical_path.clone());
         self.items.push(IndexedItem::new(
-            recordable.kind,
-            recordable.identifier.to_string(),
+            kind,
+            identifier.to_string(),
             canonical_path,
-            recordable.attributes.to_vec(),
+            attributes.to_vec(),
+            fields,
         ));
 
         Ok(())
@@ -271,21 +297,25 @@ impl ModuleWalker {
         let recordable = match item {
             Item::Struct(item_struct) => Some(Recordable {
                 attributes: &item_struct.attrs,
+                fields: index_fields(&item_struct.fields),
                 identifier: &item_struct.ident,
                 kind: ItemKind::Struct(StructShape::from(&item_struct.fields)),
             }),
             Item::Enum(item_enum) => Some(Recordable {
                 attributes: &item_enum.attrs,
+                fields: Vec::new(),
                 identifier: &item_enum.ident,
                 kind: ItemKind::Enum,
             }),
             Item::Fn(item_fn) => Some(Recordable {
                 attributes: &item_fn.attrs,
+                fields: Vec::new(),
                 identifier: &item_fn.sig.ident,
                 kind: ItemKind::Function,
             }),
             Item::Trait(item_trait) => Some(Recordable {
                 attributes: &item_trait.attrs,
+                fields: Vec::new(),
                 identifier: &item_trait.ident,
                 kind: ItemKind::Trait,
             }),
@@ -294,6 +324,7 @@ impl ModuleWalker {
 
                 Some(Recordable {
                     attributes: &item_mod.attrs,
+                    fields: Vec::new(),
                     identifier: &item_mod.ident,
                     kind: ItemKind::Module,
                 })
@@ -319,7 +350,7 @@ impl ModuleWalker {
         };
 
         match recordable {
-            Some(recordable) => self.record(&recordable, module_path),
+            Some(recordable) => self.record(recordable, module_path),
             None => Ok(()),
         }
     }
