@@ -1,0 +1,15 @@
+{
+    "outputs": {
+        "static/main.js": {
+            "imports": [{ "path": "static/chunk.js" }],
+            "cssBundle": "static/main.css",
+            "entryPoint": "resources/ts/main.ts",
+            "inputs": {}
+        },
+        "static/main.css": {
+            "imports": [],
+            "entryPoint": "resources/css/main.css",
+            "inputs": {}
+        }
+    }
+}

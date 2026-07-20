@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+use margaret_asset_codegen::asset_codegen_error::AssetCodegenError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
@@ -82,5 +83,17 @@ pub enum CodegenError {
     RemoveEntry {
         path: PathBuf,
         source: std::io::Error,
+    },
+
+    #[error("failed to read the esbuild metafile '{path}': {source}")]
+    EsbuildMetafileRead {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("the esbuild metafile '{path}' is invalid: {source}")]
+    EsbuildMetafileInvalid {
+        path: PathBuf,
+        source: AssetCodegenError,
     },
 }

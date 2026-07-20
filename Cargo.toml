@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "margaret_asset_codegen",
     "margaret_attributes",
     "margaret_codegen",
     "margaret_codegen_tokens",
@@ -54,6 +55,7 @@ chrono = { version = "=0.4.42", default-features = false, features = ["std"] }
 clap = { version = "=4.5.47", default-features = false, features = ["std", "help", "usage", "error-context"] }
 cookie = "=0.18.1"
 dashmap = "=6.1.0"
+esbuild-metafile = "=0.9.1"
 form_urlencoded = "=1.2.2"
 futures-util = "=0.3.31"
 heck = "=0.5.0"

@@ -16,17 +16,18 @@ impl CanonicalPath {
     }
 
     #[must_use]
-    pub fn segments(&self) -> &[String] {
-        &self.segments
-    }
-
-    pub(crate) fn field_name(&self) -> String {
+    pub fn field_name(&self) -> String {
         self.segments
             .iter()
             .skip(1)
             .map(|segment| segment.to_snake_case())
             .collect::<Vec<String>>()
             .join("_")
+    }
+
+    #[must_use]
+    pub fn segments(&self) -> &[String] {
+        &self.segments
     }
 }
 

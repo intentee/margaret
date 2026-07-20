@@ -1,5 +1,6 @@
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_container::provided_singleton::ProvidedSingleton;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 
@@ -13,16 +14,21 @@ pub(crate) struct BuildContext<'index> {
     capabilities: Capabilities,
     index: &'index AttributeIndex,
     module_tokens: Vec<GeneratedModuleTokens>,
+    provided_singletons: Vec<ProvidedSingleton>,
     serve_arguments: Vec<ConsoleArgument>,
     servers: Vec<HttpServer>,
 }
 
 impl<'index> BuildContext<'index> {
-    pub(crate) fn new(index: &'index AttributeIndex) -> Self {
+    pub(crate) fn new(
+        index: &'index AttributeIndex,
+        provided_singletons: Vec<ProvidedSingleton>,
+    ) -> Self {
         Self {
             capabilities: Capabilities::detect(index),
             index,
             module_tokens: Vec::new(),
+            provided_singletons,
             serve_arguments: Vec::new(),
             servers: Vec::new(),
         }
@@ -51,6 +57,10 @@ impl<'index> BuildContext<'index> {
     #[cfg(test)]
     pub(crate) fn module_tokens(&self) -> &[GeneratedModuleTokens] {
         &self.module_tokens
+    }
+
+    pub(crate) fn provided_singletons(&self) -> &[ProvidedSingleton] {
+        &self.provided_singletons
     }
 
     pub(crate) fn serve_arguments(&self) -> &[ConsoleArgument] {
@@ -94,7 +104,7 @@ mod tests {
             .index_crate(&CrateRoot::new("crate", source))
             .expect("the crate is indexed")
             .build();
-        let mut context = BuildContext::new(&index);
+        let mut context = BuildContext::new(&index, Vec::new());
         context.extend_modules(vec![GeneratedModuleTokens::new("broken", quote! { fn })]);
 
         let error = context

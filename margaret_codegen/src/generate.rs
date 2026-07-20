@@ -1,8 +1,11 @@
 use std::env;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::Path;
 
+use margaret_asset_codegen::esbuild_metafile_provider::esbuild_metafile_provider;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_container::provided_singleton::ProvidedSingleton;
 
 use crate::build::build;
 use crate::codegen_error::CodegenError;
@@ -26,7 +29,9 @@ fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
         })?;
     }
 
-    build(&crate_root)?.write_to(&generated_directory)?;
+    let provided_singletons = read_provided_singletons(manifest_directory)?;
+
+    build(&crate_root, provided_singletons)?.write_to(&generated_directory)?;
 
     println!(
         "cargo:rerun-if-changed={}",
@@ -34,6 +39,32 @@ fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
     );
 
     Ok(())
+}
+
+fn read_provided_singletons(
+    manifest_directory: &Path,
+) -> Result<Vec<ProvidedSingleton>, CodegenError> {
+    let metafile_path = manifest_directory.join("esbuild-meta.json");
+
+    println!("cargo:rerun-if-changed={}", metafile_path.display());
+
+    match fs::read_to_string(&metafile_path) {
+        Ok(contents) => {
+            let provider = esbuild_metafile_provider(&contents).map_err(|source| {
+                CodegenError::EsbuildMetafileInvalid {
+                    path: metafile_path,
+                    source,
+                }
+            })?;
+
+            Ok(vec![provider])
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(Vec::new()),
+        Err(source) => Err(CodegenError::EsbuildMetafileRead {
+            path: metafile_path,
+            source,
+        }),
+    }
 }
 
 pub fn generate() -> Result<(), CodegenError> {
@@ -188,5 +219,46 @@ struct Config {
             generate_into(host.path()).expect_err("a blocked generated source is reported");
 
         assert!(error.to_string().contains("failed to write the generated source"));
+    }
+
+    const VALID_METAFILE: &str =
+        "{\"outputs\":{\"static/main.js\":{\"imports\":[],\"entryPoint\":\"src/main.ts\",\"inputs\":{}}}}";
+
+    #[test]
+    fn bakes_a_present_esbuild_metafile_into_the_container() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), HOST_CRATE);
+        fs::write(host.path().join("esbuild-meta.json"), VALID_METAFILE)
+            .expect("the esbuild metafile is written");
+
+        generate_into(host.path()).expect("the crate generates with a metafile");
+
+        assert!(
+            read_generated(host.path(), "container.rs").contains("esbuild_metafile_esbuild_metafile")
+        );
+    }
+
+    #[test]
+    fn reports_an_invalid_esbuild_metafile() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), HOST_CRATE);
+        fs::write(host.path().join("esbuild-meta.json"), "not valid json")
+            .expect("the esbuild metafile is written");
+
+        let error = generate_into(host.path()).expect_err("an invalid metafile is reported");
+
+        assert!(error.to_string().contains("is invalid"));
+    }
+
+    #[test]
+    fn reports_an_unreadable_esbuild_metafile() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), HOST_CRATE);
+        fs::create_dir_all(host.path().join("esbuild-meta.json"))
+            .expect("the blocking directory is created");
+
+        let error = generate_into(host.path()).expect_err("an unreadable metafile is reported");
+
+        assert!(error.to_string().contains("failed to read the esbuild metafile"));
     }
 }

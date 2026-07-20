@@ -1,18 +1,16 @@
 [package]
-name = "margaret_container_tests"
+name = "margaret_asset_codegen"
 version = "0.1.0"
 edition = "2024"
-autotests = false
 
 [dependencies]
+esbuild-metafile = { workspace = true }
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_container = { path = "../margaret_container" }
-margaret_generated_module = { path = "../margaret_generated_module" }
+proc-macro2 = { workspace = true }
 quote = { workspace = true }
-
-[[test]]
-name = "main"
-path = "tests/main.rs"
+serde_json = { workspace = true }
+thiserror = { workspace = true }
 
 [lints]
 workspace = true

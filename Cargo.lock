@@ -559,6 +559,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "esbuild-metafile"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36526d344cd085e3706260dc5172cd8b15fb2e8afb7c90af034fde0a710daabe"
+dependencies = [
+ "dashmap",
+ "log",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1230,6 +1244,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
+name = "margaret_asset_codegen"
+version = "0.1.0"
+dependencies = [
+ "esbuild-metafile",
+ "margaret_attributes",
+ "margaret_container",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "margaret_attributes"
 version = "0.1.0"
 dependencies = [
@@ -1244,6 +1271,7 @@ dependencies = [
 name = "margaret_codegen"
 version = "0.1.0"
 dependencies = [
+ "margaret_asset_codegen",
  "margaret_attributes",
  "margaret_console_argument_codegen",
  "margaret_console_codegen",
@@ -1322,6 +1350,7 @@ dependencies = [
  "margaret_attributes",
  "margaret_container",
  "margaret_generated_module",
+ "quote",
 ]
 
 [[package]]
@@ -1332,6 +1361,7 @@ dependencies = [
  "async-trait",
  "clap",
  "dashmap",
+ "esbuild-metafile",
  "margaret_codegen",
  "margaret_console",
  "margaret_http",
@@ -2001,9 +2031,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.21.4"
+version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "openssl"
