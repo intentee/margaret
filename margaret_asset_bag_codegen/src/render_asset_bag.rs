@@ -9,10 +9,12 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::asset_arm::AssetArm;
 use crate::asset_bag_codegen_error::AssetBagCodegenError;
-use crate::bundle_handle::bundle_handle;
+use crate::asset_slot::AssetSlot;
+use crate::bundle_tokens::bundle_tokens;
 use crate::enumerate_inputs::enumerate_inputs;
 use crate::output_directory::output_directory;
-use crate::static_handle::static_handle;
+use crate::resolution_tokens::resolution_tokens;
+use crate::resolve_static_outputs::resolve_static_outputs;
 
 fn module_tokens(directory: &str, arms: &[AssetArm]) -> TokenStream {
     let folder = format!("{directory}/");
@@ -53,18 +55,31 @@ pub fn render_asset_bag(
     let output_paths: BTreeSet<String> = metafile.get_output_paths().into_iter().collect();
     let directory = output_directory(&output_paths)?;
 
-    let mut arms: Vec<AssetArm> = Vec::new();
+    let mut inputs: BTreeSet<String> = BTreeSet::new();
 
-    for (input, entrypoint) in &enumerated.entrypoints {
-        arms.push(AssetArm {
-            handle: bundle_handle(&metafile, entrypoint)?,
-            input: input.clone(),
-        });
+    for input in enumerated.entrypoints.keys() {
+        inputs.insert(input.clone());
     }
 
     for input in &enumerated.static_inputs {
+        inputs.insert(input.clone());
+    }
+
+    let mut arms: Vec<AssetArm> = Vec::new();
+
+    for input in &inputs {
+        let bundle = match enumerated.entrypoints.get(input) {
+            Some(entrypoint) => AssetSlot::Present(bundle_tokens(&metafile, entrypoint)?),
+            None => AssetSlot::Absent,
+        };
+        let statics = resolve_static_outputs(&metafile, input)?;
+
+        if !bundle.is_present() && !statics.image.is_present() && !statics.file.is_present() {
+            continue;
+        }
+
         arms.push(AssetArm {
-            handle: static_handle(&metafile, input)?,
+            handle: resolution_tokens(bundle, statics),
             input: input.clone(),
         });
     }
@@ -85,13 +100,29 @@ mod tests {
             "assets/app_ABC.js": {
                 "imports": [{ "path": "assets/chunk_ABC.js" }],
                 "cssBundle": "assets/app_ABC.css",
-                "entryPoint": "src/app.ts"
+                "entryPoint": "resources/ts/app.ts"
             },
             "assets/app_ABC.css": { "imports": [] },
-            "assets/chunk_ABC.js": { "imports": [] },
+            "assets/chunk_ABC.js": {
+                "imports": [],
+                "inputs": { "node_modules/react/index.js": {} }
+            },
             "assets/logo_ABC.png": {
                 "imports": [],
-                "inputs": { "media/logo.png": {} }
+                "inputs": { "resources/media/logo.png": {} }
+            },
+            "assets/favicon_MWST.svg": {
+                "imports": [],
+                "inputs": { "resources/media/favicon.svg": {} }
+            },
+            "assets/favicon_VVSH.js": {
+                "imports": [{ "path": "assets/favicon_MWST.svg", "kind": "file-loader" }],
+                "entryPoint": "resources/media/favicon.svg",
+                "inputs": { "resources/media/favicon.svg": {} }
+            },
+            "assets/inter_HASH.woff2": {
+                "imports": [],
+                "inputs": { "resources/fonts/inter.woff2": {} }
             }
         }
     }"#;
@@ -114,18 +145,29 @@ mod tests {
     }
 
     #[test]
-    fn generates_a_valid_module_with_an_arm_per_input() {
+    fn generates_a_valid_module_with_an_arm_per_addressable_input() {
         let source = formatted_module(FULL_METAFILE);
 
         assert!(source.contains("#[folder = \"assets/\"]"));
         assert!(source.contains("pub struct EmbeddedAssets"));
-        assert!(source.contains("pub type AssetServer"));
-        assert!(source.contains("::margaret_asset_bag_server::asset_server::AssetServer"));
         assert!(source.contains("macro_rules! asset"));
-        assert!(source.contains("(\"src/app.ts\") =>"));
-        assert!(source.contains("(\"media/logo.png\") =>"));
+        assert!(source.contains("(\"resources/ts/app.ts\") =>"));
+        assert!(source.contains("script_stylesheet_bundle::ScriptStylesheetBundle::new"));
+        assert!(source.contains("(\"resources/media/logo.png\") =>"));
+        assert!(source.contains("(\"resources/media/favicon.svg\") =>"));
+        assert!(source.contains("script_bundle::ScriptBundle::new"));
+        assert!(source.contains("image_output::ImageOutput::new"));
+        assert!(source.contains("(\"resources/fonts/inter.woff2\") =>"));
+        assert!(source.contains("file_output::FileOutput::new"));
         assert!(source.contains("unknown esbuild asset input: "));
         assert!(source.contains("pub(crate) use asset;"));
+    }
+
+    #[test]
+    fn omits_an_arm_for_a_bundled_source_input_without_a_static_asset() {
+        let source = formatted_module(FULL_METAFILE);
+
+        assert!(!source.contains("node_modules/react/index.js"));
     }
 
     #[test]
@@ -149,24 +191,46 @@ mod tests {
     }
 
     #[test]
-    fn propagates_an_ambiguous_input_error() {
+    fn propagates_an_ambiguous_static_input_error() {
         assert!(matches!(
             render_asset_bag(
                 r#"{
                     "outputs": {
-                        "assets/app_ABC.js": {
+                        "assets/a_ABC.png": {
                             "imports": [],
-                            "entryPoint": "src/app.ts",
-                            "inputs": {}
+                            "inputs": { "resources/media/logo.png": {} }
                         },
-                        "assets/other_ABC.js": {
+                        "assets/b_DEF.png": {
                             "imports": [],
-                            "inputs": { "src/app.ts": {} }
+                            "inputs": { "resources/media/logo.png": {} }
                         }
                     }
                 }"#
             ),
-            Err(AssetBagCodegenError::AmbiguousInput { input }) if input == "src/app.ts"
+            Err(AssetBagCodegenError::AmbiguousStaticInput { input, output_count })
+                if input == "resources/media/logo.png" && output_count == 2
+        ));
+    }
+
+    #[test]
+    fn propagates_a_duplicate_entrypoint_error() {
+        assert!(matches!(
+            render_asset_bag(
+                r#"{
+                    "outputs": {
+                        "assets/a_ABC.js": {
+                            "imports": [],
+                            "entryPoint": "resources/ts/app.ts"
+                        },
+                        "assets/b_DEF.js": {
+                            "imports": [],
+                            "entryPoint": "resources/ts/app.ts"
+                        }
+                    }
+                }"#
+            ),
+            Err(AssetBagCodegenError::DuplicateEntrypoint { input })
+                if input == "resources/ts/app.ts"
         ));
     }
 
@@ -184,28 +248,6 @@ mod tests {
                 }"#
             ),
             Err(AssetBagCodegenError::UnsupportedIncludeOutput { output }) if output == "assets/mod_ABC.wasm"
-        ));
-    }
-
-    #[test]
-    fn propagates_an_ambiguous_static_input_error() {
-        assert!(matches!(
-            render_asset_bag(
-                r#"{
-                    "outputs": {
-                        "assets/a_ABC.png": {
-                            "imports": [],
-                            "inputs": { "media/logo.png": {} }
-                        },
-                        "assets/b_DEF.png": {
-                            "imports": [],
-                            "inputs": { "media/logo.png": {} }
-                        }
-                    }
-                }"#
-            ),
-            Err(AssetBagCodegenError::AmbiguousStaticInput { input, output_count })
-                if input == "media/logo.png" && output_count == 2
         ));
     }
 }

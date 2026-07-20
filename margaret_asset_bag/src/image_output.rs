@@ -1,11 +1,11 @@
 use crate::asset_href::AssetHref;
 
 #[derive(Clone, Copy)]
-pub struct ImageAsset {
+pub struct ImageOutput {
     pub(crate) href: AssetHref,
 }
 
-impl ImageAsset {
+impl ImageOutput {
     #[must_use]
     pub const fn new(href: AssetHref) -> Self {
         Self { href }
