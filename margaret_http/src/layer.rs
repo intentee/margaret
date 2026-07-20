@@ -88,6 +88,7 @@ mod tests {
             layer(Arc::new(middleware), Arc::new(Inner)),
         )
         .await
+        .expect_http()
         .into_http()
         .status()
         .as_u16()

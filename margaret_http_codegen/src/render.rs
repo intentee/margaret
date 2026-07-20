@@ -19,6 +19,7 @@ use crate::middleware_plan::MiddlewarePlan;
 use crate::responder_argument::ResponderArgument;
 use crate::responder_argument_binding::ResponderArgumentBinding;
 use crate::route_group::RouteGroup;
+use crate::route_handler::RouteHandler;
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
@@ -61,13 +62,16 @@ fn route_references_routes(route: &HttpRoute) -> bool {
     responder_injects_routes(route) || route.layers.iter().any(|layer| layer.injects_routes)
 }
 
-fn handler_binding(route: &HttpRoute) -> Ident {
-    format_ident!("{}_handler", route.responder_field)
+fn handler_binding(field: &Ident) -> Ident {
+    format_ident!("{}_handler", field)
 }
 
 fn onion(route: &HttpRoute) -> TokenStream {
-    let responder = &route.responder_field;
-    let responder_type = path_tokens(&route.responder_path);
+    let (responder, responder_path) = match &route.handler {
+        RouteHandler::Responder { field, path } => (field, path),
+        RouteHandler::Synthetic { handler, .. } => return handler.clone(),
+    };
+    let responder_type = path_tokens(responder_path);
     let responder_access = access(quote! { container.#responder() });
     let captures = capture_fields(route);
 
@@ -383,26 +387,27 @@ fn server_module(table: &HttpRouteTable, server: &HttpServer, has_views: bool) -
         }
     });
 
-    let handler_bindings = server_routes
-        .iter()
-        .filter(|route| route.name.is_some())
-        .map(|route| {
-            let binding = handler_binding(route);
+    let handler_bindings = server_routes.iter().filter_map(|route| match &route.handler {
+        RouteHandler::Responder { field, .. } if route.name.is_some() => {
+            let binding = handler_binding(field);
             let handler = onion(route);
 
-            quote! { let #binding = #handler; }
-        });
+            Some(quote! { let #binding = #handler; })
+        }
+        _ => None,
+    });
 
     let route_entries = table.route_groups(server.name()).map(|group| {
         let path = group.path().pattern();
         let method_handlers = group.method_routes().map(|route| {
             let method = &route.method;
-            let handler = if route.name.is_some() {
-                let binding = handler_binding(route);
+            let handler = match &route.handler {
+                RouteHandler::Responder { field, .. } if route.name.is_some() => {
+                    let binding = handler_binding(field);
 
-                quote! { #binding.clone() }
-            } else {
-                onion(route)
+                    quote! { #binding.clone() }
+                }
+                _ => onion(route),
             };
 
             quote! {
@@ -417,12 +422,13 @@ fn server_module(table: &HttpRouteTable, server: &HttpServer, has_views: bool) -
     });
     let route_entries = vec_literal_tokens(route_entries);
 
-    let named_handlers = server_routes.iter().filter_map(|route| {
-        route.name.as_ref().map(|name| {
-            let binding = handler_binding(route);
+    let named_handlers = server_routes.iter().filter_map(|route| match &route.handler {
+        RouteHandler::Responder { field, .. } => route.name.as_ref().map(|name| {
+            let binding = handler_binding(field);
 
             quote! { margaret_http::named_handler::NamedHandler::new(#name, #binding) }
-        })
+        }),
+        RouteHandler::Synthetic { .. } => None,
     });
     let named_handlers = vec_literal_tokens(named_handlers);
 

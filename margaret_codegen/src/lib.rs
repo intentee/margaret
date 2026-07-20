@@ -11,3 +11,4 @@ mod http_pass;
 mod services_pass;
 mod umbrella;
 mod views_pass;
+mod websocket_pass;

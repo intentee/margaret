@@ -39,7 +39,10 @@ COVERAGE_PACKAGES := \
 	-p margaret_token_signer_tests \
 	-p margaret_validation \
 	-p margaret_views \
-	-p margaret_views_codegen
+	-p margaret_views_codegen \
+	-p margaret_websocket \
+	-p margaret_websocket_codegen \
+	-p margaret_websocket_tests
 
 SPIRE_FEATURES := \
 	--features margaret_spiffe_svid_tests/tests_that_use_spire \
@@ -102,7 +105,10 @@ coverage: node_modules
 		--gated margaret_token_signer_tests=100 \
 		--gated margaret_validation=100 \
 		--gated margaret_views=100 \
-		--gated margaret_views_codegen=100
+		--gated margaret_views_codegen=100 \
+		--gated margaret_websocket=100 \
+		--gated margaret_websocket_codegen=100 \
+		--gated margaret_websocket_tests=100
 
 .PHONY: fmt
 fmt:

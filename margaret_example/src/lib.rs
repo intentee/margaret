@@ -13,6 +13,7 @@ pub mod routes;
 pub mod services;
 pub mod stderr_sink;
 pub mod stdout_sink;
+pub mod storyboard;
 pub mod stores;
 pub mod sweep_interval;
 pub mod system_clock;

@@ -6,26 +6,27 @@ use crate::handler::Handler;
 use crate::request::Request;
 use crate::response::Response;
 use crate::response_continuation::ResponseContinuation;
+use crate::served_outcome::ServedOutcome;
 
 pub(crate) async fn respond_recursively(
     forward_targets: &Arc<ForwardTargets>,
     request: Request,
     first: Arc<dyn Handler>,
-) -> Response {
+) -> ServedOutcome {
     let mut visited: HashSet<&'static str> = HashSet::new();
     let mut request = request;
     let mut outcome = first.handle(&request).await;
 
     loop {
         match outcome {
-            ResponseContinuation::Done(response) => return response,
+            ResponseContinuation::Done(response) => return ServedOutcome::Http(response),
             ResponseContinuation::Forward(forward) => {
                 let name = forward.name();
 
                 if !visited.insert(name) {
                     eprintln!("margaret_http: forward cycle re-entered the responder `{name}`");
 
-                    return Response::text(500, "Internal Server Error");
+                    return ServedOutcome::Http(Response::text(500, "Internal Server Error"));
                 }
 
                 let Some(target) = forward_targets.resolve(name) else {
@@ -33,13 +34,16 @@ pub(crate) async fn respond_recursively(
                         "margaret_http: no forward target is registered for `{name}` on this server"
                     );
 
-                    return Response::text(500, "Internal Server Error");
+                    return ServedOutcome::Http(Response::text(500, "Internal Server Error"));
                 };
 
                 request = request.with_path_params(forward.into_path_params());
                 outcome = target.handle(&request).await;
             }
-            ResponseContinuation::Redirect(redirect) => return redirect.into_response(),
+            ResponseContinuation::Redirect(redirect) => {
+                return ServedOutcome::Http(redirect.into_response());
+            }
+            ResponseContinuation::Upgrade(handler) => return ServedOutcome::Upgrade(handler),
         }
     }
 }
@@ -146,6 +150,7 @@ mod tests {
             first,
         )
         .await
+        .expect_http()
         .into_http()
         .status()
         .as_u16()
@@ -189,6 +194,7 @@ mod tests {
             Arc::new(RedirectingResponder),
         )
         .await
+        .expect_http()
         .into_http();
 
         assert_eq!(response.status().as_u16(), 303);
@@ -211,6 +217,7 @@ mod tests {
             Arc::new(ForwardToArticle),
         )
         .await
+        .expect_http()
         .into_http();
 
         assert_eq!(response.status().as_u16(), 200);

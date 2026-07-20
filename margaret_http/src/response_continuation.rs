@@ -1,11 +1,13 @@
 use crate::forward::Forward;
 use crate::redirect::Redirect;
 use crate::response::Response;
+use crate::upgrade_handler::UpgradeHandler;
 
 pub enum ResponseContinuation {
     Done(Response),
     Forward(Forward),
     Redirect(Redirect),
+    Upgrade(Box<dyn UpgradeHandler>),
 }
 
 impl From<Forward> for ResponseContinuation {

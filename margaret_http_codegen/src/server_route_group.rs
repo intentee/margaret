@@ -29,7 +29,7 @@ impl ServerRouteGroup {
         method: String,
         route: HttpRoute,
     ) -> Result<(), HttpCodegenError> {
-        let responder = route.responder_path.to_string();
+        let responder = route.handler.describe();
         let pattern = path.pattern().to_owned();
 
         let group = match self.paths.entry(pattern.clone()) {
@@ -59,7 +59,7 @@ impl ServerRouteGroup {
 
         match group.take_method(method.clone(), route) {
             Some(existing) => Err(HttpCodegenError::DuplicateRoute {
-                existing_responder: existing.responder_path.to_string(),
+                existing_responder: existing.handler.describe(),
                 method,
                 path: pattern,
                 responder,

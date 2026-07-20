@@ -1,4 +1,5 @@
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_codegen_tokens::synthetic_route::SyntheticRoute;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
@@ -15,6 +16,7 @@ pub(crate) struct BuildContext<'index> {
     module_tokens: Vec<GeneratedModuleTokens>,
     serve_arguments: Vec<ConsoleArgument>,
     servers: Vec<HttpServer>,
+    synthetic_routes: Vec<SyntheticRoute>,
 }
 
 impl<'index> BuildContext<'index> {
@@ -25,6 +27,7 @@ impl<'index> BuildContext<'index> {
             module_tokens: Vec::new(),
             serve_arguments: Vec::new(),
             servers: Vec::new(),
+            synthetic_routes: Vec::new(),
         }
     }
 
@@ -67,6 +70,14 @@ impl<'index> BuildContext<'index> {
 
     pub(crate) fn set_servers(&mut self, servers: Vec<HttpServer>) {
         self.servers = servers;
+    }
+
+    pub(crate) fn set_synthetic_routes(&mut self, synthetic_routes: Vec<SyntheticRoute>) {
+        self.synthetic_routes = synthetic_routes;
+    }
+
+    pub(crate) fn synthetic_routes(&self) -> &[SyntheticRoute] {
+        &self.synthetic_routes
     }
 }
 

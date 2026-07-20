@@ -10,6 +10,7 @@ use crate::request::Request;
 use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
 use crate::route_entry::RouteEntry;
+use crate::served_outcome::ServedOutcome;
 
 type PathHandlers = HashMap<&'static str, Arc<dyn Handler>>;
 
@@ -38,17 +39,17 @@ impl Router {
         &self,
         request: Request,
         forward_targets: &Arc<ForwardTargets>,
-    ) -> Response {
+    ) -> ServedOutcome {
         let path = request.inputs.server.path().to_string();
         let method = request.inputs.server.method();
 
         let matched = match self.matcher.at(&path) {
             Ok(matched) => matched,
-            Err(matchit::MatchError::NotFound) => return Response::not_found(),
+            Err(matchit::MatchError::NotFound) => return ServedOutcome::Http(Response::not_found()),
         };
 
         let Some(handler) = matched.value.get(method).cloned() else {
-            return Response::text(405, "Method Not Allowed");
+            return ServedOutcome::Http(Response::text(405, "Method Not Allowed"));
         };
 
         let path_params = matched
@@ -140,6 +141,7 @@ mod tests {
         router()
             .respond(Request::new(method, path.to_string()), &forward_targets)
             .await
+            .expect_http()
             .into_http()
             .status()
             .as_u16()

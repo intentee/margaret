@@ -1,0 +1,24 @@
+[package]
+name = "margaret_websocket"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = { workspace = true }
+futures-util = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+margaret_http = { path = "../margaret_http" }
+margaret_validation = { path = "../margaret_validation" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "sync"] }
+tokio-tungstenite = { workspace = true }
+tokio-util = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["io-util", "macros", "rt-multi-thread", "sync"] }
+
+[lints]
+workspace = true

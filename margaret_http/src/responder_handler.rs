@@ -101,6 +101,7 @@ mod tests {
 
         let response = respond_recursively(&forward_targets, request, handler)
             .await
+            .expect_http()
             .into_http();
 
         assert_eq!(response.status().as_u16(), 200);

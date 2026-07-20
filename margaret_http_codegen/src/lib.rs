@@ -27,6 +27,7 @@ mod responder_argument_binding;
 mod responder_method;
 mod responder_selectors;
 mod route_group;
+mod route_handler;
 mod route_parameter_arguments;
 mod route_parameter_binder;
 mod route_path;
@@ -44,9 +45,12 @@ mod tests {
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use quote::quote;
+
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_codegen_tokens::synthetic_route::SyntheticRoute;
 
     use crate::has_responders::has_responders;
     use crate::http_codegen_error::HttpCodegenError;
@@ -61,7 +65,7 @@ mod tests {
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
 
-        Ok(render_http(&index, has_views)?
+        Ok(render_http(&index, has_views, &[])?
             .into_modules()
             .into_iter()
             .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
@@ -265,7 +269,7 @@ impl GetHealth {
             .expect("the crate is indexed")
             .build();
 
-        crate::render_http::render_http(&index, false)
+        crate::render_http::render_http(&index, false, &[])
             .expect("the http source is generated")
             .into_modules()
             .into_iter()
@@ -1187,5 +1191,70 @@ impl GetMetrics {
         assert!(source.contains("Ok(model)=>model"));
         assert!(source.contains("Err(response)=>returnresponse.into()"));
         assert!(source.contains("responder.respond(data).await"));
+    }
+
+    fn synthetic(path: &str) -> SyntheticRoute {
+        SyntheticRoute {
+            handler: quote! { crate::built_websocket_handler() },
+            label: format!("websocket handshake for {path}"),
+            path: path.to_owned(),
+            server: "public".to_owned(),
+        }
+    }
+
+    fn http_source_with_synthetic(
+        lib_source: &str,
+        synthetic_routes: &[SyntheticRoute],
+    ) -> Result<String, HttpCodegenError> {
+        let index = index_for(lib_source);
+
+        Ok(render_http(&index, false, synthetic_routes)?
+            .into_modules()
+            .into_iter()
+            .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
+            .map(|module| module.format().expect("the module formats").source().to_string())
+            .collect::<Vec<String>>()
+            .join("\n")
+            .split_whitespace()
+            .collect())
+    }
+
+    #[test]
+    fn folds_a_synthetic_route_into_a_generated_server() {
+        let source = http_source_with_synthetic("struct Plain;\n", &[synthetic("/chat")])
+            .expect("the synthetic route is folded into the http server");
+
+        assert!(source.contains("pubasyncfnserver_public"));
+        assert!(source.contains("crate::built_websocket_handler()"));
+        assert!(source.contains("\"GET\""));
+        assert!(source.contains("\"/chat\""));
+    }
+
+    #[test]
+    fn reports_a_conflict_between_a_synthetic_route_and_an_http_route() {
+        let error = http_source_with_synthetic(
+            "#[responds_to_http(method = \"get\", path = \"/chat\", server = \"public\")]\nstruct GetChat;\nimpl GetChat {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+            &[synthetic("/chat")],
+        )
+        .expect_err("a synthetic route conflicting with an http route is rejected");
+
+        assert!(matches!(
+            error,
+            HttpCodegenError::DuplicateRoute { responder, .. }
+                if responder == "websocket handshake for /chat"
+        ));
+    }
+
+    #[test]
+    fn reports_a_conflict_between_two_synthetic_routes() {
+        let error =
+            http_source_with_synthetic("struct Plain;\n", &[synthetic("/chat"), synthetic("/chat")])
+                .expect_err("two synthetic routes on the same path are rejected");
+
+        assert!(matches!(
+            error,
+            HttpCodegenError::DuplicateRoute { existing_responder, .. }
+                if existing_responder == "websocket handshake for /chat"
+        ));
     }
 }

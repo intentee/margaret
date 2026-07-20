@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
+margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
 margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
 margaret_console_codegen = { path = "../margaret_console_codegen" }
 margaret_container = { path = "../margaret_container" }
@@ -12,6 +13,7 @@ margaret_generated_module = { path = "../margaret_generated_module" }
 margaret_http_codegen = { path = "../margaret_http_codegen" }
 margaret_service_codegen = { path = "../margaret_service_codegen" }
 margaret_views_codegen = { path = "../margaret_views_codegen" }
+margaret_websocket_codegen = { path = "../margaret_websocket_codegen" }
 thiserror = { workspace = true }
 
 [dev-dependencies]

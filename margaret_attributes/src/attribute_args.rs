@@ -95,6 +95,23 @@ impl AttributeArgs {
         }
     }
 
+    pub fn call_paths(&self, key: &str) -> Result<Vec<Path>, AttributeError> {
+        let Some(arguments) = self.call_arguments(key) else {
+            return Ok(Vec::new());
+        };
+
+        let mut paths = Vec::new();
+
+        for argument in arguments {
+            match argument {
+                Expr::Path(expression) => paths.push(expression.path.clone()),
+                _ => return Err(self.unexpected_argument(key, "path")),
+            }
+        }
+
+        Ok(paths)
+    }
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.named.is_empty() && self.positional.is_empty()
@@ -138,6 +155,18 @@ impl AttributeArgs {
             },
             Some(_) => Err(self.unexpected_argument(key, "string literal")),
         }
+    }
+
+    fn call_arguments(&self, key: &str) -> Option<&Punctuated<Expr, Token![,]>> {
+        self.positional
+            .iter()
+            .find_map(|expression| match expression {
+                Expr::Call(call) => match call.func.as_ref() {
+                    Expr::Path(func) if func.path.is_ident(key) => Some(&call.args),
+                    _ => None,
+                },
+                _ => None,
+            })
     }
 
     fn unexpected_argument(&self, key: &str, expected: &str) -> AttributeError {
@@ -240,5 +269,47 @@ mod tests {
         assert!(parsed.positional_path(0).is_some());
         assert!(parsed.positional_path(1).is_none());
         assert!(parsed.positional_path(99).is_none());
+    }
+
+    #[test]
+    fn reads_a_call_list_of_paths() {
+        let parsed = args(parse_quote!(
+            #[websocket_transition(from = crate::A, emits(crate::B, crate::C))]
+        ));
+
+        let paths = parsed.call_paths("emits").expect("the call paths parse");
+
+        assert_eq!(paths.len(), 2);
+    }
+
+    #[test]
+    fn an_absent_call_list_is_empty() {
+        let parsed = args(parse_quote!(#[websocket_transition(from = crate::A)]));
+
+        assert!(
+            parsed
+                .call_paths("emits")
+                .expect("an absent call list")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn rejects_a_non_path_call_argument() {
+        let parsed = args(parse_quote!(#[websocket_transition(emits(5))]));
+
+        assert!(parsed.call_paths("emits").is_err());
+    }
+
+    #[test]
+    fn ignores_positionals_that_are_not_the_requested_call() {
+        let parsed = args(parse_quote!(#[websocket_transition(other(crate::X), 5)]));
+
+        assert!(
+            parsed
+                .call_paths("emits")
+                .expect("no matching call is present")
+                .is_empty()
+        );
     }
 }

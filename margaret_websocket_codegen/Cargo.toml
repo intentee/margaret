@@ -1,0 +1,20 @@
+[package]
+name = "margaret_websocket_codegen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+margaret_attributes = { path = "../margaret_attributes" }
+margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
+margaret_generated_module = { path = "../margaret_generated_module" }
+margaret_injection_codegen = { path = "../margaret_injection_codegen" }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

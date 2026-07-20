@@ -17,6 +17,7 @@ use crate::layer_application::LayerApplication;
 use crate::middleware_plan::MiddlewarePlan;
 use crate::responder_method::responder_method;
 use crate::responder_selectors::ResponderSelectors;
+use crate::route_handler::RouteHandler;
 use crate::route_path::RoutePath;
 
 pub(crate) fn http_routes(
@@ -137,12 +138,14 @@ pub(crate) fn http_routes(
         table.insert(
             route_path,
             HttpRoute {
+                arguments,
+                handler: RouteHandler::Responder {
+                    field: format_ident!("{}", identifier.field()),
+                    path: item.canonical_path().clone(),
+                },
                 layers,
                 method,
                 name,
-                responder_field: format_ident!("{}", identifier.field()),
-                responder_path: item.canonical_path().clone(),
-                arguments,
                 server,
             },
         )?;

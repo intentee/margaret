@@ -9,6 +9,7 @@ use crate::generated_code::GeneratedCode;
 use crate::http_pass::http_pass;
 use crate::services_pass::services_pass;
 use crate::views_pass::views_pass;
+use crate::websocket_pass::websocket_pass;
 
 pub fn build(crate_root: &CrateRoot) -> Result<GeneratedCode, CodegenError> {
     let index = AttributeIndexBuilder::new()
@@ -18,6 +19,7 @@ pub fn build(crate_root: &CrateRoot) -> Result<GeneratedCode, CodegenError> {
 
     container_pass(&mut context)?;
     views_pass(&mut context)?;
+    websocket_pass(&mut context)?;
     http_pass(&mut context)?;
     services_pass(&mut context)?;
     console_pass(&mut context)?;
@@ -86,6 +88,49 @@ struct Greet;
 impl Greet {
     #[process]
     fn run(&self) -> CommandOutcome {}
+}
+";
+
+    const WEBSOCKET_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[websocket_state(server = \"public\", path = \"/ws\")]
+struct Fresh;
+
+#[websocket_state(terminal)]
+struct Ended;
+
+#[websocket_message(method = \"go\")]
+struct Go;
+
+#[singleton]
+#[websocket_transition(from = crate::Fresh, on = crate::Go)]
+struct Begin;
+
+impl Begin {
+    #[process]
+    fn on(&self) -> crate::Ended {}
+}
+";
+
+    const INVALID_WEBSOCKET_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[websocket_state]
+struct Fresh;
+
+#[websocket_message(method = \"go\")]
+struct Go;
+
+#[singleton]
+#[websocket_transition(from = crate::Fresh, on = crate::Go)]
+struct Begin;
+
+impl Begin {
+    #[process]
+    fn on(&self) -> crate::Fresh {}
 }
 ";
 
@@ -196,10 +241,36 @@ impl Greet {
         assert!(!module(&code, "mod").contains("pub mod http;"));
         assert!(!module(&code, "mod").contains("pub mod routes;"));
         assert!(!module(&code, "mod").contains("pub mod run;"));
+        assert!(!module(&code, "mod").contains("pub mod websocket;"));
         assert!(!has_module(&code, "http"));
         assert!(!has_module(&code, "routes"));
         assert!(!has_module(&code, "run"));
+        assert!(!has_module(&code, "websocket"));
         assert!(module(&code, "container").contains("struct Container"));
+    }
+
+    #[test]
+    fn generates_websocket_modules_and_folds_the_handshake_route() {
+        let code = generate(WEBSOCKET_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod websocket;"));
+        assert!(module(&code, "mod").contains("pub mod http;"));
+        assert!(module(&code, "mod").contains("pub mod run;"));
+        assert!(has_module(&code, "websocket"));
+        assert!(has_module(&code, "websocket/fresh"));
+        assert!(module(&code, "websocket/fresh").contains("pub struct Dispatcher"));
+        assert!(concatenated(&code).contains("super::super::websocket::fresh::build"));
+    }
+
+    #[test]
+    fn reports_a_websocket_error() {
+        let error = generate(INVALID_WEBSOCKET_CRATE).expect_err("an invalid protocol fails the build");
+
+        assert!(
+            error
+                .to_string()
+                .contains("failed to generate the websocket protocols")
+        );
     }
 
     #[test]

@@ -9,6 +9,10 @@ use margaret_macros::responds_to_http;
 use margaret_macros::scheduled_with_tick_timer;
 use margaret_macros::service;
 use margaret_macros::singleton;
+use margaret_macros::websocket_internal_event;
+use margaret_macros::websocket_message;
+use margaret_macros::websocket_state;
+use margaret_macros::websocket_transition;
 
 #[singleton]
 #[responds_to_http(method = Get, path = "/subject", server = "public")]
@@ -48,6 +52,18 @@ impl Binder {
 #[scheduled_with_tick_timer(interval = SomeInterval)]
 struct Worker;
 
+#[websocket_state(server = "public", path = "/subject/{id}")]
+struct FreshSubject;
+
+#[websocket_message(method = "subject.message")]
+struct SubjectMessage;
+
+#[websocket_internal_event]
+struct SubjectReady;
+
+#[websocket_transition(from = FreshSubject, on = SubjectMessage, emits(SubjectMessage))]
+struct AdvanceSubject;
+
 #[test]
 fn attribute_macros_leave_runtime_behavior_untouched() {
     let subject = Subject::create();
@@ -57,4 +73,8 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(Binder.bind("bound".to_string()), "bound");
 
     let _worker = Worker;
+    let _fresh_subject = FreshSubject;
+    let _subject_message = SubjectMessage;
+    let _subject_ready = SubjectReady;
+    let _advance_subject = AdvanceSubject;
 }

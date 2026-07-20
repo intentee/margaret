@@ -7,15 +7,21 @@ pub(crate) fn umbrella(
         has_console,
         has_http,
         has_views,
+        has_websocket,
         serves,
     }: Capabilities,
 ) -> GeneratedModule {
+    let serves_http = has_http || has_websocket;
     let mut source = String::from("#[rustfmt::skip]\npub mod container;\n");
 
-    if has_http {
+    if serves_http {
         source.push_str("#[rustfmt::skip]\npub mod forwarders;\n");
         source.push_str("#[rustfmt::skip]\npub mod http;\n");
         source.push_str("#[rustfmt::skip]\npub mod routes;\n");
+    }
+
+    if has_websocket {
+        source.push_str("#[rustfmt::skip]\npub mod websocket;\n");
     }
 
     if has_views && has_http {

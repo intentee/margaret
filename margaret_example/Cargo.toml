@@ -19,6 +19,7 @@ margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
 margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server" }
 margaret_validation = { path = "../margaret_validation" }
 margaret_views = { path = "../margaret_views" }
+margaret_websocket = { path = "../margaret_websocket" }
 maud = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 spiffe = { workspace = true, features = ["spiffe-types"] }

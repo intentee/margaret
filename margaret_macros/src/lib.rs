@@ -62,6 +62,26 @@ pub fn console_command(_attributes: TokenStream, item: TokenStream) -> TokenStre
     item
 }
 
+#[proc_macro_attribute]
+pub fn websocket_state(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn websocket_message(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn websocket_internal_event(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn websocket_transition(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
 fn strip_parameter_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
     strip_or_compile_error(item.into(), markers).into()
 }
