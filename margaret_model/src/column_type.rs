@@ -3,6 +3,7 @@ pub enum ColumnType {
     Boolean,
     Integer,
     Text,
+    Timestamptz,
     Uuid,
 }
 
@@ -14,6 +15,7 @@ impl ColumnType {
             ColumnType::Boolean => "BOOLEAN",
             ColumnType::Integer => "INTEGER",
             ColumnType::Text => "TEXT",
+            ColumnType::Timestamptz => "TIMESTAMPTZ",
             ColumnType::Uuid => "UUID",
         }
     }

@@ -1,5 +1,6 @@
-use std::time::SystemTimeError;
+use chrono::DateTime;
+use chrono::Utc;
 
 pub trait Clock: Send + Sync {
-    fn now(&self) -> Result<u64, SystemTimeError>;
+    fn now(&self) -> DateTime<Utc>;
 }

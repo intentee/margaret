@@ -55,4 +55,58 @@ pub enum ModelCodegenError {
         model: String,
         rust_type: String,
     },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' must also carry a #[column] attribute; #[foreign_key] layers on top of #[column]"
+    )]
+    ForeignKeyRequiresColumn { field: String, model: String },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' must not set a column name; foreign key column names are derived"
+    )]
+    ForeignKeyColumnNameIsDerived { field: String, model: String },
+
+    #[error("foreign key field '{field}' of model '{model}' cannot be a primary key")]
+    ForeignKeyCannotBePrimaryKey { field: String, model: String },
+
+    #[error(
+        "the positional foreign key field at index {position} of model '{model}' requires a named field"
+    )]
+    ForeignKeyRequiresNamedField { model: String, position: usize },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' has the type '{rust_type}', which is not a #[model]"
+    )]
+    ForeignKeyTargetNotAModel {
+        field: String,
+        model: String,
+        rust_type: String,
+    },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' references '{target}', which has no primary key"
+    )]
+    ForeignKeyTargetWithoutPrimaryKey {
+        field: String,
+        model: String,
+        target: String,
+    },
+
+    #[error(
+        "model '{model}' has a table name '{table}' of {length} bytes, exceeding the 63-byte PostgreSQL identifier limit"
+    )]
+    TableNameTooLong {
+        length: usize,
+        model: String,
+        table: String,
+    },
+
+    #[error(
+        "model '{model}' has a column name '{column}' of {length} bytes, exceeding the 63-byte PostgreSQL identifier limit"
+    )]
+    ColumnNameTooLong {
+        column: String,
+        length: usize,
+        model: String,
+    },
 }

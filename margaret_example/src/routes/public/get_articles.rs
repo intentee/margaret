@@ -34,11 +34,11 @@ impl GetArticles {
             .all()
             .into_iter()
             .filter(|article| match author {
-                Some(author) => article.author_id.as_str() == author,
+                Some(author) => article.author.name == author,
                 None => true,
             })
             .map(|article| {
-                let url = routes.public.get_article(article.id).url();
+                let url = routes.public.get_article(article.id.to_string()).url();
 
                 format!("{}: {url}", article.title)
             })
