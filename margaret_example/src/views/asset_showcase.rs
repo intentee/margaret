@@ -16,10 +16,14 @@ impl RendersView for AssetShowcase {
         asset_bag.add(asset!("resources/ts/app.ts"));
 
         let logo = asset_bag.image(asset!("resources/media/logo.png"));
+        let favicon = asset_bag.image(asset!("resources/media/favicon.svg"));
+        let font = asset_bag.file(asset!("resources/fonts/inter.woff2"));
 
         html! {
             main {
                 img src=(logo) alt="logo";
+                img src=(favicon) alt="favicon";
+                link rel="preload" href=(font) as="font" crossorigin;
                 p { "Assets demo" }
             }
         }
@@ -36,7 +40,7 @@ mod tests {
     use crate::views::asset_showcase_props::AssetShowcaseProps;
 
     #[test]
-    fn renders_the_logo_and_registers_the_entry_point() {
+    fn renders_static_assets_and_registers_the_entry_point() {
         let asset_bag = AssetBag::new();
 
         let markup = AssetShowcase
@@ -47,7 +51,14 @@ mod tests {
 
         assert_eq!(
             markup,
-            "<main><img src=\"/assets/logo_I9J0K1L2.png\" alt=\"logo\"><p>Assets demo</p></main>"
+            concat!(
+                "<main>",
+                "<img src=\"/assets/logo_I9J0K1L2.png\" alt=\"logo\">",
+                "<img src=\"/assets/favicon_M1N2O3P4.svg\" alt=\"favicon\">",
+                "<link rel=\"preload\" href=\"/assets/inter_U9V0W1X2.woff2\" as=\"font\" crossorigin>",
+                "<p>Assets demo</p>",
+                "</main>",
+            )
         );
         assert!(
             asset_bag

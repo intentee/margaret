@@ -1,7 +1,5 @@
 #[derive(Debug, thiserror::Error)]
 pub enum AssetBagCodegenError {
-    #[error("the esbuild input `{input}` is both an entry point and a static asset")]
-    AmbiguousInput { input: String },
     #[error(
         "the static esbuild input `{input}` resolves to {output_count} outputs instead of exactly one"
     )]

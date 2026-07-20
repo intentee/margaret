@@ -38,14 +38,6 @@ pub(crate) fn enumerate_inputs(
         }
     }
 
-    for entry_point in entrypoints.keys() {
-        if static_inputs.contains(entry_point) {
-            return Err(AssetBagCodegenError::AmbiguousInput {
-                input: entry_point.clone(),
-            });
-        }
-    }
-
     Ok(EnumeratedInputs {
         entrypoints,
         static_inputs,
@@ -95,25 +87,36 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_input_that_is_both_an_entry_point_and_a_static_input() {
-        assert!(matches!(
-            enumerate_inputs(&raw(
-                r#"{
-                    "outputs": {
-                        "assets/app_ABC.js": {
-                            "imports": [],
-                            "entryPoint": "src/app.ts",
-                            "inputs": {}
-                        },
-                        "assets/other_ABC.js": {
-                            "imports": [],
-                            "inputs": { "src/app.ts": {} }
-                        }
+    fn captures_a_file_loader_input_as_both_an_entry_point_and_a_static_input() {
+        let enumerated = enumerate_inputs(&raw(
+            r#"{
+                "outputs": {
+                    "assets/favicon_MWST2DE3.svg": {
+                        "imports": [],
+                        "inputs": { "resources/media/favicon.svg": {} }
+                    },
+                    "assets/favicon_VVSHRDNV.js": {
+                        "imports": [
+                            { "path": "assets/favicon_MWST2DE3.svg", "kind": "file-loader" }
+                        ],
+                        "entryPoint": "resources/media/favicon.svg",
+                        "inputs": { "resources/media/favicon.svg": {} }
                     }
-                }"#,
-            )),
-            Err(AssetBagCodegenError::AmbiguousInput { input }) if input == "src/app.ts"
-        ));
+                }
+            }"#,
+        ))
+        .expect("the inputs are enumerated");
+
+        assert!(
+            enumerated
+                .entrypoints
+                .contains_key("resources/media/favicon.svg")
+        );
+        assert!(
+            enumerated
+                .static_inputs
+                .contains("resources/media/favicon.svg")
+        );
     }
 
     #[test]
