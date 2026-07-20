@@ -11,6 +11,7 @@ use crate::http_pass::http_pass;
 use crate::model_pass::model_pass;
 use crate::services_pass::services_pass;
 use crate::views_pass::views_pass;
+use crate::websocket_pass::websocket_pass;
 
 pub fn build(
     crate_root: &CrateRoot,
@@ -21,7 +22,8 @@ pub fn build(
         .build();
     let mut context = BuildContext::new(&index, provided_singletons);
 
-    container_pass(&mut context)?;
+    let bindings = container_pass(&mut context)?;
+    websocket_pass(&mut context, &bindings)?;
     views_pass(&mut context)?;
     http_pass(&mut context)?;
     services_pass(&mut context)?;
@@ -105,6 +107,52 @@ struct Widget {
     #[column(primary_key, name = \"id\")]
     id: uuid::Uuid,
 }
+";
+
+    const WEBSOCKET_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+trait Clock {}
+
+#[singleton(provides = Clock)]
+struct SystemClock;
+
+impl SystemClock {
+    #[constructor]
+    fn create() -> Self {}
+}
+
+impl Clock for SystemClock {}
+
+#[websocket_session(path = \"/room/{name}\", server = \"public\")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build(clock: std::sync::Arc<dyn Clock>, #[route_parameter(from = \"name\")] name: String) -> Self {}
+}
+
+#[websocket_message(request, method = \"chat\", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+";
+
+    const INVALID_WEBSOCKET_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[websocket_session(path = \"/x\", server = \"public\")]
+struct Room;
 ";
 
     fn write_lib(directory: &TempDir, lib_source: &str) {
@@ -219,6 +267,24 @@ struct Widget {
         assert!(!has_module(&code, "routes"));
         assert!(!has_module(&code, "run"));
         assert!(module(&code, "container").contains("struct Container"));
+    }
+
+    #[test]
+    fn generates_the_websocket_module_for_websocket_sessions() {
+        let code = generate(WEBSOCKET_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod websocket;"));
+        assert!(module(&code, "mod").contains("pub mod http;"));
+        assert!(has_module(&code, "websocket"));
+        assert!(concatenated(&code).contains("WebSocketRequestMessage"));
+        assert!(concatenated(&code).contains("public_routes"));
+    }
+
+    #[test]
+    fn propagates_a_websocket_codegen_error() {
+        let error = generate(INVALID_WEBSOCKET_CRATE).expect_err("the invalid session is rejected");
+
+        assert!(error.to_string().contains("failed to generate the websockets"));
     }
 
     #[test]

@@ -19,20 +19,46 @@ fn indexes_associated_types() {
         .iter()
         .find(|item| item.canonical_path().to_string() == "associated_types::Producer")
         .expect("the producer struct is indexed");
-    let names: Vec<&str> = producer
+
+    let trait_impls = producer.trait_impls();
+
+    assert_eq!(trait_impls.len(), 1);
+
+    let produces = &trait_impls[0];
+
+    assert_eq!(produces.module_path().join("::"), "associated_types");
+    assert_eq!(
+        index
+            .resolve_module_path(produces.module_path(), produces.trait_path())
+            .expect("the trait path resolves at the impl site")
+            .to_string(),
+        "associated_types::Produces"
+    );
+
+    let names: Vec<&str> = produces
         .associated_types()
         .iter()
         .map(|associated_type| associated_type.name())
         .collect();
 
     assert_eq!(names, ["Extra", "Output"]);
+    assert!(produces.associated_type("Missing").is_none());
 
+    let output = produces
+        .associated_type("Output")
+        .expect("the Output associated type is indexed");
     let model = index
-        .resolve_item_path(producer, &parse_quote!(Model))
-        .expect("a same-module reference resolves");
+        .resolve_module_type(produces.module_path(), output.ty())
+        .expect("the associated type resolves at the impl site");
 
     assert_eq!(model.to_string(), "associated_types::Model");
     assert!(index.struct_identifier(&model).is_some());
+
+    let same_module = index
+        .resolve_item_path(producer, &parse_quote!(Model))
+        .expect("a same-module reference resolves");
+
+    assert_eq!(same_module.to_string(), "associated_types::Model");
     assert!(
         index
             .struct_identifier(&CanonicalPath::new(vec![

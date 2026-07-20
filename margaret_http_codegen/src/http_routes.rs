@@ -7,6 +7,7 @@ use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::format_path::format_path;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::build_registry::build_registry;
 use crate::http_codegen_error::HttpCodegenError;
@@ -17,7 +18,6 @@ use crate::layer_application::LayerApplication;
 use crate::middleware_plan::MiddlewarePlan;
 use crate::responder_method::responder_method;
 use crate::responder_selectors::ResponderSelectors;
-use crate::route_path::RoutePath;
 
 pub(crate) fn http_routes(
     index: &AttributeIndex,

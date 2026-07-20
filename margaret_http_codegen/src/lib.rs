@@ -29,12 +29,9 @@ mod responder_selectors;
 mod route_group;
 mod route_parameter_arguments;
 mod route_parameter_binder;
-mod route_path;
-mod route_url_template;
 mod server_route_group;
 pub mod server_transport_policy;
 pub mod serves_spiffe;
-mod url_segment;
 
 #[cfg(test)]
 mod tests {
@@ -61,11 +58,17 @@ mod tests {
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
 
-        Ok(render_http(&index, has_views)?
+        Ok(render_http(&index, has_views, &[])?
             .into_modules()
             .into_iter()
             .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
-            .map(|module| module.format().expect("the module formats").source().to_string())
+            .map(|module| {
+                module
+                    .format()
+                    .expect("the module formats")
+                    .source()
+                    .to_string()
+            })
             .collect::<Vec<String>>()
             .join("\n"))
     }
@@ -258,6 +261,52 @@ impl GetHealth {
         assert!(message.contains("injects &Views, but the crate defines no #[renders_view]"));
     }
 
+    const HEALTH_RESPONDER: &str = r#"
+#[responds_to_http(method = "get", path = "/health", server = "public")]
+struct Health;
+
+impl Health {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+"#;
+
+    fn websocket_http_source(lib_source: &str, websocket_servers: &[String]) -> String {
+        let index = index_for(lib_source);
+
+        render_http(&index, false, websocket_servers)
+            .expect("the http source is generated")
+            .into_modules()
+            .into_iter()
+            .filter(|module| module.name().starts_with("http/"))
+            .map(|module| {
+                module
+                    .format()
+                    .expect("the module formats")
+                    .source()
+                    .to_string()
+            })
+            .collect::<Vec<String>>()
+            .join("")
+            .split_whitespace()
+            .collect()
+    }
+
+    #[test]
+    fn splices_websocket_routes_into_a_server_with_http_routes() {
+        let source = websocket_http_source(HEALTH_RESPONDER, &["public".to_string()]);
+
+        assert!(source.contains("super::super::websocket::public_routes(container).await"));
+    }
+
+    #[test]
+    fn generates_a_server_module_for_a_websocket_only_server() {
+        let source = websocket_http_source(HEALTH_RESPONDER, &["realtime".to_string()]);
+
+        assert!(source.contains("pubasyncfnserver_realtime"));
+        assert!(source.contains("super::super::websocket::realtime_routes(container).await"));
+    }
+
     fn routes_source_for(lib_source: &str) -> String {
         let directory = crate_with(lib_source);
         let index = AttributeIndexBuilder::new()
@@ -265,12 +314,18 @@ impl GetHealth {
             .expect("the crate is indexed")
             .build();
 
-        crate::render_http::render_http(&index, false)
+        crate::render_http::render_http(&index, false, &[])
             .expect("the http source is generated")
             .into_modules()
             .into_iter()
             .filter(|module| module.name() == "routes" || module.name().starts_with("routes/"))
-            .map(|module| module.format().expect("the module formats").source().to_string())
+            .map(|module| {
+                module
+                    .format()
+                    .expect("the module formats")
+                    .source()
+                    .to_string()
+            })
             .collect::<Vec<String>>()
             .join("\n")
             .split_whitespace()
@@ -608,6 +663,15 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         assert!(!source.contains("http_route_parameter_binder::HttpRouteParameterBinder"));
         assert!(source.contains("responder.respond(user).await"));
         assert!(!source.contains("forbidden"));
+    }
+
+    #[test]
+    fn ignores_an_unrelated_trait_impl_when_resolving_the_binder_model() {
+        let source = source_for(
+            "struct User;\n\ntrait Marker {}\n\n#[provides_route_parameter]\nstruct UserBinder;\n\nimpl Marker for UserBinder {}\n\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\n\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("container.user_binder().await"));
     }
 
     #[test]

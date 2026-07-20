@@ -361,7 +361,12 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     }
 }
 
-fn server_module(table: &HttpRouteTable, server: &HttpServer, has_views: bool) -> TokenStream {
+fn server_module(
+    table: &HttpRouteTable,
+    server: &HttpServer,
+    has_views: bool,
+    has_websocket_routes: bool,
+) -> TokenStream {
     let function_name = server.function_name();
     let server_routes: Vec<&HttpRoute> = table
         .route_groups(server.name())
@@ -425,6 +430,23 @@ fn server_module(table: &HttpRouteTable, server: &HttpServer, has_views: bool) -
         })
     });
     let named_handlers = vec_literal_tokens(named_handlers);
+    let router = if has_websocket_routes {
+        let websocket_routes = format_ident!("{}_routes", server.name());
+
+        quote! {
+            {
+                let mut route_entries = #route_entries;
+
+                route_entries.extend(
+                    super::super::websocket::#websocket_routes(container).await,
+                );
+
+                margaret_http::router::Router::build(route_entries)
+            }
+        }
+    } else {
+        quote! { margaret_http::router::Router::build(#route_entries) }
+    };
 
     quote! {
         pub async fn #function_name(
@@ -437,7 +459,7 @@ fn server_module(table: &HttpRouteTable, server: &HttpServer, has_views: bool) -
         > {
             #(#handler_bindings)*
 
-            margaret_http::router::Router::build(#route_entries).map(|router| {
+            #router.map(|router| {
                 margaret_http::server_routes::ServerRoutes::new(router, #named_handlers)
             })
         }
@@ -449,6 +471,7 @@ pub(crate) fn render(
     servers: &[HttpServer],
     middleware_plans: &[MiddlewarePlan],
     has_views: bool,
+    websocket_servers: &[String],
 ) -> Vec<GeneratedModuleTokens> {
     let middleware_wrappers = middleware_plans.iter().map(middleware_wrapper);
     let server_declarations = servers.iter().map(|server| {
@@ -468,9 +491,13 @@ pub(crate) fn render(
     let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];
 
     for server in servers {
+        let has_websocket_routes = websocket_servers
+            .iter()
+            .any(|websocket_server| websocket_server == server.name());
+
         modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
-            server_module(table, server, has_views),
+            server_module(table, server, has_views, has_websocket_routes),
         ));
     }
 

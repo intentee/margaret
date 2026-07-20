@@ -18,6 +18,7 @@ pub mod sweep_interval;
 pub mod system_clock;
 pub mod tickers;
 pub mod views;
+pub mod websocket;
 
 #[rustfmt::skip]
 pub mod margaret;

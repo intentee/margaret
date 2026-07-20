@@ -5,11 +5,11 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_route_parameter_codegen::url_segment::UrlSegment;
 
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::named_route::NamedRoute;
-use crate::url_segment::UrlSegment;
 
 struct ServerLayout<'server> {
     constructor: Ident,

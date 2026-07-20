@@ -1,5 +1,6 @@
+use margaret_route_parameter_codegen::route_path::RoutePath;
+
 use crate::http_route::HttpRoute;
-use crate::route_path::RoutePath;
 
 pub(crate) struct NamedRoute<'route> {
     pub(crate) name: &'route str,

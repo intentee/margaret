@@ -1,4 +1,4 @@
-pub(crate) enum UrlSegment {
+pub enum UrlSegment {
     Literal(String),
     Parameter(String),
 }

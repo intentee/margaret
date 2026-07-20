@@ -13,16 +13,15 @@ fn associated_model(
     item: &IndexedItem,
     associated_type_name: &str,
 ) -> Option<CanonicalPath> {
-    let associated_type = item
-        .associated_types()
-        .iter()
-        .find(|associated_type| associated_type.name() == associated_type_name)?;
-    let resolved = index.resolve_item_type(item, associated_type.ty())?;
+    item.trait_impls().iter().find_map(|trait_impl| {
+        let associated_type = trait_impl.associated_type(associated_type_name)?;
+        let resolved = index.resolve_module_type(trait_impl.module_path(), associated_type.ty())?;
 
-    index
-        .struct_identifier(&resolved)
-        .is_some()
-        .then_some(resolved)
+        index
+            .struct_identifier(&resolved)
+            .is_some()
+            .then_some(resolved)
+    })
 }
 
 pub(crate) fn build_registry(

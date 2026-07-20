@@ -14,6 +14,7 @@ margaret_http_codegen = { path = "../margaret_http_codegen" }
 margaret_model_codegen = { path = "../margaret_model_codegen" }
 margaret_service_codegen = { path = "../margaret_service_codegen" }
 margaret_views_codegen = { path = "../margaret_views_codegen" }
+margaret_websocket_codegen = { path = "../margaret_websocket_codegen" }
 thiserror = { workspace = true }
 
 [dev-dependencies]

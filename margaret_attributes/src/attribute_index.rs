@@ -87,20 +87,30 @@ impl AttributeIndex {
 
     #[must_use]
     pub fn resolve_item_path(&self, item: &IndexedItem, path: &Path) -> Option<CanonicalPath> {
+        self.resolve_module_path(self.module_of(item), path)
+    }
+
+    #[must_use]
+    pub fn resolve_item_type(&self, item: &IndexedItem, declared: &Type) -> Option<CanonicalPath> {
+        self.resolve_module_type(self.module_of(item), declared)
+    }
+
+    #[must_use]
+    pub fn resolve_module_path(&self, module: &[String], path: &Path) -> Option<CanonicalPath> {
         resolve_path(
             path,
-            self.module_of(item),
-            self.imports_of(item),
+            module,
+            self.imports_for_module(module),
             &self.item_paths,
         )
     }
 
     #[must_use]
-    pub fn resolve_item_type(&self, item: &IndexedItem, declared: &Type) -> Option<CanonicalPath> {
+    pub fn resolve_module_type(&self, module: &[String], declared: &Type) -> Option<CanonicalPath> {
         resolve_type(
             declared,
-            self.module_of(item),
-            self.imports_of(item),
+            module,
+            self.imports_for_module(module),
             &self.item_paths,
         )
     }
@@ -123,9 +133,9 @@ impl AttributeIndex {
         self.identifiers.get(path)
     }
 
-    fn imports_of(&self, item: &IndexedItem) -> &ModuleImports {
+    fn imports_for_module(&self, module: &[String]) -> &ModuleImports {
         self.imports
-            .get(&CanonicalPath::new(self.module_of(item).to_vec()))
+            .get(&CanonicalPath::new(module.to_vec()))
             .unwrap_or(&self.empty_imports)
     }
 

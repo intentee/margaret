@@ -1,0 +1,24 @@
+[package]
+name = "margaret_websocket_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dependencies]
+async-trait = { workspace = true }
+futures-util = { workspace = true }
+margaret_http = { path = "../margaret_http" }
+margaret_websocket = { path = "../margaret_websocket" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "rt-multi-thread", "sync"] }
+tokio-tungstenite = { workspace = true }
+tokio-util = { workspace = true }
+validator = { workspace = true, features = ["derive"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

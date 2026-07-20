@@ -8,22 +8,28 @@ pub(crate) fn umbrella(
         has_http,
         has_models,
         has_views,
+        has_websockets,
         serves,
     }: Capabilities,
 ) -> GeneratedModule {
+    let serves_http = has_http || has_websockets;
     let mut source = String::from("#[rustfmt::skip]\npub mod container;\n");
 
-    if has_http {
+    if serves_http {
         source.push_str("#[rustfmt::skip]\npub mod forwarders;\n");
         source.push_str("#[rustfmt::skip]\npub mod http;\n");
         source.push_str("#[rustfmt::skip]\npub mod routes;\n");
+    }
+
+    if has_websockets {
+        source.push_str("#[rustfmt::skip]\npub mod websocket;\n");
     }
 
     if has_models {
         source.push_str("#[rustfmt::skip]\npub mod schema;\n");
     }
 
-    if has_views && has_http {
+    if has_views && serves_http {
         source.push_str("#[rustfmt::skip]\npub mod views;\n");
     }
 

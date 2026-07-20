@@ -24,8 +24,15 @@ pub fn generate_container_source_with_provided(
         .build();
 
     let source = render_container(&index, provided)?
+        .modules
         .into_iter()
-        .map(|module| module.format().expect("the module formats").source().to_string())
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .to_string()
+        })
         .collect::<Vec<String>>()
         .join("\n");
 

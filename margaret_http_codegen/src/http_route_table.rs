@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 
+use margaret_route_parameter_codegen::route_path::RoutePath;
+
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
 use crate::named_route::NamedRoute;
 use crate::route_group::RouteGroup;
-use crate::route_path::RoutePath;
 use crate::server_route_group::ServerRouteGroup;
 
 pub(crate) struct HttpRouteTable {

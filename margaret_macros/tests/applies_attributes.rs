@@ -1,3 +1,4 @@
+use margaret_macros::build_for_session;
 use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
@@ -10,6 +11,8 @@ use margaret_macros::responds_to_http;
 use margaret_macros::scheduled_with_tick_timer;
 use margaret_macros::service;
 use margaret_macros::singleton;
+use margaret_macros::websocket_message;
+use margaret_macros::websocket_session;
 
 #[singleton]
 #[responds_to_http(method = Get, path = "/subject", server = "public")]
@@ -57,6 +60,23 @@ struct Record {
     label: String,
 }
 
+#[websocket_session(path = "/session/{topic}", server = "public")]
+struct Session {
+    topic: String,
+}
+
+impl Session {
+    #[build_for_session]
+    fn build(#[route_parameter(from = "topic")] topic: String) -> Self {
+        Self { topic }
+    }
+}
+
+#[websocket_message(request, method = "message", response = single)]
+struct Message {
+    field: String,
+}
+
 #[test]
 fn attribute_macros_leave_runtime_behavior_untouched() {
     let subject = Subject::create();
@@ -74,4 +94,14 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
 
     assert_eq!(record.id, "the-id");
     assert_eq!(record.label, "the-label");
+
+    let session = Session::build("weather".to_string());
+
+    assert_eq!(session.topic, "weather");
+
+    let message = Message {
+        field: "value".to_string(),
+    };
+
+    assert_eq!(message.field, "value");
 }

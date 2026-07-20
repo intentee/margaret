@@ -1,6 +1,7 @@
 use crate::url_segment::UrlSegment;
 
-pub(crate) fn route_url_template(path: &str) -> Vec<UrlSegment> {
+#[must_use]
+pub fn route_url_template(path: &str) -> Vec<UrlSegment> {
     let mut segments = Vec::new();
     let mut literal = String::new();
     let mut characters = path.chars().peekable();
