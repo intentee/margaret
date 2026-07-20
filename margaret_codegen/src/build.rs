@@ -8,6 +8,7 @@ use crate::console_pass::console_pass;
 use crate::container_pass::container_pass;
 use crate::generated_code::GeneratedCode;
 use crate::http_pass::http_pass;
+use crate::model_pass::model_pass;
 use crate::services_pass::services_pass;
 use crate::views_pass::views_pass;
 
@@ -25,6 +26,7 @@ pub fn build(
     views_pass(&mut context)?;
     http_pass(&mut context)?;
     services_pass(&mut context)?;
+    model_pass(&mut context)?;
     console_pass(&mut context)?;
 
     context.into_generated_code()
@@ -50,6 +52,7 @@ mod tests {
     use crate::container_pass::container_pass;
     use crate::generated_code::GeneratedCode;
     use crate::http_pass::http_pass;
+    use crate::model_pass::model_pass;
     use crate::services_pass::services_pass;
     use crate::umbrella::umbrella;
     use crate::views_pass::views_pass;
@@ -95,6 +98,17 @@ impl Greet {
 }
 ";
 
+    const MODELS_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[model(table = \"widgets\")]
+struct Widget {
+    #[column(primary_key, name = \"id\")]
+    id: uuid::Uuid,
+}
+";
+
     fn write_lib(directory: &TempDir, lib_source: &str) {
         let source_directory = directory.path().join("src");
 
@@ -137,6 +151,7 @@ impl Greet {
         views_pass(&mut context).expect("the views pass succeeds");
         http_pass(&mut context).expect("the http pass succeeds");
         services_pass(&mut context).expect("the services pass succeeds");
+        model_pass(&mut context).expect("the model pass succeeds");
         console_pass(&mut context).expect("the console pass succeeds");
 
         let mut modules: Vec<GeneratedModule> = context
@@ -535,5 +550,33 @@ impl New {
 
         assert!(http.contains("container:&super::super::container::Container"));
         assert!(!http.contains("usesuper::container::Container"));
+    }
+
+    #[test]
+    fn generates_the_schema_module_and_command_when_models_exist() {
+        let code = generate(MODELS_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod schema;"));
+        assert!(module(&code, "mod").contains("pub mod run;"));
+        assert!(!has_module(&code, "http"));
+        assert!(module(&code, "schema").contains("pub fn schema"));
+        assert!(module(&code, "schema").contains("\"widgets\""));
+        assert!(module(&code, "schema").contains("ColumnType::Uuid"));
+
+        let run: String = module(&code, "run").split_whitespace().collect();
+
+        assert!(run.contains("\"schema\""));
+        assert!(run.contains("super::schema::schema()"));
+    }
+
+    #[test]
+    fn propagates_a_models_failure() {
+        let message = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[model(table = \"widgets\")]\nstruct Widget {\n    #[column]\n    id: u64,\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(message.contains("failed to generate the models"));
     }
 }

@@ -1,8 +1,10 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
+use syn::Attribute;
 use syn::FnArg;
 use syn::ImplItemFn;
+use syn::ItemStruct;
 
 #[proc_macro_attribute]
 pub fn singleton(_attributes: TokenStream, item: TokenStream) -> TokenStream {
@@ -43,6 +45,11 @@ pub fn renders_view(_attributes: TokenStream, item: TokenStream) -> TokenStream 
 }
 
 #[proc_macro_attribute]
+pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    strip_field_markers(item, &["column"])
+}
+
+#[proc_macro_attribute]
 pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
@@ -62,15 +69,35 @@ pub fn console_command(_attributes: TokenStream, item: TokenStream) -> TokenStre
     item
 }
 
+fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {
+    attributes.retain(|attribute| {
+        !markers
+            .iter()
+            .any(|marker| attribute.path().is_ident(marker))
+    });
+}
+
+fn or_compile_error(result: Result<TokenStream2, syn::Error>) -> TokenStream2 {
+    match result {
+        Ok(stripped) => stripped,
+        Err(error) => error.to_compile_error(),
+    }
+}
+
 fn strip_parameter_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
     strip_or_compile_error(item.into(), markers).into()
 }
 
+fn strip_field_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
+    strip_struct_or_compile_error(item.into(), markers).into()
+}
+
 fn strip_or_compile_error(item: TokenStream2, markers: &[&str]) -> TokenStream2 {
-    match strip(item, markers) {
-        Ok(stripped) => stripped,
-        Err(error) => error.to_compile_error(),
-    }
+    or_compile_error(strip(item, markers))
+}
+
+fn strip_struct_or_compile_error(item: TokenStream2, markers: &[&str]) -> TokenStream2 {
+    or_compile_error(strip_struct(item, markers))
 }
 
 fn strip(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
@@ -78,15 +105,21 @@ fn strip(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Erro
 
     for input in &mut function.sig.inputs {
         if let FnArg::Typed(pattern_type) = input {
-            pattern_type.attrs.retain(|attribute| {
-                !markers
-                    .iter()
-                    .any(|marker| attribute.path().is_ident(marker))
-            });
+            retain_non_marker_attributes(&mut pattern_type.attrs, markers);
         }
     }
 
     Ok(quote!(#function))
+}
+
+fn strip_struct(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
+    let mut item_struct: ItemStruct = syn::parse2(item)?;
+
+    for field in &mut item_struct.fields {
+        retain_non_marker_attributes(&mut field.attrs, markers);
+    }
+
+    Ok(quote!(#item_struct))
 }
 
 #[cfg(test)]
@@ -94,6 +127,7 @@ mod tests {
     use quote::quote;
 
     use super::strip_or_compile_error;
+    use super::strip_struct_or_compile_error;
 
     #[test]
     fn removes_console_argument_markers_from_parameters() {
@@ -146,6 +180,34 @@ mod tests {
     fn turns_a_parse_error_into_a_compile_error() {
         let output =
             strip_or_compile_error(quote! { struct NotAMethod; }, &["route_parameter"]).to_string();
+
+        assert!(output.contains("compile_error"));
+    }
+
+    #[test]
+    fn removes_column_markers_from_struct_fields() {
+        let stripped = strip_struct_or_compile_error(
+            quote! {
+                struct Article {
+                    #[column(primary_key, name = "id")]
+                    id: Uuid,
+                    #[column]
+                    title: String,
+                }
+            },
+            &["column"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("column"));
+        assert!(stripped.contains("id"));
+        assert!(stripped.contains("title"));
+    }
+
+    #[test]
+    fn turns_a_struct_parse_error_into_a_compile_error() {
+        let output =
+            strip_struct_or_compile_error(quote! { fn not_a_struct() {} }, &["column"]).to_string();
 
         assert!(output.contains("compile_error"));
     }

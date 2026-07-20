@@ -7,6 +7,7 @@ pub(crate) fn umbrella(
         has_asset_bag,
         has_console,
         has_http,
+        has_models,
         has_views,
         serves,
     }: Capabilities,
@@ -21,6 +22,10 @@ pub(crate) fn umbrella(
         source.push_str("#[rustfmt::skip]\npub mod forwarders;\n");
         source.push_str("#[rustfmt::skip]\npub mod http;\n");
         source.push_str("#[rustfmt::skip]\npub mod routes;\n");
+    }
+
+    if has_models {
+        source.push_str("#[rustfmt::skip]\npub mod schema;\n");
     }
 
     if has_views && has_http {

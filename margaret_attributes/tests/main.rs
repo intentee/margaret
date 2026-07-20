@@ -4,6 +4,7 @@ mod ignores_items_that_are_not_named_definitions;
 mod indexes_associated_types;
 mod indexes_every_item_across_inline_and_file_modules;
 mod indexes_inherent_impl_constructor_method;
+mod indexes_struct_fields;
 mod items_are_sorted_by_canonical_path;
 mod records_each_item_kind;
 mod rejects_ambiguous_module_files;

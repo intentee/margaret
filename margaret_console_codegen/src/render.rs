@@ -74,11 +74,28 @@ fn command_arm(command: &ConsoleCommand) -> TokenStream {
 pub(crate) fn render(
     commands: &[ConsoleCommand],
     serves: bool,
+    has_models: bool,
     servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
 ) -> TokenStream {
     let subcommands = commands.iter().map(subcommand_registration);
     let arms = commands.iter().map(command_arm);
+
+    let schema_registration = if has_models {
+        quote! {
+            .subcommand(clap::Command::new("schema"))
+        }
+    } else {
+        quote! {}
+    };
+
+    let schema_arm = if has_models {
+        quote! {
+            Some(("schema", _matches)) => super::schema::schema(),
+        }
+    } else {
+        quote! {}
+    };
 
     let serve_registration = if serves {
         let spiffe_secured = serves_spiffe(servers);
@@ -138,12 +155,14 @@ pub(crate) fn render(
         {
             let mut command = clap::Command::new(env!("CARGO_PKG_NAME"))
                 #(#subcommands)*
-                #serve_registration;
+                #serve_registration
+                #schema_registration;
 
             match command.try_get_matches_from_mut(args) {
                 Ok(matches) => match matches.subcommand() {
                     #(#arms)*
                     #serve_arm
+                    #schema_arm
                     _ => margaret_console::print_help::print_help(&mut command),
                 },
                 Err(error) => {

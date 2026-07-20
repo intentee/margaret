@@ -9,6 +9,7 @@ mod format_pass;
 pub mod generate;
 pub mod generated_code;
 mod http_pass;
+mod model_pass;
 mod services_pass;
 mod umbrella;
 mod views_pass;

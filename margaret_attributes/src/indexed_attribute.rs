@@ -24,7 +24,7 @@ impl IndexedAttribute {
         self.attribute.path()
     }
 
-    pub(crate) fn args(&self) -> Result<&AttributeArgs, AttributeError> {
+    pub fn args(&self) -> Result<&AttributeArgs, AttributeError> {
         if let Some(cached) = self.args_cache.get() {
             return Ok(cached);
         }

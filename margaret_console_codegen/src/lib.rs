@@ -87,7 +87,7 @@ impl Farewell {
             Vec::new()
         };
 
-        render_console(&index_for(lib_source), has_http, &servers, &[])
+        render_console(&index_for(lib_source), has_http, false, &servers, &[])
             .expect("the console source is generated")
             .format()
             .expect("the module formats")
@@ -97,7 +97,7 @@ impl Farewell {
     }
 
     fn error_for(lib_source: &str) -> String {
-        render_console(&index_for(lib_source), false, &[], &[])
+        render_console(&index_for(lib_source), false, false, &[], &[])
             .expect_err("the console source fails to generate")
             .to_string()
     }
@@ -156,6 +156,7 @@ impl Farewell {
         let source: String = render_console(
             &index_for("struct App;\n"),
             true,
+            false,
             &[
                 HttpServer::new(
                     "internal".to_string(),
@@ -199,6 +200,7 @@ impl Farewell {
         let source: String = render_console(
             &index_for("struct App;\n"),
             true,
+            false,
             &[
                 HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
                 HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
@@ -224,7 +226,7 @@ impl Farewell {
 
     #[test]
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
-        let source: String = render_console(&index_for("struct App;\n"), true, &[], &[])
+        let source: String = render_console(&index_for("struct App;\n"), true, false, &[], &[])
             .expect("the console source is generated")
             .format()
             .expect("the module formats")
@@ -235,6 +237,20 @@ impl Farewell {
         assert!(source.contains(r#"clap::Command::new("serve")"#));
         assert!(!source.contains(r#"clap::Arg::new("addr")"#));
         assert!(!source.contains("-addr"));
+    }
+
+    #[test]
+    fn adds_a_schema_command_when_models_exist() {
+        let source: String = render_console(&index_for("struct App;\n"), false, true, &[], &[])
+            .expect("the console source is generated")
+            .format()
+            .expect("the module formats")
+            .source()
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(r#"clap::Command::new("schema")"#));
+        assert!(source.contains(r#"Some(("schema",_matches))=>super::schema::schema()"#));
     }
 
     #[test]

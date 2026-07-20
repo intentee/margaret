@@ -2,6 +2,7 @@ use crate::attribute_error::AttributeError;
 use crate::attribute_selector::AttributeSelector;
 use crate::indexed_item::IndexedItem;
 use crate::matched_attribute::MatchedAttribute;
+use crate::select_unique_attribute::select_unique_attribute;
 
 pub struct AttributeQuery<'index> {
     item: &'index IndexedItem,
@@ -17,16 +18,11 @@ impl<'index> AttributeQuery<'index> {
         &self,
         selector: &AttributeSelector,
     ) -> Result<Option<MatchedAttribute<'index>>, AttributeError> {
-        let mut matches = self.find_all(selector);
+        let unique = select_unique_attribute(self.item.attributes(), selector, || {
+            self.item.canonical_path().to_string()
+        })?;
 
-        if matches.len() > 1 {
-            return Err(AttributeError::RepeatedAttribute {
-                attribute_path: selector.display_path(),
-                target: self.item.canonical_path().to_string(),
-            });
-        }
-
-        Ok(matches.pop())
+        Ok(unique.map(|attribute| MatchedAttribute::new(self.item, attribute)))
     }
 
     #[must_use]
@@ -67,6 +63,7 @@ mod tests {
             "Service".to_string(),
             CanonicalPath::new(vec!["crate".to_string(), "Service".to_string()]),
             attributes,
+            Vec::new(),
         )
     }
 

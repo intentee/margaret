@@ -1337,6 +1337,7 @@ dependencies = [
  "margaret_container",
  "margaret_generated_module",
  "margaret_http_codegen",
+ "margaret_model_codegen",
  "margaret_service_codegen",
  "margaret_views_codegen",
  "quote",
@@ -1428,6 +1429,7 @@ dependencies = [
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
  "margaret_macros",
+ "margaret_model",
  "margaret_service",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_server",
@@ -1440,6 +1442,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trzcina",
+ "uuid",
  "validator",
 ]
 
@@ -1672,6 +1675,23 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "margaret_model"
+version = "0.1.0"
+
+[[package]]
+name = "margaret_model_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_generated_module",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -2101,9 +2121,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.21.4"
+version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "openssl"
