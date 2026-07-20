@@ -24,7 +24,8 @@ fn responds_to_notification_path() -> CanonicalPath {
 }
 
 fn handler_kind(index: &AttributeIndex, trait_impl: &IndexedTraitImpl) -> Option<HandlerKind> {
-    let trait_path = index.resolve_module_path(trait_impl.module_path(), trait_impl.trait_path())?;
+    let trait_path =
+        index.resolve_module_path(trait_impl.module_path(), trait_impl.trait_path())?;
 
     if trait_path == responds_to_message_path() {
         Some(HandlerKind::Request)

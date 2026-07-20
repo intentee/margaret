@@ -1,5 +1,5 @@
-pub mod build;
 mod asset_bag_pass;
+pub mod build;
 mod build_context;
 mod capabilities;
 pub mod codegen_error;

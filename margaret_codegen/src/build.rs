@@ -330,7 +330,11 @@ struct Room;
     fn propagates_a_websocket_codegen_error() {
         let error = generate(INVALID_WEBSOCKET_CRATE).expect_err("the invalid session is rejected");
 
-        assert!(error.to_string().contains("failed to generate the websockets"));
+        assert!(
+            error
+                .to_string()
+                .contains("failed to generate the websockets")
+        );
     }
 
     #[test]

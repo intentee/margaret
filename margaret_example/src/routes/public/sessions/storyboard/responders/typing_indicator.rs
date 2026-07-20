@@ -35,6 +35,8 @@ impl RespondsToWebSocketNotification for TypingIndicator {
         message: NotificationEnvelope<Typing>,
         _socket: WebSocket,
     ) {
-        session.record(format!("{} is typing", message.message().who)).await;
+        session
+            .record(format!("{} is typing", message.message().who))
+            .await;
     }
 }

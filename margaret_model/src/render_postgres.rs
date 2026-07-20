@@ -260,8 +260,18 @@ mod tests {
         let schema = Schema {
             tables: vec![Table {
                 columns: vec![
-                    column("order_region", ColumnType::Text, false, ColumnDefault::NotSet),
-                    column("order_number", ColumnType::BigInt, false, ColumnDefault::NotSet),
+                    column(
+                        "order_region",
+                        ColumnType::Text,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
+                    column(
+                        "order_number",
+                        ColumnType::BigInt,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
                 ],
                 foreign_keys: vec![foreign_key(
                     &["order_region", "order_number"],
@@ -283,7 +293,12 @@ mod tests {
     fn renders_a_nullable_foreign_key_column() {
         let schema = Schema {
             tables: vec![Table {
-                columns: vec![column("author_id", ColumnType::Uuid, true, ColumnDefault::NotSet)],
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    true,
+                    ColumnDefault::NotSet,
+                )],
                 foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors")],
                 name: "posts".to_string(),
                 primary_key: Vec::new(),

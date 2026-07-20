@@ -101,9 +101,7 @@ pub enum WebSocketCodegenError {
     #[error("message '{message}' has no handler")]
     MessageWithoutHandler { message: String },
 
-    #[error(
-        "session '{session}' binds method '{method}' more than once: '{first}' and '{second}'"
-    )]
+    #[error("session '{session}' binds method '{method}' more than once: '{first}' and '{second}'")]
     DuplicateMethodInSession {
         session: String,
         method: String,

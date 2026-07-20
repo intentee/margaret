@@ -75,7 +75,9 @@ mod tests {
     #[test]
     fn renders_a_module_preload() {
         assert_eq!(
-            rendered(Preload::Module(AssetHref::Local("assets/chunk_ABC12345.js"))),
+            rendered(Preload::Module(AssetHref::Local(
+                "assets/chunk_ABC12345.js"
+            ))),
             "<link rel=\"modulepreload\" href=\"/assets/chunk_ABC12345.js\">"
         );
     }

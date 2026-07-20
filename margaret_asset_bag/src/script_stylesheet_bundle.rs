@@ -61,7 +61,10 @@ impl RegistersIncludes for ScriptStylesheetBundle {
     }
 
     fn output_preloads(&self) -> Vec<Preload> {
-        vec![self.script_output_preload(), self.stylesheet_output_preload()]
+        vec![
+            self.script_output_preload(),
+            self.stylesheet_output_preload(),
+        ]
     }
 
     fn preloads(&self) -> &'static [Preload] {

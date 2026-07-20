@@ -1,7 +1,7 @@
 pub mod delete_article;
 pub mod get_article;
-pub mod get_asset;
 pub mod get_articles;
+pub mod get_asset;
 pub mod get_assets_demo;
 pub mod get_farewell_card;
 pub mod get_featured;

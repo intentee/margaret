@@ -71,7 +71,8 @@ struct CardLayout;
 
     #[test]
     fn generates_a_views_struct_and_builder() {
-        let source = formatted(render_views(&index_for(VALID_VIEW)).expect("the views are generated"));
+        let source =
+            formatted(render_views(&index_for(VALID_VIEW)).expect("the views are generated"));
 
         assert!(source.contains("pub struct Views"));
         assert!(source.contains("pub the_card: ::std::sync::Arc<crate::CardLayout>"));
@@ -92,11 +93,9 @@ struct CardLayout;
 
     #[test]
     fn rejects_a_view_without_a_singleton() {
-        let message = render_views(&index_for(
-            "#[renders_view(name = \"bad\")]\nstruct Bad;\n",
-        ))
-        .expect_err("a view without #[singleton] is rejected")
-        .to_string();
+        let message = render_views(&index_for("#[renders_view(name = \"bad\")]\nstruct Bad;\n"))
+            .expect_err("a view without #[singleton] is rejected")
+            .to_string();
 
         assert!(message.contains("must also carry #[singleton]"));
     }
@@ -125,11 +124,9 @@ struct CardLayout;
 
     #[test]
     fn rejects_a_view_without_a_name() {
-        let message = render_views(&index_for(
-            "#[renders_view]\n#[singleton]\nstruct Bad;\n",
-        ))
-        .expect_err("a view without a name is rejected")
-        .to_string();
+        let message = render_views(&index_for("#[renders_view]\n#[singleton]\nstruct Bad;\n"))
+            .expect_err("a view without a name is rejected")
+            .to_string();
 
         assert!(message.contains("is missing the 'name' argument"));
     }

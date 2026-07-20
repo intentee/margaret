@@ -21,7 +21,9 @@ pub enum ViewsCodegenError {
     )]
     ViewProvidesInterface { view: String },
 
-    #[error("#[renders_view] '{view}' is declared more than once; a view struct maps to exactly one view")]
+    #[error(
+        "#[renders_view] '{view}' is declared more than once; a view struct maps to exactly one view"
+    )]
     DuplicateViewDeclaration { view: String },
 
     #[error("view '{view}' is missing the 'name' argument")]

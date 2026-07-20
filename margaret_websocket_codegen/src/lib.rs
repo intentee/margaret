@@ -243,12 +243,20 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn rejects_a_message_that_is_not_a_struct() {
-        assert!(error(r#"#[websocket_message(response)] enum Bad {}"#).to_string().contains("carries #[websocket_message]"));
+        assert!(
+            error(r#"#[websocket_message(response)] enum Bad {}"#)
+                .to_string()
+                .contains("carries #[websocket_message]")
+        );
     }
 
     #[test]
     fn rejects_a_message_without_a_kind() {
-        assert!(error(r#"#[websocket_message(method = "x")] struct Bad;"#).to_string().contains("must declare a message kind"));
+        assert!(
+            error(r#"#[websocket_message(method = "x")] struct Bad;"#)
+                .to_string()
+                .contains("must declare a message kind")
+        );
     }
 
     #[test]
@@ -258,17 +266,29 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn rejects_a_request_without_a_method() {
-        assert!(error(r#"#[websocket_message(request, response = single)] struct Bad;"#).to_string().contains("missing the required 'method'"));
+        assert!(
+            error(r#"#[websocket_message(request, response = single)] struct Bad;"#)
+                .to_string()
+                .contains("missing the required 'method'")
+        );
     }
 
     #[test]
     fn rejects_a_request_without_a_cardinality() {
-        assert!(error(r#"#[websocket_message(request, method = "x")] struct Bad;"#).to_string().contains("must declare 'response = single'"));
+        assert!(
+            error(r#"#[websocket_message(request, method = "x")] struct Bad;"#)
+                .to_string()
+                .contains("must declare 'response = single'")
+        );
     }
 
     #[test]
     fn rejects_a_request_with_an_invalid_cardinality() {
-        assert!(error(r#"#[websocket_message(request, method = "x", response = burst)] struct Bad;"#).to_string().contains("invalid cardinality"));
+        assert!(
+            error(r#"#[websocket_message(request, method = "x", response = burst)] struct Bad;"#)
+                .to_string()
+                .contains("invalid cardinality")
+        );
     }
 
     #[test]
@@ -278,42 +298,73 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn rejects_a_response_that_declares_a_method() {
-        assert!(error(r#"#[websocket_message(response, method = "x")] struct Bad;"#).to_string().contains("must not declare a 'method'"));
+        assert!(
+            error(r#"#[websocket_message(response, method = "x")] struct Bad;"#)
+                .to_string()
+                .contains("must not declare a 'method'")
+        );
     }
 
     #[test]
     fn rejects_a_notification_that_declares_a_cardinality() {
-        assert!(error(r#"#[websocket_message(notification, method = "x", response = single)] struct Bad;"#).to_string().contains("declares a response cardinality but is not a request"));
+        assert!(
+            error(
+                r#"#[websocket_message(notification, method = "x", response = single)] struct Bad;"#
+            )
+            .to_string()
+            .contains("declares a response cardinality but is not a request")
+        );
     }
 
     #[test]
     fn rejects_a_session_that_is_not_a_struct() {
-        assert!(error(r#"#[websocket_session(path = "/x", server = "public")] enum Bad {}"#).to_string().contains("carries #[websocket_session]"));
+        assert!(
+            error(r#"#[websocket_session(path = "/x", server = "public")] enum Bad {}"#)
+                .to_string()
+                .contains("carries #[websocket_session]")
+        );
     }
 
     #[test]
     fn rejects_a_session_without_a_path() {
-        assert!(error(r#"#[websocket_session(server = "public")] struct Bad;"#).to_string().contains("missing the required 'path'"));
+        assert!(
+            error(r#"#[websocket_session(server = "public")] struct Bad;"#)
+                .to_string()
+                .contains("missing the required 'path'")
+        );
     }
 
     #[test]
     fn rejects_a_session_without_a_server() {
-        assert!(error(r#"#[websocket_session(path = "/x")] struct Bad;"#).to_string().contains("missing the required 'server'"));
+        assert!(
+            error(r#"#[websocket_session(path = "/x")] struct Bad;"#)
+                .to_string()
+                .contains("missing the required 'server'")
+        );
     }
 
     #[test]
     fn rejects_a_session_with_a_non_snake_case_server() {
-        assert!(error(r#"#[websocket_session(path = "/x", server = "Public")] struct Bad;"#).to_string().contains("has server"));
+        assert!(
+            error(r#"#[websocket_session(path = "/x", server = "Public")] struct Bad;"#)
+                .to_string()
+                .contains("has server")
+        );
     }
 
     #[test]
     fn rejects_a_session_without_a_build_for_session_method() {
-        assert!(error(r#"#[websocket_session(path = "/x", server = "public")] struct Bad;"#).to_string().contains("has no #[build_for_session] method"));
+        assert!(
+            error(r#"#[websocket_session(path = "/x", server = "public")] struct Bad;"#)
+                .to_string()
+                .contains("has no #[build_for_session] method")
+        );
     }
 
     #[test]
     fn rejects_a_session_with_two_build_for_session_methods() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
@@ -326,12 +377,16 @@ impl Bad {
     fn second() -> Self {}
 }
 "#
-            ).to_string().contains("more than one #[build_for_session] method"));
+            )
+            .to_string()
+            .contains("more than one #[build_for_session] method")
+        );
     }
 
     #[test]
     fn rejects_a_build_for_session_that_does_not_return_self() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
@@ -341,12 +396,16 @@ impl Bad {
     fn build() {}
 }
 "#
-            ).to_string().contains("must return Self"));
+            )
+            .to_string()
+            .contains("must return Self")
+        );
     }
 
     #[test]
     fn rejects_a_route_parameter_without_a_from() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x/{id}", server = "public")]
 struct Bad;
@@ -356,12 +415,16 @@ impl Bad {
     fn build(#[route_parameter] id: String) -> Self {}
 }
 "#
-            ).to_string().contains("is missing `from"));
+            )
+            .to_string()
+            .contains("is missing `from")
+        );
     }
 
     #[test]
     fn rejects_a_route_parameter_missing_from_the_path() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
@@ -371,12 +434,16 @@ impl Bad {
     fn build(#[route_parameter(from = "id")] id: String) -> Self {}
 }
 "#
-            ).to_string().contains("does not appear in the route path"));
+            )
+            .to_string()
+            .contains("does not appear in the route path")
+        );
     }
 
     #[test]
     fn rejects_an_unsupported_session_parameter_shape() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
@@ -386,12 +453,16 @@ impl Bad {
     fn build(value: String) -> Self {}
 }
 "#
-            ).to_string().contains("is not an injectable dependency"));
+            )
+            .to_string()
+            .contains("is not an injectable dependency")
+        );
     }
 
     #[test]
     fn rejects_a_session_parameter_without_a_provider() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 use std::sync::Arc;
 
@@ -403,7 +474,10 @@ impl Bad {
     fn build(missing: Arc<Unknown>) -> Self {}
 }
 "#
-            ).to_string().contains("no #[singleton] provides it"));
+            )
+            .to_string()
+            .contains("no #[singleton] provides it")
+        );
     }
 
     const PARITY_SESSION: &str = r#"
@@ -488,7 +562,8 @@ impl RespondsToWebSocketMessage for Poster {
 
     #[test]
     fn rejects_a_form_body_request_in_a_session() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
@@ -500,12 +575,16 @@ impl Bad {
     fn build(#[form_request(from = Form)] form: Form) -> Self {}
 }
 "#
-            ).to_string().contains("handshake has no body"));
+            )
+            .to_string()
+            .contains("handshake has no body")
+        );
     }
 
     #[test]
     fn rejects_a_json_body_request_in_a_session() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
@@ -517,12 +596,16 @@ impl Bad {
     fn build(#[form_request(from = Json)] payload: Payload) -> Self {}
 }
 "#
-            ).to_string().contains("handshake has no body"));
+            )
+            .to_string()
+            .contains("handshake has no body")
+        );
     }
 
     #[test]
     fn rejects_a_forwarder_in_a_session() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
@@ -532,12 +615,16 @@ impl Bad {
     fn build(forward: crate::margaret::forwarders::public::Forwarder) -> Self {}
 }
 "#
-            ).to_string().contains("cannot forward a request"));
+            )
+            .to_string()
+            .contains("cannot forward a request")
+        );
     }
 
     #[test]
     fn rejects_a_bound_route_parameter_without_a_binder() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x/{item}", server = "public")]
 struct Bad;
@@ -549,12 +636,16 @@ impl Bad {
     fn build(#[route_parameter(from = "item")] item: Widget) -> Self {}
 }
 "#
-            ).to_string().contains("no #[provides_route_parameter]"));
+            )
+            .to_string()
+            .contains("no #[provides_route_parameter]")
+        );
     }
 
     #[test]
     fn propagates_a_route_parameter_binder_error() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[provides_route_parameter]
 enum Bad {}
@@ -567,7 +658,10 @@ impl Room {
     fn build() -> Self {}
 }
 "#
-            ).to_string().contains("is only supported on structs"));
+            )
+            .to_string()
+            .contains("is only supported on structs")
+        );
     }
 
     #[test]
@@ -594,7 +688,11 @@ impl Room {
             "{REQUEST_TRAIT}\n#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n\nstruct NotASession;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = NotASession;\n    type Message = M;\n}}\n"
         );
 
-        assert!(error(&source).to_string().contains("does not resolve to a #[websocket_session]"));
+        assert!(
+            error(&source)
+                .to_string()
+                .contains("does not resolve to a #[websocket_session]")
+        );
     }
 
     #[test]
@@ -603,7 +701,11 @@ impl Room {
             "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\nstruct NotAMessage;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = NotAMessage;\n}}\n"
         );
 
-        assert!(error(&source).to_string().contains("does not resolve to a #[websocket_message]"));
+        assert!(
+            error(&source)
+                .to_string()
+                .contains("does not resolve to a #[websocket_message]")
+        );
     }
 
     #[test]
@@ -612,7 +714,11 @@ impl Room {
             "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(response)]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
         );
 
-        assert!(error(&source).to_string().contains("handles a response message"));
+        assert!(
+            error(&source)
+                .to_string()
+                .contains("handles a response message")
+        );
     }
 
     #[test]
@@ -621,7 +727,11 @@ impl Room {
             "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(notification, method = \"n\")]\nstruct N;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = N;\n}}\n"
         );
 
-        assert!(error(&source).to_string().contains("is not a request message"));
+        assert!(
+            error(&source)
+                .to_string()
+                .contains("is not a request message")
+        );
     }
 
     #[test]
@@ -630,7 +740,11 @@ impl Room {
             "{NOTIFICATION_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(request, method = \"r\", response = single)]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketNotification for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
         );
 
-        assert!(error(&source).to_string().contains("is not a notification message"));
+        assert!(
+            error(&source)
+                .to_string()
+                .contains("is not a notification message")
+        );
     }
 
     #[test]
@@ -639,7 +753,11 @@ impl Room {
             "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n\n#[singleton]\nstruct First;\n\nimpl RespondsToWebSocketMessage for First {{\n    type Session = S;\n    type Message = M;\n}}\n\n#[singleton]\nstruct Second;\n\nimpl RespondsToWebSocketMessage for Second {{\n    type Session = S;\n    type Message = M;\n}}\n"
         );
 
-        assert!(error(&source).to_string().contains("handled by more than one handler"));
+        assert!(
+            error(&source)
+                .to_string()
+                .contains("handled by more than one handler")
+        );
     }
 
     #[test]
@@ -690,7 +808,8 @@ impl BetaSession {
 
     #[test]
     fn rejects_a_build_for_session_that_returns_a_non_self_type() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
@@ -700,57 +819,97 @@ impl Bad {
     fn build() -> u8 {}
 }
 "#
-            ).to_string().contains("must return Self"));
+            )
+            .to_string()
+            .contains("must return Self")
+        );
     }
 
     #[test]
     fn propagates_a_non_path_cardinality() {
-        assert!(error(r#"#[websocket_message(request, method = "m", response = 5)] struct Bad;"#).to_string().contains("failed to read"));
+        assert!(
+            error(r#"#[websocket_message(request, method = "m", response = 5)] struct Bad;"#)
+                .to_string()
+                .contains("failed to read")
+        );
     }
 
     #[test]
     fn propagates_a_non_string_request_method() {
-        assert!(error(r#"#[websocket_message(request, method = 5, response = single)] struct Bad;"#).to_string().contains("failed to read"));
+        assert!(
+            error(r#"#[websocket_message(request, method = 5, response = single)] struct Bad;"#)
+                .to_string()
+                .contains("failed to read")
+        );
     }
 
     #[test]
     fn rejects_a_notification_without_a_method() {
-        assert!(error(r#"#[websocket_message(notification)] struct Bad;"#).to_string().contains("missing the required 'method'"));
+        assert!(
+            error(r#"#[websocket_message(notification)] struct Bad;"#)
+                .to_string()
+                .contains("missing the required 'method'")
+        );
     }
 
     #[test]
     fn rejects_a_response_that_declares_a_cardinality() {
-        assert!(error(r#"#[websocket_message(response, response = single)] struct Bad;"#).to_string().contains("declares a response cardinality but is not a request"));
+        assert!(
+            error(r#"#[websocket_message(response, response = single)] struct Bad;"#)
+                .to_string()
+                .contains("declares a response cardinality but is not a request")
+        );
     }
 
     #[test]
     fn propagates_a_non_string_response_method() {
-        assert!(error(r#"#[websocket_message(response, method = 5)] struct Bad;"#).to_string().contains("failed to read"));
+        assert!(
+            error(r#"#[websocket_message(response, method = 5)] struct Bad;"#)
+                .to_string()
+                .contains("failed to read")
+        );
     }
 
     #[test]
     fn propagates_malformed_message_arguments() {
-        assert!(error(r#"#[websocket_message(= 5)] struct Bad;"#).to_string().contains("failed to read"));
+        assert!(
+            error(r#"#[websocket_message(= 5)] struct Bad;"#)
+                .to_string()
+                .contains("failed to read")
+        );
     }
 
     #[test]
     fn propagates_malformed_session_arguments() {
-        assert!(error(r#"#[websocket_session(= 5)] struct Bad;"#).to_string().contains("failed to read"));
+        assert!(
+            error(r#"#[websocket_session(= 5)] struct Bad;"#)
+                .to_string()
+                .contains("failed to read")
+        );
     }
 
     #[test]
     fn propagates_a_non_string_session_path() {
-        assert!(error(r#"#[websocket_session(path = 5, server = "public")] struct Bad;"#).to_string().contains("failed to read"));
+        assert!(
+            error(r#"#[websocket_session(path = 5, server = "public")] struct Bad;"#)
+                .to_string()
+                .contains("failed to read")
+        );
     }
 
     #[test]
     fn propagates_a_non_string_session_server() {
-        assert!(error(r#"#[websocket_session(path = "/x", server = 5)] struct Bad;"#).to_string().contains("failed to read"));
+        assert!(
+            error(r#"#[websocket_session(path = "/x", server = 5)] struct Bad;"#)
+                .to_string()
+                .contains("failed to read")
+        );
     }
 
     #[test]
     fn propagates_malformed_route_parameter_arguments() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x/{id}", server = "public")]
 struct Bad;
@@ -760,12 +919,16 @@ impl Bad {
     fn build(#[route_parameter(= 5)] id: String) -> Self {}
 }
 "#
-            ).to_string().contains("failed to read"));
+            )
+            .to_string()
+            .contains("failed to read")
+        );
     }
 
     #[test]
     fn propagates_a_non_string_route_parameter_from() {
-        assert!(error(
+        assert!(
+            error(
                 r#"
 #[websocket_session(path = "/x/{id}", server = "public")]
 struct Bad;
@@ -775,7 +938,10 @@ impl Bad {
     fn build(#[route_parameter(from = 5)] id: String) -> Self {}
 }
 "#
-            ).to_string().contains("failed to read"));
+            )
+            .to_string()
+            .contains("failed to read")
+        );
     }
 
     #[test]

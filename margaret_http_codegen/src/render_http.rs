@@ -17,7 +17,10 @@ fn merge_websocket_servers(
     websocket_servers: &[String],
 ) -> Vec<HttpServer> {
     for websocket_server in websocket_servers {
-        if !servers.iter().any(|server| server.name() == websocket_server) {
+        if !servers
+            .iter()
+            .any(|server| server.name() == websocket_server)
+        {
             servers.push(HttpServer::new(
                 websocket_server.clone(),
                 ServerTransportPolicy::Negotiable,
@@ -38,16 +41,20 @@ pub fn render_http(
     let middleware_plans = middleware_plans(index)?;
     let table = http_routes(index, &middleware_plans)?;
 
-    if !has_views
-        && let Some(route) = table.routes().find(|route| responder_injects_views(route))
-    {
+    if !has_views && let Some(route) = table.routes().find(|route| responder_injects_views(route)) {
         return Err(HttpCodegenError::ViewInjectedWithoutViews {
             responder: route.responder_path.to_string(),
         });
     }
 
     let servers = merge_websocket_servers(active_servers(&table), websocket_servers);
-    let mut modules = render(&table, &servers, &middleware_plans, has_views, websocket_servers);
+    let mut modules = render(
+        &table,
+        &servers,
+        &middleware_plans,
+        has_views,
+        websocket_servers,
+    );
 
     modules.extend(render_routes(&table, &servers));
     modules.extend(render_forwarders(&table, &servers));

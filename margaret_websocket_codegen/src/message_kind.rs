@@ -5,7 +5,9 @@ use crate::message_cardinality::MessageCardinality;
 use crate::websocket_codegen_error::WebSocketCodegenError;
 
 pub(crate) enum MessageKind {
-    Notification { method: String },
+    Notification {
+        method: String,
+    },
     Request {
         cardinality: MessageCardinality,
         method: String,
@@ -69,11 +71,12 @@ fn cardinality(
 }
 
 fn method(arguments: &AttributeArgs, message: &str) -> Result<String, WebSocketCodegenError> {
-    let method = arguments
-        .string("method")?
-        .ok_or_else(|| WebSocketCodegenError::MissingMethod {
-            message: message.to_string(),
-        })?;
+    let method =
+        arguments
+            .string("method")?
+            .ok_or_else(|| WebSocketCodegenError::MissingMethod {
+                message: message.to_string(),
+            })?;
 
     if !is_snake_case_identifier(&method) {
         return Err(WebSocketCodegenError::InvalidMethod {

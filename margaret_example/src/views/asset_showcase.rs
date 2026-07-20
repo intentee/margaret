@@ -61,11 +61,9 @@ mod tests {
             )
         );
         assert!(
-            asset_bag
-                .head()
-                .render()
-                .into_string()
-                .contains("<script async src=\"/assets/app_A1B2C3D4.js\" type=\"module\"></script>")
+            asset_bag.head().render().into_string().contains(
+                "<script async src=\"/assets/app_A1B2C3D4.js\" type=\"module\"></script>"
+            )
         );
     }
 }

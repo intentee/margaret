@@ -143,14 +143,13 @@ fn defer_foreign_key(
 
     let rust_type = field.ty().to_token_stream().to_string();
 
-    let target_path =
-        index
-            .resolve_item_type(item, target_type)
-            .ok_or_else(|| ModelCodegenError::ForeignKeyTargetNotAModel {
-                field: field_name.clone(),
-                model: model.to_string(),
-                rust_type: rust_type.clone(),
-            })?;
+    let target_path = index.resolve_item_type(item, target_type).ok_or_else(|| {
+        ModelCodegenError::ForeignKeyTargetNotAModel {
+            field: field_name.clone(),
+            model: model.to_string(),
+            rust_type: rust_type.clone(),
+        }
+    })?;
 
     Ok(DeferredForeignKey {
         field_name,
@@ -216,11 +215,10 @@ fn collect_models(
         for field in item.fields() {
             let column_attribute =
                 select_unique_attribute(field.attributes(), &column_selector, || model.clone())?;
-            let foreign_key_attribute = select_unique_attribute(
-                field.attributes(),
-                &foreign_key_selector,
-                || model.clone(),
-            )?;
+            let foreign_key_attribute =
+                select_unique_attribute(field.attributes(), &foreign_key_selector, || {
+                    model.clone()
+                })?;
 
             match (column_attribute, foreign_key_attribute) {
                 (None, None) => {

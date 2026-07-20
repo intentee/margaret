@@ -35,7 +35,10 @@ pub(crate) fn render_server_routes(
             .session
             .injects_routes()
             .then(|| quote! { routes, });
-        let views_argument = session_plan.session.injects_views().then(|| quote! { views, });
+        let views_argument = session_plan
+            .session
+            .injects_views()
+            .then(|| quote! { views, });
 
         quote! {
             margaret_http::route_entry::RouteEntry::web_socket(

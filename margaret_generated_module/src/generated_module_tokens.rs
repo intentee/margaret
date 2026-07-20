@@ -25,7 +25,10 @@ impl GeneratedModuleTokens {
             }
         })?;
 
-        Ok(GeneratedModule::new(self.name, prettyplease::unparse(&file)))
+        Ok(GeneratedModule::new(
+            self.name,
+            prettyplease::unparse(&file),
+        ))
     }
 
     #[must_use]
@@ -47,9 +50,10 @@ mod tests {
 
     #[test]
     fn formats_tokens_into_pretty_source() {
-        let generated = GeneratedModuleTokens::new("sample", quote! { pub fn answer() -> u8 { 42 } })
-            .format()
-            .expect("the tokens form a valid file");
+        let generated =
+            GeneratedModuleTokens::new("sample", quote! { pub fn answer() -> u8 { 42 } })
+                .format()
+                .expect("the tokens form a valid file");
 
         assert_eq!(generated.name(), "sample");
         assert_eq!(generated.source(), "pub fn answer() -> u8 {\n    42\n}\n");

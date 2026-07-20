@@ -332,12 +332,15 @@ struct Author {
 
         assert!(source.contains("\"order_region\""));
         assert!(source.contains("\"order_number\""));
-        assert!(source.contains(
-            "columns:vec![\"order_region\".to_string(),\"order_number\".to_string()]"
-        ));
-        assert!(source.contains(
-            "references_columns:vec![\"region\".to_string(),\"number\".to_string()]"
-        ));
+        assert!(
+            source.contains(
+                "columns:vec![\"order_region\".to_string(),\"order_number\".to_string()]"
+            )
+        );
+        assert!(
+            source
+                .contains("references_columns:vec![\"region\".to_string(),\"number\".to_string()]")
+        );
         assert!(source.contains("references_table:\"orders\".to_string()"));
     }
 

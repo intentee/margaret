@@ -223,7 +223,12 @@ mod tests {
         };
 
         assert_eq!(
-            resolved(empty, &["crate"], &ModuleImports::default(), &HashSet::new()),
+            resolved(
+                empty,
+                &["crate"],
+                &ModuleImports::default(),
+                &HashSet::new()
+            ),
             None
         );
     }
@@ -252,7 +257,12 @@ mod tests {
             &ModuleImports::default(),
             &HashSet::new(),
         );
-        let aliased = resolved(parse_quote!(greeter::Greeter), &["crate"], &imports, &HashSet::new());
+        let aliased = resolved(
+            parse_quote!(greeter::Greeter),
+            &["crate"],
+            &imports,
+            &HashSet::new(),
+        );
 
         assert_eq!(aliased, direct);
         assert_eq!(aliased, Some("crate::greeter::Greeter".to_string()));
@@ -264,7 +274,12 @@ mod tests {
         imports.insert("g".to_string(), path(&["crate", "greeter"]));
 
         assert_eq!(
-            resolved(parse_quote!(g::Greeter), &["crate"], &imports, &HashSet::new()),
+            resolved(
+                parse_quote!(g::Greeter),
+                &["crate"],
+                &imports,
+                &HashSet::new()
+            ),
             Some("crate::greeter::Greeter".to_string())
         );
     }

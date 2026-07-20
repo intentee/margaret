@@ -57,8 +57,7 @@ mod tests {
 
     #[test]
     fn captures_each_entry_point_main_output_and_css_bundle() {
-        let enumerated = enumerate_inputs(&raw(
-            r#"{
+        let enumerated = enumerate_inputs(&raw(r#"{
                 "outputs": {
                     "assets/app_ABC.js": {
                         "imports": [],
@@ -72,8 +71,7 @@ mod tests {
                         "inputs": { "media/logo.png": {} }
                     }
                 }
-            }"#,
-        ))
+            }"#))
         .expect("the inputs are enumerated");
 
         let entrypoint = enumerated
@@ -88,8 +86,7 @@ mod tests {
 
     #[test]
     fn captures_a_file_loader_input_as_both_an_entry_point_and_a_static_input() {
-        let enumerated = enumerate_inputs(&raw(
-            r#"{
+        let enumerated = enumerate_inputs(&raw(r#"{
                 "outputs": {
                     "assets/favicon_MWST2DE3.svg": {
                         "imports": [],
@@ -103,8 +100,7 @@ mod tests {
                         "inputs": { "resources/media/favicon.svg": {} }
                     }
                 }
-            }"#,
-        ))
+            }"#))
         .expect("the inputs are enumerated");
 
         assert!(

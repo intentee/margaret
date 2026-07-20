@@ -117,6 +117,10 @@ mod tests {
             .into_generated_code()
             .expect_err("an invalid generated module is rejected");
 
-        assert!(error.to_string().contains("failed to format a generated module"));
+        assert!(
+            error
+                .to_string()
+                .contains("failed to format a generated module")
+        );
     }
 }
