@@ -10,9 +10,9 @@ use margaret_websocket::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret_websocket::web_socket::WebSocket;
 use margaret_websocket::web_socket_error::WebSocketError;
 
-use crate::websocket::conversation_message::ConversationMessage;
-use crate::websocket::response_chunk::ResponseChunk;
-use crate::websocket::storyboard_session::StoryboardSession;
+use crate::routes::public::sessions::storyboard::StoryboardSession;
+use crate::routes::public::sessions::storyboard::messages::conversation_message::ConversationMessage;
+use crate::routes::public::sessions::storyboard::messages::response_chunk::ResponseChunk;
 
 #[singleton]
 pub struct Storyboard;
