@@ -26,7 +26,7 @@ impl<Message> RequestEnvelope<Message> {
     pub fn response<Payload>(&self, payload: Payload) -> OutboundResponse<Payload> {
         OutboundResponse {
             id: self.id.clone(),
-            is_final: true,
+            is_done: true,
             method: self.method.clone(),
             payload,
         }

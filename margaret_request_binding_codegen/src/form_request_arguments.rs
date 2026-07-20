@@ -2,7 +2,7 @@ use quote::ToTokens;
 
 use margaret_attributes::attribute_args::AttributeArgs;
 
-use crate::http_codegen_error::HttpCodegenError;
+use crate::request_binding_error::RequestBindingError;
 use crate::request_input_source::RequestInputSource;
 
 pub(crate) struct FormRequestArguments {
@@ -12,19 +12,19 @@ pub(crate) struct FormRequestArguments {
 impl FormRequestArguments {
     pub(crate) fn parse(
         arguments: &AttributeArgs,
-        responder: &str,
+        subject: &str,
         position: usize,
-    ) -> Result<Self, HttpCodegenError> {
+    ) -> Result<Self, RequestBindingError> {
         let from =
             arguments
                 .path("from")?
-                .ok_or_else(|| HttpCodegenError::FormRequestMissingSource {
-                    responder: responder.to_string(),
+                .ok_or_else(|| RequestBindingError::FormRequestMissingSource {
+                    subject: subject.to_string(),
                     parameter: position.to_string(),
                 })?;
         let source = RequestInputSource::from_path(&from).ok_or_else(|| {
-            HttpCodegenError::UnknownRequestInput {
-                responder: responder.to_string(),
+            RequestBindingError::UnknownRequestInput {
+                subject: subject.to_string(),
                 parameter: position.to_string(),
                 written: from.to_token_stream().to_string(),
             }

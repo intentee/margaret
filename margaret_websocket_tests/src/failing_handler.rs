@@ -26,7 +26,7 @@ impl RespondsToWebSocketMessage for FailingHandler {
         message: StreamingRequestEnvelope<ConversationMessage>,
         socket: WebSocket,
     ) -> Result<(), WebSocketError> {
-        socket.send(message.response(FailingChunk)).await?;
+        socket.send(message.chunk(FailingChunk)).await?;
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
-pub(crate) enum HttpInjectable {
+pub enum RequestInjectable {
     AssetBag,
     CurrentRequest,
     Next,
@@ -10,7 +10,7 @@ pub(crate) enum HttpInjectable {
     Views,
 }
 
-impl HttpInjectable {
+impl RequestInjectable {
     pub(crate) fn canonical_path(&self) -> CanonicalPath {
         match self {
             Self::AssetBag => CanonicalPath::new(vec![
@@ -53,7 +53,8 @@ impl HttpInjectable {
         }
     }
 
-    pub(crate) fn matches(&self, resolved: Option<&CanonicalPath>, is_reference: bool) -> bool {
+    #[must_use]
+    pub fn matches(&self, resolved: Option<&CanonicalPath>, is_reference: bool) -> bool {
         resolved == Some(&self.canonical_path()) && is_reference == self.requires_reference()
     }
 
@@ -69,7 +70,7 @@ impl HttpInjectable {
 mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
 
-    use super::HttpInjectable;
+    use super::RequestInjectable;
 
     fn path(segments: &[&str]) -> CanonicalPath {
         CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
@@ -79,43 +80,66 @@ mod tests {
     fn matches_a_reference_injectable_only_when_written_as_a_reference() {
         let routes = path(&["crate", "margaret", "routes", "Routes"]);
 
-        assert!(HttpInjectable::Routes.matches(Some(&routes), true));
-        assert!(!HttpInjectable::Routes.matches(Some(&routes), false));
+        assert!(RequestInjectable::Routes.matches(Some(&routes), true));
+        assert!(!RequestInjectable::Routes.matches(Some(&routes), false));
     }
 
     #[test]
     fn matches_a_value_injectable_only_when_written_by_value() {
         let next = path(&["margaret_http", "next", "Next"]);
 
-        assert!(HttpInjectable::Next.matches(Some(&next), false));
-        assert!(!HttpInjectable::Next.matches(Some(&next), true));
+        assert!(RequestInjectable::Next.matches(Some(&next), false));
+        assert!(!RequestInjectable::Next.matches(Some(&next), true));
     }
 
     #[test]
     fn matches_the_asset_bag_injectable_only_when_written_by_value() {
         let asset_bag = path(&["margaret_asset_bag", "asset_bag", "AssetBag"]);
 
-        assert!(HttpInjectable::AssetBag.matches(Some(&asset_bag), false));
-        assert!(!HttpInjectable::AssetBag.matches(Some(&asset_bag), true));
+        assert!(RequestInjectable::AssetBag.matches(Some(&asset_bag), false));
+        assert!(!RequestInjectable::AssetBag.matches(Some(&asset_bag), true));
     }
 
     #[test]
     fn matches_the_views_injectable_only_when_written_as_a_reference() {
         let views = path(&["crate", "margaret", "views", "Views"]);
 
-        assert!(HttpInjectable::Views.matches(Some(&views), true));
-        assert!(!HttpInjectable::Views.matches(Some(&views), false));
+        assert!(RequestInjectable::Views.matches(Some(&views), true));
+        assert!(!RequestInjectable::Views.matches(Some(&views), false));
+    }
+
+    #[test]
+    fn matches_the_validation_result_injectable_only_when_written_by_value() {
+        let validation_result = path(&[
+            "margaret_validation",
+            "validation_result",
+            "ValidationResult",
+        ]);
+
+        assert!(RequestInjectable::ValidationResult.matches(Some(&validation_result), false));
+        assert!(!RequestInjectable::ValidationResult.matches(Some(&validation_result), true));
+    }
+
+    #[test]
+    fn matches_the_current_request_and_peer_spiffe_id_only_as_references() {
+        let request = path(&["margaret_http", "request", "Request"]);
+        let peer = path(&["spiffe", "spiffe_id", "SpiffeId"]);
+
+        assert!(RequestInjectable::CurrentRequest.matches(Some(&request), true));
+        assert!(!RequestInjectable::CurrentRequest.matches(Some(&request), false));
+        assert!(RequestInjectable::PeerSpiffeId.matches(Some(&peer), true));
+        assert!(!RequestInjectable::PeerSpiffeId.matches(Some(&peer), false));
     }
 
     #[test]
     fn rejects_a_foreign_path() {
         let shadowed = path(&["crate", "app", "Routes"]);
 
-        assert!(!HttpInjectable::Routes.matches(Some(&shadowed), true));
+        assert!(!RequestInjectable::Routes.matches(Some(&shadowed), true));
     }
 
     #[test]
     fn rejects_an_unresolved_type() {
-        assert!(!HttpInjectable::CurrentRequest.matches(None, true));
+        assert!(!RequestInjectable::CurrentRequest.matches(None, true));
     }
 }

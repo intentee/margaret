@@ -28,7 +28,7 @@ impl RespondsToWebSocketMessage for FloodHandler {
     ) -> Result<(), WebSocketError> {
         loop {
             socket
-                .send(message.response(ResponseChunk {
+                .send(message.chunk(ResponseChunk {
                     text: "flood".to_string(),
                 }))
                 .await?;

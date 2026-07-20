@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 
 #[derive(Debug, Error)]
 pub enum WebSocketCodegenError {
@@ -8,6 +9,12 @@ pub enum WebSocketCodegenError {
     Index {
         #[from]
         source: AttributeError,
+    },
+
+    #[error(transparent)]
+    Binding {
+        #[from]
+        source: RequestBindingError,
     },
 
     #[error("'{message}' carries #[websocket_message] but is not a struct")]
@@ -57,28 +64,6 @@ pub enum WebSocketCodegenError {
 
     #[error("the #[build_for_session] method of '{session}' must return Self")]
     BuildForSessionReturnTypeMismatch { session: String },
-
-    #[error(
-        "session '{session}' has a #[route_parameter] on '{parameter}' without a 'from' argument"
-    )]
-    SessionRouteParameterMissingFrom { session: String, parameter: String },
-
-    #[error(
-        "session '{session}' binds route parameter '{from}', which is not present in path '{path}'"
-    )]
-    SessionRouteParameterNotInPath {
-        session: String,
-        from: String,
-        path: String,
-    },
-
-    #[error(
-        "session '{session}' parameter '{parameter}' has an unsupported shape; expected Arc<T> or Vec<Arc<dyn Trait>>"
-    )]
-    UnsupportedSessionParameterShape { session: String, parameter: String },
-
-    #[error("session '{session}' parameter '{parameter}' has no providing singleton")]
-    MissingSessionProvider { session: String, parameter: String },
 
     #[error("'{handler}' implements a websocket handler trait but is not a #[singleton]")]
     HandlerNotSingleton { handler: String },

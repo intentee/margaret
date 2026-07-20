@@ -13,8 +13,6 @@ mod render_messages;
 mod render_server_routes;
 mod render_sessions;
 mod session_arguments;
-mod session_parameter;
-mod session_parameters;
 mod session_plan;
 mod websocket_handlers;
 mod websocket_message;
@@ -148,9 +146,13 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     fn generated(source: &str) -> String {
+        generated_with_views(source, false)
+    }
+
+    fn generated_with_views(source: &str, has_views: bool) -> String {
         let index = index_for(source);
 
-        render_websocket(&index, &bindings(&index))
+        render_websocket(&index, &bindings(&index), has_views)
             .expect("the websocket module is generated")
             .modules
             .into_iter()
@@ -169,7 +171,8 @@ impl RespondsToWebSocketNotification for Typist {
     fn error(source: &str) -> WebSocketCodegenError {
         let index = index_for(source);
 
-        render_websocket(&index, &bindings(&index)).expect_err("the websocket module is rejected")
+        render_websocket(&index, &bindings(&index), false)
+            .expect_err("the websocket module is rejected")
     }
 
     #[test]
@@ -353,7 +356,7 @@ impl Bad {
     fn build(#[route_parameter] id: String) -> Self {}
 }
 "#
-            ).to_string().contains("without a 'from' argument"));
+            ).to_string().contains("is missing `from"));
     }
 
     #[test]
@@ -368,7 +371,7 @@ impl Bad {
     fn build(#[route_parameter(from = "id")] id: String) -> Self {}
 }
 "#
-            ).to_string().contains("not present in path"));
+            ).to_string().contains("does not appear in the route path"));
     }
 
     #[test]
@@ -383,7 +386,7 @@ impl Bad {
     fn build(value: String) -> Self {}
 }
 "#
-            ).to_string().contains("unsupported shape"));
+            ).to_string().contains("is not an injectable dependency"));
     }
 
     #[test]
@@ -400,7 +403,171 @@ impl Bad {
     fn build(missing: Arc<Unknown>) -> Self {}
 }
 "#
-            ).to_string().contains("no providing singleton"));
+            ).to_string().contains("no #[singleton] provides it"));
+    }
+
+    const PARITY_SESSION: &str = r#"
+use std::sync::Arc;
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[singleton]
+struct Greeter;
+
+impl Greeter {
+    #[constructor]
+    fn new() -> Self {}
+}
+
+struct Article;
+
+#[singleton]
+#[provides_route_parameter]
+struct ArticleStore;
+
+impl ArticleStore {
+    #[constructor]
+    fn new() -> Self {}
+}
+
+impl HttpRouteParameterBinder for ArticleStore {
+    type Model = Article;
+}
+
+struct Filters;
+
+#[websocket_session(path = "/board/{topic}/{article}", server = "public")]
+struct BoardSession;
+
+impl BoardSession {
+    #[build_for_session]
+    fn build_for_session(
+        greeter: Arc<Greeter>,
+        #[route_parameter(from = "topic")] topic: String,
+        #[route_parameter(from = "article")] article: Article,
+        #[form_request(from = Query)] filters: Filters,
+        request: &margaret_http::request::Request,
+        peer: &spiffe::spiffe_id::SpiffeId,
+        routes: &crate::margaret::routes::Routes,
+        views: &crate::margaret::views::Views,
+        assets: margaret_asset_bag::asset_bag::AssetBag,
+    ) -> Self {}
+}
+
+#[websocket_message(request, method = "post", response = single)]
+struct Post;
+
+#[singleton]
+struct Poster;
+
+impl Poster {
+    #[constructor]
+    fn new() -> Self {}
+}
+
+impl RespondsToWebSocketMessage for Poster {
+    type Session = BoardSession;
+    type Message = Post;
+}
+"#;
+
+    #[test]
+    fn generates_a_session_factory_for_every_supported_binding() {
+        let source = generated_with_views(PARITY_SESSION, true);
+
+        assert!(source.contains("require_bound_route_parameter::require_bound_route_parameter"));
+        assert!(source.contains("RequestInput::Query"));
+        assert!(source.contains("require_peer_spiffe_id::require_peer_spiffe_id"));
+        assert!(source.contains("::margaret_asset_bag::asset_bag::AssetBag::new()"));
+        assert!(source.contains("self.routes.as_ref()"));
+        assert!(source.contains("self.views.as_ref()"));
+        assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
+        assert!(source.contains("views:&::std::sync::Arc<super::super::views::Views>"));
+        assert!(source.contains("upgrade_entry(container,routes,views)"));
+        assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
+    }
+
+    #[test]
+    fn rejects_a_form_body_request_in_a_session() {
+        assert!(error(
+                r#"
+#[websocket_session(path = "/x", server = "public")]
+struct Bad;
+
+struct Form;
+
+impl Bad {
+    #[build_for_session]
+    fn build(#[form_request(from = Form)] form: Form) -> Self {}
+}
+"#
+            ).to_string().contains("handshake has no body"));
+    }
+
+    #[test]
+    fn rejects_a_json_body_request_in_a_session() {
+        assert!(error(
+                r#"
+#[websocket_session(path = "/x", server = "public")]
+struct Bad;
+
+struct Payload;
+
+impl Bad {
+    #[build_for_session]
+    fn build(#[form_request(from = Json)] payload: Payload) -> Self {}
+}
+"#
+            ).to_string().contains("handshake has no body"));
+    }
+
+    #[test]
+    fn rejects_a_forwarder_in_a_session() {
+        assert!(error(
+                r#"
+#[websocket_session(path = "/x", server = "public")]
+struct Bad;
+
+impl Bad {
+    #[build_for_session]
+    fn build(forward: crate::margaret::forwarders::public::Forwarder) -> Self {}
+}
+"#
+            ).to_string().contains("cannot forward a request"));
+    }
+
+    #[test]
+    fn rejects_a_bound_route_parameter_without_a_binder() {
+        assert!(error(
+                r#"
+#[websocket_session(path = "/x/{item}", server = "public")]
+struct Bad;
+
+struct Widget;
+
+impl Bad {
+    #[build_for_session]
+    fn build(#[route_parameter(from = "item")] item: Widget) -> Self {}
+}
+"#
+            ).to_string().contains("no #[provides_route_parameter]"));
+    }
+
+    #[test]
+    fn propagates_a_route_parameter_binder_error() {
+        assert!(error(
+                r#"
+#[provides_route_parameter]
+enum Bad {}
+
+#[websocket_session(path = "/x", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+"#
+            ).to_string().contains("is only supported on structs"));
     }
 
     #[test]

@@ -18,10 +18,20 @@ impl<Message> StreamingRequestEnvelope<Message> {
     }
 
     #[must_use]
-    pub fn r#final<Payload>(&self, payload: Payload) -> OutboundResponse<Payload> {
+    pub fn chunk<Payload>(&self, payload: Payload) -> OutboundResponse<Payload> {
         OutboundResponse {
             id: self.id.clone(),
-            is_final: true,
+            is_done: false,
+            method: self.method.clone(),
+            payload,
+        }
+    }
+
+    #[must_use]
+    pub fn fin<Payload>(&self, payload: Payload) -> OutboundResponse<Payload> {
+        OutboundResponse {
+            id: self.id.clone(),
+            is_done: true,
             method: self.method.clone(),
             payload,
         }
@@ -30,15 +40,5 @@ impl<Message> StreamingRequestEnvelope<Message> {
     #[must_use]
     pub fn message(&self) -> &Message {
         &self.message
-    }
-
-    #[must_use]
-    pub fn response<Payload>(&self, payload: Payload) -> OutboundResponse<Payload> {
-        OutboundResponse {
-            id: self.id.clone(),
-            is_final: false,
-            method: self.method.clone(),
-            payload,
-        }
     }
 }

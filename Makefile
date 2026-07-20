@@ -29,6 +29,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_model_codegen \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
+	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_codegen \
 	-p margaret_service \
 	-p margaret_service_codegen \
@@ -101,6 +102,7 @@ coverage: node_modules
 		--gated margaret_model_codegen=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
+		--gated margaret_request_binding_codegen=100 \
 		--gated margaret_route_parameter_codegen=100 \
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \

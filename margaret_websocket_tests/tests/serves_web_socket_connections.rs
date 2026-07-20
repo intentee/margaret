@@ -14,8 +14,8 @@ async fn streams_a_request_across_many_frames() {
     let terminal = harness.recv().await;
 
     assert!(chunk.contains("thinking about cats"));
-    assert!(chunk.contains("\"final\":false"));
-    assert!(terminal.contains("\"final\":true"));
+    assert!(chunk.contains("\"done\":false"));
+    assert!(terminal.contains("\"done\":true"));
     assert!(terminal.contains("\"id\":1"));
     assert!(terminal.contains("\"method\":\"conversation_message\""));
 
@@ -35,7 +35,7 @@ async fn answers_a_single_response_request_with_a_string_id() {
 
     assert!(response.contains("pong here"));
     assert!(response.contains("\"id\":\"abc\""));
-    assert!(response.contains("\"final\":true"));
+    assert!(response.contains("\"done\":true"));
 
     harness.cancellation_token.cancel();
     harness.driver.await.expect("the driver finishes");

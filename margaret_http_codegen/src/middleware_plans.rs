@@ -6,9 +6,9 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
+use margaret_request_binding_codegen::request_injectable::RequestInjectable;
 
 use crate::http_codegen_error::HttpCodegenError;
-use crate::http_injectable::HttpInjectable;
 use crate::middleware_argument::MiddlewareArgument;
 use crate::middleware_attribute_arguments::MiddlewareAttributeArguments;
 use crate::middleware_plan::MiddlewarePlan;
@@ -43,11 +43,11 @@ pub(crate) fn middleware_plans(
             let resolved = index.resolve_item_type(item, declared);
             let is_reference = matches!(declared, Type::Reference(_));
             let argument =
-                if HttpInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference) {
+                if RequestInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference) {
                     MiddlewareArgument::CurrentRequest
-                } else if HttpInjectable::Next.matches(resolved.as_ref(), is_reference) {
+                } else if RequestInjectable::Next.matches(resolved.as_ref(), is_reference) {
                     MiddlewareArgument::Next
-                } else if HttpInjectable::Routes.matches(resolved.as_ref(), is_reference) {
+                } else if RequestInjectable::Routes.matches(resolved.as_ref(), is_reference) {
                     injects_routes = true;
 
                     MiddlewareArgument::Routes

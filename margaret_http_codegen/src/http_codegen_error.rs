@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_injection_codegen::injection_error::InjectionError;
+use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 
 #[derive(Debug, Error)]
 pub enum HttpCodegenError {
@@ -16,6 +17,12 @@ pub enum HttpCodegenError {
     Injection {
         #[from]
         source: InjectionError,
+    },
+
+    #[error(transparent)]
+    Binding {
+        #[from]
+        source: RequestBindingError,
     },
 
     #[error("#[responds_to_http] is only supported on structs, but '{target}' is not a struct")]
@@ -52,69 +59,6 @@ pub enum HttpCodegenError {
     )]
     UnknownMiddleware { responder: String, tag: String },
 
-    #[error(
-        "parameter '{parameter}' of responder '{responder}' must be a route parameter, a form request, the current request, the peer SPIFFE id, the forwarder, or the routes"
-    )]
-    UnmarkedResponderParameter {
-        responder: String,
-        parameter: String,
-    },
-
-    #[error(
-        "argument #{parameter} of responder '{responder}' is the peer SPIFFE id and must not also carry #[route_parameter] or #[form_request]"
-    )]
-    MarkedPeerSpiffeIdParameter {
-        responder: String,
-        parameter: String,
-    },
-
-    #[error(
-        "responder '{responder}' declares more than one peer SPIFFE id parameter; a request has exactly one peer identity"
-    )]
-    MultiplePeerSpiffeIdParameters { responder: String },
-
-    #[error(
-        "argument #{parameter} of responder '{responder}' has both #[route_parameter] and #[form_request]; a responder argument may use at most one"
-    )]
-    ConflictingArgumentMarkers {
-        responder: String,
-        parameter: String,
-    },
-
-    #[error(
-        "form request argument #{parameter} of responder '{responder}' is missing `from = <source>`; it must name the request input source it validates"
-    )]
-    FormRequestMissingSource {
-        responder: String,
-        parameter: String,
-    },
-
-    #[error(
-        "form request argument #{parameter} of responder '{responder}' names an unknown request input source '{written}'; expected Form, Query, or Json"
-    )]
-    UnknownRequestInput {
-        responder: String,
-        parameter: String,
-        written: String,
-    },
-
-    #[error(
-        "route parameter #{parameter} of responder '{responder}' is missing `from = \"...\"`; it must name the path parameter it binds"
-    )]
-    RouteParameterMissingFrom {
-        responder: String,
-        parameter: String,
-    },
-
-    #[error(
-        "route parameter '{parameter}' of responder '{responder}' does not appear in the route path '{path}'"
-    )]
-    RouteParameterNotInPath {
-        responder: String,
-        parameter: String,
-        path: String,
-    },
-
     #[error("responder '{responder}' has a malformed route path '{path}': {source}")]
     InvalidRoutePath {
         responder: String,
@@ -142,30 +86,6 @@ pub enum HttpCodegenError {
         path: String,
         responder: String,
         server: String,
-    },
-
-    #[error(
-        "#[provides_route_parameter] '{binder}' has no `type Model = <struct>` associated type that resolves to a known model"
-    )]
-    HttpRouteParameterBinderModel { binder: String },
-
-    #[error("#[provides_route_parameter] is only supported on structs, but '{binder}' is not a struct")]
-    HttpRouteParameterBinderNotAStruct { binder: String },
-
-    #[error("model '{model}' has more than one route parameter binder: '{first}' and '{second}'")]
-    AmbiguousHttpRouteParameterBinder {
-        model: String,
-        first: String,
-        second: String,
-    },
-
-    #[error(
-        "route parameter '{parameter}' of responder '{responder}' has type '{written}', which has no #[provides_route_parameter]"
-    )]
-    MissingHttpRouteParameterBinder {
-        responder: String,
-        parameter: String,
-        written: String,
     },
 
     #[error(

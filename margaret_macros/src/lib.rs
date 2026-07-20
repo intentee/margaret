@@ -81,7 +81,7 @@ pub fn websocket_message(_attributes: TokenStream, item: TokenStream) -> TokenSt
 
 #[proc_macro_attribute]
 pub fn build_for_session(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, &["route_parameter"])
+    strip_parameter_markers(item, &["route_parameter", "form_request"])
 }
 
 fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {

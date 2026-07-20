@@ -2,7 +2,7 @@ use proc_macro2::Ident;
 use quote::format_ident;
 use syn::Path;
 
-pub(crate) enum RequestInputSource {
+pub enum RequestInputSource {
     Form,
     Query,
     Json,

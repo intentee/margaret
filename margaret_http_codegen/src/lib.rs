@@ -1,11 +1,7 @@
 mod active_servers;
-mod build_registry;
-mod form_request_arguments;
-mod form_request_extraction;
 pub mod has_responders;
 pub mod http_artifacts;
 pub mod http_codegen_error;
-mod http_injectable;
 mod http_responder_arguments;
 mod http_route;
 mod http_route_table;
@@ -21,14 +17,7 @@ mod render;
 mod render_forwarders;
 pub mod render_http;
 mod render_routes;
-mod request_input_source;
-mod responder_argument;
-mod responder_argument_binding;
-mod responder_method;
-mod responder_selectors;
 mod route_group;
-mod route_parameter_arguments;
-mod route_parameter_binder;
 mod server_route_group;
 pub mod server_transport_policy;
 pub mod serves_spiffe;
@@ -272,9 +261,17 @@ impl Health {
 "#;
 
     fn websocket_http_source(lib_source: &str, websocket_servers: &[String]) -> String {
+        websocket_http_source_with_views(lib_source, websocket_servers, false)
+    }
+
+    fn websocket_http_source_with_views(
+        lib_source: &str,
+        websocket_servers: &[String],
+        has_views: bool,
+    ) -> String {
         let index = index_for(lib_source);
 
-        render_http(&index, false, websocket_servers)
+        render_http(&index, has_views, websocket_servers)
             .expect("the http source is generated")
             .into_modules()
             .into_iter()
@@ -296,7 +293,7 @@ impl Health {
     fn splices_websocket_routes_into_a_server_with_http_routes() {
         let source = websocket_http_source(HEALTH_RESPONDER, &["public".to_string()]);
 
-        assert!(source.contains("super::super::websocket::public_routes(container).await"));
+        assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
     }
 
     #[test]
@@ -304,7 +301,18 @@ impl Health {
         let source = websocket_http_source(HEALTH_RESPONDER, &["realtime".to_string()]);
 
         assert!(source.contains("pubasyncfnserver_realtime"));
-        assert!(source.contains("super::super::websocket::realtime_routes(container).await"));
+        assert!(source.contains("super::super::websocket::realtime_routes(container,routes).await"));
+    }
+
+    #[test]
+    fn threads_views_into_the_websocket_routes_of_a_server_with_views() {
+        let source =
+            websocket_http_source_with_views(HEALTH_RESPONDER, &["public".to_string()], true);
+
+        assert!(source.contains(
+            "super::super::websocket::public_routes(container,routes,views).await"
+        ));
+        assert!(source.contains("views:&::std::sync::Arc<super::super::views::Views>"));
     }
 
     fn routes_source_for(lib_source: &str) -> String {
@@ -725,7 +733,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "#[responds_to_http(method = \"get\", path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[process]\n    fn respond(&self, #[route_parameter(= 5)] thing: String) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(message.contains("failed to read a binding attribute"));
     }
 
     #[test]
@@ -779,7 +787,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "#[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self, #[route_parameter(from = 5)] id: String) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(message.contains("failed to read a binding attribute"));
     }
 
     #[test]
@@ -1239,7 +1247,7 @@ impl GetMetrics {
             "#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = 5)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(message.contains("failed to read a binding attribute"));
     }
 
     #[test]
@@ -1248,7 +1256,7 @@ impl GetMetrics {
             "#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(= 5)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(message.contains("failed to read a binding attribute"));
     }
 
     #[test]

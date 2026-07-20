@@ -44,16 +44,18 @@ impl RespondsToWebSocketMessage for Storyboard {
         let turn_count = session.turn_count().await;
 
         socket
-            .send(message.response(ResponseChunk {
+            .send(message.chunk(ResponseChunk {
                 text: format!(
-                    "{} storyboard '{}' turn {turn_count}: {prompt}",
+                    "{} {} storyboard '{}' about '{}' turn {turn_count}: {prompt}",
+                    session.welcome(),
                     session.greeting(),
                     session.topic(),
+                    session.article_title(),
                 ),
             }))
             .await?;
         socket
-            .send(message.r#final(ResponseChunk {
+            .send(message.fin(ResponseChunk {
                 text: "storyboard complete".to_string(),
             }))
             .await?;

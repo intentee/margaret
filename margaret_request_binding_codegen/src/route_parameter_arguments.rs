@@ -1,6 +1,6 @@
 use margaret_attributes::attribute_args::AttributeArgs;
 
-use crate::http_codegen_error::HttpCodegenError;
+use crate::request_binding_error::RequestBindingError;
 
 pub(crate) struct RouteParameterArguments {
     pub(crate) from: String,
@@ -9,12 +9,12 @@ pub(crate) struct RouteParameterArguments {
 impl RouteParameterArguments {
     pub(crate) fn parse(
         arguments: &AttributeArgs,
-        responder: &str,
+        subject: &str,
         position: usize,
-    ) -> Result<Self, HttpCodegenError> {
+    ) -> Result<Self, RequestBindingError> {
         let from = arguments.string("from")?.ok_or_else(|| {
-            HttpCodegenError::RouteParameterMissingFrom {
-                responder: responder.to_string(),
+            RequestBindingError::RouteParameterMissingFrom {
+                subject: subject.to_string(),
                 parameter: position.to_string(),
             }
         })?;

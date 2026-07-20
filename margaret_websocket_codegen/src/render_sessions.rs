@@ -1,15 +1,20 @@
+use std::collections::BTreeMap;
+
 use heck::ToUpperCamelCase;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
+use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::handler_binding::HandlerBinding;
-use crate::session_parameter::SessionParameter;
 use crate::session_plan::SessionPlan;
 use crate::websocket_session::WebSocketSession;
 
@@ -53,55 +58,104 @@ fn injected_field_value(dependency: &InjectedDependency) -> TokenStream {
     }
 }
 
-fn factory_fields(session: &WebSocketSession) -> TokenStream {
-    let fields = session.parameters.iter().filter_map(|parameter| match parameter {
-        SessionParameter::Injectable { dependency, holder } => {
-            let field_type = injected_field_type(dependency);
+fn binder_fields(session: &WebSocketSession) -> BTreeMap<String, &CanonicalPath> {
+    let mut fields = BTreeMap::new();
 
-            Some(quote! { #holder: #field_type, })
+    for parameter in &session.parameters {
+        if let RequestBinding::Bound {
+            binder_field,
+            binder_provider,
+            ..
+        } = &parameter.binding
+        {
+            fields.insert(binder_field.clone(), binder_provider);
         }
-        SessionParameter::Route { .. } => None,
+    }
+
+    fields
+}
+
+fn factory_fields(session: &WebSocketSession) -> TokenStream {
+    let holders = session.parameters.iter().filter_map(|parameter| {
+        let holder = &parameter.holder;
+
+        match &parameter.binding {
+            RequestBinding::Injectable { dependency } => {
+                let field_type = injected_field_type(dependency);
+
+                Some(quote! { #holder: #field_type, })
+            }
+            RequestBinding::Routes => Some(quote! {
+                #holder: ::std::sync::Arc<super::super::routes::Routes>,
+            }),
+            RequestBinding::Views => Some(quote! {
+                #holder: ::std::sync::Arc<super::super::views::Views>,
+            }),
+            _ => None,
+        }
+    });
+    let binders = binder_fields(session).into_iter().map(|(field, provider)| {
+        let field = format_ident!("{field}");
+        let provider = path_tokens(provider);
+
+        quote! { #field: ::std::sync::Arc<#provider>, }
     });
 
-    quote! { #(#fields)* }
+    quote! { #(#holders)* #(#binders)* }
 }
 
 fn factory_initializers(session: &WebSocketSession) -> TokenStream {
-    let initializers = session.parameters.iter().filter_map(|parameter| match parameter {
-        SessionParameter::Injectable { dependency, holder } => {
-            let value = injected_field_value(dependency);
+    let holders = session.parameters.iter().filter_map(|parameter| {
+        let holder = &parameter.holder;
 
-            Some(quote! { #holder: #value, })
+        match &parameter.binding {
+            RequestBinding::Injectable { dependency } => {
+                let value = injected_field_value(dependency);
+
+                Some(quote! { #holder: #value, })
+            }
+            RequestBinding::Routes => Some(quote! { #holder: routes.clone(), }),
+            RequestBinding::Views => Some(quote! { #holder: views.clone(), }),
+            _ => None,
         }
-        SessionParameter::Route { .. } => None,
+    });
+    let binders = binder_fields(session).into_keys().map(|field| {
+        let field = format_ident!("{field}");
+
+        quote! { #field: container.#field().await, }
     });
 
-    quote! { #(#initializers)* }
+    quote! { #(#holders)* #(#binders)* }
 }
 
-fn route_extractions(session: &WebSocketSession) -> TokenStream {
-    let extractions = session.parameters.iter().filter_map(|parameter| match parameter {
-        SessionParameter::Route { from, holder } => Some(quote! {
-            let #holder = match margaret_http::require_route_parameter::require_route_parameter(
-                handshake,
-                #from,
-            ) {
-                ::std::result::Result::Ok(value) => value,
-                ::std::result::Result::Err(response) => {
-                    return ::std::result::Result::Err(response);
-                }
-            };
-        }),
-        SessionParameter::Injectable { .. } => None,
+fn create_extractions(session: &WebSocketSession) -> TokenStream {
+    let handshake = format_ident!("handshake");
+    let error_return = quote! { return ::std::result::Result::Err(response) };
+    let binder_owner = quote! { self. };
+    let extractions = session.parameters.iter().map(|parameter| {
+        render_request_extraction(
+            &parameter.binding,
+            &parameter.holder,
+            &ExtractionContext {
+                binder_owner: &binder_owner,
+                error_return: &error_return,
+                request_local: &handshake,
+            },
+        )
     });
 
     quote! { #(#extractions)* }
 }
 
 fn build_arguments(session: &WebSocketSession) -> TokenStream {
-    let arguments = session.parameters.iter().map(|parameter| match parameter {
-        SessionParameter::Injectable { holder, .. } => quote! { self.#holder.clone() },
-        SessionParameter::Route { holder, .. } => quote! { #holder },
+    let arguments = session.parameters.iter().map(|parameter| {
+        let holder = &parameter.holder;
+
+        match &parameter.binding {
+            RequestBinding::Injectable { .. } => quote! { self.#holder.clone() },
+            RequestBinding::Routes | RequestBinding::Views => quote! { self.#holder.as_ref() },
+            _ => quote! { #holder },
+        }
     });
 
     quote! { #(#arguments),* }
@@ -110,7 +164,7 @@ fn build_arguments(session: &WebSocketSession) -> TokenStream {
 fn render_factory(session: &WebSocketSession) -> TokenStream {
     let session_path = path_tokens(&session.session_path);
     let fields = factory_fields(session);
-    let extractions = route_extractions(session);
+    let extractions = create_extractions(session);
     let arguments = build_arguments(session);
 
     quote! {
@@ -283,6 +337,12 @@ fn render_session(plan: &SessionPlan) -> TokenStream {
     let session_path = path_tokens(&plan.session.session_path);
     let factory = render_factory(&plan.session);
     let initializers = factory_initializers(&plan.session);
+    let routes_parameter = plan.session.injects_routes().then(|| {
+        quote! { routes: &::std::sync::Arc<super::super::routes::Routes>, }
+    });
+    let views_parameter = plan.session.injects_views().then(|| {
+        quote! { views: &::std::sync::Arc<super::super::views::Views>, }
+    });
     let request_dispatches = plan
         .request_handlers
         .iter()
@@ -303,6 +363,8 @@ fn render_session(plan: &SessionPlan) -> TokenStream {
 
         pub async fn upgrade_entry(
             container: &super::super::container::Container,
+            #routes_parameter
+            #views_parameter
         ) -> ::std::sync::Arc<dyn margaret_http::web_socket_upgrade::WebSocketUpgrade> {
             ::std::sync::Arc::new(
                 margaret_websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry::new(

@@ -14,6 +14,7 @@ pub(crate) fn websocket_pass(
     let artifacts = margaret_websocket_codegen::render_websocket::render_websocket(
         context.index(),
         bindings,
+        context.capabilities().has_views,
     )?;
 
     context.set_websocket_servers(artifacts.servers);

@@ -27,12 +27,12 @@ impl RespondsToWebSocketMessage for StoryboardHandler {
         socket: WebSocket,
     ) -> Result<(), WebSocketError> {
         socket
-            .send(message.response(ResponseChunk {
+            .send(message.chunk(ResponseChunk {
                 text: format!("thinking about {}", message.message().prompt),
             }))
             .await?;
         socket
-            .send(message.r#final(ResponseChunk {
+            .send(message.fin(ResponseChunk {
                 text: "done".to_string(),
             }))
             .await?;

@@ -5,11 +5,14 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::container_bindings::ContainerBindings;
+use margaret_request_binding_codegen::binding_site::BindingSite;
+use margaret_request_binding_codegen::classify_parameters::classify_parameters;
+use margaret_request_binding_codegen::request_binding_policy::RequestBindingPolicy;
+use margaret_request_binding_codegen::route_parameter_binders::route_parameter_binders;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::build_for_session_method::build_for_session_method;
 use crate::session_arguments::SessionArguments;
-use crate::session_parameters::session_parameters;
 use crate::websocket_codegen_error::WebSocketCodegenError;
 use crate::websocket_session::WebSocketSession;
 
@@ -26,6 +29,7 @@ pub(crate) fn websocket_sessions(
     bindings: &ContainerBindings,
 ) -> Result<Vec<WebSocketSession>, WebSocketCodegenError> {
     let selector = AttributeSelector::from_marker("websocket_session");
+    let binders = route_parameter_binders(index)?;
     let mut sessions = Vec::new();
 
     for matched in index.select(&selector) {
@@ -44,8 +48,20 @@ pub(crate) fn websocket_sessions(
         }
 
         let route_path = RoutePath::parse(&path);
-        let parameters =
-            session_parameters(index, item, method, &session, &path, &route_path, bindings)?;
+        let subject = format!("session '{session}'");
+        let parameters = classify_parameters(
+            index,
+            item,
+            method.signature(),
+            &BindingSite {
+                route_path: &route_path,
+                server: &server,
+                subject: &subject,
+            },
+            &binders,
+            Some(bindings),
+            &RequestBindingPolicy::handshake(),
+        )?;
 
         sessions.push(WebSocketSession {
             module_name: identifier.field().to_string(),
