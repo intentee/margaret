@@ -41,7 +41,35 @@ impl PostArticleImport {
 
         match self.articles.insert(title, body, author_id) {
             Ok(article) => Response::text(201, format!("imported \"{}\"", article.title)),
-            Err(error) => Response::text(404, error.to_string()),
+            Err(error) => Response::text(500, error.to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use uuid::Uuid;
+
+    use margaret_validation::validation_result::ValidationResult;
+
+    use super::PostArticleImport;
+    use crate::forms::post_article_form::PostArticleForm;
+    use crate::stores::article_store::ArticleStore;
+    use crate::system_clock::SystemClock;
+
+    #[tokio::test]
+    async fn responds_with_500_when_the_author_is_unknown() {
+        let responder = PostArticleImport::create(Arc::new(ArticleStore::create(Arc::new(
+            SystemClock::create(),
+        ))));
+        let form = ValidationResult::Valid(PostArticleForm {
+            title: "Title".to_string(),
+            body: "Body".to_string(),
+            author_id: Uuid::from_u128(999),
+        });
+
+        assert_eq!(responder.respond(form).await.status(), 500);
     }
 }
