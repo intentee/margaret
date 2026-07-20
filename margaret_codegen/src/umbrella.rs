@@ -4,6 +4,7 @@ use crate::capabilities::Capabilities;
 
 pub(crate) fn umbrella(
     Capabilities {
+        has_asset_bag,
         has_console,
         has_http,
         has_models,
@@ -14,6 +15,10 @@ pub(crate) fn umbrella(
 ) -> GeneratedModule {
     let serves_http = has_http || has_websockets;
     let mut source = String::from("#[rustfmt::skip]\npub mod container;\n");
+
+    if has_asset_bag {
+        source.push_str("#[rustfmt::skip]\npub mod asset_bag;\n");
+    }
 
     if serves_http {
         source.push_str("#[rustfmt::skip]\npub mod forwarders;\n");

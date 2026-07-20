@@ -1,9 +1,24 @@
+use chrono::DateTime;
+use chrono::Utc;
+
+use margaret_macros::model;
+
+use crate::models::author::Author;
+
+#[model(table = "articles")]
 #[derive(Clone)]
 pub struct Article {
-    pub id: String,
+    #[column(primary_key)]
+    pub id: uuid::Uuid,
+    #[column]
     pub title: String,
-    pub author_id: String,
+    #[column]
     pub body: String,
+    #[column]
     pub published: bool,
-    pub created_at: u64,
+    #[column]
+    pub created_at: DateTime<Utc>,
+    #[column]
+    #[foreign_key]
+    pub author: Author,
 }

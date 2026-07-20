@@ -28,10 +28,10 @@ impl PatchArticle {
         #[route_parameter(from = "article")] Article {
             id,
             title: current_title,
-            author_id,
             body: current_body,
             published,
             created_at,
+            author,
         }: Article,
         #[form_request(from = Form)] PatchArticleForm { title, body }: PatchArticleForm,
     ) -> Response {
@@ -41,10 +41,10 @@ impl PatchArticle {
         self.articles.save(Article {
             id,
             title: title.clone(),
-            author_id,
             body,
             published,
             created_at,
+            author,
         });
 
         Response::text(200, format!("updated \"{title}\""))

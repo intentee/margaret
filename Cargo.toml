@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
 members = [
+    "margaret_asset_bag",
+    "margaret_asset_bag_codegen",
+    "margaret_asset_bag_server",
     "margaret_attributes",
     "margaret_codegen",
     "margaret_codegen_tokens",
@@ -9,7 +12,6 @@ members = [
     "margaret_console_codegen",
     "margaret_container",
     "margaret_container_tests",
-    "margaret_esbuild_metafile_codegen",
     "margaret_example",
     "margaret_generated_module",
     "margaret_http",
@@ -75,6 +77,7 @@ log = "=0.4.28"
 matchit = "=0.8.4"
 maud = "=0.27.0"
 mime = "=0.3.17"
+mime_guess = "=2.0.5"
 multer = "=3.1.0"
 p256 = "=0.13.2"
 p384 = "=0.13.1"
@@ -83,6 +86,7 @@ proc-macro2 = "=1.0.106"
 quote = "=1.0.46"
 rcgen = "=0.14.8"
 reqwest = { version = "=0.12.26", features = ["json", "rustls-tls"] }
+rust-embed = { version = "=8.11.0", features = ["debug-embed"] }
 rustls = "=0.23.35"
 rustls-webpki = "=0.103.13"
 serde = "=1.0.228"

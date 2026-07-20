@@ -12,7 +12,6 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::matched_attribute::MatchedAttribute;
-use margaret_attributes::name_allocator::NameAllocator;
 
 use crate::collection_table::CollectionTable;
 use crate::construction_source::ConstructionSource;
@@ -23,7 +22,6 @@ use crate::direct_construction::DirectConstruction;
 use crate::managed_arguments::ManagedArguments;
 use crate::path_text::path_text;
 use crate::peel_target::peel_target;
-use crate::provided_singleton::ProvidedSingleton;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::raw_target::RawTarget;
@@ -284,24 +282,11 @@ struct DraftedProviders<'index> {
     provided_keys: HashMap<CanonicalPath, CanonicalPath>,
 }
 
-pub(crate) fn build_plan(
-    index: &AttributeIndex,
-    provided: &[ProvidedSingleton],
-) -> Result<ContainerPlan, ContainerError> {
+pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
     let DraftedProviders {
         drafts,
-        mut provided_keys,
+        provided_keys,
     } = build_drafts(index)?;
-
-    for ProvidedSingleton { path, .. } in provided {
-        if let Some(first) = provided_keys.insert(path.clone(), path.clone()) {
-            return Err(ContainerError::DuplicateProvider {
-                provided: path.to_string(),
-                first: first.to_string(),
-                second: path.to_string(),
-            });
-        }
-    }
 
     let mut collections = CollectionTable::new();
     let mut providers = BTreeMap::new();
@@ -313,10 +298,10 @@ pub(crate) fn build_plan(
             construction,
             field_name,
             item,
-            provided: provided_type,
+            provided,
         } = draft;
 
-        let provider_key = provided_type.key().clone();
+        let provider_key = provided.key().clone();
 
         if let Some(trait_path) = collection {
             collections.add(trait_path, provider_key.clone());
@@ -331,29 +316,7 @@ pub(crate) fn build_plan(
                 concrete_path,
                 construction,
                 field_name,
-                provided: provided_type,
-            },
-        );
-    }
-
-    let mut allocator = NameAllocator::new();
-
-    for provider in providers.values() {
-        allocator.reserve(&provider.field_name);
-    }
-
-    for ProvidedSingleton { construction, path } in provided {
-        let field_name = allocator.allocate(&path.field_name()).field().to_string();
-
-        providers.insert(
-            path.clone(),
-            Provider {
-                concrete_path: path.clone(),
-                construction: DirectConstruction::Provided {
-                    expression: construction.clone(),
-                },
-                field_name,
-                provided: ProvidedType::Concrete(path.clone()),
+                provided,
             },
         );
     }

@@ -8,10 +8,7 @@ pub(crate) fn container_pass(
     context: &mut BuildContext,
 ) -> Result<ContainerBindings, CodegenError> {
     let RenderedContainer { bindings, modules } =
-        margaret_container::render_container::render_container(
-            context.index(),
-            context.provided_singletons(),
-        )?;
+        margaret_container::render_container::render_container(context.index())?;
 
     context.extend_modules(modules);
 

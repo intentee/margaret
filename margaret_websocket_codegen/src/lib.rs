@@ -142,7 +142,7 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
-        render_container(index, &[])
+        render_container(index)
             .expect("the container renders")
             .bindings
     }

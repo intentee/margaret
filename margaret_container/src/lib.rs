@@ -13,7 +13,6 @@ mod managed_arguments;
 mod ordered_providers;
 mod path_text;
 mod peel_target;
-pub mod provided_singleton;
 mod provided_type;
 mod provider;
 mod provider_binding;

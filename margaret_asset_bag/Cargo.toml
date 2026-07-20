@@ -1,0 +1,11 @@
+[package]
+name = "margaret_asset_bag"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dashmap = { workspace = true }
+maud = { workspace = true }
+
+[lints]
+workspace = true
