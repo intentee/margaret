@@ -2,6 +2,7 @@ use crate::form_request_extraction::FormRequestExtraction;
 use crate::request_input_source::RequestInputSource;
 
 pub(crate) enum ResponderArgumentBinding {
+    AssetBag,
     CurrentRequest,
     Forwarder,
     PeerSpiffeId,

@@ -1,6 +1,7 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
 pub(crate) enum HttpInjectable {
+    AssetBag,
     CurrentRequest,
     Next,
     PeerSpiffeId,
@@ -12,6 +13,11 @@ pub(crate) enum HttpInjectable {
 impl HttpInjectable {
     pub(crate) fn canonical_path(&self) -> CanonicalPath {
         match self {
+            Self::AssetBag => CanonicalPath::new(vec![
+                "margaret_asset_bag".to_string(),
+                "asset_bag".to_string(),
+                "AssetBag".to_string(),
+            ]),
             Self::CurrentRequest => CanonicalPath::new(vec![
                 "margaret_http".to_string(),
                 "request".to_string(),
@@ -54,7 +60,7 @@ impl HttpInjectable {
     fn requires_reference(&self) -> bool {
         match self {
             Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes | Self::Views => true,
-            Self::Next | Self::ValidationResult => false,
+            Self::AssetBag | Self::Next | Self::ValidationResult => false,
         }
     }
 }
@@ -83,6 +89,14 @@ mod tests {
 
         assert!(HttpInjectable::Next.matches(Some(&next), false));
         assert!(!HttpInjectable::Next.matches(Some(&next), true));
+    }
+
+    #[test]
+    fn matches_the_asset_bag_injectable_only_when_written_by_value() {
+        let asset_bag = path(&["margaret_asset_bag", "asset_bag", "AssetBag"]);
+
+        assert!(HttpInjectable::AssetBag.matches(Some(&asset_bag), false));
+        assert!(!HttpInjectable::AssetBag.matches(Some(&asset_bag), true));
     }
 
     #[test]

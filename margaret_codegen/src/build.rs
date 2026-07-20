@@ -1,7 +1,7 @@
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_container::provided_singleton::ProvidedSingleton;
 
+use crate::asset_bag_pass::asset_bag_pass;
 use crate::build_context::BuildContext;
 use crate::codegen_error::CodegenError;
 use crate::console_pass::console_pass;
@@ -14,14 +14,15 @@ use crate::views_pass::views_pass;
 
 pub fn build(
     crate_root: &CrateRoot,
-    provided_singletons: Vec<ProvidedSingleton>,
+    metafile_contents: Option<String>,
 ) -> Result<GeneratedCode, CodegenError> {
     let index = AttributeIndexBuilder::new()
         .index_crate(crate_root)?
         .build();
-    let mut context = BuildContext::new(&index, provided_singletons);
+    let mut context = BuildContext::new(&index, metafile_contents);
 
     container_pass(&mut context)?;
+    asset_bag_pass(&mut context)?;
     views_pass(&mut context)?;
     http_pass(&mut context)?;
     services_pass(&mut context)?;
@@ -44,6 +45,7 @@ mod tests {
     use margaret_generated_module::generated_module::GeneratedModule;
 
     use super::build;
+    use crate::asset_bag_pass::asset_bag_pass;
     use crate::build_context::BuildContext;
     use crate::codegen_error::CodegenError;
     use crate::console_pass::console_pass;
@@ -134,7 +136,7 @@ struct Widget {
 
         bootstrap(&directory);
 
-        build(&CrateRoot::new("crate", directory.path().join("src")), Vec::new())
+        build(&CrateRoot::new("crate", directory.path().join("src")), None)
     }
 
     fn generate_unformatted(source: &Path) -> GeneratedCode {
@@ -142,9 +144,10 @@ struct Widget {
             .index_crate(&CrateRoot::new("crate", source))
             .expect("the crate is indexed")
             .build();
-        let mut context = BuildContext::new(&index, Vec::new());
+        let mut context = BuildContext::new(&index, None);
 
         container_pass(&mut context).expect("the container pass succeeds");
+        asset_bag_pass(&mut context).expect("the asset bag pass succeeds");
         views_pass(&mut context).expect("the views pass succeeds");
         http_pass(&mut context).expect("the http pass succeeds");
         services_pass(&mut context).expect("the services pass succeeds");
@@ -205,6 +208,47 @@ struct Widget {
         assert!(!module(&code, "mod").contains("pub mod http;"));
         assert!(!has_module(&code, "http"));
         assert!(module(&code, "run").contains("\"greet\""));
+    }
+
+    #[test]
+    fn generates_the_asset_bag_module_when_a_metafile_is_present() {
+        let directory = crate_with(PLAIN_CRATE);
+        bootstrap(&directory);
+
+        let code = build(
+            &CrateRoot::new("crate", directory.path().join("src")),
+            Some(
+                r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
+                    .to_string(),
+            ),
+        )
+        .expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod asset_bag;"));
+        assert!(module(&code, "asset_bag").contains("macro_rules! asset"));
+    }
+
+    #[test]
+    fn omits_the_asset_bag_module_without_a_metafile() {
+        let code = generate(PLAIN_CRATE).expect("the build succeeds");
+
+        assert!(!module(&code, "mod").contains("pub mod asset_bag;"));
+        assert!(!has_module(&code, "asset_bag"));
+    }
+
+    #[test]
+    fn propagates_an_asset_bag_failure() {
+        let directory = crate_with(PLAIN_CRATE);
+        bootstrap(&directory);
+
+        let message = build(
+            &CrateRoot::new("crate", directory.path().join("src")),
+            Some(r#"{ "outputs": {} }"#.to_string()),
+        )
+        .expect_err("an invalid metafile is rejected")
+        .to_string();
+
+        assert!(message.contains("failed to generate the asset bag"));
     }
 
     #[test]

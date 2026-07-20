@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+use margaret_asset_bag_codegen::asset_bag_codegen_error::AssetBagCodegenError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
-use margaret_esbuild_metafile_codegen::esbuild_metafile_codegen_error::EsbuildMetafileCodegenError;
 use margaret_generated_module::generated_module_error::GeneratedModuleError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 use margaret_model_codegen::model_codegen_error::ModelCodegenError;
@@ -18,6 +18,12 @@ pub enum CodegenError {
     Index {
         #[from]
         source: AttributeError,
+    },
+
+    #[error("failed to generate the asset bag: {source}")]
+    AssetBag {
+        #[from]
+        source: AssetBagCodegenError,
     },
 
     #[error("failed to generate the dependency container: {source}")]
@@ -80,6 +86,12 @@ pub enum CodegenError {
         source: std::io::Error,
     },
 
+    #[error("failed to read the esbuild metafile '{path}': {source}")]
+    ReadMetafile {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
     #[error("failed to write the generated source '{path}': {source}")]
     WriteSource {
         path: PathBuf,
@@ -90,17 +102,5 @@ pub enum CodegenError {
     RemoveEntry {
         path: PathBuf,
         source: std::io::Error,
-    },
-
-    #[error("failed to read the esbuild metafile '{path}': {source}")]
-    EsbuildMetafileRead {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
-    #[error("the esbuild metafile '{path}' is invalid: {source}")]
-    EsbuildMetafileInvalid {
-        path: PathBuf,
-        source: EsbuildMetafileCodegenError,
     },
 }

@@ -1,0 +1,12 @@
+[package]
+name = "margaret_asset_bag_server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+margaret_http = { path = "../margaret_http" }
+mime_guess = { workspace = true }
+rust-embed = { workspace = true }
+
+[lints]
+workspace = true

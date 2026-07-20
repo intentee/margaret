@@ -369,6 +369,17 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     }
 
     #[test]
+    fn injects_a_fresh_asset_bag_into_a_responder_by_value() {
+        let source = source_for(
+            "use margaret_asset_bag::asset_bag::AssetBag;\n\n#[responds_to_http(method = \"get\", path = \"/page\", server = \"public\")]\nstruct GetPage;\nimpl GetPage {\n    #[process]\n    fn respond(&self, asset_bag: AssetBag) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("|responder:std::sync::Arc<crate::GetPage>,_request:&margaret_http::request::Request"));
+        assert!(source.contains("letasset_bag=::margaret_asset_bag::asset_bag::AssetBag::new();"));
+        assert!(source.contains("responder.respond(asset_bag).await"));
+    }
+
+    #[test]
     fn injects_the_peer_spiffe_id_into_a_responder_by_type() {
         let source = source_for(
             "use spiffe::spiffe_id::SpiffeId;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, peer: &SpiffeId) -> Response {}\n}\n",

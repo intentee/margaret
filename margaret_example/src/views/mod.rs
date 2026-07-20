@@ -1,3 +1,7 @@
+pub mod asset_page;
+pub mod asset_page_props;
+pub mod asset_showcase;
+pub mod asset_showcase_props;
 pub mod card_layout;
 pub mod card_layout_props;
 pub mod farewell_view;

@@ -87,7 +87,6 @@ fn direct_value(
             }
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
-        DirectConstruction::Provided { expression } => expression.clone(),
     }
 }
 

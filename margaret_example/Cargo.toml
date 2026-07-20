@@ -9,7 +9,8 @@ async-trait = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 clap = { workspace = true }
 dashmap = { workspace = true }
-esbuild-metafile = { workspace = true }
+margaret_asset_bag = { path = "../margaret_asset_bag" }
+margaret_asset_bag_server = { path = "../margaret_asset_bag_server" }
 margaret_console = { path = "../margaret_console" }
 margaret_http = { path = "../margaret_http" }
 margaret_http_validation = { path = "../margaret_http_validation" }
@@ -23,6 +24,7 @@ margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server" }
 margaret_validation = { path = "../margaret_validation" }
 margaret_views = { path = "../margaret_views" }
 maud = { workspace = true }
+rust-embed = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 spiffe = { workspace = true, features = ["spiffe-types"] }
 thiserror = { workspace = true }
