@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::Display;
 use std::net::SocketAddr;
@@ -28,11 +29,15 @@ use crate::forward_targets::ForwardTargets;
 use crate::request::Request;
 use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
+use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
+use crate::router::RequestRoute;
+use crate::router::RouteResolution;
 use crate::router::Router;
 use crate::server_registry::ServerRegistry;
 use crate::transport_config::TransportConfig;
 use crate::upload_config::UploadConfig;
+use crate::web_socket_upgrade::WebSocketUpgrade;
 
 #[derive(Clone)]
 enum BoundTransport {
@@ -43,6 +48,7 @@ enum BoundTransport {
 #[derive(Clone)]
 struct ConnectionContext {
     body_limit: BodyLimit,
+    cancellation_token: CancellationToken,
     forward_targets: Arc<ForwardTargets>,
     peer_identity: Arc<PeerIdentity>,
     remote_addr: SocketAddr,
@@ -104,8 +110,9 @@ impl BoundServer {
             .run_until_cancelled(self.listener.accept())
             .await
         {
-            accept_outcome(accepted)
-                .map(|connection| self.spawn_connection(&builder, &graceful, connection));
+            accept_outcome(accepted).map(|connection| {
+                self.spawn_connection(&builder, &graceful, connection, &cancellation_token)
+            });
         }
 
         graceful.shutdown().await;
@@ -119,6 +126,7 @@ impl BoundServer {
             remote_addr,
             stream,
         }: AcceptedConnection,
+        cancellation_token: &CancellationToken,
     ) -> JoinHandle<()> {
         let builder = builder.clone();
         let watcher = graceful.watcher();
@@ -127,6 +135,7 @@ impl BoundServer {
         let upload_config = self.upload_config.clone();
         let forward_targets = self.forward_targets.clone();
         let body_limit = self.body_limit;
+        let cancellation_token = cancellation_token.clone();
 
         tokio::spawn(async move {
             match transport {
@@ -137,6 +146,7 @@ impl BoundServer {
                         TokioIo::new(stream),
                         ConnectionContext {
                             body_limit,
+                            cancellation_token,
                             forward_targets,
                             peer_identity: Arc::new(PeerIdentity::from_peer_certificate(None)),
                             remote_addr,
@@ -163,6 +173,7 @@ impl BoundServer {
                         TokioIo::new(tls_stream),
                         ConnectionContext {
                             body_limit,
+                            cancellation_token,
                             forward_targets,
                             peer_identity,
                             remote_addr,
@@ -238,20 +249,20 @@ async fn serve_connection<Io>(
         },
     ));
 
-    report_connection_outcome(watcher.watch(builder.serve_connection(io, service)).await);
+    report_connection_outcome(
+        watcher
+            .watch(builder.serve_connection_with_upgrades(io, service))
+            .await,
+    );
 }
 
-async fn dispatch(
-    ConnectionContext {
-        body_limit,
-        forward_targets,
-        peer_identity,
-        remote_addr,
-        router,
-        upload_config,
-    }: ConnectionContext,
+async fn parse_request(
     request: http::Request<Incoming>,
-) -> http::Response<Full<Bytes>> {
+    remote_addr: SocketAddr,
+    peer_identity: Arc<PeerIdentity>,
+    body_limit: &BodyLimit,
+    upload_config: &UploadConfig,
+) -> Result<Request, RequestError> {
     let (parts, incoming) = request.into_parts();
     let Parts {
         method,
@@ -260,26 +271,114 @@ async fn dispatch(
         ..
     } = parts;
     let body = incoming.map_err(std::io::Error::other).boxed_unsync();
-
-    match RequestInputs::parse(
+    let inputs = RequestInputs::parse(
         method,
         &uri,
         headers,
         remote_addr,
         body,
-        &body_limit,
-        &upload_config,
+        body_limit,
+        upload_config,
     )
-    .await
-    {
-        Ok(inputs) => router
-            .respond(
-                Request::from_inputs(inputs).with_peer_identity(peer_identity),
-                &forward_targets,
+    .await?;
+
+    Ok(Request::from_inputs(inputs).with_peer_identity(peer_identity))
+}
+
+async fn complete_request(
+    route: RequestRoute,
+    request: Request,
+    forward_targets: &Arc<ForwardTargets>,
+) -> http::Response<Full<Bytes>> {
+    match route {
+        RequestRoute::Handler {
+            handler,
+            path_params,
+        } => respond_recursively(
+            forward_targets,
+            request.with_path_params(path_params),
+            handler,
+        )
+        .await
+        .into_http(),
+        RequestRoute::MethodNotAllowed => Response::text(405, "Method Not Allowed").into_http(),
+        RequestRoute::NotFound => Response::not_found().into_http(),
+    }
+}
+
+async fn dispatch_web_socket(
+    mut request: http::Request<Incoming>,
+    remote_addr: SocketAddr,
+    peer_identity: Arc<PeerIdentity>,
+    cancellation_token: CancellationToken,
+    upgrade: Arc<dyn WebSocketUpgrade>,
+    path_params: HashMap<String, String>,
+) -> http::Response<Full<Bytes>> {
+    let on_upgrade = hyper::upgrade::on(&mut request);
+    let (parts, _incoming) = request.into_parts();
+    let Parts {
+        method,
+        headers,
+        uri,
+        ..
+    } = parts;
+
+    match RequestInputs::from_handshake(method, &uri, headers, remote_addr) {
+        Ok(inputs) => {
+            let handshake = Request::from_inputs(inputs)
+                .with_peer_identity(peer_identity)
+                .with_path_params(path_params);
+
+            upgrade
+                .upgrade(handshake, on_upgrade, cancellation_token)
+                .await
+                .into_http()
+        }
+        Err(error) => error_response(error).into_http(),
+    }
+}
+
+async fn dispatch(
+    ConnectionContext {
+        body_limit,
+        cancellation_token,
+        forward_targets,
+        peer_identity,
+        remote_addr,
+        router,
+        upload_config,
+    }: ConnectionContext,
+    request: http::Request<Incoming>,
+) -> http::Response<Full<Bytes>> {
+    match router.resolve(request.method().as_str(), request.uri().path()) {
+        RouteResolution::Upgrade {
+            path_params,
+            upgrade,
+        } => {
+            dispatch_web_socket(
+                request,
+                remote_addr,
+                peer_identity,
+                cancellation_token.child_token(),
+                upgrade,
+                path_params,
             )
             .await
-            .into_http(),
-        Err(error) => error_response(error).into_http(),
+        }
+        RouteResolution::Request(route) => {
+            match parse_request(
+                request,
+                remote_addr,
+                peer_identity,
+                &body_limit,
+                &upload_config,
+            )
+            .await
+            {
+                Ok(request) => complete_request(route, request, &forward_targets).await,
+                Err(error) => error_response(error).into_http(),
+            }
+        }
     }
 }
 
@@ -289,6 +388,7 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use hyper::upgrade::OnUpgrade;
     use tokio::io::AsyncReadExt;
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpStream;
@@ -311,6 +411,7 @@ mod tests {
     use crate::server_registry::ServerRegistry;
     use crate::transport_config::TransportConfig;
     use crate::upload_config::UploadConfig;
+    use crate::web_socket_upgrade::WebSocketUpgrade;
 
     struct PlainOk;
 
@@ -356,6 +457,35 @@ mod tests {
                 .as_u16(),
             400
         );
+    }
+
+    #[test]
+    fn rejects_conflicting_route_paths() {
+        let conflict = Router::build(vec![
+            RouteEntry::new(
+                "/items/{id}",
+                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+            ),
+            RouteEntry::new(
+                "/items/{name}",
+                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+            ),
+        ]);
+
+        assert!(conflict.is_err());
+    }
+
+    #[test]
+    fn rejects_a_web_socket_route_that_conflicts_with_an_http_route() {
+        let conflict = Router::build(vec![
+            RouteEntry::new(
+                "/x/{id}",
+                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+            ),
+            RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade)),
+        ]);
+
+        assert!(conflict.is_err());
     }
 
     #[test]
@@ -467,6 +597,84 @@ mod tests {
         assert!(unmatched.contains(" 404 "));
         assert!(unsupported.contains(" 405 "));
         assert!(truncated.contains(" 400 "));
+
+        cancellation_token.cancel();
+
+        serving.await.expect("the server task finishes cleanly");
+    }
+
+    struct TestUpgrade;
+
+    #[async_trait]
+    impl WebSocketUpgrade for TestUpgrade {
+        async fn upgrade(
+            self: Arc<Self>,
+            handshake: Request,
+            _on_upgrade: OnUpgrade,
+            _cancellation_token: CancellationToken,
+        ) -> Response {
+            Response::text(
+                200,
+                handshake
+                    .path_param("id")
+                    .expect("the room route binds the id path parameter")
+                    .to_string(),
+            )
+        }
+    }
+
+    fn registry_with_web_socket() -> Arc<ServerRegistry> {
+        Arc::new(ServerRegistry::new(vec![Server::new(
+            "test",
+            "127.0.0.1:0".to_string(),
+            TransportConfig::Plain,
+            UploadConfig::Disabled,
+            BodyLimit::default(),
+            Router::build(vec![RouteEntry::web_socket(
+                "/room/{id}",
+                Arc::new(TestUpgrade),
+            )])
+            .expect("the route entries register cleanly"),
+        )]))
+    }
+
+    #[tokio::test]
+    async fn serves_web_socket_routes() {
+        let bound = BoundServer::bind(
+            registry_with_web_socket(),
+            empty_forward_targets(),
+            Arc::from("test"),
+        )
+        .await
+        .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let (upgraded, wrong_method, malformed_cookie) = tokio::join!(
+            exchange(
+                address,
+                b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+            exchange(
+                address,
+                b"POST /room/42 HTTP/1.1\r\nHost: test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+            exchange(
+                address,
+                b"GET /room/9 HTTP/1.1\r\nHost: test\r\nCookie: =nameless\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+        );
+
+        assert!(upgraded.contains(" 200 "));
+        assert!(upgraded.contains("42"));
+        assert!(wrong_method.contains(" 405 "));
+        assert!(malformed_cookie.contains(" 400 "));
 
         cancellation_token.cancel();
 

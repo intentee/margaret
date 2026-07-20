@@ -732,6 +732,7 @@ checksum = "9fa08315bb612088cc391249efdc3bc77536f16c91f6cf495e6fbe85b20a4a81"
 dependencies = [
  "futures-core",
  "futures-macro",
+ "futures-sink",
  "futures-task",
  "pin-project-lite",
  "pin-utils",
@@ -1375,6 +1376,7 @@ dependencies = [
  "margaret_model_codegen",
  "margaret_service_codegen",
  "margaret_views_codegen",
+ "margaret_websocket_codegen",
  "quote",
  "tempfile",
  "thiserror",
@@ -1445,6 +1447,7 @@ dependencies = [
  "margaret_attributes",
  "margaret_container",
  "margaret_generated_module",
+ "syn",
 ]
 
 [[package]]
@@ -1471,9 +1474,11 @@ dependencies = [
  "margaret_spiffe_svid_server",
  "margaret_validation",
  "margaret_views",
+ "margaret_websocket",
  "maud",
  "rust-embed",
  "serde",
+ "serde_json",
  "spiffe",
  "thiserror",
  "tokio",
@@ -1535,6 +1540,8 @@ dependencies = [
  "margaret_codegen_tokens",
  "margaret_generated_module",
  "margaret_injection_codegen",
+ "margaret_request_binding_codegen",
+ "margaret_route_parameter_codegen",
  "matchit",
  "proc-macro2",
  "quote",
@@ -1749,6 +1756,24 @@ dependencies = [
  "rcgen",
  "spiffe",
 ]
+
+[[package]]
+name = "margaret_request_binding_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_container",
+ "margaret_injection_codegen",
+ "margaret_route_parameter_codegen",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "thiserror",
+]
+
+[[package]]
+name = "margaret_route_parameter_codegen"
+version = "0.1.0"
 
 [[package]]
 name = "margaret_service"
@@ -1972,6 +1997,61 @@ dependencies = [
  "quote",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "margaret_websocket"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "hyper",
+ "hyper-util",
+ "margaret_http",
+ "margaret_validation",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "validator",
+]
+
+[[package]]
+name = "margaret_websocket_codegen"
+version = "0.1.0"
+dependencies = [
+ "heck",
+ "margaret_attributes",
+ "margaret_codegen_tokens",
+ "margaret_container",
+ "margaret_generated_module",
+ "margaret_injection_codegen",
+ "margaret_request_binding_codegen",
+ "margaret_route_parameter_codegen",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "margaret_websocket_tests"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "margaret_http",
+ "margaret_http_validation",
+ "margaret_websocket",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "validator",
 ]
 
 [[package]]
@@ -3002,6 +3082,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3349,6 +3440,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-tungstenite"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17a073bfed563fa236697a068031408a93cd9522e08abf9933ead3e73411bd71"
+dependencies = [
+ "futures-util",
+ "log",
+ "tokio",
+ "tungstenite",
+]
+
+[[package]]
 name = "tokio-util"
 version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3528,6 +3631,22 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "tungstenite"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e48ac77174b19c110a50ab2128b24215ac9cb40e0e12e093fb602d175c569d22"
+dependencies = [
+ "bytes",
+ "data-encoding",
+ "http",
+ "httparse",
+ "log",
+ "rand",
+ "sha1",
+ "thiserror",
 ]
 
 [[package]]

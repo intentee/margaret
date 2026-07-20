@@ -1,20 +1,20 @@
 use syn::Attribute;
 
 use crate::canonical_path::CanonicalPath;
-use crate::indexed_associated_type::IndexedAssociatedType;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_field::IndexedField;
 use crate::indexed_method::IndexedMethod;
+use crate::indexed_trait_impl::IndexedTraitImpl;
 use crate::item_kind::ItemKind;
 
 pub struct IndexedItem {
-    associated_types: Vec<IndexedAssociatedType>,
     attributes: Vec<IndexedAttribute>,
     canonical_path: CanonicalPath,
     fields: Vec<IndexedField>,
     identifier: String,
     kind: ItemKind,
     methods: Vec<IndexedMethod>,
+    trait_impls: Vec<IndexedTraitImpl>,
 }
 
 impl IndexedItem {
@@ -26,19 +26,14 @@ impl IndexedItem {
         fields: Vec<IndexedField>,
     ) -> Self {
         Self {
-            associated_types: Vec::new(),
             attributes: attributes.into_iter().map(IndexedAttribute::new).collect(),
             canonical_path,
             fields,
             identifier,
             kind,
             methods: Vec::new(),
+            trait_impls: Vec::new(),
         }
-    }
-
-    #[must_use]
-    pub fn associated_types(&self) -> &[IndexedAssociatedType] {
-        &self.associated_types
     }
 
     #[must_use]
@@ -71,17 +66,20 @@ impl IndexedItem {
         &self.methods
     }
 
-    pub(crate) fn add_associated_type(&mut self, associated_type: IndexedAssociatedType) {
-        self.associated_types.push(associated_type);
+    #[must_use]
+    pub fn trait_impls(&self) -> &[IndexedTraitImpl] {
+        &self.trait_impls
     }
 
     pub(crate) fn add_method(&mut self, method: IndexedMethod) {
         self.methods.push(method);
     }
 
+    pub(crate) fn add_trait_impl(&mut self, trait_impl: IndexedTraitImpl) {
+        self.trait_impls.push(trait_impl);
+    }
+
     pub(crate) fn sort_members(&mut self) {
-        self.associated_types
-            .sort_by(|left, right| left.name().cmp(right.name()));
         self.methods
             .sort_by(|left, right| left.identifier().cmp(right.identifier()));
     }

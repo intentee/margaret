@@ -8,6 +8,7 @@ autotests = false
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_container = { path = "../margaret_container" }
 margaret_generated_module = { path = "../margaret_generated_module" }
+syn = { workspace = true }
 
 [[test]]
 name = "main"

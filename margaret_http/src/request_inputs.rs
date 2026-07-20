@@ -89,6 +89,32 @@ impl RequestInputs {
         }
     }
 
+    pub(crate) fn from_handshake(
+        method: Method,
+        uri: &Uri,
+        headers: HeaderMap,
+        remote_addr: SocketAddr,
+    ) -> Result<Self, RequestError> {
+        let cookies = parse_cookies(&headers)?;
+        let query = index_fields(form_fields(uri.query().unwrap_or_default().as_bytes()));
+        let server = ServerParams::new(
+            method,
+            uri.path().to_string(),
+            uri.query().unwrap_or_default().to_string(),
+            remote_addr,
+            headers,
+        );
+
+        Ok(Self {
+            cookies,
+            files: HashMap::new(),
+            json: None,
+            form: HashMap::new(),
+            query,
+            server,
+        })
+    }
+
     pub(crate) async fn parse(
         method: Method,
         uri: &Uri,
@@ -250,6 +276,39 @@ mod tests {
             &UploadConfig::Disabled,
         )
         .await
+    }
+
+    #[test]
+    fn builds_body_less_inputs_from_a_handshake() {
+        let mut headers = HeaderMap::new();
+        headers.insert(COOKIE, HeaderValue::from_static("session=abc"));
+
+        let uri: Uri = "/socket?room=lobby".parse().expect("a valid uri");
+        let inputs = RequestInputs::from_handshake(Method::GET, &uri, headers, unspecified_addr())
+            .expect("the handshake inputs are built");
+
+        assert_eq!(
+            inputs.cookies.get("session").map(String::as_str),
+            Some("abc")
+        );
+        assert_eq!(inputs.query.get("room").map(String::as_str), Some("lobby"));
+        assert_eq!(inputs.server.path(), "/socket");
+        assert_eq!(inputs.server.query_string(), "room=lobby");
+        assert!(inputs.form.is_empty());
+        assert!(inputs.files.is_empty());
+        assert!(inputs.json.is_none());
+    }
+
+    #[test]
+    fn rejects_a_handshake_with_a_malformed_cookie_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert(COOKIE, HeaderValue::from_static("=nameless"));
+
+        let uri: Uri = "/socket".parse().expect("a valid uri");
+
+        assert!(
+            RequestInputs::from_handshake(Method::GET, &uri, headers, unspecified_addr()).is_err()
+        );
     }
 
     #[tokio::test]

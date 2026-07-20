@@ -2,13 +2,16 @@ use crate::build_context::BuildContext;
 use crate::codegen_error::CodegenError;
 
 pub(crate) fn http_pass(context: &mut BuildContext) -> Result<(), CodegenError> {
-    if !context.capabilities().has_http {
+    let capabilities = context.capabilities();
+
+    if !capabilities.has_http && !capabilities.has_websockets {
         return Ok(());
     }
 
     let artifacts = margaret_http_codegen::render_http::render_http(
         context.index(),
-        context.capabilities().has_views,
+        capabilities.has_views,
+        context.websocket_servers(),
     )?;
 
     context.set_servers(artifacts.servers().to_vec());

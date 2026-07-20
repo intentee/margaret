@@ -7,6 +7,7 @@ pub(crate) struct Capabilities {
     pub(crate) has_http: bool,
     pub(crate) has_models: bool,
     pub(crate) has_views: bool,
+    pub(crate) has_websockets: bool,
     pub(crate) serves: bool,
 }
 
@@ -16,7 +17,9 @@ impl Capabilities {
         let has_models = margaret_model_codegen::has_models::has_models(index);
         let has_services = margaret_service_codegen::has_services::has_services(index);
         let has_views = margaret_views_codegen::has_views::has_views(index);
-        let serves = has_http || has_services;
+        let has_websockets =
+            margaret_websocket_codegen::has_websocket_sessions::has_websocket_sessions(index);
+        let serves = has_http || has_services || has_websockets;
         let has_console =
             margaret_console_codegen::has_commands::has_commands(index) || serves || has_models;
 
@@ -26,6 +29,7 @@ impl Capabilities {
             has_http,
             has_models,
             has_views,
+            has_websockets,
             serves,
         }
     }

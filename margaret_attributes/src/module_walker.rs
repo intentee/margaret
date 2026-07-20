@@ -22,6 +22,7 @@ use crate::indexed_associated_type::IndexedAssociatedType;
 use crate::indexed_field::IndexedField;
 use crate::indexed_item::IndexedItem;
 use crate::indexed_method::IndexedMethod;
+use crate::indexed_trait_impl::IndexedTraitImpl;
 use crate::item_kind::ItemKind;
 use crate::module_imports::ModuleImports;
 use crate::resolve_type::resolve_type;
@@ -36,8 +37,11 @@ struct Recordable<'item> {
 }
 
 enum PendingMemberKind {
-    AssociatedType(IndexedAssociatedType),
     Method(IndexedMethod),
+    TraitImpl {
+        associated_types: Vec<IndexedAssociatedType>,
+        trait_path: syn::Path,
+    },
 }
 
 struct PendingMember {
@@ -174,11 +178,18 @@ impl ModuleWalker {
             };
 
             match kind {
-                PendingMemberKind::AssociatedType(associated_type) => {
-                    item.add_associated_type(associated_type);
-                }
                 PendingMemberKind::Method(method) => {
                     item.add_method(method);
+                }
+                PendingMemberKind::TraitImpl {
+                    associated_types,
+                    trait_path,
+                } => {
+                    item.add_trait_impl(IndexedTraitImpl::new(
+                        trait_path,
+                        module_path,
+                        associated_types,
+                    ));
                 }
             }
         }
@@ -255,19 +266,26 @@ impl ModuleWalker {
     }
 
     fn walk_impl(&mut self, item_impl: &ItemImpl, module_path: &[String]) {
-        if item_impl.trait_.is_some() {
+        if let Some((_, trait_path, _)) = &item_impl.trait_ {
+            let mut associated_types = Vec::new();
+
             for impl_item in &item_impl.items {
                 if let ImplItem::Type(associated_type) = impl_item {
-                    self.pending_members.push(PendingMember {
-                        kind: PendingMemberKind::AssociatedType(IndexedAssociatedType::new(
-                            associated_type.ident.to_string(),
-                            associated_type.ty.clone(),
-                        )),
-                        module_path: module_path.to_vec(),
-                        self_type: (*item_impl.self_ty).clone(),
-                    });
+                    associated_types.push(IndexedAssociatedType::new(
+                        associated_type.ident.to_string(),
+                        associated_type.ty.clone(),
+                    ));
                 }
             }
+
+            self.pending_members.push(PendingMember {
+                kind: PendingMemberKind::TraitImpl {
+                    associated_types,
+                    trait_path: trait_path.clone(),
+                },
+                module_path: module_path.to_vec(),
+                self_type: (*item_impl.self_ty).clone(),
+            });
 
             return;
         }

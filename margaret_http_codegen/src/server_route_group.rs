@@ -4,10 +4,11 @@ use std::collections::btree_map::Entry;
 use matchit::InsertError;
 use matchit::Router;
 
+use margaret_route_parameter_codegen::route_path::RoutePath;
+
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
 use crate::route_group::RouteGroup;
-use crate::route_path::RoutePath;
 
 pub(crate) struct ServerRouteGroup {
     matcher: Router<()>,

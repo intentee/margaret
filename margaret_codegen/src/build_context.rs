@@ -16,6 +16,7 @@ pub(crate) struct BuildContext<'index> {
     module_tokens: Vec<GeneratedModuleTokens>,
     serve_arguments: Vec<ConsoleArgument>,
     servers: Vec<HttpServer>,
+    websocket_servers: Vec<String>,
 }
 
 impl<'index> BuildContext<'index> {
@@ -27,6 +28,7 @@ impl<'index> BuildContext<'index> {
             module_tokens: Vec::new(),
             serve_arguments: Vec::new(),
             servers: Vec::new(),
+            websocket_servers: Vec::new(),
         }
     }
 
@@ -73,6 +75,14 @@ impl<'index> BuildContext<'index> {
 
     pub(crate) fn set_servers(&mut self, servers: Vec<HttpServer>) {
         self.servers = servers;
+    }
+
+    pub(crate) fn set_websocket_servers(&mut self, websocket_servers: Vec<String>) {
+        self.websocket_servers = websocket_servers;
+    }
+
+    pub(crate) fn websocket_servers(&self) -> &[String] {
+        &self.websocket_servers
     }
 }
 

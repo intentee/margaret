@@ -43,3 +43,4 @@ pub mod upload_config;
 pub mod uploaded_file;
 pub mod url_parameter;
 pub mod url_segment;
+pub mod web_socket_upgrade;

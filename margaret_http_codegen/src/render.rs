@@ -9,38 +9,39 @@ use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_request_binding_codegen::bound_parameter::BoundParameter;
+use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
+use margaret_request_binding_codegen::request_binding::RequestBinding;
 
-use crate::form_request_extraction::FormRequestExtraction;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::middleware_argument::MiddlewareArgument;
 use crate::middleware_plan::MiddlewarePlan;
-use crate::responder_argument::ResponderArgument;
-use crate::responder_argument_binding::ResponderArgumentBinding;
 use crate::route_group::RouteGroup;
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
 }
 
-fn argument_needs_request(argument: &ResponderArgument) -> bool {
+fn argument_needs_request(argument: &BoundParameter) -> bool {
     !matches!(
         argument.binding,
-        ResponderArgumentBinding::Routes
-            | ResponderArgumentBinding::Forwarder
-            | ResponderArgumentBinding::Views
-            | ResponderArgumentBinding::AssetBag
+        RequestBinding::Routes
+            | RequestBinding::Forwarder
+            | RequestBinding::Views
+            | RequestBinding::AssetBag
     )
 }
 
-fn holder_shadows_request(binding: &ResponderArgumentBinding) -> bool {
+fn holder_shadows_request(binding: &RequestBinding) -> bool {
     matches!(
         binding,
-        ResponderArgumentBinding::Raw { .. }
-            | ResponderArgumentBinding::Bound { .. }
-            | ResponderArgumentBinding::FormRequest { .. }
-            | ResponderArgumentBinding::PeerSpiffeId
+        RequestBinding::Raw { .. }
+            | RequestBinding::Bound { .. }
+            | RequestBinding::FormRequest { .. }
+            | RequestBinding::PeerSpiffeId
     )
 }
 
@@ -48,14 +49,14 @@ fn responder_injects_routes(route: &HttpRoute) -> bool {
     route
         .arguments
         .iter()
-        .any(|argument| matches!(argument.binding, ResponderArgumentBinding::Routes))
+        .any(|argument| matches!(argument.binding, RequestBinding::Routes))
 }
 
 pub(crate) fn responder_injects_views(route: &HttpRoute) -> bool {
     route
         .arguments
         .iter()
-        .any(|argument| matches!(argument.binding, ResponderArgumentBinding::Views))
+        .any(|argument| matches!(argument.binding, RequestBinding::Views))
 }
 
 fn route_references_routes(route: &HttpRoute) -> bool {
@@ -91,7 +92,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
     };
 
     for argument in &route.arguments {
-        if matches!(argument.binding, ResponderArgumentBinding::CurrentRequest) {
+        if matches!(argument.binding, RequestBinding::CurrentRequest) {
             allocator.reserve(&argument.holder.to_string());
         }
     }
@@ -198,15 +199,15 @@ fn onion(route: &HttpRoute) -> TokenStream {
 }
 
 fn argument_value(
-    argument: &ResponderArgument,
+    argument: &BoundParameter,
     routes_binding: &Ident,
     views_binding: &Ident,
     server: &Ident,
 ) -> TokenStream {
     match &argument.binding {
-        ResponderArgumentBinding::Routes => quote! { #routes_binding.as_ref() },
-        ResponderArgumentBinding::Views => quote! { #views_binding.as_ref() },
-        ResponderArgumentBinding::Forwarder => {
+        RequestBinding::Routes => quote! { #routes_binding.as_ref() },
+        RequestBinding::Views => quote! { #views_binding.as_ref() },
+        RequestBinding::Forwarder => {
             quote! { super::super::forwarders::#server::Forwarder }
         }
         _ => {
@@ -217,94 +218,23 @@ fn argument_value(
     }
 }
 
-fn argument_binding(argument: &ResponderArgument, request: &Ident) -> TokenStream {
-    let holder = &argument.holder;
-
-    match &argument.binding {
-        ResponderArgumentBinding::Raw { path_key } => {
-            quote! {
-                let #holder = match margaret_http::require_route_parameter::require_route_parameter(
-                    #request,
-                    #path_key,
-                ) {
-                    Ok(value) => value,
-                    Err(response) => return response.into(),
-                };
-            }
-        }
-        ResponderArgumentBinding::CurrentRequest => {
-            if holder == request {
-                TokenStream::new()
-            } else {
-                quote! {
-                    let #holder = #request;
-                }
-            }
-        }
-        ResponderArgumentBinding::Routes
-        | ResponderArgumentBinding::Forwarder
-        | ResponderArgumentBinding::Views => TokenStream::new(),
-        ResponderArgumentBinding::AssetBag => {
-            quote! {
-                let #holder = ::margaret_asset_bag::asset_bag::AssetBag::new();
-            }
-        }
-        ResponderArgumentBinding::PeerSpiffeId => {
-            quote! {
-                let #holder = match margaret_http::require_peer_spiffe_id::require_peer_spiffe_id(
-                    #request,
-                ) {
-                    Ok(value) => value,
-                    Err(response) => return response.into(),
-                };
-            }
-        }
-        ResponderArgumentBinding::Bound {
-            binder_field,
-            path_key,
-        } => {
-            let binder_field = format_ident!("{}", binder_field);
-
-            quote! {
-                let #holder = match margaret_http::require_bound_route_parameter::require_bound_route_parameter(
-                    #request,
-                    #path_key,
-                    #binder_field.as_ref(),
-                ).await {
-                    Ok(value) => value,
-                    Err(response) => return response.into(),
-                };
-            }
-        }
-        ResponderArgumentBinding::FormRequest { source, extraction } => {
-            let variant = source.variant();
-
-            match extraction {
-                FormRequestExtraction::Result => quote! {
-                    let #holder = margaret_http_validation::validate_input::validate_input(
-                        #request,
-                        margaret_http_validation::request_input::RequestInput::#variant,
-                    );
-                },
-                FormRequestExtraction::Model => quote! {
-                    let #holder = match margaret_http_validation::require_input::require_input(
-                        #request,
-                        margaret_http_validation::request_input::RequestInput::#variant,
-                    ) {
-                        Ok(model) => model,
-                        Err(response) => return response.into(),
-                    };
-                },
-            }
-        }
-    }
+fn argument_binding(argument: &BoundParameter, request: &Ident) -> TokenStream {
+    render_request_extraction(
+        &argument.binding,
+        &argument.holder,
+        &ExtractionContext {
+            binder_owner: &TokenStream::new(),
+            error_return: &quote! { return response.into() },
+            request_local: request,
+        },
+    )
 }
 
 fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
     let mut fields: BTreeSet<String> = BTreeSet::new();
 
     for argument in &route.arguments {
-        if let ResponderArgumentBinding::Bound { binder_field, .. } = &argument.binding {
+        if let RequestBinding::Bound { binder_field, .. } = &argument.binding {
             fields.insert(binder_field.clone());
         }
     }
@@ -367,18 +297,26 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     }
 }
 
-fn server_module(table: &HttpRouteTable, server: &HttpServer, has_views: bool) -> TokenStream {
+fn server_module(
+    table: &HttpRouteTable,
+    server: &HttpServer,
+    has_views: bool,
+    has_websocket_routes: bool,
+) -> TokenStream {
     let function_name = server.function_name();
     let server_routes: Vec<&HttpRoute> = table
         .route_groups(server.name())
         .flat_map(RouteGroup::method_routes)
         .collect();
-    let routes_param = if server_routes.iter().copied().any(route_references_routes) {
-        format_ident!("routes")
-    } else {
-        format_ident!("_routes")
-    };
-    let views_param = if server_routes.iter().copied().any(responder_injects_views) {
+    let routes_param =
+        if has_websocket_routes || server_routes.iter().copied().any(route_references_routes) {
+            format_ident!("routes")
+        } else {
+            format_ident!("_routes")
+        };
+    let views_param = if (has_websocket_routes && has_views)
+        || server_routes.iter().copied().any(responder_injects_views)
+    {
         format_ident!("views")
     } else {
         format_ident!("_views")
@@ -431,6 +369,24 @@ fn server_module(table: &HttpRouteTable, server: &HttpServer, has_views: bool) -
         })
     });
     let named_handlers = vec_literal_tokens(named_handlers);
+    let router = if has_websocket_routes {
+        let websocket_routes = format_ident!("{}_routes", server.name());
+        let views_argument = has_views.then(|| quote! { , #views_param });
+
+        quote! {
+            {
+                let mut route_entries = #route_entries;
+
+                route_entries.extend(
+                    super::super::websocket::#websocket_routes(container, #routes_param #views_argument).await,
+                );
+
+                margaret_http::router::Router::build(route_entries)
+            }
+        }
+    } else {
+        quote! { margaret_http::router::Router::build(#route_entries) }
+    };
 
     quote! {
         pub async fn #function_name(
@@ -443,7 +399,7 @@ fn server_module(table: &HttpRouteTable, server: &HttpServer, has_views: bool) -
         > {
             #(#handler_bindings)*
 
-            margaret_http::router::Router::build(#route_entries).map(|router| {
+            #router.map(|router| {
                 margaret_http::server_routes::ServerRoutes::new(router, #named_handlers)
             })
         }
@@ -455,6 +411,7 @@ pub(crate) fn render(
     servers: &[HttpServer],
     middleware_plans: &[MiddlewarePlan],
     has_views: bool,
+    websocket_servers: &[String],
 ) -> Vec<GeneratedModuleTokens> {
     let middleware_wrappers = middleware_plans.iter().map(middleware_wrapper);
     let server_declarations = servers.iter().map(|server| {
@@ -474,9 +431,13 @@ pub(crate) fn render(
     let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];
 
     for server in servers {
+        let has_websocket_routes = websocket_servers
+            .iter()
+            .any(|websocket_server| websocket_server == server.name());
+
         modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
-            server_module(table, server, has_views),
+            server_module(table, server, has_views, has_websocket_routes),
         ));
     }
 

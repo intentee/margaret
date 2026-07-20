@@ -1,16 +1,17 @@
 use std::collections::BTreeMap;
 
+use margaret_request_binding_codegen::request_binding::RequestBinding;
+
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
-use crate::responder_argument_binding::ResponderArgumentBinding;
 use crate::server_transport_policy::ServerTransportPolicy;
 
 fn requires_peer_spiffe_id(route: &HttpRoute) -> bool {
     route
         .arguments
         .iter()
-        .any(|argument| matches!(argument.binding, ResponderArgumentBinding::PeerSpiffeId))
+        .any(|argument| matches!(argument.binding, RequestBinding::PeerSpiffeId))
 }
 
 pub(crate) fn active_servers(table: &HttpRouteTable) -> Vec<HttpServer> {

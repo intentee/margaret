@@ -7,37 +7,27 @@ use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::format_path::format_path;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_injection_codegen::process_method::process_method;
+use margaret_request_binding_codegen::binding_site::BindingSite;
+use margaret_request_binding_codegen::classify_parameters::classify_parameters;
+use margaret_request_binding_codegen::request_binding_policy::RequestBindingPolicy;
+use margaret_request_binding_codegen::route_parameter_binders::route_parameter_binders;
+use margaret_route_parameter_codegen::route_path::RoutePath;
 
-use crate::build_registry::build_registry;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_responder_arguments::HttpResponderArguments;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::layer_application::LayerApplication;
 use crate::middleware_plan::MiddlewarePlan;
-use crate::responder_method::responder_method;
-use crate::responder_selectors::ResponderSelectors;
-use crate::route_path::RoutePath;
 
 pub(crate) fn http_routes(
     index: &AttributeIndex,
     middleware_plans: &[MiddlewarePlan],
 ) -> Result<HttpRouteTable, HttpCodegenError> {
     let selector = AttributeSelector::from_marker("responds_to_http");
-    let binders = build_registry(
-        index,
-        "provides_route_parameter",
-        "Model",
-        |binder| HttpCodegenError::HttpRouteParameterBinderNotAStruct { binder },
-        |binder| HttpCodegenError::HttpRouteParameterBinderModel { binder },
-        |model, first, second| HttpCodegenError::AmbiguousHttpRouteParameterBinder {
-            model,
-            first,
-            second,
-        },
-    )?;
+    let binders = route_parameter_binders(index)?;
     let middleware_selector = AttributeSelector::from_marker("middleware");
-    let responder_selectors = ResponderSelectors::new();
     let mut table = HttpRouteTable::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
 
@@ -93,27 +83,22 @@ pub(crate) fn http_routes(
 
         layers.reverse();
 
-        let arguments = responder_method(
+        let route_path = RoutePath::parse(&path);
+        let subject = format!("responder '{responder}'");
+        let handler_method = process_method(item)?;
+        let arguments = classify_parameters(
             index,
             item,
-            &responder,
-            &server,
+            handler_method.signature(),
+            &BindingSite {
+                route_path: &route_path,
+                server: &server,
+                subject: &subject,
+            },
             &binders,
-            &responder_selectors,
+            None,
+            &RequestBindingPolicy::full_request(),
         )?;
-        let route_path = RoutePath::parse(&path);
-
-        for argument in &arguments {
-            if let Some(path_key) = argument.binding.path_key()
-                && !route_path.parameters().any(|name| name == path_key)
-            {
-                return Err(HttpCodegenError::RouteParameterNotInPath {
-                    responder: responder.clone(),
-                    parameter: path_key.to_string(),
-                    path: path.clone(),
-                });
-            }
-        }
 
         if let Some(name) = &name {
             if !is_snake_case_identifier(name) {

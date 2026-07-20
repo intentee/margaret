@@ -32,6 +32,8 @@ members = [
     "margaret_model_codegen",
     "margaret_peer_identity",
     "margaret_peer_identity_tests",
+    "margaret_request_binding_codegen",
+    "margaret_route_parameter_codegen",
     "margaret_service",
     "margaret_service_codegen",
     "margaret_service_tests",
@@ -48,6 +50,9 @@ members = [
     "margaret_validation",
     "margaret_views",
     "margaret_views_codegen",
+    "margaret_websocket",
+    "margaret_websocket_codegen",
+    "margaret_websocket_tests",
 ]
 
 [workspace.dependencies]
@@ -93,6 +98,7 @@ tempfile = "=3.20.0"
 thiserror = "=2.0.18"
 tokio = "=1.52.3"
 tokio-rustls = "=0.26.4"
+tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 tokio-util = "=0.7.18"
 tower = "=0.5.3"
 trzcina = "=0.4.0"

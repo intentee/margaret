@@ -25,4 +25,5 @@ mod reports_singleton_requires_constructor;
 mod reports_unresolvable_collection;
 mod reports_unresolvable_provides;
 mod reports_unsupported_parameter_shape;
+mod resolves_injectable_dependencies;
 mod wires_dependencies_through_lazy_accessors;

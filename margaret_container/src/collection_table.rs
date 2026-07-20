@@ -17,6 +17,12 @@ impl CollectionTable {
         self.members.entry(trait_path).or_default().push(member_key);
     }
 
+    pub(crate) fn entries(&self) -> impl Iterator<Item = (&CanonicalPath, &[CanonicalPath])> {
+        self.members
+            .iter()
+            .map(|(trait_path, members)| (trait_path, members.as_slice()))
+    }
+
     pub(crate) fn members_of(&self, trait_path: &CanonicalPath) -> &[CanonicalPath] {
         match self.members.get(trait_path) {
             Some(members) => members,
