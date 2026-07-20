@@ -1,5 +1,6 @@
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_container::provided_singleton::ProvidedSingleton;
 
 use crate::build_context::BuildContext;
 use crate::codegen_error::CodegenError;
@@ -11,11 +12,14 @@ use crate::model_pass::model_pass;
 use crate::services_pass::services_pass;
 use crate::views_pass::views_pass;
 
-pub fn build(crate_root: &CrateRoot) -> Result<GeneratedCode, CodegenError> {
+pub fn build(
+    crate_root: &CrateRoot,
+    provided_singletons: Vec<ProvidedSingleton>,
+) -> Result<GeneratedCode, CodegenError> {
     let index = AttributeIndexBuilder::new()
         .index_crate(crate_root)?
         .build();
-    let mut context = BuildContext::new(&index);
+    let mut context = BuildContext::new(&index, provided_singletons);
 
     container_pass(&mut context)?;
     views_pass(&mut context)?;
@@ -130,7 +134,7 @@ struct Widget {
 
         bootstrap(&directory);
 
-        build(&CrateRoot::new("crate", directory.path().join("src")))
+        build(&CrateRoot::new("crate", directory.path().join("src")), Vec::new())
     }
 
     fn generate_unformatted(source: &Path) -> GeneratedCode {
@@ -138,7 +142,7 @@ struct Widget {
             .index_crate(&CrateRoot::new("crate", source))
             .expect("the crate is indexed")
             .build();
-        let mut context = BuildContext::new(&index);
+        let mut context = BuildContext::new(&index, Vec::new());
 
         container_pass(&mut context).expect("the container pass succeeds");
         views_pass(&mut context).expect("the views pass succeeds");
