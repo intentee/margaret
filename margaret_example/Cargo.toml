@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+chrono = { workspace = true, features = ["clock"] }
 clap = { workspace = true }
 dashmap = { workspace = true }
 margaret_asset_bag = { path = "../margaret_asset_bag" }
@@ -26,10 +27,11 @@ maud = { workspace = true }
 rust-embed = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 spiffe = { workspace = true, features = ["spiffe-types"] }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
-uuid = { workspace = true }
+uuid = { workspace = true, features = ["serde"] }
 validator = { workspace = true, features = ["derive"] }
 
 [build-dependencies]
