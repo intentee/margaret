@@ -13,6 +13,21 @@
     "assets/logo_I9J0K1L2.png": {
       "imports": [],
       "inputs": { "resources/media/logo.png": {} }
+    },
+    "assets/favicon_M1N2O3P4.svg": {
+      "imports": [],
+      "inputs": { "resources/media/favicon.svg": {} }
+    },
+    "assets/favicon_Q5R6S7T8.js": {
+      "imports": [
+        { "path": "assets/favicon_M1N2O3P4.svg", "kind": "file-loader" }
+      ],
+      "entryPoint": "resources/media/favicon.svg",
+      "inputs": { "resources/media/favicon.svg": {} }
+    },
+    "assets/inter_U9V0W1X2.woff2": {
+      "imports": [],
+      "inputs": { "resources/fonts/inter.woff2": {} }
     }
   }
 }

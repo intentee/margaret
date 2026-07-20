@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use esbuild_metafile::asset::Asset;
 use esbuild_metafile::esbuild_metafile::EsbuildMetafile;
 use esbuild_metafile::output_lookup::OutputLookup;
 use esbuild_metafile::output_properties::OutputProperties;
@@ -8,54 +9,59 @@ use quote::quote;
 
 use crate::asset_bag_codegen_error::AssetBagCodegenError;
 use crate::entrypoint_output::EntrypointOutput;
-use crate::include_tokens::include_tokens;
+use crate::href_tokens::href_tokens;
 use crate::preload_tokens::preload_tokens;
 
-pub(crate) fn bundle_handle(
+pub(crate) fn bundle_tokens(
     metafile: &EsbuildMetafile,
     EntrypointOutput {
         css_bundle,
         main_output,
     }: &EntrypointOutput,
 ) -> Result<TokenStream, AssetBagCodegenError> {
-    let mut bundle_outputs: Vec<&str> = vec![main_output.as_str()];
-
-    if let Some(css_bundle) = css_bundle {
-        bundle_outputs.push(css_bundle.as_str());
-    }
-
-    let mut includes: Vec<TokenStream> = Vec::new();
-    let mut output_preloads: Vec<TokenStream> = Vec::new();
-
-    for output in &bundle_outputs {
-        includes.push(include_tokens(output)?);
-        output_preloads.push(preload_tokens(output));
-    }
-
     let OutputLookup::Found(OutputProperties { preloads }) = metafile.output(main_output) else {
         return Err(AssetBagCodegenError::EntrypointOutputMissing {
             output: main_output.clone(),
         });
     };
 
-    let mut preload_paths: BTreeSet<String> = BTreeSet::new();
-
-    for preload in preloads {
-        preload_paths.insert(preload);
-    }
-
-    let preloads: Vec<TokenStream> = preload_paths
+    let preload_paths: BTreeSet<String> = preloads.into_iter().collect();
+    let preload_list: Vec<TokenStream> = preload_paths
         .iter()
         .map(|preload| preload_tokens(preload))
         .collect();
+    let main_href = href_tokens(main_output);
 
-    Ok(quote! {
-        ::margaret_asset_bag::bundle_asset::BundleAsset::new(
-            &[#(#includes),*],
-            &[#(#output_preloads),*],
-            &[#(#preloads),*],
-        )
-    })
+    match Asset::from_path(main_output.clone()) {
+        Asset::Script(_) => match css_bundle {
+            Some(css_bundle) => {
+                let stylesheet_href = href_tokens(css_bundle);
+
+                Ok(quote! {
+                    ::margaret_asset_bag::script_stylesheet_bundle::ScriptStylesheetBundle::new(
+                        #main_href,
+                        #stylesheet_href,
+                        &[#(#preload_list),*],
+                    )
+                })
+            }
+            None => Ok(quote! {
+                ::margaret_asset_bag::script_bundle::ScriptBundle::new(
+                    #main_href,
+                    &[#(#preload_list),*],
+                )
+            }),
+        },
+        Asset::Stylesheet(_) => Ok(quote! {
+            ::margaret_asset_bag::stylesheet_bundle::StylesheetBundle::new(
+                #main_href,
+                &[#(#preload_list),*],
+            )
+        }),
+        Asset::Unknown(_) => Err(AssetBagCodegenError::UnsupportedIncludeOutput {
+            output: main_output.clone(),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -65,7 +71,7 @@ mod tests {
     use esbuild_metafile::esbuild_metafile::EsbuildMetafile;
     use quote::quote;
 
-    use super::bundle_handle;
+    use super::bundle_tokens;
     use crate::asset_bag_codegen_error::AssetBagCodegenError;
     use crate::entrypoint_output::EntrypointOutput;
 
@@ -74,7 +80,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_a_bundle_with_includes_output_preloads_and_transitive_preloads() {
+    fn builds_a_script_stylesheet_bundle_with_transitive_preloads() {
         let metafile = metafile(
             r#"{
                 "outputs": {
@@ -92,7 +98,7 @@ mod tests {
             }"#,
         );
 
-        let handle = bundle_handle(
+        let handle = bundle_tokens(
             &metafile,
             &EntrypointOutput {
                 css_bundle: Some("assets/app_ABC.css".to_string()),
@@ -104,23 +110,9 @@ mod tests {
         assert_eq!(
             handle.to_string(),
             quote! {
-                ::margaret_asset_bag::bundle_asset::BundleAsset::new(
-                    &[
-                        ::margaret_asset_bag::include::Include::Script(
-                            ::margaret_asset_bag::asset_href::AssetHref::Local("assets/app_ABC.js")
-                        ),
-                        ::margaret_asset_bag::include::Include::Stylesheet(
-                            ::margaret_asset_bag::asset_href::AssetHref::Local("assets/app_ABC.css")
-                        )
-                    ],
-                    &[
-                        ::margaret_asset_bag::preload::Preload::Module(
-                            ::margaret_asset_bag::asset_href::AssetHref::Local("assets/app_ABC.js")
-                        ),
-                        ::margaret_asset_bag::preload::Preload::Style(
-                            ::margaret_asset_bag::asset_href::AssetHref::Local("assets/app_ABC.css")
-                        )
-                    ],
+                ::margaret_asset_bag::script_stylesheet_bundle::ScriptStylesheetBundle::new(
+                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/app_ABC.js"),
+                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/app_ABC.css"),
                     &[
                         ::margaret_asset_bag::preload::Preload::Module(
                             ::margaret_asset_bag::asset_href::AssetHref::Local("assets/chunk_ABC.js")
@@ -136,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_a_bundle_without_a_css_bundle_or_preloads() {
+    fn builds_a_script_bundle_without_a_css_bundle_or_preloads() {
         let metafile = metafile(
             r#"{
                 "outputs": {
@@ -148,7 +140,7 @@ mod tests {
             }"#,
         );
 
-        let handle = bundle_handle(
+        let handle = bundle_tokens(
             &metafile,
             &EntrypointOutput {
                 css_bundle: None,
@@ -160,17 +152,42 @@ mod tests {
         assert_eq!(
             handle.to_string(),
             quote! {
-                ::margaret_asset_bag::bundle_asset::BundleAsset::new(
-                    &[
-                        ::margaret_asset_bag::include::Include::Script(
-                            ::margaret_asset_bag::asset_href::AssetHref::Local("assets/solo_ABC.js")
-                        )
-                    ],
-                    &[
-                        ::margaret_asset_bag::preload::Preload::Module(
-                            ::margaret_asset_bag::asset_href::AssetHref::Local("assets/solo_ABC.js")
-                        )
-                    ],
+                ::margaret_asset_bag::script_bundle::ScriptBundle::new(
+                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/solo_ABC.js"),
+                    &[],
+                )
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn builds_a_stylesheet_bundle_for_a_pure_css_entry_point() {
+        let metafile = metafile(
+            r#"{
+                "outputs": {
+                    "assets/theme_ABC.css": {
+                        "imports": [],
+                        "entryPoint": "src/theme.css"
+                    }
+                }
+            }"#,
+        );
+
+        let handle = bundle_tokens(
+            &metafile,
+            &EntrypointOutput {
+                css_bundle: None,
+                main_output: "assets/theme_ABC.css".to_string(),
+            },
+        )
+        .expect("the bundle handle is built");
+
+        assert_eq!(
+            handle.to_string(),
+            quote! {
+                ::margaret_asset_bag::stylesheet_bundle::StylesheetBundle::new(
+                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/theme_ABC.css"),
                     &[],
                 )
             }
@@ -192,7 +209,7 @@ mod tests {
         );
 
         assert!(matches!(
-            bundle_handle(
+            bundle_tokens(
                 &metafile,
                 &EntrypointOutput {
                     css_bundle: None,
@@ -208,7 +225,7 @@ mod tests {
         let metafile = metafile(r#"{ "outputs": { "assets/real_ABC.js": { "imports": [] } } }"#);
 
         assert!(matches!(
-            bundle_handle(
+            bundle_tokens(
                 &metafile,
                 &EntrypointOutput {
                     css_bundle: None,
