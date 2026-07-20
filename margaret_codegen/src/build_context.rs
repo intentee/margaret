@@ -12,16 +12,18 @@ use crate::umbrella::umbrella;
 pub(crate) struct BuildContext<'index> {
     capabilities: Capabilities,
     index: &'index AttributeIndex,
+    metafile_contents: Option<String>,
     module_tokens: Vec<GeneratedModuleTokens>,
     serve_arguments: Vec<ConsoleArgument>,
     servers: Vec<HttpServer>,
 }
 
 impl<'index> BuildContext<'index> {
-    pub(crate) fn new(index: &'index AttributeIndex) -> Self {
+    pub(crate) fn new(index: &'index AttributeIndex, metafile_contents: Option<String>) -> Self {
         Self {
-            capabilities: Capabilities::detect(index),
+            capabilities: Capabilities::detect(index, metafile_contents.is_some()),
             index,
+            metafile_contents,
             module_tokens: Vec::new(),
             serve_arguments: Vec::new(),
             servers: Vec::new(),
@@ -38,6 +40,10 @@ impl<'index> BuildContext<'index> {
 
     pub(crate) fn index(&self) -> &'index AttributeIndex {
         self.index
+    }
+
+    pub(crate) fn metafile_contents(&self) -> Option<&str> {
+        self.metafile_contents.as_deref()
     }
 
     pub(crate) fn into_generated_code(self) -> Result<GeneratedCode, CodegenError> {
@@ -94,7 +100,7 @@ mod tests {
             .index_crate(&CrateRoot::new("crate", source))
             .expect("the crate is indexed")
             .build();
-        let mut context = BuildContext::new(&index);
+        let mut context = BuildContext::new(&index, None);
         context.extend_modules(vec![GeneratedModuleTokens::new("broken", quote! { fn })]);
 
         let error = context

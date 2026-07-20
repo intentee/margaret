@@ -1,0 +1,18 @@
+{
+  "outputs": {
+    "assets/app_A1B2C3D4.js": {
+      "imports": [
+        { "path": "assets/chunk_E5F6G7H8.js" },
+        { "path": "https://fonts.example/inter.woff2" }
+      ],
+      "cssBundle": "assets/app_A1B2C3D4.css",
+      "entryPoint": "resources/ts/app.ts"
+    },
+    "assets/app_A1B2C3D4.css": { "imports": [] },
+    "assets/chunk_E5F6G7H8.js": { "imports": [] },
+    "assets/logo_I9J0K1L2.png": {
+      "imports": [],
+      "inputs": { "resources/media/logo.png": {} }
+    }
+  }
+}

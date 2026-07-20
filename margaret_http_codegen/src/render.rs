@@ -30,6 +30,7 @@ fn argument_needs_request(argument: &ResponderArgument) -> bool {
         ResponderArgumentBinding::Routes
             | ResponderArgumentBinding::Forwarder
             | ResponderArgumentBinding::Views
+            | ResponderArgumentBinding::AssetBag
     )
 }
 
@@ -243,6 +244,11 @@ fn argument_binding(argument: &ResponderArgument, request: &Ident) -> TokenStrea
         ResponderArgumentBinding::Routes
         | ResponderArgumentBinding::Forwarder
         | ResponderArgumentBinding::Views => TokenStream::new(),
+        ResponderArgumentBinding::AssetBag => {
+            quote! {
+                let #holder = ::margaret_asset_bag::asset_bag::AssetBag::new();
+            }
+        }
         ResponderArgumentBinding::PeerSpiffeId => {
             quote! {
                 let #holder = match margaret_http::require_peer_spiffe_id::require_peer_spiffe_id(

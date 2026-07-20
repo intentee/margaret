@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::Path;
 
 use margaret_attributes::crate_root::CrateRoot;
@@ -7,9 +8,21 @@ use margaret_attributes::crate_root::CrateRoot;
 use crate::build::build;
 use crate::codegen_error::CodegenError;
 
+fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
+    match fs::read_to_string(metafile_path) {
+        Ok(contents) => Ok(Some(contents)),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(source) => Err(CodegenError::ReadMetafile {
+            path: metafile_path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
 fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
     let host_source = manifest_directory.join("src");
     let generated_directory = host_source.join("margaret");
+    let metafile_path = manifest_directory.join("esbuild-meta.json");
     let crate_root = CrateRoot::new("crate", host_source);
 
     fs::create_dir_all(&generated_directory).map_err(|source| CodegenError::CreateDirectory {
@@ -26,12 +39,15 @@ fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
         })?;
     }
 
-    build(&crate_root)?.write_to(&generated_directory)?;
+    let metafile_contents = read_metafile(&metafile_path)?;
+
+    build(&crate_root, metafile_contents)?.write_to(&generated_directory)?;
 
     println!(
         "cargo:rerun-if-changed={}",
         crate_root.source_directory.display()
     );
+    println!("cargo:rerun-if-changed={}", metafile_path.display());
 
     Ok(())
 }
@@ -100,6 +116,34 @@ struct Config {
 
         assert!(read_generated(host.path(), "container.rs").contains("struct Container"));
         assert!(read_generated(host.path(), "mod.rs").contains("pub mod container;"));
+    }
+
+    #[test]
+    fn generates_the_asset_bag_module_from_a_committed_metafile() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), HOST_CRATE);
+        fs::write(
+            host.path().join("esbuild-meta.json"),
+            r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#,
+        )
+        .expect("the metafile is written");
+
+        generate_into(host.path()).expect("the crate generates");
+
+        assert!(read_generated(host.path(), "mod.rs").contains("pub mod asset_bag;"));
+        assert!(read_generated(host.path(), "asset_bag.rs").contains("macro_rules! asset"));
+    }
+
+    #[test]
+    fn reports_a_metafile_that_cannot_be_read() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), HOST_CRATE);
+        fs::create_dir(host.path().join("esbuild-meta.json"))
+            .expect("the blocking directory is created");
+
+        let error = generate_into(host.path()).expect_err("an unreadable metafile is reported");
+
+        assert!(error.to_string().contains("failed to read the esbuild metafile"));
     }
 
     #[test]

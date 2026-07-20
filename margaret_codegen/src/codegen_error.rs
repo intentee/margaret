@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+use margaret_asset_bag_codegen::asset_bag_codegen_error::AssetBagCodegenError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
@@ -16,6 +17,12 @@ pub enum CodegenError {
     Index {
         #[from]
         source: AttributeError,
+    },
+
+    #[error("failed to generate the asset bag: {source}")]
+    AssetBag {
+        #[from]
+        source: AssetBagCodegenError,
     },
 
     #[error("failed to generate the dependency container: {source}")]
@@ -68,6 +75,12 @@ pub enum CodegenError {
 
     #[error("failed to read the generated directory '{path}': {source}")]
     ReadDirectory {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("failed to read the esbuild metafile '{path}': {source}")]
+    ReadMetafile {
         path: PathBuf,
         source: std::io::Error,
     },

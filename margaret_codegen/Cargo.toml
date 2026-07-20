@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+margaret_asset_bag_codegen = { path = "../margaret_asset_bag_codegen" }
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
 margaret_console_codegen = { path = "../margaret_console_codegen" }

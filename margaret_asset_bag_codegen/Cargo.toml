@@ -1,0 +1,16 @@
+[package]
+name = "margaret_asset_bag_codegen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+esbuild-metafile = { workspace = true }
+margaret_generated_module = { path = "../margaret_generated_module" }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }
+
+[lints]
+workspace = true
