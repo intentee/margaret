@@ -96,6 +96,14 @@ impl AttributeArgs {
     }
 
     #[must_use]
+    pub fn has_positional_flag(&self, name: &str) -> bool {
+        self.positional.iter().any(|expression| match expression {
+            Expr::Path(expression) => expression.path.is_ident(name),
+            _ => false,
+        })
+    }
+
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.named.is_empty() && self.positional.is_empty()
     }
@@ -240,5 +248,13 @@ mod tests {
         assert!(parsed.positional_path(0).is_some());
         assert!(parsed.positional_path(1).is_none());
         assert!(parsed.positional_path(99).is_none());
+    }
+
+    #[test]
+    fn detects_a_bare_positional_flag() {
+        let parsed = args(parse_quote!(#[column(primary_key, name = "id", 5)]));
+
+        assert!(parsed.has_positional_flag("primary_key"));
+        assert!(!parsed.has_positional_flag("unique"));
     }
 }

@@ -2,6 +2,7 @@ use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
 use margaret_macros::middleware;
+use margaret_macros::model;
 use margaret_macros::process;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::renders_view;
@@ -48,6 +49,14 @@ impl Binder {
 #[scheduled_with_tick_timer(interval = SomeInterval)]
 struct Worker;
 
+#[model(table = "records")]
+struct Record {
+    #[column(primary_key, name = "id")]
+    id: String,
+    #[column]
+    label: String,
+}
+
 #[test]
 fn attribute_macros_leave_runtime_behavior_untouched() {
     let subject = Subject::create();
@@ -57,4 +66,12 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(Binder.bind("bound".to_string()), "bound");
 
     let _worker = Worker;
+
+    let record = Record {
+        id: "the-id".to_string(),
+        label: "the-label".to_string(),
+    };
+
+    assert_eq!(record.id, "the-id");
+    assert_eq!(record.label, "the-label");
 }

@@ -10,6 +10,7 @@ use crate::render::render;
 pub fn render_console(
     index: &AttributeIndex,
     serves: bool,
+    has_models: bool,
     servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
 ) -> Result<GeneratedModuleTokens, ConsoleCodegenError> {
@@ -17,6 +18,6 @@ pub fn render_console(
 
     Ok(GeneratedModuleTokens::new(
         "run",
-        render(&commands, serves, servers, serve_arguments),
+        render(&commands, serves, has_models, servers, serve_arguments),
     ))
 }
