@@ -1,5 +1,5 @@
 [package]
-name = "margaret_asset_codegen"
+name = "margaret_esbuild_metafile_codegen"
 version = "0.1.0"
 edition = "2024"
 

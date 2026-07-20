@@ -11,7 +11,7 @@ use quote::quote;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::provided_singleton::ProvidedSingleton;
 
-use crate::asset_codegen_error::AssetCodegenError;
+use crate::esbuild_metafile_codegen_error::EsbuildMetafileCodegenError;
 
 fn esbuild_metafile_path() -> CanonicalPath {
     CanonicalPath::new(vec![
@@ -102,7 +102,9 @@ fn outputs_tokens(outputs: &HashMap<String, Output>) -> TokenStream {
     map_tokens(entries)
 }
 
-pub fn esbuild_metafile_provider(json: &str) -> Result<ProvidedSingleton, AssetCodegenError> {
+pub fn esbuild_metafile_provider(
+    json: &str,
+) -> Result<ProvidedSingleton, EsbuildMetafileCodegenError> {
     let RawEsbuildMetafile { outputs } = serde_json::from_str(json)?;
     let outputs = outputs_tokens(&outputs);
 

@@ -3,9 +3,9 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
 
-use margaret_asset_codegen::esbuild_metafile_provider::esbuild_metafile_provider;
 use margaret_attributes::crate_root::CrateRoot;
 use margaret_container::provided_singleton::ProvidedSingleton;
+use margaret_esbuild_metafile_codegen::esbuild_metafile_provider::esbuild_metafile_provider;
 
 use crate::build::build;
 use crate::codegen_error::CodegenError;

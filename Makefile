@@ -1,5 +1,4 @@
 COVERAGE_PACKAGES := \
-	-p margaret_asset_codegen \
 	-p margaret_attributes \
 	-p margaret_codegen \
 	-p margaret_codegen_tokens \
@@ -8,6 +7,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_console_codegen \
 	-p margaret_container \
 	-p margaret_container_tests \
+	-p margaret_esbuild_metafile_codegen \
 	-p margaret_generated_module \
 	-p margaret_http \
 	-p margaret_http_codegen \
@@ -63,7 +63,6 @@ coverage: node_modules
 	cargo llvm-cov report
 	npx rust-coverage-check target/llvm-cov.json \
 		--workspace-root $(CURDIR) \
-		--gated margaret_asset_codegen=100 \
 		--gated margaret_attributes=100 \
 		--gated margaret_codegen=100 \
 		--gated margaret_codegen_tokens=100 \
@@ -72,6 +71,7 @@ coverage: node_modules
 		--gated margaret_console_codegen=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_tests=100 \
+		--gated margaret_esbuild_metafile_codegen=100 \
 		--gated margaret_generated_module=100 \
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \

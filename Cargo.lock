@@ -560,13 +560,11 @@ dependencies = [
 
 [[package]]
 name = "esbuild-metafile"
-version = "0.9.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36526d344cd085e3706260dc5172cd8b15fb2e8afb7c90af034fde0a710daabe"
+checksum = "7571831916baa6ebcab6050587fc1ef69a6a6d7f1345f1f3b8f71674474831f7"
 dependencies = [
- "dashmap",
  "log",
- "once_cell",
  "serde",
  "serde_json",
  "thiserror",
@@ -1244,19 +1242,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
-name = "margaret_asset_codegen"
-version = "0.1.0"
-dependencies = [
- "esbuild-metafile",
- "margaret_attributes",
- "margaret_container",
- "proc-macro2",
- "quote",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "margaret_attributes"
 version = "0.1.0"
 dependencies = [
@@ -1271,11 +1256,11 @@ dependencies = [
 name = "margaret_codegen"
 version = "0.1.0"
 dependencies = [
- "margaret_asset_codegen",
  "margaret_attributes",
  "margaret_console_argument_codegen",
  "margaret_console_codegen",
  "margaret_container",
+ "margaret_esbuild_metafile_codegen",
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_service_codegen",
@@ -1351,6 +1336,19 @@ dependencies = [
  "margaret_container",
  "margaret_generated_module",
  "quote",
+]
+
+[[package]]
+name = "margaret_esbuild_metafile_codegen"
+version = "0.1.0"
+dependencies = [
+ "esbuild-metafile",
+ "margaret_attributes",
+ "margaret_container",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
