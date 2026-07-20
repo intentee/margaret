@@ -4,6 +4,5 @@ pub struct PostArticleForm {
     pub title: String,
     #[validate(length(min = 1))]
     pub body: String,
-    #[validate(length(min = 1))]
-    pub author_id: String,
+    pub author_id: uuid::Uuid,
 }

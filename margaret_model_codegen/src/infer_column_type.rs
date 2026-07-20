@@ -1,64 +1,47 @@
-use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
-use syn::GenericArgument;
-use syn::PathArguments;
-use syn::PathSegment;
 use syn::Type;
 
 use crate::inferred_column::InferredColumn;
 use crate::model_codegen_error::ModelCodegenError;
+use crate::option_inner::option_inner;
 
-fn single_generic_argument(segment: &PathSegment) -> Option<&Type> {
-    let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
-        return None;
-    };
-
-    let mut arguments = arguments.args.iter();
-
-    match (arguments.next(), arguments.next()) {
-        (Some(GenericArgument::Type(generic_type)), None) => Some(generic_type),
-        _ => None,
-    }
-}
-
-fn option_inner(ty: &Type) -> Option<&Type> {
+fn base_column_type(ty: &Type) -> Option<InferredColumn> {
     let Type::Path(type_path) = ty else {
         return None;
     };
 
     match type_path.path.segments.last() {
-        Some(segment) if segment.ident == "Option" => single_generic_argument(segment),
-        _ => None,
-    }
-}
-
-fn base_column_type(ty: &Type) -> Option<(TokenStream, TokenStream)> {
-    let Type::Path(type_path) = ty else {
-        return None;
-    };
-
-    match type_path.path.segments.last() {
-        Some(segment) if segment.ident == "Uuid" => Some((
-            quote!(margaret_model::column_type::ColumnType::Uuid),
-            quote!(margaret_model::column_default::ColumnDefault::UuidV7),
-        )),
-        Some(segment) if segment.ident == "String" => Some((
-            quote!(margaret_model::column_type::ColumnType::Text),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet),
-        )),
-        Some(segment) if segment.ident == "bool" => Some((
-            quote!(margaret_model::column_type::ColumnType::Boolean),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet),
-        )),
-        Some(segment) if segment.ident == "i32" => Some((
-            quote!(margaret_model::column_type::ColumnType::Integer),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet),
-        )),
-        Some(segment) if segment.ident == "i64" => Some((
-            quote!(margaret_model::column_type::ColumnType::BigInt),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet),
-        )),
+        Some(segment) if segment.ident == "Uuid" => Some(InferredColumn {
+            column_type: quote!(margaret_model::column_type::ColumnType::Uuid),
+            default: quote!(margaret_model::column_default::ColumnDefault::UuidV7),
+            nullable: false,
+        }),
+        Some(segment) if segment.ident == "String" => Some(InferredColumn {
+            column_type: quote!(margaret_model::column_type::ColumnType::Text),
+            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            nullable: false,
+        }),
+        Some(segment) if segment.ident == "bool" => Some(InferredColumn {
+            column_type: quote!(margaret_model::column_type::ColumnType::Boolean),
+            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            nullable: false,
+        }),
+        Some(segment) if segment.ident == "i32" => Some(InferredColumn {
+            column_type: quote!(margaret_model::column_type::ColumnType::Integer),
+            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            nullable: false,
+        }),
+        Some(segment) if segment.ident == "i64" => Some(InferredColumn {
+            column_type: quote!(margaret_model::column_type::ColumnType::BigInt),
+            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            nullable: false,
+        }),
+        Some(segment) if segment.ident == "DateTime" => Some(InferredColumn {
+            column_type: quote!(margaret_model::column_type::ColumnType::Timestamptz),
+            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            nullable: false,
+        }),
         _ => None,
     }
 }
@@ -74,11 +57,7 @@ pub(crate) fn infer_column_type(
     };
 
     match base_column_type(base) {
-        Some((column_type, default)) => Ok(InferredColumn {
-            column_type,
-            default,
-            nullable,
-        }),
+        Some(inferred) => Ok(InferredColumn { nullable, ..inferred }),
         None => Err(ModelCodegenError::UninferrableColumnType {
             column: column.to_string(),
             model: model.to_string(),
@@ -154,6 +133,21 @@ mod tests {
             column_type("i64"),
             quote!(margaret_model::column_type::ColumnType::BigInt).to_string()
         );
+    }
+
+    #[test]
+    fn infers_timestamptz_from_datetime() {
+        let inferred = infer("chrono::DateTime<chrono::Utc>").expect("a datetime is inferable");
+
+        assert_eq!(
+            inferred.column_type.to_string(),
+            quote!(margaret_model::column_type::ColumnType::Timestamptz).to_string()
+        );
+        assert_eq!(
+            inferred.default.to_string(),
+            quote!(margaret_model::column_default::ColumnDefault::NotSet).to_string()
+        );
+        assert!(!inferred.nullable);
     }
 
     #[test]

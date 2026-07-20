@@ -2,14 +2,21 @@ pub mod has_models;
 pub mod model_codegen_error;
 pub mod render_models;
 
+mod collected_model;
 mod column_arguments;
+mod deferred_foreign_key;
+mod foreign_key_column_name;
+mod foreign_key_target;
+mod foreign_key_target_column;
 mod infer_column_type;
 mod inferred_column;
 mod model;
 mod model_arguments;
 mod models;
+mod option_inner;
 mod render;
 mod resolved_column;
+mod resolved_foreign_key;
 
 #[cfg(test)]
 mod tests {
@@ -288,5 +295,216 @@ struct S {
             )
             .contains("failed to read the model attributes")
         );
+    }
+
+    const AUTHOR_MODEL: &str = "\
+#[model(table = \"authors\")]
+struct Author {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+}
+";
+
+    fn with_author(referencing: &str) -> String {
+        format!("{AUTHOR_MODEL}\n{referencing}")
+    }
+
+    #[test]
+    fn generates_a_foreign_key_column_and_constraint() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n",
+        ));
+
+        assert!(source.contains("margaret_model::foreign_key::ForeignKey"));
+        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
+        assert!(source.contains("references_columns:vec![\"id\".to_string()]"));
+        assert!(source.contains("references_table:\"authors\".to_string()"));
+        assert!(source.contains(
+            "column_type:margaret_model::column_type::ColumnType::Uuid,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"author_id\".to_string(),nullable:false,"
+        ));
+    }
+
+    #[test]
+    fn generates_a_composite_foreign_key() {
+        let source = schema_source(
+            "#[model(table = \"orders\")]\nstruct Order {\n    #[column(primary_key)]\n    region: String,\n    #[column(primary_key)]\n    number: i64,\n}\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    order: Order,\n}\n",
+        );
+
+        assert!(source.contains("\"order_region\""));
+        assert!(source.contains("\"order_number\""));
+        assert!(source.contains(
+            "columns:vec![\"order_region\".to_string(),\"order_number\".to_string()]"
+        ));
+        assert!(source.contains(
+            "references_columns:vec![\"region\".to_string(),\"number\".to_string()]"
+        ));
+        assert!(source.contains("references_table:\"orders\".to_string()"));
+    }
+
+    #[test]
+    fn generates_a_nullable_foreign_key_column() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Option<Author>,\n}\n",
+        ));
+
+        assert!(source.contains("name:\"author_id\".to_string(),nullable:true,"));
+    }
+
+    #[test]
+    fn copies_the_referenced_primary_key_type() {
+        let source = schema_source(
+            "#[model(table = \"tags\")]\nstruct Tag {\n    #[column(primary_key)]\n    slug: String,\n}\n\n#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    tag: Tag,\n}\n",
+        );
+
+        assert!(source.contains(
+            "column_type:margaret_model::column_type::ColumnType::Text,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"tag_slug\".to_string(),nullable:false,"
+        ));
+    }
+
+    #[test]
+    fn resolves_a_foreign_key_to_a_model_declared_later() {
+        let source = schema_source(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
+        );
+
+        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
+        assert!(source.contains("references_table:\"authors\".to_string()"));
+    }
+
+    #[test]
+    fn resolves_a_self_referential_foreign_key() {
+        let source = schema_source(
+            "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Node>,\n}\n",
+        );
+
+        assert!(source.contains("name:\"parent_id\".to_string(),nullable:true,"));
+        assert!(source.contains("references_table:\"nodes\".to_string()"));
+    }
+
+    #[test]
+    fn derives_distinct_columns_for_two_foreign_keys_to_the_same_model() {
+        let source = schema_source(
+            "#[model(table = \"users\")]\nstruct User {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"docs\")]\nstruct Doc {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: User,\n    #[column]\n    #[foreign_key]\n    editor: User,\n}\n",
+        );
+
+        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
+        assert!(source.contains("columns:vec![\"editor_id\".to_string()]"));
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_without_a_column() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[foreign_key]\n    author: Author,\n}\n",
+            ))
+            .contains("must also carry a #[column]")
+        );
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_that_sets_a_column_name() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(name = \"writer\")]\n    #[foreign_key]\n    author: Author,\n}\n",
+            ))
+            .contains("column names are derived")
+        );
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_that_is_a_primary_key() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    #[foreign_key]\n    author: Author,\n}\n",
+            ))
+            .contains("cannot be a primary key")
+        );
+    }
+
+    #[test]
+    fn rejects_a_positional_foreign_key() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"t\")]\nstruct S(#[column] #[foreign_key] Author);\n",
+            ))
+            .contains("requires a named field")
+        );
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_to_an_unresolvable_type() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    other: DoesNotExist,\n}\n",
+            )
+            .contains("is not a #[model]")
+        );
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_to_a_non_model_struct() {
+        assert!(
+            error_message(
+                "struct Plain;\n\n#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    other: Plain,\n}\n",
+            )
+            .contains("is not a #[model]")
+        );
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_to_a_model_without_a_primary_key() {
+        let source = "#[model(table = \"authors\")]\nstruct Author {\n    #[column]\n    name: String,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n";
+
+        assert!(error_message(source).contains("which has no primary key"));
+    }
+
+    #[test]
+    fn rejects_a_repeated_foreign_key_attribute() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[foreign_key]\n    author: Author,\n}\n",
+            ))
+            .contains("failed to read the model attributes")
+        );
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_that_collides_with_a_scalar_column() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(name = \"author_id\")]\n    author_id: String,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n",
+            ))
+            .contains("duplicate column name")
+        );
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_whose_derived_name_is_not_snake_case() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    myAuthor: Author,\n}\n",
+            ))
+            .contains("invalid column name")
+        );
+    }
+
+    #[test]
+    fn rejects_a_table_name_that_is_too_long() {
+        let table = "a".repeat(64);
+        let source = format!(
+            "#[model(table = \"{table}\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n"
+        );
+
+        assert!(error_message(&source).contains("exceeding the 63-byte"));
+    }
+
+    #[test]
+    fn rejects_a_derived_column_name_that_is_too_long() {
+        let field = "a".repeat(62);
+        let source = with_author(&format!(
+            "#[model(table = \"articles\")]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    {field}: Author,\n}}\n"
+        ));
+
+        assert!(error_message(&source).contains("exceeding the 63-byte"));
     }
 }

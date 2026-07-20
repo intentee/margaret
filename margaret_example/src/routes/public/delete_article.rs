@@ -26,7 +26,7 @@ impl DeleteArticle {
         &self,
         #[route_parameter(from = "article")] Article { id, title, .. }: Article,
     ) -> Response {
-        self.articles.remove(&id);
+        self.articles.remove(id);
 
         Response::text(200, format!("deleted \"{title}\""))
     }

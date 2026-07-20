@@ -37,7 +37,7 @@ impl PostArticle {
     ) -> Response {
         match self.articles.insert(title, body, author_id) {
             Ok(article) => Response::text(201, format!("created \"{}\"", article.title)),
-            Err(error) => Response::text(500, error.to_string()),
+            Err(error) => Response::text(404, error.to_string()),
         }
     }
 }
