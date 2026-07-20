@@ -13,7 +13,7 @@ pub fn singleton(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn constructor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
+    strip_parameter_markers(item, &["endpoint_provider"])
 }
 
 #[proc_macro_attribute]
@@ -47,6 +47,11 @@ pub fn renders_view(_attributes: TokenStream, item: TokenStream) -> TokenStream 
 #[proc_macro_attribute]
 pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     strip_field_markers(item, &["column", "foreign_key"])
+}
+
+#[proc_macro_attribute]
+pub fn provides_endpoint(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
 }
 
 #[proc_macro_attribute]
@@ -164,6 +169,24 @@ mod tests {
         assert!(stripped.contains("greeter"));
         assert!(stripped.contains("name"));
         assert!(stripped.contains("loud"));
+    }
+
+    #[test]
+    fn removes_endpoint_provider_markers_from_constructor_parameters() {
+        let stripped = strip_or_compile_error(
+            quote! {
+                pub fn create(
+                    #[endpoint_provider(jwks)] endpoint: Arc<dyn ProvidesEndpoint>,
+                ) -> Self {
+                    Self { endpoint }
+                }
+            },
+            &["endpoint_provider"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("endpoint_provider"));
+        assert!(stripped.contains("endpoint"));
     }
 
     #[test]

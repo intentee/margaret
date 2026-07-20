@@ -5,7 +5,9 @@ edition = "2024"
 autotests = false
 
 [dependencies]
+async-trait = { workspace = true }
 chrono = { workspace = true }
+margaret_endpoint = { path = "../margaret_endpoint" }
 margaret_http = { path = "../margaret_http" }
 margaret_identity_session = { path = "../margaret_identity_session" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }

@@ -58,6 +58,41 @@ pub enum ContainerError {
         written: String,
     },
 
+    #[error("#[provides_endpoint(...)] on '{path}' requires a #[singleton]")]
+    EndpointProviderNotASingleton { path: String },
+
+    #[error(
+        "singleton '{singleton}' is an endpoint provider and must not also declare 'provides' or 'collection'"
+    )]
+    EndpointProviderNotConcrete { singleton: String },
+
+    #[error("#[provides_endpoint(...)] on singleton '{singleton}' must name exactly one tag")]
+    MalformedProvidesEndpoint { singleton: String },
+
+    #[error("two singletons provide the same endpoint tag '{tag}': '{first}' and '{second}'")]
+    DuplicateEndpointProvider {
+        tag: String,
+        first: String,
+        second: String,
+    },
+
+    #[error(
+        "parameter '{parameter}' of singleton '{singleton}' has an #[endpoint_provider(...)] that must name exactly one tag"
+    )]
+    MalformedEndpointProvider {
+        singleton: String,
+        parameter: String,
+    },
+
+    #[error(
+        "parameter '{parameter}' of singleton '{singleton}' requests the endpoint tag '{tag}', which no singleton provides"
+    )]
+    MissingEndpointProvider {
+        singleton: String,
+        parameter: String,
+        tag: String,
+    },
+
     #[error("dependency cycle detected: {path}")]
     DependencyCycle { path: String },
 }

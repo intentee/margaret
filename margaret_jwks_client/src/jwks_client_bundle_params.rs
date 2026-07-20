@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use rustls::ClientConfig;
-use url::Url;
+
+use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
 
 pub struct JwksClientBundleParams {
     pub client_config: ClientConfig,
-    pub issuer_url: Url,
+    pub endpoint: Arc<dyn ProvidesEndpoint>,
 }

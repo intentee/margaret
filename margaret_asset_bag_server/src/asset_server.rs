@@ -29,10 +29,12 @@ impl<TEmbedded: RustEmbed> AssetServer<TEmbedded> {
     #[must_use]
     pub fn respond(&self, asset_path: &str) -> Response {
         match TEmbedded::get(asset_path) {
-            Some(embedded_file) => {
-                Response::bytes(200, content_type(asset_path), embedded_file.data.into_owned())
-                    .header("cache-control", CACHE_CONTROL)
-            }
+            Some(embedded_file) => Response::bytes(
+                200,
+                content_type(asset_path),
+                embedded_file.data.into_owned(),
+            )
+            .header("cache-control", CACHE_CONTROL),
             None => Response::not_found(),
         }
     }

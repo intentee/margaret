@@ -50,11 +50,9 @@ mod tests {
             "<main><img src=\"/assets/logo_I9J0K1L2.png\" alt=\"logo\"><p>Assets demo</p></main>"
         );
         assert!(
-            asset_bag
-                .head()
-                .render()
-                .into_string()
-                .contains("<script async src=\"/assets/app_A1B2C3D4.js\" type=\"module\"></script>")
+            asset_bag.head().render().into_string().contains(
+                "<script async src=\"/assets/app_A1B2C3D4.js\" type=\"module\"></script>"
+            )
         );
     }
 }

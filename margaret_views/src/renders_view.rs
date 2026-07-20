@@ -31,6 +31,9 @@ mod tests {
 
     #[test]
     fn renders_a_view_directly_to_a_string() {
-        assert_eq!(Greeting.render_to_string("ada".to_string()), "<p>hi ada</p>");
+        assert_eq!(
+            Greeting.render_to_string("ada".to_string()),
+            "<p>hi ada</p>"
+        );
     }
 }

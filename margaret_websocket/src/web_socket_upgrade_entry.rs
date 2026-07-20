@@ -27,8 +27,7 @@ async fn drive_web_socket_upgrade<Session>(
     let Ok(upgraded) = on_upgrade.await else {
         return;
     };
-    let stream =
-        WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
+    let stream = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
 
     serve_web_socket_connection(cancellation_token, session, dispatch_table, stream).await;
 }
@@ -119,8 +118,13 @@ mod tests {
         let dispatch_table: Arc<WebSocketDispatchTable<()>> =
             Arc::new(WebSocketDispatchTable::new(HashMap::new(), HashMap::new()));
 
-        drive_web_socket_upgrade(on_upgrade, CancellationToken::new(), session, dispatch_table)
-            .await;
+        drive_web_socket_upgrade(
+            on_upgrade,
+            CancellationToken::new(),
+            session,
+            dispatch_table,
+        )
+        .await;
 
         assert_eq!(Arc::strong_count(&session_handle), 1);
     }

@@ -10,6 +10,7 @@ use margaret_http_tests::mtls_fixture::MtlsFixture;
 use margaret_jwks_client::JwksClientBundle;
 use margaret_jwks_client::JwksClientBundleParams;
 use margaret_jwks_client_tests::running_jwks_server::RunningJwksServer;
+use margaret_jwks_client_tests::static_endpoint::StaticEndpoint;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
 use margaret_jwks_key_gen::signs_claims::SignsClaims as _;
@@ -61,12 +62,14 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
 
     let client_bundle = JwksClientBundle::new(JwksClientBundleParams {
         client_config: ClientConfig::clone(&fixture.client_config),
-        issuer_url: Url::parse(&format!(
-            "https://{}:{}",
-            fixture.server_name,
-            jwks_server.port()
-        ))
-        .expect("the issuer url parses"),
+        endpoint: Arc::new(StaticEndpoint::new(
+            Url::parse(&format!(
+                "https://{}:{}",
+                fixture.server_name,
+                jwks_server.port()
+            ))
+            .expect("the issuer url parses"),
+        )),
     })
     .expect("the client bundle builds");
     let verifier = client_bundle.verifier();

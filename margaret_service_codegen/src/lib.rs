@@ -187,9 +187,11 @@ mod tests {
         assert!(source.contains(
             "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
         ));
-        assert!(source.contains(
-            "super::http::server_public::server_public(container,&routes,&views).await"
-        ));
+        assert!(
+            source.contains(
+                "super::http::server_public::server_public(container,&routes,&views).await"
+            )
+        );
     }
 
     #[test]

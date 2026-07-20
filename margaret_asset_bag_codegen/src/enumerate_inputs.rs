@@ -65,8 +65,7 @@ mod tests {
 
     #[test]
     fn captures_each_entry_point_main_output_and_css_bundle() {
-        let enumerated = enumerate_inputs(&raw(
-            r#"{
+        let enumerated = enumerate_inputs(&raw(r#"{
                 "outputs": {
                     "assets/app_ABC.js": {
                         "imports": [],
@@ -80,8 +79,7 @@ mod tests {
                         "inputs": { "media/logo.png": {} }
                     }
                 }
-            }"#,
-        ))
+            }"#))
         .expect("the inputs are enumerated");
 
         let entrypoint = enumerated

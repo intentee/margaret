@@ -57,7 +57,10 @@ pub(crate) fn infer_column_type(
     };
 
     match base_column_type(base) {
-        Some(inferred) => Ok(InferredColumn { nullable, ..inferred }),
+        Some(inferred) => Ok(InferredColumn {
+            nullable,
+            ..inferred
+        }),
         None => Err(ModelCodegenError::UninferrableColumnType {
             column: column.to_string(),
             model: model.to_string(),

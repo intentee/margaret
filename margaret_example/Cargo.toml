@@ -9,11 +9,15 @@ async-trait = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 clap = { workspace = true }
 dashmap = { workspace = true }
+log = { workspace = true }
 margaret_asset_bag = { path = "../margaret_asset_bag" }
 margaret_asset_bag_server = { path = "../margaret_asset_bag_server" }
 margaret_console = { path = "../margaret_console" }
+margaret_endpoint = { path = "../margaret_endpoint" }
 margaret_http = { path = "../margaret_http" }
 margaret_http_validation = { path = "../margaret_http_validation" }
+margaret_jwks_client = { path = "../margaret_jwks_client" }
+margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
 margaret_jwks_roller_server = { path = "../margaret_jwks_roller_server" }
 margaret_macros = { path = "../margaret_macros" }
@@ -25,6 +29,7 @@ margaret_validation = { path = "../margaret_validation" }
 margaret_views = { path = "../margaret_views" }
 margaret_websocket = { path = "../margaret_websocket" }
 maud = { workspace = true }
+reqwest = { workspace = true }
 rust-embed = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -33,6 +38,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
+url = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
 validator = { workspace = true, features = ["derive"] }
 

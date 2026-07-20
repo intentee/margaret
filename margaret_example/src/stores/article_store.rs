@@ -241,12 +241,7 @@ mod tests {
     async fn binds_an_article_by_its_uuid() {
         let store = store();
 
-        assert!(
-            store
-                .bind(FEATURED_ARTICLE_ID.to_string())
-                .await
-                .is_some()
-        );
+        assert!(store.bind(FEATURED_ARTICLE_ID.to_string()).await.is_some());
         assert!(store.bind("not-a-uuid".to_string()).await.is_none());
     }
 }

@@ -5,6 +5,7 @@ use margaret_macros::handles_middleware_attribute;
 use margaret_macros::middleware;
 use margaret_macros::model;
 use margaret_macros::process;
+use margaret_macros::provides_endpoint;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::renders_view;
 use margaret_macros::responds_to_http;
@@ -72,6 +73,31 @@ impl Session {
     }
 }
 
+#[provides_endpoint(jwks)]
+struct Endpoint {
+    origin: String,
+}
+
+impl Endpoint {
+    #[constructor]
+    fn create() -> Self {
+        Self {
+            origin: "origin".to_string(),
+        }
+    }
+}
+
+struct Consumer {
+    endpoint: Endpoint,
+}
+
+impl Consumer {
+    #[constructor]
+    fn create(#[endpoint_provider(jwks)] endpoint: Endpoint) -> Self {
+        Self { endpoint }
+    }
+}
+
 #[websocket_message(request, method = "message", response = single)]
 struct Message {
     field: String,
@@ -104,4 +130,8 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     };
 
     assert_eq!(message.field, "value");
+
+    let consumer = Consumer::create(Endpoint::create());
+
+    assert_eq!(consumer.endpoint.origin, "origin");
 }

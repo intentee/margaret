@@ -5,37 +5,33 @@ use anyhow::Result;
 use async_trait::async_trait;
 use log::error;
 use reqwest::Client;
-use reqwest::Response;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 use trzcina::TickContext;
 use trzcina::Ticker;
-use url::Url;
 
+use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
 use margaret_jwks_key_gen::jwk_public_set::JwkPublicSet;
 
+use crate::fetch_jwk_public_set::fetch_jwk_public_set;
 use crate::jwk_public_set_holder::JwkPublicSetHolder;
 use crate::jwks_client_error::JwksClientError;
 use crate::jwks_poll_interval_after_ready::JWKS_POLL_INTERVAL_AFTER_READY;
 use crate::jwks_poll_interval_before_ready::JWKS_POLL_INTERVAL_BEFORE_READY;
+use crate::well_known_jwks_url::well_known_jwks_url;
 
 pub struct JwkPublicSetPollService {
+    pub endpoint: Arc<dyn ProvidesEndpoint>,
     pub http_client: Client,
     pub jwk_public_set_holder: JwkPublicSetHolder,
-    pub jwks_url: Url,
 }
 
 impl JwkPublicSetPollService {
-    pub async fn fetch_jwk_public_set(&self) -> Result<JwkPublicSet, JwksClientError> {
-        self.http_client
-            .get(self.jwks_url.clone())
-            .send()
-            .await
-            .and_then(Response::error_for_status)
-            .map_err(JwksClientError::DocumentFetch)?
-            .json::<JwkPublicSet>()
-            .await
-            .map_err(JwksClientError::DocumentFetch)
+    pub async fn poll(&self) -> Result<JwkPublicSet, JwksClientError> {
+        let endpoint = self.endpoint.resolve().await?;
+        let jwks_url = well_known_jwks_url(&endpoint.url)?;
+
+        fetch_jwk_public_set(&self.http_client, jwks_url).await
     }
 }
 
@@ -50,7 +46,7 @@ impl Ticker for JwkPublicSetPollService {
         cancellation_token: CancellationToken,
         _tick_context: TickContext,
     ) -> Result<()> {
-        match self.fetch_jwk_public_set().await {
+        match self.poll().await {
             Ok(jwk_public_set) => self
                 .jwk_public_set_holder
                 .set(Some(Arc::new(jwk_public_set))),

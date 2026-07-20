@@ -116,12 +116,12 @@ fn classify_form_request(
 
     let resolved = index.resolve_item_type(item, declared);
     let is_reference = matches!(declared, Type::Reference(_));
-    let extraction =
-        if RequestInjectable::ValidationResult.matches(resolved.as_ref(), is_reference) {
-            FormRequestExtraction::Result
-        } else {
-            FormRequestExtraction::Model
-        };
+    let extraction = if RequestInjectable::ValidationResult.matches(resolved.as_ref(), is_reference)
+    {
+        FormRequestExtraction::Result
+    } else {
+        FormRequestExtraction::Model
+    };
 
     Ok(RequestBinding::FormRequest { source, extraction })
 }

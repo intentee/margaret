@@ -18,7 +18,12 @@ impl AssetBag {
         Self::default()
     }
 
-    pub fn add(&self, BundleAsset { includes, preloads, .. }: BundleAsset) {
+    pub fn add(
+        &self,
+        BundleAsset {
+            includes, preloads, ..
+        }: BundleAsset,
+    ) {
         for include in includes {
             self.inner.add_include(*include);
         }
@@ -161,7 +166,9 @@ mod tests {
         let asset_bag = AssetBag::new();
 
         assert_eq!(
-            asset_bag.file(StaticAsset::new(AssetHref::Local("assets/data_ABC12345.bin"))),
+            asset_bag.file(StaticAsset::new(AssetHref::Local(
+                "assets/data_ABC12345.bin"
+            ))),
             "/assets/data_ABC12345.bin"
         );
     }
@@ -171,7 +178,9 @@ mod tests {
         let asset_bag = AssetBag::new();
 
         assert_eq!(
-            asset_bag.image(ImageAsset::new(AssetHref::Local("assets/logo_ABC12345.png"))),
+            asset_bag.image(ImageAsset::new(AssetHref::Local(
+                "assets/logo_ABC12345.png"
+            ))),
             "/assets/logo_ABC12345.png"
         );
     }

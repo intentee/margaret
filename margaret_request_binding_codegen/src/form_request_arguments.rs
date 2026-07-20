@@ -15,13 +15,12 @@ impl FormRequestArguments {
         subject: &str,
         position: usize,
     ) -> Result<Self, RequestBindingError> {
-        let from =
-            arguments
-                .path("from")?
-                .ok_or_else(|| RequestBindingError::FormRequestMissingSource {
-                    subject: subject.to_string(),
-                    parameter: position.to_string(),
-                })?;
+        let from = arguments.path("from")?.ok_or_else(|| {
+            RequestBindingError::FormRequestMissingSource {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+            }
+        })?;
         let source = RequestInputSource::from_path(&from).ok_or_else(|| {
             RequestBindingError::UnknownRequestInput {
                 subject: subject.to_string(),

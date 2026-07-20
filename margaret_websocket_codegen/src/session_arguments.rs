@@ -13,11 +13,12 @@ impl SessionArguments {
         arguments: &AttributeArgs,
         session: &str,
     ) -> Result<Self, WebSocketCodegenError> {
-        let path = arguments
-            .string("path")?
-            .ok_or_else(|| WebSocketCodegenError::MissingSessionPath {
-                session: session.to_string(),
-            })?;
+        let path =
+            arguments
+                .string("path")?
+                .ok_or_else(|| WebSocketCodegenError::MissingSessionPath {
+                    session: session.to_string(),
+                })?;
         let server = arguments.string("server")?.ok_or_else(|| {
             WebSocketCodegenError::MissingSessionServer {
                 session: session.to_string(),

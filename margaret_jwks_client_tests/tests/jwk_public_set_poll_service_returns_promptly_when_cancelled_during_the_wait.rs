@@ -9,7 +9,7 @@ use margaret_jwks_client::jwk_public_set_holder::JwkPublicSetHolder;
 use margaret_jwks_client::jwk_public_set_poll_service::JwkPublicSetPollService;
 use margaret_jwks_client::jwks_poll_interval_after_ready::JWKS_POLL_INTERVAL_AFTER_READY;
 use margaret_jwks_client_tests::first_tick_context::first_tick_context;
-use margaret_jwks_client_tests::unreachable_issuer_url::unreachable_issuer_url;
+use margaret_jwks_client_tests::unreachable_endpoint::unreachable_endpoint;
 use margaret_jwks_key_gen::curve::Curve;
 use margaret_jwks_key_gen::jwk_public_set::JwkPublicSet;
 use margaret_jwks_key_gen::jwks_secret::JwksSecret;
@@ -22,9 +22,9 @@ async fn jwk_public_set_poll_service_returns_promptly_when_cancelled_during_the_
     jwk_public_set_holder.set(Some(Arc::new(JwkPublicSet::from(known_good))));
 
     let mut service = JwkPublicSetPollService {
+        endpoint: unreachable_endpoint(),
         http_client: Client::new(),
         jwk_public_set_holder,
-        jwks_url: unreachable_issuer_url(),
     };
 
     let cancellation_token = CancellationToken::new();

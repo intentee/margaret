@@ -143,7 +143,11 @@ struct Config {
 
         let error = generate_into(host.path()).expect_err("an unreadable metafile is reported");
 
-        assert!(error.to_string().contains("failed to read the esbuild metafile"));
+        assert!(
+            error
+                .to_string()
+                .contains("failed to read the esbuild metafile")
+        );
     }
 
     #[test]
@@ -191,7 +195,11 @@ struct Config {
         let error =
             generate_into(host.path()).expect_err("a blocked generated directory is reported");
 
-        assert!(error.to_string().contains("failed to create the generated directory"));
+        assert!(
+            error
+                .to_string()
+                .contains("failed to create the generated directory")
+        );
     }
 
     #[test]
@@ -208,7 +216,11 @@ struct Config {
         fs::set_permissions(&generated, std::fs::Permissions::from_mode(0o755))
             .expect("the generated directory is restored to writable");
 
-        assert!(error.to_string().contains("failed to write the generated source"));
+        assert!(
+            error
+                .to_string()
+                .contains("failed to write the generated source")
+        );
     }
 
     #[test]
@@ -218,7 +230,11 @@ struct Config {
 
         let error = generate_into(host.path()).expect_err("an unbuildable crate is reported");
 
-        assert!(error.to_string().contains("failed to generate the dependency container"));
+        assert!(
+            error
+                .to_string()
+                .contains("failed to generate the dependency container")
+        );
     }
 
     #[test]
@@ -228,9 +244,12 @@ struct Config {
         fs::create_dir_all(host.path().join("src/margaret/container.rs"))
             .expect("the blocking directory is created");
 
-        let error =
-            generate_into(host.path()).expect_err("a blocked generated source is reported");
+        let error = generate_into(host.path()).expect_err("a blocked generated source is reported");
 
-        assert!(error.to_string().contains("failed to write the generated source"));
+        assert!(
+            error
+                .to_string()
+                .contains("failed to write the generated source")
+        );
     }
 }

@@ -1,16 +1,19 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
+use syn::Attribute;
 use syn::FnArg;
 use syn::Pat;
 use syn::Path;
 
+use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
+use margaret_attributes::marker::marker;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 
 use crate::collection_table::CollectionTable;
@@ -60,10 +63,58 @@ fn build_drafts<'index>(
         }
     }
 
+    let endpoint_table = build_endpoint_table(index, &drafts)?;
+
     Ok(DraftedProviders {
         drafts,
+        endpoint_table,
         provided_keys,
     })
+}
+
+fn build_endpoint_table(
+    index: &AttributeIndex,
+    drafts: &[SingletonDraft],
+) -> Result<HashMap<String, CanonicalPath>, ContainerError> {
+    let drafts_by_concrete: HashMap<&CanonicalPath, &SingletonDraft> = drafts
+        .iter()
+        .map(|draft| (&draft.concrete_path, draft))
+        .collect();
+    let mut endpoint_table: HashMap<String, CanonicalPath> = HashMap::new();
+
+    for matched in index.select(&AttributeSelector::from_marker("provides_endpoint")) {
+        let concrete_path = matched.item().canonical_path();
+
+        let Some(draft) = drafts_by_concrete.get(concrete_path) else {
+            return Err(ContainerError::EndpointProviderNotASingleton {
+                path: concrete_path.to_string(),
+            });
+        };
+
+        if draft.collection.is_some() || !matches!(draft.provided, ProvidedType::Concrete(_)) {
+            return Err(ContainerError::EndpointProviderNotConcrete {
+                singleton: concrete_path.to_string(),
+            });
+        }
+
+        let arguments = matched.args()?;
+        let (Some(tag), None) = (arguments.positional_path(0), arguments.positional(1)) else {
+            return Err(ContainerError::MalformedProvidesEndpoint {
+                singleton: concrete_path.to_string(),
+            });
+        };
+        let tag = path_text(tag);
+
+        if let Some(first) = endpoint_table.insert(tag.clone(), draft.provided.key().clone()) {
+            return Err(ContainerError::DuplicateEndpointProvider {
+                tag,
+                first: first.to_string(),
+                second: draft.provided.key().to_string(),
+            });
+        }
+    }
+
+    Ok(endpoint_table)
 }
 
 fn build_draft<'index>(
@@ -152,11 +203,18 @@ fn resolve_direct(
     source: ConstructionSource,
     concrete_path: &CanonicalPath,
     provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
+    endpoint_table: &HashMap<String, CanonicalPath>,
 ) -> Result<DirectConstruction, ContainerError> {
     match source {
         ConstructionSource::Constructor(constructor) => {
-            let dependencies =
-                resolve_dependencies(index, item, concrete_path, constructor, provided_keys)?;
+            let dependencies = resolve_dependencies(
+                index,
+                item,
+                concrete_path,
+                constructor,
+                provided_keys,
+                endpoint_table,
+            )?;
 
             Ok(DirectConstruction::Constructor {
                 dependencies,
@@ -174,7 +232,9 @@ fn resolve_dependencies(
     concrete_path: &CanonicalPath,
     constructor: &IndexedMethod,
     provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
+    endpoint_table: &HashMap<String, CanonicalPath>,
 ) -> Result<Vec<DependencyKind>, ContainerError> {
+    let endpoint_selector = AttributeSelector::from_marker("endpoint_provider");
     let mut dependencies = Vec::new();
 
     for (position, input) in constructor.signature().inputs.iter().enumerate() {
@@ -187,6 +247,17 @@ fn resolve_dependencies(
         };
 
         let parameter = parameter_name(&pattern_type.pat, position);
+
+        if let Some(attribute) = marker(&pattern_type.attrs, &endpoint_selector) {
+            dependencies.push(resolve_endpoint_provider(
+                attribute,
+                concrete_path,
+                &parameter,
+                endpoint_table,
+            )?);
+
+            continue;
+        }
 
         let Some(target) = peel_target(&pattern_type.ty) else {
             return Err(ContainerError::UnsupportedParameterShape {
@@ -207,6 +278,34 @@ fn resolve_dependencies(
     }
 
     Ok(dependencies)
+}
+
+fn resolve_endpoint_provider(
+    attribute: &Attribute,
+    concrete_path: &CanonicalPath,
+    parameter: &str,
+    endpoint_table: &HashMap<String, CanonicalPath>,
+) -> Result<DependencyKind, ContainerError> {
+    let arguments = AttributeArgs::from_attribute(attribute)?;
+    let (Some(tag), None) = (arguments.positional_path(0), arguments.positional(1)) else {
+        return Err(ContainerError::MalformedEndpointProvider {
+            singleton: concrete_path.to_string(),
+            parameter: parameter.to_string(),
+        });
+    };
+    let tag = path_text(tag);
+
+    let Some(provider_key) = endpoint_table.get(&tag) else {
+        return Err(ContainerError::MissingEndpointProvider {
+            singleton: concrete_path.to_string(),
+            parameter: parameter.to_string(),
+            tag,
+        });
+    };
+
+    Ok(DependencyKind::Single {
+        provider_key: provider_key.clone(),
+    })
 }
 
 fn resolve_target(
@@ -279,12 +378,14 @@ struct SingletonDraft<'index> {
 
 struct DraftedProviders<'index> {
     drafts: Vec<SingletonDraft<'index>>,
+    endpoint_table: HashMap<String, CanonicalPath>,
     provided_keys: HashMap<CanonicalPath, CanonicalPath>,
 }
 
 pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
     let DraftedProviders {
         drafts,
+        endpoint_table,
         provided_keys,
     } = build_drafts(index)?;
 
@@ -307,8 +408,14 @@ pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, Contai
             collections.add(trait_path, provider_key.clone());
         }
 
-        let construction =
-            resolve_direct(index, item, construction, &concrete_path, &provided_keys)?;
+        let construction = resolve_direct(
+            index,
+            item,
+            construction,
+            &concrete_path,
+            &provided_keys,
+            &endpoint_table,
+        )?;
 
         providers.insert(
             provider_key,

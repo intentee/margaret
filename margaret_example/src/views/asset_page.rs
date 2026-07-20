@@ -76,7 +76,9 @@ mod tests {
 
         assert!(markup.contains("<link rel=\"modulepreload\" href=\"/assets/chunk_E5F6G7H8.js\">"));
         assert!(
-            markup.contains("<script async src=\"/assets/app_A1B2C3D4.js\" type=\"module\"></script>")
+            markup.contains(
+                "<script async src=\"/assets/app_A1B2C3D4.js\" type=\"module\"></script>"
+            )
         );
         assert!(logo > head_end);
     }

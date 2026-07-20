@@ -25,8 +25,11 @@ impl AssetBagInner {
     }
 
     pub(crate) fn sorted_externals(&self) -> Vec<ExternalAsset> {
-        let mut externals: Vec<ExternalAsset> =
-            self.externals.iter().map(|external| external.clone()).collect();
+        let mut externals: Vec<ExternalAsset> = self
+            .externals
+            .iter()
+            .map(|external| external.clone())
+            .collect();
 
         externals.sort();
 

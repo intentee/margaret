@@ -301,7 +301,9 @@ impl Health {
         let source = websocket_http_source(HEALTH_RESPONDER, &["realtime".to_string()]);
 
         assert!(source.contains("pubasyncfnserver_realtime"));
-        assert!(source.contains("super::super::websocket::realtime_routes(container,routes).await"));
+        assert!(
+            source.contains("super::super::websocket::realtime_routes(container,routes).await")
+        );
     }
 
     #[test]
@@ -309,9 +311,9 @@ impl Health {
         let source =
             websocket_http_source_with_views(HEALTH_RESPONDER, &["public".to_string()], true);
 
-        assert!(source.contains(
-            "super::super::websocket::public_routes(container,routes,views).await"
-        ));
+        assert!(
+            source.contains("super::super::websocket::public_routes(container,routes,views).await")
+        );
         assert!(source.contains("views:&::std::sync::Arc<super::super::views::Views>"));
     }
 
@@ -437,7 +439,9 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "use margaret_asset_bag::asset_bag::AssetBag;\n\n#[responds_to_http(method = \"get\", path = \"/page\", server = \"public\")]\nstruct GetPage;\nimpl GetPage {\n    #[process]\n    fn respond(&self, asset_bag: AssetBag) -> Response {}\n}\n",
         );
 
-        assert!(source.contains("|responder:std::sync::Arc<crate::GetPage>,_request:&margaret_http::request::Request"));
+        assert!(source.contains(
+            "|responder:std::sync::Arc<crate::GetPage>,_request:&margaret_http::request::Request"
+        ));
         assert!(source.contains("letasset_bag=::margaret_asset_bag::asset_bag::AssetBag::new();"));
         assert!(source.contains("responder.respond(asset_bag).await"));
     }
