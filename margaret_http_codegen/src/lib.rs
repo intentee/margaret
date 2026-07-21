@@ -33,6 +33,7 @@ mod tests {
     use crate::has_responders::has_responders;
     use crate::http_codegen_error::HttpCodegenError;
     use crate::render_http::render_http;
+    use crate::serves_spiffe::serves_spiffe;
 
     fn http_source(
         crate_name: &str,
@@ -928,7 +929,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> ResponseContinuation {}\n}\n",
         );
 
-        assert!(message.contains("must be the current request, the next handler, or the routes"));
+        assert!(message.contains("must be the current request, the next handler"));
     }
 
     #[test]
@@ -1235,5 +1236,115 @@ impl GetMetrics {
         assert!(source.contains("Ok(model)=>model"));
         assert!(source.contains("Err(response)=>returnresponse.into()"));
         assert!(source.contains("responder.respond(data).await"));
+    }
+
+    #[test]
+    fn threads_views_into_a_views_injecting_middleware_onion() {
+        let source = source_for_with_views(
+            r#"
+use margaret_http::next::Next;
+
+#[responds_to_http(method = "get", path = "/page", server = "public")]
+#[middleware(traced)]
+struct Page;
+
+impl Page {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[handles_middleware_attribute(attribute = traced)]
+struct Tracer;
+
+impl Tracer {
+    #[process]
+    fn process(&self, next: Next, views: &crate::margaret::views::Views) -> ResponseContinuation {}
+}
+"#,
+        );
+
+        assert!(source.contains(
+            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await,views:views.clone()"
+        ));
+        assert!(source.contains("views:&::std::sync::Arc<super::super::views::Views>"));
+    }
+
+    #[test]
+    fn rejects_middleware_view_injection_without_declared_views() {
+        let message = error_for(
+            r#"
+use margaret_http::next::Next;
+
+#[responds_to_http(method = "get", path = "/page", server = "public")]
+#[middleware(traced)]
+struct Page;
+
+impl Page {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[handles_middleware_attribute(attribute = traced)]
+struct Tracer;
+
+impl Tracer {
+    #[process]
+    fn process(&self, next: Next, views: &crate::margaret::views::Views) -> ResponseContinuation {}
+}
+"#,
+        );
+
+        assert!(message.contains("injects &Views, but the crate defines no #[renders_view]"));
+    }
+
+    #[test]
+    fn pins_a_server_to_mutual_tls_when_a_middleware_reads_the_peer_spiffe_id() {
+        let index = index_for(
+            r#"
+use margaret_http::next::Next;
+use spiffe::spiffe_id::SpiffeId;
+
+#[responds_to_http(method = "get", path = "/x", server = "internal")]
+#[middleware(guard)]
+struct GetX;
+
+impl GetX {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[handles_middleware_attribute(attribute = guard)]
+struct Guard;
+
+impl Guard {
+    #[process]
+    fn process(&self, peer: &SpiffeId, next: Next) -> ResponseContinuation {}
+}
+"#,
+        );
+        let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let artifacts =
+            render_http(&index, false, &[], &plans).expect("the http source is generated");
+
+        assert!(serves_spiffe(artifacts.servers()));
+    }
+
+    #[test]
+    fn rejects_the_next_handler_in_a_responder() {
+        let message = error_for(
+            r#"
+use margaret_http::next::Next;
+
+#[responds_to_http(method = "get", path = "/x", server = "public")]
+struct GetX;
+
+impl GetX {
+    #[process]
+    fn respond(&self, next: Next) -> Response {}
+}
+"#,
+        );
+
+        assert!(message.contains("only available inside an HTTP middleware"));
     }
 }

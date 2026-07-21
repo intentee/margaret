@@ -7,9 +7,8 @@ use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_middleware_codegen::resolve_layers::resolve_layers;
-use margaret_request_binding_codegen::binding_site::BindingSite;
+use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
-use margaret_request_binding_codegen::request_binding_policy::RequestBindingPolicy;
 use margaret_request_binding_codegen::route_parameter_binders::route_parameter_binders;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
@@ -56,14 +55,13 @@ pub(crate) fn websocket_sessions(
             index,
             item,
             method.signature(),
-            &BindingSite {
+            &BindingContext::Handshake {
+                container_bindings: bindings,
                 route_path: &route_path,
                 server: &server,
                 subject: &subject,
             },
             &binders,
-            Some(bindings),
-            &RequestBindingPolicy::handshake(),
         )?;
         let layers = resolve_layers(item, middleware_plans, &subject)?;
 
