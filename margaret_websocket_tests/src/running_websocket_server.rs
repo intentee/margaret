@@ -7,12 +7,14 @@ use tokio_util::sync::CancellationToken;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
+use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::router::Router;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http::upload_config::UploadConfig;
+use margaret_http::web_socket_upgrade::WebSocketUpgrade;
 use margaret_websocket::web_socket_session_factory::WebSocketSessionFactory;
 use margaret_websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry;
 
@@ -35,14 +37,35 @@ impl RunningWebSocketServer {
     where
         Factory: WebSocketSessionFactory<Session = TestSession> + 'static,
     {
-        let entry = Arc::new(WebSocketUpgradeEntry::new(factory, test_dispatch_table()));
+        Self::start_from(
+            Arc::new(WebSocketUpgradeEntry::new(factory, test_dispatch_table())),
+            Vec::new(),
+        )
+        .await
+    }
+
+    pub async fn start_gated(middleware: Vec<Arc<dyn HttpMiddleware>>) -> Self {
+        Self::start_from(
+            Arc::new(WebSocketUpgradeEntry::new(
+                TestSessionFactory,
+                test_dispatch_table(),
+            )),
+            middleware,
+        )
+        .await
+    }
+
+    async fn start_from(
+        upgrade: Arc<dyn WebSocketUpgrade>,
+        middleware: Vec<Arc<dyn HttpMiddleware>>,
+    ) -> Self {
         let server = Server::new(
             "public",
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
-            Router::build(vec![RouteEntry::web_socket("/ws", entry)])
+            Router::build(vec![RouteEntry::web_socket("/ws", upgrade, middleware)])
                 .expect("the route entries register cleanly"),
         );
         let server_registry = Arc::new(ServerRegistry::new(vec![server]));

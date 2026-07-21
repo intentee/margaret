@@ -8,6 +8,7 @@ use crate::console_pass::console_pass;
 use crate::container_pass::container_pass;
 use crate::generated_code::GeneratedCode;
 use crate::http_pass::http_pass;
+use crate::middleware_pass::middleware_pass;
 use crate::model_pass::model_pass;
 use crate::services_pass::services_pass;
 use crate::views_pass::views_pass;
@@ -24,6 +25,7 @@ pub fn build(
 
     let bindings = container_pass(&mut context)?;
     asset_bag_pass(&mut context)?;
+    middleware_pass(&mut context)?;
     websocket_pass(&mut context, &bindings)?;
     views_pass(&mut context)?;
     http_pass(&mut context)?;
@@ -54,6 +56,7 @@ mod tests {
     use crate::container_pass::container_pass;
     use crate::generated_code::GeneratedCode;
     use crate::http_pass::http_pass;
+    use crate::middleware_pass::middleware_pass;
     use crate::model_pass::model_pass;
     use crate::services_pass::services_pass;
     use crate::umbrella::umbrella;
@@ -197,6 +200,7 @@ struct Room;
 
         let bindings = container_pass(&mut context).expect("the container pass succeeds");
         asset_bag_pass(&mut context).expect("the asset bag pass succeeds");
+        middleware_pass(&mut context).expect("the middleware pass succeeds");
         websocket_pass(&mut context, &bindings).expect("the websocket pass succeeds");
         views_pass(&mut context).expect("the views pass succeeds");
         http_pass(&mut context).expect("the http pass succeeds");
@@ -335,6 +339,119 @@ struct Room;
                 .to_string()
                 .contains("failed to generate the websockets")
         );
+    }
+
+    const MIDDLEWARE_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret_http::next::Next;
+use margaret_http::request::Request;
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+#[middleware(logged)]
+struct Page;
+
+impl Page {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[handles_middleware_attribute(attribute = logged)]
+struct RequestLog;
+
+impl RequestLog {
+    #[constructor]
+    fn create() -> Self {}
+
+    #[process]
+    fn process(&self, request: &Request, next: Next) -> ResponseContinuation {}
+}
+";
+
+    #[test]
+    fn generates_the_middleware_module_for_attached_middleware() {
+        let code = generate(MIDDLEWARE_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod middleware;"));
+        assert!(module(&code, "middleware").contains("pub struct RequestLog"));
+        assert!(
+            concatenated(&code)
+                .contains("super::super::middleware::RequestLog")
+        );
+    }
+
+    #[test]
+    fn omits_the_middleware_module_without_attached_middleware() {
+        let code = generate(WEB_CRATE).expect("the build succeeds");
+
+        assert!(!module(&code, "mod").contains("pub mod middleware;"));
+        assert!(!has_module(&code, "middleware"));
+    }
+
+    const WEBSOCKET_MIDDLEWARE_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret_http::next::Next;
+use margaret_http::request::Request;
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[websocket_session(path = \"/room\", server = \"public\")]
+#[middleware(logged)]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[websocket_message(request, method = \"chat\", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+
+#[singleton]
+#[handles_middleware_attribute(attribute = logged)]
+struct RequestLog;
+
+impl RequestLog {
+    #[constructor]
+    fn create() -> Self {}
+
+    #[process]
+    fn process(&self, request: &Request, next: Next) -> ResponseContinuation {}
+}
+";
+
+    #[test]
+    fn generates_the_middleware_module_for_a_websocket_only_server() {
+        let code = generate(WEBSOCKET_MIDDLEWARE_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod websocket;"));
+        assert!(module(&code, "mod").contains("pub mod middleware;"));
+        assert!(module(&code, "middleware").contains("pub struct RequestLog"));
+        assert!(concatenated(&code).contains("super::middleware::RequestLog"));
+        assert!(!concatenated(&code).contains("GatedWebSocketUpgrade"));
+    }
+
+    #[test]
+    fn propagates_a_middleware_codegen_error() {
+        let message = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n",
+        )
+        .expect_err("the invalid middleware handler is rejected")
+        .to_string();
+
+        assert!(message.contains("failed to generate the middleware"));
     }
 
     #[test]

@@ -8,14 +8,14 @@ use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_request_binding_codegen::request_injectable::RequestInjectable;
 
-use crate::http_codegen_error::HttpCodegenError;
 use crate::middleware_argument::MiddlewareArgument;
 use crate::middleware_attribute_arguments::MiddlewareAttributeArguments;
+use crate::middleware_codegen_error::MiddlewareCodegenError;
 use crate::middleware_plan::MiddlewarePlan;
 
-pub(crate) fn middleware_plans(
+pub fn middleware_plans(
     index: &AttributeIndex,
-) -> Result<Vec<MiddlewarePlan>, HttpCodegenError> {
+) -> Result<Vec<MiddlewarePlan>, MiddlewareCodegenError> {
     let selector = AttributeSelector::from_marker("handles_middleware_attribute");
     let mut plans = Vec::new();
 
@@ -23,7 +23,7 @@ pub(crate) fn middleware_plans(
         let item = matched.item();
 
         let Some(identifier) = index.struct_identifier(item.canonical_path()) else {
-            return Err(HttpCodegenError::HttpMiddlewareNotOnStruct {
+            return Err(MiddlewareCodegenError::MiddlewareHandlerNotOnStruct {
                 target: item.canonical_path().to_string(),
             });
         };
@@ -51,7 +51,7 @@ pub(crate) fn middleware_plans(
 
                     MiddlewareArgument::Routes
                 } else {
-                    return Err(HttpCodegenError::UnclassifiableMiddlewareParameter {
+                    return Err(MiddlewareCodegenError::UnclassifiableMiddlewareParameter {
                         middleware,
                         parameter: position.to_string(),
                     });

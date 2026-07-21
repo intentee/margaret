@@ -4,6 +4,7 @@ pub mod responders;
 use std::sync::Arc;
 
 use margaret_macros::build_for_session;
+use margaret_macros::middleware;
 use margaret_macros::websocket_session;
 use margaret_views::renders_view::RendersView;
 use tokio::sync::Mutex;
@@ -15,6 +16,7 @@ use crate::margaret::views::Views;
 use crate::models::article::Article;
 use crate::views::greeting_view_props::GreetingViewProps;
 
+#[middleware(logged)]
 #[websocket_session(path = "/storyboard/{topic}/{article}", server = "public")]
 pub struct StoryboardSession {
     article_title: String,

@@ -12,6 +12,7 @@ pub(crate) fn http_pass(context: &mut BuildContext) -> Result<(), CodegenError> 
         context.index(),
         capabilities.has_views,
         context.websocket_servers(),
+        context.middleware_plans(),
     )?;
 
     context.set_servers(artifacts.servers().to_vec());

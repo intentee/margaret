@@ -2,6 +2,8 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use margaret_middleware_codegen::middleware_vec_tokens::middleware_vec_tokens;
+
 use crate::session_plan::SessionPlan;
 
 pub(crate) fn render_server_routes(
@@ -12,7 +14,7 @@ pub(crate) fn render_server_routes(
     let function = format_ident!("{server}_routes");
     let routes_name = if sessions
         .iter()
-        .any(|session_plan| session_plan.session.injects_routes())
+        .any(|session_plan| session_plan.session.references_routes())
     {
         format_ident!("routes")
     } else {
@@ -39,11 +41,17 @@ pub(crate) fn render_server_routes(
             .session
             .injects_views()
             .then(|| quote! { views, });
+        let middleware = if session_plan.session.layers.is_empty() {
+            quote! { ::std::vec::Vec::new() }
+        } else {
+            middleware_vec_tokens(&session_plan.session.layers, &quote! { super::middleware })
+        };
 
         quote! {
             margaret_http::route_entry::RouteEntry::web_socket(
                 #path,
                 #module::upgrade_entry(container, #routes_argument #views_argument).await,
+                #middleware,
             ),
         }
     });

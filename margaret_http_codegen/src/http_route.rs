@@ -1,9 +1,8 @@
 use proc_macro2::Ident;
 
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_middleware_codegen::layer_application::LayerApplication;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
-
-use crate::layer_application::LayerApplication;
 
 pub(crate) struct HttpRoute {
     pub(crate) arguments: Vec<BoundParameter>,

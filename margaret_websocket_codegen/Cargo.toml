@@ -9,6 +9,7 @@ margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
 margaret_container = { path = "../margaret_container" }
 margaret_generated_module = { path = "../margaret_generated_module" }
 margaret_injection_codegen = { path = "../margaret_injection_codegen" }
+margaret_middleware_codegen = { path = "../margaret_middleware_codegen" }
 margaret_request_binding_codegen = { path = "../margaret_request_binding_codegen" }
 margaret_route_parameter_codegen = { path = "../margaret_route_parameter_codegen" }
 heck = { workspace = true }

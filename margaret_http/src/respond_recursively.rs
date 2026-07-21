@@ -1,47 +1,19 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::forward_targets::ForwardTargets;
 use crate::handler::Handler;
 use crate::request::Request;
+use crate::resolve_continuation::resolve_continuation;
 use crate::response::Response;
-use crate::response_continuation::ResponseContinuation;
 
 pub(crate) async fn respond_recursively(
     forward_targets: &Arc<ForwardTargets>,
     request: Request,
     first: Arc<dyn Handler>,
 ) -> Response {
-    let mut visited: HashSet<&'static str> = HashSet::new();
-    let mut request = request;
-    let mut outcome = first.handle(&request).await;
+    let outcome = first.handle(&request).await;
 
-    loop {
-        match outcome {
-            ResponseContinuation::Done(response) => return response,
-            ResponseContinuation::Forward(forward) => {
-                let name = forward.name();
-
-                if !visited.insert(name) {
-                    eprintln!("margaret_http: forward cycle re-entered the responder `{name}`");
-
-                    return Response::text(500, "Internal Server Error");
-                }
-
-                let Some(target) = forward_targets.resolve(name) else {
-                    eprintln!(
-                        "margaret_http: no forward target is registered for `{name}` on this server"
-                    );
-
-                    return Response::text(500, "Internal Server Error");
-                };
-
-                request = request.with_path_params(forward.into_path_params());
-                outcome = target.handle(&request).await;
-            }
-            ResponseContinuation::Redirect(redirect) => return redirect.into_response(),
-        }
-    }
+    resolve_continuation(forward_targets, request, outcome).await
 }
 
 #[cfg(test)]

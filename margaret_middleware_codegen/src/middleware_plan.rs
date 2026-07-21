@@ -5,7 +5,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::middleware_argument::MiddlewareArgument;
 
-pub(crate) struct MiddlewarePlan {
+pub struct MiddlewarePlan {
     pub(crate) arguments: Vec<MiddlewareArgument>,
     pub(crate) concrete: CanonicalPath,
     pub(crate) field: Ident,
