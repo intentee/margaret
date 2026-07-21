@@ -26,6 +26,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_jwks_roller_server \
 	-p margaret_jwks_roller_tests \
 	-p margaret_macros \
+	-p margaret_middleware_codegen \
 	-p margaret_model \
 	-p margaret_model_codegen \
 	-p margaret_peer_identity \
@@ -102,6 +103,7 @@ coverage: node_modules
 		--gated margaret_jwks_roller_server=100 \
 		--gated margaret_jwks_roller_tests=100 \
 		--gated margaret_macros=100 \
+		--gated margaret_middleware_codegen=100 \
 		--gated margaret_model=100 \
 		--gated margaret_model_codegen=100 \
 		--gated margaret_peer_identity=100 \

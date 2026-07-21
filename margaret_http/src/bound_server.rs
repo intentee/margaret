@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::Display;
 use std::net::SocketAddr;
@@ -34,10 +33,12 @@ use crate::response::Response;
 use crate::router::RequestRoute;
 use crate::router::RouteResolution;
 use crate::router::Router;
+use crate::router::UpgradeRoute;
+use crate::run_upgrade_gate::run_upgrade_gate;
 use crate::server_registry::ServerRegistry;
 use crate::transport_config::TransportConfig;
+use crate::upgrade_gate_outcome::UpgradeGateOutcome;
 use crate::upload_config::UploadConfig;
-use crate::web_socket_upgrade::WebSocketUpgrade;
 
 #[derive(Clone)]
 enum BoundTransport {
@@ -311,8 +312,12 @@ async fn dispatch_web_socket(
     remote_addr: SocketAddr,
     peer_identity: Arc<PeerIdentity>,
     cancellation_token: CancellationToken,
-    upgrade: Arc<dyn WebSocketUpgrade>,
-    path_params: HashMap<String, String>,
+    UpgradeRoute {
+        middleware,
+        path_params,
+        upgrade,
+    }: UpgradeRoute,
+    forward_targets: &Arc<ForwardTargets>,
 ) -> http::Response<Full<Bytes>> {
     let on_upgrade = hyper::upgrade::on(&mut request);
     let (parts, _incoming) = request.into_parts();
@@ -329,10 +334,13 @@ async fn dispatch_web_socket(
                 .with_peer_identity(peer_identity)
                 .with_path_params(path_params);
 
-            upgrade
-                .upgrade(handshake, on_upgrade, cancellation_token)
-                .await
-                .into_http()
+            match run_upgrade_gate(&middleware, forward_targets, handshake).await {
+                UpgradeGateOutcome::ShortCircuit(response) => response.into_http(),
+                UpgradeGateOutcome::Proceed(handshake) => upgrade
+                    .upgrade(*handshake, on_upgrade, cancellation_token)
+                    .await
+                    .into_http(),
+            }
         }
         Err(error) => error_response(error).into_http(),
     }
@@ -351,17 +359,14 @@ async fn dispatch(
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
     match router.resolve(request.method().as_str(), request.uri().path()) {
-        RouteResolution::Upgrade {
-            path_params,
-            upgrade,
-        } => {
+        RouteResolution::Upgrade(upgrade_route) => {
             dispatch_web_socket(
                 request,
                 remote_addr,
                 peer_identity,
                 cancellation_token.child_token(),
-                upgrade,
-                path_params,
+                upgrade_route,
+                &forward_targets,
             )
             .await
         }
@@ -482,7 +487,7 @@ mod tests {
                 "/x/{id}",
                 vec![MethodHandler::new("GET", Arc::new(PlainOk))],
             ),
-            RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade)),
+            RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade), Vec::new()),
         ]);
 
         assert!(conflict.is_err());
@@ -633,6 +638,7 @@ mod tests {
             Router::build(vec![RouteEntry::web_socket(
                 "/room/{id}",
                 Arc::new(TestUpgrade),
+                Vec::new(),
             )])
             .expect("the route entries register cleanly"),
         )]))

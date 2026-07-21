@@ -1,11 +1,11 @@
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 
 use crate::active_servers::active_servers;
 use crate::http_artifacts::HttpArtifacts;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_routes::http_routes;
 use crate::http_server::HttpServer;
-use crate::middleware_plans::middleware_plans;
 use crate::render::render;
 use crate::render::responder_injects_views;
 use crate::render_forwarders::render_forwarders;
@@ -37,9 +37,9 @@ pub fn render_http(
     index: &AttributeIndex,
     has_views: bool,
     websocket_servers: &[String],
+    middleware_plans: &[MiddlewarePlan],
 ) -> Result<HttpArtifacts, HttpCodegenError> {
-    let middleware_plans = middleware_plans(index)?;
-    let table = http_routes(index, &middleware_plans)?;
+    let table = http_routes(index, middleware_plans)?;
 
     if !has_views {
         if let Some(route) = table.routes().find(|route| responder_injects_views(route)) {
@@ -56,13 +56,7 @@ pub fn render_http(
     }
 
     let servers = merge_websocket_servers(active_servers(&table), websocket_servers);
-    let mut modules = render(
-        &table,
-        &servers,
-        &middleware_plans,
-        has_views,
-        websocket_servers,
-    );
+    let mut modules = render(&table, &servers, has_views, websocket_servers);
 
     modules.extend(render_routes(&table, &servers));
     modules.extend(render_forwarders(&table, &servers));

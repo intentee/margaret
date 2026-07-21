@@ -8,6 +8,7 @@ use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
 use margaret_generated_module::generated_module_error::GeneratedModuleError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
+use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_model_codegen::model_codegen_error::ModelCodegenError;
 use margaret_service_codegen::service_codegen_error::ServiceCodegenError;
 use margaret_views_codegen::views_codegen_error::ViewsCodegenError;
@@ -37,6 +38,12 @@ pub enum CodegenError {
     Http {
         #[from]
         source: HttpCodegenError,
+    },
+
+    #[error("failed to generate the middleware: {source}")]
+    Middleware {
+        #[from]
+        source: MiddlewareCodegenError,
     },
 
     #[error("failed to generate the console: {source}")]

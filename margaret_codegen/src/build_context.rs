@@ -2,6 +2,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
+use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 
 use crate::capabilities::Capabilities;
 use crate::codegen_error::CodegenError;
@@ -13,6 +14,7 @@ pub(crate) struct BuildContext<'index> {
     capabilities: Capabilities,
     index: &'index AttributeIndex,
     metafile_contents: Option<String>,
+    middleware_plans: Vec<MiddlewarePlan>,
     module_tokens: Vec<GeneratedModuleTokens>,
     serve_arguments: Vec<ConsoleArgument>,
     servers: Vec<HttpServer>,
@@ -25,6 +27,7 @@ impl<'index> BuildContext<'index> {
             capabilities: Capabilities::detect(index, metafile_contents.is_some()),
             index,
             metafile_contents,
+            middleware_plans: Vec::new(),
             module_tokens: Vec::new(),
             serve_arguments: Vec::new(),
             servers: Vec::new(),
@@ -48,6 +51,10 @@ impl<'index> BuildContext<'index> {
         self.metafile_contents.as_deref()
     }
 
+    pub(crate) fn middleware_plans(&self) -> &[MiddlewarePlan] {
+        &self.middleware_plans
+    }
+
     pub(crate) fn into_generated_code(self) -> Result<GeneratedCode, CodegenError> {
         let mut modules = format_pass(self.module_tokens)?;
 
@@ -67,6 +74,10 @@ impl<'index> BuildContext<'index> {
 
     pub(crate) fn servers(&self) -> &[HttpServer] {
         &self.servers
+    }
+
+    pub(crate) fn set_middleware_plans(&mut self, middleware_plans: Vec<MiddlewarePlan>) {
+        self.middleware_plans = middleware_plans;
     }
 
     pub(crate) fn set_serve_arguments(&mut self, serve_arguments: Vec<ConsoleArgument>) {

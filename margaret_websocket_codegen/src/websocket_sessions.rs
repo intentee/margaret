@@ -5,6 +5,8 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::container_bindings::ContainerBindings;
+use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
 use margaret_request_binding_codegen::route_parameter_binders::route_parameter_binders;
@@ -26,6 +28,7 @@ fn returns_self(method: &IndexedMethod) -> bool {
 pub(crate) fn websocket_sessions(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
+    middleware_plans: &[MiddlewarePlan],
 ) -> Result<Vec<WebSocketSession>, WebSocketCodegenError> {
     let selector = AttributeSelector::from_marker("websocket_session");
     let binders = route_parameter_binders(index)?;
@@ -60,8 +63,10 @@ pub(crate) fn websocket_sessions(
             },
             &binders,
         )?;
+        let layers = resolve_layers(item, middleware_plans, &subject)?;
 
         sessions.push(WebSocketSession {
+            layers,
             module_name: identifier.field().to_string(),
             parameters,
             path,

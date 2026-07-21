@@ -9,6 +9,9 @@ use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_middleware_codegen::fold_layers::fold_layers;
+use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
+use margaret_request_binding_codegen::binding_shadows_request::binding_shadows_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
@@ -17,32 +20,10 @@ use margaret_request_binding_codegen::request_binding::RequestBinding;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
-use crate::middleware_plan::MiddlewarePlan;
 use crate::route_group::RouteGroup;
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
-}
-
-fn argument_needs_request(argument: &BoundParameter) -> bool {
-    !matches!(
-        argument.binding,
-        RequestBinding::AssetBag
-            | RequestBinding::Forwarder
-            | RequestBinding::Next
-            | RequestBinding::Routes
-            | RequestBinding::Views
-    )
-}
-
-fn holder_shadows_request(binding: &RequestBinding) -> bool {
-    matches!(
-        binding,
-        RequestBinding::Raw { .. }
-            | RequestBinding::Bound { .. }
-            | RequestBinding::FormRequest { .. }
-            | RequestBinding::PeerSpiffeId
-    )
 }
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
@@ -80,7 +61,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let mut allocator = NameAllocator::new();
 
     for argument in &route.arguments {
-        if holder_shadows_request(&argument.binding) {
+        if binding_shadows_request(&argument.binding) {
             allocator.reserve(&argument.holder.to_string());
         }
     }
@@ -89,7 +70,11 @@ fn onion(route: &HttpRoute) -> TokenStream {
         allocator.reserve(&field.to_string());
     }
 
-    let request_binding = if route.arguments.iter().any(argument_needs_request) {
+    let request_binding = if route
+        .arguments
+        .iter()
+        .any(|argument| binding_reads_request(&argument.binding))
+    {
         format_ident!("{}", allocator.allocate("request").field())
     } else {
         format_ident!("_request")
@@ -133,7 +118,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
         >
     };
 
-    let mut handler = if captures.is_empty() && !captures_routes && !captures_views {
+    let handler = if captures.is_empty() && !captures_routes && !captures_views {
         quote! {
             margaret_http::responder_handler::responder_handler(
                 #responder_access,
@@ -184,26 +169,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
         }
     };
 
-    for application in &route.layers {
-        let wrapper = &application.wrapper;
-        let field = &application.field;
-        let middleware_access = access(quote! { container.#field() });
-        let routes_init = application
-            .injects_routes
-            .then(|| quote! { routes: routes.clone(), });
-        let views_init = application
-            .injects_views
-            .then(|| quote! { views: views.clone(), });
-        let middleware_expr = quote! {
-            std::sync::Arc::new(super::#wrapper { inner: #middleware_access, #routes_init #views_init })
-        };
-
-        handler = quote! {
-            margaret_http::layer::layer(#middleware_expr, #handler)
-        };
-    }
-
-    handler
+    fold_layers(&route.layers, handler, &quote! { super::super::middleware })
 }
 
 fn argument_value(
@@ -251,101 +217,6 @@ fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
         .iter()
         .map(|field| format_ident!("{}", field))
         .collect()
-}
-
-fn middleware_argument_value(parameter: &BoundParameter, next_binding: &Ident) -> TokenStream {
-    match &parameter.binding {
-        RequestBinding::Next => quote! { #next_binding },
-        RequestBinding::Routes => quote! { &self.routes },
-        RequestBinding::Views => quote! { &self.views },
-        _ => {
-            let holder = &parameter.holder;
-
-            quote! { #holder }
-        }
-    }
-}
-
-fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
-    let injects_routes = plan.injects_routes();
-    let injects_views = plan.injects_views();
-    let MiddlewarePlan {
-        concrete,
-        parameters,
-        wrapper,
-        ..
-    } = plan;
-    let concrete = path_tokens(concrete);
-    let routes_field =
-        injects_routes.then(|| quote! { routes: std::sync::Arc<super::routes::Routes>, });
-    let views_field =
-        injects_views.then(|| quote! { views: std::sync::Arc<super::views::Views>, });
-
-    let mut allocator = NameAllocator::new();
-
-    for parameter in parameters {
-        if holder_shadows_request(&parameter.binding) {
-            allocator.reserve(&parameter.holder.to_string());
-        }
-    }
-
-    let request_binding = if parameters.iter().any(argument_needs_request) {
-        format_ident!("{}", allocator.allocate("request").field())
-    } else {
-        format_ident!("_request")
-    };
-
-    for parameter in parameters {
-        if matches!(parameter.binding, RequestBinding::CurrentRequest) {
-            allocator.reserve(&parameter.holder.to_string());
-        }
-    }
-
-    let next_binding = if parameters
-        .iter()
-        .any(|parameter| matches!(parameter.binding, RequestBinding::Next))
-    {
-        format_ident!("{}", allocator.allocate("next").field())
-    } else {
-        format_ident!("_next")
-    };
-
-    let error_return = quote! { return response.into() };
-    let binder_owner = TokenStream::new();
-    let extractions = parameters.iter().map(|parameter| {
-        render_request_extraction(
-            &parameter.binding,
-            &parameter.holder,
-            &ExtractionContext {
-                binder_owner: &binder_owner,
-                error_return: &error_return,
-                request_local: &request_binding,
-            },
-        )
-    });
-    let call_arguments = parameters
-        .iter()
-        .map(|parameter| middleware_argument_value(parameter, &next_binding));
-
-    quote! {
-        struct #wrapper {
-            inner: std::sync::Arc<#concrete>,
-            #routes_field
-            #views_field
-        }
-
-        #[async_trait::async_trait]
-        impl margaret_http::http_middleware::HttpMiddleware for #wrapper {
-            async fn process(
-                &self,
-                #request_binding: &margaret_http::request::Request,
-                #next_binding: margaret_http::next::Next,
-            ) -> margaret_http::response_continuation::ResponseContinuation {
-                #(#extractions)*
-                self.inner.process(#(#call_arguments),*).await
-            }
-        }
-    }
 }
 
 fn server_module(
@@ -460,11 +331,9 @@ fn server_module(
 pub(crate) fn render(
     table: &HttpRouteTable,
     servers: &[HttpServer],
-    middleware_plans: &[MiddlewarePlan],
     has_views: bool,
     websocket_servers: &[String],
 ) -> Vec<GeneratedModuleTokens> {
-    let middleware_wrappers = middleware_plans.iter().map(middleware_wrapper);
     let server_declarations = servers.iter().map(|server| {
         let function_name = server.function_name();
 
@@ -476,7 +345,6 @@ pub(crate) fn render(
 
     let http_tokens = quote! {
         #(#server_declarations)*
-        #(#middleware_wrappers)*
     };
 
     let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];

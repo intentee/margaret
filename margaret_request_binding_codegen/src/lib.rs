@@ -1,4 +1,6 @@
 pub mod binding_context;
+pub mod binding_reads_request;
+pub mod binding_shadows_request;
 pub mod bound_parameter;
 pub mod classify_parameters;
 pub mod extraction_context;

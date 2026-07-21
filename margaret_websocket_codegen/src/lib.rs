@@ -32,6 +32,7 @@ mod tests {
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_middleware_codegen::middleware_plans::middleware_plans;
 
     use crate::has_websocket_sessions::has_websocket_sessions;
     use crate::render_websocket::render_websocket;
@@ -151,8 +152,9 @@ impl RespondsToWebSocketNotification for Typist {
 
     fn generated_with_views(source: &str, has_views: bool) -> String {
         let index = index_for(source);
+        let plans = middleware_plans(&index).expect("the middleware plans are collected");
 
-        render_websocket(&index, &bindings(&index), has_views)
+        render_websocket(&index, &bindings(&index), has_views, &plans)
             .expect("the websocket module is generated")
             .modules
             .into_iter()
@@ -170,9 +172,86 @@ impl RespondsToWebSocketNotification for Typist {
 
     fn error(source: &str) -> WebSocketCodegenError {
         let index = index_for(source);
+        let plans = middleware_plans(&index).expect("the middleware plans are collected");
 
-        render_websocket(&index, &bindings(&index), false)
+        render_websocket(&index, &bindings(&index), false, &plans)
             .expect_err("the websocket module is rejected")
+    }
+
+    const SESSION_WITH_MIDDLEWARE: &str = r#"
+use margaret_http::next::Next;
+use margaret_http::request::Request;
+
+#[websocket_session(path = "/room", server = "public")]
+#[middleware(guard)]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[handles_middleware_attribute(attribute = guard)]
+struct Guard;
+
+impl Guard {
+    #[process]
+    fn process(&self, request: &Request, next: Next) -> ResponseContinuation {}
+}
+"#;
+
+    const SESSION_WITH_ROUTES_MIDDLEWARE: &str = r#"
+use crate::margaret::routes::Routes;
+use margaret_http::next::Next;
+use margaret_http::request::Request;
+
+#[websocket_session(path = "/room", server = "public")]
+#[middleware(traced)]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[handles_middleware_attribute(attribute = traced)]
+struct Tracer;
+
+impl Tracer {
+    #[process]
+    fn process(&self, request: &Request, next: Next, routes: &Routes) -> ResponseContinuation {}
+}
+"#;
+
+    #[test]
+    fn carries_its_middleware_on_the_route_entry() {
+        let source = generated(SESSION_WITH_MIDDLEWARE);
+
+        assert!(source.contains("margaret_http::route_entry::RouteEntry::web_socket("));
+        assert!(source.contains(
+            "middleware.push(std::sync::Arc::new(super::middleware::Guard{inner:container.guard().await"
+        ));
+        assert!(!source.contains("GatedWebSocketUpgrade"));
+    }
+
+    #[test]
+    fn rejects_a_session_with_an_unknown_middleware_tag() {
+        assert!(
+            error(
+                "#[websocket_session(path = \"/room\", server = \"public\")]\n#[middleware(missing)]\nstruct Room;\n\nimpl Room {\n    #[build_for_session]\n    fn build() -> Self {}\n}\n"
+            )
+            .to_string()
+            .contains("no #[handles_middleware_attribute] handles it")
+        );
+    }
+
+    #[test]
+    fn threads_routes_when_only_a_middleware_injects_them() {
+        let source = generated(SESSION_WITH_ROUTES_MIDDLEWARE);
+
+        assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
+        assert!(source.contains("super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"));
+        assert!(source.contains("upgrade_entry(container)"));
     }
 
     #[test]

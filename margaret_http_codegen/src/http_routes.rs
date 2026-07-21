@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use quote::format_ident;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_attributes::format_path::format_path;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_injection_codegen::process_method::process_method;
+use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
 use margaret_request_binding_codegen::route_parameter_binders::route_parameter_binders;
@@ -17,8 +17,6 @@ use crate::http_codegen_error::HttpCodegenError;
 use crate::http_responder_arguments::HttpResponderArguments;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
-use crate::layer_application::LayerApplication;
-use crate::middleware_plan::MiddlewarePlan;
 
 pub(crate) fn http_routes(
     index: &AttributeIndex,
@@ -26,7 +24,6 @@ pub(crate) fn http_routes(
 ) -> Result<HttpRouteTable, HttpCodegenError> {
     let selector = AttributeSelector::from_marker("responds_to_http");
     let binders = route_parameter_binders(index)?;
-    let middleware_selector = AttributeSelector::from_marker("middleware");
     let mut table = HttpRouteTable::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
 
@@ -54,38 +51,9 @@ pub(crate) fn http_routes(
             });
         }
 
-        let mut layers = Vec::new();
-
-        for matched in AttributeQuery::new(item).find_all(&middleware_selector) {
-            let arguments = matched.args()?;
-            let (Some(tag), None) = (arguments.positional_path(0), arguments.positional(1)) else {
-                return Err(HttpCodegenError::MalformedMiddleware {
-                    responder: responder.clone(),
-                });
-            };
-            let Some(plan) = middleware_plans
-                .iter()
-                .find(|plan| plan.selector.matches(tag))
-            else {
-                return Err(HttpCodegenError::UnknownMiddleware {
-                    responder: responder.clone(),
-                    tag: format_path(tag),
-                });
-            };
-
-            layers.push(LayerApplication {
-                field: plan.field.clone(),
-                injects_peer_spiffe_id: plan.injects_peer_spiffe_id(),
-                injects_routes: plan.injects_routes(),
-                injects_views: plan.injects_views(),
-                wrapper: plan.wrapper.clone(),
-            });
-        }
-
-        layers.reverse();
-
-        let route_path = RoutePath::parse(&path);
         let subject = format!("responder '{responder}'");
+        let layers = resolve_layers(item, middleware_plans, &subject)?;
+        let route_path = RoutePath::parse(&path);
         let handler_method = process_method(item)?;
         let arguments = classify_parameters(
             index,

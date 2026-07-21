@@ -11,6 +11,7 @@ margaret_console_codegen = { path = "../margaret_console_codegen" }
 margaret_container = { path = "../margaret_container" }
 margaret_generated_module = { path = "../margaret_generated_module" }
 margaret_http_codegen = { path = "../margaret_http_codegen" }
+margaret_middleware_codegen = { path = "../margaret_middleware_codegen" }
 margaret_model_codegen = { path = "../margaret_model_codegen" }
 margaret_service_codegen = { path = "../margaret_service_codegen" }
 margaret_views_codegen = { path = "../margaret_views_codegen" }

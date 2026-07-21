@@ -4,13 +4,17 @@ use std::sync::Arc;
 use matchit::InsertError;
 
 use crate::handler::Handler;
+use crate::http_middleware::HttpMiddleware;
 use crate::method_handler::MethodHandler;
 use crate::route_entry::RouteEntry;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
 enum RouteTarget {
     Http(HashMap<&'static str, Arc<dyn Handler>>),
-    WebSocket(Arc<dyn WebSocketUpgrade>),
+    WebSocket {
+        middleware: Vec<Arc<dyn HttpMiddleware>>,
+        upgrade: Arc<dyn WebSocketUpgrade>,
+    },
 }
 
 pub(crate) enum RequestRoute {
@@ -22,12 +26,15 @@ pub(crate) enum RequestRoute {
     NotFound,
 }
 
+pub(crate) struct UpgradeRoute {
+    pub(crate) middleware: Vec<Arc<dyn HttpMiddleware>>,
+    pub(crate) path_params: HashMap<String, String>,
+    pub(crate) upgrade: Arc<dyn WebSocketUpgrade>,
+}
+
 pub(crate) enum RouteResolution {
     Request(RequestRoute),
-    Upgrade {
-        path_params: HashMap<String, String>,
-        upgrade: Arc<dyn WebSocketUpgrade>,
-    },
+    Upgrade(UpgradeRoute),
 }
 
 pub struct Router {
@@ -51,8 +58,18 @@ impl Router {
                         ),
                     )?;
                 }
-                RouteEntry::WebSocket { path, upgrade } => {
-                    matcher.insert(path, RouteTarget::WebSocket(upgrade))?;
+                RouteEntry::WebSocket {
+                    middleware,
+                    path,
+                    upgrade,
+                } => {
+                    matcher.insert(
+                        path,
+                        RouteTarget::WebSocket {
+                            middleware,
+                            upgrade,
+                        },
+                    )?;
                 }
             }
         }
@@ -81,12 +98,16 @@ impl Router {
                 }),
                 None => RouteResolution::Request(RequestRoute::MethodNotAllowed),
             },
-            RouteTarget::WebSocket(upgrade) => {
+            RouteTarget::WebSocket {
+                middleware,
+                upgrade,
+            } => {
                 if method == "GET" {
-                    RouteResolution::Upgrade {
+                    RouteResolution::Upgrade(UpgradeRoute {
+                        middleware: middleware.clone(),
                         path_params,
                         upgrade: upgrade.clone(),
-                    }
+                    })
                 } else {
                     RouteResolution::Request(RequestRoute::MethodNotAllowed)
                 }

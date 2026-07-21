@@ -7,6 +7,7 @@ pub(crate) fn umbrella(
         has_asset_bag,
         has_console,
         has_http,
+        has_middleware,
         has_models,
         has_views,
         has_websockets,
@@ -24,6 +25,10 @@ pub(crate) fn umbrella(
         source.push_str("#[rustfmt::skip]\npub mod forwarders;\n");
         source.push_str("#[rustfmt::skip]\npub mod http;\n");
         source.push_str("#[rustfmt::skip]\npub mod routes;\n");
+    }
+
+    if has_middleware && serves_http {
+        source.push_str("#[rustfmt::skip]\npub mod middleware;\n");
     }
 
     if has_websockets {

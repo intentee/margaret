@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_injection_codegen::injection_error::InjectionError;
+use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 
 #[derive(Debug, Error)]
@@ -23,6 +24,12 @@ pub enum HttpCodegenError {
     Binding {
         #[from]
         source: RequestBindingError,
+    },
+
+    #[error(transparent)]
+    Middleware {
+        #[from]
+        source: MiddlewareCodegenError,
     },
 
     #[error("#[responds_to_http] is only supported on structs, but '{target}' is not a struct")]

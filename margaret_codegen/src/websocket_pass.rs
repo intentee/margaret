@@ -15,6 +15,7 @@ pub(crate) fn websocket_pass(
         context.index(),
         bindings,
         context.capabilities().has_views,
+        context.middleware_plans(),
     )?;
 
     context.set_websocket_servers(artifacts.servers);
