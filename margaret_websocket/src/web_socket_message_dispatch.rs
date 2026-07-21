@@ -14,7 +14,6 @@ pub trait WebSocketMessageDispatch<Session>: Send + Sync {
         cancellation_token: CancellationToken,
         session: Arc<Session>,
         id: RequestId,
-        method: String,
         params: Value,
         socket: WebSocket,
     );

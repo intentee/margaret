@@ -7,7 +7,7 @@ pub struct OutboundResponse<Payload> {
     pub id: RequestId,
     #[serde(rename = "done")]
     pub is_done: bool,
-    pub method: String,
+    pub method: &'static str,
     #[serde(rename = "result")]
     pub payload: Payload,
 }

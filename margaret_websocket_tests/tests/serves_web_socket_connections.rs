@@ -15,9 +15,12 @@ async fn streams_a_request_across_many_frames() {
 
     assert!(chunk.contains("thinking about cats"));
     assert!(chunk.contains("\"done\":false"));
+    assert!(chunk.contains("\"method\":\"response_chunk\""));
     assert!(terminal.contains("\"done\":true"));
     assert!(terminal.contains("\"id\":1"));
-    assert!(terminal.contains("\"method\":\"conversation_message\""));
+    assert!(terminal.contains("\"method\":\"storyboard_complete\""));
+    assert!(!chunk.contains("\"method\":\"conversation_message\""));
+    assert!(!terminal.contains("\"method\":\"conversation_message\""));
 
     harness.cancellation_token.cancel();
     harness.driver.await.expect("the driver finishes");
@@ -36,6 +39,7 @@ async fn answers_a_single_response_request_with_a_string_id() {
     assert!(response.contains("pong here"));
     assert!(response.contains("\"id\":\"abc\""));
     assert!(response.contains("\"done\":true"));
+    assert!(response.contains("\"method\":\"response_chunk\""));
 
     harness.cancellation_token.cancel();
     harness.driver.await.expect("the driver finishes");

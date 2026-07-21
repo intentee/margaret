@@ -215,7 +215,6 @@ fn render_request_dispatch(binding: &HandlerBinding, session_path: &TokenStream)
                 cancellation_token: tokio_util::sync::CancellationToken,
                 session: ::std::sync::Arc<#session_path>,
                 id: margaret_websocket::request_id::RequestId,
-                method: ::std::string::String,
                 params: serde_json::Value,
                 socket: margaret_websocket::web_socket::WebSocket,
             ) {
@@ -224,7 +223,6 @@ fn render_request_dispatch(binding: &HandlerBinding, session_path: &TokenStream)
                     cancellation_token,
                     session,
                     id,
-                    method,
                     params,
                     socket,
                 )

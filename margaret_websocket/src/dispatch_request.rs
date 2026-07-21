@@ -20,7 +20,6 @@ pub async fn dispatch_request<Handler>(
     cancellation_token: CancellationToken,
     session: Arc<Handler::Session>,
     id: RequestId,
-    method: String,
     params: Value,
     socket: WebSocket,
 ) where
@@ -29,7 +28,7 @@ pub async fn dispatch_request<Handler>(
 {
     match validate_json::<Handler::Message>(Some(&params)) {
         ValidationResult::Valid(message) => {
-            let envelope = Handler::Message::envelope(id, method, message);
+            let envelope = Handler::Message::envelope(id, message);
 
             report_send_failure(
                 handler
