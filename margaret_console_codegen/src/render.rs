@@ -1,4 +1,6 @@
+use proc_macro2::Ident;
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
 
 use margaret_console_argument_codegen::argument_registration::argument_registration;
@@ -40,7 +42,7 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
     }
 }
 
-fn command_arm(command: &ConsoleCommand) -> TokenStream {
+fn command_arm(command: &ConsoleCommand, container: &Ident) -> TokenStream {
     let name = &command.name;
     let accessor = &command.accessor;
     let matches_binding = if command.arguments.is_empty() {
@@ -49,7 +51,7 @@ fn command_arm(command: &ConsoleCommand) -> TokenStream {
         quote! { matches }
     };
     let values = command.arguments.iter().map(argument_value);
-    let accessor_access = quote! { container.#accessor().await };
+    let accessor_access = quote! { #container.#accessor().await };
 
     if command.takes_token {
         quote! {
@@ -78,8 +80,15 @@ pub(crate) fn render(
     servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
 ) -> TokenStream {
+    let container = if !commands.is_empty() || serves {
+        format_ident!("container")
+    } else {
+        format_ident!("_container")
+    };
     let subcommands = commands.iter().map(subcommand_registration);
-    let arms = commands.iter().map(command_arm);
+    let arms = commands
+        .iter()
+        .map(|command| command_arm(command, &container));
 
     let schema_registration = if has_models {
         quote! {
@@ -135,7 +144,7 @@ pub(crate) fn render(
             Some(("serve", matches)) => {
                 margaret_service::dispatch_serve::dispatch_serve(
                     margaret_service::install::install,
-                    |cancellation_token| super::serve::serve(container, matches, cancellation_token),
+                    |cancellation_token| super::serve::serve(#container, matches, cancellation_token),
                 )
                 .await
             }
@@ -146,7 +155,7 @@ pub(crate) fn render(
 
     quote! {
         pub async fn run<Arguments, Argument>(
-            container: &super::container::Container,
+            #container: &super::container::Container,
             args: Arguments,
         ) -> margaret_console::command_outcome::CommandOutcome
         where

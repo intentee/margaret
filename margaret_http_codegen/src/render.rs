@@ -24,16 +24,6 @@ fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
 }
 
-fn argument_needs_request(argument: &BoundParameter) -> bool {
-    !matches!(
-        argument.binding,
-        RequestBinding::Routes
-            | RequestBinding::Forwarder
-            | RequestBinding::Views
-            | RequestBinding::AssetBag
-    )
-}
-
 fn holder_shadows_request(binding: &RequestBinding) -> bool {
     matches!(
         binding,
@@ -84,7 +74,11 @@ fn onion(route: &HttpRoute) -> TokenStream {
         allocator.reserve(&field.to_string());
     }
 
-    let request_binding = if route.arguments.iter().any(argument_needs_request) {
+    let request_binding = if route
+        .arguments
+        .iter()
+        .any(|argument| argument.binding.references_request())
+    {
         format_ident!("{}", allocator.allocate("request").field())
     } else {
         format_ident!("_request")
