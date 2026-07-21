@@ -1,8 +1,8 @@
 use crate::on_delete::OnDelete;
 
 pub struct ForeignKey {
-    pub columns: Vec<String>,
+    pub column: String,
     pub on_delete: OnDelete,
-    pub references_columns: Vec<String>,
+    pub references_column: String,
     pub references_table: String,
 }

@@ -10,6 +10,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_console_codegen \
 	-p margaret_container \
 	-p margaret_container_tests \
+	-p margaret_foreign_key_naming \
 	-p margaret_generated_module \
 	-p margaret_http \
 	-p margaret_http_codegen \
@@ -31,6 +32,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_peer_identity_tests \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_codegen \
+	-p margaret_schema_identifier \
+	-p margaret_schema_index_naming \
 	-p margaret_service \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
@@ -83,6 +86,7 @@ coverage: node_modules
 		--gated margaret_console_codegen=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_tests=100 \
+		--gated margaret_foreign_key_naming=100 \
 		--gated margaret_generated_module=100 \
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \
@@ -104,6 +108,8 @@ coverage: node_modules
 		--gated margaret_peer_identity_tests=100 \
 		--gated margaret_request_binding_codegen=100 \
 		--gated margaret_route_parameter_codegen=100 \
+		--gated margaret_schema_identifier=100 \
+		--gated margaret_schema_index_naming=100 \
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \

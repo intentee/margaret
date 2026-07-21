@@ -1,6 +1,7 @@
 use crate::column::Column;
 use crate::column_default::ColumnDefault;
 use crate::foreign_key::ForeignKey;
+use crate::index::Index;
 use crate::on_delete::OnDelete;
 use crate::schema::Schema;
 use crate::table::Table;
@@ -40,9 +41,9 @@ fn render_column(column: &Column) -> String {
 fn render_foreign_key(foreign_key: &ForeignKey) -> String {
     let mut definition = format!(
         "FOREIGN KEY ({}) REFERENCES {} ({})",
-        quote_identifier_list(&foreign_key.columns),
+        quote_identifier(&foreign_key.column),
         quote_identifier(&foreign_key.references_table),
-        quote_identifier_list(&foreign_key.references_columns)
+        quote_identifier(&foreign_key.references_column)
     );
 
     match foreign_key.on_delete {
@@ -56,8 +57,20 @@ fn render_foreign_key(foreign_key: &ForeignKey) -> String {
     definition
 }
 
+fn render_index(table_name: &str, index: &Index) -> String {
+    format!(
+        "CREATE INDEX {} ON {} ({});",
+        quote_identifier(&index.name),
+        quote_identifier(table_name),
+        quote_identifier(&index.column)
+    )
+}
+
 fn render_unique_constraint(unique_constraint: &UniqueConstraint) -> String {
-    format!("UNIQUE ({})", quote_identifier_list(&unique_constraint.columns))
+    format!(
+        "UNIQUE ({})",
+        quote_identifier_list(&unique_constraint.columns)
+    )
 }
 
 fn render_table(table: &Table) -> String {
@@ -86,17 +99,34 @@ fn render_table(table: &Table) -> String {
     foreign_key_lines.sort();
     lines.extend(foreign_key_lines);
 
-    if lines.is_empty() {
-        return format!("CREATE TABLE {name} ();");
+    let table_statement = if lines.is_empty() {
+        format!("CREATE TABLE {name} ();")
+    } else {
+        let body = lines
+            .iter()
+            .map(|line| format!("    {line}"))
+            .collect::<Vec<String>>()
+            .join(",\n");
+
+        format!("CREATE TABLE {name} (\n{body}\n);")
+    };
+
+    let mut index_statements: Vec<String> = table
+        .indexes
+        .iter()
+        .map(|index| render_index(&table.name, index))
+        .collect();
+
+    index_statements.sort();
+
+    if index_statements.is_empty() {
+        return table_statement;
     }
 
-    let body = lines
-        .iter()
-        .map(|line| format!("    {line}"))
-        .collect::<Vec<String>>()
-        .join(",\n");
+    let mut statements = vec![table_statement];
+    statements.extend(index_statements);
 
-    format!("CREATE TABLE {name} (\n{body}\n);")
+    statements.join("\n\n")
 }
 
 #[must_use]
@@ -115,6 +145,7 @@ mod tests {
     use crate::column_default::ColumnDefault;
     use crate::column_type::ColumnType;
     use crate::foreign_key::ForeignKey;
+    use crate::index::Index;
     use crate::on_delete::OnDelete;
     use crate::render_postgres::render_postgres;
     use crate::schema::Schema;
@@ -136,19 +167,23 @@ mod tests {
     }
 
     fn foreign_key(
-        columns: &[&str],
-        references_columns: &[&str],
+        column: &str,
+        references_column: &str,
         references_table: &str,
         on_delete: OnDelete,
     ) -> ForeignKey {
         ForeignKey {
-            columns: columns.iter().map(|column| column.to_string()).collect(),
+            column: column.to_string(),
             on_delete,
-            references_columns: references_columns
-                .iter()
-                .map(|column| column.to_string())
-                .collect(),
+            references_column: references_column.to_string(),
             references_table: references_table.to_string(),
+        }
+    }
+
+    fn index(column: &str, name: &str) -> Index {
+        Index {
+            column: column.to_string(),
+            name: name.to_string(),
         }
     }
 
@@ -171,6 +206,7 @@ mod tests {
                     column("note", ColumnType::Text, true, ColumnDefault::NotSet),
                 ],
                 foreign_keys: Vec::new(),
+                indexes: Vec::new(),
                 name: "things".to_string(),
                 primary_key: vec!["id".to_string()],
                 unique_constraints: Vec::new(),
@@ -194,6 +230,7 @@ mod tests {
                     ColumnDefault::NotSet,
                 )],
                 foreign_keys: Vec::new(),
+                indexes: Vec::new(),
                 name: "events".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: Vec::new(),
@@ -210,8 +247,14 @@ mod tests {
     fn renders_a_bytea_column() {
         let schema = Schema {
             tables: vec![Table {
-                columns: vec![column("data", ColumnType::Bytea, false, ColumnDefault::NotSet)],
+                columns: vec![column(
+                    "data",
+                    ColumnType::Bytea,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
                 foreign_keys: Vec::new(),
+                indexes: Vec::new(),
                 name: "files".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: Vec::new(),
@@ -233,6 +276,7 @@ mod tests {
                     column("right", ColumnType::Uuid, false, ColumnDefault::UuidV7),
                 ],
                 foreign_keys: Vec::new(),
+                indexes: Vec::new(),
                 name: "pairs".to_string(),
                 primary_key: vec!["left".to_string(), "right".to_string()],
                 unique_constraints: Vec::new(),
@@ -254,6 +298,7 @@ mod tests {
                     column("email", ColumnType::Text, false, ColumnDefault::NotSet),
                 ],
                 foreign_keys: Vec::new(),
+                indexes: Vec::new(),
                 name: "users".to_string(),
                 primary_key: vec!["id".to_string()],
                 unique_constraints: vec![unique_constraint(&["email"])],
@@ -276,11 +321,12 @@ mod tests {
                     column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
                 ],
                 foreign_keys: vec![foreign_key(
-                    &["author_id"],
-                    &["id"],
+                    "author_id",
+                    "id",
                     "authors",
                     OnDelete::NoAction,
                 )],
+                indexes: Vec::new(),
                 name: "line_items".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: vec![unique_constraint(&["region", "number"])],
@@ -300,6 +346,7 @@ mod tests {
                 Table {
                     columns: vec![column("id", ColumnType::Text, false, ColumnDefault::NotSet)],
                     foreign_keys: Vec::new(),
+                    indexes: Vec::new(),
                     name: "first".to_string(),
                     primary_key: Vec::new(),
                     unique_constraints: Vec::new(),
@@ -307,6 +354,7 @@ mod tests {
                 Table {
                     columns: vec![column("id", ColumnType::Text, false, ColumnDefault::NotSet)],
                     foreign_keys: Vec::new(),
+                    indexes: Vec::new(),
                     name: "second".to_string(),
                     primary_key: Vec::new(),
                     unique_constraints: Vec::new(),
@@ -326,6 +374,7 @@ mod tests {
             tables: vec![Table {
                 columns: Vec::new(),
                 foreign_keys: Vec::new(),
+                indexes: Vec::new(),
                 name: "empty".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: Vec::new(),
@@ -344,7 +393,13 @@ mod tests {
                     column("title", ColumnType::Text, false, ColumnDefault::NotSet),
                     column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
                 ],
-                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::NoAction)],
+                foreign_keys: vec![foreign_key(
+                    "author_id",
+                    "id",
+                    "authors",
+                    OnDelete::NoAction,
+                )],
+                indexes: Vec::new(),
                 name: "articles".to_string(),
                 primary_key: vec!["id".to_string()],
                 unique_constraints: Vec::new(),
@@ -358,42 +413,6 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_composite_foreign_key() {
-        let schema = Schema {
-            tables: vec![Table {
-                columns: vec![
-                    column(
-                        "order_region",
-                        ColumnType::Text,
-                        false,
-                        ColumnDefault::NotSet,
-                    ),
-                    column(
-                        "order_number",
-                        ColumnType::BigInt,
-                        false,
-                        ColumnDefault::NotSet,
-                    ),
-                ],
-                foreign_keys: vec![foreign_key(
-                    &["order_region", "order_number"],
-                    &["region", "number"],
-                    "orders",
-                    OnDelete::NoAction,
-                )],
-                name: "line_items".to_string(),
-                primary_key: Vec::new(),
-                unique_constraints: Vec::new(),
-            }],
-        };
-
-        assert_eq!(
-            render_postgres(&schema),
-            "CREATE TABLE \"line_items\" (\n    \"order_region\" TEXT NOT NULL,\n    \"order_number\" BIGINT NOT NULL,\n    FOREIGN KEY (\"order_region\", \"order_number\") REFERENCES \"orders\" (\"region\", \"number\")\n);"
-        );
-    }
-
-    #[test]
     fn renders_a_nullable_foreign_key_column() {
         let schema = Schema {
             tables: vec![Table {
@@ -403,7 +422,13 @@ mod tests {
                     true,
                     ColumnDefault::NotSet,
                 )],
-                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::NoAction)],
+                foreign_keys: vec![foreign_key(
+                    "author_id",
+                    "id",
+                    "authors",
+                    OnDelete::NoAction,
+                )],
+                indexes: Vec::new(),
                 name: "posts".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: Vec::new(),
@@ -425,9 +450,10 @@ mod tests {
                     column("editor_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
                 ],
                 foreign_keys: vec![
-                    foreign_key(&["editor_id"], &["id"], "users", OnDelete::NoAction),
-                    foreign_key(&["author_id"], &["id"], "users", OnDelete::NoAction),
+                    foreign_key("editor_id", "id", "users", OnDelete::NoAction),
+                    foreign_key("author_id", "id", "users", OnDelete::NoAction),
                 ],
+                indexes: Vec::new(),
                 name: "docs".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: Vec::new(),
@@ -444,8 +470,14 @@ mod tests {
     fn renders_on_delete_cascade() {
         let schema = Schema {
             tables: vec![Table {
-                columns: vec![column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet)],
-                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::Cascade)],
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key("author_id", "id", "authors", OnDelete::Cascade)],
+                indexes: Vec::new(),
                 name: "posts".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: Vec::new(),
@@ -462,8 +494,19 @@ mod tests {
     fn renders_on_delete_restrict() {
         let schema = Schema {
             tables: vec![Table {
-                columns: vec![column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet)],
-                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::Restrict)],
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key(
+                    "author_id",
+                    "id",
+                    "authors",
+                    OnDelete::Restrict,
+                )],
+                indexes: Vec::new(),
                 name: "posts".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: Vec::new(),
@@ -480,8 +523,14 @@ mod tests {
     fn renders_on_delete_set_null() {
         let schema = Schema {
             tables: vec![Table {
-                columns: vec![column("author_id", ColumnType::Uuid, true, ColumnDefault::NotSet)],
-                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::SetNull)],
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    true,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key("author_id", "id", "authors", OnDelete::SetNull)],
+                indexes: Vec::new(),
                 name: "posts".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: Vec::new(),
@@ -498,8 +547,19 @@ mod tests {
     fn renders_on_delete_set_default() {
         let schema = Schema {
             tables: vec![Table {
-                columns: vec![column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet)],
-                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::SetDefault)],
+                columns: vec![column(
+                    "author_id",
+                    ColumnType::Uuid,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: vec![foreign_key(
+                    "author_id",
+                    "id",
+                    "authors",
+                    OnDelete::SetDefault,
+                )],
+                indexes: Vec::new(),
                 name: "posts".to_string(),
                 primary_key: Vec::new(),
                 unique_constraints: Vec::new(),
@@ -509,6 +569,63 @@ mod tests {
         assert_eq!(
             render_postgres(&schema),
             "CREATE TABLE \"posts\" (\n    \"author_id\" UUID NOT NULL,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\") ON DELETE SET DEFAULT\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_single_column_index() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![
+                    column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                    column(
+                        "created_at",
+                        ColumnType::Timestamptz,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
+                ],
+                foreign_keys: Vec::new(),
+                indexes: vec![index("created_at", "articles_created_at_index")],
+                name: "articles".to_string(),
+                primary_key: vec!["id".to_string()],
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"articles\" (\n    \"id\" UUID NOT NULL DEFAULT uuidv7(),\n    \"created_at\" TIMESTAMPTZ NOT NULL,\n    PRIMARY KEY (\"id\")\n);\n\nCREATE INDEX \"articles_created_at_index\" ON \"articles\" (\"created_at\");"
+        );
+    }
+
+    #[test]
+    fn renders_indexes_in_a_deterministic_order() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![
+                    column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
+                    column(
+                        "created_at",
+                        ColumnType::Timestamptz,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
+                ],
+                foreign_keys: Vec::new(),
+                indexes: vec![
+                    index("created_at", "articles_created_at_index"),
+                    index("author_id", "articles_author_id_index"),
+                ],
+                name: "articles".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"articles\" (\n    \"author_id\" UUID NOT NULL,\n    \"created_at\" TIMESTAMPTZ NOT NULL\n);\n\nCREATE INDEX \"articles_author_id_index\" ON \"articles\" (\"author_id\");\n\nCREATE INDEX \"articles_created_at_index\" ON \"articles\" (\"created_at\");"
         );
     }
 }
