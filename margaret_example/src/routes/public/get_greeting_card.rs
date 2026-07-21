@@ -30,7 +30,7 @@ impl GetGreetingCard {
             200,
             views.greeting_view.render(GreetingViewProps {
                 greeting: self.greeter.greet(),
-                home_url: routes.public.get_greeting.url(),
+                routes,
             }),
         )
     }

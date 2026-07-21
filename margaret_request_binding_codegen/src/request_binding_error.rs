@@ -54,7 +54,7 @@ pub enum RequestBindingError {
     FormRequestMissingSource { subject: String, parameter: String },
 
     #[error(
-        "form request argument #{parameter} of {subject} names an unknown request input source '{written}'; expected Form, Query, or Json"
+        "form request argument #{parameter} of {subject} names an unknown request input source '{written}'; expected Form, Query, Json, or Cookie"
     )]
     UnknownRequestInput {
         subject: String,
@@ -63,7 +63,7 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "form request argument #{parameter} of {subject} reads the request body via '{input_source}', but a WebSocket upgrade handshake has no body; only `from = Query` is available"
+        "form request argument #{parameter} of {subject} reads the request body via '{input_source}', but a WebSocket upgrade handshake has no body; only `from = Query` or `from = Cookie` is available"
     )]
     FormRequestBodyUnavailable {
         subject: String,

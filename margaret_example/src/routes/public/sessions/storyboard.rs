@@ -41,7 +41,7 @@ impl StoryboardSession {
             .greeting_view
             .render(GreetingViewProps {
                 greeting: greeter.greet(),
-                home_url: routes.public.get_greeting.url(),
+                routes,
             })
             .into_string();
         let article_title = match filters.author {

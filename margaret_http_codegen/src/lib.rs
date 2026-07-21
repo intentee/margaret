@@ -1171,6 +1171,15 @@ impl GetMetrics {
     }
 
     #[test]
+    fn injects_a_form_request_from_the_cookie_source() {
+        let source = source_for(
+            "use margaret_validation::validation_result::ValidationResult;\n\n#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] data: ValidationResult<Data>) -> Response {}\n}\n",
+        );
+
+        assert!(source.contains("margaret_http_validation::request_input::RequestInput::Cookie"));
+    }
+
+    #[test]
     fn rejects_a_form_request_without_a_source() {
         let message = error_for(
             "#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request] data: ValidationResult<Data>) -> Response {}\n}\n",
@@ -1182,10 +1191,10 @@ impl GetMetrics {
     #[test]
     fn rejects_a_form_request_with_an_unknown_source() {
         let message = error_for(
-            "#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookies)] data: ValidationResult<Data>) -> Response {}\n}\n",
+            "#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Headers)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("unknown request input source 'Cookies'"));
+        assert!(message.contains("unknown request input source 'Headers'"));
     }
 
     #[test]

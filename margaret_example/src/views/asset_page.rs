@@ -25,9 +25,9 @@ impl AssetPage {
 }
 
 impl RendersView for AssetPage {
-    type Props = AssetPageProps;
+    type Props<'props> = AssetPageProps;
 
-    fn render(&self, AssetPageProps { asset_bag }: AssetPageProps) -> Markup {
+    fn render(&self, AssetPageProps { asset_bag }: Self::Props<'_>) -> Markup {
         let body = self.showcase.render(AssetShowcaseProps {
             asset_bag: asset_bag.clone(),
         });

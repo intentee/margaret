@@ -1,11 +1,21 @@
 use crate::column::Column;
 use crate::column_default::ColumnDefault;
 use crate::foreign_key::ForeignKey;
+use crate::on_delete::OnDelete;
 use crate::schema::Schema;
 use crate::table::Table;
+use crate::unique_constraint::UniqueConstraint;
 
 fn quote_identifier(identifier: &str) -> String {
     format!("\"{identifier}\"")
+}
+
+fn quote_identifier_list(identifiers: &[String]) -> String {
+    identifiers
+        .iter()
+        .map(|identifier| quote_identifier(identifier))
+        .collect::<Vec<String>>()
+        .join(", ")
 }
 
 fn render_column(column: &Column) -> String {
@@ -28,23 +38,26 @@ fn render_column(column: &Column) -> String {
 }
 
 fn render_foreign_key(foreign_key: &ForeignKey) -> String {
-    let columns: Vec<String> = foreign_key
-        .columns
-        .iter()
-        .map(|column| quote_identifier(column))
-        .collect();
-    let references_columns: Vec<String> = foreign_key
-        .references_columns
-        .iter()
-        .map(|column| quote_identifier(column))
-        .collect();
-
-    format!(
+    let mut definition = format!(
         "FOREIGN KEY ({}) REFERENCES {} ({})",
-        columns.join(", "),
+        quote_identifier_list(&foreign_key.columns),
         quote_identifier(&foreign_key.references_table),
-        references_columns.join(", ")
-    )
+        quote_identifier_list(&foreign_key.references_columns)
+    );
+
+    match foreign_key.on_delete {
+        OnDelete::Cascade => definition.push_str(" ON DELETE CASCADE"),
+        OnDelete::NoAction => {}
+        OnDelete::Restrict => definition.push_str(" ON DELETE RESTRICT"),
+        OnDelete::SetDefault => definition.push_str(" ON DELETE SET DEFAULT"),
+        OnDelete::SetNull => definition.push_str(" ON DELETE SET NULL"),
+    }
+
+    definition
+}
+
+fn render_unique_constraint(unique_constraint: &UniqueConstraint) -> String {
+    format!("UNIQUE ({})", quote_identifier_list(&unique_constraint.columns))
 }
 
 fn render_table(table: &Table) -> String {
@@ -52,14 +65,20 @@ fn render_table(table: &Table) -> String {
     let mut lines: Vec<String> = table.columns.iter().map(render_column).collect();
 
     if !table.primary_key.is_empty() {
-        let keys: Vec<String> = table
-            .primary_key
-            .iter()
-            .map(|key| quote_identifier(key))
-            .collect();
-
-        lines.push(format!("PRIMARY KEY ({})", keys.join(", ")));
+        lines.push(format!(
+            "PRIMARY KEY ({})",
+            quote_identifier_list(&table.primary_key)
+        ));
     }
+
+    let mut unique_lines: Vec<String> = table
+        .unique_constraints
+        .iter()
+        .map(render_unique_constraint)
+        .collect();
+
+    unique_lines.sort();
+    lines.extend(unique_lines);
 
     let mut foreign_key_lines: Vec<String> =
         table.foreign_keys.iter().map(render_foreign_key).collect();
@@ -96,9 +115,11 @@ mod tests {
     use crate::column_default::ColumnDefault;
     use crate::column_type::ColumnType;
     use crate::foreign_key::ForeignKey;
+    use crate::on_delete::OnDelete;
     use crate::render_postgres::render_postgres;
     use crate::schema::Schema;
     use crate::table::Table;
+    use crate::unique_constraint::UniqueConstraint;
 
     fn column(
         name: &str,
@@ -118,14 +139,22 @@ mod tests {
         columns: &[&str],
         references_columns: &[&str],
         references_table: &str,
+        on_delete: OnDelete,
     ) -> ForeignKey {
         ForeignKey {
             columns: columns.iter().map(|column| column.to_string()).collect(),
+            on_delete,
             references_columns: references_columns
                 .iter()
                 .map(|column| column.to_string())
                 .collect(),
             references_table: references_table.to_string(),
+        }
+    }
+
+    fn unique_constraint(columns: &[&str]) -> UniqueConstraint {
+        UniqueConstraint {
+            columns: columns.iter().map(|column| column.to_string()).collect(),
         }
     }
 
@@ -144,6 +173,7 @@ mod tests {
                 foreign_keys: Vec::new(),
                 name: "things".to_string(),
                 primary_key: vec!["id".to_string()],
+                unique_constraints: Vec::new(),
             }],
         };
 
@@ -166,12 +196,31 @@ mod tests {
                 foreign_keys: Vec::new(),
                 name: "events".to_string(),
                 primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
         };
 
         assert_eq!(
             render_postgres(&schema),
             "CREATE TABLE \"events\" (\n    \"created_at\" TIMESTAMPTZ NOT NULL\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_bytea_column() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![column("data", ColumnType::Bytea, false, ColumnDefault::NotSet)],
+                foreign_keys: Vec::new(),
+                name: "files".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"files\" (\n    \"data\" BYTEA NOT NULL\n);"
         );
     }
 
@@ -186,12 +235,61 @@ mod tests {
                 foreign_keys: Vec::new(),
                 name: "pairs".to_string(),
                 primary_key: vec!["left".to_string(), "right".to_string()],
+                unique_constraints: Vec::new(),
             }],
         };
 
         assert_eq!(
             render_postgres(&schema),
             "CREATE TABLE \"pairs\" (\n    \"left\" UUID NOT NULL DEFAULT uuidv7(),\n    \"right\" UUID NOT NULL DEFAULT uuidv7(),\n    PRIMARY KEY (\"left\", \"right\")\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_single_column_unique_constraint() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![
+                    column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                    column("email", ColumnType::Text, false, ColumnDefault::NotSet),
+                ],
+                foreign_keys: Vec::new(),
+                name: "users".to_string(),
+                primary_key: vec!["id".to_string()],
+                unique_constraints: vec![unique_constraint(&["email"])],
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"users\" (\n    \"id\" UUID NOT NULL DEFAULT uuidv7(),\n    \"email\" TEXT NOT NULL,\n    PRIMARY KEY (\"id\"),\n    UNIQUE (\"email\")\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_composite_unique_constraint_before_foreign_keys() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![
+                    column("region", ColumnType::Text, false, ColumnDefault::NotSet),
+                    column("number", ColumnType::BigInt, false, ColumnDefault::NotSet),
+                    column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
+                ],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::NoAction,
+                )],
+                name: "line_items".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: vec![unique_constraint(&["region", "number"])],
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"line_items\" (\n    \"region\" TEXT NOT NULL,\n    \"number\" BIGINT NOT NULL,\n    \"author_id\" UUID NOT NULL,\n    UNIQUE (\"region\", \"number\"),\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\")\n);"
         );
     }
 
@@ -204,12 +302,14 @@ mod tests {
                     foreign_keys: Vec::new(),
                     name: "first".to_string(),
                     primary_key: Vec::new(),
+                    unique_constraints: Vec::new(),
                 },
                 Table {
                     columns: vec![column("id", ColumnType::Text, false, ColumnDefault::NotSet)],
                     foreign_keys: Vec::new(),
                     name: "second".to_string(),
                     primary_key: Vec::new(),
+                    unique_constraints: Vec::new(),
                 },
             ],
         };
@@ -228,6 +328,7 @@ mod tests {
                 foreign_keys: Vec::new(),
                 name: "empty".to_string(),
                 primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
         };
 
@@ -243,9 +344,10 @@ mod tests {
                     column("title", ColumnType::Text, false, ColumnDefault::NotSet),
                     column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
                 ],
-                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors")],
+                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::NoAction)],
                 name: "articles".to_string(),
                 primary_key: vec!["id".to_string()],
+                unique_constraints: Vec::new(),
             }],
         };
 
@@ -277,9 +379,11 @@ mod tests {
                     &["order_region", "order_number"],
                     &["region", "number"],
                     "orders",
+                    OnDelete::NoAction,
                 )],
                 name: "line_items".to_string(),
                 primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
         };
 
@@ -299,9 +403,10 @@ mod tests {
                     true,
                     ColumnDefault::NotSet,
                 )],
-                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors")],
+                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::NoAction)],
                 name: "posts".to_string(),
                 primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
         };
 
@@ -320,17 +425,90 @@ mod tests {
                     column("editor_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
                 ],
                 foreign_keys: vec![
-                    foreign_key(&["editor_id"], &["id"], "users"),
-                    foreign_key(&["author_id"], &["id"], "users"),
+                    foreign_key(&["editor_id"], &["id"], "users", OnDelete::NoAction),
+                    foreign_key(&["author_id"], &["id"], "users", OnDelete::NoAction),
                 ],
                 name: "docs".to_string(),
                 primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
             }],
         };
 
         assert_eq!(
             render_postgres(&schema),
             "CREATE TABLE \"docs\" (\n    \"author_id\" UUID NOT NULL,\n    \"editor_id\" UUID NOT NULL,\n    FOREIGN KEY (\"author_id\") REFERENCES \"users\" (\"id\"),\n    FOREIGN KEY (\"editor_id\") REFERENCES \"users\" (\"id\")\n);"
+        );
+    }
+
+    #[test]
+    fn renders_on_delete_cascade() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet)],
+                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::Cascade)],
+                name: "posts".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"posts\" (\n    \"author_id\" UUID NOT NULL,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\") ON DELETE CASCADE\n);"
+        );
+    }
+
+    #[test]
+    fn renders_on_delete_restrict() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet)],
+                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::Restrict)],
+                name: "posts".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"posts\" (\n    \"author_id\" UUID NOT NULL,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\") ON DELETE RESTRICT\n);"
+        );
+    }
+
+    #[test]
+    fn renders_on_delete_set_null() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![column("author_id", ColumnType::Uuid, true, ColumnDefault::NotSet)],
+                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::SetNull)],
+                name: "posts".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"posts\" (\n    \"author_id\" UUID,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\") ON DELETE SET NULL\n);"
+        );
+    }
+
+    #[test]
+    fn renders_on_delete_set_default() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet)],
+                foreign_keys: vec![foreign_key(&["author_id"], &["id"], "authors", OnDelete::SetDefault)],
+                name: "posts".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"posts\" (\n    \"author_id\" UUID NOT NULL,\n    FOREIGN KEY (\"author_id\") REFERENCES \"authors\" (\"id\") ON DELETE SET DEFAULT\n);"
         );
     }
 }

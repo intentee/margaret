@@ -12,6 +12,7 @@ pub mod get_greeting_see_other;
 pub mod get_greeting_temporary_redirect;
 pub mod get_health;
 pub mod get_logo;
+pub mod get_preferences;
 pub mod get_welcome;
 pub mod patch_article;
 pub mod post_article;

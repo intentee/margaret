@@ -11,9 +11,9 @@ use crate::views::card_layout_props::CardLayoutProps;
 pub struct CardLayout;
 
 impl RendersView for CardLayout {
-    type Props = CardLayoutProps;
+    type Props<'props> = CardLayoutProps;
 
-    fn render(&self, CardLayoutProps { body, home_url }: CardLayoutProps) -> Markup {
+    fn render(&self, CardLayoutProps { body, home_url }: Self::Props<'_>) -> Markup {
         html! {
             main { (body) }
             nav {

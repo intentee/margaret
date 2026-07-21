@@ -1,4 +1,6 @@
-pub struct FarewellViewProps {
-    pub home_url: String,
+use crate::margaret::routes::Routes;
+
+pub struct FarewellViewProps<'routes> {
     pub name: String,
+    pub routes: &'routes Routes,
 }

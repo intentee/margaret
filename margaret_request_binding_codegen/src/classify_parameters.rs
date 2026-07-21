@@ -110,7 +110,7 @@ fn classify_form_request(
         match source {
             RequestInputSource::Form => return Err(unavailable("Form")),
             RequestInputSource::Json => return Err(unavailable("Json")),
-            RequestInputSource::Query => {}
+            RequestInputSource::Cookie | RequestInputSource::Query => {}
         }
     }
 

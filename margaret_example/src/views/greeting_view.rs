@@ -26,12 +26,12 @@ impl GreetingView {
 }
 
 impl RendersView for GreetingView {
-    type Props = GreetingViewProps;
+    type Props<'props> = GreetingViewProps<'props>;
 
-    fn render(&self, GreetingViewProps { greeting, home_url }: GreetingViewProps) -> Markup {
+    fn render(&self, GreetingViewProps { greeting, routes }: Self::Props<'_>) -> Markup {
         self.card_layout.render(CardLayoutProps {
             body: html! { (greeting) },
-            home_url,
+            home_url: routes.public.get_greeting.url(),
         })
     }
 }
@@ -43,6 +43,7 @@ mod tests {
     use margaret_views::renders_view::RendersView;
 
     use super::GreetingView;
+    use crate::margaret::routes::Routes;
     use crate::views::card_layout::CardLayout;
     use crate::views::greeting_view_props::GreetingViewProps;
 
@@ -51,15 +52,16 @@ mod tests {
         let view = GreetingView {
             card_layout: Arc::new(CardLayout),
         };
+        let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
 
         let markup = view.render(GreetingViewProps {
             greeting: "Hello, World".to_string(),
-            home_url: "/greeting".to_string(),
+            routes: &routes,
         });
 
         assert_eq!(
             markup.into_string(),
-            "<main>Hello, World</main><nav><a href=\"/greeting\">home</a></nav>"
+            "<main>Hello, World</main><nav><a href=\"http://public/greeting\">home</a></nav>"
         );
     }
 }

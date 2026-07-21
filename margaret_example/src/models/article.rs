@@ -15,10 +15,12 @@ pub struct Article {
     #[column]
     pub body: String,
     #[column]
+    pub cover: Option<Vec<u8>>,
+    #[column]
     pub published: bool,
     #[column]
     pub created_at: DateTime<Utc>,
     #[column]
-    #[foreign_key]
+    #[foreign_key(on_delete = cascade)]
     pub author: Author,
 }
