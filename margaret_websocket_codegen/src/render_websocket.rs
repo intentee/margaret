@@ -6,6 +6,7 @@ use quote::quote;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 
 use crate::render_messages::render_messages;
 use crate::render_server_routes::render_server_routes;
@@ -19,8 +20,9 @@ pub fn render_websocket(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     has_views: bool,
+    middleware_plans: &[MiddlewarePlan],
 ) -> Result<WebSocketArtifacts, WebSocketCodegenError> {
-    let plan = websocket_plan(index, bindings)?;
+    let plan = websocket_plan(index, bindings, middleware_plans)?;
 
     let mut sessions_by_server: BTreeMap<String, Vec<&SessionPlan>> = BTreeMap::new();
 

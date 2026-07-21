@@ -8,6 +8,7 @@ use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
 use tokio_tungstenite::tungstenite::protocol::Role;
 use tokio_util::sync::CancellationToken;
 
+use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_http::web_socket_upgrade::WebSocketUpgrade;
@@ -61,6 +62,7 @@ where
         handshake: Request,
         on_upgrade: OnUpgrade,
         cancellation_token: CancellationToken,
+        _forward_targets: &Arc<ForwardTargets>,
     ) -> Response {
         let Ok(Some(key)) = handshake.inputs.server.header("sec-websocket-key") else {
             return Response::text(

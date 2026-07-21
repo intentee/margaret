@@ -313,6 +313,7 @@ async fn dispatch_web_socket(
     cancellation_token: CancellationToken,
     upgrade: Arc<dyn WebSocketUpgrade>,
     path_params: HashMap<String, String>,
+    forward_targets: &Arc<ForwardTargets>,
 ) -> http::Response<Full<Bytes>> {
     let on_upgrade = hyper::upgrade::on(&mut request);
     let (parts, _incoming) = request.into_parts();
@@ -330,7 +331,7 @@ async fn dispatch_web_socket(
                 .with_path_params(path_params);
 
             upgrade
-                .upgrade(handshake, on_upgrade, cancellation_token)
+                .upgrade(handshake, on_upgrade, cancellation_token, forward_targets)
                 .await
                 .into_http()
         }
@@ -362,6 +363,7 @@ async fn dispatch(
                 cancellation_token.child_token(),
                 upgrade,
                 path_params,
+                &forward_targets,
             )
             .await
         }
@@ -612,6 +614,7 @@ mod tests {
             handshake: Request,
             _on_upgrade: OnUpgrade,
             _cancellation_token: CancellationToken,
+            _forward_targets: &Arc<ForwardTargets>,
         ) -> Response {
             Response::text(
                 200,

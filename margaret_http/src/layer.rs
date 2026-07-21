@@ -8,7 +8,7 @@ use crate::next::Next;
 use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;
 
-struct LayeredHandler<Middleware: HttpMiddleware> {
+struct LayeredHandler<Middleware: HttpMiddleware + ?Sized> {
     inner: Arc<dyn Handler>,
     middleware: Arc<Middleware>,
 }
@@ -16,7 +16,7 @@ struct LayeredHandler<Middleware: HttpMiddleware> {
 #[async_trait]
 impl<Middleware> Handler for LayeredHandler<Middleware>
 where
-    Middleware: HttpMiddleware + Send + Sync + 'static,
+    Middleware: HttpMiddleware + Send + Sync + ?Sized + 'static,
 {
     async fn handle(&self, request: &Request) -> ResponseContinuation {
         self.middleware
@@ -27,7 +27,7 @@ where
 
 pub fn layer<Middleware>(middleware: Arc<Middleware>, inner: Arc<dyn Handler>) -> Arc<dyn Handler>
 where
-    Middleware: HttpMiddleware + Send + Sync + 'static,
+    Middleware: HttpMiddleware + Send + Sync + ?Sized + 'static,
 {
     Arc::new(LayeredHandler { inner, middleware })
 }

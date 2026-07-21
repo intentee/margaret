@@ -9,6 +9,7 @@ use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_middleware_codegen::fold_layers::fold_layers;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
@@ -17,8 +18,6 @@ use margaret_request_binding_codegen::request_binding::RequestBinding;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
-use crate::middleware_argument::MiddlewareArgument;
-use crate::middleware_plan::MiddlewarePlan;
 use crate::route_group::RouteGroup;
 
 fn access(call: TokenStream) -> TokenStream {
@@ -129,7 +128,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
         >
     };
 
-    let mut handler = if captures.is_empty() && !captures_routes && !captures_views {
+    let handler = if captures.is_empty() && !captures_routes && !captures_views {
         quote! {
             margaret_http::responder_handler::responder_handler(
                 #responder_access,
@@ -180,22 +179,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
         }
     };
 
-    for application in &route.layers {
-        let wrapper = &application.wrapper;
-        let field = &application.field;
-        let middleware_access = access(quote! { container.#field() });
-        let middleware_expr = if application.injects_routes {
-            quote! { std::sync::Arc::new(super::#wrapper { inner: #middleware_access, routes: routes.clone() }) }
-        } else {
-            quote! { std::sync::Arc::new(super::#wrapper { inner: #middleware_access }) }
-        };
-
-        handler = quote! {
-            margaret_http::layer::layer(#middleware_expr, #handler)
-        };
-    }
-
-    handler
+    fold_layers(&route.layers, handler, &quote! { super::super::middleware })
 }
 
 fn argument_value(
@@ -243,58 +227,6 @@ fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
         .iter()
         .map(|field| format_ident!("{}", field))
         .collect()
-}
-
-fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
-    let MiddlewarePlan {
-        arguments,
-        concrete,
-        injects_routes,
-        wrapper,
-        ..
-    } = plan;
-    let concrete = path_tokens(concrete);
-    let routes_field =
-        injects_routes.then(|| quote! { routes: std::sync::Arc<super::routes::Routes>, });
-    let request_binding = if arguments
-        .iter()
-        .any(|argument| matches!(argument, MiddlewareArgument::CurrentRequest))
-    {
-        format_ident!("request")
-    } else {
-        format_ident!("_request")
-    };
-    let next_binding = if arguments
-        .iter()
-        .any(|argument| matches!(argument, MiddlewareArgument::Next))
-    {
-        format_ident!("next")
-    } else {
-        format_ident!("_next")
-    };
-    let call_arguments = arguments.iter().map(|argument| match argument {
-        MiddlewareArgument::CurrentRequest => quote! { request },
-        MiddlewareArgument::Next => quote! { next },
-        MiddlewareArgument::Routes => quote! { &self.routes },
-    });
-
-    quote! {
-        struct #wrapper {
-            inner: std::sync::Arc<#concrete>,
-            #routes_field
-        }
-
-        #[async_trait::async_trait]
-        impl margaret_http::http_middleware::HttpMiddleware for #wrapper {
-            async fn process(
-                &self,
-                #request_binding: &margaret_http::request::Request,
-                #next_binding: margaret_http::next::Next,
-            ) -> margaret_http::response_continuation::ResponseContinuation {
-                self.inner.process(#(#call_arguments),*).await
-            }
-        }
-    }
 }
 
 fn server_module(
@@ -409,11 +341,9 @@ fn server_module(
 pub(crate) fn render(
     table: &HttpRouteTable,
     servers: &[HttpServer],
-    middleware_plans: &[MiddlewarePlan],
     has_views: bool,
     websocket_servers: &[String],
 ) -> Vec<GeneratedModuleTokens> {
-    let middleware_wrappers = middleware_plans.iter().map(middleware_wrapper);
     let server_declarations = servers.iter().map(|server| {
         let function_name = server.function_name();
 
@@ -425,7 +355,6 @@ pub(crate) fn render(
 
     let http_tokens = quote! {
         #(#server_declarations)*
-        #(#middleware_wrappers)*
     };
 
     let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];

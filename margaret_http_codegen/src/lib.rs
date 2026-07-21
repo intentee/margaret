@@ -7,11 +7,6 @@ mod http_route;
 mod http_route_table;
 mod http_routes;
 pub mod http_server;
-mod layer_application;
-mod middleware_argument;
-mod middleware_attribute_arguments;
-mod middleware_plan;
-mod middleware_plans;
 mod named_route;
 mod render;
 mod render_forwarders;
@@ -33,6 +28,7 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_middleware_codegen::middleware_plans::middleware_plans;
 
     use crate::has_responders::has_responders;
     use crate::http_codegen_error::HttpCodegenError;
@@ -46,8 +42,9 @@ mod tests {
         let index = AttributeIndexBuilder::new()
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
+        let plans = middleware_plans(&index)?;
 
-        Ok(render_http(&index, has_views, &[])?
+        Ok(render_http(&index, has_views, &[], &plans)?
             .into_modules()
             .into_iter()
             .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
@@ -270,8 +267,9 @@ impl Health {
         has_views: bool,
     ) -> String {
         let index = index_for(lib_source);
+        let plans = middleware_plans(&index).expect("the middleware plans are collected");
 
-        render_http(&index, has_views, websocket_servers)
+        render_http(&index, has_views, websocket_servers, &plans)
             .expect("the http source is generated")
             .into_modules()
             .into_iter()
@@ -323,8 +321,9 @@ impl Health {
             .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
             .expect("the crate is indexed")
             .build();
+        let plans = middleware_plans(&index).expect("the middleware plans are collected");
 
-        crate::render_http::render_http(&index, false, &[])
+        crate::render_http::render_http(&index, false, &[], &plans)
             .expect("the http source is generated")
             .into_modules()
             .into_iter()
@@ -562,10 +561,10 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         ));
         assert!(source.contains("responder.respond().await"));
         assert!(source.contains(
-            "margaret_http::layer::layer(std::sync::Arc::new(super::Guard{inner:container.guard().await,}),margaret_http::responder_handler::responder_handler(container.resource().await"
+            "margaret_http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await,}),margaret_http::responder_handler::responder_handler(container.resource().await"
         ));
         assert!(source.contains(
-            "margaret_http::layer::layer(std::sync::Arc::new(super::Tracer{inner:container.tracer().await,}),margaret_http::layer::layer(std::sync::Arc::new(super::Guard{"
+            "margaret_http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await,}),margaret_http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{"
         ));
 
         let guard = source.find("container.guard").expect("the guard is wired");
@@ -577,26 +576,13 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     }
 
     #[test]
-    fn generates_a_middleware_wrapper_that_forwards_to_the_process_method() {
-        let source = source_for(RESPONDERS_AND_MIDDLEWARE);
-
-        assert!(source.contains("structGuard{inner:std::sync::Arc<crate::Guard>,}"));
-        assert!(source.contains("implmargaret_http::http_middleware::HttpMiddlewareforGuard"));
-        assert!(source.contains("self.inner.process(request,next).await"));
-    }
-
-    #[test]
-    fn injects_the_routes_reference_into_a_middleware_process_method() {
+    fn threads_routes_into_a_routes_injecting_middleware_onion() {
         let source = source_for(
             "use crate::margaret::routes::Routes;\nuse margaret_http::next::Next;\nuse margaret_http::request::Request;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, request: &Request, next: Next, routes: &Routes) -> ResponseContinuation {}\n}\n",
         );
 
         assert!(source.contains(
-            "structTracer{inner:std::sync::Arc<crate::Tracer>,routes:std::sync::Arc<super::routes::Routes>,}"
-        ));
-        assert!(source.contains("self.inner.process(request,next,&self.routes).await"));
-        assert!(source.contains(
-            "std::sync::Arc::new(super::Tracer{inner:container.tracer().await,routes:routes.clone()"
+            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"
         ));
     }
 
@@ -1092,40 +1078,6 @@ impl GetGreeting {
         );
 
         assert!(message.contains("failed to index"));
-    }
-
-    #[test]
-    fn omits_the_request_from_a_middleware_that_only_delegates() {
-        let source = source_for(
-            "use margaret_http::next::Next;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
-        );
-
-        assert!(source.contains(
-            "asyncfnprocess(&self,_request:&margaret_http::request::Request,next:margaret_http::next::Next,)"
-        ));
-        assert!(source.contains("self.inner.process(next).await"));
-    }
-
-    #[test]
-    fn omits_the_next_handler_from_a_short_circuiting_middleware() {
-        let source = source_for(
-            "use margaret_http::request::Request;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(guard)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, request: &Request) -> ResponseContinuation {}\n}\n",
-        );
-
-        assert!(source.contains(
-            "asyncfnprocess(&self,request:&margaret_http::request::Request,_next:margaret_http::next::Next,)"
-        ));
-        assert!(source.contains("self.inner.process(request).await"));
-    }
-
-    #[test]
-    fn disambiguates_middlewares_that_derive_the_same_wrapper_name() {
-        let source = source_for(
-            "use margaret_http::next::Next;\n\n#[handles_middleware_attribute(attribute = one)]\nstruct V2;\nimpl V2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n\n#[handles_middleware_attribute(attribute = two)]\nstruct V_2;\nimpl V_2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
-        );
-
-        assert!(source.contains("structV2{inner:std::sync::Arc<crate::V2>,}"));
-        assert!(source.contains("structV22{inner:std::sync::Arc<crate::V_2>,}"));
     }
 
     #[test]

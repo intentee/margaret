@@ -12,7 +12,7 @@ pub(crate) fn render_server_routes(
     let function = format_ident!("{server}_routes");
     let routes_name = if sessions
         .iter()
-        .any(|session_plan| session_plan.session.injects_routes())
+        .any(|session_plan| session_plan.session.references_routes())
     {
         format_ident!("routes")
     } else {
@@ -33,7 +33,7 @@ pub(crate) fn render_server_routes(
         let module = format_ident!("{}", session_plan.session.module_name);
         let routes_argument = session_plan
             .session
-            .injects_routes()
+            .references_routes()
             .then(|| quote! { routes, });
         let views_argument = session_plan
             .session

@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 
 #[derive(Debug, Error)]
@@ -15,6 +16,12 @@ pub enum WebSocketCodegenError {
     Binding {
         #[from]
         source: RequestBindingError,
+    },
+
+    #[error(transparent)]
+    Middleware {
+        #[from]
+        source: MiddlewareCodegenError,
     },
 
     #[error("'{message}' carries #[websocket_message] but is not a struct")]

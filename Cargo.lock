@@ -1373,6 +1373,7 @@ dependencies = [
  "margaret_container",
  "margaret_generated_module",
  "margaret_http_codegen",
+ "margaret_middleware_codegen",
  "margaret_model_codegen",
  "margaret_service_codegen",
  "margaret_views_codegen",
@@ -1540,6 +1541,7 @@ dependencies = [
  "margaret_codegen_tokens",
  "margaret_generated_module",
  "margaret_injection_codegen",
+ "margaret_middleware_codegen",
  "margaret_request_binding_codegen",
  "margaret_route_parameter_codegen",
  "matchit",
@@ -1719,6 +1721,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "margaret_middleware_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_codegen_tokens",
+ "margaret_injection_codegen",
+ "margaret_request_binding_codegen",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -2028,6 +2045,7 @@ dependencies = [
  "margaret_container",
  "margaret_generated_module",
  "margaret_injection_codegen",
+ "margaret_middleware_codegen",
  "margaret_request_binding_codegen",
  "margaret_route_parameter_codegen",
  "proc-macro2",

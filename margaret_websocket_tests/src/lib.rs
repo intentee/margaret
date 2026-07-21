@@ -1,3 +1,4 @@
+pub mod blocking_middleware;
 pub mod conversation_message;
 pub mod driver_harness;
 pub mod failing_chunk;
@@ -8,6 +9,7 @@ pub mod flood_handler;
 pub mod ping_dispatch;
 pub mod ping_handler;
 pub mod ping_message;
+pub mod passing_middleware;
 pub mod raw_http_exchange;
 pub mod rejecting_session_factory;
 pub mod response_chunk;
