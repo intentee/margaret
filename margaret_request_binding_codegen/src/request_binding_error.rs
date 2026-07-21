@@ -16,6 +16,21 @@ pub enum RequestBindingError {
     UnmarkedParameter { subject: String, parameter: String },
 
     #[error(
+        "parameter '{parameter}' of {subject} must be the current request, the next handler, a form request, the peer SPIFFE id, the views, an asset bag, or the routes"
+    )]
+    UnmarkedMiddlewareParameter { subject: String, parameter: String },
+
+    #[error(
+        "parameter '{parameter}' of {subject} is the next handler, which is only available inside an HTTP middleware"
+    )]
+    NextOutsideMiddleware { subject: String, parameter: String },
+
+    #[error(
+        "{subject} declares more than one next handler; a middleware forwards to exactly one"
+    )]
+    MultipleNextParameters { subject: String },
+
+    #[error(
         "parameter '{parameter}' of {subject} is not an injectable dependency; expected Arc<T> or Vec<Arc<dyn Trait>>"
     )]
     UnsupportedParameterShape { subject: String, parameter: String },
@@ -38,6 +53,11 @@ pub enum RequestBindingError {
         parameter: String,
         path: String,
     },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[route_parameter], but an HTTP middleware has no route path to bind from"
+    )]
+    RouteParameterUnavailable { subject: String, parameter: String },
 
     #[error(
         "route parameter '{parameter}' of {subject} has type '{written}', which has no #[provides_route_parameter]"

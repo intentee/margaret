@@ -12,6 +12,7 @@ fn requires_peer_spiffe_id(route: &HttpRoute) -> bool {
         .arguments
         .iter()
         .any(|argument| matches!(argument.binding, RequestBinding::PeerSpiffeId))
+        || route.layers.iter().any(|layer| layer.injects_peer_spiffe_id)
 }
 
 pub(crate) fn active_servers(table: &HttpRouteTable) -> Vec<HttpServer> {

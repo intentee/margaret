@@ -17,7 +17,6 @@ use margaret_request_binding_codegen::request_binding::RequestBinding;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
-use crate::middleware_argument::MiddlewareArgument;
 use crate::middleware_plan::MiddlewarePlan;
 use crate::route_group::RouteGroup;
 
@@ -28,10 +27,11 @@ fn access(call: TokenStream) -> TokenStream {
 fn argument_needs_request(argument: &BoundParameter) -> bool {
     !matches!(
         argument.binding,
-        RequestBinding::Routes
+        RequestBinding::AssetBag
             | RequestBinding::Forwarder
+            | RequestBinding::Next
+            | RequestBinding::Routes
             | RequestBinding::Views
-            | RequestBinding::AssetBag
     )
 }
 
@@ -61,6 +61,10 @@ pub(crate) fn responder_injects_views(route: &HttpRoute) -> bool {
 
 fn route_references_routes(route: &HttpRoute) -> bool {
     responder_injects_routes(route) || route.layers.iter().any(|layer| layer.injects_routes)
+}
+
+fn route_references_views(route: &HttpRoute) -> bool {
+    responder_injects_views(route) || route.layers.iter().any(|layer| layer.injects_views)
 }
 
 fn handler_binding(route: &HttpRoute) -> Ident {
@@ -184,10 +188,14 @@ fn onion(route: &HttpRoute) -> TokenStream {
         let wrapper = &application.wrapper;
         let field = &application.field;
         let middleware_access = access(quote! { container.#field() });
-        let middleware_expr = if application.injects_routes {
-            quote! { std::sync::Arc::new(super::#wrapper { inner: #middleware_access, routes: routes.clone() }) }
-        } else {
-            quote! { std::sync::Arc::new(super::#wrapper { inner: #middleware_access }) }
+        let routes_init = application
+            .injects_routes
+            .then(|| quote! { routes: routes.clone(), });
+        let views_init = application
+            .injects_views
+            .then(|| quote! { views: views.clone(), });
+        let middleware_expr = quote! {
+            std::sync::Arc::new(super::#wrapper { inner: #middleware_access, #routes_init #views_init })
         };
 
         handler = quote! {
@@ -245,43 +253,85 @@ fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
         .collect()
 }
 
+fn middleware_argument_value(parameter: &BoundParameter, next_binding: &Ident) -> TokenStream {
+    match &parameter.binding {
+        RequestBinding::Next => quote! { #next_binding },
+        RequestBinding::Routes => quote! { &self.routes },
+        RequestBinding::Views => quote! { &self.views },
+        _ => {
+            let holder = &parameter.holder;
+
+            quote! { #holder }
+        }
+    }
+}
+
 fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
+    let injects_routes = plan.injects_routes();
+    let injects_views = plan.injects_views();
     let MiddlewarePlan {
-        arguments,
         concrete,
-        injects_routes,
+        parameters,
         wrapper,
         ..
     } = plan;
     let concrete = path_tokens(concrete);
     let routes_field =
         injects_routes.then(|| quote! { routes: std::sync::Arc<super::routes::Routes>, });
-    let request_binding = if arguments
-        .iter()
-        .any(|argument| matches!(argument, MiddlewareArgument::CurrentRequest))
-    {
-        format_ident!("request")
+    let views_field =
+        injects_views.then(|| quote! { views: std::sync::Arc<super::views::Views>, });
+
+    let mut allocator = NameAllocator::new();
+
+    for parameter in parameters {
+        if holder_shadows_request(&parameter.binding) {
+            allocator.reserve(&parameter.holder.to_string());
+        }
+    }
+
+    let request_binding = if parameters.iter().any(argument_needs_request) {
+        format_ident!("{}", allocator.allocate("request").field())
     } else {
         format_ident!("_request")
     };
-    let next_binding = if arguments
+
+    for parameter in parameters {
+        if matches!(parameter.binding, RequestBinding::CurrentRequest) {
+            allocator.reserve(&parameter.holder.to_string());
+        }
+    }
+
+    let next_binding = if parameters
         .iter()
-        .any(|argument| matches!(argument, MiddlewareArgument::Next))
+        .any(|parameter| matches!(parameter.binding, RequestBinding::Next))
     {
-        format_ident!("next")
+        format_ident!("{}", allocator.allocate("next").field())
     } else {
         format_ident!("_next")
     };
-    let call_arguments = arguments.iter().map(|argument| match argument {
-        MiddlewareArgument::CurrentRequest => quote! { request },
-        MiddlewareArgument::Next => quote! { next },
-        MiddlewareArgument::Routes => quote! { &self.routes },
+
+    let error_return = quote! { return response.into() };
+    let binder_owner = TokenStream::new();
+    let extractions = parameters.iter().map(|parameter| {
+        render_request_extraction(
+            &parameter.binding,
+            &parameter.holder,
+            &ExtractionContext {
+                binder_owner: &binder_owner,
+                error_return: &error_return,
+                request_local: &request_binding,
+            },
+        )
     });
+    let call_arguments = parameters
+        .iter()
+        .map(|parameter| middleware_argument_value(parameter, &next_binding));
 
     quote! {
         struct #wrapper {
             inner: std::sync::Arc<#concrete>,
             #routes_field
+            #views_field
         }
 
         #[async_trait::async_trait]
@@ -291,6 +341,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
                 #request_binding: &margaret_http::request::Request,
                 #next_binding: margaret_http::next::Next,
             ) -> margaret_http::response_continuation::ResponseContinuation {
+                #(#extractions)*
                 self.inner.process(#(#call_arguments),*).await
             }
         }
@@ -315,7 +366,7 @@ fn server_module(
             format_ident!("_routes")
         };
     let views_param = if (has_websocket_routes && has_views)
-        || server_routes.iter().copied().any(responder_injects_views)
+        || server_routes.iter().copied().any(route_references_views)
     {
         format_ident!("views")
     } else {

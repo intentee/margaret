@@ -8,9 +8,8 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::format_path::format_path;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_injection_codegen::process_method::process_method;
-use margaret_request_binding_codegen::binding_site::BindingSite;
+use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
-use margaret_request_binding_codegen::request_binding_policy::RequestBindingPolicy;
 use margaret_request_binding_codegen::route_parameter_binders::route_parameter_binders;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
@@ -76,7 +75,9 @@ pub(crate) fn http_routes(
 
             layers.push(LayerApplication {
                 field: plan.field.clone(),
-                injects_routes: plan.injects_routes,
+                injects_peer_spiffe_id: plan.injects_peer_spiffe_id(),
+                injects_routes: plan.injects_routes(),
+                injects_views: plan.injects_views(),
                 wrapper: plan.wrapper.clone(),
             });
         }
@@ -90,14 +91,12 @@ pub(crate) fn http_routes(
             index,
             item,
             handler_method.signature(),
-            &BindingSite {
+            &BindingContext::Responder {
                 route_path: &route_path,
                 server: &server,
                 subject: &subject,
             },
             &binders,
-            None,
-            &RequestBindingPolicy::full_request(),
         )?;
 
         if let Some(name) = &name {

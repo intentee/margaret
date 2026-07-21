@@ -41,10 +41,18 @@ pub fn render_http(
     let middleware_plans = middleware_plans(index)?;
     let table = http_routes(index, &middleware_plans)?;
 
-    if !has_views && let Some(route) = table.routes().find(|route| responder_injects_views(route)) {
-        return Err(HttpCodegenError::ViewInjectedWithoutViews {
-            responder: route.responder_path.to_string(),
-        });
+    if !has_views {
+        if let Some(route) = table.routes().find(|route| responder_injects_views(route)) {
+            return Err(HttpCodegenError::ViewInjectedWithoutViews {
+                responder: route.responder_path.to_string(),
+            });
+        }
+
+        if let Some(plan) = middleware_plans.iter().find(|plan| plan.injects_views()) {
+            return Err(HttpCodegenError::MiddlewareViewInjectedWithoutViews {
+                middleware: plan.concrete.to_string(),
+            });
+        }
     }
 
     let servers = merge_websocket_servers(active_servers(&table), websocket_servers);

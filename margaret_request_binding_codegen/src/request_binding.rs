@@ -20,6 +20,7 @@ pub enum RequestBinding {
     Injectable {
         dependency: InjectedDependency,
     },
+    Next,
     PeerSpiffeId,
     Raw {
         path_key: String,
