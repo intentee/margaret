@@ -5,6 +5,7 @@ pub mod render_models;
 mod collected_model;
 mod column_arguments;
 mod deferred_foreign_key;
+mod foreign_key_arguments;
 mod foreign_key_column_name;
 mod foreign_key_target;
 mod foreign_key_target_column;
@@ -17,6 +18,7 @@ mod option_inner;
 mod render;
 mod resolved_column;
 mod resolved_foreign_key;
+mod single_generic_argument;
 
 #[cfg(test)]
 mod tests {
@@ -317,6 +319,7 @@ struct Author {
 
         assert!(source.contains("margaret_model::foreign_key::ForeignKey"));
         assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
+        assert!(source.contains("on_delete:margaret_model::on_delete::OnDelete::NoAction"));
         assert!(source.contains("references_columns:vec![\"id\".to_string()]"));
         assert!(source.contains("references_table:\"authors\".to_string()"));
         assert!(source.contains(
@@ -472,6 +475,16 @@ struct Author {
     }
 
     #[test]
+    fn rejects_malformed_foreign_key_arguments() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(= 5)]\n    author: Author,\n}\n",
+            ))
+            .contains("failed to read the model attributes")
+        );
+    }
+
+    #[test]
     fn rejects_a_foreign_key_that_collides_with_a_scalar_column() {
         assert!(
             error_message(&with_author(
@@ -509,5 +522,55 @@ struct Author {
         ));
 
         assert!(error_message(&source).contains("exceeding the 63-byte"));
+    }
+
+    #[test]
+    fn generates_a_bytea_column_from_a_byte_vector() {
+        let source = schema_source(
+            "#[model(table = \"files\")]\nstruct File {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    data: Vec<u8>,\n}\n",
+        );
+
+        assert!(source.contains("margaret_model::column_type::ColumnType::Bytea"));
+    }
+
+    #[test]
+    fn generates_a_unique_constraint_from_a_scalar_column() {
+        let source = schema_source(
+            "#[model(table = \"users\")]\nstruct User {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: String,\n}\n",
+        );
+
+        assert!(source.contains(
+            "unique_constraints:vec![margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"email\".to_string()],}]"
+        ));
+    }
+
+    #[test]
+    fn generates_a_unique_constraint_over_a_foreign_key() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[foreign_key]\n    author: Author,\n}\n",
+        ));
+
+        assert!(source.contains(
+            "unique_constraints:vec![margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"author_id\".to_string()],}]"
+        ));
+    }
+
+    #[test]
+    fn generates_a_foreign_key_on_delete_action() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = cascade)]\n    author: Author,\n}\n",
+        ));
+
+        assert!(source.contains("on_delete:margaret_model::on_delete::OnDelete::Cascade"));
+    }
+
+    #[test]
+    fn rejects_an_unknown_on_delete_action() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = purge)]\n    author: Author,\n}\n",
+            ))
+            .contains("unknown ON DELETE action")
+        );
     }
 }

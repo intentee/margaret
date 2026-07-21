@@ -8,7 +8,7 @@ use margaret_macros::model;
 pub struct Author {
     #[column(primary_key)]
     pub id: uuid::Uuid,
-    #[column]
+    #[column(unique)]
     pub name: String,
     #[column(name = "is_active")]
     pub active: bool,

@@ -1,6 +1,7 @@
 pub enum ColumnType {
     BigInt,
     Boolean,
+    Bytea,
     Integer,
     Text,
     Timestamptz,
@@ -13,6 +14,7 @@ impl ColumnType {
         match self {
             ColumnType::BigInt => "BIGINT",
             ColumnType::Boolean => "BOOLEAN",
+            ColumnType::Bytea => "BYTEA",
             ColumnType::Integer => "INTEGER",
             ColumnType::Text => "TEXT",
             ColumnType::Timestamptz => "TIMESTAMPTZ",

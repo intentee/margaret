@@ -5,6 +5,15 @@ use syn::Type;
 use crate::inferred_column::InferredColumn;
 use crate::model_codegen_error::ModelCodegenError;
 use crate::option_inner::option_inner;
+use crate::single_generic_argument::single_generic_argument;
+
+fn is_u8(ty: &Type) -> bool {
+    let Type::Path(type_path) = ty else {
+        return false;
+    };
+
+    matches!(type_path.path.segments.last(), Some(segment) if segment.ident == "u8")
+}
 
 fn base_column_type(ty: &Type) -> Option<InferredColumn> {
     let Type::Path(type_path) = ty else {
@@ -42,6 +51,15 @@ fn base_column_type(ty: &Type) -> Option<InferredColumn> {
             default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
             nullable: false,
         }),
+        Some(segment)
+            if segment.ident == "Vec" && single_generic_argument(segment).is_some_and(is_u8) =>
+        {
+            Some(InferredColumn {
+                column_type: quote!(margaret_model::column_type::ColumnType::Bytea),
+                default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+                nullable: false,
+            })
+        }
         _ => None,
     }
 }
@@ -166,6 +184,43 @@ mod tests {
             inferred.default.to_string(),
             quote!(margaret_model::column_default::ColumnDefault::NotSet).to_string()
         );
+    }
+
+    #[test]
+    fn infers_bytea_from_a_byte_vector() {
+        let inferred = infer("Vec<u8>").expect("a byte vector is inferable");
+
+        assert_eq!(
+            inferred.column_type.to_string(),
+            quote!(margaret_model::column_type::ColumnType::Bytea).to_string()
+        );
+        assert_eq!(
+            inferred.default.to_string(),
+            quote!(margaret_model::column_default::ColumnDefault::NotSet).to_string()
+        );
+        assert!(!inferred.nullable);
+    }
+
+    #[test]
+    fn treats_an_optional_byte_vector_as_a_nullable_bytea_column() {
+        let inferred =
+            infer("Option<Vec<u8>>").expect("an optional byte vector is inferable");
+
+        assert!(inferred.nullable);
+        assert_eq!(
+            inferred.column_type.to_string(),
+            quote!(margaret_model::column_type::ColumnType::Bytea).to_string()
+        );
+    }
+
+    #[test]
+    fn rejects_a_vector_of_non_bytes() {
+        assert!(infer("Vec<i32>").is_err());
+    }
+
+    #[test]
+    fn rejects_a_vector_of_a_non_path_element() {
+        assert!(infer("Vec<[u8; 4]>").is_err());
     }
 
     #[test]
