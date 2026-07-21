@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_injection_codegen::injection_error::InjectionError;
+use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 
 #[derive(Debug, Error)]
 pub enum MiddlewareCodegenError {
@@ -17,6 +18,12 @@ pub enum MiddlewareCodegenError {
         source: InjectionError,
     },
 
+    #[error(transparent)]
+    Binding {
+        #[from]
+        source: RequestBindingError,
+    },
+
     #[error(
         "#[handles_middleware_attribute] is only supported on structs, but '{target}' is not a struct"
     )]
@@ -24,14 +31,6 @@ pub enum MiddlewareCodegenError {
 
     #[error("middleware '{middleware}' is missing the 'attribute' argument")]
     MissingMiddlewareHandles { middleware: String },
-
-    #[error(
-        "parameter '{parameter}' of middleware '{middleware}' must be the current request, the next handler, or the routes"
-    )]
-    UnclassifiableMiddlewareParameter {
-        middleware: String,
-        parameter: String,
-    },
 
     #[error("{site} has a #[middleware(...)] attribute that must name exactly one middleware tag")]
     MalformedMiddleware { site: String },

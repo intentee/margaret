@@ -109,14 +109,6 @@ pub enum HttpCodegenError {
     )]
     InvalidRouteName { name: String, responder: String },
 
-    #[error(
-        "parameter '{parameter}' of middleware '{middleware}' must be the current request, the next handler, or the routes"
-    )]
-    UnclassifiableMiddlewareParameter {
-        middleware: String,
-        parameter: String,
-    },
-
     #[error("responder '{responder}' is missing the 'server' argument")]
     MissingHttpServer { responder: String },
 
@@ -129,4 +121,9 @@ pub enum HttpCodegenError {
         "responder '{responder}' injects &Views, but the crate defines no #[renders_view]; a view must exist to be injected"
     )]
     ViewInjectedWithoutViews { responder: String },
+
+    #[error(
+        "middleware '{middleware}' injects &Views, but the crate defines no #[renders_view]; a view must exist to be injected"
+    )]
+    MiddlewareViewInjectedWithoutViews { middleware: String },
 }

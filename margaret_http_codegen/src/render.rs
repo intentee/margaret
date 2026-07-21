@@ -10,6 +10,8 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::fold_layers::fold_layers;
+use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
+use margaret_request_binding_codegen::binding_shadows_request::binding_shadows_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
@@ -22,16 +24,6 @@ use crate::route_group::RouteGroup;
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
-}
-
-fn holder_shadows_request(binding: &RequestBinding) -> bool {
-    matches!(
-        binding,
-        RequestBinding::Raw { .. }
-            | RequestBinding::Bound { .. }
-            | RequestBinding::FormRequest { .. }
-            | RequestBinding::PeerSpiffeId
-    )
 }
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
@@ -52,6 +44,10 @@ fn route_references_routes(route: &HttpRoute) -> bool {
     responder_injects_routes(route) || route.layers.iter().any(|layer| layer.injects_routes)
 }
 
+fn route_references_views(route: &HttpRoute) -> bool {
+    responder_injects_views(route) || route.layers.iter().any(|layer| layer.injects_views)
+}
+
 fn handler_binding(route: &HttpRoute) -> Ident {
     format_ident!("{}_handler", route.responder_field)
 }
@@ -65,7 +61,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let mut allocator = NameAllocator::new();
 
     for argument in &route.arguments {
-        if holder_shadows_request(&argument.binding) {
+        if binding_shadows_request(&argument.binding) {
             allocator.reserve(&argument.holder.to_string());
         }
     }
@@ -77,7 +73,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let request_binding = if route
         .arguments
         .iter()
-        .any(|argument| argument.binding.references_request())
+        .any(|argument| binding_reads_request(&argument.binding))
     {
         format_ident!("{}", allocator.allocate("request").field())
     } else {
@@ -241,7 +237,7 @@ fn server_module(
             format_ident!("_routes")
         };
     let views_param = if (has_websocket_routes && has_views)
-        || server_routes.iter().copied().any(responder_injects_views)
+        || server_routes.iter().copied().any(route_references_views)
     {
         format_ident!("views")
     } else {

@@ -88,6 +88,7 @@ pub fn render_request_extraction(
         },
         RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
+        | RequestBinding::Next
         | RequestBinding::Routes
         | RequestBinding::Views => TokenStream::new(),
     }

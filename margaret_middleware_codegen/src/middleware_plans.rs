@@ -1,14 +1,13 @@
+use std::collections::HashMap;
+
 use quote::format_ident;
-use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_injection_codegen::parameter_view::ParameterView;
-use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
-use margaret_request_binding_codegen::request_injectable::RequestInjectable;
+use margaret_request_binding_codegen::binding_context::BindingContext;
+use margaret_request_binding_codegen::classify_parameters::classify_parameters;
 
-use crate::middleware_argument::MiddlewareArgument;
 use crate::middleware_attribute_arguments::MiddlewareAttributeArguments;
 use crate::middleware_codegen_error::MiddlewareCodegenError;
 use crate::middleware_plan::MiddlewarePlan;
@@ -17,6 +16,7 @@ pub fn middleware_plans(
     index: &AttributeIndex,
 ) -> Result<Vec<MiddlewarePlan>, MiddlewareCodegenError> {
     let selector = AttributeSelector::from_marker("handles_middleware_attribute");
+    let binders = HashMap::new();
     let mut plans = Vec::new();
 
     for matched in index.select(&selector) {
@@ -32,39 +32,19 @@ pub fn middleware_plans(
         let MiddlewareAttributeArguments { handles } =
             MiddlewareAttributeArguments::parse(matched.args()?, &middleware)?;
         let method = process_method(item)?;
-        let mut arguments = Vec::new();
-        let mut injects_routes = false;
-
-        for ParameterView {
-            declared, position, ..
-        } in parameters(method.signature())
-        {
-            let resolved = index.resolve_item_type(item, declared);
-            let is_reference = matches!(declared, Type::Reference(_));
-            let argument =
-                if RequestInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference) {
-                    MiddlewareArgument::CurrentRequest
-                } else if RequestInjectable::Next.matches(resolved.as_ref(), is_reference) {
-                    MiddlewareArgument::Next
-                } else if RequestInjectable::Routes.matches(resolved.as_ref(), is_reference) {
-                    injects_routes = true;
-
-                    MiddlewareArgument::Routes
-                } else {
-                    return Err(MiddlewareCodegenError::UnclassifiableMiddlewareParameter {
-                        middleware,
-                        parameter: position.to_string(),
-                    });
-                };
-
-            arguments.push(argument);
-        }
+        let subject = format!("middleware '{middleware}'");
+        let parameters = classify_parameters(
+            index,
+            item,
+            method.signature(),
+            &BindingContext::Middleware { subject: &subject },
+            &binders,
+        )?;
 
         plans.push(MiddlewarePlan {
-            arguments,
             concrete: item.canonical_path().clone(),
             field: format_ident!("{}", identifier.field()),
-            injects_routes,
+            parameters,
             selector: AttributeSelector::from_path(handles),
             wrapper: format_ident!("{}", identifier.type_name()),
         });

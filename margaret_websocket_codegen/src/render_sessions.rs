@@ -10,6 +10,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -166,7 +167,7 @@ fn render_factory(session: &WebSocketSession) -> TokenStream {
     let handshake = if session
         .parameters
         .iter()
-        .any(|parameter| parameter.binding.references_request())
+        .any(|parameter| binding_reads_request(&parameter.binding))
     {
         format_ident!("handshake")
     } else {
