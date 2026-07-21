@@ -605,9 +605,9 @@ dependencies = [
 
 [[package]]
 name = "esbuild-metafile"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7571831916baa6ebcab6050587fc1ef69a6a6d7f1345f1f3b8f71674474831f7"
+checksum = "b459cfd2ffbb488a9fa85bd2677681d54f632323011aa9445e8cfd6208cafa8d"
 dependencies = [
  "log",
  "serde",
