@@ -203,8 +203,7 @@ mod tests {
 
     #[test]
     fn treats_an_optional_byte_vector_as_a_nullable_bytea_column() {
-        let inferred =
-            infer("Option<Vec<u8>>").expect("an optional byte vector is inferable");
+        let inferred = infer("Option<Vec<u8>>").expect("an optional byte vector is inferable");
 
         assert!(inferred.nullable);
         assert_eq!(

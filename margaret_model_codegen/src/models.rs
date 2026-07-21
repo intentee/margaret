@@ -13,12 +13,13 @@ use margaret_attributes::indexed_field::IndexedField;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::select_unique_attribute::select_unique_attribute;
+use margaret_foreign_key_naming::foreign_key_column_name::foreign_key_column_name;
+use margaret_schema_index_naming::index_name::index_name;
 
 use crate::collected_model::CollectedModel;
 use crate::column_arguments::ColumnArguments;
 use crate::deferred_foreign_key::DeferredForeignKey;
 use crate::foreign_key_arguments::ForeignKeyArguments;
-use crate::foreign_key_column_name::foreign_key_column_name;
 use crate::foreign_key_target::ForeignKeyTarget;
 use crate::foreign_key_target_column::ForeignKeyTargetColumn;
 use crate::infer_column_type::infer_column_type;
@@ -29,6 +30,7 @@ use crate::model_codegen_error::ModelCodegenError;
 use crate::option_inner::option_inner;
 use crate::resolved_column::ResolvedColumn;
 use crate::resolved_foreign_key::ResolvedForeignKey;
+use crate::resolved_index::ResolvedIndex;
 
 const POSTGRES_MAX_IDENTIFIER_BYTES: usize = 63;
 
@@ -90,21 +92,60 @@ fn register_column_name(
     Ok(column_name)
 }
 
+fn resolve_index(
+    table: &str,
+    column: &str,
+    model: &str,
+) -> Result<ResolvedIndex, ModelCodegenError> {
+    let name = index_name(table, column);
+    let length = name.len();
+
+    if length > POSTGRES_MAX_IDENTIFIER_BYTES {
+        return Err(ModelCodegenError::IndexNameTooLong {
+            length,
+            model: model.to_string(),
+            name,
+        });
+    }
+
+    Ok(ResolvedIndex {
+        column: column.to_string(),
+        name,
+    })
+}
+
 fn resolve_scalar_column(
     ColumnArguments {
         name,
         primary_key,
         unique,
     }: ColumnArguments,
+    index: bool,
     field: &IndexedField,
     model: &str,
     seen_columns: &mut HashSet<String>,
 ) -> Result<ResolvedColumn, ModelCodegenError> {
     let column_name = resolve_column_name(name, field.identifier(), model)?;
     let column_name = register_column_name(column_name, model, seen_columns)?;
+
+    if index && unique {
+        return Err(ModelCodegenError::RedundantIndexOnUniqueColumn {
+            field: field_display(field.identifier()),
+            model: model.to_string(),
+        });
+    }
+
+    if index && primary_key {
+        return Err(ModelCodegenError::RedundantIndexOnPrimaryKeyColumn {
+            field: field_display(field.identifier()),
+            model: model.to_string(),
+        });
+    }
+
     let inferred = infer_column_type(field.ty(), model, &column_name)?;
 
     Ok(ResolvedColumn {
+        index,
         inferred,
         name: column_name,
         primary_key,
@@ -118,10 +159,11 @@ fn defer_foreign_key(
         primary_key,
         unique,
     }: ColumnArguments,
+    index: bool,
     foreign_key_arguments: &AttributeArgs,
     field: &IndexedField,
     model: &str,
-    index: &AttributeIndex,
+    attribute_index: &AttributeIndex,
     item: &IndexedItem,
 ) -> Result<DeferredForeignKey, ModelCodegenError> {
     if name.is_some() {
@@ -148,6 +190,13 @@ fn defer_foreign_key(
         }
     };
 
+    if index && unique {
+        return Err(ModelCodegenError::RedundantIndexOnUniqueColumn {
+            field: field_name,
+            model: model.to_string(),
+        });
+    }
+
     let ForeignKeyArguments { on_delete } =
         ForeignKeyArguments::parse(foreign_key_arguments, model, &field_name)?;
 
@@ -158,16 +207,17 @@ fn defer_foreign_key(
 
     let rust_type = field.ty().to_token_stream().to_string();
 
-    let target_path = index.resolve_item_type(item, target_type).ok_or_else(|| {
-        ModelCodegenError::ForeignKeyTargetNotAModel {
+    let target_path = attribute_index
+        .resolve_item_type(item, target_type)
+        .ok_or_else(|| ModelCodegenError::ForeignKeyTargetNotAModel {
             field: field_name.clone(),
             model: model.to_string(),
             rust_type: rust_type.clone(),
-        }
-    })?;
+        })?;
 
     Ok(DeferredForeignKey {
         field_name,
+        index,
         nullable,
         on_delete,
         rust_type,
@@ -177,17 +227,18 @@ fn defer_foreign_key(
 }
 
 fn collect_models(
-    index: &AttributeIndex,
+    attribute_index: &AttributeIndex,
     targets: &mut HashMap<CanonicalPath, ForeignKeyTarget>,
 ) -> Result<Vec<CollectedModel>, ModelCodegenError> {
     let selector = AttributeSelector::from_marker("model");
     let column_selector = AttributeSelector::from_marker("column");
     let foreign_key_selector = AttributeSelector::from_marker("foreign_key");
+    let index_selector = AttributeSelector::from_marker("index");
     let mut collected: Vec<CollectedModel> = Vec::new();
     let mut seen_models: HashSet<String> = HashSet::new();
     let mut seen_tables: HashMap<String, String> = HashMap::new();
 
-    for matched in index.select(&selector) {
+    for matched in attribute_index.select(&selector) {
         let item = matched.item();
         let model = item.canonical_path().to_string();
 
@@ -236,6 +287,16 @@ fn collect_models(
                 select_unique_attribute(field.attributes(), &foreign_key_selector, || {
                     model.clone()
                 })?;
+            let index =
+                select_unique_attribute(field.attributes(), &index_selector, || model.clone())?
+                    .is_some();
+
+            if index && column_attribute.is_none() {
+                return Err(ModelCodegenError::IndexRequiresColumn {
+                    field: field_display(field.identifier()),
+                    model,
+                });
+            }
 
             match (column_attribute, foreign_key_attribute) {
                 (None, None) => {
@@ -257,6 +318,7 @@ fn collect_models(
                         None => {
                             scalar_columns.push(resolve_scalar_column(
                                 column_arguments,
+                                index,
                                 field,
                                 &model,
                                 &mut seen_columns,
@@ -265,10 +327,11 @@ fn collect_models(
                         Some(foreign_key_attribute) => {
                             deferred_foreign_keys.push(defer_foreign_key(
                                 column_arguments,
+                                index,
                                 foreign_key_attribute.args()?,
                                 field,
                                 &model,
-                                index,
+                                attribute_index,
                                 item,
                             )?);
                         }
@@ -319,10 +382,12 @@ fn resolve_model(
     } = collected;
 
     let mut foreign_keys: Vec<ResolvedForeignKey> = Vec::new();
+    let mut indexes: Vec<ResolvedIndex> = Vec::new();
 
     for deferred in deferred_foreign_keys {
         let DeferredForeignKey {
             field_name,
+            index,
             nullable,
             on_delete,
             rust_type,
@@ -338,55 +403,65 @@ fn resolve_model(
             });
         };
 
-        if target.primary_key.is_empty() {
-            return Err(ModelCodegenError::ForeignKeyTargetWithoutPrimaryKey {
-                field: field_name,
-                model,
-                target: target.table.clone(),
-            });
-        }
+        let referenced = match target.primary_key.as_slice() {
+            [] => {
+                return Err(ModelCodegenError::ForeignKeyTargetWithoutPrimaryKey {
+                    field: field_name,
+                    model,
+                    target: target.table.clone(),
+                });
+            }
+            [referenced] => referenced,
+            _ => {
+                return Err(ModelCodegenError::ForeignKeyTargetHasCompositePrimaryKey {
+                    field: field_name,
+                    model,
+                    target: target.table.clone(),
+                });
+            }
+        };
 
-        let mut fk_columns: Vec<String> = Vec::new();
-        let mut references_columns: Vec<String> = Vec::new();
+        let column_name = foreign_key_column_name(&field_name, &referenced.name);
+        let column_name = register_column_name(column_name, &model, &mut seen_columns)?;
 
-        for referenced in &target.primary_key {
-            let column_name = foreign_key_column_name(&field_name, &referenced.name);
-            let column_name = register_column_name(column_name, &model, &mut seen_columns)?;
-
-            columns.push(ResolvedColumn {
-                inferred: InferredColumn {
-                    column_type: referenced.column_type.clone(),
-                    default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
-                    nullable,
-                },
-                name: column_name.clone(),
-                primary_key: false,
-                unique: false,
-            });
-
-            fk_columns.push(column_name);
-            references_columns.push(referenced.name.clone());
-        }
+        columns.push(ResolvedColumn {
+            index,
+            inferred: InferredColumn {
+                column_type: referenced.column_type.clone(),
+                default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+                nullable,
+            },
+            name: column_name.clone(),
+            primary_key: false,
+            unique: false,
+        });
 
         foreign_keys.push(ResolvedForeignKey {
-            columns: fk_columns,
+            column: column_name,
             on_delete,
-            references_columns,
+            references_column: referenced.name.clone(),
             references_table: target.table.clone(),
             unique,
         });
     }
 
+    for column in &columns {
+        if column.index {
+            indexes.push(resolve_index(&table, &column.name, &model)?);
+        }
+    }
+
     Ok(Model {
         columns,
         foreign_keys,
+        indexes,
         table,
     })
 }
 
-pub(crate) fn models(index: &AttributeIndex) -> Result<Vec<Model>, ModelCodegenError> {
+pub(crate) fn models(attribute_index: &AttributeIndex) -> Result<Vec<Model>, ModelCodegenError> {
     let mut targets: HashMap<CanonicalPath, ForeignKeyTarget> = HashMap::new();
-    let collected = collect_models(index, &mut targets)?;
+    let collected = collect_models(attribute_index, &mut targets)?;
 
     let mut resolved: Vec<Model> = collected
         .into_iter()

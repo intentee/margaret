@@ -5,6 +5,7 @@ use quote::quote;
 use crate::model::Model;
 use crate::resolved_column::ResolvedColumn;
 use crate::resolved_foreign_key::ResolvedForeignKey;
+use crate::resolved_index::ResolvedIndex;
 
 fn string_vec(values: &[String]) -> TokenStream {
     let items = values.iter().map(|value| {
@@ -33,17 +34,29 @@ fn render_column(column: &ResolvedColumn) -> TokenStream {
 }
 
 fn render_foreign_key(foreign_key: &ResolvedForeignKey) -> TokenStream {
-    let columns = string_vec(&foreign_key.columns);
+    let column = Literal::string(&foreign_key.column);
     let on_delete = &foreign_key.on_delete;
-    let references_columns = string_vec(&foreign_key.references_columns);
+    let references_column = Literal::string(&foreign_key.references_column);
     let references_table = Literal::string(&foreign_key.references_table);
 
     quote! {
         margaret_model::foreign_key::ForeignKey {
-            columns: #columns,
+            column: #column.to_string(),
             on_delete: #on_delete,
-            references_columns: #references_columns,
+            references_column: #references_column.to_string(),
             references_table: #references_table.to_string(),
+        }
+    }
+}
+
+fn render_index(index: &ResolvedIndex) -> TokenStream {
+    let column = Literal::string(&index.column);
+    let name = Literal::string(&index.name);
+
+    quote! {
+        margaret_model::index::Index {
+            column: #column.to_string(),
+            name: #name.to_string(),
         }
     }
 }
@@ -62,6 +75,7 @@ fn render_table(model: &Model) -> TokenStream {
     let table = Literal::string(&model.table);
     let columns = model.columns.iter().map(render_column);
     let foreign_keys = model.foreign_keys.iter().map(render_foreign_key);
+    let indexes = model.indexes.iter().map(render_index);
 
     let primary_key_columns: Vec<String> = model
         .columns
@@ -80,13 +94,14 @@ fn render_table(model: &Model) -> TokenStream {
         .foreign_keys
         .iter()
         .filter(|foreign_key| foreign_key.unique)
-        .map(|foreign_key| render_unique_constraint(&foreign_key.columns));
+        .map(|foreign_key| render_unique_constraint(std::slice::from_ref(&foreign_key.column)));
     let unique_constraints = scalar_unique.chain(foreign_key_unique);
 
     quote! {
         margaret_model::table::Table {
             columns: vec![#(#columns),*],
             foreign_keys: vec![#(#foreign_keys),*],
+            indexes: vec![#(#indexes),*],
             name: #table.to_string(),
             primary_key: #primary_key,
             unique_constraints: vec![#(#unique_constraints),*],

@@ -5,7 +5,9 @@ edition = "2024"
 
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
+margaret_foreign_key_naming = { path = "../margaret_foreign_key_naming" }
 margaret_generated_module = { path = "../margaret_generated_module" }
+margaret_schema_index_naming = { path = "../margaret_schema_index_naming" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }
