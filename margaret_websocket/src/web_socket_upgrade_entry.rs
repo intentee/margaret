@@ -58,7 +58,7 @@ where
 {
     async fn upgrade(
         self: Arc<Self>,
-        handshake: Request,
+        handshake: &Request,
         on_upgrade: OnUpgrade,
         cancellation_token: CancellationToken,
     ) -> Response {
@@ -80,7 +80,7 @@ where
         }
 
         let accept = derive_accept_key(key.as_bytes());
-        let session = match self.factory.create(&handshake).await {
+        let session = match self.factory.create(handshake).await {
             Ok(session) => session,
             Err(response) => return response,
         };
