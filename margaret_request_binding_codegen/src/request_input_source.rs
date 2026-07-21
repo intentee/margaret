@@ -3,6 +3,7 @@ use quote::format_ident;
 use syn::Path;
 
 pub enum RequestInputSource {
+    Cookie,
     Form,
     Query,
     Json,
@@ -13,6 +14,7 @@ impl RequestInputSource {
         let leaf = path.segments.last().map(|segment| &segment.ident);
 
         match leaf {
+            Some(leaf) if leaf == "Cookie" => Some(Self::Cookie),
             Some(leaf) if leaf == "Form" => Some(Self::Form),
             Some(leaf) if leaf == "Query" => Some(Self::Query),
             Some(leaf) if leaf == "Json" => Some(Self::Json),
@@ -22,6 +24,7 @@ impl RequestInputSource {
 
     pub(crate) fn variant(&self) -> Ident {
         match self {
+            Self::Cookie => format_ident!("Cookie"),
             Self::Form => format_ident!("Form"),
             Self::Query => format_ident!("Query"),
             Self::Json => format_ident!("Json"),

@@ -509,6 +509,8 @@ impl HttpRouteParameterBinder for ArticleStore {
 
 struct Filters;
 
+struct Preferences;
+
 #[websocket_session(path = "/board/{topic}/{article}", server = "public")]
 struct BoardSession;
 
@@ -519,6 +521,7 @@ impl BoardSession {
         #[route_parameter(from = "topic")] topic: String,
         #[route_parameter(from = "article")] article: Article,
         #[form_request(from = Query)] filters: Filters,
+        #[form_request(from = Cookie)] preferences: Preferences,
         request: &margaret_http::request::Request,
         peer: &spiffe::spiffe_id::SpiffeId,
         routes: &crate::margaret::routes::Routes,
@@ -550,6 +553,7 @@ impl RespondsToWebSocketMessage for Poster {
 
         assert!(source.contains("require_bound_route_parameter::require_bound_route_parameter"));
         assert!(source.contains("RequestInput::Query"));
+        assert!(source.contains("RequestInput::Cookie"));
         assert!(source.contains("require_peer_spiffe_id::require_peer_spiffe_id"));
         assert!(source.contains("::margaret_asset_bag::asset_bag::AssetBag::new()"));
         assert!(source.contains("self.routes.as_ref()"));
