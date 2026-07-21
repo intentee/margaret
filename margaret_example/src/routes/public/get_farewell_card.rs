@@ -30,8 +30,8 @@ impl GetFarewellCard {
         Response::html(
             200,
             views.farewell_view.render(FarewellViewProps {
-                home_url: routes.public.get_greeting.url(),
                 name: self.config.app_name().to_string(),
+                routes,
             }),
         )
     }

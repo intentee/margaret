@@ -1,13 +1,13 @@
 use maud::Markup;
 
 pub trait RendersView {
-    type Props;
+    type Props<'props>;
 
     #[must_use]
-    fn render(&self, props: Self::Props) -> Markup;
+    fn render(&self, props: Self::Props<'_>) -> Markup;
 
     #[must_use]
-    fn render_to_string(&self, props: Self::Props) -> String {
+    fn render_to_string(&self, props: Self::Props<'_>) -> String {
         self.render(props).into_string()
     }
 }
@@ -21,11 +21,25 @@ mod tests {
 
     struct Greeting;
 
-    impl RendersView for Greeting {
-        type Props = String;
+    struct Link;
 
-        fn render(&self, name: Self::Props) -> Markup {
+    struct LinkProps<'href> {
+        href: &'href str,
+    }
+
+    impl RendersView for Greeting {
+        type Props<'props> = String;
+
+        fn render(&self, name: Self::Props<'_>) -> Markup {
             html! { p { "hi " (name) } }
+        }
+    }
+
+    impl RendersView for Link {
+        type Props<'props> = LinkProps<'props>;
+
+        fn render(&self, LinkProps { href }: Self::Props<'_>) -> Markup {
+            html! { a href=(href) { "go" } }
         }
     }
 
@@ -34,6 +48,16 @@ mod tests {
         assert_eq!(
             Greeting.render_to_string("ada".to_string()),
             "<p>hi ada</p>"
+        );
+    }
+
+    #[test]
+    fn renders_a_view_whose_props_borrow_a_reference() {
+        let href = String::from("/home");
+
+        assert_eq!(
+            Link.render(LinkProps { href: &href }).into_string(),
+            "<a href=\"/home\">go</a>"
         );
     }
 }
