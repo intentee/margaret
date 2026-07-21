@@ -10,7 +10,6 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-use margaret_middleware_codegen::middleware_vec_tokens::middleware_vec_tokens;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -334,40 +333,11 @@ fn render_dispatch_table(plan: &SessionPlan, session_path: &TokenStream) -> Toke
     }
 }
 
-fn upgrade_entry_expression(initializers: &TokenStream, plan: &SessionPlan) -> TokenStream {
-    let entry = quote! {
-        ::std::sync::Arc::new(
-            margaret_websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry::new(
-                Factory {
-                    #initializers
-                },
-                dispatch_table(container).await,
-            ),
-        )
-    };
-
-    if plan.session.layers.is_empty() {
-        return entry;
-    }
-
-    let middleware = middleware_vec_tokens(&plan.session.layers, &quote! { super::super::middleware });
-
-    quote! {
-        ::std::sync::Arc::new(
-            margaret_http::gated_web_socket_upgrade::GatedWebSocketUpgrade::new(
-                #entry,
-                #middleware,
-            ),
-        )
-    }
-}
-
 fn render_session(plan: &SessionPlan) -> TokenStream {
     let session_path = path_tokens(&plan.session.session_path);
     let factory = render_factory(&plan.session);
     let initializers = factory_initializers(&plan.session);
-    let upgrade_entry = upgrade_entry_expression(&initializers, plan);
-    let routes_parameter = plan.session.references_routes().then(|| {
+    let routes_parameter = plan.session.injects_routes().then(|| {
         quote! { routes: &::std::sync::Arc<super::super::routes::Routes>, }
     });
     let views_parameter = plan.session.injects_views().then(|| {
@@ -396,7 +366,14 @@ fn render_session(plan: &SessionPlan) -> TokenStream {
             #routes_parameter
             #views_parameter
         ) -> ::std::sync::Arc<dyn margaret_http::web_socket_upgrade::WebSocketUpgrade> {
-            #upgrade_entry
+            ::std::sync::Arc::new(
+                margaret_websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry::new(
+                    Factory {
+                        #initializers
+                    },
+                    dispatch_table(container).await,
+                ),
+            )
         }
     }
 }

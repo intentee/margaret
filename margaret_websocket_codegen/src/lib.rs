@@ -224,15 +224,14 @@ impl Tracer {
 "#;
 
     #[test]
-    fn wraps_the_upgrade_entry_with_its_middleware() {
+    fn carries_its_middleware_on_the_route_entry() {
         let source = generated(SESSION_WITH_MIDDLEWARE);
 
+        assert!(source.contains("margaret_http::route_entry::RouteEntry::web_socket("));
         assert!(source.contains(
-            "margaret_http::gated_web_socket_upgrade::GatedWebSocketUpgrade::new"
+            "middleware.push(std::sync::Arc::new(super::middleware::Guard{inner:container.guard().await"
         ));
-        assert!(source.contains(
-            "middleware.push(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await"
-        ));
+        assert!(!source.contains("GatedWebSocketUpgrade"));
     }
 
     #[test]
@@ -250,9 +249,9 @@ impl Tracer {
     fn threads_routes_when_only_a_middleware_injects_them() {
         let source = generated(SESSION_WITH_ROUTES_MIDDLEWARE);
 
-        assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
-        assert!(source.contains("super::super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"));
-        assert!(source.contains("upgrade_entry(container,routes)"));
+        assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
+        assert!(source.contains("super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"));
+        assert!(source.contains("upgrade_entry(container)"));
     }
 
     #[test]

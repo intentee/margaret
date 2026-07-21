@@ -439,9 +439,8 @@ impl RequestLog {
         assert!(module(&code, "mod").contains("pub mod websocket;"));
         assert!(module(&code, "mod").contains("pub mod middleware;"));
         assert!(module(&code, "middleware").contains("pub struct RequestLog"));
-        assert!(concatenated(&code).contains(
-            "margaret_http::gated_web_socket_upgrade::GatedWebSocketUpgrade::new"
-        ));
+        assert!(concatenated(&code).contains("super::middleware::RequestLog"));
+        assert!(!concatenated(&code).contains("GatedWebSocketUpgrade"));
     }
 
     #[test]

@@ -10,7 +10,6 @@ pub(crate) mod form_fields;
 pub mod forward;
 pub mod forward_targets;
 pub mod forwardable_route;
-pub mod gated_web_socket_upgrade;
 pub mod handler;
 pub mod header;
 pub mod http_middleware;
