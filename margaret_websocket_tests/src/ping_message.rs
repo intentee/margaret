@@ -14,7 +14,7 @@ pub struct PingMessage {
 impl WebSocketRequestMessage for PingMessage {
     type Envelope = RequestEnvelope<Self>;
 
-    fn envelope(id: RequestId, method: String, message: Self) -> Self::Envelope {
-        RequestEnvelope::new(id, method, message)
+    fn envelope(id: RequestId, message: Self) -> Self::Envelope {
+        RequestEnvelope::new(id, message)
     }
 }

@@ -20,10 +20,10 @@ fn render_request_message(path: &CanonicalPath, cardinality: &MessageCardinality
     };
     let construction = match cardinality {
         MessageCardinality::Single => {
-            quote! { margaret_websocket::request_envelope::RequestEnvelope::new(id, method, message) }
+            quote! { margaret_websocket::request_envelope::RequestEnvelope::new(id, message) }
         }
         MessageCardinality::Stream => {
-            quote! { margaret_websocket::streaming_request_envelope::StreamingRequestEnvelope::new(id, method, message) }
+            quote! { margaret_websocket::streaming_request_envelope::StreamingRequestEnvelope::new(id, message) }
         }
     };
 
@@ -33,11 +33,20 @@ fn render_request_message(path: &CanonicalPath, cardinality: &MessageCardinality
 
             fn envelope(
                 id: margaret_websocket::request_id::RequestId,
-                method: ::std::string::String,
                 message: Self,
             ) -> Self::Envelope {
                 #construction
             }
+        }
+    }
+}
+
+fn render_response_message(path: &CanonicalPath, method: &str) -> TokenStream {
+    let message = path_tokens(path);
+
+    quote! {
+        impl margaret_websocket::web_socket_response_message::WebSocketResponseMessage for #message {
+            const METHOD: &'static str = #method;
         }
     }
 }
@@ -47,7 +56,8 @@ pub(crate) fn render_messages(messages: &[WebSocketMessage]) -> TokenStream {
         MessageKind::Request { cardinality, .. } => {
             Some(render_request_message(&message.path, cardinality))
         }
-        MessageKind::Notification { .. } | MessageKind::Response => None,
+        MessageKind::Response { method } => Some(render_response_message(&message.path, method)),
+        MessageKind::Notification { .. } => None,
     });
 
     quote! {

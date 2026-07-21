@@ -23,7 +23,6 @@ impl WebSocketMessageDispatch<TestSession> for PingDispatch {
         cancellation_token: CancellationToken,
         session: Arc<TestSession>,
         id: RequestId,
-        method: String,
         params: Value,
         socket: WebSocket,
     ) {
@@ -32,7 +31,6 @@ impl WebSocketMessageDispatch<TestSession> for PingDispatch {
             cancellation_token,
             session,
             id,
-            method,
             params,
             socket,
         )

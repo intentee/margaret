@@ -2,6 +2,8 @@ use serde::Serialize;
 use serde::Serializer;
 use serde::ser::Error;
 
+use margaret_websocket::web_socket_response_message::WebSocketResponseMessage;
+
 pub struct FailingChunk;
 
 impl Serialize for FailingChunk {
@@ -13,4 +15,8 @@ impl Serialize for FailingChunk {
             "this response payload cannot be serialized",
         ))
     }
+}
+
+impl WebSocketResponseMessage for FailingChunk {
+    const METHOD: &'static str = "failing_chunk";
 }

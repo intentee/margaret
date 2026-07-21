@@ -14,7 +14,7 @@ pub struct ConversationMessage {
 impl WebSocketRequestMessage for ConversationMessage {
     type Envelope = StreamingRequestEnvelope<Self>;
 
-    fn envelope(id: RequestId, method: String, message: Self) -> Self::Envelope {
-        StreamingRequestEnvelope::new(id, method, message)
+    fn envelope(id: RequestId, message: Self) -> Self::Envelope {
+        StreamingRequestEnvelope::new(id, message)
     }
 }

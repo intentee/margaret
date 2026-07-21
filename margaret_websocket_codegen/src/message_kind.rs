@@ -12,7 +12,9 @@ pub(crate) enum MessageKind {
         cardinality: MessageCardinality,
         method: String,
     },
-    Response,
+    Response {
+        method: String,
+    },
 }
 
 impl MessageKind {
@@ -38,9 +40,10 @@ impl MessageKind {
             }
             (false, false, true) => {
                 reject_cardinality(arguments, message)?;
-                reject_method(arguments, message)?;
 
-                Ok(Self::Response)
+                Ok(Self::Response {
+                    method: method(arguments, message)?,
+                })
             }
             (false, false, false) => Err(WebSocketCodegenError::MissingMessageKind {
                 message: message.to_string(),
@@ -94,16 +97,6 @@ fn reject_cardinality(
 ) -> Result<(), WebSocketCodegenError> {
     if arguments.named("response").is_some() {
         return Err(WebSocketCodegenError::CardinalityOnNonRequest {
-            message: message.to_string(),
-        });
-    }
-
-    Ok(())
-}
-
-fn reject_method(arguments: &AttributeArgs, message: &str) -> Result<(), WebSocketCodegenError> {
-    if arguments.string("method")?.is_some() {
-        return Err(WebSocketCodegenError::MethodOnResponse {
             message: message.to_string(),
         });
     }

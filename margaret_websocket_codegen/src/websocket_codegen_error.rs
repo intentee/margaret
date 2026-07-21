@@ -36,9 +36,6 @@ pub enum WebSocketCodegenError {
     #[error("'{message}' is missing the required 'method' argument")]
     MissingMethod { message: String },
 
-    #[error("response '{message}' must not declare a 'method'")]
-    MethodOnResponse { message: String },
-
     #[error("'{message}' has method '{method}', which is not a snake_case identifier")]
     InvalidMethod { message: String, method: String },
 
@@ -111,6 +108,13 @@ pub enum WebSocketCodegenError {
     #[error("session '{session}' binds method '{method}' more than once: '{first}' and '{second}'")]
     DuplicateMethodInSession {
         session: String,
+        method: String,
+        first: String,
+        second: String,
+    },
+
+    #[error("response method '{method}' is declared more than once: '{first}' and '{second}'")]
+    DuplicateResponseMethod {
         method: String,
         first: String,
         second: String,
