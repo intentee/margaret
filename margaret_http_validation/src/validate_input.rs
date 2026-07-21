@@ -12,6 +12,7 @@ where
     Model: DeserializeOwned + Validate,
 {
     match source {
+        RequestInput::Cookie => margaret_validation::validate::validate(&request.inputs.cookies),
         RequestInput::Form => margaret_validation::validate::validate(&request.inputs.form),
         RequestInput::Query => margaret_validation::validate::validate(&request.inputs.query),
         RequestInput::Json => {
@@ -69,6 +70,17 @@ mod tests {
         assert_eq!(
             value(validate_input(&request, RequestInput::Query)),
             Some("queried".to_string())
+        );
+    }
+
+    #[test]
+    fn validates_the_cookie_source() {
+        let mut request = request();
+        request.inputs.cookies = HashMap::from([("value".to_string(), "baked".to_string())]);
+
+        assert_eq!(
+            value(validate_input(&request, RequestInput::Cookie)),
+            Some("baked".to_string())
         );
     }
 
