@@ -19,8 +19,10 @@ pub struct Article {
     #[column]
     pub published: bool,
     #[column]
+    #[index]
     pub created_at: DateTime<Utc>,
     #[column]
     #[foreign_key(on_delete = cascade)]
+    #[index]
     pub author: Author,
 }

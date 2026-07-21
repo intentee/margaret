@@ -46,7 +46,7 @@ pub fn renders_view(_attributes: TokenStream, item: TokenStream) -> TokenStream 
 
 #[proc_macro_attribute]
 pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_field_markers(item, &["column", "foreign_key"])
+    strip_field_markers(item, &["column", "foreign_key", "index"])
 }
 
 #[proc_macro_attribute]
@@ -239,6 +239,27 @@ mod tests {
         assert!(!stripped.contains("foreign_key"));
         assert!(stripped.contains("author"));
         assert!(stripped.contains("Author"));
+    }
+
+    #[test]
+    fn removes_index_markers_from_struct_fields() {
+        let stripped = strip_struct_or_compile_error(
+            quote! {
+                struct Article {
+                    #[column(primary_key)]
+                    id: Uuid,
+                    #[column]
+                    #[index]
+                    created_at: DateTime<Utc>,
+                }
+            },
+            &["column", "foreign_key", "index"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("column"));
+        assert!(!stripped.contains("index"));
+        assert!(stripped.contains("created_at"));
     }
 
     #[test]

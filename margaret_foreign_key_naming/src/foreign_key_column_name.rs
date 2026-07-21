@@ -1,10 +1,13 @@
-pub(crate) fn foreign_key_column_name(field_name: &str, referenced_column_name: &str) -> String {
-    format!("{field_name}_{referenced_column_name}")
+use margaret_schema_identifier::schema_identifier::schema_identifier;
+
+#[must_use]
+pub fn foreign_key_column_name(field_name: &str, referenced_column_name: &str) -> String {
+    schema_identifier(&[field_name, referenced_column_name])
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::foreign_key_column_name::foreign_key_column_name;
+    use super::foreign_key_column_name;
 
     #[test]
     fn joins_the_field_name_and_referenced_column() {

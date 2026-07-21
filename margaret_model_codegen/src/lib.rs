@@ -6,7 +6,6 @@ mod collected_model;
 mod column_arguments;
 mod deferred_foreign_key;
 mod foreign_key_arguments;
-mod foreign_key_column_name;
 mod foreign_key_target;
 mod foreign_key_target_column;
 mod infer_column_type;
@@ -18,6 +17,7 @@ mod option_inner;
 mod render;
 mod resolved_column;
 mod resolved_foreign_key;
+mod resolved_index;
 mod single_generic_argument;
 
 #[cfg(test)]
@@ -318,9 +318,9 @@ struct Author {
         ));
 
         assert!(source.contains("margaret_model::foreign_key::ForeignKey"));
-        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
+        assert!(source.contains("column:\"author_id\".to_string()"));
         assert!(source.contains("on_delete:margaret_model::on_delete::OnDelete::NoAction"));
-        assert!(source.contains("references_columns:vec![\"id\".to_string()]"));
+        assert!(source.contains("references_column:\"id\".to_string()"));
         assert!(source.contains("references_table:\"authors\".to_string()"));
         assert!(source.contains(
             "column_type:margaret_model::column_type::ColumnType::Uuid,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"author_id\".to_string(),nullable:false,"
@@ -328,23 +328,13 @@ struct Author {
     }
 
     #[test]
-    fn generates_a_composite_foreign_key() {
-        let source = schema_source(
-            "#[model(table = \"orders\")]\nstruct Order {\n    #[column(primary_key)]\n    region: String,\n    #[column(primary_key)]\n    number: i64,\n}\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    order: Order,\n}\n",
-        );
-
-        assert!(source.contains("\"order_region\""));
-        assert!(source.contains("\"order_number\""));
+    fn rejects_a_foreign_key_to_a_composite_primary_key() {
         assert!(
-            source.contains(
-                "columns:vec![\"order_region\".to_string(),\"order_number\".to_string()]"
+            error_message(
+                "#[model(table = \"orders\")]\nstruct Order {\n    #[column(primary_key)]\n    region: String,\n    #[column(primary_key)]\n    number: i64,\n}\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    order: Order,\n}\n",
             )
+            .contains("composite primary key")
         );
-        assert!(
-            source
-                .contains("references_columns:vec![\"region\".to_string(),\"number\".to_string()]")
-        );
-        assert!(source.contains("references_table:\"orders\".to_string()"));
     }
 
     #[test]
@@ -373,7 +363,7 @@ struct Author {
             "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
         );
 
-        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
+        assert!(source.contains("column:\"author_id\".to_string()"));
         assert!(source.contains("references_table:\"authors\".to_string()"));
     }
 
@@ -393,8 +383,8 @@ struct Author {
             "#[model(table = \"users\")]\nstruct User {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"docs\")]\nstruct Doc {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: User,\n    #[column]\n    #[foreign_key]\n    editor: User,\n}\n",
         );
 
-        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
-        assert!(source.contains("columns:vec![\"editor_id\".to_string()]"));
+        assert!(source.contains("column:\"author_id\".to_string()"));
+        assert!(source.contains("column:\"editor_id\".to_string()"));
     }
 
     #[test]
@@ -572,5 +562,87 @@ struct Author {
             ))
             .contains("unknown ON DELETE action")
         );
+    }
+
+    #[test]
+    fn generates_an_index_from_a_scalar_column() {
+        let source = schema_source(
+            "#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    slug: String,\n}\n",
+        );
+
+        assert!(source.contains(
+            "indexes:vec![margaret_model::index::Index{column:\"slug\".to_string(),name:\"posts_slug_index\".to_string(),}]"
+        ));
+    }
+
+    #[test]
+    fn generates_an_index_over_a_foreign_key() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[index]\n    author: Author,\n}\n",
+        ));
+
+        assert!(source.contains(
+            "indexes:vec![margaret_model::index::Index{column:\"author_id\".to_string(),name:\"articles_author_id_index\".to_string(),}]"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_repeated_index_attribute() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index]\n    #[index]\n    value: String,\n}\n",
+            )
+            .contains("failed to read the model attributes")
+        );
+    }
+
+    #[test]
+    fn rejects_an_index_without_a_column() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[index]\n    value: String,\n}\n"
+            )
+            .contains("has an #[index] attribute")
+        );
+    }
+
+    #[test]
+    fn rejects_an_index_on_a_unique_column() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[index]\n    email: String,\n}\n",
+            )
+            .contains("a unique constraint is already indexed")
+        );
+    }
+
+    #[test]
+    fn rejects_an_index_on_a_unique_foreign_key() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[foreign_key]\n    #[index]\n    author: Author,\n}\n",
+            ))
+            .contains("a unique constraint is already indexed")
+        );
+    }
+
+    #[test]
+    fn rejects_an_index_on_a_primary_key_column() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    #[index]\n    id: uuid::Uuid,\n}\n",
+            )
+            .contains("a primary key is already indexed")
+        );
+    }
+
+    #[test]
+    fn rejects_an_index_whose_derived_name_is_too_long() {
+        let column = "a".repeat(50);
+        let source = format!(
+            "#[model(table = \"articles\")]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    {column}: String,\n}}\n"
+        );
+
+        assert!(error_message(&source).contains("derives an index name"));
     }
 }

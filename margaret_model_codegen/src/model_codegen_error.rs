@@ -93,6 +93,15 @@ pub enum ModelCodegenError {
     },
 
     #[error(
+        "foreign key field '{field}' of model '{model}' references '{target}', which has a composite primary key; foreign keys are single-column"
+    )]
+    ForeignKeyTargetHasCompositePrimaryKey {
+        field: String,
+        model: String,
+        target: String,
+    },
+
+    #[error(
         "model '{model}' has a table name '{table}' of {length} bytes, exceeding the 63-byte PostgreSQL identifier limit"
     )]
     TableNameTooLong {
@@ -118,4 +127,28 @@ pub enum ModelCodegenError {
         field: String,
         model: String,
     },
+
+    #[error(
+        "field '{field}' of model '{model}' has an #[index] attribute but no #[column]; #[index] layers on top of #[column]"
+    )]
+    IndexRequiresColumn { field: String, model: String },
+
+    #[error(
+        "model '{model}' derives an index name '{name}' of {length} bytes, exceeding the 63-byte PostgreSQL identifier limit"
+    )]
+    IndexNameTooLong {
+        length: usize,
+        model: String,
+        name: String,
+    },
+
+    #[error(
+        "field '{field}' of model '{model}' is both #[column(unique)] and #[index]; a unique constraint is already indexed"
+    )]
+    RedundantIndexOnUniqueColumn { field: String, model: String },
+
+    #[error(
+        "field '{field}' of model '{model}' is both #[column(primary_key)] and #[index]; a primary key is already indexed"
+    )]
+    RedundantIndexOnPrimaryKeyColumn { field: String, model: String },
 }
