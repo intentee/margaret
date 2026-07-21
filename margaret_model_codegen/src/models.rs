@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use quote::ToTokens;
 use quote::quote;
 
+use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -16,6 +17,7 @@ use margaret_attributes::select_unique_attribute::select_unique_attribute;
 use crate::collected_model::CollectedModel;
 use crate::column_arguments::ColumnArguments;
 use crate::deferred_foreign_key::DeferredForeignKey;
+use crate::foreign_key_arguments::ForeignKeyArguments;
 use crate::foreign_key_column_name::foreign_key_column_name;
 use crate::foreign_key_target::ForeignKeyTarget;
 use crate::foreign_key_target_column::ForeignKeyTargetColumn;
@@ -89,7 +91,11 @@ fn register_column_name(
 }
 
 fn resolve_scalar_column(
-    ColumnArguments { name, primary_key }: ColumnArguments,
+    ColumnArguments {
+        name,
+        primary_key,
+        unique,
+    }: ColumnArguments,
     field: &IndexedField,
     model: &str,
     seen_columns: &mut HashSet<String>,
@@ -102,11 +108,17 @@ fn resolve_scalar_column(
         inferred,
         name: column_name,
         primary_key,
+        unique,
     })
 }
 
 fn defer_foreign_key(
-    ColumnArguments { name, primary_key }: ColumnArguments,
+    ColumnArguments {
+        name,
+        primary_key,
+        unique,
+    }: ColumnArguments,
+    foreign_key_arguments: &AttributeArgs,
     field: &IndexedField,
     model: &str,
     index: &AttributeIndex,
@@ -136,6 +148,9 @@ fn defer_foreign_key(
         }
     };
 
+    let ForeignKeyArguments { on_delete } =
+        ForeignKeyArguments::parse(foreign_key_arguments, model, &field_name)?;
+
     let (target_type, nullable) = match option_inner(field.ty()) {
         Some(inner) => (inner, true),
         None => (field.ty(), false),
@@ -154,8 +169,10 @@ fn defer_foreign_key(
     Ok(DeferredForeignKey {
         field_name,
         nullable,
+        on_delete,
         rust_type,
         target_path,
+        unique,
     })
 }
 
@@ -245,9 +262,10 @@ fn collect_models(
                                 &mut seen_columns,
                             )?);
                         }
-                        Some(_) => {
+                        Some(foreign_key_attribute) => {
                             deferred_foreign_keys.push(defer_foreign_key(
                                 column_arguments,
+                                foreign_key_attribute.args()?,
                                 field,
                                 &model,
                                 index,
@@ -306,8 +324,10 @@ fn resolve_model(
         let DeferredForeignKey {
             field_name,
             nullable,
+            on_delete,
             rust_type,
             target_path,
+            unique,
         } = deferred;
 
         let Some(target) = targets.get(&target_path) else {
@@ -341,6 +361,7 @@ fn resolve_model(
                 },
                 name: column_name.clone(),
                 primary_key: false,
+                unique: false,
             });
 
             fk_columns.push(column_name);
@@ -349,8 +370,10 @@ fn resolve_model(
 
         foreign_keys.push(ResolvedForeignKey {
             columns: fk_columns,
+            on_delete,
             references_columns,
             references_table: target.table.clone(),
+            unique,
         });
     }
 

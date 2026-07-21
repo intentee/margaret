@@ -109,4 +109,13 @@ pub enum ModelCodegenError {
         length: usize,
         model: String,
     },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' has an unknown ON DELETE action '{action}'; valid actions are cascade, restrict, set_null, set_default"
+    )]
+    UnknownOnDeleteAction {
+        action: String,
+        field: String,
+        model: String,
+    },
 }
