@@ -60,7 +60,7 @@ anyhow = "=1.0.102"
 async-trait = "=0.1.89"
 base64ct = "=1.8.3"
 bytes = "=1.12.0"
-chrono = { version = "=0.4.42", default-features = false, features = ["std"] }
+chrono = { version = "=0.4.45", default-features = false, features = ["std"] }
 clap = { version = "=4.5.47", default-features = false, features = ["std", "help", "usage", "error-context"] }
 cookie = "=0.18.1"
 dashmap = "=6.1.0"
