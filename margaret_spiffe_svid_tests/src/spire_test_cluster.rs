@@ -12,17 +12,13 @@ use crate::wait_until_unix_socket_ready::wait_until_unix_socket_ready;
 use crate::wait_until_workload_api_ready::wait_until_workload_api_ready;
 use crate::write_spire_config::write_spire_config;
 
-#[expect(
-    dead_code,
-    reason = "children and tempdir are held only for their drop-time teardown side effects"
-)]
 pub struct SpireTestCluster {
-    agent_child: Child,
-    server_child: Child,
+    _agent_child: Child,
+    _server_child: Child,
     agent_socket_path: PathBuf,
     server_socket_path: PathBuf,
     trust_domain: String,
-    data_dir: tempfile::TempDir,
+    _data_dir: tempfile::TempDir,
 }
 
 impl SpireTestCluster {
@@ -36,12 +32,12 @@ impl SpireTestCluster {
         data_dir: tempfile::TempDir,
     ) -> Self {
         Self {
-            agent_child,
-            server_child,
+            _agent_child: agent_child,
+            _server_child: server_child,
             agent_socket_path,
             server_socket_path,
             trust_domain,
-            data_dir,
+            _data_dir: data_dir,
         }
     }
 

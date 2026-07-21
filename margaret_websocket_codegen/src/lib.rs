@@ -223,6 +223,58 @@ impl Tracer {
 }
 "#;
 
+    const INJECTED_ONLY_SESSION: &str = r#"
+use std::sync::Arc;
+
+trait Clock {}
+
+#[singleton(provides = Clock)]
+struct SystemClock;
+
+impl SystemClock {
+    #[constructor]
+    fn new() -> Self {}
+}
+
+impl Clock for SystemClock {}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build_for_session(clock: Arc<dyn Clock>) -> Self {}
+}
+"#;
+
+    #[test]
+    fn names_the_factory_handshake_unused_when_no_binding_reads_the_request() {
+        let source = generated(INJECTED_ONLY_SESSION);
+
+        assert!(source.contains("&self,_handshake:&margaret_http::request::Request"));
+    }
+
+    #[test]
+    fn names_the_factory_handshake_when_a_binding_reads_the_request() {
+        let source = generated(FULL_SESSION);
+
+        assert!(source.contains("&self,handshake:&margaret_http::request::Request"));
+    }
+
+    #[test]
+    fn names_the_dispatch_container_unused_when_a_session_has_no_handlers() {
+        let source = generated(INJECTED_ONLY_SESSION);
+
+        assert!(source.contains("dispatch_table(_container:&super::super::container::Container"));
+    }
+
+    #[test]
+    fn names_the_dispatch_container_when_a_session_has_handlers() {
+        let source = generated(FULL_SESSION);
+
+        assert!(source.contains("dispatch_table(container:&super::super::container::Container"));
+    }
+
     #[test]
     fn carries_its_middleware_on_the_route_entry() {
         let source = generated(SESSION_WITH_MIDDLEWARE);
@@ -250,7 +302,9 @@ impl Tracer {
         let source = generated(SESSION_WITH_ROUTES_MIDDLEWARE);
 
         assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
-        assert!(source.contains("super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"));
+        assert!(source.contains(
+            "super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"
+        ));
         assert!(source.contains("upgrade_entry(container)"));
     }
 

@@ -6,6 +6,7 @@ pub fn binding_reads_request(binding: &RequestBinding) -> bool {
         binding,
         RequestBinding::AssetBag
             | RequestBinding::Forwarder
+            | RequestBinding::Injectable { .. }
             | RequestBinding::Next
             | RequestBinding::Routes
             | RequestBinding::Views

@@ -107,6 +107,7 @@ impl Farewell {
         let source = source_for(COMMANDS, false);
 
         assert!(source.contains("pubasyncfnrun"));
+        assert!(source.contains("run<Arguments,Argument>(container:&super::container::Container,"));
         assert!(source.contains(r#"clap::Command::new("demo").about("Demonstratesarguments")"#));
 
         assert!(source.contains(r#"clap::Arg::new("name").required(true)"#));
@@ -251,6 +252,9 @@ impl Farewell {
 
         assert!(source.contains(r#"clap::Command::new("schema")"#));
         assert!(source.contains(r#"Some(("schema",_matches))=>super::schema::schema()"#));
+        assert!(
+            source.contains("run<Arguments,Argument>(_container:&super::container::Container,")
+        );
     }
 
     #[test]
