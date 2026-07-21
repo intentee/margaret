@@ -26,12 +26,12 @@ impl FarewellView {
 }
 
 impl RendersView for FarewellView {
-    type Props = FarewellViewProps;
+    type Props<'props> = FarewellViewProps<'props>;
 
-    fn render(&self, FarewellViewProps { home_url, name }: FarewellViewProps) -> Markup {
+    fn render(&self, FarewellViewProps { name, routes }: Self::Props<'_>) -> Markup {
         self.card_layout.render(CardLayoutProps {
             body: html! { "goodbye, " (name) },
-            home_url,
+            home_url: routes.public.get_greeting.url(),
         })
     }
 }
@@ -43,6 +43,7 @@ mod tests {
     use margaret_views::renders_view::RendersView;
 
     use super::FarewellView;
+    use crate::margaret::routes::Routes;
     use crate::views::card_layout::CardLayout;
     use crate::views::farewell_view_props::FarewellViewProps;
 
@@ -51,15 +52,16 @@ mod tests {
         let view = FarewellView {
             card_layout: Arc::new(CardLayout),
         };
+        let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
 
         let markup = view.render(FarewellViewProps {
-            home_url: "/greeting".to_string(),
             name: "Ada".to_string(),
+            routes: &routes,
         });
 
         assert_eq!(
             markup.into_string(),
-            "<main>goodbye, Ada</main><nav><a href=\"/greeting\">home</a></nav>"
+            "<main>goodbye, Ada</main><nav><a href=\"http://public/greeting\">home</a></nav>"
         );
     }
 }

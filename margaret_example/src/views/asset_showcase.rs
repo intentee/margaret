@@ -10,9 +10,9 @@ use crate::views::asset_showcase_props::AssetShowcaseProps;
 pub struct AssetShowcase;
 
 impl RendersView for AssetShowcase {
-    type Props = AssetShowcaseProps;
+    type Props<'props> = AssetShowcaseProps;
 
-    fn render(&self, AssetShowcaseProps { asset_bag }: AssetShowcaseProps) -> Markup {
+    fn render(&self, AssetShowcaseProps { asset_bag }: Self::Props<'_>) -> Markup {
         asset_bag.add(asset!("resources/ts/app.ts"));
 
         let logo = asset_bag.image(asset!("resources/media/logo.png"));
