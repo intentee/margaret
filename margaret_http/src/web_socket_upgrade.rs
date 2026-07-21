@@ -11,7 +11,7 @@ use crate::response::Response;
 pub trait WebSocketUpgrade: Send + Sync {
     async fn upgrade(
         self: Arc<Self>,
-        handshake: Request,
+        handshake: &Request,
         on_upgrade: OnUpgrade,
         cancellation_token: CancellationToken,
     ) -> Response;
