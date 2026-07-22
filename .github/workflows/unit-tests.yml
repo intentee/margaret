@@ -22,6 +22,24 @@ jobs:
       - name: run tests
         run: make test.unit
 
+  postgres:
+    name: postgres
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.137
+
+      - name: pull postgres image
+        run: docker pull postgres:18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
+
+      - name: run postgres tests
+        run: make test.postgres
+
   clippy:
     name: clippy
     runs-on: ubuntu-latest

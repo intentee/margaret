@@ -100,7 +100,14 @@ pub(crate) fn render(
 
     let schema_arm = if has_models {
         quote! {
-            Some(("schema", _matches)) => super::schema::schema(),
+            Some(("schema", _matches)) => {
+                println!(
+                    "{}",
+                    margaret_model::render_postgres::render_postgres(&super::schema::schema())
+                );
+
+                margaret_console::command_outcome::CommandOutcome::Succeeded
+            }
         }
     } else {
         quote! {}

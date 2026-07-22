@@ -114,17 +114,10 @@ pub(crate) fn render(models: &[Model]) -> TokenStream {
 
     quote! {
         #[must_use]
-        pub fn schema() -> margaret_console::command_outcome::CommandOutcome {
-            let schema = margaret_model::schema::Schema {
+        pub fn schema() -> margaret_model::schema::Schema {
+            margaret_model::schema::Schema {
                 tables: vec![#(#tables),*],
-            };
-
-            println!(
-                "{}",
-                margaret_model::render_postgres::render_postgres(&schema)
-            );
-
-            margaret_console::command_outcome::CommandOutcome::Succeeded
+            }
         }
     }
 }

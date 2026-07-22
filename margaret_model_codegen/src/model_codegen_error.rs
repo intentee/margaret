@@ -102,6 +102,11 @@ pub enum ModelCodegenError {
     },
 
     #[error(
+        "foreign key dependency cycle detected between tables: {path}; inline foreign keys require an acyclic table order"
+    )]
+    ForeignKeyCycle { path: String },
+
+    #[error(
         "model '{model}' has a table name '{table}' of {length} bytes, exceeding the 63-byte PostgreSQL identifier limit"
     )]
     TableNameTooLong {

@@ -448,4 +448,37 @@ struct S {
 
         assert!(error_message(&source).contains("derives an index name"));
     }
+
+    fn table_order(lib_source: &str) -> Vec<String> {
+        let directory = crate_with(lib_source);
+
+        models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .map(|model| model.table)
+            .collect()
+    }
+
+    #[test]
+    fn orders_referenced_tables_before_referencing_tables() {
+        let source = with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n",
+        );
+
+        assert_eq!(table_order(&source), ["authors", "articles"]);
+    }
+
+    #[test]
+    fn orders_a_self_referential_foreign_key_without_a_cycle() {
+        let source = "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Node,\n}\n";
+
+        assert_eq!(table_order(source), ["nodes"]);
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_cycle() {
+        let source = "#[model(table = \"alpha\")]\nstruct Alpha {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    beta: Beta,\n}\n\n#[model(table = \"beta\")]\nstruct Beta {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    alpha: Alpha,\n}\n";
+
+        assert!(error_message(source).contains("foreign key dependency cycle"));
+    }
 }

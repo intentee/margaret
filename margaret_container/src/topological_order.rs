@@ -1,36 +1,38 @@
-use std::cell::Cell;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_toposort::cycle::Cycle;
+use margaret_toposort::topological_order::topological_order as order_by_dependencies;
 
 use crate::collection_table::CollectionTable;
 use crate::container_error::ContainerError;
 use crate::dependency_kind::DependencyKind;
 use crate::provider::Provider;
 
-#[derive(Clone, Copy)]
-enum Mark {
-    Done,
-    InProgress,
-    Unvisited,
+fn dependency_cycle(cycle: Cycle<CanonicalPath>) -> ContainerError {
+    ContainerError::DependencyCycle {
+        path: cycle
+            .path
+            .iter()
+            .map(CanonicalPath::to_string)
+            .collect::<Vec<String>>()
+            .join(" -> "),
+    }
 }
 
-struct Node<'plan> {
-    adjacency: Vec<&'plan CanonicalPath>,
-    mark: Cell<Mark>,
-}
-
-fn dependency_keys<'plan>(
-    provider: &'plan Provider,
-    collections: &'plan CollectionTable,
-) -> Vec<&'plan CanonicalPath> {
-    let mut keys = Vec::new();
+fn dependency_keys(provider: &Provider, collections: &CollectionTable) -> BTreeSet<CanonicalPath> {
+    let mut keys: BTreeSet<CanonicalPath> = BTreeSet::new();
 
     for dependency in provider.dependencies() {
         match dependency {
-            DependencyKind::Single { provider_key } => keys.push(provider_key),
+            DependencyKind::Single { provider_key } => {
+                keys.insert(provider_key.clone());
+            }
             DependencyKind::Collection { trait_path } => {
-                keys.extend(collections.members_of(trait_path));
+                for member in collections.members_of(trait_path) {
+                    keys.insert(member.clone());
+                }
             }
         }
     }
@@ -38,74 +40,16 @@ fn dependency_keys<'plan>(
     keys
 }
 
-fn nodes_of<'plan>(
-    providers: &'plan BTreeMap<CanonicalPath, Provider>,
-    collections: &'plan CollectionTable,
-) -> BTreeMap<&'plan CanonicalPath, Node<'plan>> {
-    providers
-        .iter()
-        .map(|(key, provider)| {
-            (
-                key,
-                Node {
-                    adjacency: dependency_keys(provider, collections),
-                    mark: Cell::new(Mark::Unvisited),
-                },
-            )
-        })
-        .collect()
-}
-
-fn cycle(key: &CanonicalPath, stack: &[&CanonicalPath]) -> ContainerError {
-    let mut path: Vec<String> = stack
-        .iter()
-        .copied()
-        .skip_while(|entry| *entry != key)
-        .map(CanonicalPath::to_string)
-        .collect();
-    path.push(key.to_string());
-
-    ContainerError::DependencyCycle {
-        path: path.join(" -> "),
-    }
-}
-
-fn visit<'plan>(
-    nodes: &BTreeMap<&'plan CanonicalPath, Node<'plan>>,
-    key: &'plan CanonicalPath,
-    stack: &mut Vec<&'plan CanonicalPath>,
-) -> Result<(), ContainerError> {
-    let node = &nodes[key];
-
-    match node.mark.get() {
-        Mark::Done => return Ok(()),
-        Mark::InProgress => return Err(cycle(key, stack)),
-        Mark::Unvisited => {}
-    }
-
-    node.mark.set(Mark::InProgress);
-    stack.push(key);
-
-    for &dependency in &node.adjacency {
-        visit(nodes, dependency, stack)?;
-    }
-
-    stack.pop();
-    node.mark.set(Mark::Done);
-
-    Ok(())
-}
-
 pub(crate) fn topological_order(
     providers: &BTreeMap<CanonicalPath, Provider>,
     collections: &CollectionTable,
 ) -> Result<(), ContainerError> {
-    let nodes = nodes_of(providers, collections);
-    let mut stack = Vec::new();
+    let dependencies: BTreeMap<CanonicalPath, BTreeSet<CanonicalPath>> = providers
+        .iter()
+        .map(|(key, provider)| (key.clone(), dependency_keys(provider, collections)))
+        .collect();
 
-    for key in providers.keys() {
-        visit(&nodes, key, &mut stack)?;
-    }
+    order_by_dependencies(&dependencies).map_err(dependency_cycle)?;
 
     Ok(())
 }

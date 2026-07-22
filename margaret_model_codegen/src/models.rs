@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -15,6 +17,7 @@ use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::select_unique_attribute::select_unique_attribute;
 use margaret_schema_identifier_naming::index_name::index_name;
 use margaret_schema_identifier_naming::schema_identifier::schema_identifier;
+use margaret_toposort::topological_order::topological_order;
 
 use crate::collected_model::CollectedModel;
 use crate::column_arguments::ColumnArguments;
@@ -459,16 +462,45 @@ fn resolve_model(
     })
 }
 
+fn order_by_dependencies(resolved: Vec<Model>) -> Result<Vec<Model>, ModelCodegenError> {
+    let dependencies: BTreeMap<String, BTreeSet<String>> = resolved
+        .iter()
+        .map(|model| {
+            let references: BTreeSet<String> = model
+                .foreign_keys
+                .iter()
+                .map(|foreign_key| foreign_key.references_table.clone())
+                .filter(|referenced_table| referenced_table != &model.table)
+                .collect();
+
+            (model.table.clone(), references)
+        })
+        .collect();
+
+    let order =
+        topological_order(&dependencies).map_err(|cycle| ModelCodegenError::ForeignKeyCycle {
+            path: cycle.path.join(" -> "),
+        })?;
+
+    let mut by_table: HashMap<String, Model> = resolved
+        .into_iter()
+        .map(|model| (model.table.clone(), model))
+        .collect();
+
+    Ok(order
+        .iter()
+        .filter_map(|table| by_table.remove(table))
+        .collect())
+}
+
 pub fn models(attribute_index: &AttributeIndex) -> Result<Vec<Model>, ModelCodegenError> {
     let mut targets: HashMap<CanonicalPath, ForeignKeyTarget> = HashMap::new();
     let collected = collect_models(attribute_index, &mut targets)?;
 
-    let mut resolved: Vec<Model> = collected
+    let resolved: Vec<Model> = collected
         .into_iter()
         .map(|collected_model| resolve_model(collected_model, &targets))
         .collect::<Result<Vec<Model>, ModelCodegenError>>()?;
 
-    resolved.sort_by(|first, second| first.table.cmp(&second.table));
-
-    Ok(resolved)
+    order_by_dependencies(resolved)
 }

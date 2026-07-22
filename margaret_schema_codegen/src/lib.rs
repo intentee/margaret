@@ -88,8 +88,6 @@ struct Author {
         assert!(source.contains("nullable:true"));
         assert!(source.contains("nullable:false"));
         assert!(source.contains("primary_key:vec![\"id\".to_string()]"));
-        assert!(source.contains("margaret_model::render_postgres::render_postgres"));
-        assert!(source.contains("CommandOutcome::Succeeded"));
     }
 
     #[test]

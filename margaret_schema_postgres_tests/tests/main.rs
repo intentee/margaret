@@ -1,0 +1,4 @@
+mod applies_and_round_trips;
+mod foreign_key_cascade_deletes_dependent_rows;
+mod structure_matches_the_declared_schema;
+mod uuidv7_default_populates_the_primary_key;

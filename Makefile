@@ -33,6 +33,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_route_parameter_codegen \
 	-p margaret_schema_codegen \
 	-p margaret_schema_identifier_naming \
+	-p margaret_schema_postgres_tests \
 	-p margaret_service \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
@@ -46,6 +47,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_sync_holder \
 	-p margaret_token_signer \
 	-p margaret_token_signer_tests \
+	-p margaret_toposort \
 	-p margaret_validation \
 	-p margaret_views \
 	-p margaret_views_codegen \
@@ -108,6 +110,7 @@ coverage: node_modules
 		--gated margaret_route_parameter_codegen=100 \
 		--gated margaret_schema_codegen=100 \
 		--gated margaret_schema_identifier_naming=100 \
+		--gated margaret_schema_postgres_tests=100 \
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
@@ -121,6 +124,7 @@ coverage: node_modules
 		--gated margaret_sync_holder=100 \
 		--gated margaret_token_signer=100 \
 		--gated margaret_token_signer_tests=100 \
+		--gated margaret_toposort=100 \
 		--gated margaret_validation=100 \
 		--gated margaret_views=100 \
 		--gated margaret_views_codegen=100 \
@@ -134,11 +138,15 @@ fmt:
 
 .PHONY: test.unit
 test.unit:
-	cargo nextest run --workspace
+	cargo nextest run --workspace --exclude margaret_schema_postgres_tests
 
 .PHONY: test.integration
 test.integration:
 	cargo nextest run --workspace $(SPIRE_FEATURES)
+
+.PHONY: test.postgres
+test.postgres:
+	cargo nextest run -p margaret_schema_postgres_tests
 
 .PHONY: test
 test: test.integration
