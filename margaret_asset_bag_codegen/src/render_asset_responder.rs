@@ -17,7 +17,7 @@ fn responder_arm(
     let resolved_content_type = content_type(output_path)?;
 
     Ok(quote! {
-        #tail => ::margaret_http::response::Response::bytes(
+        #tail => ::margaret_http::response::Response::static_bytes(
             200,
             #resolved_content_type,
             ::core::include_bytes!(::core::concat!(
@@ -26,7 +26,7 @@ fn responder_arm(
                 #embed_relative,
                 "/",
                 #output_path
-            )).as_slice(),
+            )),
         )
         .header("cache-control", #IMMUTABLE_CACHE_CONTROL),
     })
@@ -98,6 +98,8 @@ mod tests {
         );
 
         assert!(source.contains("pub struct AssetResponder"));
+        assert!(source.contains("static_bytes"));
+        assert!(!source.contains("as_slice"));
         assert!(source.contains("\"app_A1B2C3D4.js\" =>"));
         assert!(source.contains("\"logo_I9J0K1L2.png\" =>"));
         assert!(source.contains("\"text/javascript\""));

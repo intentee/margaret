@@ -68,6 +68,11 @@ impl Response {
         self.header("set-cookie", cookie.to_string())
     }
 
+    #[must_use]
+    pub fn static_bytes(status: u16, content_type: &'static str, body: &'static [u8]) -> Self {
+        Self::new(status, Bytes::from_static(body)).header("content-type", content_type)
+    }
+
     pub fn text(status: u16, body: impl Into<String>) -> Self {
         Self::new(status, Bytes::from(body.into()))
     }
@@ -150,6 +155,29 @@ mod tests {
                 .expect("the content type header is present"),
             "image/png"
         );
+    }
+
+    #[tokio::test]
+    async fn serves_static_bytes_with_the_given_content_type() {
+        let response = Response::static_bytes(200, "image/png", PNG_MAGIC).into_http();
+
+        assert_eq!(response.status().as_u16(), 200);
+        assert_eq!(
+            response
+                .headers()
+                .get("content-type")
+                .expect("the content type header is present"),
+            "image/png"
+        );
+
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("the buffered body is collected")
+            .to_bytes();
+
+        assert_eq!(body.as_ref(), PNG_MAGIC);
     }
 
     #[test]

@@ -13,3 +13,4 @@ The goal of `margaret_asset_bag` crates is to expose front-end assets in a way t
 - content types must be resolved at compile time from `esbuild-meta.json`
 - both content type and the content itself must be resolved compile-time
 - asset bag can only access `esbuild-meta.json` properties through `esbuild-metafile` crate
+- the asset responder must serve the asset payload zero-copy and allocation-free: bytes are served via `Bytes::from_static`, never copied or allocated per request
