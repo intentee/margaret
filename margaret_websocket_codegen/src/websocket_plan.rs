@@ -40,10 +40,32 @@ fn handler_method(
                 message: message.path.to_string(),
             })
         }
-        (_, MessageKind::Response) => Err(WebSocketCodegenError::HandlerMessageIsResponse {
+        (_, MessageKind::Response { .. }) => Err(WebSocketCodegenError::HandlerMessageIsResponse {
             handler: handler.to_string(),
         }),
     }
+}
+
+fn reject_duplicate_response_methods(
+    messages: &[WebSocketMessage],
+) -> Result<(), WebSocketCodegenError> {
+    let mut seen: HashMap<String, String> = HashMap::new();
+
+    for message in messages {
+        if let MessageKind::Response { method } = &message.kind {
+            if let Some(first) = seen.get(method) {
+                return Err(WebSocketCodegenError::DuplicateResponseMethod {
+                    method: method.clone(),
+                    first: first.clone(),
+                    second: message.path.to_string(),
+                });
+            }
+
+            seen.insert(method.clone(), message.path.to_string());
+        }
+    }
+
+    Ok(())
 }
 
 pub(crate) fn websocket_plan(
@@ -52,6 +74,9 @@ pub(crate) fn websocket_plan(
     middleware_plans: &[MiddlewarePlan],
 ) -> Result<WebSocketPlan, WebSocketCodegenError> {
     let messages = websocket_messages(index)?;
+
+    reject_duplicate_response_methods(&messages)?;
+
     let sessions = websocket_sessions(index, bindings, middleware_plans)?;
     let handlers = websocket_handlers(index)?;
 
@@ -133,7 +158,7 @@ pub(crate) fn websocket_plan(
     for message in &messages {
         let requires_handler = match &message.kind {
             MessageKind::Request { .. } | MessageKind::Notification { .. } => true,
-            MessageKind::Response => false,
+            MessageKind::Response { .. } => false,
         };
 
         if requires_handler && !message_handler.contains_key(&message.path.to_string()) {

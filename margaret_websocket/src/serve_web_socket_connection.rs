@@ -55,7 +55,7 @@ async fn dispatch_frame<Session>(
 
                 tokio::spawn(async move {
                     dispatch
-                        .dispatch(cancellation_token, session, id, method, params, socket)
+                        .dispatch(cancellation_token, session, id, params, socket)
                         .await;
                 });
             }

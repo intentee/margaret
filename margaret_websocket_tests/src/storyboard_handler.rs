@@ -10,6 +10,7 @@ use margaret_websocket::web_socket_error::WebSocketError;
 
 use crate::conversation_message::ConversationMessage;
 use crate::response_chunk::ResponseChunk;
+use crate::storyboard_complete::StoryboardComplete;
 use crate::test_session::TestSession;
 
 pub struct StoryboardHandler;
@@ -32,8 +33,8 @@ impl RespondsToWebSocketMessage for StoryboardHandler {
             }))
             .await?;
         socket
-            .send(message.fin(ResponseChunk {
-                text: "done".to_string(),
+            .send(message.fin(StoryboardComplete {
+                summary: "done".to_string(),
             }))
             .await?;
 

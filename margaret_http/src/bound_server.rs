@@ -25,6 +25,8 @@ use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::body_limit::BodyLimit;
 use crate::forward_targets::ForwardTargets;
+use crate::handler::Handler;
+use crate::layer::layer;
 use crate::request::Request;
 use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
@@ -34,11 +36,10 @@ use crate::router::RequestRoute;
 use crate::router::RouteResolution;
 use crate::router::Router;
 use crate::router::UpgradeRoute;
-use crate::run_upgrade_gate::run_upgrade_gate;
 use crate::server_registry::ServerRegistry;
 use crate::transport_config::TransportConfig;
-use crate::upgrade_gate_outcome::UpgradeGateOutcome;
 use crate::upload_config::UploadConfig;
+use crate::web_socket_upgrade_terminal::WebSocketUpgradeTerminal;
 
 #[derive(Clone)]
 enum BoundTransport {
@@ -334,13 +335,19 @@ async fn dispatch_web_socket(
                 .with_peer_identity(peer_identity)
                 .with_path_params(path_params);
 
-            match run_upgrade_gate(&middleware, forward_targets, handshake).await {
-                UpgradeGateOutcome::ShortCircuit(response) => response.into_http(),
-                UpgradeGateOutcome::Proceed(handshake) => upgrade
-                    .upgrade(*handshake, on_upgrade, cancellation_token)
-                    .await
-                    .into_http(),
+            let mut onion: Arc<dyn Handler> = Arc::new(WebSocketUpgradeTerminal::new(
+                upgrade,
+                on_upgrade,
+                cancellation_token,
+            ));
+
+            for middleware_layer in middleware.iter().rev() {
+                onion = layer(middleware_layer.clone(), onion);
             }
+
+            respond_recursively(forward_targets, handshake, onion)
+                .await
+                .into_http()
         }
         Err(error) => error_response(error).into_http(),
     }
@@ -389,10 +396,12 @@ async fn dispatch(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::net::SocketAddr;
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use cookie::Cookie;
     use hyper::upgrade::OnUpgrade;
     use tokio::io::AsyncReadExt;
     use tokio::io::AsyncWriteExt;
@@ -403,9 +412,14 @@ mod tests {
     use super::accept_outcome;
     use super::error_response;
     use crate::body_limit::BodyLimit;
+    use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
+    use crate::http_middleware::HttpMiddleware;
     use crate::method_handler::MethodHandler;
+    use crate::named_handler::NamedHandler;
+    use crate::next::Next;
+    use crate::redirect::Redirect;
     use crate::request::Request;
     use crate::request_error::RequestError;
     use crate::response::Response;
@@ -614,7 +628,7 @@ mod tests {
     impl WebSocketUpgrade for TestUpgrade {
         async fn upgrade(
             self: Arc<Self>,
-            handshake: Request,
+            handshake: &Request,
             _on_upgrade: OnUpgrade,
             _cancellation_token: CancellationToken,
         ) -> Response {
@@ -628,7 +642,60 @@ mod tests {
         }
     }
 
-    fn registry_with_web_socket() -> Arc<ServerRegistry> {
+    struct PassThrough;
+
+    #[async_trait]
+    impl HttpMiddleware for PassThrough {
+        async fn process(&self, request: &Request, next: Next) -> ResponseContinuation {
+            next.run(request).await
+        }
+    }
+
+    struct RespondsWith {
+        status: u16,
+    }
+
+    #[async_trait]
+    impl HttpMiddleware for RespondsWith {
+        async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
+            ResponseContinuation::Done(Response::text(self.status, "short circuit"))
+        }
+    }
+
+    struct RedirectsAway;
+
+    #[async_trait]
+    impl HttpMiddleware for RedirectsAway {
+        async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
+            ResponseContinuation::from(Redirect::see_other("http://localhost/login".to_string()))
+        }
+    }
+
+    struct OverridesAfterDelegating;
+
+    #[async_trait]
+    impl HttpMiddleware for OverridesAfterDelegating {
+        async fn process(&self, request: &Request, next: Next) -> ResponseContinuation {
+            let _delegated = next.run(request).await;
+
+            ResponseContinuation::Done(
+                Response::forbidden().set_cookie(Cookie::new("session", "rotated")),
+            )
+        }
+    }
+
+    struct ForwardsToTarget;
+
+    #[async_trait]
+    impl HttpMiddleware for ForwardsToTarget {
+        async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
+            ResponseContinuation::from(Forward::new("target", HashMap::new()))
+        }
+    }
+
+    fn registry_with_web_socket_middleware(
+        middleware: Vec<Arc<dyn HttpMiddleware>>,
+    ) -> Arc<ServerRegistry> {
         Arc::new(ServerRegistry::new(vec![Server::new(
             "test",
             "127.0.0.1:0".to_string(),
@@ -638,10 +705,35 @@ mod tests {
             Router::build(vec![RouteEntry::web_socket(
                 "/room/{id}",
                 Arc::new(TestUpgrade),
-                Vec::new(),
+                middleware,
             )])
             .expect("the route entries register cleanly"),
         )]))
+    }
+
+    fn registry_with_web_socket() -> Arc<ServerRegistry> {
+        registry_with_web_socket_middleware(Vec::new())
+    }
+
+    async fn web_socket_handshake_response(
+        registry: Arc<ServerRegistry>,
+        request: &[u8],
+    ) -> String {
+        let bound = BoundServer::bind(registry, empty_forward_targets(), Arc::from("test"))
+            .await
+            .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let response = exchange(address, request, false).await;
+
+        cancellation_token.cancel();
+        serving.await.expect("the server task finishes cleanly");
+
+        response
     }
 
     #[tokio::test]
@@ -681,6 +773,104 @@ mod tests {
         assert!(upgraded.contains("42"));
         assert!(wrong_method.contains(" 405 "));
         assert!(malformed_cookie.contains(" 400 "));
+
+        cancellation_token.cancel();
+
+        serving.await.expect("the server task finishes cleanly");
+    }
+
+    #[tokio::test]
+    async fn upgrades_a_web_socket_handshake_through_a_delegating_middleware() {
+        let response = web_socket_handshake_response(
+            registry_with_web_socket_middleware(vec![Arc::new(PassThrough)]),
+            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+
+        assert!(response.contains(" 200 "));
+        assert!(response.contains("42"));
+    }
+
+    #[tokio::test]
+    async fn honors_a_web_socket_middleware_that_short_circuits_before_upgrading() {
+        let response = web_socket_handshake_response(
+            registry_with_web_socket_middleware(vec![Arc::new(RespondsWith { status: 403 })]),
+            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+
+        assert!(response.contains(" 403 "));
+        assert!(!response.contains("42"));
+    }
+
+    #[tokio::test]
+    async fn honors_a_web_socket_middleware_that_redirects_instead_of_upgrading() {
+        let response = web_socket_handshake_response(
+            registry_with_web_socket_middleware(vec![Arc::new(RedirectsAway)]),
+            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+
+        assert!(response.contains(" 303 "));
+        assert!(!response.contains("42"));
+    }
+
+    #[tokio::test]
+    async fn honors_a_web_socket_middleware_that_overrides_the_response_after_delegating() {
+        let response = web_socket_handshake_response(
+            registry_with_web_socket_middleware(vec![Arc::new(OverridesAfterDelegating)]),
+            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+
+        assert!(response.contains(" 403 "));
+        assert!(response.contains("set-cookie"));
+        assert!(response.contains("session=rotated"));
+        assert!(!response.contains("42"));
+    }
+
+    #[tokio::test]
+    async fn applies_the_first_declared_web_socket_middleware_outermost() {
+        let response = web_socket_handshake_response(
+            registry_with_web_socket_middleware(vec![
+                Arc::new(RespondsWith { status: 401 }),
+                Arc::new(RespondsWith { status: 403 }),
+            ]),
+            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+
+        assert!(response.contains(" 401 "));
+    }
+
+    #[tokio::test]
+    async fn resolves_a_forward_from_a_web_socket_middleware() {
+        let bound = BoundServer::bind(
+            registry_with_web_socket_middleware(vec![Arc::new(ForwardsToTarget)]),
+            Arc::new(ForwardTargets::new(vec![NamedHandler::new(
+                "target",
+                Arc::new(PlainOk),
+            )])),
+            Arc::from("test"),
+        )
+        .await
+        .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let response = exchange(
+            address,
+            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            false,
+        )
+        .await;
+
+        assert!(response.contains(" 200 "));
+        assert!(response.contains("ok"));
+        assert!(!response.contains("42"));
 
         cancellation_token.cancel();
 

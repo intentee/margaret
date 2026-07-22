@@ -1,0 +1,12 @@
+use serde::Serialize;
+
+use margaret_websocket::web_socket_response_message::WebSocketResponseMessage;
+
+#[derive(Serialize)]
+pub struct StoryboardComplete {
+    pub summary: String,
+}
+
+impl WebSocketResponseMessage for StoryboardComplete {
+    const METHOD: &'static str = "storyboard_complete";
+}

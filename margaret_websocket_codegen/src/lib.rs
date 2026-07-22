@@ -99,7 +99,7 @@ struct Ping;
 #[websocket_message(notification, method = "typing")]
 struct Typing;
 
-#[websocket_message(response)]
+#[websocket_message(response, method = "chunk")]
 struct Chunk;
 
 #[singleton]
@@ -223,6 +223,58 @@ impl Tracer {
 }
 "#;
 
+    const INJECTED_ONLY_SESSION: &str = r#"
+use std::sync::Arc;
+
+trait Clock {}
+
+#[singleton(provides = Clock)]
+struct SystemClock;
+
+impl SystemClock {
+    #[constructor]
+    fn new() -> Self {}
+}
+
+impl Clock for SystemClock {}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build_for_session(clock: Arc<dyn Clock>) -> Self {}
+}
+"#;
+
+    #[test]
+    fn names_the_factory_handshake_unused_when_no_binding_reads_the_request() {
+        let source = generated(INJECTED_ONLY_SESSION);
+
+        assert!(source.contains("&self,_handshake:&margaret_http::request::Request"));
+    }
+
+    #[test]
+    fn names_the_factory_handshake_when_a_binding_reads_the_request() {
+        let source = generated(FULL_SESSION);
+
+        assert!(source.contains("&self,handshake:&margaret_http::request::Request"));
+    }
+
+    #[test]
+    fn names_the_dispatch_container_unused_when_a_session_has_no_handlers() {
+        let source = generated(INJECTED_ONLY_SESSION);
+
+        assert!(source.contains("dispatch_table(_container:&super::super::container::Container"));
+    }
+
+    #[test]
+    fn names_the_dispatch_container_when_a_session_has_handlers() {
+        let source = generated(FULL_SESSION);
+
+        assert!(source.contains("dispatch_table(container:&super::super::container::Container"));
+    }
+
     #[test]
     fn carries_its_middleware_on_the_route_entry() {
         let source = generated(SESSION_WITH_MIDDLEWARE);
@@ -250,7 +302,9 @@ impl Tracer {
         let source = generated(SESSION_WITH_ROUTES_MIDDLEWARE);
 
         assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
-        assert!(source.contains("super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"));
+        assert!(source.contains(
+            "super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"
+        ));
         assert!(source.contains("upgrade_entry(container)"));
     }
 
@@ -265,6 +319,18 @@ impl Tracer {
         assert!(source.contains("request_envelope::RequestEnvelope::new"));
         assert!(!source.contains("WebSocketRequestMessageforcrate::Typing"));
         assert!(!source.contains("WebSocketRequestMessageforcrate::Chunk"));
+        assert!(source.contains("WebSocketResponseMessageforcrate::Chunk"));
+        assert!(source.contains("constMETHOD:&'staticstr=\"chunk\""));
+        assert!(!source.contains("WebSocketResponseMessageforcrate::Say"));
+        assert!(!source.contains("WebSocketResponseMessageforcrate::Typing"));
+    }
+
+    #[test]
+    fn omits_the_request_method_from_the_request_dispatch() {
+        let source = generated(FULL_SESSION);
+
+        assert!(source.contains("RequestId,params:serde_json::Value"));
+        assert!(!source.contains("method:::std::string::String"));
     }
 
     #[test]
@@ -376,11 +442,31 @@ impl Tracer {
     }
 
     #[test]
-    fn rejects_a_response_that_declares_a_method() {
+    fn rejects_a_response_without_a_method() {
         assert!(
-            error(r#"#[websocket_message(response, method = "x")] struct Bad;"#)
+            error(r#"#[websocket_message(response)] struct Bad;"#)
                 .to_string()
-                .contains("must not declare a 'method'")
+                .contains("missing the required 'method'")
+        );
+    }
+
+    #[test]
+    fn rejects_a_non_snake_case_response_method() {
+        assert!(
+            error(r#"#[websocket_message(response, method = "NotSnake")] struct Bad;"#)
+                .to_string()
+                .contains("has method")
+        );
+    }
+
+    #[test]
+    fn rejects_two_responses_that_share_a_method() {
+        assert!(
+            error(
+                "#[websocket_message(response, method = \"dup\")] struct First;\n#[websocket_message(response, method = \"dup\")] struct Second;\n"
+            )
+            .to_string()
+            .contains("declared more than once")
         );
     }
 
@@ -794,7 +880,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_whose_message_is_a_response() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(response)]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(response, method = \"r\")]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
         );
 
         assert!(

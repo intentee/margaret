@@ -10,6 +10,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -128,8 +129,7 @@ fn factory_initializers(session: &WebSocketSession) -> TokenStream {
     quote! { #(#holders)* #(#binders)* }
 }
 
-fn create_extractions(session: &WebSocketSession) -> TokenStream {
-    let handshake = format_ident!("handshake");
+fn create_extractions(session: &WebSocketSession, handshake: &Ident) -> TokenStream {
     let error_return = quote! { return ::std::result::Result::Err(response) };
     let binder_owner = quote! { self. };
     let extractions = session.parameters.iter().map(|parameter| {
@@ -139,7 +139,7 @@ fn create_extractions(session: &WebSocketSession) -> TokenStream {
             &ExtractionContext {
                 binder_owner: &binder_owner,
                 error_return: &error_return,
-                request_local: &handshake,
+                request_local: handshake,
             },
         )
     });
@@ -164,7 +164,16 @@ fn build_arguments(session: &WebSocketSession) -> TokenStream {
 fn render_factory(session: &WebSocketSession) -> TokenStream {
     let session_path = path_tokens(&session.session_path);
     let fields = factory_fields(session);
-    let extractions = create_extractions(session);
+    let handshake = if session
+        .parameters
+        .iter()
+        .any(|parameter| binding_reads_request(&parameter.binding))
+    {
+        format_ident!("handshake")
+    } else {
+        format_ident!("_handshake")
+    };
+    let extractions = create_extractions(session, &handshake);
     let arguments = build_arguments(session);
 
     quote! {
@@ -178,7 +187,7 @@ fn render_factory(session: &WebSocketSession) -> TokenStream {
 
             async fn create(
                 &self,
-                handshake: &margaret_http::request::Request,
+                #handshake: &margaret_http::request::Request,
             ) -> ::std::result::Result<
                 ::std::sync::Arc<Self::Session>,
                 margaret_http::response::Response,
@@ -215,7 +224,6 @@ fn render_request_dispatch(binding: &HandlerBinding, session_path: &TokenStream)
                 cancellation_token: tokio_util::sync::CancellationToken,
                 session: ::std::sync::Arc<#session_path>,
                 id: margaret_websocket::request_id::RequestId,
-                method: ::std::string::String,
                 params: serde_json::Value,
                 socket: margaret_websocket::web_socket::WebSocket,
             ) {
@@ -224,7 +232,6 @@ fn render_request_dispatch(binding: &HandlerBinding, session_path: &TokenStream)
                     cancellation_token,
                     session,
                     id,
-                    method,
                     params,
                     socket,
                 )
@@ -270,7 +277,7 @@ fn render_notification_dispatch(
     }
 }
 
-fn dispatch_insert(binding: &HandlerBinding, map: &Ident) -> TokenStream {
+fn dispatch_insert(binding: &HandlerBinding, map: &Ident, container: &Ident) -> TokenStream {
     let dispatch = dispatch_struct_ident(binding);
     let method = &binding.method;
     let accessor = format_ident!("{}", binding.handler_path.field_name());
@@ -279,7 +286,7 @@ fn dispatch_insert(binding: &HandlerBinding, map: &Ident) -> TokenStream {
         #map.insert(
             #method.to_string(),
             ::std::sync::Arc::new(#dispatch {
-                handler: container.#accessor().await,
+                handler: #container.#accessor().await,
             }),
         );
     }
@@ -288,18 +295,23 @@ fn dispatch_insert(binding: &HandlerBinding, map: &Ident) -> TokenStream {
 fn render_dispatch_table(plan: &SessionPlan, session_path: &TokenStream) -> TokenStream {
     let requests = format_ident!("requests");
     let notifications = format_ident!("notifications");
+    let container = if plan.request_handlers.is_empty() && plan.notification_handlers.is_empty() {
+        format_ident!("_container")
+    } else {
+        format_ident!("container")
+    };
     let request_inserts = plan
         .request_handlers
         .iter()
-        .map(|binding| dispatch_insert(binding, &requests));
+        .map(|binding| dispatch_insert(binding, &requests, &container));
     let notification_inserts = plan
         .notification_handlers
         .iter()
-        .map(|binding| dispatch_insert(binding, &notifications));
+        .map(|binding| dispatch_insert(binding, &notifications, &container));
 
     quote! {
         async fn dispatch_table(
-            container: &super::super::container::Container,
+            #container: &super::super::container::Container,
         ) -> ::std::sync::Arc<
             margaret_websocket::web_socket_dispatch_table::WebSocketDispatchTable<#session_path>,
         > {
