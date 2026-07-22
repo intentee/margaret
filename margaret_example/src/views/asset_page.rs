@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use margaret_asset_bag::asset_bag::AssetBag;
 use margaret_macros::constructor;
 use margaret_macros::singleton;
 use margaret_views::maud::DOCTYPE;
@@ -7,9 +8,12 @@ use margaret_views::maud::Markup;
 use margaret_views::maud::html;
 use margaret_views::renders_view::RendersView;
 
-use crate::views::asset_page_props::AssetPageProps;
 use crate::views::asset_showcase::AssetShowcase;
-use crate::views::asset_showcase_props::AssetShowcaseProps;
+use crate::views::asset_showcase::AssetShowcaseProps;
+
+pub struct AssetPageProps {
+    pub asset_bag: AssetBag,
+}
 
 #[singleton]
 pub struct AssetPage {
@@ -54,7 +58,7 @@ mod tests {
     use margaret_views::renders_view::RendersView;
 
     use super::AssetPage;
-    use crate::views::asset_page_props::AssetPageProps;
+    use super::AssetPageProps;
     use crate::views::asset_showcase::AssetShowcase;
 
     #[test]

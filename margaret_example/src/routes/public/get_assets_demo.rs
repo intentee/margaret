@@ -9,7 +9,7 @@ use margaret_macros::singleton;
 use margaret_views::renders_view::RendersView;
 
 use crate::views::asset_page::AssetPage;
-use crate::views::asset_page_props::AssetPageProps;
+use crate::views::asset_page::AssetPageProps;
 
 #[singleton]
 #[responds_to_http(method = "get", path = "/assets-demo", server = "public")]

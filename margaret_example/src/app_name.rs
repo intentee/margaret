@@ -2,21 +2,21 @@ use margaret_macros::constructor;
 use margaret_macros::singleton;
 
 #[singleton]
-pub struct Config {
-    app_name: String,
+pub struct AppName {
+    value: String,
 }
 
-impl Config {
+impl AppName {
     #[constructor]
     #[must_use]
     pub fn create() -> Self {
         Self {
-            app_name: "margaret".to_string(),
+            value: "margaret".to_string(),
         }
     }
 
     #[must_use]
-    pub fn app_name(&self) -> &str {
-        &self.app_name
+    pub fn as_str(&self) -> &str {
+        &self.value
     }
 }

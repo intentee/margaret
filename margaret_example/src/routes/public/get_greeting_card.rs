@@ -10,7 +10,7 @@ use margaret_views::renders_view::RendersView;
 use crate::greeter::Greeter;
 use crate::margaret::routes::Routes;
 use crate::margaret::views::Views;
-use crate::views::greeting_view_props::GreetingViewProps;
+use crate::views::greeting_view::GreetingViewProps;
 
 #[singleton]
 #[responds_to_http(method = "get", path = "/greeting-card", server = "public")]

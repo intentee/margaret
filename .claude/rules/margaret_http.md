@@ -1,6 +1,8 @@
 ---
 paths:
   - "margaret_http/**"
+  - "margaret_http_tests/**"
+  - "margaret_http_validation/**"
   - "margaret_macros/**"
 ---
 

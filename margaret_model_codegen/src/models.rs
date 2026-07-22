@@ -13,8 +13,8 @@ use margaret_attributes::indexed_field::IndexedField;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::select_unique_attribute::select_unique_attribute;
-use margaret_foreign_key_naming::foreign_key_column_name::foreign_key_column_name;
-use margaret_schema_index_naming::index_name::index_name;
+use margaret_schema_identifier::schema_identifier::schema_identifier;
+use margaret_schema_identifier_naming::index_name::index_name;
 
 use crate::collected_model::CollectedModel;
 use crate::column_arguments::ColumnArguments;
@@ -421,7 +421,7 @@ fn resolve_model(
             }
         };
 
-        let column_name = foreign_key_column_name(&field_name, &referenced.name);
+        let column_name = schema_identifier(&[field_name.as_str(), referenced.name.as_str()]);
         let column_name = register_column_name(column_name, &model, &mut seen_columns)?;
 
         columns.push(ResolvedColumn {

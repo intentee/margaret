@@ -7,22 +7,22 @@ use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 use margaret_views::renders_view::RendersView;
 
-use crate::config::Config;
+use crate::app_name::AppName;
 use crate::margaret::routes::Routes;
 use crate::margaret::views::Views;
-use crate::views::farewell_view_props::FarewellViewProps;
+use crate::views::farewell_view::FarewellViewProps;
 
 #[singleton]
 #[responds_to_http(method = "get", path = "/farewell-card", server = "public")]
 pub struct GetFarewellCard {
-    config: Arc<Config>,
+    app_name: Arc<AppName>,
 }
 
 impl GetFarewellCard {
     #[constructor]
     #[must_use]
-    pub fn create(config: Arc<Config>) -> Self {
-        Self { config }
+    pub fn create(app_name: Arc<AppName>) -> Self {
+        Self { app_name }
     }
 
     #[process]
@@ -30,7 +30,7 @@ impl GetFarewellCard {
         Response::html(
             200,
             views.farewell_view.render(FarewellViewProps {
-                name: self.config.app_name().to_string(),
+                name: self.app_name.as_str().to_string(),
                 routes,
             }),
         )
@@ -42,7 +42,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::GetFarewellCard;
-    use crate::config::Config;
+    use crate::app_name::AppName;
     use crate::margaret::routes::Routes;
     use crate::margaret::views::Views;
     use crate::views::card_layout::CardLayout;
@@ -58,7 +58,7 @@ mod tests {
             greeting_view: Arc::new(GreetingView::create(card_layout)),
         };
         let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
-        let responder = GetFarewellCard::create(Arc::new(Config::create()));
+        let responder = GetFarewellCard::create(Arc::new(AppName::create()));
 
         assert_eq!(responder.respond(&routes, &views).await.status(), 200);
     }

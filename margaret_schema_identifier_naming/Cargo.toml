@@ -1,5 +1,5 @@
 [package]
-name = "margaret_schema_index_naming"
+name = "margaret_schema_identifier_naming"
 version = "0.1.0"
 edition = "2024"
 

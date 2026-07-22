@@ -1,6 +1,7 @@
 ---
 paths:
   - "margaret_container/**"
+  - "margaret_container_tests/**"
   - "margaret_macros/**"
 ---
 

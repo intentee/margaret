@@ -7,9 +7,14 @@ use margaret_views::maud::Markup;
 use margaret_views::maud::html;
 use margaret_views::renders_view::RendersView;
 
+use crate::margaret::routes::Routes;
 use crate::views::card_layout::CardLayout;
-use crate::views::card_layout_props::CardLayoutProps;
-use crate::views::greeting_view_props::GreetingViewProps;
+use crate::views::card_layout::CardLayoutProps;
+
+pub struct GreetingViewProps<'routes> {
+    pub greeting: String,
+    pub routes: &'routes Routes,
+}
 
 #[renders_view(name = "greeting_view")]
 #[singleton]
@@ -43,9 +48,9 @@ mod tests {
     use margaret_views::renders_view::RendersView;
 
     use super::GreetingView;
+    use super::GreetingViewProps;
     use crate::margaret::routes::Routes;
     use crate::views::card_layout::CardLayout;
-    use crate::views::greeting_view_props::GreetingViewProps;
 
     #[test]
     fn renders_the_greeting_inside_the_card_layout() {

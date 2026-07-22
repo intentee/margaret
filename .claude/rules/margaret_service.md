@@ -1,6 +1,7 @@
 ---
 paths:
   - "margaret_service/**"
+  - "margaret_service_tests/**"
 ---
 
 # `margaret_service` crate rules

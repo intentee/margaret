@@ -4,7 +4,10 @@ use margaret_views::maud::Markup;
 use margaret_views::maud::html;
 use margaret_views::renders_view::RendersView;
 
-use crate::views::card_layout_props::CardLayoutProps;
+pub struct CardLayoutProps {
+    pub body: Markup,
+    pub home_url: String,
+}
 
 #[renders_view(name = "card_layout")]
 #[singleton]
@@ -29,7 +32,7 @@ mod tests {
     use margaret_views::renders_view::RendersView;
 
     use super::CardLayout;
-    use crate::views::card_layout_props::CardLayoutProps;
+    use super::CardLayoutProps;
 
     #[test]
     fn wraps_the_body_and_links_home() {

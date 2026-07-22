@@ -1,10 +1,14 @@
+use margaret_asset_bag::asset_bag::AssetBag;
 use margaret_macros::singleton;
 use margaret_views::maud::Markup;
 use margaret_views::maud::html;
 use margaret_views::renders_view::RendersView;
 
 use crate::margaret::asset_bag::asset;
-use crate::views::asset_showcase_props::AssetShowcaseProps;
+
+pub struct AssetShowcaseProps {
+    pub asset_bag: AssetBag,
+}
 
 #[singleton]
 pub struct AssetShowcase;
@@ -37,7 +41,7 @@ mod tests {
     use margaret_views::renders_view::RendersView;
 
     use super::AssetShowcase;
-    use crate::views::asset_showcase_props::AssetShowcaseProps;
+    use super::AssetShowcaseProps;
 
     #[test]
     fn renders_static_assets_and_registers_the_entry_point() {

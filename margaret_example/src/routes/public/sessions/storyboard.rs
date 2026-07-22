@@ -14,7 +14,7 @@ use crate::greeter::Greeter;
 use crate::margaret::routes::Routes;
 use crate::margaret::views::Views;
 use crate::models::article::Article;
-use crate::views::greeting_view_props::GreetingViewProps;
+use crate::views::greeting_view::GreetingViewProps;
 
 #[middleware(logged)]
 #[websocket_session(path = "/storyboard/{topic}/{article}", server = "public")]

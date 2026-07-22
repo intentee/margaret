@@ -1,0 +1,4 @@
+---
+paths:
+  - "margaret_model/**"
+---

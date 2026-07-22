@@ -1476,13 +1476,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_foreign_key_naming"
-version = "0.1.0"
-dependencies = [
- "margaret_schema_identifier",
-]
-
-[[package]]
 name = "margaret_generated_module"
 version = "0.1.0"
 dependencies = [
@@ -1740,9 +1733,9 @@ name = "margaret_model_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
- "margaret_foreign_key_naming",
  "margaret_generated_module",
- "margaret_schema_index_naming",
+ "margaret_schema_identifier",
+ "margaret_schema_identifier_naming",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -1792,7 +1785,7 @@ name = "margaret_schema_identifier"
 version = "0.1.0"
 
 [[package]]
-name = "margaret_schema_index_naming"
+name = "margaret_schema_identifier_naming"
 version = "0.1.0"
 dependencies = [
  "margaret_schema_identifier",
