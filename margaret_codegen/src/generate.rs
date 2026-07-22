@@ -7,6 +7,7 @@ use margaret_attributes::crate_root::CrateRoot;
 
 use crate::build::build;
 use crate::codegen_error::CodegenError;
+use crate::workspace_root::workspace_root;
 
 fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
     match fs::read_to_string(metafile_path) {
@@ -22,7 +23,9 @@ fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
 fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
     let host_source = manifest_directory.join("src");
     let generated_directory = host_source.join("margaret");
-    let metafile_path = manifest_directory.join("esbuild-meta.json");
+    let location = workspace_root(manifest_directory)?;
+    let metafile_path = location.root().join("esbuild-meta.json");
+    let assets_directory = location.root().join("assets");
     let crate_root = CrateRoot::new("crate", host_source);
 
     fs::create_dir_all(&generated_directory).map_err(|source| CodegenError::CreateDirectory {
@@ -41,13 +44,15 @@ fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
 
     let metafile_contents = read_metafile(&metafile_path)?;
 
-    build(&crate_root, metafile_contents)?.write_to(&generated_directory)?;
+    build(&crate_root, metafile_contents, location.embed_relative())?
+        .write_to(&generated_directory)?;
 
     println!(
         "cargo:rerun-if-changed={}",
         crate_root.source_directory.display()
     );
     println!("cargo:rerun-if-changed={}", metafile_path.display());
+    println!("cargo:rerun-if-changed={}", assets_directory.display());
 
     Ok(())
 }
@@ -90,6 +95,8 @@ impl Config {
 
         fs::create_dir_all(&source).expect("the src directory exists");
         fs::write(source.join("lib.rs"), lib_source).expect("lib.rs is written");
+        fs::write(directory.join("Cargo.toml"), "[workspace]\n")
+            .expect("the workspace manifest is written");
     }
 
     fn read_generated(manifest_directory: &Path, name: &str) -> String {
@@ -147,6 +154,24 @@ struct Config {
             error
                 .to_string()
                 .contains("failed to read the esbuild metafile")
+        );
+    }
+
+    #[test]
+    fn reports_a_manifest_without_a_workspace_root() {
+        let host = tempdir().expect("a host crate directory");
+        let source = host.path().join("src");
+
+        fs::create_dir_all(&source).expect("the src directory exists");
+        fs::write(source.join("lib.rs"), "").expect("lib.rs is written");
+
+        let error =
+            generate_into(host.path()).expect_err("a manifest without a workspace root is reported");
+
+        assert!(
+            error
+                .to_string()
+                .contains("no Cargo workspace root was found")
         );
     }
 

@@ -17,6 +17,7 @@ use crate::websocket_pass::websocket_pass;
 pub fn build(
     crate_root: &CrateRoot,
     metafile_contents: Option<String>,
+    embed_relative: &str,
 ) -> Result<GeneratedCode, CodegenError> {
     let index = AttributeIndexBuilder::new()
         .index_crate(crate_root)?
@@ -24,7 +25,7 @@ pub fn build(
     let mut context = BuildContext::new(&index, metafile_contents);
 
     let bindings = container_pass(&mut context)?;
-    asset_bag_pass(&mut context)?;
+    asset_bag_pass(&mut context, &bindings, embed_relative)?;
     middleware_pass(&mut context)?;
     websocket_pass(&mut context, &bindings)?;
     views_pass(&mut context)?;
@@ -183,12 +184,18 @@ struct Room;
         fs::write(generated_directory.join("mod.rs"), "").expect("the umbrella stub is written");
     }
 
+    const EMBED_RELATIVE: &str = ".";
+
     fn generate(lib_source: &str) -> Result<GeneratedCode, CodegenError> {
         let directory = crate_with(lib_source);
 
         bootstrap(&directory);
 
-        build(&CrateRoot::new("crate", directory.path().join("src")), None)
+        build(
+            &CrateRoot::new("crate", directory.path().join("src")),
+            None,
+            EMBED_RELATIVE,
+        )
     }
 
     fn generate_unformatted(source: &Path) -> GeneratedCode {
@@ -199,7 +206,7 @@ struct Room;
         let mut context = BuildContext::new(&index, None);
 
         let bindings = container_pass(&mut context).expect("the container pass succeeds");
-        asset_bag_pass(&mut context).expect("the asset bag pass succeeds");
+        asset_bag_pass(&mut context, &bindings, EMBED_RELATIVE).expect("the asset bag pass succeeds");
         middleware_pass(&mut context).expect("the middleware pass succeeds");
         websocket_pass(&mut context, &bindings).expect("the websocket pass succeeds");
         views_pass(&mut context).expect("the views pass succeeds");
@@ -275,11 +282,100 @@ struct Room;
                 r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
                     .to_string(),
             ),
+            EMBED_RELATIVE,
         )
         .expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod asset_bag;"));
         assert!(module(&code, "asset_bag").contains("macro_rules! asset"));
+        assert!(!module(&code, "asset_bag").contains("pub mod asset_responder"));
+        assert!(!has_module(&code, "asset_bag/asset_responder"));
+    }
+
+    const ASSET_RESPONDER_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+struct AssetRoute {
+    responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
+}
+
+impl AssetRoute {
+    #[constructor]
+    fn create(
+        responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
+    ) -> Self {}
+}
+";
+
+    #[test]
+    fn generates_the_asset_responder_when_a_constructor_injects_it() {
+        let directory = crate_with(ASSET_RESPONDER_CRATE);
+        bootstrap(&directory);
+
+        let code = build(
+            &CrateRoot::new("crate", directory.path().join("src")),
+            Some(
+                r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
+                    .to_string(),
+            ),
+            EMBED_RELATIVE,
+        )
+        .expect("the build succeeds");
+
+        assert!(module(&code, "asset_bag").contains("pub mod asset_responder;"));
+        assert!(module(&code, "asset_bag/asset_responder").contains("pub struct AssetResponder"));
+        assert!(module(&code, "asset_bag/asset_responder").contains("\"app_ABC.js\" =>"));
+        assert!(
+            module(&code, "container").contains("asset_bag::asset_responder::AssetResponder")
+        );
+    }
+
+    #[test]
+    fn reports_an_injected_asset_responder_without_a_metafile() {
+        let message = generate(ASSET_RESPONDER_CRATE)
+            .expect_err("an injected asset responder without a metafile is rejected")
+            .to_string();
+
+        assert!(message.contains("no esbuild metafile was found at the workspace root"));
+    }
+
+    const ASSET_RESPONDER_COLLISION_CRATE: &str = "\
+#[singleton]
+struct AssetRoute {
+    responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
+}
+
+impl AssetRoute {
+    #[constructor]
+    fn create(
+        responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
+    ) -> Self {}
+}
+
+pub mod margaret {
+    pub mod asset_bag {
+        pub mod asset_responder {
+            #[singleton]
+            pub struct AssetResponder;
+
+            impl AssetResponder {
+                #[constructor]
+                pub fn create() -> Self {}
+            }
+        }
+    }
+}
+";
+
+    #[test]
+    fn reports_a_user_singleton_colliding_with_the_asset_responder() {
+        let message = generate(ASSET_RESPONDER_COLLISION_CRATE)
+            .expect_err("a singleton at the asset responder path is rejected")
+            .to_string();
+
+        assert!(message.contains("collides with a singleton declared at the same path"));
     }
 
     #[test]
@@ -298,6 +394,7 @@ struct Room;
         let message = build(
             &CrateRoot::new("crate", directory.path().join("src")),
             Some(r#"{ "outputs": {} }"#.to_string()),
+            EMBED_RELATIVE,
         )
         .expect_err("an invalid metafile is rejected")
         .to_string();
@@ -513,6 +610,28 @@ impl RequestLog {
                 .to_string();
 
         assert!(message.contains("failed to generate the dependency container"));
+    }
+
+    const RECEIVER_CONSTRUCTOR_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+struct Config;
+
+impl Config {
+    #[constructor]
+    fn create(&self) -> Self {}
+}
+";
+
+    #[test]
+    fn reports_a_constructor_with_a_receiver_parameter() {
+        let message = generate(RECEIVER_CONSTRUCTOR_CRATE)
+            .expect_err("a constructor with a receiver parameter is rejected")
+            .to_string();
+
+        assert!(message.contains("has an unsupported type"));
     }
 
     #[test]

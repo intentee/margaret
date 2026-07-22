@@ -16,7 +16,7 @@ pub fn resolve_full_fixture(consumer: &str, declared: &str) -> InjectableResolut
         .index_crate(&CrateRoot::new("full", &directory))
         .expect("the full fixture crate is indexed")
         .build();
-    let bindings = render_container(&index)
+    let bindings = render_container(&index, &[])
         .expect("the full fixture renders")
         .bindings;
     let item = index
