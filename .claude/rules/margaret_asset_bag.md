@@ -12,4 +12,4 @@ The goal of `margaret_asset_bag` crates is to expose front-end assets in a way t
 - invalid paths must be detected at compile time
 - content types must be derived from the files themselves, and `esbuild-meta.json` itself (never just from the filename)
 - both content type and the content itself must be resolved compile-time
-
+- asset bag can only access `esbuild-meta.json` properties through `esbuild-metafile` crate

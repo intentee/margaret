@@ -3,8 +3,5 @@ name = "margaret_schema_identifier_naming"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
-margaret_schema_identifier = { path = "../margaret_schema_identifier" }
-
 [lints]
 workspace = true

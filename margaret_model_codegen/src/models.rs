@@ -13,8 +13,8 @@ use margaret_attributes::indexed_field::IndexedField;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::select_unique_attribute::select_unique_attribute;
-use margaret_schema_identifier::schema_identifier::schema_identifier;
 use margaret_schema_identifier_naming::index_name::index_name;
+use margaret_schema_identifier_naming::schema_identifier::schema_identifier;
 
 use crate::collected_model::CollectedModel;
 use crate::column_arguments::ColumnArguments;

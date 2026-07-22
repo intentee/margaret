@@ -1,4 +1,4 @@
-use margaret_schema_identifier::schema_identifier::schema_identifier;
+use crate::schema_identifier::schema_identifier;
 
 #[must_use]
 pub fn index_name(table: &str, column: &str) -> String {
