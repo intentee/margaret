@@ -101,10 +101,12 @@ fn classify_context_specific(
                 }
             }
         }
-        BindingContext::Middleware { .. } => Err(RequestBindingError::UnmarkedMiddlewareParameter {
-            subject: subject.to_string(),
-            parameter: position.to_string(),
-        }),
+        BindingContext::Middleware { .. } => {
+            Err(RequestBindingError::UnmarkedMiddlewareParameter {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+            })
+        }
     }
 }
 

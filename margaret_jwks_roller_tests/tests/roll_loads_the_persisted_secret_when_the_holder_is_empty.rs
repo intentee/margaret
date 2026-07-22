@@ -1,6 +1,6 @@
-use margaret_jwks_key_gen::curve::Curve;
-use margaret_jwks_key_gen::jwks_secret::JwksSecret;
-use margaret_jwks_key_gen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_keygen::curve::Curve;
+use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_roller::roll::roll;
 use margaret_jwks_roller_tests::stored_jwks_secret_storage::StoredJwksSecretStorage;
 

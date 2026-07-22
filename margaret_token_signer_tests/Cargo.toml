@@ -7,7 +7,7 @@ autotests = false
 [dependencies]
 chrono = { workspace = true }
 margaret_identity_session = { path = "../margaret_identity_session" }
-margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
+margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 uuid = { workspace = true }
 
 [dev-dependencies]

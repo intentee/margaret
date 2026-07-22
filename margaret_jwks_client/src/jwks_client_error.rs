@@ -1,15 +1,12 @@
 use thiserror::Error;
 use url::ParseError;
 
-use margaret_jwks_key_gen::jwks_key_error::JwksKeyError;
+use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 
 #[derive(Debug, Error)]
 pub enum JwksClientError {
     #[error("the jwks document could not be fetched from the issuer: {0}")]
     DocumentFetch(#[source] reqwest::Error),
-
-    #[error("the jwks http client could not be built: {0}")]
-    HttpClientBuild(#[source] reqwest::Error),
 
     #[error("the issuer url '{issuer_url}' cannot carry the well known jwks path: {source}")]
     IssuerUrlNotABase {

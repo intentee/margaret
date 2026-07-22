@@ -21,8 +21,8 @@ members = [
     "margaret_injection_codegen",
     "margaret_jwks_client",
     "margaret_jwks_client_tests",
-    "margaret_jwks_key_gen",
-    "margaret_jwks_key_gen_tests",
+    "margaret_jwks_keygen",
+    "margaret_jwks_keygen_tests",
     "margaret_jwks_roller",
     "margaret_jwks_roller_server",
     "margaret_jwks_roller_tests",
@@ -34,6 +34,7 @@ members = [
     "margaret_peer_identity_tests",
     "margaret_request_binding_codegen",
     "margaret_route_parameter_codegen",
+    "margaret_schema_codegen",
     "margaret_schema_identifier_naming",
     "margaret_service",
     "margaret_service_codegen",
@@ -116,5 +117,5 @@ must_use_candidate = "warn"
 [profile.dev.package."*"]
 opt-level = 3
 
-[profile.dev.package.margaret_jwks_key_gen]
+[profile.dev.package.margaret_jwks_keygen]
 opt-level = 3

@@ -1,0 +1,65 @@
+use std::sync::Arc;
+
+use serde::Deserialize;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+
+use crate::compact_jws::CompactJws;
+use crate::jwk_public::JwkPublic;
+use crate::jwks_key_error::JwksKeyError;
+use crate::jwks_secret::JwksSecret;
+use crate::jws_header::JwsHeader;
+use crate::token_verification::TokenVerification;
+use crate::verifies_token::VerifiesToken;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PublicJwks {
+    pub keys: Vec<JwkPublic>,
+}
+
+impl PublicJwks {
+    #[must_use]
+    pub fn find_by_kid(&self, kid: &str) -> Option<&JwkPublic> {
+        self.keys.iter().find(|key| key.kid == kid)
+    }
+
+    fn publish(&mut self, jwk_public: &JwkPublic) {
+        if self.find_by_kid(&jwk_public.kid).is_none() {
+            self.keys.push(jwk_public.clone());
+        }
+    }
+}
+
+impl From<Arc<JwksSecret>> for PublicJwks {
+    fn from(jwks_secret: Arc<JwksSecret>) -> Self {
+        let mut public_jwks = Self { keys: Vec::new() };
+
+        public_jwks.publish(&jwks_secret.current.public);
+        public_jwks.publish(&jwks_secret.previous.public);
+        public_jwks.publish(&jwks_secret.next.public);
+
+        public_jwks
+    }
+}
+
+impl From<JwksSecret> for PublicJwks {
+    fn from(jwks_secret: JwksSecret) -> Self {
+        Self::from(Arc::new(jwks_secret))
+    }
+}
+
+impl VerifiesToken for PublicJwks {
+    fn verify<TClaims: DeserializeOwned>(
+        &self,
+        token: &str,
+    ) -> Result<TokenVerification<TClaims>, JwksKeyError> {
+        let compact_jws = CompactJws::parse(token)?;
+        let header: JwsHeader = serde_json::from_slice(&compact_jws.header_bytes)
+            .map_err(|source| JwksKeyError::HeaderJson { source })?;
+
+        match self.find_by_kid(&header.kid) {
+            Some(key) => key.verify(token),
+            None => Err(JwksKeyError::UnknownKeyId { kid: header.kid }),
+        }
+    }
+}

@@ -1,5 +1,5 @@
-use margaret_jwks_key_gen::curve::Curve;
-use margaret_jwks_key_gen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_keygen::curve::Curve;
+use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_roller::roll::roll;
 use margaret_jwks_roller::roller_error::RollerError;
 use margaret_jwks_roller_tests::unreachable_jwks_secret_storage::UnreachableJwksSecretStorage;
