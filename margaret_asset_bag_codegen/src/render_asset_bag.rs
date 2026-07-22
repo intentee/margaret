@@ -3,21 +3,24 @@ use std::collections::BTreeSet;
 use esbuild_metafile::esbuild_metafile::EsbuildMetafile;
 use esbuild_metafile::raw_esbuild_metafile::RawEsbuildMetafile;
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::asset_arm::AssetArm;
 use crate::asset_bag_codegen_error::AssetBagCodegenError;
+use crate::asset_responder_identity::asset_responder_canonical_suffix;
 use crate::asset_slot::AssetSlot;
 use crate::bundle_tokens::bundle_tokens;
 use crate::enumerate_inputs::enumerate_inputs;
 use crate::output_directory::output_directory;
+use crate::render_asset_responder::render_asset_responder;
 use crate::resolution_tokens::resolution_tokens;
 use crate::resolve_static_outputs::resolve_static_outputs;
+use crate::responder_generation::ResponderGeneration;
 
-fn module_tokens(directory: &str, arms: &[AssetArm]) -> TokenStream {
-    let folder = format!("{directory}/");
+fn macro_module_tokens(arms: &[AssetArm], responder_declaration: &TokenStream) -> TokenStream {
     let arm_tokens: Vec<TokenStream> = arms
         .iter()
         .map(|AssetArm { handle, input }| {
@@ -28,9 +31,7 @@ fn module_tokens(directory: &str, arms: &[AssetArm]) -> TokenStream {
         .collect();
 
     quote! {
-        #[derive(::rust_embed::RustEmbed)]
-        #[folder = #folder]
-        pub struct EmbeddedAssets;
+        #responder_declaration
 
         macro_rules! asset {
             #(#arm_tokens)*
@@ -45,6 +46,7 @@ fn module_tokens(directory: &str, arms: &[AssetArm]) -> TokenStream {
 
 pub fn render_asset_bag(
     metafile_contents: &str,
+    responder: ResponderGeneration,
 ) -> Result<Vec<GeneratedModuleTokens>, AssetBagCodegenError> {
     let raw: RawEsbuildMetafile = serde_json::from_str(metafile_contents)?;
     let enumerated = enumerate_inputs(&raw)?;
@@ -81,16 +83,38 @@ pub fn render_asset_bag(
         });
     }
 
-    Ok(vec![GeneratedModuleTokens::new(
-        "asset_bag",
-        module_tokens(&directory, &arms),
-    )])
+    let [root_module, responder_module, responder_type] = asset_responder_canonical_suffix();
+
+    match responder {
+        ResponderGeneration::Skip => Ok(vec![GeneratedModuleTokens::new(
+            root_module,
+            macro_module_tokens(&arms, &quote! {}),
+        )]),
+        ResponderGeneration::Emit { embed_relative } => {
+            let responder_module_identifier = format_ident!("{responder_module}");
+            let responder_declaration = quote! { pub mod #responder_module_identifier; };
+            let responder_tokens =
+                render_asset_responder(&output_paths, &directory, &embed_relative, responder_type)?;
+
+            Ok(vec![
+                GeneratedModuleTokens::new(
+                    root_module,
+                    macro_module_tokens(&arms, &responder_declaration),
+                ),
+                GeneratedModuleTokens::new(
+                    format!("{root_module}/{responder_module}"),
+                    responder_tokens,
+                ),
+            ])
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::render_asset_bag;
     use crate::asset_bag_codegen_error::AssetBagCodegenError;
+    use crate::responder_generation::ResponderGeneration;
 
     const FULL_METAFILE: &str = r#"{
         "outputs": {
@@ -124,17 +148,14 @@ mod tests {
         }
     }"#;
 
-    fn formatted_module(metafile_contents: &str) -> String {
-        let mut modules =
-            render_asset_bag(metafile_contents).expect("the asset bag module is generated");
+    fn formatted(metafile_contents: &str, responder: ResponderGeneration, name: &str) -> String {
+        let modules =
+            render_asset_bag(metafile_contents, responder).expect("the asset bag module is generated");
 
-        assert_eq!(modules.len(), 1);
-
-        let module = modules.remove(0);
-
-        assert_eq!(module.name(), "asset_bag");
-
-        module
+        modules
+            .into_iter()
+            .find(|module| module.name() == name)
+            .expect("the requested module is generated")
             .format()
             .expect("the generated tokens form a valid Rust file")
             .source()
@@ -142,11 +163,11 @@ mod tests {
     }
 
     #[test]
-    fn generates_a_valid_module_with_an_arm_per_addressable_input() {
-        let source = formatted_module(FULL_METAFILE);
+    fn generates_the_macro_with_an_arm_per_addressable_input() {
+        let source = formatted(FULL_METAFILE, ResponderGeneration::Skip, "asset_bag");
 
-        assert!(source.contains("#[folder = \"assets/\"]"));
-        assert!(source.contains("pub struct EmbeddedAssets"));
+        assert!(!source.contains("EmbeddedAssets"));
+        assert!(!source.contains("RustEmbed"));
         assert!(source.contains("macro_rules! asset"));
         assert!(source.contains("(\"resources/ts/app.ts\") =>"));
         assert!(source.contains("script_stylesheet_bundle::ScriptStylesheetBundle::new"));
@@ -161,8 +182,65 @@ mod tests {
     }
 
     #[test]
+    fn omits_the_responder_submodule_when_generation_is_skipped() {
+        let modules = render_asset_bag(FULL_METAFILE, ResponderGeneration::Skip)
+            .expect("the asset bag module is generated");
+
+        assert_eq!(modules.len(), 1);
+        assert_eq!(modules[0].name(), "asset_bag");
+
+        let root = formatted(FULL_METAFILE, ResponderGeneration::Skip, "asset_bag");
+
+        assert!(!root.contains("pub mod asset_responder"));
+    }
+
+    #[test]
+    fn emits_the_responder_submodule_and_declares_it_from_the_root() {
+        let modules = render_asset_bag(
+            FULL_METAFILE,
+            ResponderGeneration::Emit {
+                embed_relative: "..".to_string(),
+            },
+        )
+        .expect("the asset bag module is generated");
+
+        assert_eq!(modules.len(), 2);
+        assert!(modules.iter().any(|module| module.name() == "asset_bag"));
+        assert!(
+            modules
+                .iter()
+                .any(|module| module.name() == "asset_bag/asset_responder")
+        );
+
+        let root = formatted(
+            FULL_METAFILE,
+            ResponderGeneration::Emit {
+                embed_relative: "..".to_string(),
+            },
+            "asset_bag",
+        );
+        let responder = formatted(
+            FULL_METAFILE,
+            ResponderGeneration::Emit {
+                embed_relative: "..".to_string(),
+            },
+            "asset_bag/asset_responder",
+        );
+
+        assert!(root.contains("pub mod asset_responder;"));
+        assert!(responder.contains("pub struct AssetResponder"));
+        assert!(responder.contains("\"app_ABC.js\" =>"));
+        assert!(responder.contains("\"text/javascript\""));
+        assert!(responder.contains("\"logo_ABC.png\" =>"));
+        assert!(responder.contains("\"image/png\""));
+        assert!(responder.contains("\"favicon_MWST.svg\" =>"));
+        assert!(responder.contains("\"image/svg+xml\""));
+        assert!(responder.contains("public, max-age=31536000, immutable"));
+    }
+
+    #[test]
     fn omits_an_arm_for_a_bundled_source_input_without_a_static_asset() {
-        let source = formatted_module(FULL_METAFILE);
+        let source = formatted(FULL_METAFILE, ResponderGeneration::Skip, "asset_bag");
 
         assert!(!source.contains("node_modules/react/index.js"));
     }
@@ -170,7 +248,7 @@ mod tests {
     #[test]
     fn rejects_a_metafile_that_is_not_valid_json() {
         assert_eq!(
-            render_asset_bag("not json")
+            render_asset_bag("not json", ResponderGeneration::Skip)
                 .expect_err("invalid json is rejected")
                 .to_string(),
             "failed to parse the esbuild metafile"
@@ -180,7 +258,7 @@ mod tests {
     #[test]
     fn rejects_a_metafile_without_outputs() {
         assert_eq!(
-            render_asset_bag(r#"{ "outputs": {} }"#)
+            render_asset_bag(r#"{ "outputs": {} }"#, ResponderGeneration::Skip)
                 .expect_err("a metafile without outputs is rejected")
                 .to_string(),
             "the esbuild metafile declares no outputs"
@@ -202,7 +280,8 @@ mod tests {
                             "inputs": { "resources/media/logo.png": {} }
                         }
                     }
-                }"#
+                }"#,
+                ResponderGeneration::Skip,
             ),
             Err(AssetBagCodegenError::AmbiguousStaticInput { input, output_count })
                 if input == "resources/media/logo.png" && output_count == 2
@@ -224,10 +303,32 @@ mod tests {
                             "entryPoint": "resources/ts/app.ts"
                         }
                     }
-                }"#
+                }"#,
+                ResponderGeneration::Skip,
             ),
             Err(AssetBagCodegenError::DuplicateEntrypoint { input })
                 if input == "resources/ts/app.ts"
+        ));
+    }
+
+    #[test]
+    fn propagates_an_unsupported_content_type_when_emitting_the_responder() {
+        assert!(matches!(
+            render_asset_bag(
+                r#"{
+                    "outputs": {
+                        "assets/model_HASH.bin": {
+                            "imports": [],
+                            "inputs": { "resources/model.bin": {} }
+                        }
+                    }
+                }"#,
+                ResponderGeneration::Emit {
+                    embed_relative: "..".to_string(),
+                },
+            ),
+            Err(AssetBagCodegenError::UnsupportedAssetContentType { output })
+                if output == "assets/model_HASH.bin"
         ));
     }
 
@@ -242,7 +343,8 @@ mod tests {
                             "entryPoint": "src/mod.ts"
                         }
                     }
-                }"#
+                }"#,
+                ResponderGeneration::Skip,
             ),
             Err(AssetBagCodegenError::UnsupportedIncludeOutput { output }) if output == "assets/mod_ABC.wasm"
         ));

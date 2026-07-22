@@ -1,4 +1,5 @@
 mod asset_bag_pass;
+mod asset_responder_path;
 pub mod build;
 mod build_context;
 mod capabilities;
@@ -15,3 +16,5 @@ mod services_pass;
 mod umbrella;
 mod views_pass;
 mod websocket_pass;
+mod workspace_location;
+mod workspace_root;

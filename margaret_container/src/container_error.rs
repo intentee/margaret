@@ -34,6 +34,11 @@ pub enum ContainerError {
         second: String,
     },
 
+    #[error(
+        "the framework-provided injectable '{path}' collides with a singleton declared at the same path"
+    )]
+    AmbiguousFrameworkProvider { path: String },
+
     #[error("the provided interface '{written}' of singleton '{singleton}' matches no trait")]
     ProvidesUnresolvable { singleton: String, written: String },
 
