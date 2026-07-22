@@ -459,7 +459,7 @@ fn resolve_model(
     })
 }
 
-pub(crate) fn models(attribute_index: &AttributeIndex) -> Result<Vec<Model>, ModelCodegenError> {
+pub fn models(attribute_index: &AttributeIndex) -> Result<Vec<Model>, ModelCodegenError> {
     let mut targets: HashMap<CanonicalPath, ForeignKeyTarget> = HashMap::new();
     let collected = collect_models(attribute_index, &mut targets)?;
 

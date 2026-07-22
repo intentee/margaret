@@ -3,8 +3,8 @@ use std::sync::Arc;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller_server::JwksRollerServerBundle;
 use margaret_jwks_roller_server::JwksRollerServerBundleParams;
-use margaret_jwks_roller_server::jwk_public_set_handler::JwkPublicSetHandler;
 use margaret_jwks_roller_server::jwks_roller_server_error::JwksRollerServerError;
+use margaret_jwks_roller_server::public_jwks_handler::PublicJwksHandler;
 use margaret_macros::constructor;
 use margaret_macros::process;
 use margaret_macros::scheduled_with_tick_timer;
@@ -15,7 +15,7 @@ use margaret_macros::scheduled_with_tick_timer;
 )]
 pub struct JwksRoller {
     bundle: JwksRollerServerBundle,
-    jwk_public_set_handler: Arc<JwkPublicSetHandler>,
+    public_jwks_handler: Arc<PublicJwksHandler>,
 }
 
 impl JwksRoller {
@@ -25,17 +25,17 @@ impl JwksRoller {
         let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
             storage: Arc::new(MemoryJwksSecretStorage),
         });
-        let jwk_public_set_handler = bundle.jwk_public_set_handler();
+        let public_jwks_handler = bundle.public_jwks_handler();
 
         Self {
             bundle,
-            jwk_public_set_handler,
+            public_jwks_handler,
         }
     }
 
     #[must_use]
-    pub fn jwk_public_set_handler(&self) -> &JwkPublicSetHandler {
-        &self.jwk_public_set_handler
+    pub fn public_jwks_handler(&self) -> &PublicJwksHandler {
+        &self.public_jwks_handler
     }
 
     #[process]

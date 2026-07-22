@@ -25,9 +25,7 @@ pub enum RequestBindingError {
     )]
     NextOutsideMiddleware { subject: String, parameter: String },
 
-    #[error(
-        "{subject} declares more than one next handler; a middleware forwards to exactly one"
-    )]
+    #[error("{subject} declares more than one next handler; a middleware forwards to exactly one")]
     MultipleNextParameters { subject: String },
 
     #[error(

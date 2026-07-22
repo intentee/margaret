@@ -1,5 +1,8 @@
 use std::sync::Arc;
+use std::time::Duration;
 
+use reqwest::Client;
+use reqwest::redirect::Policy;
 use rustls::ClientConfig;
 use tokio::task::yield_now;
 use tokio_util::sync::CancellationToken;
@@ -12,7 +15,7 @@ use margaret_jwks_client::JwksClientBundleParams;
 use margaret_jwks_client_tests::running_jwks_server::RunningJwksServer;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
-use margaret_jwks_key_gen::signs_claims::SignsClaims as _;
+use margaret_jwks_keygen::signs_claims::SignsClaims as _;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller_server::JwksRollerServerBundle;
 use margaret_jwks_roller_server::JwksRollerServerBundleParams;
@@ -24,7 +27,7 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
     let server_bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
         storage: Arc::new(MemoryJwksSecretStorage),
     });
-    let jwk_public_set_handler = server_bundle.jwk_public_set_handler();
+    let public_jwks_handler = server_bundle.public_jwks_handler();
     let jwks_secret_holder = server_bundle.jwks_secret_holder();
     let mut roll_services = server_bundle
         .services()
@@ -57,10 +60,17 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
         .expect("the claims sign");
 
     let jwks_server =
-        RunningJwksServer::start(fixture.server_config.clone(), jwk_public_set_handler).await;
+        RunningJwksServer::start(fixture.server_config.clone(), public_jwks_handler).await;
 
+    let http_client = Client::builder()
+        .use_preconfigured_tls(ClientConfig::clone(&fixture.client_config))
+        .https_only(true)
+        .redirect(Policy::none())
+        .timeout(Duration::from_secs(60))
+        .build()
+        .expect("the test jwks http client builds");
     let client_bundle = JwksClientBundle::new(JwksClientBundleParams {
-        client_config: ClientConfig::clone(&fixture.client_config),
+        http_client,
         issuer_url: Url::parse(&format!(
             "https://{}:{}",
             fixture.server_name,

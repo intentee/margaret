@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
+margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 thiserror = { workspace = true }
 
 [lints]

@@ -1,7 +1,8 @@
 use proc_macro2::TokenStream;
 
-pub(crate) struct InferredColumn {
-    pub(crate) column_type: TokenStream,
-    pub(crate) default: TokenStream,
-    pub(crate) nullable: bool,
+#[derive(Debug)]
+pub struct InferredColumn {
+    pub column_type: TokenStream,
+    pub default: TokenStream,
+    pub nullable: bool,
 }

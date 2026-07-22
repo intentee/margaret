@@ -247,9 +247,7 @@ impl Guard {
 
     #[test]
     fn propagates_malformed_middleware_attribute_arguments() {
-        assert!(
-            layers_error_for("#[middleware(= 5)]\nstruct Site;\n").contains("failed to index")
-        );
+        assert!(layers_error_for("#[middleware(= 5)]\nstruct Site;\n").contains("failed to index"));
     }
 
     #[test]
@@ -275,7 +273,10 @@ impl Guard {
     #[test]
     fn folds_the_first_declared_layer_outermost() {
         let folded = fold_layers(
-            &[plain_layer("tracer", "Tracer"), plain_layer("guard", "Guard")],
+            &[
+                plain_layer("tracer", "Tracer"),
+                plain_layer("guard", "Guard"),
+            ],
             quote! { BASE },
             &quote! { super::super::middleware },
         )
@@ -326,15 +327,20 @@ impl Guard {
             "middleware.push(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await}));"
         ));
 
-        let tracer = vector.find("Tracer").expect("the routed middleware is present");
-        let guard = vector.find("Guard").expect("the plain middleware is present");
+        let tracer = vector
+            .find("Tracer")
+            .expect("the routed middleware is present");
+        let guard = vector
+            .find("Guard")
+            .expect("the plain middleware is present");
 
         assert!(tracer < guard);
     }
 
     #[test]
     fn reports_middleware_present() {
-        let index = index_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n");
+        let index =
+            index_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n");
 
         assert!(has_middleware(&index));
     }

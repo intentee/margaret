@@ -9,11 +9,10 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 log = { workspace = true }
 margaret_identity_session = { path = "../margaret_identity_session" }
-margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
+margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
 margaret_sync_holder = { path = "../margaret_sync_holder" }
 reqwest = { workspace = true }
-rustls = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "time"] }

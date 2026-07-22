@@ -1352,6 +1352,7 @@ dependencies = [
  "margaret_http_codegen",
  "margaret_middleware_codegen",
  "margaret_model_codegen",
+ "margaret_schema_codegen",
  "margaret_service_codegen",
  "margaret_views_codegen",
  "margaret_websocket_codegen",
@@ -1585,11 +1586,10 @@ dependencies = [
  "chrono",
  "log",
  "margaret_identity_session",
- "margaret_jwks_key_gen",
+ "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_sync_holder",
  "reqwest",
- "rustls",
  "serde",
  "serde_json",
  "thiserror",
@@ -1608,7 +1608,7 @@ dependencies = [
  "margaret_http_tests",
  "margaret_identity_session",
  "margaret_jwks_client",
- "margaret_jwks_key_gen",
+ "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
  "reqwest",
@@ -1621,7 +1621,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_jwks_key_gen"
+name = "margaret_jwks_keygen"
 version = "0.1.0"
 dependencies = [
  "async-trait",
@@ -1637,12 +1637,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_jwks_key_gen_tests"
+name = "margaret_jwks_keygen_tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64ct",
- "margaret_jwks_key_gen",
+ "margaret_jwks_keygen",
  "p256",
  "p384",
  "serde",
@@ -1655,7 +1655,7 @@ dependencies = [
 name = "margaret_jwks_roller"
 version = "0.1.0"
 dependencies = [
- "margaret_jwks_key_gen",
+ "margaret_jwks_keygen",
  "thiserror",
 ]
 
@@ -1669,7 +1669,7 @@ dependencies = [
  "http",
  "margaret_http",
  "margaret_identity_session",
- "margaret_jwks_key_gen",
+ "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_roller_tests",
  "margaret_sync_holder",
@@ -1685,7 +1685,7 @@ name = "margaret_jwks_roller_tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "margaret_jwks_key_gen",
+ "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "thiserror",
 ]
@@ -1723,7 +1723,6 @@ name = "margaret_model_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
- "margaret_generated_module",
  "margaret_schema_identifier_naming",
  "proc-macro2",
  "quote",
@@ -1768,6 +1767,18 @@ dependencies = [
 [[package]]
 name = "margaret_route_parameter_codegen"
 version = "0.1.0"
+
+[[package]]
+name = "margaret_schema_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_generated_module",
+ "margaret_model_codegen",
+ "proc-macro2",
+ "quote",
+ "tempfile",
+]
 
 [[package]]
 name = "margaret_schema_identifier_naming"
@@ -1949,7 +1960,7 @@ dependencies = [
  "chrono",
  "futures-util",
  "margaret_identity_session",
- "margaret_jwks_key_gen",
+ "margaret_jwks_keygen",
  "serde",
  "thiserror",
 ]
@@ -1961,7 +1972,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "margaret_identity_session",
- "margaret_jwks_key_gen",
+ "margaret_jwks_keygen",
  "margaret_token_signer",
  "tokio",
  "uuid",

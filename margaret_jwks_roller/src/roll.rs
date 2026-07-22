@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use margaret_jwks_key_gen::curve::Curve;
-use margaret_jwks_key_gen::jwks_secret::JwksSecret;
-use margaret_jwks_key_gen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_keygen::curve::Curve;
+use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 
 use crate::jwks_secret_storage::JwksSecretStorage;
 use crate::loaded_secret::LoadedSecret;

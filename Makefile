@@ -18,8 +18,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_injection_codegen \
 	-p margaret_jwks_client \
 	-p margaret_jwks_client_tests \
-	-p margaret_jwks_key_gen \
-	-p margaret_jwks_key_gen_tests \
+	-p margaret_jwks_keygen \
+	-p margaret_jwks_keygen_tests \
 	-p margaret_jwks_roller \
 	-p margaret_jwks_roller_server \
 	-p margaret_jwks_roller_tests \
@@ -31,6 +31,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_peer_identity_tests \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_codegen \
+	-p margaret_schema_codegen \
 	-p margaret_schema_identifier_naming \
 	-p margaret_service \
 	-p margaret_service_codegen \
@@ -92,8 +93,8 @@ coverage: node_modules
 		--gated margaret_injection_codegen=100 \
 		--gated margaret_jwks_client=100 \
 		--gated margaret_jwks_client_tests=100 \
-		--gated margaret_jwks_key_gen=100 \
-		--gated margaret_jwks_key_gen_tests=100 \
+		--gated margaret_jwks_keygen=100 \
+		--gated margaret_jwks_keygen_tests=100 \
 		--gated margaret_jwks_roller=100 \
 		--gated margaret_jwks_roller_server=100 \
 		--gated margaret_jwks_roller_tests=100 \
@@ -105,6 +106,7 @@ coverage: node_modules
 		--gated margaret_peer_identity_tests=100 \
 		--gated margaret_request_binding_codegen=100 \
 		--gated margaret_route_parameter_codegen=100 \
+		--gated margaret_schema_codegen=100 \
 		--gated margaret_schema_identifier_naming=100 \
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \

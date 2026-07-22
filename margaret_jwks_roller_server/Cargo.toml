@@ -9,7 +9,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
 margaret_http = { path = "../margaret_http" }
-margaret_jwks_key_gen = { path = "../margaret_jwks_key_gen" }
+margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
 margaret_sync_holder = { path = "../margaret_sync_holder" }
 serde_json = { workspace = true }

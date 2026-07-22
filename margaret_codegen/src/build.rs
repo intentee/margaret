@@ -377,10 +377,7 @@ impl RequestLog {
 
         assert!(module(&code, "mod").contains("pub mod middleware;"));
         assert!(module(&code, "middleware").contains("pub struct RequestLog"));
-        assert!(
-            concatenated(&code)
-                .contains("super::super::middleware::RequestLog")
-        );
+        assert!(concatenated(&code).contains("super::super::middleware::RequestLog"));
     }
 
     #[test]

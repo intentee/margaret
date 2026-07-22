@@ -23,6 +23,6 @@ impl GetWellKnownJwks {
 
     #[process]
     pub async fn respond(&self) -> Response {
-        self.jwks_roller.jwk_public_set_handler().respond()
+        self.jwks_roller.public_jwks_handler().respond()
     }
 }

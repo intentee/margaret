@@ -1,4 +1,4 @@
-use margaret_jwks_key_gen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::jwks_secret::JwksSecret;
 
 use crate::loaded_secret::LoadedSecret;
 use crate::roller_error::RollerError;

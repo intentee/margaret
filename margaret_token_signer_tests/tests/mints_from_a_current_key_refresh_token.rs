@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use margaret_identity_session::access_token_claims::AccessTokenClaims;
-use margaret_jwks_key_gen::verifies_token::VerifiesToken;
+use margaret_jwks_keygen::verifies_token::VerifiesToken;
 use margaret_token_signer::mint_access_token::mint_access_token;
 use margaret_token_signer::minted_tokens::MintedTokens;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
