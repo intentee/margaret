@@ -30,7 +30,7 @@ Specific attribute rules:
     * `<server>`  must be a string with a server name
 - `#[provides_route_parameter]` - attached to a struct implementing `HttpRouteParameterBinder` with a specific type
 - `#[route_parameter(from = <from>)]` 
-    * used as a part of `#[responder]` method
+    * used as a part of a `#[process]` method
     * `<from>` must be the name of a route parameter that is mapped into the argument (must result in compile time error if there is no such parameter)
 
 # `margaret_http` data flow

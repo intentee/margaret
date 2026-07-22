@@ -3,7 +3,6 @@ resolver = "3"
 members = [
     "margaret_asset_bag",
     "margaret_asset_bag_codegen",
-    "margaret_asset_bag_server",
     "margaret_attributes",
     "margaret_codegen",
     "margaret_codegen_tokens",
@@ -81,7 +80,6 @@ log = "0.4"
 matchit = "0.8"
 maud = "0.27"
 mime = "0.3"
-mime_guess = "2.0"
 multer = "3.1"
 p256 = "0.13"
 p384 = "0.13"

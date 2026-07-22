@@ -1329,15 +1329,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_asset_bag_server"
-version = "0.1.0"
-dependencies = [
- "margaret_http",
- "mime_guess",
- "rust-embed",
-]
-
-[[package]]
 name = "margaret_attributes"
 version = "0.1.0"
 dependencies = [
@@ -1447,7 +1438,6 @@ dependencies = [
  "clap",
  "dashmap",
  "margaret_asset_bag",
- "margaret_asset_bag_server",
  "margaret_codegen",
  "margaret_console",
  "margaret_http",

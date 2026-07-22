@@ -6,5 +6,5 @@ paths:
 
 # `margaret_service` crate rules
 
-- services need to reuse `#[runner]` attribute in the method that actually starts the service
+- services need to reuse `#[process]` attribute in the method that actually starts the service
 - `cancellation_token` argument is optional; if a service does not need it it should not be injected

@@ -32,9 +32,6 @@ fn module_tokens(directory: &str, arms: &[AssetArm]) -> TokenStream {
         #[folder = #folder]
         pub struct EmbeddedAssets;
 
-        pub type AssetServer =
-            ::margaret_asset_bag_server::asset_server::AssetServer<EmbeddedAssets>;
-
         macro_rules! asset {
             #(#arm_tokens)*
             ($other:literal) => {

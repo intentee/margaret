@@ -3,7 +3,7 @@ paths:
   - "margaret_example/build.rs"
 ---
 
-# `margaret_example` `buidl.rs` rules
+# `margaret_example` `build.rs` rules
 
 The rules apply to all the consumer crates in principle.
 

@@ -1,7 +1,6 @@
 COVERAGE_PACKAGES := \
 	-p margaret_asset_bag \
 	-p margaret_asset_bag_codegen \
-	-p margaret_asset_bag_server \
 	-p margaret_attributes \
 	-p margaret_codegen \
 	-p margaret_codegen_tokens \
@@ -77,7 +76,6 @@ coverage: node_modules
 		--workspace-root $(CURDIR) \
 		--gated margaret_asset_bag=100 \
 		--gated margaret_asset_bag_codegen=100 \
-		--gated margaret_asset_bag_server=100 \
 		--gated margaret_attributes=100 \
 		--gated margaret_codegen=100 \
 		--gated margaret_codegen_tokens=100 \
