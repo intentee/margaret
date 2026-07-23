@@ -1,15 +1,20 @@
 use std::path::Path;
 
-use syn::parse_quote;
-
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_console_argument_codegen::threading_kind::ThreadingKind;
 use margaret_container_tests::bindings_for_fixture::bindings_for_fixture;
 
 fn named(name: &str) -> ConsoleArgument {
     ConsoleArgument::Named {
         name: name.to_string(),
         required: true,
-        value_type: parse_quote!(String),
+        threading: ThreadingKind::BorrowedStr,
+        value_type: CanonicalPath::new(vec![
+            "std".to_string(),
+            "string".to_string(),
+            "String".to_string(),
+        ]),
     }
 }
 
@@ -51,12 +56,12 @@ fn renders_the_console_argument_threading_tokens() {
 
     assert_eq!(
         collapsed(&parameters[0]),
-        format!("console_argument_{slot}:&String,")
+        format!("console_argument_{slot}:&str,")
     );
     assert_eq!(collapsed(&borrows[0]), format!("&console_argument_{slot},"));
     assert_eq!(collapsed(&forwards[0]), format!("console_argument_{slot},"));
     assert_eq!(
         collapsed(&threads[0]),
-        format!("console_argument_{slot}.clone()")
+        format!("console_argument_{slot}.to_owned()")
     );
 }

@@ -144,11 +144,11 @@ impl Farewell {
                 r#"clap::Arg::new("loud").long("loud").action(clap::ArgAction::SetTrue)"#
             )
         );
-        assert!(source.contains("clap::value_parser!(String)"));
+        assert!(source.contains("clap::value_parser!(std::string::String)"));
 
         assert!(source.contains("container.demo("));
-        assert!(source.contains(r#"matches.get_one::<String>("name")"#));
-        assert!(source.contains(r#"matches.get_one::<String>("salutation").cloned()"#));
+        assert!(source.contains(r#"matches.get_one::<std::string::String>("name")"#));
+        assert!(source.contains(r#"matches.get_one::<std::string::String>("salutation").cloned()"#));
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 
         assert!(source.contains(r#"("farewell",_matches)"#));
@@ -387,12 +387,12 @@ impl Farewell {
     #[test]
     fn binds_a_destructured_positional_console_argument() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            "struct Point {\n    x: i32,\n    y: i32,\n}\n\n#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
             false,
         );
 
         assert!(source.contains(r#"clap::Arg::new("argument_0").required(true)"#));
-        assert!(source.contains(r#"matches.get_one::<Point>("argument_0")"#));
+        assert!(source.contains(r#"matches.get_one::<crate::Point>("argument_0")"#));
     }
 
     #[test]

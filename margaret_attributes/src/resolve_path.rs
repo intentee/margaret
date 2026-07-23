@@ -12,7 +12,10 @@ fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
             "string".to_string(),
             "String".to_string(),
         ])),
-        "bool" => Some(CanonicalPath::new(vec!["bool".to_string()])),
+        "bool" | "char" | "f32" | "f64" | "i8" | "i16" | "i32" | "i64" | "i128" | "isize"
+        | "u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
+            Some(CanonicalPath::new(vec![leaf.to_string()]))
+        }
         _ => None,
     }
 }

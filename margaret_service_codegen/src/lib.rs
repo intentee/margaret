@@ -456,11 +456,11 @@ impl Roller {
         assert!(source.contains("self.inner.run().await.map_err(anyhow::Error::from)"));
         assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains(
-            "manager.register_service(Roller{inner:container.roller(console_argument_0.clone()).await,});"
+            "manager.register_service(Roller{inner:container.roller(console_argument_0.to_owned()).await,});"
         ));
         assert!(
             source.contains(
-                r#"letconsole_argument_0=matchmatches.get_one::<PathBuf>("secret-path")"#
+                r#"letconsole_argument_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
             )
         );
     }
@@ -493,7 +493,7 @@ impl Roller {
         );
         assert!(!source.contains("_cancellation_token"));
         assert!(source.contains(
-            "manager.register_service(Roller{inner:container.roller(console_argument_0.clone()).await,});"
+            "manager.register_service(Roller{inner:container.roller(console_argument_0.to_owned()).await,});"
         ));
     }
 
@@ -520,7 +520,7 @@ impl Worker {
 
         assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
         assert!(source.contains(
-            "manager.register_service(Worker{inner:container.worker(console_argument_0.clone()).await,});"
+            "manager.register_service(Worker{inner:container.worker(console_argument_0.to_owned()).await,});"
         ));
     }
 
@@ -546,11 +546,38 @@ impl Worker {
         assert!(source.contains("structWorker{inner:std::sync::Arc<crate::Worker>,}"));
         assert!(source.contains("self.inner.run().await?;Ok(())"));
         assert!(source.contains(
-            "manager.register_service(Worker{inner:container.worker(console_argument_0.clone()).await,});"
+            "manager.register_service(Worker{inner:container.worker(console_argument_0.to_owned()).await,});"
         ));
         assert!(
-            source.contains(r#"letconsole_argument_0=matchmatches.get_one::<String>("label")"#)
+            source.contains(
+                r#"letconsole_argument_0=matchmatches.get_one::<std::string::String>("label")"#
+            )
         );
+    }
+
+    #[test]
+    fn threads_a_copy_console_argument_into_a_service_by_value() {
+        let source = rendered(
+            r#"#[service]
+struct Watcher {
+    verbose: bool,
+}
+
+impl Watcher {
+    #[constructor]
+    fn create(#[console_argument(from = "verbose")] verbose: bool) -> Self {}
+
+    #[process]
+    fn run(&self) -> Result<(), Infallible> {}
+}
+"#,
+            &[],
+        );
+
+        assert!(source.contains(
+            "manager.register_service(Watcher{inner:container.watcher(console_argument_0).await,});"
+        ));
+        assert!(source.contains(r#"letconsole_argument_0=matches.get_flag("verbose")"#));
     }
 
     #[test]
@@ -586,10 +613,10 @@ impl Second {
         );
 
         assert!(source.contains(
-            "manager.register_service(First{inner:container.first(console_argument_0.clone()).await,});"
+            "manager.register_service(First{inner:container.first(console_argument_0.to_owned()).await,});"
         ));
         assert!(source.contains(
-            "manager.register_service(Second{inner:container.second(console_argument_0.clone()).await,});"
+            "manager.register_service(Second{inner:container.second(console_argument_0.to_owned()).await,});"
         ));
         assert_eq!(source.matches("letconsole_argument_0=").count(), 1);
     }

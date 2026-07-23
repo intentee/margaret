@@ -9,4 +9,5 @@ pub mod console_argument_registry;
 pub mod optional_parameter;
 pub mod required_flag_read;
 pub mod scan;
+pub mod threading_kind;
 pub mod unify_by_key;

@@ -129,7 +129,6 @@ pub fn scan(
 mod tests {
     use std::fs;
 
-    use quote::quote;
     use tempfile::tempdir;
 
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
@@ -169,20 +168,14 @@ mod tests {
                 name,
                 required,
                 value_type,
-            } => format!(
-                "named:{name}:{}:{}",
-                requiredness(*required),
-                quote!(#value_type)
-            ),
+                ..
+            } => format!("named:{name}:{}:{value_type}", requiredness(*required)),
             ConsoleArgument::Positional {
                 id,
                 required,
                 value_type,
-            } => format!(
-                "positional:{id}:{}:{}",
-                requiredness(*required),
-                quote!(#value_type)
-            ),
+                ..
+            } => format!("positional:{id}:{}:{value_type}", requiredness(*required)),
         }
     }
 
@@ -208,7 +201,7 @@ mod tests {
                 "Config",
                 0,
             ),
-            "named:label:required:String"
+            "named:label:required:std::string::String"
         );
     }
 
@@ -220,7 +213,7 @@ mod tests {
                 "Config",
                 0,
             ),
-            "named:label:optional:String"
+            "named:label:optional:std::string::String"
         );
     }
 
@@ -244,7 +237,7 @@ mod tests {
                 "Greet",
                 0,
             ),
-            "positional:name:required:String"
+            "positional:name:required:std::string::String"
         );
     }
 
@@ -256,7 +249,7 @@ mod tests {
                 "Greet",
                 0,
             ),
-            "positional:name:optional:String"
+            "positional:name:optional:std::string::String"
         );
     }
 
@@ -361,6 +354,60 @@ mod tests {
                 "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = 5)] value: String) -> Self {}\n}\n",
             )
             .contains("failed to index the crate")
+        );
+    }
+
+    #[test]
+    fn scans_a_numeric_argument() {
+        assert_eq!(
+            described(
+                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"count\")] count: u16) -> Self {}\n}\n",
+                "Config",
+                0,
+            ),
+            "named:count:required:u16"
+        );
+    }
+
+    #[test]
+    fn scans_a_qualified_path_buf_argument() {
+        assert_eq!(
+            described(
+                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"config\")] config: std::path::PathBuf) -> Self {}\n}\n",
+                "Config",
+                0,
+            ),
+            "named:config:required:std::path::PathBuf"
+        );
+    }
+
+    #[test]
+    fn rejects_a_generic_value_type() {
+        assert!(
+            error_message(
+                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"tags\")] tags: Vec<String>) -> Self {}\n}\n",
+            )
+            .contains("a console argument value type must be a single concrete type")
+        );
+    }
+
+    #[test]
+    fn rejects_an_unresolvable_value_type() {
+        assert!(
+            error_message(
+                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"widget\")] widget: Widget) -> Self {}\n}\n",
+            )
+            .contains("could not be resolved to a concrete type")
+        );
+    }
+
+    #[test]
+    fn rejects_a_non_path_value_type() {
+        assert!(
+            error_message(
+                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"pair\")] pair: (u8, u8)) -> Self {}\n}\n",
+            )
+            .contains("could not be resolved to a concrete type")
         );
     }
 

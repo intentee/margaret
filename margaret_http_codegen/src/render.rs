@@ -8,6 +8,7 @@ use quote::quote;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
@@ -402,7 +403,11 @@ fn server_module(
         quote! { margaret_http::router::Router::build(#route_entries) }
     };
 
+    let parameter_count = 2 + console_parameters.len() + usize::from(views_parameter.is_some());
+    let too_many_arguments = too_many_arguments_expect(parameter_count);
+
     quote! {
+        #too_many_arguments
         pub async fn #function_name(
             container: &super::super::container::Container,
             #(#console_parameters)*

@@ -12,7 +12,7 @@ fn generates_parameterized_accessor_for_console_arguments() {
         .collect();
 
     assert!(source.contains(
-        "pubasyncfngreet(&self,console_argument_0:String,console_argument_1:::std::option::Option<String>,console_argument_2:bool,)"
+        "pubasyncfngreet(&self,console_argument_0:std::string::String,console_argument_1:::std::option::Option<std::string::String>,console_argument_2:bool,)"
     ));
     assert!(source.contains(
         "crate::Greet::create(self.english_greeter().await,console_argument_0,console_argument_1,console_argument_2,)"

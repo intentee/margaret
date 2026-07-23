@@ -1,13 +1,29 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Type;
+
+use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_codegen_tokens::path_tokens::path_tokens;
 
 use crate::console_argument::ConsoleArgument;
 use crate::required_flag_read::required_flag_read;
+use crate::threading_kind::ThreadingKind;
 
-fn value_expression(id: &str, required: bool, value_type: &Type) -> TokenStream {
+fn value_expression(
+    id: &str,
+    required: bool,
+    is_copy: bool,
+    value_type: &CanonicalPath,
+) -> TokenStream {
+    let value_type = path_tokens(value_type);
+
     if required {
-        required_flag_read(&quote! { #value_type }, id, &quote! { value.clone() })
+        let present = if is_copy {
+            quote! { *value }
+        } else {
+            quote! { value.clone() }
+        };
+
+        required_flag_read(&value_type, id, &present)
     } else {
         quote! { matches.get_one::<#value_type>(#id).cloned() }
     }
@@ -20,12 +36,109 @@ pub fn argument_value(argument: &ConsoleArgument) -> TokenStream {
         ConsoleArgument::Named {
             name,
             required,
+            threading,
             value_type,
-        } => value_expression(name, *required, value_type),
+        } => value_expression(
+            name,
+            *required,
+            matches!(threading, ThreadingKind::Copy),
+            value_type,
+        ),
         ConsoleArgument::Positional {
             id,
             required,
+            threading,
             value_type,
-        } => value_expression(id, *required, value_type),
+        } => value_expression(
+            id,
+            *required,
+            matches!(threading, ThreadingKind::Copy),
+            value_type,
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use margaret_attributes::canonical_path::CanonicalPath;
+
+    use crate::console_argument::ConsoleArgument;
+    use crate::threading_kind::ThreadingKind;
+
+    use super::argument_value;
+
+    fn path(segments: &[&str]) -> CanonicalPath {
+        CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
+    }
+
+    fn collapsed(argument: &ConsoleArgument) -> String {
+        argument_value(argument)
+            .to_string()
+            .split_whitespace()
+            .collect()
+    }
+
+    #[test]
+    fn a_flag_reads_from_get_flag() {
+        let flag = ConsoleArgument::Flag {
+            name: "loud".to_string(),
+        };
+
+        assert_eq!(collapsed(&flag), r#"matches.get_flag("loud")"#);
+    }
+
+    #[test]
+    fn a_required_copy_argument_dereferences_the_read_value() {
+        let named = ConsoleArgument::Named {
+            name: "retries".to_string(),
+            required: true,
+            threading: ThreadingKind::Copy,
+            value_type: path(&["u16"]),
+        };
+
+        assert!(collapsed(&named).contains("matches.get_one::<u16>(\"retries\"){Some(value)=>*value"));
+    }
+
+    #[test]
+    fn a_required_non_copy_argument_clones_the_qualified_read_value() {
+        let named = ConsoleArgument::Named {
+            name: "label".to_string(),
+            required: true,
+            threading: ThreadingKind::BorrowedStr,
+            value_type: path(&["std", "string", "String"]),
+        };
+
+        assert!(collapsed(&named).contains(
+            "matches.get_one::<std::string::String>(\"label\"){Some(value)=>value.clone()"
+        ));
+    }
+
+    #[test]
+    fn an_optional_argument_reads_a_cloned_qualified_option() {
+        let named = ConsoleArgument::Named {
+            name: "note".to_string(),
+            required: false,
+            threading: ThreadingKind::Cloned,
+            value_type: path(&["std", "string", "String"]),
+        };
+
+        assert_eq!(
+            collapsed(&named),
+            r#"matches.get_one::<std::string::String>("note").cloned()"#
+        );
+    }
+
+    #[test]
+    fn a_positional_argument_reads_by_its_id() {
+        let positional = ConsoleArgument::Positional {
+            id: "point".to_string(),
+            required: true,
+            threading: ThreadingKind::Cloned,
+            value_type: path(&["crate", "geometry", "Point"]),
+        };
+
+        assert!(collapsed(&positional).contains(
+            r#"matches.get_one::<crate::geometry::Point>("point")"#
+        ));
     }
 }
