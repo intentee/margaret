@@ -1,25 +1,41 @@
 use std::collections::BTreeSet;
+use std::ffi::OsStr;
 use std::fs;
+use std::fs::FileType;
 use std::path::Path;
+use std::path::PathBuf;
 
 use crate::codegen_error::CodegenError;
+
+fn read_entries(directory: &Path) -> Result<Vec<AssetEntry>, CodegenError> {
+    fs::read_dir(directory)
+        .and_then(|entries| {
+            entries
+                .map(|entry| {
+                    entry.and_then(|entry| {
+                        let path = entry.path();
+
+                        fs::symlink_metadata(&path).map(|metadata| AssetEntry {
+                            file_type: metadata.file_type(),
+                            path,
+                        })
+                    })
+                })
+                .collect::<std::io::Result<Vec<AssetEntry>>>()
+        })
+        .map_err(|source| CodegenError::ReadAssetDirectory {
+            path: directory.to_path_buf(),
+            source,
+        })
+}
 
 fn collect_asset_tails(
     directory: &Path,
     prefix: &str,
     tails: &mut BTreeSet<String>,
 ) -> Result<(), CodegenError> {
-    let entries: Vec<fs::DirEntry> = fs::read_dir(directory)
-        .and_then(Iterator::collect)
-        .map_err(|source| CodegenError::ReadAssetDirectory {
-            path: directory.to_path_buf(),
-            source,
-        })?;
-
-    for entry in entries {
-        let path = entry.path();
-        let file_name = entry.file_name();
-        let Some(name) = file_name.to_str() else {
+    for AssetEntry { file_type, path } in read_entries(directory)? {
+        let Some(name) = path.file_name().and_then(OsStr::to_str) else {
             return Err(CodegenError::NonUtf8AssetPath { path });
         };
         let tail = if prefix.is_empty() {
@@ -28,14 +44,23 @@ fn collect_asset_tails(
             format!("{prefix}/{name}")
         };
 
-        if path.is_dir() {
+        if file_type.is_symlink() {
+            return Err(CodegenError::SymlinkAsset { path });
+        } else if file_type.is_dir() {
             collect_asset_tails(&path, &tail, tails)?;
-        } else {
+        } else if file_type.is_file() {
             tails.insert(tail);
+        } else {
+            return Err(CodegenError::NonRegularAsset { path });
         }
     }
 
     Ok(())
+}
+
+struct AssetEntry {
+    file_type: FileType,
+    path: PathBuf,
 }
 
 pub(crate) fn walk_asset_directory(
@@ -50,8 +75,11 @@ pub(crate) fn walk_asset_directory(
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
     use std::fs;
     use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::symlink;
+    use std::os::unix::net::UnixListener;
     use std::path::Path;
 
     use tempfile::tempdir;
@@ -111,7 +139,7 @@ mod tests {
     #[test]
     fn rejects_a_non_utf8_asset_file_name() {
         let directory = tempdir().expect("a temporary assets directory");
-        let name = std::ffi::OsStr::from_bytes(&[0x66, 0x6f, 0xff]);
+        let name = OsStr::from_bytes(&[0x66, 0x6f, 0xff]);
         fs::write(directory.path().join(name), "x").expect("the non-utf8 file exists");
 
         let error =
@@ -129,7 +157,7 @@ mod tests {
         let directory = tempdir().expect("a temporary assets directory");
         let nested = directory.path().join("chunks");
         fs::create_dir(&nested).expect("the nested directory exists");
-        let name = std::ffi::OsStr::from_bytes(&[0x66, 0x6f, 0xff]);
+        let name = OsStr::from_bytes(&[0x66, 0x6f, 0xff]);
         fs::write(nested.join(name), "x").expect("the nested non-utf8 file exists");
 
         let error =
@@ -139,5 +167,75 @@ mod tests {
             error,
             CodegenError::NonUtf8AssetPath { path } if path == nested.join(name)
         ));
+    }
+
+    #[test]
+    fn rejects_a_file_symlink() {
+        let directory = tempdir().expect("a temporary assets directory");
+        let secret = directory.path().join("secret.txt");
+        fs::write(&secret, "top secret").expect("the target file exists");
+        let assets = directory.path().join("assets");
+        fs::create_dir(&assets).expect("the assets directory exists");
+        let link = assets.join("leak.txt");
+        symlink(&secret, &link).expect("the file symlink exists");
+
+        let error = walk_asset_directory(&assets).expect_err("a file symlink is rejected");
+
+        assert!(matches!(
+            &error,
+            CodegenError::SymlinkAsset { path } if *path == link
+        ));
+        assert!(error.to_string().contains("symbolic link"));
+    }
+
+    #[test]
+    fn rejects_a_directory_symlink() {
+        let directory = tempdir().expect("a temporary assets directory");
+        let outside = directory.path().join("outside");
+        fs::create_dir(&outside).expect("the target directory exists");
+        fs::write(outside.join("secret.js"), "x").expect("the target file exists");
+        let assets = directory.path().join("assets");
+        fs::create_dir(&assets).expect("the assets directory exists");
+        let link = assets.join("escape");
+        symlink(&outside, &link).expect("the directory symlink exists");
+
+        let error = walk_asset_directory(&assets).expect_err("a directory symlink is rejected");
+
+        assert!(matches!(
+            error,
+            CodegenError::SymlinkAsset { path } if path == link
+        ));
+    }
+
+    #[test]
+    fn rejects_a_symlink_cycle() {
+        let directory = tempdir().expect("a temporary assets directory");
+        let assets = directory.path().join("assets");
+        fs::create_dir(&assets).expect("the assets directory exists");
+        let link = assets.join("loop");
+        symlink(&assets, &link).expect("the cyclic symlink exists");
+
+        let error = walk_asset_directory(&assets).expect_err("a symlink cycle is rejected");
+
+        assert!(matches!(
+            error,
+            CodegenError::SymlinkAsset { path } if path == link
+        ));
+    }
+
+    #[test]
+    fn rejects_a_non_regular_file() {
+        let directory = tempdir().expect("a temporary assets directory");
+        let socket_path = directory.path().join("socket");
+        let _listener = UnixListener::bind(&socket_path).expect("the unix socket exists");
+
+        let error =
+            walk_asset_directory(directory.path()).expect_err("a non-regular file is rejected");
+
+        assert!(matches!(
+            &error,
+            CodegenError::NonRegularAsset { path } if *path == socket_path
+        ));
+        assert!(error.to_string().contains("not a regular file"));
     }
 }
