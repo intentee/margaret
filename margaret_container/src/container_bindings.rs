@@ -45,6 +45,11 @@ impl ContainerBindings {
         }
     }
 
+    #[must_use]
+    pub fn provides(&self, provider_key: &CanonicalPath) -> bool {
+        self.providers.contains_key(provider_key)
+    }
+
     pub(crate) fn collection_members(&self, trait_path: &CanonicalPath) -> &[String] {
         match self.collections.get(trait_path) {
             Some(member_fields) => member_fields,

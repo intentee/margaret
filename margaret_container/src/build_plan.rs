@@ -12,6 +12,7 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::matched_attribute::MatchedAttribute;
+use margaret_attributes::struct_shape::StructShape;
 
 use crate::collection_table::CollectionTable;
 use crate::construction_source::ConstructionSource;
@@ -282,11 +283,81 @@ struct DraftedProviders<'index> {
     provided_keys: HashMap<CanonicalPath, CanonicalPath>,
 }
 
-pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
+fn resolve_framework_providers(
+    index: &AttributeIndex,
+    drafts: &[SingletonDraft],
+    provided_keys: &mut HashMap<CanonicalPath, CanonicalPath>,
+    framework_provided: &[CanonicalPath],
+) -> Result<Vec<Provider>, ContainerError> {
+    let mut providers = Vec::new();
+
+    for path in framework_provided {
+        if !is_framework_path_referenced(index, drafts, path) {
+            continue;
+        }
+
+        if provided_keys.insert(path.clone(), path.clone()).is_some() {
+            return Err(ContainerError::AmbiguousFrameworkProvider {
+                path: path.to_string(),
+            });
+        }
+
+        providers.push(Provider {
+            concrete_path: path.clone(),
+            construction: DirectConstruction::Fieldless {
+                shape: StructShape::Unit,
+            },
+            field_name: path.field_name(),
+            provided: ProvidedType::Concrete(path.clone()),
+        });
+    }
+
+    Ok(providers)
+}
+
+fn is_framework_path_referenced(
+    index: &AttributeIndex,
+    drafts: &[SingletonDraft],
+    path: &CanonicalPath,
+) -> bool {
+    drafts
+        .iter()
+        .any(|draft| draft_references_path(index, draft, path))
+}
+
+fn draft_references_path(
+    index: &AttributeIndex,
+    draft: &SingletonDraft,
+    path: &CanonicalPath,
+) -> bool {
+    let ConstructionSource::Constructor(constructor) = &draft.construction else {
+        return false;
+    };
+
+    constructor.signature().inputs.iter().any(|input| {
+        let FnArg::Typed(pattern_type) = input else {
+            return false;
+        };
+
+        matches!(
+            peel_target(&pattern_type.ty),
+            Some(RawTarget::Single(written))
+                if index.resolve_item_path(draft.item, &written).as_ref() == Some(path)
+        )
+    })
+}
+
+pub(crate) fn build_plan(
+    index: &AttributeIndex,
+    framework_provided: &[CanonicalPath],
+) -> Result<ContainerPlan, ContainerError> {
     let DraftedProviders {
         drafts,
-        provided_keys,
+        mut provided_keys,
     } = build_drafts(index)?;
+
+    let framework_providers =
+        resolve_framework_providers(index, &drafts, &mut provided_keys, framework_provided)?;
 
     let mut collections = CollectionTable::new();
     let mut providers = BTreeMap::new();
@@ -319,6 +390,10 @@ pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, Contai
                 provided,
             },
         );
+    }
+
+    for provider in framework_providers {
+        providers.insert(provider.provided.key().clone(), provider);
     }
 
     Ok(ContainerPlan {

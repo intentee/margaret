@@ -14,7 +14,7 @@ pub fn generate_container_source(
         .index_crate(&CrateRoot::new(crate_name, source_directory))?
         .build();
 
-    let source = render_container(&index)?
+    let source = render_container(&index, &[])?
         .modules
         .into_iter()
         .map(|module| {
