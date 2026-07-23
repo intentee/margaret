@@ -68,7 +68,7 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 clap = { version = "4.5", default-features = false, features = ["std", "help", "usage", "error-context"] }
 cookie = "0.18"
 dashmap = "6.1"
-ephemeral-postgres = "0.2"
+ephemeral-postgres = "0.3"
 esbuild-metafile = "0.10"
 form_urlencoded = "1.2"
 futures-util = "0.3"
