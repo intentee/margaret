@@ -186,7 +186,12 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         }
     };
 
-    fold_layers(&route.layers, handler, &quote! { super::super::middleware })
+    fold_layers(
+        &route.layers,
+        handler,
+        &quote! { super::super::middleware },
+        bindings,
+    )
 }
 
 fn argument_value(
@@ -267,6 +272,10 @@ fn responder_and_binder_arguments(
             {
                 collected.extend_from_slice(bindings.console_arguments(binder_provider));
             }
+        }
+
+        for layer in &route.layers {
+            collected.extend_from_slice(bindings.console_arguments(&layer.concrete));
         }
     }
 

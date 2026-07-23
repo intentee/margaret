@@ -1,14 +1,18 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use margaret_container::container_bindings::ContainerBindings;
+
 use crate::layer_application::LayerApplication;
 
 pub(crate) fn middleware_instance_tokens(
     application: &LayerApplication,
     module_path: &TokenStream,
+    bindings: &ContainerBindings,
 ) -> TokenStream {
     let field = &application.field;
     let wrapper = &application.wrapper;
+    let threaded = bindings.console_threads(bindings.console_arguments(&application.concrete));
     let routes_init = application
         .injects_routes
         .then(|| quote! { , routes: routes.clone() });
@@ -17,6 +21,6 @@ pub(crate) fn middleware_instance_tokens(
         .then(|| quote! { , views: views.clone() });
 
     quote! {
-        std::sync::Arc::new(#module_path::#wrapper { inner: container.#field().await #routes_init #views_init })
+        std::sync::Arc::new(#module_path::#wrapper { inner: container.#field(#(#threaded),*).await #routes_init #views_init })
     }
 }

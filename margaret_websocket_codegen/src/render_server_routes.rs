@@ -17,6 +17,10 @@ pub(crate) fn server_console_arguments(
 
     for session_plan in sessions {
         collected.extend(session_console_arguments(session_plan, bindings));
+
+        for layer in &session_plan.session.layers {
+            collected.extend_from_slice(bindings.console_arguments(&layer.concrete));
+        }
     }
 
     bindings.console_union(&collected)
@@ -65,7 +69,11 @@ pub(crate) fn render_server_routes(
         let middleware = if session_plan.session.layers.is_empty() {
             quote! { ::std::vec::Vec::new() }
         } else {
-            middleware_vec_tokens(&session_plan.session.layers, &quote! { super::middleware })
+            middleware_vec_tokens(
+                &session_plan.session.layers,
+                &quote! { super::middleware },
+                bindings,
+            )
         };
 
         quote! {

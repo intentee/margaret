@@ -1454,4 +1454,40 @@ impl GetUser {
         assert!(source.contains("console_argument_0:&String,"));
         assert!(source.contains("container.user_binder(console_argument_0.clone())"));
     }
+
+    const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
+use margaret_http::next::Next;
+use margaret_http::request::Request;
+
+#[responds_to_http(method = "get", path = "/resource", server = "public")]
+#[middleware(guard)]
+struct Resource;
+
+impl Resource {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[handles_middleware_attribute(attribute = guard)]
+struct Guard;
+
+impl Guard {
+    #[constructor]
+    fn create(#[console_argument(from = "token")] token: String) -> Self {}
+
+    #[process]
+    fn process(&self, request: &Request, next: Next) -> ResponseContinuation {}
+}
+"#;
+
+    #[test]
+    fn threads_a_console_argument_into_a_middleware_and_its_server() {
+        let source = source_for(CONSOLE_ARGUMENT_MIDDLEWARE);
+
+        assert!(source.contains(
+            "pubasyncfnserver_public(container:&super::super::container::Container,console_argument_0:&String,"
+        ));
+        assert!(source.contains("container.guard(console_argument_0.clone())"));
+    }
 }

@@ -2168,6 +2168,8 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "margaret_codegen_tokens",
+ "margaret_console_argument_codegen",
+ "margaret_container",
  "margaret_injection_codegen",
  "margaret_request_binding_codegen",
  "proc-macro2",
