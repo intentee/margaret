@@ -10,25 +10,33 @@ use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 use trzcina::TickContext;
 use trzcina::Ticker;
-use url::Url;
 
+use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 
 use crate::jwks_client_error::JwksClientError;
 use crate::jwks_poll_interval_after_ready::JWKS_POLL_INTERVAL_AFTER_READY;
 use crate::jwks_poll_interval_before_ready::JWKS_POLL_INTERVAL_BEFORE_READY;
 use crate::public_jwks_holder::PublicJwksHolder;
+use crate::well_known_jwks_url::well_known_jwks_url;
 
 pub struct PublicJwksPollService {
+    pub endpoint_provider: Arc<dyn ProvidesEndpoint>,
     pub http_client: Client,
     pub public_jwks_holder: PublicJwksHolder,
-    pub jwks_url: Url,
 }
 
 impl PublicJwksPollService {
     pub async fn fetch_public_jwks(&self) -> Result<PublicJwks, JwksClientError> {
+        let issuer_url = self
+            .endpoint_provider
+            .provide()
+            .await
+            .map_err(JwksClientError::EndpointResolution)?;
+        let jwks_url = well_known_jwks_url(&issuer_url)?;
+
         self.http_client
-            .get(self.jwks_url.clone())
+            .get(jwks_url)
             .send()
             .await
             .and_then(Response::error_for_status)

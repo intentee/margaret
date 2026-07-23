@@ -239,7 +239,7 @@ impl Guard {
     fn rejects_a_middleware_attribute_without_a_tag() {
         assert!(
             layers_error_for("#[middleware]\nstruct Site;\n")
-                .contains("must name exactly one middleware tag")
+                .contains("must reference exactly one tag")
         );
     }
 
@@ -252,12 +252,12 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_an_ambiguous_middleware_tag() {
+    fn rejects_a_handler_with_a_multi_segment_tag() {
         assert!(
-            layers_error_for(
-                "use margaret_http::next::Next;\n\n#[middleware(shared)]\nstruct Site;\n\n#[handles_middleware_attribute(attribute = shared)]\nstruct First;\nimpl First {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n\n#[handles_middleware_attribute(attribute = shared)]\nstruct Second;\nimpl Second {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n"
+            plans_error_for(
+                "#[handles_middleware_attribute(attribute = tags::guard)]\nstruct Guard;\n"
             )
-            .contains("handled by more than one #[handles_middleware_attribute]")
+            .contains("not a single plain name")
         );
     }
 

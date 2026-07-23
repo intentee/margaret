@@ -4,6 +4,7 @@ pub mod commands;
 pub mod english_greeter;
 pub mod forms;
 pub mod greeter;
+pub mod issuer_endpoint;
 pub mod log_sink;
 pub mod metrics;
 pub mod middleware;

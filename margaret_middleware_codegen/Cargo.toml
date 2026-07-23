@@ -9,6 +9,7 @@ margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
 margaret_container = { path = "../margaret_container" }
 margaret_injection_codegen = { path = "../margaret_injection_codegen" }
 margaret_request_binding_codegen = { path = "../margaret_request_binding_codegen" }
+margaret_tag_codegen = { path = "../margaret_tag_codegen" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

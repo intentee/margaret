@@ -10,6 +10,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_console_codegen \
 	-p margaret_container \
 	-p margaret_container_tests \
+	-p margaret_endpoint \
 	-p margaret_generated_module \
 	-p margaret_http \
 	-p margaret_http_codegen \
@@ -46,6 +47,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_spiffe_svid_server_tests \
 	-p margaret_spiffe_svid_tests \
 	-p margaret_sync_holder \
+	-p margaret_tag_codegen \
 	-p margaret_token_signer \
 	-p margaret_token_signer_tests \
 	-p margaret_toposort \
@@ -96,6 +98,7 @@ coverage: node_modules postgres-image
 		--gated margaret_console_codegen=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_tests=100 \
+		--gated margaret_endpoint=100 \
 		--gated margaret_generated_module=100 \
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \
@@ -132,6 +135,7 @@ coverage: node_modules postgres-image
 		--gated margaret_spiffe_svid_server_tests=100 \
 		--gated margaret_spiffe_svid_tests=100 \
 		--gated margaret_sync_holder=100 \
+		--gated margaret_tag_codegen=100 \
 		--gated margaret_token_signer=100 \
 		--gated margaret_token_signer_tests=100 \
 		--gated margaret_toposort=100 \

@@ -1,7 +1,7 @@
 use proc_macro2::Ident;
 
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::tag::Tag;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
@@ -9,7 +9,7 @@ pub struct MiddlewarePlan {
     pub concrete: CanonicalPath,
     pub(crate) field: Ident,
     pub(crate) parameters: Vec<BoundParameter>,
-    pub(crate) selector: AttributeSelector,
+    pub(crate) tag: Tag,
     pub(crate) wrapper: Ident,
 }
 

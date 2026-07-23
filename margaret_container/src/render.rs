@@ -15,6 +15,7 @@ use crate::direct_construction::DirectConstruction;
 use crate::field_ident::field_ident;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
+use crate::provides_endpoint_path::provides_endpoint_path;
 
 fn field_declaration(provider: &Provider) -> TokenStream {
     let name = field_ident(provider);
@@ -32,6 +33,11 @@ fn field_type(provider: &Provider) -> TokenStream {
         }
         ProvidedType::Interface(path) => {
             let interface = path_tokens(path);
+
+            quote! { std::sync::Arc<dyn #interface> }
+        }
+        ProvidedType::Endpoint(_) => {
+            let interface = path_tokens(&provides_endpoint_path());
 
             quote! { std::sync::Arc<dyn #interface> }
         }

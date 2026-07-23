@@ -12,6 +12,9 @@ pub enum AttributeError {
     #[error("two items resolve to the same canonical path '{path}'")]
     DuplicateCanonicalPath { path: String },
 
+    #[error("argument '{key}' of attribute '{attribute_path}' is provided more than once")]
+    DuplicateNamedArgument { attribute_path: String, key: String },
+
     #[error("failed to parse Rust source file '{path}': {source}")]
     FileParse {
         path: String,
