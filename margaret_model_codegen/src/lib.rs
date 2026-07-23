@@ -366,17 +366,27 @@ struct S {
             "#[model(table = \"{table}\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n"
         );
 
-        assert!(error_message(&source).contains("exceeding the 63-byte"));
+        assert!(error_message(&source).contains("table name that is too long"));
     }
 
     #[test]
-    fn rejects_a_derived_column_name_that_is_too_long() {
+    fn rejects_a_scalar_column_name_that_is_too_long() {
+        let column = "a".repeat(64);
+        let source = format!(
+            "#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(name = \"{column}\")]\n    value: String,\n}}\n"
+        );
+
+        assert!(error_message(&source).contains("column name that is too long"));
+    }
+
+    #[test]
+    fn rejects_a_foreign_key_whose_derived_name_is_too_long() {
         let field = "a".repeat(62);
         let source = with_author(&format!(
             "#[model(table = \"articles\")]\nstruct Article {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    {field}: Author,\n}}\n"
         ));
 
-        assert!(error_message(&source).contains("exceeding the 63-byte"));
+        assert!(error_message(&source).contains("foreign key field"));
     }
 
     #[test]
