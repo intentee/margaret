@@ -62,6 +62,24 @@ fn index_files(files: Vec<UploadedFile>) -> HashMap<String, UploadedFile> {
     indexed
 }
 
+struct ParsedQuery {
+    fields: HashMap<String, String>,
+    raw: String,
+}
+
+fn parse_query(uri: &Uri) -> ParsedQuery {
+    match uri.query() {
+        Some(raw) => ParsedQuery {
+            fields: index_fields(form_fields(raw.as_bytes())),
+            raw: raw.to_string(),
+        },
+        None => ParsedQuery {
+            fields: HashMap::new(),
+            raw: String::new(),
+        },
+    }
+}
+
 pub struct RequestInputs {
     pub cookies: HashMap<String, String>,
     pub files: HashMap<String, UploadedFile>,
@@ -96,11 +114,14 @@ impl RequestInputs {
         remote_addr: SocketAddr,
     ) -> Result<Self, RequestError> {
         let cookies = parse_cookies(&headers)?;
-        let query = index_fields(form_fields(uri.query().unwrap_or_default().as_bytes()));
+        let ParsedQuery {
+            fields: query,
+            raw: raw_query,
+        } = parse_query(uri);
         let server = ServerParams::new(
             method,
             uri.path().to_string(),
-            uri.query().unwrap_or_default().to_string(),
+            raw_query,
             remote_addr,
             headers,
         );
@@ -125,7 +146,10 @@ impl RequestInputs {
         upload_config: &UploadConfig,
     ) -> Result<Self, RequestError> {
         let cookies = parse_cookies(&headers)?;
-        let query = index_fields(form_fields(uri.query().unwrap_or_default().as_bytes()));
+        let ParsedQuery {
+            fields: query,
+            raw: raw_query,
+        } = parse_query(uri);
         let mut files = HashMap::new();
         let mut json: Option<serde_json::Value> = None;
         let mut form = HashMap::new();
@@ -159,7 +183,7 @@ impl RequestInputs {
         let server = ServerParams::new(
             method,
             uri.path().to_string(),
-            uri.query().unwrap_or_default().to_string(),
+            raw_query,
             remote_addr,
             headers,
         );

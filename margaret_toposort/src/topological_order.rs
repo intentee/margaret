@@ -125,7 +125,10 @@ mod tests {
 
     #[test]
     fn orders_independent_nodes_in_sorted_order() {
-        assert_eq!(order(&[("zebra", &[]), ("apple", &[])]), names(&["apple", "zebra"]));
+        assert_eq!(
+            order(&[("zebra", &[]), ("apple", &[])]),
+            names(&["apple", "zebra"])
+        );
     }
 
     #[test]
@@ -151,8 +154,8 @@ mod tests {
 
     #[test]
     fn reports_a_self_dependency_as_a_cycle() {
-        let cycle = topological_order(&graph(&[("a", &["a"])]))
-            .expect_err("a self dependency is a cycle");
+        let cycle =
+            topological_order(&graph(&[("a", &["a"])])).expect_err("a self dependency is a cycle");
 
         assert_eq!(cycle.path, ["a", "a"]);
     }

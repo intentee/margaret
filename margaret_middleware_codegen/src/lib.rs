@@ -395,7 +395,7 @@ struct Site;
         .split_whitespace()
         .collect::<String>();
 
-        assert!(folded.contains("container.guard(console_argument_0.clone()).await"));
+        assert!(folded.contains("container.guard(console_argument_0.to_owned()).await"));
     }
 
     #[test]

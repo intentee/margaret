@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_vec_tokens::middleware_vec_tokens;
@@ -85,7 +86,11 @@ pub(crate) fn render_server_routes(
         }
     });
 
+    let parameter_count = 2 + console_parameters.len() + usize::from(views_parameter.is_some());
+    let too_many_arguments = too_many_arguments_expect(parameter_count);
+
     quote! {
+        #too_many_arguments
         pub async fn #function(
             container: &super::container::Container,
             #(#console_parameters)*

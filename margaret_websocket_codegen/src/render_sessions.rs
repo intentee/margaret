@@ -8,6 +8,7 @@ use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::injected_dependency::InjectedDependency;
@@ -337,7 +338,11 @@ fn render_dispatch_table(
         .iter()
         .map(|binding| dispatch_insert(binding, &notifications, &container, bindings));
 
+    let parameter_count = 1 + parameters.len();
+    let too_many_arguments = too_many_arguments_expect(parameter_count);
+
     quote! {
+        #too_many_arguments
         async fn dispatch_table(
             #container: &super::super::container::Container,
             #(#parameters)*
@@ -397,6 +402,11 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
         .iter()
         .map(|binding| render_notification_dispatch(binding, &session_path));
     let dispatch_table = render_dispatch_table(plan, &session_path, &dispatch_arguments, bindings);
+    let parameter_count = 1
+        + upgrade_parameters.len()
+        + usize::from(routes_parameter.is_some())
+        + usize::from(views_parameter.is_some());
+    let too_many_arguments = too_many_arguments_expect(parameter_count);
 
     quote! {
         #factory
@@ -406,6 +416,7 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
 
         #dispatch_table
 
+        #too_many_arguments
         pub async fn upgrade_entry(
             container: &super::super::container::Container,
             #(#upgrade_parameters)*

@@ -214,11 +214,11 @@ impl RespondsToWebSocketMessage for Chatter {
     fn threads_a_console_argument_through_the_websocket_dispatch_chain() {
         let source = generated(CONSOLE_ARGUMENT_HANDLER);
 
-        assert!(source.contains("console_argument_0:&String"));
-        assert!(source.contains("container.chatter(console_argument_0.clone()).await"));
+        assert!(source.contains("console_argument_0:&str"));
+        assert!(source.contains("container.chatter(console_argument_0.to_owned()).await"));
         assert!(source.contains("dispatch_table(container,console_argument_0).await"));
         assert!(source.contains(
-            "public_routes(container:&super::container::Container,console_argument_0:&String,"
+            "public_routes(container:&super::container::Container,console_argument_0:&str,"
         ));
         assert!(source.contains("upgrade_entry(container,console_argument_0"));
     }
@@ -362,9 +362,9 @@ impl Guard {
         let source = generated(SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE);
 
         assert!(source.contains(
-            "public_routes(container:&super::container::Container,console_argument_0:&String,"
+            "public_routes(container:&super::container::Container,console_argument_0:&str,"
         ));
-        assert!(source.contains("container.guard(console_argument_0.clone()).await"));
+        assert!(source.contains("container.guard(console_argument_0.to_owned()).await"));
     }
 
     #[test]

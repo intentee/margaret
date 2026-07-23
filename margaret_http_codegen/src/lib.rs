@@ -1416,9 +1416,9 @@ impl Greeting {
         let source = source_for(CONSOLE_ARGUMENT_RESPONDER);
 
         assert!(source.contains(
-            "pubasyncfnserver_public(container:&super::super::container::Container,console_argument_0:&String,"
+            "pubasyncfnserver_public(container:&super::super::container::Container,console_argument_0:&str,"
         ));
-        assert!(source.contains("container.greeting(console_argument_0.clone())"));
+        assert!(source.contains("container.greeting(console_argument_0.to_owned())"));
     }
 
     const CONSOLE_ARGUMENT_BINDER: &str = r#"
@@ -1451,8 +1451,8 @@ impl GetUser {
     fn threads_a_console_argument_into_a_route_parameter_binder() {
         let source = source_for(CONSOLE_ARGUMENT_BINDER);
 
-        assert!(source.contains("console_argument_0:&String,"));
-        assert!(source.contains("container.user_binder(console_argument_0.clone())"));
+        assert!(source.contains("console_argument_0:&str,"));
+        assert!(source.contains("container.user_binder(console_argument_0.to_owned())"));
     }
 
     const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
@@ -1486,8 +1486,46 @@ impl Guard {
         let source = source_for(CONSOLE_ARGUMENT_MIDDLEWARE);
 
         assert!(source.contains(
-            "pubasyncfnserver_public(container:&super::super::container::Container,console_argument_0:&String,"
+            "pubasyncfnserver_public(container:&super::super::container::Container,console_argument_0:&str,"
         ));
-        assert!(source.contains("container.guard(console_argument_0.clone())"));
+        assert!(source.contains("container.guard(console_argument_0.to_owned())"));
+    }
+
+    const CONSOLE_ARGUMENT_MIXED_CATEGORIES: &str = r#"
+use std::path::PathBuf;
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/configured", server = "public")]
+struct Configured;
+
+impl Configured {
+    #[constructor]
+    fn create(
+        #[console_argument(from = "label")] label: String,
+        #[console_argument(from = "root")] root: PathBuf,
+        #[console_argument(from = "tenant")] tenant: String,
+        #[console_argument(from = "verbose")] verbose: bool,
+        #[console_argument(from = "retries")] retries: Option<u16>,
+        #[console_argument(from = "note")] note: Option<String>,
+    ) -> Self {}
+
+    #[process]
+    fn respond(&self) -> Response {}
+}
+"#;
+
+    #[test]
+    fn expects_too_many_arguments_and_threads_each_category_by_its_type() {
+        let source = source_for(CONSOLE_ARGUMENT_MIXED_CATEGORIES);
+
+        assert!(source.contains("#[expect(clippy::too_many_arguments"));
+        assert!(source.contains(":&str,"));
+        assert!(source.contains(":&::std::path::Path,"));
+        assert!(source.contains(":&bool,"));
+        assert!(source.contains(":&::std::option::Option<u16>,"));
+        assert!(source.contains(":&::std::option::Option<std::string::String>,"));
+        assert!(source.contains(
+            "container.configured(console_argument_0.to_owned(),console_argument_1.to_owned(),console_argument_2.to_owned(),*console_argument_3,*console_argument_4,console_argument_5.clone(),)"
+        ));
     }
 }

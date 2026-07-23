@@ -36,16 +36,26 @@ pub fn unify_by_key(
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
+    use margaret_attributes::canonical_path::CanonicalPath;
 
     use super::unify_by_key;
     use crate::console_argument::ConsoleArgument;
+    use crate::threading_kind::ThreadingKind;
+
+    fn string_type() -> CanonicalPath {
+        CanonicalPath::new(vec![
+            "std".to_string(),
+            "string".to_string(),
+            "String".to_string(),
+        ])
+    }
 
     fn named(name: &str) -> ConsoleArgument {
         ConsoleArgument::Named {
             name: name.to_string(),
             required: true,
-            value_type: parse_quote!(String),
+            threading: ThreadingKind::BorrowedStr,
+            value_type: string_type(),
         }
     }
 
@@ -53,7 +63,8 @@ mod tests {
         ConsoleArgument::Positional {
             id: id.to_string(),
             required: true,
-            value_type: parse_quote!(String),
+            threading: ThreadingKind::BorrowedStr,
+            value_type: string_type(),
         }
     }
 

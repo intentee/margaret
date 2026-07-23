@@ -1,0 +1,4 @@
+mod canonicalizes_console_argument_types;
+mod emits_conditional_too_many_arguments_expectations;
+mod rejects_invalid_console_argument_types;
+mod threads_console_arguments_by_type;

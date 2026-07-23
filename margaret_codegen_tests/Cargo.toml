@@ -1,0 +1,23 @@
+[package]
+name = "margaret_codegen_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[lib]
+doctest = false
+test = false
+
+[dependencies]
+margaret_attributes = { path = "../margaret_attributes" }
+margaret_codegen = { path = "../margaret_codegen" }
+
+[dev-dependencies]
+margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

@@ -1,6 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Type;
+
+use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_codegen_tokens::path_tokens::path_tokens;
+
+use crate::threading_kind::ThreadingKind;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConsoleArgument {
@@ -10,12 +14,14 @@ pub enum ConsoleArgument {
     Named {
         name: String,
         required: bool,
-        value_type: Type,
+        threading: ThreadingKind,
+        value_type: CanonicalPath,
     },
     Positional {
         id: String,
         required: bool,
-        value_type: Type,
+        threading: ThreadingKind,
+        value_type: CanonicalPath,
     },
 }
 
@@ -34,10 +40,12 @@ impl ConsoleArgument {
                 value_type,
                 ..
             } => {
+                let type_tokens = path_tokens(value_type);
+
                 if *required {
-                    quote! { #value_type }
+                    type_tokens
                 } else {
-                    quote! { ::std::option::Option<#value_type> }
+                    quote! { ::std::option::Option<#type_tokens> }
                 }
             }
         }
@@ -51,20 +59,40 @@ impl ConsoleArgument {
             ConsoleArgument::Positional { id, .. } => id,
         }
     }
+
+    #[must_use]
+    pub fn parameter_referent(&self) -> TokenStream {
+        match self.threading() {
+            ThreadingKind::BorrowedStr => quote! { str },
+            ThreadingKind::BorrowedPath => quote! { ::std::path::Path },
+            ThreadingKind::Copy | ThreadingKind::Cloned => self.field_type(),
+        }
+    }
+
+    #[must_use]
+    pub fn threading(&self) -> ThreadingKind {
+        match self {
+            ConsoleArgument::Flag { .. } => ThreadingKind::Copy,
+            ConsoleArgument::Named { threading, .. }
+            | ConsoleArgument::Positional { threading, .. } => threading.clone(),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
+    use margaret_attributes::canonical_path::CanonicalPath;
+
+    use crate::threading_kind::ThreadingKind;
 
     use super::ConsoleArgument;
 
-    fn collapsed(argument: &ConsoleArgument) -> String {
-        argument
-            .field_type()
-            .to_string()
-            .split_whitespace()
-            .collect()
+    fn path(segments: &[&str]) -> CanonicalPath {
+        CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
+    }
+
+    fn collapsed(tokens: proc_macro2::TokenStream) -> String {
+        tokens.to_string().split_whitespace().collect()
     }
 
     #[test]
@@ -73,42 +101,94 @@ mod tests {
             name: "loud".to_string(),
         };
 
-        assert_eq!(collapsed(&flag), "bool");
+        assert_eq!(collapsed(flag.field_type()), "bool");
         assert_eq!(flag.name(), "loud");
     }
 
     #[test]
-    fn a_required_field_is_the_value_type() {
+    fn a_required_field_is_the_qualified_value_type() {
         let named = ConsoleArgument::Named {
-            name: "path".to_string(),
+            name: "config".to_string(),
             required: true,
-            value_type: parse_quote!(PathBuf),
+            threading: ThreadingKind::BorrowedPath,
+            value_type: path(&["std", "path", "PathBuf"]),
         };
 
-        assert_eq!(collapsed(&named), "PathBuf");
-        assert_eq!(named.name(), "path");
+        assert_eq!(collapsed(named.field_type()), "std::path::PathBuf");
+        assert_eq!(named.name(), "config");
     }
 
     #[test]
-    fn an_optional_field_is_an_option() {
+    fn an_optional_field_is_an_option_of_the_qualified_value_type() {
         let named = ConsoleArgument::Named {
             name: "label".to_string(),
             required: false,
-            value_type: parse_quote!(String),
+            threading: ThreadingKind::Cloned,
+            value_type: path(&["std", "string", "String"]),
         };
 
-        assert_eq!(collapsed(&named), "::std::option::Option<String>");
+        assert_eq!(
+            collapsed(named.field_type()),
+            "::std::option::Option<std::string::String>"
+        );
     }
 
     #[test]
-    fn a_positional_field_is_the_value_type_and_names_its_id() {
+    fn a_positional_field_is_the_qualified_value_type_and_names_its_id() {
         let positional = ConsoleArgument::Positional {
             id: "point".to_string(),
             required: true,
-            value_type: parse_quote!(Point),
+            threading: ThreadingKind::Cloned,
+            value_type: path(&["crate", "geometry", "Point"]),
         };
 
-        assert_eq!(collapsed(&positional), "Point");
+        assert_eq!(collapsed(positional.field_type()), "crate::geometry::Point");
         assert_eq!(positional.name(), "point");
+    }
+
+    #[test]
+    fn a_flag_parameter_referent_is_its_bool_field_type() {
+        let flag = ConsoleArgument::Flag {
+            name: "loud".to_string(),
+        };
+
+        assert_eq!(flag.threading(), ThreadingKind::Copy);
+        assert_eq!(collapsed(flag.parameter_referent()), "bool");
+    }
+
+    #[test]
+    fn a_positional_threads_by_its_stored_kind() {
+        let positional = ConsoleArgument::Positional {
+            id: "count".to_string(),
+            required: true,
+            threading: ThreadingKind::Copy,
+            value_type: path(&["u16"]),
+        };
+
+        assert_eq!(positional.threading(), ThreadingKind::Copy);
+    }
+
+    #[test]
+    fn a_borrowed_str_parameter_referent_is_str() {
+        let named = ConsoleArgument::Named {
+            name: "label".to_string(),
+            required: true,
+            threading: ThreadingKind::BorrowedStr,
+            value_type: path(&["std", "string", "String"]),
+        };
+
+        assert_eq!(collapsed(named.parameter_referent()), "str");
+    }
+
+    #[test]
+    fn a_borrowed_path_parameter_referent_is_the_path_type() {
+        let named = ConsoleArgument::Named {
+            name: "config".to_string(),
+            required: true,
+            threading: ThreadingKind::BorrowedPath,
+            value_type: path(&["std", "path", "PathBuf"]),
+        };
+
+        assert_eq!(collapsed(named.parameter_referent()), "::std::path::Path");
     }
 }

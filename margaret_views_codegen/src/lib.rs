@@ -128,8 +128,8 @@ impl Banner {
 
         assert_eq!(slot, 1);
         assert_eq!(artifacts.console_arguments[0].name(), "title");
-        assert!(source.contains("console_argument_0: &String"));
-        assert!(source.contains("banner: container.banner(console_argument_0.clone()).await"));
+        assert!(source.contains("console_argument_0: &str"));
+        assert!(source.contains("banner: container.banner(console_argument_0.to_owned()).await"));
     }
 
     #[test]

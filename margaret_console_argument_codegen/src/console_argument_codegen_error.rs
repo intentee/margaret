@@ -43,4 +43,22 @@ pub enum ConsoleArgumentCodegenError {
         "the command-line argument '{name}' is declared both as a positional and as a named argument within the same command; a name must resolve to exactly one argument"
     )]
     ConflictingConsoleArgumentId { name: String },
+
+    #[error(
+        "console argument '{parameter}' of '{owner}' has a generic value type '{value_type}'; a console argument value type must be a single concrete type, never a generic like Vec<T>"
+    )]
+    GenericValueType {
+        owner: String,
+        parameter: String,
+        value_type: String,
+    },
+
+    #[error(
+        "console argument '{parameter}' of '{owner}' has value type '{value_type}', which could not be resolved to a concrete type; import or fully qualify it"
+    )]
+    UnresolvableValueType {
+        owner: String,
+        parameter: String,
+        value_type: String,
+    },
 }

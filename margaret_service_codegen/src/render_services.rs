@@ -285,7 +285,7 @@ fn service_adapter(unit: &ServiceUnit) -> TokenStream {
 }
 
 fn threaded_arguments(unit: &ServiceUnit, bindings: &ContainerBindings) -> Vec<TokenStream> {
-    bindings.console_threads(bindings.console_arguments(&unit.concrete_path))
+    bindings.console_threads_owned(bindings.console_arguments(&unit.concrete_path))
 }
 
 fn registration(unit: &ServiceUnit, bindings: &ContainerBindings) -> TokenStream {

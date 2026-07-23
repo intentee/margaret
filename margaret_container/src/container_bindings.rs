@@ -2,13 +2,18 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use proc_macro2::TokenStream;
+use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::console_argument_argument::console_argument_argument;
 use margaret_codegen_tokens::console_argument_borrow::console_argument_borrow;
 use margaret_codegen_tokens::console_argument_clone::console_argument_clone;
+use margaret_codegen_tokens::console_argument_deref::console_argument_deref;
+use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::console_argument_parameter::console_argument_parameter;
+use margaret_codegen_tokens::console_argument_to_owned::console_argument_to_owned;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_console_argument_codegen::threading_kind::ThreadingKind;
 use margaret_console_argument_codegen::unify_by_key::unify_by_key;
 
 use crate::console_closures::ConsoleClosures;
@@ -115,7 +120,7 @@ impl ContainerBindings {
             .map(|argument| {
                 console_argument_parameter(
                     self.console_slot(argument.name()),
-                    &argument.field_type(),
+                    &argument.parameter_referent(),
                 )
             })
             .collect()
@@ -130,7 +135,15 @@ impl ContainerBindings {
     pub fn console_threads(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
         arguments
             .iter()
-            .map(|argument| console_argument_clone(self.console_slot(argument.name())))
+            .map(|argument| self.materialize(argument, false))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn console_threads_owned(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
+        arguments
+            .iter()
+            .map(|argument| self.materialize(argument, true))
             .collect()
     }
 
@@ -201,5 +214,25 @@ impl ContainerBindings {
 
     fn accessor_console_arguments(&self, field: &str) -> &[ConsoleArgument] {
         &self.accessor_console_arguments[field]
+    }
+
+    fn materialize(&self, argument: &ConsoleArgument, owned_source: bool) -> TokenStream {
+        let slot = self.console_slot(argument.name());
+
+        match argument.threading() {
+            ThreadingKind::Copy => {
+                if owned_source {
+                    let ident = console_argument_ident(slot);
+
+                    quote! { #ident }
+                } else {
+                    console_argument_deref(slot)
+                }
+            }
+            ThreadingKind::BorrowedStr | ThreadingKind::BorrowedPath => {
+                console_argument_to_owned(slot)
+            }
+            ThreadingKind::Cloned => console_argument_clone(slot),
+        }
     }
 }
