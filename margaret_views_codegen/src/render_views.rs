@@ -1,18 +1,40 @@
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::render::render;
 use crate::render_build::render_build;
+use crate::view::View;
 use crate::views::views;
+use crate::views_artifacts::ViewsArtifacts;
 use crate::views_codegen_error::ViewsCodegenError;
+
+fn views_console_arguments(views: &[View], bindings: &ContainerBindings) -> Vec<ConsoleArgument> {
+    let mut collected: Vec<ConsoleArgument> = Vec::new();
+
+    for view in views {
+        collected.extend_from_slice(bindings.console_arguments(&view.concrete_path));
+    }
+
+    bindings.console_union(&collected)
+}
 
 pub fn render_views(
     index: &AttributeIndex,
-) -> Result<Vec<GeneratedModuleTokens>, ViewsCodegenError> {
+    bindings: &ContainerBindings,
+) -> Result<ViewsArtifacts, ViewsCodegenError> {
     let views = views(index)?;
+    let console_arguments = views_console_arguments(&views, bindings);
 
-    Ok(vec![
-        GeneratedModuleTokens::new("views", render(&views)),
-        GeneratedModuleTokens::new("views/build", render_build(&views)),
-    ])
+    Ok(ViewsArtifacts {
+        modules: vec![
+            GeneratedModuleTokens::new("views", render(&views)),
+            GeneratedModuleTokens::new(
+                "views/build",
+                render_build(&views, &console_arguments, bindings),
+            ),
+        ],
+        console_arguments,
+    })
 }

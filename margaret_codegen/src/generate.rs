@@ -165,8 +165,8 @@ struct Config {
         fs::create_dir_all(&source).expect("the src directory exists");
         fs::write(source.join("lib.rs"), "").expect("lib.rs is written");
 
-        let error =
-            generate_into(host.path()).expect_err("a manifest without a workspace root is reported");
+        let error = generate_into(host.path())
+            .expect_err("a manifest without a workspace root is reported");
 
         assert!(
             error

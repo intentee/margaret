@@ -1,13 +1,16 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
+use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::fold_layers::fold_layers;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
@@ -22,8 +25,17 @@ use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::route_group::RouteGroup;
 
+struct CaptureBinder {
+    field: Ident,
+    provider: CanonicalPath,
+}
+
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
+}
+
+fn console_thread(path: &CanonicalPath, bindings: &ContainerBindings) -> Vec<TokenStream> {
+    bindings.console_threads(bindings.console_arguments(path))
 }
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
@@ -52,11 +64,12 @@ fn handler_binding(route: &HttpRoute) -> Ident {
     format_ident!("{}_handler", route.responder_field)
 }
 
-fn onion(route: &HttpRoute) -> TokenStream {
+fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let responder = &route.responder_field;
     let responder_type = path_tokens(&route.responder_path);
-    let responder_access = access(quote! { container.#responder() });
-    let captures = capture_fields(route);
+    let responder_threaded = console_thread(&route.responder_path, bindings);
+    let responder_access = access(quote! { container.#responder(#(#responder_threaded),*) });
+    let captures = capture_binders(route);
 
     let mut allocator = NameAllocator::new();
 
@@ -66,8 +79,8 @@ fn onion(route: &HttpRoute) -> TokenStream {
         }
     }
 
-    for field in &captures {
-        allocator.reserve(&field.to_string());
+    for binder in &captures {
+        allocator.reserve(&binder.field.to_string());
     }
 
     let request_binding = if route
@@ -90,7 +103,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
     let routes_local = format_ident!("{}", allocator.allocate("routes").field());
     let views_local = format_ident!("{}", allocator.allocate("views").field());
 
-    let bindings = route
+    let bindings_tokens = route
         .arguments
         .iter()
         .map(|argument| argument_binding(argument, &request_binding));
@@ -101,7 +114,7 @@ fn onion(route: &HttpRoute) -> TokenStream {
         .map(|argument| argument_value(argument, &routes_local, &views_local, &server));
     let respond_call = quote! { #responder_binding.respond(#(#argument_values),*).await };
     let body = quote! {
-        #(#bindings)*
+        #(#bindings_tokens)*
         margaret_http::response_continuation::ResponseContinuation::from(#respond_call)
     };
 
@@ -132,14 +145,18 @@ fn onion(route: &HttpRoute) -> TokenStream {
             )
         }
     } else {
-        let capture_bindings = captures.iter().map(|field| {
-            let field_access = access(quote! { container.#field() });
+        let capture_bindings = captures.iter().map(|binder| {
+            let field = &binder.field;
+            let binder_threaded = console_thread(&binder.provider, bindings);
+            let field_access = access(quote! { container.#field(#(#binder_threaded),*) });
 
             quote! { let #field = #field_access; }
         });
-        let capture_clones = captures
-            .iter()
-            .map(|field| quote! { let #field = #field.clone(); });
+        let capture_clones = captures.iter().map(|binder| {
+            let field = &binder.field;
+
+            quote! { let #field = #field.clone(); }
+        });
         let routes_setup = captures_routes.then(|| quote! { let #routes_local = routes.clone(); });
         let routes_reclone =
             captures_routes.then(|| quote! { let #routes_local = #routes_local.clone(); });
@@ -204,18 +221,79 @@ fn argument_binding(argument: &BoundParameter, request: &Ident) -> TokenStream {
     )
 }
 
-fn capture_fields(route: &HttpRoute) -> Vec<Ident> {
-    let mut fields: BTreeSet<String> = BTreeSet::new();
+fn capture_binders(route: &HttpRoute) -> Vec<CaptureBinder> {
+    let mut binders: BTreeMap<String, CanonicalPath> = BTreeMap::new();
 
     for argument in &route.arguments {
-        if let RequestBinding::Bound { binder_field, .. } = &argument.binding {
-            fields.insert(binder_field.clone());
+        if let RequestBinding::Bound {
+            binder_field,
+            binder_provider,
+            ..
+        } = &argument.binding
+        {
+            binders.insert(binder_field.clone(), binder_provider.clone());
         }
     }
 
-    fields
+    binders
+        .into_iter()
+        .map(|(field, provider)| CaptureBinder {
+            field: format_ident!("{}", field),
+            provider,
+        })
+        .collect()
+}
+
+fn server_routes<'table>(table: &'table HttpRouteTable, server: &str) -> Vec<&'table HttpRoute> {
+    table
+        .route_groups(server)
+        .flat_map(RouteGroup::method_routes)
+        .collect()
+}
+
+fn responder_and_binder_arguments(
+    routes: &[&HttpRoute],
+    bindings: &ContainerBindings,
+) -> Vec<ConsoleArgument> {
+    let mut collected: Vec<ConsoleArgument> = Vec::new();
+
+    for route in routes {
+        collected.extend_from_slice(bindings.console_arguments(&route.responder_path));
+
+        for argument in &route.arguments {
+            if let RequestBinding::Bound {
+                binder_provider, ..
+            } = &argument.binding
+            {
+                collected.extend_from_slice(bindings.console_arguments(binder_provider));
+            }
+        }
+    }
+
+    collected
+}
+
+pub(crate) fn server_console_arguments(
+    table: &HttpRouteTable,
+    servers: &[HttpServer],
+    bindings: &ContainerBindings,
+    websocket_server_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
+) -> BTreeMap<String, Vec<ConsoleArgument>> {
+    servers
         .iter()
-        .map(|field| format_ident!("{}", field))
+        .map(|server| {
+            let routes = server_routes(table, server.name());
+            let mut collected = responder_and_binder_arguments(&routes, bindings);
+
+            if let Some(websocket_arguments) = websocket_server_arguments.get(server.name()) {
+                collected.extend_from_slice(websocket_arguments);
+            }
+
+            (
+                server.name().to_string(),
+                bindings.console_union(&collected),
+            )
+        })
         .collect()
 }
 
@@ -224,6 +302,9 @@ fn server_module(
     server: &HttpServer,
     has_views: bool,
     has_websocket_routes: bool,
+    bindings: &ContainerBindings,
+    server_arguments: &[ConsoleArgument],
+    websocket_arguments: &[ConsoleArgument],
 ) -> TokenStream {
     let function_name = server.function_name();
     let server_routes: Vec<&HttpRoute> = table
@@ -248,13 +329,14 @@ fn server_module(
             #views_param: &::std::sync::Arc<super::super::views::Views>,
         }
     });
+    let console_parameters = bindings.console_parameters(server_arguments);
 
     let handler_bindings = server_routes
         .iter()
         .filter(|route| route.name.is_some())
         .map(|route| {
             let binding = handler_binding(route);
-            let handler = onion(route);
+            let handler = onion(route, bindings);
 
             quote! { let #binding = #handler; }
         });
@@ -268,7 +350,7 @@ fn server_module(
 
                 quote! { #binding.clone() }
             } else {
-                onion(route)
+                onion(route, bindings)
             };
 
             quote! {
@@ -294,13 +376,14 @@ fn server_module(
     let router = if has_websocket_routes {
         let websocket_routes = format_ident!("{}_routes", server.name());
         let views_argument = has_views.then(|| quote! { , #views_param });
+        let websocket_forward = bindings.console_forwards(websocket_arguments);
 
         quote! {
             {
                 let mut route_entries = #route_entries;
 
                 route_entries.extend(
-                    super::super::websocket::#websocket_routes(container, #routes_param #views_argument).await,
+                    super::super::websocket::#websocket_routes(container, #(#websocket_forward)* #routes_param #views_argument).await,
                 );
 
                 margaret_http::router::Router::build(route_entries)
@@ -313,6 +396,7 @@ fn server_module(
     quote! {
         pub async fn #function_name(
             container: &super::super::container::Container,
+            #(#console_parameters)*
             #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
             #views_parameter
         ) -> ::std::result::Result<
@@ -333,6 +417,9 @@ pub(crate) fn render(
     servers: &[HttpServer],
     has_views: bool,
     websocket_servers: &[String],
+    bindings: &ContainerBindings,
+    server_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
+    websocket_server_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
 ) -> Vec<GeneratedModuleTokens> {
     let server_declarations = servers.iter().map(|server| {
         let function_name = server.function_name();
@@ -348,15 +435,28 @@ pub(crate) fn render(
     };
 
     let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];
+    let empty: Vec<ConsoleArgument> = Vec::new();
 
     for server in servers {
         let has_websocket_routes = websocket_servers
             .iter()
             .any(|websocket_server| websocket_server == server.name());
+        let server_union = server_arguments.get(server.name()).unwrap_or(&empty);
+        let websocket_union = websocket_server_arguments
+            .get(server.name())
+            .unwrap_or(&empty);
 
         modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
-            server_module(table, server, has_views, has_websocket_routes),
+            server_module(
+                table,
+                server,
+                has_views,
+                has_websocket_routes,
+                bindings,
+                server_union,
+                websocket_union,
+            ),
         ));
     }
 

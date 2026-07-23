@@ -1,10 +1,12 @@
 pub mod argument_registration;
 pub mod argument_value;
+mod classify;
 pub mod console_argument;
-pub mod console_argument_arguments;
+mod console_argument_arguments;
 pub mod console_argument_codegen_error;
-pub mod ensure_unique;
+mod console_argument_form;
+pub mod console_argument_registry;
 pub mod optional_parameter;
-pub mod process_arguments;
-pub mod required_argument_style;
 pub mod required_flag_read;
+pub mod scan;
+pub mod unify_by_key;

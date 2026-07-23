@@ -17,12 +17,13 @@ fn is_workspace_manifest(manifest_path: &Path) -> Result<bool, CodegenError> {
         }
     };
 
-    let document = contents
-        .parse::<toml::Table>()
-        .map_err(|source| CodegenError::ParseWorkspaceManifest {
-            path: manifest_path.to_path_buf(),
-            source: Box::new(source),
-        })?;
+    let document =
+        contents
+            .parse::<toml::Table>()
+            .map_err(|source| CodegenError::ParseWorkspaceManifest {
+                path: manifest_path.to_path_buf(),
+                source: Box::new(source),
+            })?;
 
     Ok(document.contains_key("workspace"))
 }

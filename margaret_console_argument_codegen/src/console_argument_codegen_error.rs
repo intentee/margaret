@@ -11,21 +11,36 @@ pub enum ConsoleArgumentCodegenError {
     },
 
     #[error(
-        "parameter '{parameter}' of '{owner}' is not marked #[console_argument]; every process parameter must be a console argument"
+        "console argument '{parameter}' of '{owner}' declares both `from` and `positional`; an argument is either named or positional, never both"
     )]
-    UnmarkedProcessParameter { owner: String, parameter: String },
+    NamedAndPositional { owner: String, parameter: String },
 
     #[error(
-        "console argument #{parameter} of '{owner}' is missing `from = \"...\"`; it must name the command-line argument it binds"
+        "console argument '{parameter}' of '{owner}' declares neither `from = \"...\"` nor `positional`; it must be exactly one of them"
     )]
-    MissingFrom { owner: String, parameter: String },
+    NeitherNamedNorPositional { owner: String, parameter: String },
 
     #[error(
-        "the command-line argument '{name}' declared by '{owner}' is already declared by '{existing_owner}'; every argument must be unique"
+        "console argument '{parameter}' of '{owner}' is `positional` but its type is a boolean; a boolean is a named flag, never positional"
     )]
-    DuplicateConsoleArgument {
-        existing_owner: String,
+    BooleanPositional { owner: String, parameter: String },
+
+    #[error(
+        "console argument '{parameter}' of '{owner}' is `positional`, but '{owner}' is not a #[console_command]; positional arguments are only allowed on console commands"
+    )]
+    PositionalOutsideCommand { owner: String, parameter: String },
+
+    #[error(
+        "the command-line argument '{name}' declared by '{owner}' has a different type than the '{name}' declared by '{first_owner}'; a shared named argument must have the same type everywhere"
+    )]
+    ConflictingConsoleArgumentType {
+        first_owner: String,
         name: String,
         owner: String,
     },
+
+    #[error(
+        "the command-line argument '{name}' is declared both as a positional and as a named argument within the same command; a name must resolve to exactly one argument"
+    )]
+    ConflictingConsoleArgumentId { name: String },
 }

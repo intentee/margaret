@@ -19,6 +19,7 @@ pub(crate) fn websocket_pass(
     )?;
 
     context.set_websocket_servers(artifacts.servers);
+    context.set_websocket_server_arguments(artifacts.server_console_arguments);
     context.extend_modules(artifacts.modules);
 
     Ok(())

@@ -13,6 +13,7 @@ mod render_messages;
 mod render_server_routes;
 mod render_sessions;
 mod session_arguments;
+mod session_console_arguments;
 mod session_plan;
 mod websocket_handlers;
 mod websocket_message;
@@ -141,7 +142,10 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
-        render_container(index, &[])
+        let registry = margaret_console_argument_codegen::scan::scan(index)
+            .expect("the console arguments are scanned");
+
+        render_container(index, &registry, &[])
             .expect("the container renders")
             .bindings
     }
@@ -176,6 +180,47 @@ impl RespondsToWebSocketNotification for Typist {
 
         render_websocket(&index, &bindings(&index), false, &plans)
             .expect_err("the websocket module is rejected")
+    }
+
+    const CONSOLE_ARGUMENT_HANDLER: &str = r#"
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[websocket_message(request, method = "chat", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl Chatter {
+    #[constructor]
+    fn create(#[console_argument(from = "greeting")] greeting: String) -> Self {}
+}
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+"#;
+
+    #[test]
+    fn threads_a_console_argument_through_the_websocket_dispatch_chain() {
+        let source = generated(CONSOLE_ARGUMENT_HANDLER);
+
+        assert!(source.contains("console_argument_0:&String"));
+        assert!(source.contains("container.chatter(console_argument_0.clone()).await"));
+        assert!(source.contains("dispatch_table(container,console_argument_0).await"));
+        assert!(source.contains(
+            "public_routes(container:&super::container::Container,console_argument_0:&String,"
+        ));
+        assert!(source.contains("upgrade_entry(container,console_argument_0"));
     }
 
     const SESSION_WITH_MIDDLEWARE: &str = r#"

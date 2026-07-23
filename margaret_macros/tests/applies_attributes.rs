@@ -20,12 +20,14 @@ use margaret_macros::websocket_session;
 #[console_command]
 #[handles_middleware_attribute(attribute = traced)]
 #[middleware(traced)]
-struct Subject;
+struct Subject {
+    name: String,
+}
 
 impl Subject {
     #[constructor]
-    fn create() -> Self {
-        Self
+    fn create(#[console_argument(positional)] name: String) -> Self {
+        Self { name }
     }
 
     #[process]
@@ -34,8 +36,8 @@ impl Subject {
     }
 
     #[process]
-    fn run(&self, #[console_argument] name: String) -> String {
-        name
+    fn run(&self) -> String {
+        self.name.clone()
     }
 }
 
@@ -79,10 +81,10 @@ struct Message {
 
 #[test]
 fn attribute_macros_leave_runtime_behavior_untouched() {
-    let subject = Subject::create();
+    let subject = Subject::create("typed-name".to_string());
 
     assert_eq!(subject.respond("path-id".to_string()), "path-id");
-    assert_eq!(subject.run("typed-name".to_string()), "typed-name");
+    assert_eq!(subject.run(), "typed-name");
     assert_eq!(Binder.bind("bound".to_string()), "bound");
 
     let _worker = Worker;

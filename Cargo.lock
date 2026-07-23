@@ -1388,6 +1388,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+ "tempfile",
  "thiserror",
 ]
 
@@ -1397,6 +1398,7 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "margaret_console_argument_codegen",
+ "margaret_container",
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_injection_codegen",
@@ -1413,6 +1415,7 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "margaret_codegen_tokens",
+ "margaret_console_argument_codegen",
  "margaret_generated_module",
  "proc-macro2",
  "quote",
@@ -1425,6 +1428,7 @@ name = "margaret_container_tests"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
  "syn 2.0.119",
@@ -1516,6 +1520,8 @@ dependencies = [
  "http",
  "margaret_attributes",
  "margaret_codegen_tokens",
+ "margaret_console_argument_codegen",
+ "margaret_container",
  "margaret_generated_module",
  "margaret_injection_codegen",
  "margaret_middleware_codegen",
@@ -1807,6 +1813,7 @@ dependencies = [
  "margaret_attributes",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
+ "margaret_container",
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_injection_codegen",
@@ -2001,6 +2008,8 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "margaret_codegen_tokens",
+ "margaret_console_argument_codegen",
+ "margaret_container",
  "margaret_generated_module",
  "proc-macro2",
  "quote",
@@ -2034,6 +2043,7 @@ dependencies = [
  "heck",
  "margaret_attributes",
  "margaret_codegen_tokens",
+ "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
  "margaret_injection_codegen",

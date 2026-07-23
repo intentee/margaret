@@ -19,6 +19,7 @@ pub mod serves_spiffe;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::fs;
     use std::path::Path;
 
@@ -28,12 +29,28 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+    use margaret_console_argument_codegen::scan::scan;
+    use margaret_container::container_bindings::ContainerBindings;
+    use margaret_container::render_container::render_container;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
 
     use crate::has_responders::has_responders;
     use crate::http_codegen_error::HttpCodegenError;
     use crate::render_http::render_http;
     use crate::serves_spiffe::serves_spiffe;
+
+    fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
+        let registry = scan(index).expect("the console arguments are scanned");
+
+        render_container(index, &registry, &[])
+            .expect("the container renders")
+            .bindings
+    }
+
+    fn no_websocket_arguments() -> BTreeMap<String, Vec<ConsoleArgument>> {
+        BTreeMap::new()
+    }
 
     fn http_source(
         crate_name: &str,
@@ -44,20 +61,28 @@ mod tests {
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
         let plans = middleware_plans(&index)?;
+        let bindings = bindings_for(&index);
 
-        Ok(render_http(&index, has_views, &[], &plans)?
-            .into_modules()
-            .into_iter()
-            .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
-            .map(|module| {
-                module
-                    .format()
-                    .expect("the module formats")
-                    .source()
-                    .to_string()
-            })
-            .collect::<Vec<String>>()
-            .join("\n"))
+        Ok(render_http(
+            &index,
+            has_views,
+            &[],
+            &plans,
+            &bindings,
+            &no_websocket_arguments(),
+        )?
+        .into_modules()
+        .into_iter()
+        .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .to_string()
+        })
+        .collect::<Vec<String>>()
+        .join("\n"))
     }
 
     fn generate_http_source(
@@ -269,23 +294,31 @@ impl Health {
     ) -> String {
         let index = index_for(lib_source);
         let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let bindings = bindings_for(&index);
 
-        render_http(&index, has_views, websocket_servers, &plans)
-            .expect("the http source is generated")
-            .into_modules()
-            .into_iter()
-            .filter(|module| module.name().starts_with("http/"))
-            .map(|module| {
-                module
-                    .format()
-                    .expect("the module formats")
-                    .source()
-                    .to_string()
-            })
-            .collect::<Vec<String>>()
-            .join("")
-            .split_whitespace()
-            .collect()
+        render_http(
+            &index,
+            has_views,
+            websocket_servers,
+            &plans,
+            &bindings,
+            &no_websocket_arguments(),
+        )
+        .expect("the http source is generated")
+        .into_modules()
+        .into_iter()
+        .filter(|module| module.name().starts_with("http/"))
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .to_string()
+        })
+        .collect::<Vec<String>>()
+        .join("")
+        .split_whitespace()
+        .collect()
     }
 
     #[test]
@@ -323,23 +356,31 @@ impl Health {
             .expect("the crate is indexed")
             .build();
         let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let bindings = bindings_for(&index);
 
-        crate::render_http::render_http(&index, false, &[], &plans)
-            .expect("the http source is generated")
-            .into_modules()
-            .into_iter()
-            .filter(|module| module.name() == "routes" || module.name().starts_with("routes/"))
-            .map(|module| {
-                module
-                    .format()
-                    .expect("the module formats")
-                    .source()
-                    .to_string()
-            })
-            .collect::<Vec<String>>()
-            .join("\n")
-            .split_whitespace()
-            .collect()
+        crate::render_http::render_http(
+            &index,
+            false,
+            &[],
+            &plans,
+            &bindings,
+            &no_websocket_arguments(),
+        )
+        .expect("the http source is generated")
+        .into_modules()
+        .into_iter()
+        .filter(|module| module.name() == "routes" || module.name().starts_with("routes/"))
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .to_string()
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
+        .split_whitespace()
+        .collect()
     }
 
     const ROUTES_FIXTURE: &str = r#"
@@ -1323,8 +1364,16 @@ impl Guard {
 "#,
         );
         let plans = middleware_plans(&index).expect("the middleware plans are collected");
-        let artifacts =
-            render_http(&index, false, &[], &plans).expect("the http source is generated");
+        let bindings = bindings_for(&index);
+        let artifacts = render_http(
+            &index,
+            false,
+            &[],
+            &plans,
+            &bindings,
+            &no_websocket_arguments(),
+        )
+        .expect("the http source is generated");
 
         assert!(serves_spiffe(artifacts.servers()));
     }
@@ -1346,5 +1395,63 @@ impl GetX {
         );
 
         assert!(message.contains("only available inside an HTTP middleware"));
+    }
+
+    const CONSOLE_ARGUMENT_RESPONDER: &str = r#"
+#[singleton]
+#[responds_to_http(method = "get", path = "/greeting", server = "public")]
+struct Greeting;
+
+impl Greeting {
+    #[constructor]
+    fn create(#[console_argument(from = "salutation")] salutation: String) -> Self {}
+
+    #[process]
+    fn respond(&self) -> Response {}
+}
+"#;
+
+    #[test]
+    fn threads_a_console_argument_into_a_responder_and_its_server() {
+        let source = source_for(CONSOLE_ARGUMENT_RESPONDER);
+
+        assert!(source.contains(
+            "pubasyncfnserver_public(container:&super::super::container::Container,console_argument_0:&String,"
+        ));
+        assert!(source.contains("container.greeting(console_argument_0.clone())"));
+    }
+
+    const CONSOLE_ARGUMENT_BINDER: &str = r#"
+struct User;
+
+#[singleton]
+#[provides_route_parameter]
+struct UserBinder;
+
+impl UserBinder {
+    #[constructor]
+    fn create(#[console_argument(from = "tenant")] tenant: String) -> Self {}
+}
+
+impl HttpRouteParameterBinder for UserBinder {
+    type Model = User;
+    async fn bind(&self, value: String) -> Option<User> {}
+}
+
+#[responds_to_http(method = "get", path = "/users/{user}", server = "public")]
+struct GetUser;
+
+impl GetUser {
+    #[process]
+    fn respond(&self, #[route_parameter(from = "user")] user: User) -> Response {}
+}
+"#;
+
+    #[test]
+    fn threads_a_console_argument_into_a_route_parameter_binder() {
+        let source = source_for(CONSOLE_ARGUMENT_BINDER);
+
+        assert!(source.contains("console_argument_0:&String,"));
+        assert!(source.contains("container.user_binder(console_argument_0.clone())"));
     }
 }

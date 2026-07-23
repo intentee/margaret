@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
+margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
+margaret_container = { path = "../margaret_container" }
 margaret_generated_module = { path = "../margaret_generated_module" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }

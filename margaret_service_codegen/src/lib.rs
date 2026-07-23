@@ -1,6 +1,5 @@
 pub mod has_services;
 pub mod render_services;
-pub mod rendered_services;
 pub mod service_codegen_error;
 
 mod service_kind;
@@ -10,6 +9,7 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::fs;
 
     use tempfile::TempDir;
@@ -17,7 +17,12 @@ mod tests {
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+    use margaret_attributes::attribute_selector::AttributeSelector;
+    use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_console_argument_codegen::scan::scan;
+    use margaret_container::container_bindings::ContainerBindings;
+    use margaret_container::render_container::render_container;
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 
@@ -43,15 +48,53 @@ mod tests {
             .build()
     }
 
+    fn bindings(index: &AttributeIndex) -> ContainerBindings {
+        let registry = scan(index).expect("the console arguments are scanned");
+
+        render_container(index, &registry, &[])
+            .expect("the container is rendered")
+            .bindings
+    }
+
+    fn serve_roots(index: &AttributeIndex) -> Vec<CanonicalPath> {
+        let mut roots = Vec::new();
+
+        for marker in [
+            "service",
+            "scheduled_with_tick_timer",
+            "responds_to_http",
+            "renders_view",
+        ] {
+            for matched in index.select(&AttributeSelector::from_marker(marker)) {
+                roots.push(matched.item().canonical_path().clone());
+            }
+        }
+
+        roots
+    }
+
     fn render_source(lib_source: &str, servers: &[HttpServer], has_views: bool) -> String {
-        render_services(&index_for(lib_source), servers, has_views)
-            .expect("the services source is generated")
-            .module
-            .format()
-            .expect("the module formats")
-            .source()
-            .split_whitespace()
-            .collect()
+        let index = index_for(lib_source);
+        let bindings = bindings(&index);
+        let serve_arguments = bindings
+            .serve_arguments(&serve_roots(&index), &[])
+            .expect("the serve arguments unify");
+
+        render_services(
+            &index,
+            servers,
+            has_views,
+            &bindings,
+            &serve_arguments,
+            &BTreeMap::new(),
+            &[],
+        )
+        .expect("the services source is generated")
+        .format()
+        .expect("the module formats")
+        .source()
+        .split_whitespace()
+        .collect()
     }
 
     fn rendered(lib_source: &str, servers: &[HttpServer]) -> String {
@@ -63,10 +106,19 @@ mod tests {
     }
 
     fn error_for(lib_source: &str) -> String {
-        render_services(&index_for(lib_source), &[], false)
-            .err()
-            .expect("the services source fails to generate")
-            .to_string()
+        let placeholder = bindings(&index_for("#[singleton]\nstruct Placeholder;\n"));
+
+        render_services(
+            &index_for(lib_source),
+            &[],
+            false,
+            &placeholder,
+            &[],
+            &BTreeMap::new(),
+            &[],
+        )
+        .expect_err("the services source fails to generate")
+        .to_string()
     }
 
     fn public() -> Vec<HttpServer> {
@@ -364,7 +416,8 @@ mod tests {
             "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> Result<(), Infallible> {}\n}\n",
         );
 
-        assert!(message.contains("must be a console argument"));
+        assert!(message.contains("takes parameter 'value'"));
+        assert!(message.contains("a runner may only take &self and an optional CancellationToken"));
     }
 
     #[test]
@@ -373,75 +426,172 @@ mod tests {
             "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> Result<(), Infallible> {}\n}\n",
         );
 
-        assert!(message.contains("must be a console argument"));
+        assert!(message.contains("takes parameter 'token'"));
+        assert!(message.contains("a runner may only take &self and an optional CancellationToken"));
     }
 
     #[test]
     fn threads_a_console_argument_into_a_ticker() {
         let source = rendered(
-            "use std::path::PathBuf;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Roller;\n\nimpl Roller {\n    #[process]\n    fn run(&self, #[console_argument(from = \"secret-path\")] secret_path: PathBuf) -> Result<(), Infallible> {}\n}\n",
+            r#"use std::path::PathBuf;
+
+#[scheduled_with_tick_timer(interval = crate::P)]
+struct Roller {
+    secret_path: PathBuf,
+}
+
+impl Roller {
+    #[constructor]
+    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> Self {}
+
+    #[process]
+    fn run(&self) -> Result<(), Infallible> {}
+}
+"#,
             &[],
         );
 
-        assert!(
-            source
-                .contains("structRoller{inner:std::sync::Arc<crate::Roller>,argument_0:PathBuf,}")
-        );
+        assert!(source.contains("structRoller{inner:std::sync::Arc<crate::Roller>,}"));
         assert!(source.contains("impltrzcina::TickerforRoller"));
-        assert!(source.contains(
-            "self.inner.run(self.argument_0.clone()).await.map_err(anyhow::Error::from)"
-        ));
+        assert!(source.contains("self.inner.run().await.map_err(anyhow::Error::from)"));
         assert!(!source.contains("impltrzcina::Servicefor"));
-        assert!(source.contains(r#"argument_0:matchmatches.get_one::<PathBuf>("secret-path")"#));
+        assert!(source.contains(
+            "manager.register_service(Roller{inner:container.roller(console_argument_0.clone()).await,});"
+        ));
+        assert!(
+            source.contains(
+                r#"letconsole_argument_0=matchmatches.get_one::<PathBuf>("secret-path")"#
+            )
+        );
     }
 
     #[test]
     fn threads_a_console_argument_and_the_token_into_a_ticker() {
         let source = rendered(
-            "use std::path::PathBuf;\nuse tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Roller;\n\nimpl Roller {\n    #[process]\n    fn run(&self, #[console_argument(from = \"secret-path\")] secret_path: PathBuf, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            r#"use std::path::PathBuf;
+use tokio_util::sync::CancellationToken;
+
+#[scheduled_with_tick_timer(interval = crate::P)]
+struct Roller {
+    secret_path: PathBuf,
+}
+
+impl Roller {
+    #[constructor]
+    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> Self {}
+
+    #[process]
+    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}
+}
+"#,
             &[],
         );
 
-        assert!(source.contains(
-            "self.inner.run(self.argument_0.clone(),cancellation_token).await.map_err(anyhow::Error::from)"
-        ));
+        assert!(
+            source
+                .contains("self.inner.run(cancellation_token).await.map_err(anyhow::Error::from)")
+        );
         assert!(!source.contains("_cancellation_token"));
+        assert!(source.contains(
+            "manager.register_service(Roller{inner:container.roller(console_argument_0.clone()).await,});"
+        ));
     }
 
     #[test]
     fn threads_a_console_argument_into_a_service_with_a_token() {
         let source = rendered(
-            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Worker;\n\nimpl Worker {\n    #[process]\n    fn run(&self, #[console_argument(from = \"label\")] label: String, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            r#"use tokio_util::sync::CancellationToken;
+
+#[service]
+struct Worker {
+    label: String,
+}
+
+impl Worker {
+    #[constructor]
+    fn create(#[console_argument(from = "label")] label: String) -> Self {}
+
+    #[process]
+    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}
+}
+"#,
             &[],
         );
 
-        assert!(source.contains("letWorker{inner,argument_0}=*self;"));
-        assert!(source.contains("inner.run(argument_0,cancellation_token).await?;Ok(())"));
+        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
+        assert!(source.contains(
+            "manager.register_service(Worker{inner:container.worker(console_argument_0.clone()).await,});"
+        ));
     }
 
     #[test]
     fn threads_a_console_argument_into_a_service() {
         let source = rendered(
-            "#[service]\nstruct Worker;\n\nimpl Worker {\n    #[process]\n    fn run(&self, #[console_argument(from = \"label\")] label: String) -> Result<(), Infallible> {}\n}\n",
+            r#"#[service]
+struct Worker {
+    label: String,
+}
+
+impl Worker {
+    #[constructor]
+    fn create(#[console_argument(from = "label")] label: String) -> Self {}
+
+    #[process]
+    fn run(&self) -> Result<(), Infallible> {}
+}
+"#,
             &[],
         );
 
+        assert!(source.contains("structWorker{inner:std::sync::Arc<crate::Worker>,}"));
+        assert!(source.contains("self.inner.run().await?;Ok(())"));
+        assert!(source.contains(
+            "manager.register_service(Worker{inner:container.worker(console_argument_0.clone()).await,});"
+        ));
         assert!(
-            source.contains("structWorker{inner:std::sync::Arc<crate::Worker>,argument_0:String,}")
-        );
-        assert!(
-            source
-                .contains("letWorker{inner,argument_0}=*self;inner.run(argument_0).await?;Ok(())")
+            source.contains(r#"letconsole_argument_0=matchmatches.get_one::<String>("label")"#)
         );
     }
 
     #[test]
-    fn rejects_two_components_declaring_the_same_console_argument() {
-        let message = error_for(
-            "#[service]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self, #[console_argument(from = \"shared\")] a: String) -> Result<(), Infallible> {}\n}\n\n#[service]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self, #[console_argument(from = \"shared\")] b: String) -> Result<(), Infallible> {}\n}\n",
+    fn threads_a_shared_console_argument_into_both_services_once() {
+        let source = rendered(
+            r#"#[service]
+struct First {
+    shared: String,
+}
+
+impl First {
+    #[constructor]
+    fn create(#[console_argument(from = "shared")] a: String) -> Self {}
+
+    #[process]
+    fn run(&self) -> Result<(), Infallible> {}
+}
+
+#[service]
+struct Second {
+    shared: String,
+}
+
+impl Second {
+    #[constructor]
+    fn create(#[console_argument(from = "shared")] b: String) -> Self {}
+
+    #[process]
+    fn run(&self) -> Result<(), Infallible> {}
+}
+"#,
+            &[],
         );
 
-        assert!(message.contains("already declared"));
+        assert!(source.contains(
+            "manager.register_service(First{inner:container.first(console_argument_0.clone()).await,});"
+        ));
+        assert!(source.contains(
+            "manager.register_service(Second{inner:container.second(console_argument_0.clone()).await,});"
+        ));
+        assert_eq!(source.matches("letconsole_argument_0=").count(), 1);
     }
 
     #[test]

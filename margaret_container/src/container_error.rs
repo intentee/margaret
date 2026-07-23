@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_console_argument_codegen::console_argument_codegen_error::ConsoleArgumentCodegenError;
 
 #[derive(Debug, Error)]
 pub enum ContainerError {
@@ -8,6 +9,12 @@ pub enum ContainerError {
     Index {
         #[from]
         source: AttributeError,
+    },
+
+    #[error(transparent)]
+    ConsoleArgument {
+        #[from]
+        source: ConsoleArgumentCodegenError,
     },
 
     #[error("#[singleton] is only supported on structs, but '{path}' is not a struct")]

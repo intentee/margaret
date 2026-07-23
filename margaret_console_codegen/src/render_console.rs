@@ -1,5 +1,6 @@
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 
@@ -13,8 +14,9 @@ pub fn render_console(
     has_models: bool,
     servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
+    bindings: &ContainerBindings,
 ) -> Result<GeneratedModuleTokens, ConsoleCodegenError> {
-    let commands = console_commands(index)?;
+    let commands = console_commands(index, bindings)?;
 
     Ok(GeneratedModuleTokens::new(
         "run",

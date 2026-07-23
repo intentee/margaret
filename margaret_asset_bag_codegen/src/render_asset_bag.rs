@@ -149,8 +149,8 @@ mod tests {
     }"#;
 
     fn formatted(metafile_contents: &str, responder: ResponderGeneration, name: &str) -> String {
-        let modules =
-            render_asset_bag(metafile_contents, responder).expect("the asset bag module is generated");
+        let modules = render_asset_bag(metafile_contents, responder)
+            .expect("the asset bag module is generated");
 
         modules
             .into_iter()

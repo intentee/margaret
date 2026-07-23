@@ -18,7 +18,9 @@ pub enum AssetBagCodegenError {
     MetafileParse(#[from] serde_json::Error),
     #[error("the esbuild output `{output}` is not inside an output directory")]
     OutputMissingDirectory { output: String },
-    #[error("the esbuild output `{output}` is not inside the shared output directory `{directory}`")]
+    #[error(
+        "the esbuild output `{output}` is not inside the shared output directory `{directory}`"
+    )]
     OutputOutsideDirectory { output: String, directory: String },
     #[error("the esbuild output `{output}` has no recognized content type")]
     UnsupportedAssetContentType { output: String },

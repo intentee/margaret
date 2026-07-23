@@ -6,8 +6,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
-use margaret_console_argument_codegen::process_arguments::process_arguments;
-use margaret_console_argument_codegen::required_argument_style::RequiredArgumentStyle;
+use margaret_container::container_bindings::ContainerBindings;
 use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
@@ -22,12 +21,31 @@ fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, runner: &Index
         .any(|view| is_cancellation_token(index, item, view.declared))
 }
 
+fn validate_runner(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    runner: &IndexedMethod,
+    command: &str,
+) -> Result<(), ConsoleCodegenError> {
+    for view in parameters(runner.signature()) {
+        if !is_cancellation_token(index, item, view.declared) {
+            return Err(ConsoleCodegenError::ConsoleCommandRunnerArgument {
+                command: command.to_string(),
+                parameter: view.holder.to_string(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 fn selector(name: &str) -> AttributeSelector {
     AttributeSelector::from_marker(name)
 }
 
 pub(crate) fn console_commands(
     index: &AttributeIndex,
+    bindings: &ContainerBindings,
 ) -> Result<Vec<ConsoleCommand>, ConsoleCodegenError> {
     let mut commands: BTreeMap<String, ConsoleCommand> = BTreeMap::new();
 
@@ -45,19 +63,14 @@ pub(crate) fn console_commands(
             ConsoleCommandArguments::parse(matched.args()?, &command)?;
         let accessor = format_ident!("{}", identifier.field());
         let runner = process_method(item)?;
-        let arguments = process_arguments(
-            index,
-            item,
-            runner,
-            &command,
-            RequiredArgumentStyle::Positional,
-        )?;
+
+        validate_runner(index, item, runner, &command)?;
 
         let existing = commands.insert(
             name.clone(),
             ConsoleCommand {
                 accessor,
-                arguments,
+                arguments: bindings.console_arguments(item.canonical_path()).to_vec(),
                 command_path: command.clone(),
                 description,
                 name: name.clone(),

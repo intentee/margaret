@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
@@ -16,8 +18,10 @@ pub(crate) struct BuildContext<'index> {
     metafile_contents: Option<String>,
     middleware_plans: Vec<MiddlewarePlan>,
     module_tokens: Vec<GeneratedModuleTokens>,
-    serve_arguments: Vec<ConsoleArgument>,
+    server_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
     servers: Vec<HttpServer>,
+    views_console_arguments: Vec<ConsoleArgument>,
+    websocket_server_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
     websocket_servers: Vec<String>,
 }
 
@@ -29,8 +33,10 @@ impl<'index> BuildContext<'index> {
             metafile_contents,
             middleware_plans: Vec::new(),
             module_tokens: Vec::new(),
-            serve_arguments: Vec::new(),
+            server_console_arguments: BTreeMap::new(),
             servers: Vec::new(),
+            views_console_arguments: Vec::new(),
+            websocket_server_arguments: BTreeMap::new(),
             websocket_servers: Vec::new(),
         }
     }
@@ -68,8 +74,8 @@ impl<'index> BuildContext<'index> {
         &self.module_tokens
     }
 
-    pub(crate) fn serve_arguments(&self) -> &[ConsoleArgument] {
-        &self.serve_arguments
+    pub(crate) fn server_console_arguments(&self) -> &BTreeMap<String, Vec<ConsoleArgument>> {
+        &self.server_console_arguments
     }
 
     pub(crate) fn servers(&self) -> &[HttpServer] {
@@ -80,16 +86,41 @@ impl<'index> BuildContext<'index> {
         self.middleware_plans = middleware_plans;
     }
 
-    pub(crate) fn set_serve_arguments(&mut self, serve_arguments: Vec<ConsoleArgument>) {
-        self.serve_arguments = serve_arguments;
+    pub(crate) fn set_server_console_arguments(
+        &mut self,
+        server_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
+    ) {
+        self.server_console_arguments = server_console_arguments;
     }
 
     pub(crate) fn set_servers(&mut self, servers: Vec<HttpServer>) {
         self.servers = servers;
     }
 
+    pub(crate) fn set_views_console_arguments(
+        &mut self,
+        views_console_arguments: Vec<ConsoleArgument>,
+    ) {
+        self.views_console_arguments = views_console_arguments;
+    }
+
+    pub(crate) fn set_websocket_server_arguments(
+        &mut self,
+        websocket_server_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
+    ) {
+        self.websocket_server_arguments = websocket_server_arguments;
+    }
+
     pub(crate) fn set_websocket_servers(&mut self, websocket_servers: Vec<String>) {
         self.websocket_servers = websocket_servers;
+    }
+
+    pub(crate) fn views_console_arguments(&self) -> &[ConsoleArgument] {
+        &self.views_console_arguments
+    }
+
+    pub(crate) fn websocket_server_arguments(&self) -> &BTreeMap<String, Vec<ConsoleArgument>> {
+        &self.websocket_server_arguments
     }
 
     pub(crate) fn websocket_servers(&self) -> &[String] {

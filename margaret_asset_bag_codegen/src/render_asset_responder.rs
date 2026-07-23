@@ -84,9 +84,14 @@ mod tests {
     }
 
     fn rendered(paths: &[&str], directory: &str, embed_relative: &str) -> String {
-        render_asset_responder(&output_paths(paths), directory, embed_relative, "AssetResponder")
-            .expect("the responder renders")
-            .to_string()
+        render_asset_responder(
+            &output_paths(paths),
+            directory,
+            embed_relative,
+            "AssetResponder",
+        )
+        .expect("the responder renders")
+        .to_string()
     }
 
     #[test]
@@ -113,7 +118,11 @@ mod tests {
 
     #[test]
     fn omits_source_map_outputs_from_the_served_set() {
-        let source = rendered(&["assets/app_A1B2C3D4.js", "assets/app_A1B2C3D4.js.map"], "assets", "..");
+        let source = rendered(
+            &["assets/app_A1B2C3D4.js", "assets/app_A1B2C3D4.js.map"],
+            "assets",
+            "..",
+        );
 
         assert!(source.contains("\"app_A1B2C3D4.js\" =>"));
         assert!(!source.contains(".map"));
