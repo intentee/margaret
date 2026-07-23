@@ -1,4 +1,7 @@
 mod accepts_singletons_named_after_framework_identifiers;
+mod clones_a_console_argument_shared_by_collection_members;
+mod clones_a_console_argument_shared_by_sibling_singles;
+mod clones_a_console_argument_used_by_constructor_and_dependency;
 mod disambiguates_colliding_field_names;
 mod exposes_console_argument_threading_tokens;
 mod generates_async_accessors;
@@ -9,6 +12,7 @@ mod generates_empty_collection_as_empty_vector;
 mod generates_fieldless_singletons;
 mod generates_parameterized_accessor_for_console_arguments;
 mod generation_is_deterministic;
+mod moves_a_copy_console_argument_shared_by_dependencies;
 mod propagates_index_failure;
 mod propagates_malformed_singleton_arguments;
 mod propagates_non_path_collection_argument;

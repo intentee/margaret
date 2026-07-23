@@ -7,6 +7,7 @@ pub mod console_argument_codegen_error;
 mod console_argument_form;
 pub mod console_argument_registry;
 pub mod optional_parameter;
+pub mod owned_thread;
 pub mod required_flag_read;
 pub mod scan;
 pub mod threading_kind;
