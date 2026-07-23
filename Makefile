@@ -18,8 +18,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_injection_codegen \
 	-p margaret_jwks_client \
 	-p margaret_jwks_client_tests \
-	-p margaret_jwks_key_gen \
-	-p margaret_jwks_key_gen_tests \
+	-p margaret_jwks_keygen \
+	-p margaret_jwks_keygen_tests \
 	-p margaret_jwks_roller \
 	-p margaret_jwks_roller_server \
 	-p margaret_jwks_roller_tests \
@@ -92,8 +92,8 @@ coverage: node_modules
 		--gated margaret_injection_codegen=100 \
 		--gated margaret_jwks_client=100 \
 		--gated margaret_jwks_client_tests=100 \
-		--gated margaret_jwks_key_gen=100 \
-		--gated margaret_jwks_key_gen_tests=100 \
+		--gated margaret_jwks_keygen=100 \
+		--gated margaret_jwks_keygen_tests=100 \
 		--gated margaret_jwks_roller=100 \
 		--gated margaret_jwks_roller_server=100 \
 		--gated margaret_jwks_roller_tests=100 \

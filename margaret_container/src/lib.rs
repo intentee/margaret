@@ -1,5 +1,6 @@
 mod build_plan;
 mod collection_table;
+mod console_closures;
 mod construction_source;
 pub mod container_bindings;
 pub mod container_error;

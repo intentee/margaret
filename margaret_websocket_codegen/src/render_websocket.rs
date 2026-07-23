@@ -10,6 +10,7 @@ use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 
 use crate::render_messages::render_messages;
 use crate::render_server_routes::render_server_routes;
+use crate::render_server_routes::server_console_arguments;
 use crate::render_sessions::render_sessions;
 use crate::session_plan::SessionPlan;
 use crate::websocket_artifacts::WebSocketArtifacts;
@@ -43,7 +44,7 @@ pub fn render_websocket(
     });
     let server_routes = sessions_by_server
         .iter()
-        .map(|(server, sessions)| render_server_routes(server, sessions, has_views));
+        .map(|(server, sessions)| render_server_routes(server, sessions, has_views, bindings));
     let message_implementations = render_messages(&plan.messages);
 
     let mut modules = vec![GeneratedModuleTokens::new(
@@ -57,10 +58,16 @@ pub fn render_websocket(
         },
     )];
 
-    modules.extend(render_sessions(&plan.sessions));
+    modules.extend(render_sessions(&plan.sessions, bindings));
+
+    let server_console_arguments = sessions_by_server
+        .iter()
+        .map(|(server, sessions)| (server.clone(), server_console_arguments(sessions, bindings)))
+        .collect();
 
     Ok(WebSocketArtifacts {
         modules,
+        server_console_arguments,
         servers: sessions_by_server.into_keys().collect(),
     })
 }

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use margaret_jwks_key_gen::jwks_key_error::JwksKeyError;
+use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 
 #[derive(Debug, Error)]
 pub enum TokenSignerError {

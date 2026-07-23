@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Type;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ConsoleArgument {
     Flag {
         name: String,

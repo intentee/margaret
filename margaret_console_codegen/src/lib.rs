@@ -16,6 +16,9 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_console_argument_codegen::scan::scan;
+    use margaret_container::container_bindings::ContainerBindings;
+    use margaret_container::render_container::render_container;
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 
@@ -23,25 +26,40 @@ mod tests {
     use crate::render_console::render_console;
 
     const COMMANDS: &str = r#"
-trait Greeter: Send + Sync {}
+use std::sync::Arc;
+
+pub trait Greeter: Send + Sync {}
+
+#[singleton(provides = Greeter)]
+struct EnglishGreeter;
+
+impl EnglishGreeter {
+    #[constructor]
+    fn create() -> Self {}
+}
+
+impl Greeter for EnglishGreeter {}
 
 #[singleton]
 #[console_command(name = "demo", description = "Demonstrates arguments")]
 struct Demo {
     greeter: Arc<dyn Greeter>,
+    name: String,
+    salutation: Option<String>,
+    loud: bool,
 }
 
 impl Demo {
     #[constructor]
-    fn create(greeter: Arc<dyn Greeter>) -> Self {}
-
-    #[process]
-    fn run(
-        &self,
-        #[console_argument(from = "name")] name: String,
+    fn create(
+        greeter: Arc<dyn Greeter>,
+        #[console_argument(positional)] name: String,
         #[console_argument(from = "salutation")] salutation: Option<String>,
         #[console_argument(from = "loud")] loud: bool,
-    ) -> CommandOutcome {}
+    ) -> Self {}
+
+    #[process]
+    fn run(&self) -> CommandOutcome {}
 }
 
 #[singleton]
@@ -73,11 +91,16 @@ impl Farewell {
             .build()
     }
 
-    fn source_for(lib_source: &str, has_http: bool) -> String {
-        rendered(lib_source, has_http)
+    fn bindings(index: &AttributeIndex) -> ContainerBindings {
+        let registry = scan(index).expect("the console arguments are scanned");
+
+        render_container(index, &registry)
+            .expect("the container renders")
+            .bindings
     }
 
-    fn rendered(lib_source: &str, has_http: bool) -> String {
+    fn source_for(lib_source: &str, has_http: bool) -> String {
+        let index = index_for(lib_source);
         let servers = if has_http {
             vec![HttpServer::new(
                 "public".to_string(),
@@ -87,7 +110,7 @@ impl Farewell {
             Vec::new()
         };
 
-        render_console(&index_for(lib_source), has_http, false, &servers, &[])
+        render_console(&index, has_http, false, &servers, &[], &bindings(&index))
             .expect("the console source is generated")
             .format()
             .expect("the module formats")
@@ -97,7 +120,9 @@ impl Farewell {
     }
 
     fn error_for(lib_source: &str) -> String {
-        render_console(&index_for(lib_source), false, false, &[], &[])
+        let index = index_for(lib_source);
+
+        render_console(&index, false, false, &[], &[], &bindings(&index))
             .expect_err("the console source fails to generate")
             .to_string()
     }
@@ -121,7 +146,7 @@ impl Farewell {
         );
         assert!(source.contains("clap::value_parser!(String)"));
 
-        assert!(source.contains("container.demo().await.run("));
+        assert!(source.contains("container.demo("));
         assert!(source.contains(r#"matches.get_one::<String>("name")"#));
         assert!(source.contains(r#"matches.get_one::<String>("salutation").cloned()"#));
         assert!(source.contains(r#"matches.get_flag("loud")"#));
@@ -154,8 +179,9 @@ impl Farewell {
 
     #[test]
     fn emits_spiffe_transport_flags_when_a_server_is_pinned() {
+        let index = index_for("struct App;\n");
         let source: String = render_console(
-            &index_for("struct App;\n"),
+            &index,
             true,
             false,
             &[
@@ -166,6 +192,7 @@ impl Farewell {
                 HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
             ],
             &[],
+            &bindings(&index),
         )
         .expect("the console source is generated")
         .format()
@@ -198,8 +225,9 @@ impl Farewell {
 
     #[test]
     fn registers_one_address_argument_per_active_server() {
+        let index = index_for("struct App;\n");
         let source: String = render_console(
-            &index_for("struct App;\n"),
+            &index,
             true,
             false,
             &[
@@ -207,6 +235,7 @@ impl Farewell {
                 HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
             ],
             &[],
+            &bindings(&index),
         )
         .expect("the console source is generated")
         .format()
@@ -227,7 +256,8 @@ impl Farewell {
 
     #[test]
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
-        let source: String = render_console(&index_for("struct App;\n"), true, false, &[], &[])
+        let index = index_for("struct App;\n");
+        let source: String = render_console(&index, true, false, &[], &[], &bindings(&index))
             .expect("the console source is generated")
             .format()
             .expect("the module formats")
@@ -242,7 +272,8 @@ impl Farewell {
 
     #[test]
     fn adds_a_schema_command_when_models_exist() {
-        let source: String = render_console(&index_for("struct App;\n"), false, true, &[], &[])
+        let index = index_for("struct App;\n");
+        let source: String = render_console(&index, false, true, &[], &[], &bindings(&index))
             .expect("the console source is generated")
             .format()
             .expect("the module formats")
@@ -260,23 +291,24 @@ impl Farewell {
     #[test]
     fn injects_the_cancellation_token_into_a_command_runner() {
         let source = source_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[process]\n    fn run(&self, #[console_argument(from = \"target\")] target: String, token: CancellationToken) -> CommandOutcome {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch {\n    target: String,\n}\n\nimpl Watch {\n    #[constructor]\n    fn create(#[console_argument(positional)] target: String) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> CommandOutcome {}\n}\n",
             false,
         );
 
         assert!(source.contains("letcancellation_token=matchmargaret_service::install::install()"));
-        assert!(source.contains("cancellation_token,).await"));
+        assert!(source.contains(".run(cancellation_token).await"));
     }
 
     #[test]
-    fn ignores_a_receiver_in_a_runner() {
+    fn renders_a_command_that_takes_only_a_flag() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged;\n\nimpl Flagged {\n    #[process]\n    fn run(&self, #[console_argument(from = \"loud\")] loud: bool) -> CommandOutcome {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged {\n    loud: bool,\n}\n\nimpl Flagged {\n    #[constructor]\n    fn create(#[console_argument(from = \"loud\")] loud: bool) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
             false,
         );
 
-        assert!(source.contains("container.flagged().await.run("));
-        assert!(source.contains(r#"matches.get_flag("loud")"#));
+        assert!(
+            source.contains(r#"container.flagged(matches.get_flag("loud")).await.run().await"#)
+        );
     }
 
     #[test]
@@ -326,7 +358,7 @@ impl Farewell {
     #[test]
     fn dispatches_a_fieldless_command_without_a_constructor() {
         let source = source_for(
-            "#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
             false,
         );
 
@@ -342,50 +374,23 @@ impl Farewell {
     }
 
     #[test]
-    fn rejects_an_unmarked_runner_parameter() {
+    fn rejects_a_non_token_runner_parameter() {
         let message = error_for(
             "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> CommandOutcome {}\n}\n",
         );
 
-        assert!(message.contains("must be a console argument"));
+        assert!(message.contains("may only take &self and an optional CancellationToken"));
     }
 
     #[test]
-    fn binds_a_destructured_console_argument_named_by_from() {
+    fn binds_a_destructured_positional_console_argument() {
         let source = source_for(
-            "#[console_command(name = \"plot\")]\nstruct Plot;\n\nimpl Plot {\n    #[process]\n    fn run(&self, #[console_argument(from = \"point\")] Point { x, y }: Point) -> CommandOutcome {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
             false,
         );
 
-        assert!(source.contains(r#"clap::Arg::new("point").required(true)"#));
-        assert!(source.contains(r#"matches.get_one::<Point>("point")"#));
-    }
-
-    #[test]
-    fn rejects_a_console_argument_without_from() {
-        let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[console_argument] flag: bool) -> CommandOutcome {}\n}\n",
-        );
-
-        assert!(message.contains("must name the command-line argument it binds"));
-    }
-
-    #[test]
-    fn rejects_a_non_string_argument_source() {
-        let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[console_argument(from = 5)] value: String) -> CommandOutcome {}\n}\n",
-        );
-
-        assert!(message.contains("failed to index"));
-    }
-
-    #[test]
-    fn rejects_a_malformed_argument() {
-        let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[console_argument(= 5)] value: String) -> CommandOutcome {}\n}\n",
-        );
-
-        assert!(message.contains("failed to index"));
+        assert!(source.contains(r#"clap::Arg::new("argument_0").required(true)"#));
+        assert!(source.contains(r#"matches.get_one::<Point>("argument_0")"#));
     }
 
     #[test]

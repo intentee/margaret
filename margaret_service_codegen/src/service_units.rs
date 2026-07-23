@@ -3,8 +3,6 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::matched_attribute::MatchedAttribute;
-use margaret_console_argument_codegen::process_arguments::process_arguments;
-use margaret_console_argument_codegen::required_argument_style::RequiredArgumentStyle;
 use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
@@ -18,6 +16,24 @@ use crate::tick_timer_arguments::TickTimerArguments;
 enum Role {
     Service,
     Ticker,
+}
+
+fn validate_runner(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    runner: &IndexedMethod,
+    path: &str,
+) -> Result<(), ServiceCodegenError> {
+    for view in parameters(runner.signature()) {
+        if !is_cancellation_token(index, item, view.declared) {
+            return Err(ServiceCodegenError::RunnerArgument {
+                path: path.to_string(),
+                parameter: view.holder.to_string(),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 fn build_unit(
@@ -40,7 +56,9 @@ fn build_unit(
     }
 
     let runner = process_method(item)?;
-    let arguments = process_arguments(index, item, runner, &path, RequiredArgumentStyle::Named)?;
+
+    validate_runner(index, item, runner, &path)?;
+
     let takes_token = runner_takes_token(index, item, runner);
     let kind = match role {
         Role::Service => ServiceKind::Service,
@@ -53,7 +71,6 @@ fn build_unit(
     };
 
     Ok(ServiceUnit {
-        arguments,
         concrete_path: item.canonical_path().clone(),
         field_name: identifier.field().to_string(),
         kind,

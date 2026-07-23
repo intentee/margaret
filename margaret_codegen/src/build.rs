@@ -4,12 +4,14 @@ use margaret_attributes::crate_root::CrateRoot;
 use crate::asset_bag_pass::asset_bag_pass;
 use crate::build_context::BuildContext;
 use crate::codegen_error::CodegenError;
+use crate::console_arguments_pass::console_arguments_pass;
 use crate::console_pass::console_pass;
 use crate::container_pass::container_pass;
 use crate::generated_code::GeneratedCode;
 use crate::http_pass::http_pass;
 use crate::middleware_pass::middleware_pass;
 use crate::model_pass::model_pass;
+use crate::serve_arguments::serve_arguments;
 use crate::services_pass::services_pass;
 use crate::views_pass::views_pass;
 use crate::websocket_pass::websocket_pass;
@@ -23,15 +25,22 @@ pub fn build(
         .build();
     let mut context = BuildContext::new(&index, metafile_contents);
 
-    let bindings = container_pass(&mut context)?;
+    let registry = console_arguments_pass(&index)?;
+    let bindings = container_pass(&mut context, &registry)?;
     asset_bag_pass(&mut context)?;
     middleware_pass(&mut context)?;
     websocket_pass(&mut context, &bindings)?;
-    views_pass(&mut context)?;
-    http_pass(&mut context)?;
-    services_pass(&mut context)?;
+    views_pass(&mut context, &bindings)?;
+    http_pass(&mut context, &bindings)?;
+    let serve_arguments = serve_arguments(
+        &index,
+        &bindings,
+        context.server_console_arguments(),
+        context.views_console_arguments(),
+    )?;
+    services_pass(&mut context, &bindings, &serve_arguments)?;
     model_pass(&mut context)?;
-    console_pass(&mut context)?;
+    console_pass(&mut context, &bindings, &serve_arguments)?;
 
     context.into_generated_code()
 }
@@ -52,12 +61,14 @@ mod tests {
     use crate::asset_bag_pass::asset_bag_pass;
     use crate::build_context::BuildContext;
     use crate::codegen_error::CodegenError;
+    use crate::console_arguments_pass::console_arguments_pass;
     use crate::console_pass::console_pass;
     use crate::container_pass::container_pass;
     use crate::generated_code::GeneratedCode;
     use crate::http_pass::http_pass;
     use crate::middleware_pass::middleware_pass;
     use crate::model_pass::model_pass;
+    use crate::serve_arguments::serve_arguments;
     use crate::services_pass::services_pass;
     use crate::umbrella::umbrella;
     use crate::views_pass::views_pass;
@@ -198,15 +209,25 @@ struct Room;
             .build();
         let mut context = BuildContext::new(&index, None);
 
-        let bindings = container_pass(&mut context).expect("the container pass succeeds");
+        let registry = console_arguments_pass(&index).expect("the console arguments pass succeeds");
+        let bindings =
+            container_pass(&mut context, &registry).expect("the container pass succeeds");
         asset_bag_pass(&mut context).expect("the asset bag pass succeeds");
         middleware_pass(&mut context).expect("the middleware pass succeeds");
         websocket_pass(&mut context, &bindings).expect("the websocket pass succeeds");
-        views_pass(&mut context).expect("the views pass succeeds");
-        http_pass(&mut context).expect("the http pass succeeds");
-        services_pass(&mut context).expect("the services pass succeeds");
+        views_pass(&mut context, &bindings).expect("the views pass succeeds");
+        http_pass(&mut context, &bindings).expect("the http pass succeeds");
+        let serve_arguments = serve_arguments(
+            &index,
+            &bindings,
+            context.server_console_arguments(),
+            context.views_console_arguments(),
+        )
+        .expect("the serve arguments pass succeeds");
+        services_pass(&mut context, &bindings, &serve_arguments)
+            .expect("the services pass succeeds");
         model_pass(&mut context).expect("the model pass succeeds");
-        console_pass(&mut context).expect("the console pass succeeds");
+        console_pass(&mut context, &bindings, &serve_arguments).expect("the console pass succeeds");
 
         let mut modules: Vec<GeneratedModule> = context
             .module_tokens()
@@ -377,10 +398,7 @@ impl RequestLog {
 
         assert!(module(&code, "mod").contains("pub mod middleware;"));
         assert!(module(&code, "middleware").contains("pub struct RequestLog"));
-        assert!(
-            concatenated(&code)
-                .contains("super::super::middleware::RequestLog")
-        );
+        assert!(concatenated(&code).contains("super::super::middleware::RequestLog"));
     }
 
     #[test]
@@ -547,6 +565,63 @@ impl RequestLog {
             .to_string();
 
         assert!(message.contains("failed to generate the services"));
+    }
+
+    const POSITIONAL_OUTSIDE_COMMAND_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+struct Bad;
+
+impl Bad {
+    #[constructor]
+    fn create(#[console_argument(positional)] label: String) -> Self {}
+}
+";
+
+    #[test]
+    fn propagates_a_console_argument_failure() {
+        let message = generate(POSITIONAL_OUTSIDE_COMMAND_CRATE)
+            .expect_err("the positional argument outside a command is rejected")
+            .to_string();
+
+        assert!(message.contains("failed to read the console arguments"));
+    }
+
+    const CONFLICTING_SERVE_ARGUMENT_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[service]
+#[console_command(name = \"worker\")]
+struct Worker;
+
+impl Worker {
+    #[constructor]
+    fn create(#[console_argument(positional)] label: String) -> Self {}
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+struct Page;
+
+impl Page {
+    #[constructor]
+    fn create(#[console_argument(from = \"label\")] label: String) -> Self {}
+
+    #[process]
+    fn respond(&self) -> Response {}
+}
+";
+
+    #[test]
+    fn propagates_a_serve_arguments_failure() {
+        let message = generate(CONFLICTING_SERVE_ARGUMENT_CRATE)
+            .expect_err("the conflicting serve argument is rejected")
+            .to_string();
+
+        assert!(message.contains("declared both as a positional and as a named argument"));
     }
 
     const VIEWS_CRATE: &str = "\
@@ -767,5 +842,159 @@ impl New {
         .to_string();
 
         assert!(message.contains("failed to generate the models"));
+    }
+
+    const CONSOLE_ARGUMENT_RESPONDER_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+struct Page;
+
+impl Page {
+    #[constructor]
+    fn create(#[console_argument(from = \"greeting\")] greeting: String) -> Self {}
+
+    #[process]
+    fn respond(&self) -> Response {}
+}
+";
+
+    #[test]
+    fn threads_a_console_argument_from_serve_into_the_http_server() {
+        let code = generate(CONSOLE_ARGUMENT_RESPONDER_CRATE).expect("the build succeeds");
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+
+        assert!(serve.contains("letconsole_argument_0="));
+        assert!(serve.contains("server_public(container,&console_argument_0,"));
+
+        let run = module(&code, "run");
+        assert!(run.contains(r#"clap::Arg::new("greeting")"#));
+    }
+
+    const CONSOLE_ARGUMENT_VIEW_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+#[renders_view(name = \"banner\")]
+struct Banner;
+
+impl Banner {
+    #[constructor]
+    fn create(#[console_argument(from = \"title\")] title: String) -> Self {}
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+struct Page;
+
+impl Page {
+    #[process]
+    fn respond(&self, views: &crate::margaret::views::Views) -> Response {}
+}
+";
+
+    #[test]
+    fn threads_a_console_argument_from_serve_into_the_view_builder() {
+        let code = generate(CONSOLE_ARGUMENT_VIEW_CRATE).expect("the build succeeds");
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+
+        assert!(serve.contains("letconsole_argument_0="));
+        assert!(serve.contains("super::views::build::build(container,&console_argument_0)"));
+    }
+
+    const CONSOLE_ARGUMENT_WEBSOCKET_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[websocket_session(path = \"/room\", server = \"public\")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[websocket_message(request, method = \"chat\", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl Chatter {
+    #[constructor]
+    fn create(#[console_argument(from = \"greeting\")] greeting: String) -> Self {}
+}
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+";
+
+    #[test]
+    fn threads_a_console_argument_from_serve_into_the_websocket_handler() {
+        let code = generate(CONSOLE_ARGUMENT_WEBSOCKET_CRATE).expect("the build succeeds");
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+
+        assert!(serve.contains("letconsole_argument_0="));
+        assert!(serve.contains("server_public(container,&console_argument_0,"));
+    }
+
+    const CONSOLE_ARGUMENT_SESSION_DEPENDENCY_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use std::sync::Arc;
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+trait Clock {}
+
+#[singleton(provides = Clock)]
+struct SystemClock;
+
+impl SystemClock {
+    #[constructor]
+    fn create(#[console_argument(from = \"timezone\")] timezone: String) -> Self {}
+}
+
+impl Clock for SystemClock {}
+
+#[websocket_session(path = \"/room\", server = \"public\")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build(clock: Arc<dyn Clock>) -> Self {}
+}
+
+#[websocket_message(request, method = \"chat\", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl Chatter {
+    #[constructor]
+    fn create() -> Self {}
+}
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+";
+
+    #[test]
+    fn resolves_a_console_argument_for_a_session_injected_dependency() {
+        let code = generate(CONSOLE_ARGUMENT_SESSION_DEPENDENCY_CRATE).expect("the build succeeds");
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+
+        assert!(serve.contains("letconsole_argument_0="));
+        assert!(serve.contains("server_public(container,&console_argument_0,"));
     }
 }

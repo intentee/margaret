@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use margaret_asset_bag_codegen::asset_bag_codegen_error::AssetBagCodegenError;
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_console_argument_codegen::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
 use margaret_container::container_error::ContainerError;
 use margaret_generated_module::generated_module_error::GeneratedModuleError;
@@ -26,6 +27,12 @@ pub enum CodegenError {
     AssetBag {
         #[from]
         source: AssetBagCodegenError,
+    },
+
+    #[error("failed to read the console arguments: {source}")]
+    ConsoleArgument {
+        #[from]
+        source: ConsoleArgumentCodegenError,
     },
 
     #[error("failed to generate the dependency container: {source}")]

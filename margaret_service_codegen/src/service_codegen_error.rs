@@ -1,7 +1,6 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
-use margaret_console_argument_codegen::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use margaret_injection_codegen::injection_error::InjectionError;
 
 #[derive(Debug, Error)]
@@ -18,11 +17,10 @@ pub enum ServiceCodegenError {
         source: InjectionError,
     },
 
-    #[error(transparent)]
-    ConsoleArgument {
-        #[from]
-        source: ConsoleArgumentCodegenError,
-    },
+    #[error(
+        "the #[process] runner of '{path}' takes parameter '{parameter}'; a runner may only take &self and an optional CancellationToken, console arguments belong on the #[constructor]"
+    )]
+    RunnerArgument { path: String, parameter: String },
 
     #[error("#[service] is only supported on structs, but '{path}' is not a struct")]
     ServiceNotAStruct { path: String },

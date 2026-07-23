@@ -12,6 +12,7 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::matched_attribute::MatchedAttribute;
+use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
 
 use crate::collection_table::CollectionTable;
 use crate::construction_source::ConstructionSource;
@@ -152,11 +153,18 @@ fn resolve_direct(
     source: ConstructionSource,
     concrete_path: &CanonicalPath,
     provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
+    registry: &ConsoleArgumentRegistry,
 ) -> Result<DirectConstruction, ContainerError> {
     match source {
         ConstructionSource::Constructor(constructor) => {
-            let dependencies =
-                resolve_dependencies(index, item, concrete_path, constructor, provided_keys)?;
+            let dependencies = resolve_dependencies(
+                index,
+                item,
+                concrete_path,
+                constructor,
+                provided_keys,
+                registry,
+            )?;
 
             Ok(DirectConstruction::Constructor {
                 dependencies,
@@ -174,6 +182,7 @@ fn resolve_dependencies(
     concrete_path: &CanonicalPath,
     constructor: &IndexedMethod,
     provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
+    registry: &ConsoleArgumentRegistry,
 ) -> Result<Vec<DependencyKind>, ContainerError> {
     let mut dependencies = Vec::new();
 
@@ -185,6 +194,14 @@ fn resolve_dependencies(
                 written: "self".to_string(),
             });
         };
+
+        if let Some(argument) = registry.argument(concrete_path, position) {
+            dependencies.push(DependencyKind::ConsoleArgument {
+                argument: Box::new(argument.clone()),
+            });
+
+            continue;
+        }
 
         let parameter = parameter_name(&pattern_type.pat, position);
 
@@ -282,7 +299,10 @@ struct DraftedProviders<'index> {
     provided_keys: HashMap<CanonicalPath, CanonicalPath>,
 }
 
-pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, ContainerError> {
+pub(crate) fn build_plan(
+    index: &AttributeIndex,
+    registry: &ConsoleArgumentRegistry,
+) -> Result<ContainerPlan, ContainerError> {
     let DraftedProviders {
         drafts,
         provided_keys,
@@ -307,8 +327,14 @@ pub(crate) fn build_plan(index: &AttributeIndex) -> Result<ContainerPlan, Contai
             collections.add(trait_path, provider_key.clone());
         }
 
-        let construction =
-            resolve_direct(index, item, construction, &concrete_path, &provided_keys)?;
+        let construction = resolve_direct(
+            index,
+            item,
+            construction,
+            &concrete_path,
+            &provided_keys,
+            registry,
+        )?;
 
         providers.insert(
             provider_key,

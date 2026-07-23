@@ -1,0 +1,59 @@
+use anyhow::Result;
+use serde_json::from_value;
+use serde_json::json;
+
+use margaret_jwks_keygen::curve::Curve;
+use margaret_jwks_keygen::generate_keypair::generate_keypair;
+use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
+use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
+use margaret_jwks_keygen::persisted_jwks_secret::PersistedJwksSecret;
+use margaret_jwks_keygen::signs_claims::SignsClaims;
+use margaret_jwks_keygen::verifies_any_token::VerifiesAnyToken;
+use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
+use margaret_jwks_keygen_tests::test_claims::TestClaims;
+
+#[tokio::test]
+async fn jwks_secret_from_fixture_verifies_any_token() -> Result<()> {
+    let keypair = generate_keypair(GenerateKeypairParams {
+        crv: Curve::P256,
+        kid: "fixture-kid".to_string(),
+    })?;
+    let claims = TestClaims {
+        exp: FAR_FUTURE_EXPIRY,
+        sub: "subject".to_string(),
+    };
+    let token = keypair.signing.sign(&claims).await?;
+
+    let pem = keypair.signing.pem.as_str().to_owned();
+    let x = keypair.public.x.clone();
+    let y = keypair.public.y.clone();
+    let pair_json = || {
+        json!({
+            "signing": { "crv": "P-256", "kid": "fixture-kid", "pem": pem.clone() },
+            "public": {
+                "crv": "P-256",
+                "kid": "fixture-kid",
+                "kty": "EC",
+                "use": "sig",
+                "x": x.clone(),
+                "y": y.clone(),
+            }
+        })
+    };
+    let fixture = json!({
+        "current": pair_json(),
+        "next": pair_json(),
+        "previous": pair_json(),
+    });
+
+    let secret: JwksSecret = from_value::<PersistedJwksSecret>(fixture)?.into_secret();
+    let result = secret.verify_any::<TestClaims>(&token)?;
+
+    assert!(matches!(
+        result,
+        JwksSecretVerificationResult::SignedWithCurrent(verified) if verified == claims
+    ));
+
+    Ok(())
+}

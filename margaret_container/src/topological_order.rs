@@ -32,6 +32,7 @@ fn dependency_keys<'plan>(
             DependencyKind::Collection { trait_path } => {
                 keys.extend(collections.members_of(trait_path));
             }
+            DependencyKind::ConsoleArgument { .. } => {}
         }
     }
 

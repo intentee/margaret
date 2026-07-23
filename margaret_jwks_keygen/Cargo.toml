@@ -1,0 +1,19 @@
+[package]
+name = "margaret_jwks_keygen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = { workspace = true }
+base64ct = { workspace = true }
+margaret_sync_holder = { path = "../margaret_sync_holder" }
+p256 = { workspace = true }
+p384 = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+zeroize = { workspace = true }
+
+[lints]
+workspace = true

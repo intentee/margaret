@@ -51,7 +51,7 @@ fn command_arm(command: &ConsoleCommand, container: &Ident) -> TokenStream {
         quote! { matches }
     };
     let values = command.arguments.iter().map(argument_value);
-    let accessor_access = quote! { #container.#accessor().await };
+    let accessor_access = quote! { #container.#accessor(#(#values),*).await };
 
     if command.takes_token {
         quote! {
@@ -63,12 +63,12 @@ fn command_arm(command: &ConsoleCommand, container: &Ident) -> TokenStream {
                     }
                 };
 
-                #accessor_access.run(#(#values,)* cancellation_token).await
+                #accessor_access.run(cancellation_token).await
             }
         }
     } else {
         quote! {
-            Some((#name, #matches_binding)) => #accessor_access.run(#(#values),*).await,
+            Some((#name, #matches_binding)) => #accessor_access.run().await,
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -5,18 +7,18 @@ use quote::quote;
 use syn::Path;
 
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_console_argument_codegen::ensure_unique::ensure_unique;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
+use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
-use crate::rendered_services::RenderedServices;
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
@@ -52,6 +54,9 @@ fn server_manager_setup(
     servers: &[HttpServer],
     has_views: bool,
     registers_services: bool,
+    bindings: &ContainerBindings,
+    server_console_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
+    views_console_arguments: &[ConsoleArgument],
 ) -> TokenStream {
     let manager_binding = if registers_services {
         quote! { mut manager }
@@ -104,6 +109,7 @@ fn server_manager_setup(
         quote! { #origin_variable.clone() }
     });
 
+    let empty_arguments: Vec<ConsoleArgument> = Vec::new();
     let views_argument = has_views.then(|| quote! { , &views });
     let assemblies = servers.iter().map(|server| {
         let function_name = server.function_name();
@@ -112,12 +118,17 @@ fn server_manager_setup(
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
         let transport = transport_expression(server, spiffe_secured);
+        let server_borrows = bindings.console_borrows(
+            server_console_arguments
+                .get(server.name())
+                .unwrap_or(&empty_arguments),
+        );
 
         quote! {
             margaret_service::server_assembly::ServerAssembly {
                 address_argument: #address_argument,
                 name: #name,
-                routes: super::http::#function_name::#function_name(container, &routes #views_argument).await,
+                routes: super::http::#function_name::#function_name(container, #(#server_borrows)* &routes #views_argument).await,
                 transport: #transport,
                 upload_dir_argument: #upload_dir_argument,
                 uploads_argument: #uploads_argument,
@@ -140,8 +151,10 @@ fn server_manager_setup(
         }
     });
     let views_setup = has_views.then(|| {
+        let views_borrows = bindings.console_borrows(views_console_arguments);
+
         quote! {
-            let views = ::std::sync::Arc::new(super::views::build::build(container).await);
+            let views = ::std::sync::Arc::new(super::views::build::build(container, #(#views_borrows)*).await);
         }
     });
 
@@ -177,25 +190,6 @@ fn server_manager_setup(
     }
 }
 
-fn argument_field_idents(unit: &ServiceUnit) -> Vec<Ident> {
-    (0..unit.arguments.len())
-        .map(|position| format_ident!("argument_{position}"))
-        .collect()
-}
-
-fn argument_fields(unit: &ServiceUnit) -> Vec<TokenStream> {
-    unit.arguments
-        .iter()
-        .enumerate()
-        .map(|(position, argument)| {
-            let field = format_ident!("argument_{position}");
-            let field_type = argument.field_type();
-
-            quote! { #field: #field_type, }
-        })
-        .collect()
-}
-
 fn missed_tick_behavior_method(behavior: &Option<Path>) -> TokenStream {
     match behavior {
         Some(behavior) => quote! {
@@ -214,43 +208,26 @@ fn adapter(unit: &ServiceUnit) -> TokenStream {
     }
 }
 
-fn service_adapter(unit: &ServiceUnit) -> TokenStream {
-    if unit.arguments.is_empty() {
-        service_adapter_without_arguments(unit)
-    } else {
-        service_adapter_with_arguments(unit)
-    }
-}
-
-fn ticker_call(unit: &ServiceUnit) -> TokenStream {
-    let runner = format_ident!("{}", unit.runner);
-    let arguments = argument_field_idents(unit)
-        .into_iter()
-        .map(|field| quote! { self.#field.clone() });
-
-    if unit.takes_token {
-        quote! { self.inner.#runner(#(#arguments,)* cancellation_token).await }
-    } else {
-        quote! { self.inner.#runner(#(#arguments),*).await }
-    }
-}
-
 fn ticker_adapter(unit: &ServiceUnit, behavior: &Option<Path>, interval: &Path) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
-    let fields = argument_fields(unit);
+    let runner = format_ident!("{}", unit.runner);
     let missed_tick_behavior_method = missed_tick_behavior_method(behavior);
-    let token_binding = if unit.takes_token {
-        quote! { cancellation_token }
+    let (token_binding, call) = if unit.takes_token {
+        (
+            quote! { cancellation_token },
+            quote! { self.inner.#runner(cancellation_token).await },
+        )
     } else {
-        quote! { _cancellation_token }
+        (
+            quote! { _cancellation_token },
+            quote! { self.inner.#runner().await },
+        )
     };
-    let call = ticker_call(unit);
 
     quote! {
         struct #name {
             inner: std::sync::Arc<#concrete>,
-            #(#fields)*
         }
 
         #[async_trait::async_trait]
@@ -272,7 +249,7 @@ fn ticker_adapter(unit: &ServiceUnit, behavior: &Option<Path>, interval: &Path) 
     }
 }
 
-fn service_adapter_without_arguments(unit: &ServiceUnit) -> TokenStream {
+fn service_adapter(unit: &ServiceUnit) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
     let runner = format_ident!("{}", unit.runner);
@@ -307,72 +284,17 @@ fn service_adapter_without_arguments(unit: &ServiceUnit) -> TokenStream {
     }
 }
 
-fn service_adapter_with_arguments(unit: &ServiceUnit) -> TokenStream {
-    let name = adapter_ident(unit);
-    let concrete = path_tokens(&unit.concrete_path);
-    let fields = argument_fields(unit);
-    let field_idents = argument_field_idents(unit);
-    let runner = format_ident!("{}", unit.runner);
-    let (token_binding, call) = if unit.takes_token {
-        (
-            quote! { cancellation_token },
-            quote! { inner.#runner(#(#field_idents,)* cancellation_token).await? },
-        )
-    } else {
-        (
-            quote! { _cancellation_token },
-            quote! { inner.#runner(#(#field_idents),*).await? },
-        )
-    };
-
-    quote! {
-        struct #name {
-            inner: std::sync::Arc<#concrete>,
-            #(#fields)*
-        }
-
-        #[async_trait::async_trait]
-        impl trzcina::Service for #name {
-            async fn run(
-                self: Box<Self>,
-                #token_binding: tokio_util::sync::CancellationToken,
-            ) -> anyhow::Result<()> {
-                let #name { inner, #(#field_idents),* } = *self;
-
-                #call;
-
-                Ok(())
-            }
-        }
-    }
+fn threaded_arguments(unit: &ServiceUnit, bindings: &ContainerBindings) -> Vec<TokenStream> {
+    bindings.console_threads(bindings.console_arguments(&unit.concrete_path))
 }
 
-fn registration(unit: &ServiceUnit) -> TokenStream {
+fn registration(unit: &ServiceUnit, bindings: &ContainerBindings) -> TokenStream {
     let name = adapter_ident(unit);
     let accessor = format_ident!("{}", unit.field_name);
-
-    if unit.arguments.is_empty() {
-        return quote! {
-            manager.register_service(#name { inner: container.#accessor().await });
-        };
-    }
-
-    let field_assignments = unit
-        .arguments
-        .iter()
-        .enumerate()
-        .map(|(position, argument)| {
-            let field = format_ident!("argument_{position}");
-            let value = argument_value(argument);
-
-            quote! { #field: #value, }
-        });
+    let threaded = threaded_arguments(unit, bindings);
 
     quote! {
-        manager.register_service(#name {
-            inner: container.#accessor().await,
-            #(#field_assignments)*
-        });
+        manager.register_service(#name { inner: container.#accessor(#(#threaded),*).await });
     }
 }
 
@@ -380,30 +302,38 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
     format_ident!("{}", unit.type_name)
 }
 
-fn serve_arguments(units: &[ServiceUnit]) -> Result<Vec<ConsoleArgument>, ServiceCodegenError> {
-    let declarations: Vec<(String, Vec<ConsoleArgument>)> = units
-        .iter()
-        .map(|unit| (unit.concrete_path.to_string(), unit.arguments.clone()))
-        .collect();
+fn serve_prelude(serve_arguments: &[ConsoleArgument], bindings: &ContainerBindings) -> TokenStream {
+    let resolutions = serve_arguments.iter().map(|argument| {
+        let ident = console_argument_ident(bindings.console_slot(argument.name()));
+        let value = argument_value(argument);
 
-    ensure_unique(&declarations)?;
+        quote! { let #ident = #value; }
+    });
 
-    Ok(units
-        .iter()
-        .flat_map(|unit| unit.arguments.clone())
-        .collect())
+    quote! { #(#resolutions)* }
 }
 
 pub fn render_services(
     index: &AttributeIndex,
     servers: &[HttpServer],
     has_views: bool,
-) -> Result<RenderedServices, ServiceCodegenError> {
+    bindings: &ContainerBindings,
+    serve_arguments: &[ConsoleArgument],
+    server_console_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
+    views_console_arguments: &[ConsoleArgument],
+) -> Result<GeneratedModuleTokens, ServiceCodegenError> {
     let units = service_units(index)?;
-    let serve_arguments = serve_arguments(&units)?;
     let adapters = units.iter().map(adapter);
-    let registrations = units.iter().map(registration);
-    let manager_setup = server_manager_setup(servers, has_views, !units.is_empty());
+    let registrations = units.iter().map(|unit| registration(unit, bindings));
+    let manager_setup = server_manager_setup(
+        servers,
+        has_views,
+        !units.is_empty(),
+        bindings,
+        server_console_arguments,
+        views_console_arguments,
+    );
+    let prelude = serve_prelude(serve_arguments, bindings);
     let matches_binding = if servers.is_empty() && serve_arguments.is_empty() {
         quote! { _matches }
     } else {
@@ -418,6 +348,7 @@ pub fn render_services(
             #matches_binding: &clap::ArgMatches,
             cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret_console::command_outcome::CommandOutcome {
+            #prelude
             #manager_setup
 
             #(#registrations)*
@@ -431,8 +362,5 @@ pub fn render_services(
         }
     };
 
-    Ok(RenderedServices {
-        module: GeneratedModuleTokens::new("serve", tokens),
-        serve_arguments,
-    })
+    Ok(GeneratedModuleTokens::new("serve", tokens))
 }
