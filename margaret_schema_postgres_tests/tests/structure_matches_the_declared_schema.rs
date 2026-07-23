@@ -136,7 +136,9 @@ async fn assert_unique_constraints_exist(pool: &PgPool, table: &Table) {
         expected.sort();
 
         assert!(
-            unique_column_sets(pool, &table.name).await.contains(&expected),
+            unique_column_sets(pool, &table.name)
+                .await
+                .contains(&expected),
             "unique constraint over {:?} of table '{}' is missing",
             unique_constraint.columns,
             table.name,

@@ -22,7 +22,11 @@ fn has_generic_arguments(value_type: &Type) -> bool {
     };
 
     matches!(
-        type_path.path.segments.last().map(|segment| &segment.arguments),
+        type_path
+            .path
+            .segments
+            .last()
+            .map(|segment| &segment.arguments),
         Some(PathArguments::AngleBracketed(_))
     )
 }

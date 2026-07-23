@@ -148,7 +148,9 @@ impl Farewell {
 
         assert!(source.contains("container.demo("));
         assert!(source.contains(r#"matches.get_one::<std::string::String>("name")"#));
-        assert!(source.contains(r#"matches.get_one::<std::string::String>("salutation").cloned()"#));
+        assert!(
+            source.contains(r#"matches.get_one::<std::string::String>("salutation").cloned()"#)
+        );
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 
         assert!(source.contains(r#"("farewell",_matches)"#));

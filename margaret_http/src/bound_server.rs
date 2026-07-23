@@ -736,6 +736,13 @@ mod tests {
         response
     }
 
+    fn response_body(response: &str) -> &str {
+        response
+            .split_once("\r\n\r\n")
+            .map(|(_, body)| body)
+            .expect("the server returns a complete HTTP response")
+    }
+
     #[tokio::test]
     async fn serves_web_socket_routes() {
         let bound = BoundServer::bind(
@@ -800,7 +807,7 @@ mod tests {
         .await;
 
         assert!(response.contains(" 403 "));
-        assert!(!response.contains("42"));
+        assert_eq!(response_body(&response), "short circuit");
     }
 
     #[tokio::test]
@@ -812,7 +819,7 @@ mod tests {
         .await;
 
         assert!(response.contains(" 303 "));
-        assert!(!response.contains("42"));
+        assert_eq!(response_body(&response), "");
     }
 
     #[tokio::test]
@@ -826,7 +833,7 @@ mod tests {
         assert!(response.contains(" 403 "));
         assert!(response.contains("set-cookie"));
         assert!(response.contains("session=rotated"));
-        assert!(!response.contains("42"));
+        assert_eq!(response_body(&response), "Forbidden");
     }
 
     #[tokio::test]
@@ -869,8 +876,7 @@ mod tests {
         .await;
 
         assert!(response.contains(" 200 "));
-        assert!(response.contains("ok"));
-        assert!(!response.contains("42"));
+        assert_eq!(response_body(&response), "ok");
 
         cancellation_token.cancel();
 

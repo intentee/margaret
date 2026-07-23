@@ -1,13 +1,5 @@
 use margaret_attributes::canonical_path::CanonicalPath;
-
-const COPY_PRIMITIVES: [&str; 16] = [
-    "bool", "char", "f32", "f64", "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32",
-    "u64", "u128", "usize",
-];
-
-fn is_copy_primitive(canonical: &CanonicalPath) -> bool {
-    matches!(canonical.segments(), [name] if COPY_PRIMITIVES.contains(&name.as_str()))
-}
+use margaret_attributes::is_copy_primitive::is_copy_primitive;
 
 fn is_string(canonical: &CanonicalPath) -> bool {
     canonical
@@ -38,7 +30,7 @@ pub enum ThreadingKind {
 impl ThreadingKind {
     #[must_use]
     pub fn from_canonical(canonical: &CanonicalPath, required: bool) -> Self {
-        if is_copy_primitive(canonical) {
+        if matches!(canonical.segments(), [name] if is_copy_primitive(name)) {
             return ThreadingKind::Copy;
         }
 

@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use syn::Path;
 
 use crate::canonical_path::CanonicalPath;
+use crate::is_copy_primitive::is_copy_primitive;
 use crate::module_imports::ModuleImports;
 
 fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
@@ -12,8 +13,7 @@ fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
             "string".to_string(),
             "String".to_string(),
         ])),
-        "bool" | "char" | "f32" | "f64" | "i8" | "i16" | "i32" | "i64" | "i128" | "isize"
-        | "u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
+        primitive if is_copy_primitive(primitive) => {
             Some(CanonicalPath::new(vec![leaf.to_string()]))
         }
         _ => None,
@@ -193,15 +193,15 @@ mod tests {
     }
 
     #[test]
-    fn resolves_a_bare_bool_to_the_prelude() {
+    fn resolves_a_bare_copy_primitive_to_the_prelude() {
         assert_eq!(
             resolved(
-                parse_quote!(bool),
+                parse_quote!(u16),
                 &["crate"],
                 &ModuleImports::default(),
                 &HashSet::new()
             ),
-            Some("bool".to_string())
+            Some("u16".to_string())
         );
     }
 

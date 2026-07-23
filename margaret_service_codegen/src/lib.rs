@@ -458,11 +458,9 @@ impl Roller {
         assert!(source.contains(
             "manager.register_service(Roller{inner:container.roller(console_argument_0.to_owned()).await,});"
         ));
-        assert!(
-            source.contains(
-                r#"letconsole_argument_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
-            )
-        );
+        assert!(source.contains(
+            r#"letconsole_argument_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
+        ));
     }
 
     #[test]
@@ -548,11 +546,9 @@ impl Worker {
         assert!(source.contains(
             "manager.register_service(Worker{inner:container.worker(console_argument_0.to_owned()).await,});"
         ));
-        assert!(
-            source.contains(
-                r#"letconsole_argument_0=matchmatches.get_one::<std::string::String>("label")"#
-            )
-        );
+        assert!(source.contains(
+            r#"letconsole_argument_0=matchmatches.get_one::<std::string::String>("label")"#
+        ));
     }
 
     #[test]

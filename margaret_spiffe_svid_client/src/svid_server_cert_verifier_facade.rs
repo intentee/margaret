@@ -33,9 +33,10 @@ impl SvidServerCertVerifierFacade {
 
 impl ServerCertVerifier for SvidServerCertVerifierFacade {
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        self.current_verifier()
-            .map(|current_verifier| current_verifier.supported_verify_schemes())
-            .unwrap_or_default()
+        match self.current_verifier() {
+            Some(current_verifier) => current_verifier.supported_verify_schemes(),
+            None => Vec::new(),
+        }
     }
 
     fn verify_server_cert(

@@ -14,7 +14,9 @@ fn threads_console_arguments_through_dependencies() {
 
     assert!(source.contains("pubasyncfnconfig(&self,console_argument_0:std::string::String,)"));
     assert!(source.contains("crate::Config::create(console_argument_0)"));
-    assert!(source.contains("pubasyncfnalpha_plugin(&self,console_argument_1:std::string::String,)"));
+    assert!(
+        source.contains("pubasyncfnalpha_plugin(&self,console_argument_1:std::string::String,)")
+    );
     assert!(
         source.contains(
             "pubasyncfnservice(&self,console_argument_0:std::string::String,console_argument_1:std::string::String,)"

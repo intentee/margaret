@@ -3,6 +3,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_asset_bag_codegen \
 	-p margaret_attributes \
 	-p margaret_codegen \
+	-p margaret_codegen_tests \
 	-p margaret_codegen_tokens \
 	-p margaret_console \
 	-p margaret_console_argument_codegen \
@@ -88,6 +89,7 @@ coverage: node_modules postgres-image
 		--gated margaret_asset_bag_codegen=100 \
 		--gated margaret_attributes=100 \
 		--gated margaret_codegen=100 \
+		--gated margaret_codegen_tests=100 \
 		--gated margaret_codegen_tokens=100 \
 		--gated margaret_console=100 \
 		--gated margaret_console_argument_codegen=100 \

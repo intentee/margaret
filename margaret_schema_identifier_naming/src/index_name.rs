@@ -39,11 +39,14 @@ mod tests {
     fn rejects_a_derived_name_over_the_byte_limit() {
         let column = "a".repeat(MAX_IDENTIFIER_BYTES);
 
-        let error = index_name("articles", &column)
-            .expect_err("the derived index name exceeds the limit");
+        let error =
+            index_name("articles", &column).expect_err("the derived index name exceeds the limit");
 
         let SchemaIdentifierNamingError::IdentifierTooLong { length, .. } = error;
 
-        assert_eq!(length, "articles".len() + 1 + MAX_IDENTIFIER_BYTES + "_index".len());
+        assert_eq!(
+            length,
+            "articles".len() + 1 + MAX_IDENTIFIER_BYTES + "_index".len()
+        );
     }
 }

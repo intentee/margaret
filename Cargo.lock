@@ -1834,6 +1834,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_codegen_clippy_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "margaret_asset_bag",
+ "margaret_codegen",
+ "margaret_console",
+ "margaret_http",
+ "margaret_macros",
+ "margaret_service",
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_server",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+]
+
+[[package]]
+name = "margaret_codegen_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_codegen",
+ "margaret_console_argument_codegen",
+]
+
+[[package]]
 name = "margaret_codegen_tokens"
 version = "0.1.0"
 dependencies = [

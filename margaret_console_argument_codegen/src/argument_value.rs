@@ -96,7 +96,9 @@ mod tests {
             value_type: path(&["u16"]),
         };
 
-        assert!(collapsed(&named).contains("matches.get_one::<u16>(\"retries\"){Some(value)=>*value"));
+        assert!(
+            collapsed(&named).contains("matches.get_one::<u16>(\"retries\"){Some(value)=>*value")
+        );
     }
 
     #[test]
@@ -137,8 +139,9 @@ mod tests {
             value_type: path(&["crate", "geometry", "Point"]),
         };
 
-        assert!(collapsed(&positional).contains(
-            r#"matches.get_one::<crate::geometry::Point>("point")"#
-        ));
+        assert!(
+            collapsed(&positional)
+                .contains(r#"matches.get_one::<crate::geometry::Point>("point")"#)
+        );
     }
 }
