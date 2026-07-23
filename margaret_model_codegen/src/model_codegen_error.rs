@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_schema_identifier_naming::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
 #[derive(Debug, Error)]
 pub enum ModelCodegenError {
@@ -106,22 +107,28 @@ pub enum ModelCodegenError {
     )]
     ForeignKeyCycle { path: String },
 
-    #[error(
-        "model '{model}' has a table name '{table}' of {length} bytes, exceeding the 63-byte PostgreSQL identifier limit"
-    )]
+    #[error("model '{model}' has a table name that is too long: {source}")]
     TableNameTooLong {
-        length: usize,
         model: String,
-        table: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
+    },
+
+    #[error("model '{model}' has a column name that is too long: {source}")]
+    ColumnNameTooLong {
+        model: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
     },
 
     #[error(
-        "model '{model}' has a column name '{column}' of {length} bytes, exceeding the 63-byte PostgreSQL identifier limit"
+        "foreign key field '{field}' of model '{model}' derives a column name that is too long: {source}"
     )]
-    ColumnNameTooLong {
-        column: String,
-        length: usize,
+    ForeignKeyColumnNameTooLong {
+        field: String,
         model: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
     },
 
     #[error(
@@ -138,13 +145,11 @@ pub enum ModelCodegenError {
     )]
     IndexRequiresColumn { field: String, model: String },
 
-    #[error(
-        "model '{model}' derives an index name '{name}' of {length} bytes, exceeding the 63-byte PostgreSQL identifier limit"
-    )]
+    #[error("model '{model}' derives an index name that is too long: {source}")]
     IndexNameTooLong {
-        length: usize,
         model: String,
-        name: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
     },
 
     #[error(

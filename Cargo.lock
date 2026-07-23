@@ -2247,6 +2247,9 @@ dependencies = [
 [[package]]
 name = "margaret_schema_identifier_naming"
 version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "margaret_schema_postgres_tests"

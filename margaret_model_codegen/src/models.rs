@@ -17,6 +17,7 @@ use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::select_unique_attribute::select_unique_attribute;
 use margaret_schema_identifier_naming::index_name::index_name;
 use margaret_schema_identifier_naming::schema_identifier::schema_identifier;
+use margaret_schema_identifier_naming::validate_identifier_length::validate_identifier_length;
 use margaret_toposort::topological_order::topological_order;
 
 use crate::collected_model::CollectedModel;
@@ -34,8 +35,6 @@ use crate::option_inner::option_inner;
 use crate::resolved_column::ResolvedColumn;
 use crate::resolved_foreign_key::ResolvedForeignKey;
 use crate::resolved_index::ResolvedIndex;
-
-const POSTGRES_MAX_IDENTIFIER_BYTES: usize = 63;
 
 fn field_display(identifier: &FieldIdentifier) -> String {
     match identifier {
@@ -75,16 +74,6 @@ fn register_column_name(
         });
     }
 
-    let length = column_name.len();
-
-    if length > POSTGRES_MAX_IDENTIFIER_BYTES {
-        return Err(ModelCodegenError::ColumnNameTooLong {
-            column: column_name,
-            length,
-            model: model.to_string(),
-        });
-    }
-
     if !seen_columns.insert(column_name.clone()) {
         return Err(ModelCodegenError::DuplicateColumnName {
             column: column_name,
@@ -100,16 +89,10 @@ fn resolve_index(
     column: &str,
     model: &str,
 ) -> Result<ResolvedIndex, ModelCodegenError> {
-    let name = index_name(table, column);
-    let length = name.len();
-
-    if length > POSTGRES_MAX_IDENTIFIER_BYTES {
-        return Err(ModelCodegenError::IndexNameTooLong {
-            length,
-            model: model.to_string(),
-            name,
-        });
-    }
+    let name = index_name(table, column).map_err(|source| ModelCodegenError::IndexNameTooLong {
+        model: model.to_string(),
+        source,
+    })?;
 
     Ok(ResolvedIndex {
         column: column.to_string(),
@@ -129,6 +112,14 @@ fn resolve_scalar_column(
     seen_columns: &mut HashSet<String>,
 ) -> Result<ResolvedColumn, ModelCodegenError> {
     let column_name = resolve_column_name(name, field.identifier(), model)?;
+
+    if let Err(source) = validate_identifier_length(&column_name) {
+        return Err(ModelCodegenError::ColumnNameTooLong {
+            model: model.to_string(),
+            source,
+        });
+    }
+
     let column_name = register_column_name(column_name, model, seen_columns)?;
 
     if index && unique {
@@ -259,14 +250,8 @@ fn collect_models(
             return Err(ModelCodegenError::InvalidTableName { model, table });
         }
 
-        let table_length = table.len();
-
-        if table_length > POSTGRES_MAX_IDENTIFIER_BYTES {
-            return Err(ModelCodegenError::TableNameTooLong {
-                length: table_length,
-                model,
-                table,
-            });
+        if let Err(source) = validate_identifier_length(&table) {
+            return Err(ModelCodegenError::TableNameTooLong { model, source });
         }
 
         if let Some(first) = seen_tables.get(&table) {
@@ -424,7 +409,17 @@ fn resolve_model(
             }
         };
 
-        let column_name = schema_identifier(&[field_name.as_str(), referenced.name.as_str()]);
+        let column_name = match schema_identifier(&[field_name.as_str(), referenced.name.as_str()])
+        {
+            Ok(column_name) => column_name,
+            Err(source) => {
+                return Err(ModelCodegenError::ForeignKeyColumnNameTooLong {
+                    field: field_name,
+                    model,
+                    source,
+                });
+            }
+        };
         let column_name = register_column_name(column_name, &model, &mut seen_columns)?;
 
         columns.push(ResolvedColumn {
