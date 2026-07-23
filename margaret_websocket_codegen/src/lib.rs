@@ -145,7 +145,7 @@ impl RespondsToWebSocketNotification for Typist {
         let registry = margaret_console_argument_codegen::scan::scan(index)
             .expect("the console arguments are scanned");
 
-        render_container(index, &registry)
+        render_container(index, &registry, &[])
             .expect("the container renders")
             .bindings
     }

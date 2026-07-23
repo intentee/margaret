@@ -13,9 +13,9 @@ use margaret_jwks_roller::roll::roll;
 
 use crate::jwks_curve::JWKS_CURVE;
 use crate::jwks_document_holder::JwksDocumentHolder;
-use crate::jwks_roll_service::JwksRollService;
 use crate::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 use crate::jwks_roller_server_error::JwksRollerServerError;
+use crate::jwks_roller_service::JwksRollerService;
 use crate::public_jwks_handler::PublicJwksHandler;
 
 pub struct JwksRollerServerBundle {
@@ -57,6 +57,6 @@ impl JwksRollerServerBundle {
 #[async_trait]
 impl ServiceBundle for JwksRollerServerBundle {
     async fn services(self) -> Result<Vec<Box<dyn Service>>> {
-        Ok(vec![Box::new(JwksRollService { bundle: self })])
+        Ok(vec![Box::new(JwksRollerService { bundle: self })])
     }
 }

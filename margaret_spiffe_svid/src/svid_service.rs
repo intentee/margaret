@@ -7,13 +7,13 @@ use crate::svid_certified_key_holder::SvidCertifiedKeyHolder;
 use crate::svid_converter_service::SvidConverterService;
 use crate::svid_rotate_service::SvidRotateService;
 
-pub struct SvidServiceCore {
+pub struct SvidService {
     root_cert_store_holder: RootCertStoreHolder,
     spire_agent_addr: String,
     svid_certified_key_holder: SvidCertifiedKeyHolder,
 }
 
-impl SvidServiceCore {
+impl SvidService {
     #[must_use]
     pub fn new(spire_agent_addr: String) -> Self {
         Self {

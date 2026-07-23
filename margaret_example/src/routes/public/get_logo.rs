@@ -13,7 +13,7 @@ impl GetLogo {
         Response::bytes(
             200,
             "image/png",
-            include_bytes!("../../../assets/logo.png").as_slice(),
+            include_bytes!("../../../../assets/logo.png").as_slice(),
         )
     }
 }

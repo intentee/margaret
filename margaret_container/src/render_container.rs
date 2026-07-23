@@ -1,4 +1,5 @@
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
@@ -14,8 +15,9 @@ use crate::topological_order::topological_order;
 pub fn render_container(
     index: &AttributeIndex,
     registry: &ConsoleArgumentRegistry,
+    framework_provided: &[CanonicalPath],
 ) -> Result<RenderedContainer, ContainerError> {
-    let plan = build_plan(index, registry)?;
+    let plan = build_plan(index, registry, framework_provided)?;
 
     topological_order(&plan.providers, &plan.collections)?;
 

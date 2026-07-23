@@ -9,12 +9,12 @@ use trzcina::Ticker;
 use crate::jwks_roll_interval::JWKS_ROLL_INTERVAL;
 use crate::jwks_roller_server_bundle::JwksRollerServerBundle;
 
-pub struct JwksRollService {
+pub struct JwksRollerService {
     pub bundle: JwksRollerServerBundle,
 }
 
 #[async_trait]
-impl Ticker for JwksRollService {
+impl Ticker for JwksRollerService {
     fn tick_interval(&self) -> Duration {
         JWKS_ROLL_INTERVAL
     }

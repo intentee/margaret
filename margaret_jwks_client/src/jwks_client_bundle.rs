@@ -9,7 +9,6 @@ use url::Url;
 
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
 
-use crate::build_jwks_http_client::build_jwks_http_client;
 use crate::jwks_client_bundle_params::JwksClientBundleParams;
 use crate::jwks_client_error::JwksClientError;
 use crate::public_jwks_holder::PublicJwksHolder;
@@ -34,19 +33,15 @@ pub struct JwksClientBundle {
 impl JwksClientBundle {
     pub fn new(
         JwksClientBundleParams {
-            client_config,
+            http_client,
             issuer_url,
         }: JwksClientBundleParams,
     ) -> Result<Self, JwksClientError> {
-        build_jwks_http_client(Client::builder().use_preconfigured_tls(client_config)).and_then(
-            |http_client| {
-                Ok(Self {
-                    http_client,
-                    public_jwks_holder: PublicJwksHolder::default(),
-                    jwks_url: well_known_jwks_url(&issuer_url)?,
-                })
-            },
-        )
+        Ok(Self {
+            http_client,
+            public_jwks_holder: PublicJwksHolder::default(),
+            jwks_url: well_known_jwks_url(&issuer_url)?,
+        })
     }
 
     #[must_use]

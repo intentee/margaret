@@ -1,5 +1,8 @@
 use std::sync::Arc;
+use std::time::Duration;
 
+use reqwest::Client;
+use reqwest::redirect::Policy;
 use rustls::ClientConfig;
 use tokio::task::yield_now;
 use tokio_util::sync::CancellationToken;
@@ -59,8 +62,15 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
     let jwks_server =
         RunningJwksServer::start(fixture.server_config.clone(), public_jwks_handler).await;
 
+    let http_client = Client::builder()
+        .use_preconfigured_tls(ClientConfig::clone(&fixture.client_config))
+        .https_only(true)
+        .redirect(Policy::none())
+        .timeout(Duration::from_secs(60))
+        .build()
+        .expect("the test jwks http client builds");
     let client_bundle = JwksClientBundle::new(JwksClientBundleParams {
-        client_config: ClientConfig::clone(&fixture.client_config),
+        http_client,
         issuer_url: Url::parse(&format!(
             "https://{}:{}",
             fixture.server_name,

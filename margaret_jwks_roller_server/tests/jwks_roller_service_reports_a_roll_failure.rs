@@ -6,7 +6,7 @@ use margaret_jwks_roller_server::jwks_roller_server_error::JwksRollerServerError
 use margaret_jwks_roller_tests::unreachable_jwks_secret_storage::UnreachableJwksSecretStorage;
 
 #[test]
-fn jwks_roll_service_reports_a_roll_failure() {
+fn jwks_roller_service_reports_a_roll_failure() {
     let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
         storage: Arc::new(UnreachableJwksSecretStorage),
     });

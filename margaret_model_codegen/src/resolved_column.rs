@@ -1,9 +1,10 @@
 use crate::inferred_column::InferredColumn;
 
-pub(crate) struct ResolvedColumn {
-    pub(crate) index: bool,
-    pub(crate) inferred: InferredColumn,
-    pub(crate) name: String,
-    pub(crate) primary_key: bool,
-    pub(crate) unique: bool,
+#[derive(Debug)]
+pub struct ResolvedColumn {
+    pub index: bool,
+    pub inferred: InferredColumn,
+    pub name: String,
+    pub primary_key: bool,
+    pub unique: bool,
 }

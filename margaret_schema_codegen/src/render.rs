@@ -2,10 +2,10 @@ use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::model::Model;
-use crate::resolved_column::ResolvedColumn;
-use crate::resolved_foreign_key::ResolvedForeignKey;
-use crate::resolved_index::ResolvedIndex;
+use margaret_model_codegen::model::Model;
+use margaret_model_codegen::resolved_column::ResolvedColumn;
+use margaret_model_codegen::resolved_foreign_key::ResolvedForeignKey;
+use margaret_model_codegen::resolved_index::ResolvedIndex;
 
 fn string_vec(values: &[String]) -> TokenStream {
     let items = values.iter().map(|value| {

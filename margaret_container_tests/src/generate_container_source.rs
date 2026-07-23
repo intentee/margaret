@@ -16,7 +16,7 @@ pub fn generate_container_source(
         .build();
     let registry = scan(&index)?;
 
-    let source = render_container(&index, &registry)?
+    let source = render_container(&index, &registry, &[])?
         .modules
         .into_iter()
         .map(|module| {

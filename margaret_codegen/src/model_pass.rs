@@ -6,7 +6,8 @@ pub(crate) fn model_pass(context: &mut BuildContext) -> Result<(), CodegenError>
         return Ok(());
     }
 
-    let module = margaret_model_codegen::render_models::render_models(context.index())?;
+    let models = margaret_model_codegen::models::models(context.index())?;
+    let module = margaret_schema_codegen::render_schema::render_schema(&models);
 
     context.extend_modules(vec![module]);
 

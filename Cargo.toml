@@ -34,6 +34,7 @@ members = [
     "margaret_peer_identity_tests",
     "margaret_request_binding_codegen",
     "margaret_route_parameter_codegen",
+    "margaret_schema_codegen",
     "margaret_schema_identifier_naming",
     "margaret_service",
     "margaret_service_codegen",
@@ -87,7 +88,6 @@ proc-macro2 = "1.0"
 quote = "1.0"
 rcgen = "0.14"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
-rust-embed = { version = "8.11", features = ["debug-embed"] }
 rustls = "0.23"
 rustls-webpki = "0.103"
 serde = "1.0"
@@ -100,6 +100,7 @@ tokio = "1.52"
 tokio-rustls = "0.26"
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 tokio-util = "0.7"
+toml = "0.8"
 tower = "0.5"
 trzcina = "0.4"
 url = "2.5"

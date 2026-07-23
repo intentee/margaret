@@ -35,6 +35,11 @@ pub enum CodegenError {
         source: ConsoleArgumentCodegenError,
     },
 
+    #[error(
+        "a constructor injects the asset responder, but no esbuild metafile was found at the workspace root"
+    )]
+    AssetResponderWithoutMetafile,
+
     #[error("failed to generate the dependency container: {source}")]
     Container {
         #[from]
@@ -93,6 +98,21 @@ pub enum CodegenError {
     ManifestDirectory {
         #[source]
         source: std::env::VarError,
+    },
+
+    #[error("no Cargo workspace root was found above the manifest directory '{start}'")]
+    WorkspaceRootNotFound { start: PathBuf },
+
+    #[error("failed to read the workspace manifest '{path}': {source}")]
+    ReadWorkspaceManifest {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("failed to parse the workspace manifest '{path}': {source}")]
+    ParseWorkspaceManifest {
+        path: PathBuf,
+        source: Box<toml::de::Error>,
     },
 
     #[error("failed to create the generated directory '{path}': {source}")]

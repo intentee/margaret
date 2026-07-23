@@ -167,6 +167,11 @@ impl ContainerBindings {
         }
     }
 
+    #[must_use]
+    pub fn provides(&self, provider_key: &CanonicalPath) -> bool {
+        self.providers.contains_key(provider_key)
+    }
+
     pub fn serve_arguments(
         &self,
         roots: &[CanonicalPath],

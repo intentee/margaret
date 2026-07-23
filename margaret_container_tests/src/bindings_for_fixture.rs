@@ -14,7 +14,7 @@ pub fn bindings_for_fixture(crate_name: &str, source_directory: &Path) -> Contai
         .build();
     let registry = scan(&index).expect("the console arguments are scanned");
 
-    render_container(&index, &registry)
+    render_container(&index, &registry, &[])
         .expect("the fixture renders")
         .bindings
 }

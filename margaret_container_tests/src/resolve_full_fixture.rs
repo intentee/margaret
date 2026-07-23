@@ -18,7 +18,7 @@ pub fn resolve_full_fixture(consumer: &str, declared: &str) -> InjectableResolut
         .expect("the full fixture crate is indexed")
         .build();
     let registry = scan(&index).expect("the console arguments are scanned");
-    let bindings = render_container(&index, &registry)
+    let bindings = render_container(&index, &registry, &[])
         .expect("the full fixture renders")
         .bindings;
     let item = index

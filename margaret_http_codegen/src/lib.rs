@@ -43,7 +43,7 @@ mod tests {
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry)
+        render_container(index, &registry, &[])
             .expect("the container renders")
             .bindings
     }
