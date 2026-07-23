@@ -55,6 +55,14 @@ COVERAGE_PACKAGES := \
 	-p margaret_websocket_codegen \
 	-p margaret_websocket_tests
 
+POSTGRES_FEATURES := --features margaret_schema_postgres_tests/tests_that_use_postgres
+
+POSTGRES_IMAGE_NAME := postgres
+POSTGRES_IMAGE_TAG := 18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
+
+export POSTGRES_IMAGE_NAME
+export POSTGRES_IMAGE_TAG
+
 SPIRE_FEATURES := \
 	--features margaret_spiffe_svid_tests/tests_that_use_spire \
 	--features margaret_spiffe_svid_integration_tests/tests_that_use_spire
@@ -65,12 +73,12 @@ node_modules: package.json
 
 .PHONY: clippy
 clippy:
-	cargo clippy --workspace --all-targets $(SPIRE_FEATURES) -- -D warnings
+	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(SPIRE_FEATURES) -- -D warnings
 
 .PHONY: coverage
-coverage: node_modules
+coverage: node_modules postgres-image
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest $(COVERAGE_PACKAGES) $(SPIRE_FEATURES) --no-report
+	cargo llvm-cov nextest $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) --no-report
 	cargo llvm-cov report --json --output-path target/llvm-cov.json
 	cargo llvm-cov report --lcov --output-path target/lcov.info
 	cargo llvm-cov report
@@ -136,17 +144,17 @@ coverage: node_modules
 fmt:
 	cargo fmt
 
+.PHONY: postgres-image
+postgres-image:
+	docker pull $(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG)
+
 .PHONY: test.unit
 test.unit:
-	cargo nextest run --workspace --exclude margaret_schema_postgres_tests
+	cargo nextest run --workspace
 
 .PHONY: test.integration
-test.integration:
-	cargo nextest run --workspace $(SPIRE_FEATURES)
-
-.PHONY: test.postgres
-test.postgres:
-	cargo nextest run -p margaret_schema_postgres_tests
+test.integration: postgres-image
+	cargo nextest run --workspace $(POSTGRES_FEATURES) $(SPIRE_FEATURES)
 
 .PHONY: test
 test: test.integration
