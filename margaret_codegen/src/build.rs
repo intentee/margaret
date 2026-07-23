@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
 
@@ -19,6 +21,7 @@ use crate::websocket_pass::websocket_pass;
 pub fn build(
     crate_root: &CrateRoot,
     metafile_contents: Option<String>,
+    assets_directory: &Path,
     embed_relative: &str,
 ) -> Result<GeneratedCode, CodegenError> {
     let index = AttributeIndexBuilder::new()
@@ -28,7 +31,7 @@ pub fn build(
 
     let registry = console_arguments_pass(&index)?;
     let bindings = container_pass(&mut context, &registry)?;
-    asset_bag_pass(&mut context, &bindings, embed_relative)?;
+    asset_bag_pass(&mut context, &bindings, assets_directory, embed_relative)?;
     middleware_pass(&mut context)?;
     websocket_pass(&mut context, &bindings)?;
     views_pass(&mut context, &bindings)?;
@@ -205,6 +208,7 @@ struct Room;
         build(
             &CrateRoot::new("crate", directory.path().join("src")),
             None,
+            &directory.path().join("assets"),
             EMBED_RELATIVE,
         )
     }
@@ -219,7 +223,7 @@ struct Room;
         let registry = console_arguments_pass(&index).expect("the console arguments pass succeeds");
         let bindings =
             container_pass(&mut context, &registry).expect("the container pass succeeds");
-        asset_bag_pass(&mut context, &bindings, EMBED_RELATIVE)
+        asset_bag_pass(&mut context, &bindings, &source.join("assets"), EMBED_RELATIVE)
             .expect("the asset bag pass succeeds");
         middleware_pass(&mut context).expect("the middleware pass succeeds");
         websocket_pass(&mut context, &bindings).expect("the websocket pass succeeds");
@@ -304,6 +308,7 @@ struct Room;
                 r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
                     .to_string(),
             ),
+            &directory.path().join("assets"),
             EMBED_RELATIVE,
         )
         .expect("the build succeeds");
@@ -335,6 +340,12 @@ impl AssetRoute {
     fn generates_the_asset_responder_when_a_constructor_injects_it() {
         let directory = crate_with(ASSET_RESPONDER_CRATE);
         bootstrap(&directory);
+        let assets = directory.path().join("assets");
+        fs::create_dir(&assets).expect("the assets directory exists");
+        fs::write(assets.join("app_ABC.js"), "console.log(1)")
+            .expect("the fingerprinted asset exists");
+        fs::write(assets.join("service_worker.js"), "self.addEventListener('install', () => {})")
+            .expect("the un-fingerprinted asset exists");
 
         let code = build(
             &CrateRoot::new("crate", directory.path().join("src")),
@@ -342,14 +353,40 @@ impl AssetRoute {
                 r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
                     .to_string(),
             ),
+            &assets,
             EMBED_RELATIVE,
         )
         .expect("the build succeeds");
 
+        let responder = module(&code, "asset_bag/asset_responder");
+
         assert!(module(&code, "asset_bag").contains("pub mod asset_responder;"));
-        assert!(module(&code, "asset_bag/asset_responder").contains("pub struct AssetResponder"));
-        assert!(module(&code, "asset_bag/asset_responder").contains("\"app_ABC.js\" =>"));
+        assert!(responder.contains("pub struct AssetResponder"));
+        assert!(responder.contains("\"app_ABC.js\" =>"));
+        assert!(responder.contains("public, max-age=31536000, immutable"));
+        assert!(responder.contains("\"service_worker.js\" =>"));
+        assert!(responder.contains("\"no-cache\""));
         assert!(module(&code, "container").contains("asset_bag::asset_responder::AssetResponder"));
+    }
+
+    #[test]
+    fn reports_a_missing_asset_directory_when_the_responder_is_injected() {
+        let directory = crate_with(ASSET_RESPONDER_CRATE);
+        bootstrap(&directory);
+
+        let message = build(
+            &CrateRoot::new("crate", directory.path().join("src")),
+            Some(
+                r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
+                    .to_string(),
+            ),
+            &directory.path().join("assets"),
+            EMBED_RELATIVE,
+        )
+        .expect_err("a missing asset directory is rejected")
+        .to_string();
+
+        assert!(message.contains("failed to read the asset directory"));
     }
 
     #[test]
@@ -414,6 +451,7 @@ pub mod margaret {
         let message = build(
             &CrateRoot::new("crate", directory.path().join("src")),
             Some(r#"{ "outputs": {} }"#.to_string()),
+            &directory.path().join("assets"),
             EMBED_RELATIVE,
         )
         .expect_err("an invalid metafile is rejected")

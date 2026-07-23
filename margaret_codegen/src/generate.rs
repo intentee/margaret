@@ -9,6 +9,8 @@ use crate::build::build;
 use crate::codegen_error::CodegenError;
 use crate::workspace_root::workspace_root;
 
+pub(crate) const ASSETS_DIRECTORY_NAME: &str = "assets";
+
 fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
     match fs::read_to_string(metafile_path) {
         Ok(contents) => Ok(Some(contents)),
@@ -25,7 +27,7 @@ fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
     let generated_directory = host_source.join("margaret");
     let location = workspace_root(manifest_directory)?;
     let metafile_path = location.root().join("esbuild-meta.json");
-    let assets_directory = location.root().join("assets");
+    let assets_directory = location.root().join(ASSETS_DIRECTORY_NAME);
     let crate_root = CrateRoot::new("crate", host_source);
 
     fs::create_dir_all(&generated_directory).map_err(|source| CodegenError::CreateDirectory {
@@ -44,8 +46,13 @@ fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
 
     let metafile_contents = read_metafile(&metafile_path)?;
 
-    build(&crate_root, metafile_contents, location.embed_relative())?
-        .write_to(&generated_directory)?;
+    build(
+        &crate_root,
+        metafile_contents,
+        &assets_directory,
+        location.embed_relative(),
+    )?
+    .write_to(&generated_directory)?;
 
     println!(
         "cargo:rerun-if-changed={}",
@@ -139,6 +146,52 @@ struct Config {
 
         assert!(read_generated(host.path(), "mod.rs").contains("pub mod asset_bag;"));
         assert!(read_generated(host.path(), "asset_bag.rs").contains("macro_rules! asset"));
+    }
+
+    const ASSET_RESPONDER_HOST: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+struct AssetRoute {
+    responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
+}
+
+impl AssetRoute {
+    #[constructor]
+    fn create(
+        responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
+    ) -> Self {}
+}
+";
+
+    #[test]
+    fn serves_every_file_in_the_assets_directory_including_unfingerprinted_ones() {
+        let host = tempdir().expect("a host crate directory");
+        write_crate(host.path(), ASSET_RESPONDER_HOST);
+        fs::write(
+            host.path().join("esbuild-meta.json"),
+            r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#,
+        )
+        .expect("the metafile is written");
+        let assets = host.path().join("assets");
+        fs::create_dir(&assets).expect("the assets directory exists");
+        fs::write(assets.join("app_ABC.js"), "console.log(1)")
+            .expect("the fingerprinted asset exists");
+        fs::write(
+            assets.join("service_worker.js"),
+            "self.addEventListener('install', () => {})",
+        )
+        .expect("the service worker exists");
+
+        generate_into(host.path()).expect("the crate generates");
+
+        let responder = read_generated(host.path(), "asset_bag/asset_responder.rs");
+
+        assert!(responder.contains("\"service_worker.js\" =>"));
+        assert!(responder.contains("\"no-cache\""));
+        assert!(responder.contains("\"app_ABC.js\" =>"));
+        assert!(responder.contains("public, max-age=31536000, immutable"));
     }
 
     #[test]
