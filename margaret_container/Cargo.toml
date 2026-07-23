@@ -8,6 +8,7 @@ margaret_attributes = { path = "../margaret_attributes" }
 margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
 margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
 margaret_generated_module = { path = "../margaret_generated_module" }
+margaret_toposort = { path = "../margaret_toposort" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

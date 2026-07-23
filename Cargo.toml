@@ -36,6 +36,7 @@ members = [
     "margaret_route_parameter_codegen",
     "margaret_schema_codegen",
     "margaret_schema_identifier_naming",
+    "margaret_schema_postgres_tests",
     "margaret_service",
     "margaret_service_codegen",
     "margaret_service_tests",
@@ -49,6 +50,7 @@ members = [
     "margaret_sync_holder",
     "margaret_token_signer",
     "margaret_token_signer_tests",
+    "margaret_toposort",
     "margaret_validation",
     "margaret_views",
     "margaret_views_codegen",
@@ -66,6 +68,7 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 clap = { version = "4.5", default-features = false, features = ["std", "help", "usage", "error-context"] }
 cookie = "0.18"
 dashmap = "6.1"
+ephemeral-postgres = "0.2"
 esbuild-metafile = "0.10"
 form_urlencoded = "1.2"
 futures-util = "0.3"
@@ -93,6 +96,7 @@ rustls-webpki = "0.103"
 serde = "1.0"
 serde_json = "1.0"
 spiffe = { version = "0.6", default-features = false }
+sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "uuid"] }
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 tempfile = "3.20"
 thiserror = "2.0"

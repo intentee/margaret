@@ -282,7 +282,9 @@ impl Farewell {
             .collect();
 
         assert!(source.contains(r#"clap::Command::new("schema")"#));
-        assert!(source.contains(r#"Some(("schema",_matches))=>super::schema::schema()"#));
+        assert!(source.contains(r#"Some(("schema",_matches))=>{"#));
+        assert!(source.contains("render_postgres(&super::schema::schema())"));
+        assert!(source.contains("CommandOutcome::Succeeded"));
         assert!(
             source.contains("run<Arguments,Argument>(_container:&super::container::Container,")
         );
