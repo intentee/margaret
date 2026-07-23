@@ -13,8 +13,8 @@ use crate::asset_bag_codegen_error::AssetBagCodegenError;
 use crate::asset_responder_identity::asset_responder_canonical_suffix;
 use crate::asset_slot::AssetSlot;
 use crate::bundle_tokens::bundle_tokens;
+use crate::directory_relative_outputs::directory_relative_outputs;
 use crate::enumerate_inputs::enumerate_inputs;
-use crate::output_directory::output_directory;
 use crate::render_asset_responder::render_asset_responder;
 use crate::resolution_tokens::resolution_tokens;
 use crate::resolve_static_outputs::resolve_static_outputs;
@@ -52,7 +52,7 @@ pub fn render_asset_bag(
     let enumerated = enumerate_inputs(&raw)?;
     let metafile: EsbuildMetafile = raw.into();
     let output_paths: BTreeSet<String> = metafile.get_output_paths().into_iter().collect();
-    let directory = output_directory(&output_paths)?;
+    let relative_outputs = directory_relative_outputs(&output_paths)?;
 
     let mut inputs: BTreeSet<String> = BTreeSet::new();
 
@@ -94,7 +94,7 @@ pub fn render_asset_bag(
             let responder_module_identifier = format_ident!("{responder_module}");
             let responder_declaration = quote! { pub mod #responder_module_identifier; };
             let responder_tokens =
-                render_asset_responder(&output_paths, &directory, &embed_relative, responder_type)?;
+                render_asset_responder(&relative_outputs, &embed_relative, responder_type);
 
             Ok(vec![
                 GeneratedModuleTokens::new(
@@ -312,24 +312,24 @@ mod tests {
     }
 
     #[test]
-    fn propagates_an_unsupported_content_type_when_emitting_the_responder() {
-        assert!(matches!(
-            render_asset_bag(
-                r#"{
-                    "outputs": {
-                        "assets/model_HASH.bin": {
-                            "imports": [],
-                            "inputs": { "resources/model.bin": {} }
-                        }
+    fn emits_octet_stream_for_an_unrecognized_output() {
+        let responder = formatted(
+            r#"{
+                "outputs": {
+                    "assets/model_HASH.bin": {
+                        "imports": [],
+                        "inputs": { "resources/model.bin": {} }
                     }
-                }"#,
-                ResponderGeneration::Emit {
-                    embed_relative: "..".to_string(),
-                },
-            ),
-            Err(AssetBagCodegenError::UnsupportedAssetContentType { output })
-                if output == "assets/model_HASH.bin"
-        ));
+                }
+            }"#,
+            ResponderGeneration::Emit {
+                embed_relative: "..".to_string(),
+            },
+            "asset_bag/asset_responder",
+        );
+
+        assert!(responder.contains("\"model_HASH.bin\" =>"));
+        assert!(responder.contains("\"application/octet-stream\""));
     }
 
     #[test]

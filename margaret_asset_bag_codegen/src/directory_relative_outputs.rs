@@ -1,14 +1,16 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use crate::asset_bag_codegen_error::AssetBagCodegenError;
 
-pub(crate) fn output_directory(
+pub(crate) fn directory_relative_outputs(
     output_paths: &BTreeSet<String>,
-) -> Result<String, AssetBagCodegenError> {
+) -> Result<BTreeMap<String, String>, AssetBagCodegenError> {
     let mut directory: Option<&str> = None;
+    let mut relative_outputs: BTreeMap<String, String> = BTreeMap::new();
 
     for output_path in output_paths {
-        let Some((candidate, _rest)) = output_path.split_once('/') else {
+        let Some((candidate, tail)) = output_path.split_once('/') else {
             return Err(AssetBagCodegenError::OutputMissingDirectory {
                 output: output_path.clone(),
             });
@@ -24,10 +26,12 @@ pub(crate) fn output_directory(
                 });
             }
         }
+
+        relative_outputs.insert(output_path.clone(), tail.to_string());
     }
 
     match directory {
-        Some(directory) => Ok(directory.to_string()),
+        Some(_) => Ok(relative_outputs),
         None => Err(AssetBagCodegenError::EmptyMetafile),
     }
 }
@@ -36,7 +40,7 @@ pub(crate) fn output_directory(
 mod tests {
     use std::collections::BTreeSet;
 
-    use super::output_directory;
+    use super::directory_relative_outputs;
     use crate::asset_bag_codegen_error::AssetBagCodegenError;
 
     fn paths(paths: &[&str]) -> BTreeSet<String> {
@@ -44,18 +48,31 @@ mod tests {
     }
 
     #[test]
-    fn derives_the_shared_output_directory() {
+    fn maps_each_output_to_its_directory_relative_tail() {
+        let relative_outputs = directory_relative_outputs(&paths(&[
+            "assets/app_ABC.js",
+            "assets/nested/chunk_ABC.js",
+        ]))
+        .expect("the shared directory resolves");
+
         assert_eq!(
-            output_directory(&paths(&["assets/app_ABC.js", "assets/nested/chunk_ABC.js"]))
-                .expect("a shared directory is derived"),
-            "assets"
+            relative_outputs
+                .get("assets/app_ABC.js")
+                .map(String::as_str),
+            Some("app_ABC.js")
+        );
+        assert_eq!(
+            relative_outputs
+                .get("assets/nested/chunk_ABC.js")
+                .map(String::as_str),
+            Some("nested/chunk_ABC.js")
         );
     }
 
     #[test]
     fn rejects_an_output_without_a_directory() {
         assert!(matches!(
-            output_directory(&paths(&["app_ABC.js"])),
+            directory_relative_outputs(&paths(&["app_ABC.js"])),
             Err(AssetBagCodegenError::OutputMissingDirectory { output }) if output == "app_ABC.js"
         ));
     }
@@ -63,7 +80,7 @@ mod tests {
     #[test]
     fn rejects_outputs_spanning_multiple_directories() {
         assert!(matches!(
-            output_directory(&paths(&["assets/app_ABC.js", "static/app_ABC.css"])),
+            directory_relative_outputs(&paths(&["assets/app_ABC.js", "static/app_ABC.css"])),
             Err(AssetBagCodegenError::InconsistentOutputDirectory { first, second })
                 if first == "assets" && second == "static"
         ));
@@ -72,7 +89,7 @@ mod tests {
     #[test]
     fn rejects_a_metafile_without_outputs() {
         assert_eq!(
-            output_directory(&BTreeSet::new())
+            directory_relative_outputs(&BTreeSet::new())
                 .expect_err("an empty metafile is rejected")
                 .to_string(),
             "the esbuild metafile declares no outputs"
