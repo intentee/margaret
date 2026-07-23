@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
+margaret_container = { path = "../margaret_container" }
 margaret_injection_codegen = { path = "../margaret_injection_codegen" }
 margaret_request_binding_codegen = { path = "../margaret_request_binding_codegen" }
 proc-macro2 = { workspace = true }
@@ -14,6 +15,7 @@ syn = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
 tempfile = { workspace = true }
 
 [lints]

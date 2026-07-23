@@ -22,7 +22,11 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::attribute_selector::AttributeSelector;
+    use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_console_argument_codegen::scan::scan;
+    use margaret_container::container_bindings::ContainerBindings;
+    use margaret_container::render_container::render_container;
 
     use crate::fold_layers::fold_layers;
     use crate::has_middleware::has_middleware;
@@ -50,6 +54,18 @@ mod tests {
             .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
             .expect("the crate is indexed")
             .build()
+    }
+
+    fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
+        let registry = scan(index).expect("the console arguments are scanned");
+
+        render_container(index, &registry, &[])
+            .expect("the container renders")
+            .bindings
+    }
+
+    fn empty_bindings() -> ContainerBindings {
+        bindings_for(&index_for("#[singleton]\nstruct Config;\n"))
     }
 
     fn wrappers_for(lib_source: &str) -> String {
@@ -262,6 +278,7 @@ impl Guard {
 
     fn plain_layer(field: &str, wrapper: &str) -> LayerApplication {
         LayerApplication {
+            concrete: CanonicalPath::new(vec!["crate".to_string(), wrapper.to_string()]),
             field: format_ident!("{field}"),
             injects_peer_spiffe_id: false,
             injects_routes: false,
@@ -279,6 +296,7 @@ impl Guard {
             ],
             quote! { BASE },
             &quote! { super::super::middleware },
+            &empty_bindings(),
         )
         .to_string()
         .split_whitespace()
@@ -292,10 +310,15 @@ impl Guard {
 
     #[test]
     fn folds_no_layers_into_the_base_unchanged() {
-        let folded = fold_layers(&[], quote! { BASE }, &quote! { super::super::middleware })
-            .to_string()
-            .split_whitespace()
-            .collect::<String>();
+        let folded = fold_layers(
+            &[],
+            quote! { BASE },
+            &quote! { super::super::middleware },
+            &empty_bindings(),
+        )
+        .to_string()
+        .split_whitespace()
+        .collect::<String>();
 
         assert_eq!(folded, "BASE");
     }
@@ -303,6 +326,7 @@ impl Guard {
     #[test]
     fn builds_a_declaration_ordered_vector_of_boxed_middleware() {
         let routed = LayerApplication {
+            concrete: CanonicalPath::new(vec!["crate".to_string(), "Tracer".to_string()]),
             field: format_ident!("tracer"),
             injects_peer_spiffe_id: false,
             injects_routes: true,
@@ -312,6 +336,7 @@ impl Guard {
         let vector = middleware_vec_tokens(
             &[routed, plain_layer("guard", "Guard")],
             &quote! { super::super::middleware },
+            &empty_bindings(),
         )
         .to_string()
         .split_whitespace()
@@ -335,6 +360,42 @@ impl Guard {
             .expect("the plain middleware is present");
 
         assert!(tracer < guard);
+    }
+
+    const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
+use margaret_http::next::Next;
+
+#[singleton]
+#[handles_middleware_attribute(attribute = guard)]
+struct Guard;
+
+impl Guard {
+    #[constructor]
+    fn create(#[console_argument(from = "token")] token: String) -> Self {}
+
+    #[process]
+    fn process(&self, next: Next) -> ResponseContinuation {}
+}
+
+#[middleware(guard)]
+struct Site;
+"#;
+
+    #[test]
+    fn threads_a_console_argument_into_the_middleware_instance() {
+        let layers = layers_for(CONSOLE_ARGUMENT_MIDDLEWARE).expect("the layers resolve");
+        let bindings = bindings_for(&index_for(CONSOLE_ARGUMENT_MIDDLEWARE));
+        let folded = fold_layers(
+            &layers,
+            quote! { BASE },
+            &quote! { super::super::middleware },
+            &bindings,
+        )
+        .to_string()
+        .split_whitespace()
+        .collect::<String>();
+
+        assert!(folded.contains("container.guard(console_argument_0.clone()).await"));
     }
 
     #[test]

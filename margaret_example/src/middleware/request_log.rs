@@ -15,13 +15,17 @@ use crate::margaret::routes::Routes;
 #[handles_middleware_attribute(attribute = logged)]
 pub struct RequestLog {
     sinks: Vec<Arc<dyn LogSink>>,
+    prefix: Option<String>,
 }
 
 impl RequestLog {
     #[constructor]
     #[must_use]
-    pub fn create(sinks: Vec<Arc<dyn LogSink>>) -> Self {
-        Self { sinks }
+    pub fn create(
+        sinks: Vec<Arc<dyn LogSink>>,
+        #[console_argument(from = "request-log-prefix")] prefix: Option<String>,
+    ) -> Self {
+        Self { sinks, prefix }
     }
 
     #[process]
@@ -32,10 +36,11 @@ impl RequestLog {
         routes: &Routes,
     ) -> ResponseContinuation {
         let line = format!(
-            "{} {} (home: {})",
+            "{} {} (home: {}, prefix: {:?})",
             request.inputs.server.method(),
             request.inputs.server.path(),
             routes.public.get_greeting.url(),
+            self.prefix,
         );
 
         for sink in &self.sinks {

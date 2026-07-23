@@ -331,6 +331,42 @@ impl Room {
         assert!(!source.contains("GatedWebSocketUpgrade"));
     }
 
+    const SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
+use margaret_http::next::Next;
+use margaret_http::request::Request;
+
+#[websocket_session(path = "/room", server = "public")]
+#[middleware(guard)]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[singleton]
+#[handles_middleware_attribute(attribute = guard)]
+struct Guard;
+
+impl Guard {
+    #[constructor]
+    fn create(#[console_argument(from = "token")] token: String) -> Self {}
+
+    #[process]
+    fn process(&self, request: &Request, next: Next) -> ResponseContinuation {}
+}
+"#;
+
+    #[test]
+    fn threads_a_console_argument_into_a_session_middleware() {
+        let source = generated(SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE);
+
+        assert!(source.contains(
+            "public_routes(container:&super::container::Container,console_argument_0:&String,"
+        ));
+        assert!(source.contains("container.guard(console_argument_0.clone()).await"));
+    }
+
     #[test]
     fn rejects_a_session_with_an_unknown_middleware_tag() {
         assert!(

@@ -1,6 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use margaret_container::container_bindings::ContainerBindings;
+
 use crate::layer_application::LayerApplication;
 use crate::middleware_instance_tokens::middleware_instance_tokens;
 
@@ -8,9 +10,10 @@ use crate::middleware_instance_tokens::middleware_instance_tokens;
 pub fn middleware_vec_tokens(
     layers: &[LayerApplication],
     module_path: &TokenStream,
+    bindings: &ContainerBindings,
 ) -> TokenStream {
     let pushes = layers.iter().map(|application| {
-        let element = middleware_instance_tokens(application, module_path);
+        let element = middleware_instance_tokens(application, module_path, bindings);
 
         quote! { middleware.push(#element); }
     });

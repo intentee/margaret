@@ -38,6 +38,7 @@ pub fn resolve_layers(
         }
 
         layers.push(LayerApplication {
+            concrete: plan.concrete.clone(),
             field: plan.field.clone(),
             injects_peer_spiffe_id: plan.injects_peer_spiffe_id(),
             injects_routes: plan.injects_routes(),
