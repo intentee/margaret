@@ -133,6 +133,15 @@ pub enum CodegenError {
         source: std::io::Error,
     },
 
+    #[error("failed to read the asset directory '{path}': {source}")]
+    ReadAssetDirectory {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("the asset file name '{path}' is not valid UTF-8")]
+    NonUtf8AssetPath { path: PathBuf },
+
     #[error("failed to write the generated source '{path}': {source}")]
     WriteSource {
         path: PathBuf,

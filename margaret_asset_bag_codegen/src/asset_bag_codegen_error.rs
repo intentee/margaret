@@ -10,14 +10,10 @@ pub enum AssetBagCodegenError {
     EmptyMetafile,
     #[error("the entry-point output `{output}` is not present in the metafile")]
     EntrypointOutputMissing { output: String },
-    #[error("the esbuild outputs span multiple directories `{first}` and `{second}`")]
-    InconsistentOutputDirectory { first: String, second: String },
     #[error("the esbuild input `{input}` is not present in the metafile")]
     InputNotInMetafile { input: String },
     #[error("failed to parse the esbuild metafile")]
     MetafileParse(#[from] serde_json::Error),
-    #[error("the esbuild output `{output}` is not inside an output directory")]
-    OutputMissingDirectory { output: String },
     #[error("the entry-point output `{output}` is neither a script nor a stylesheet")]
     UnsupportedIncludeOutput { output: String },
 }

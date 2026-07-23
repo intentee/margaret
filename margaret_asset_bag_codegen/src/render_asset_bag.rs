@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use esbuild_metafile::esbuild_metafile::EsbuildMetafile;
@@ -13,12 +14,32 @@ use crate::asset_bag_codegen_error::AssetBagCodegenError;
 use crate::asset_responder_identity::asset_responder_canonical_suffix;
 use crate::asset_slot::AssetSlot;
 use crate::bundle_tokens::bundle_tokens;
-use crate::directory_relative_outputs::directory_relative_outputs;
+use crate::cache_policy::CachePolicy;
 use crate::enumerate_inputs::enumerate_inputs;
 use crate::render_asset_responder::render_asset_responder;
 use crate::resolution_tokens::resolution_tokens;
 use crate::resolve_static_outputs::resolve_static_outputs;
 use crate::responder_generation::ResponderGeneration;
+
+fn classify_served_tails(
+    served_tails: &BTreeSet<String>,
+    assets_directory_name: &str,
+    output_paths: &BTreeSet<String>,
+) -> BTreeMap<String, CachePolicy> {
+    served_tails
+        .iter()
+        .map(|tail| {
+            let output_path = format!("{assets_directory_name}/{tail}");
+            let policy = if output_paths.contains(&output_path) {
+                CachePolicy::Immutable
+            } else {
+                CachePolicy::Revalidate
+            };
+
+            (tail.clone(), policy)
+        })
+        .collect()
+}
 
 fn macro_module_tokens(arms: &[AssetArm], responder_declaration: &TokenStream) -> TokenStream {
     let arm_tokens: Vec<TokenStream> = arms
@@ -52,7 +73,10 @@ pub fn render_asset_bag(
     let enumerated = enumerate_inputs(&raw)?;
     let metafile: EsbuildMetafile = raw.into();
     let output_paths: BTreeSet<String> = metafile.get_output_paths().into_iter().collect();
-    let relative_outputs = directory_relative_outputs(&output_paths)?;
+
+    if output_paths.is_empty() {
+        return Err(AssetBagCodegenError::EmptyMetafile);
+    }
 
     let mut inputs: BTreeSet<String> = BTreeSet::new();
 
@@ -90,11 +114,21 @@ pub fn render_asset_bag(
             root_module,
             macro_module_tokens(&arms, &quote! {}),
         )]),
-        ResponderGeneration::Emit { embed_relative } => {
+        ResponderGeneration::Emit {
+            assets_directory_name,
+            embed_relative,
+            served_tails,
+        } => {
             let responder_module_identifier = format_ident!("{responder_module}");
             let responder_declaration = quote! { pub mod #responder_module_identifier; };
-            let responder_tokens =
-                render_asset_responder(&relative_outputs, &embed_relative, responder_type);
+            let served =
+                classify_served_tails(&served_tails, &assets_directory_name, &output_paths);
+            let responder_tokens = render_asset_responder(
+                &served,
+                &assets_directory_name,
+                &embed_relative,
+                responder_type,
+            );
 
             Ok(vec![
                 GeneratedModuleTokens::new(
@@ -162,6 +196,17 @@ mod tests {
             .to_string()
     }
 
+    fn emit(served_tails: &[&str]) -> ResponderGeneration {
+        ResponderGeneration::Emit {
+            assets_directory_name: "assets".to_string(),
+            embed_relative: "..".to_string(),
+            served_tails: served_tails
+                .iter()
+                .map(|tail| (*tail).to_string())
+                .collect(),
+        }
+    }
+
     #[test]
     fn generates_the_macro_with_an_arm_per_addressable_input() {
         let source = formatted(FULL_METAFILE, ResponderGeneration::Skip, "asset_bag");
@@ -198,9 +243,7 @@ mod tests {
     fn emits_the_responder_submodule_and_declares_it_from_the_root() {
         let modules = render_asset_bag(
             FULL_METAFILE,
-            ResponderGeneration::Emit {
-                embed_relative: "..".to_string(),
-            },
+            emit(&["app_ABC.js", "logo_ABC.png", "favicon_MWST.svg"]),
         )
         .expect("the asset bag module is generated");
 
@@ -214,16 +257,12 @@ mod tests {
 
         let root = formatted(
             FULL_METAFILE,
-            ResponderGeneration::Emit {
-                embed_relative: "..".to_string(),
-            },
+            emit(&["app_ABC.js", "logo_ABC.png", "favicon_MWST.svg"]),
             "asset_bag",
         );
         let responder = formatted(
             FULL_METAFILE,
-            ResponderGeneration::Emit {
-                embed_relative: "..".to_string(),
-            },
+            emit(&["app_ABC.js", "logo_ABC.png", "favicon_MWST.svg"]),
             "asset_bag/asset_responder",
         );
 
@@ -235,6 +274,20 @@ mod tests {
         assert!(responder.contains("\"image/png\""));
         assert!(responder.contains("\"favicon_MWST.svg\" =>"));
         assert!(responder.contains("\"image/svg+xml\""));
+        assert!(responder.contains("public, max-age=31536000, immutable"));
+    }
+
+    #[test]
+    fn serves_a_directory_file_absent_from_the_metafile_with_revalidation() {
+        let responder = formatted(
+            FULL_METAFILE,
+            emit(&["app_ABC.js", "service_worker.js"]),
+            "asset_bag/asset_responder",
+        );
+
+        assert!(responder.contains("\"service_worker.js\" =>"));
+        assert!(responder.contains("\"no-cache\""));
+        assert!(responder.contains("\"app_ABC.js\" =>"));
         assert!(responder.contains("public, max-age=31536000, immutable"));
     }
 
@@ -322,9 +375,7 @@ mod tests {
                     }
                 }
             }"#,
-            ResponderGeneration::Emit {
-                embed_relative: "..".to_string(),
-            },
+            emit(&["model_HASH.bin"]),
             "asset_bag/asset_responder",
         );
 

@@ -10,6 +10,12 @@ pub fn generate_fixture(name: &str) -> Result<GeneratedCode, CodegenError> {
         .join("tests/fixtures")
         .join(name)
         .join("src");
+    let assets_directory = source_directory.join("assets");
 
-    build(&CrateRoot::new(name, source_directory), None, ".")
+    build(
+        &CrateRoot::new(name, source_directory),
+        None,
+        &assets_directory,
+        ".",
+    )
 }

@@ -17,6 +17,7 @@ mod serve_arguments;
 mod services_pass;
 mod umbrella;
 mod views_pass;
+mod walk_asset_directory;
 mod websocket_pass;
 mod workspace_location;
 mod workspace_root;
