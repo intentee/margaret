@@ -157,6 +157,7 @@ impl Farewell {
     fn adds_a_serve_command_when_http_exists() {
         let source = source_for("struct App;\n", true);
 
+        assert!(source.contains("pubasyncfnrun"));
         assert!(source.contains(r#"clap::Command::new("serve")"#));
         assert!(
             source.contains(r#"clap::Arg::new("public-addr").long("public-addr").required(true)"#)
@@ -286,6 +287,21 @@ impl Farewell {
         assert!(
             source.contains("run<Arguments,Argument>(_container:&super::container::Container,")
         );
+    }
+
+    #[test]
+    fn emits_a_synchronous_run_when_only_the_schema_command_exists() {
+        let index = index_for("struct App;\n");
+        let source: String = render_console(&index, false, true, &[], &[], &bindings(&index))
+            .expect("the console source is generated")
+            .format()
+            .expect("the module formats")
+            .source()
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains("pubfnrun<Arguments,Argument>"));
+        assert!(!source.contains("pubasyncfnrun"));
     }
 
     #[test]

@@ -1052,6 +1052,8 @@ impl New {
 
         let run: String = module(&code, "run").split_whitespace().collect();
 
+        assert!(run.contains("pubfnrun"));
+        assert!(!run.contains("pubasyncfnrun"));
         assert!(run.contains("\"schema\""));
         assert!(run.contains("super::schema::schema()"));
     }

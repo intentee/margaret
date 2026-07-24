@@ -80,10 +80,16 @@ pub(crate) fn render(
     servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
 ) -> TokenStream {
-    let container = if !commands.is_empty() || serves {
+    let dispatches_asynchronously = !commands.is_empty() || serves;
+    let container = if dispatches_asynchronously {
         format_ident!("container")
     } else {
         format_ident!("_container")
+    };
+    let run_asyncness = if dispatches_asynchronously {
+        quote! { async }
+    } else {
+        quote! {}
     };
     let subcommands = commands.iter().map(subcommand_registration);
     let arms = commands
@@ -161,7 +167,7 @@ pub(crate) fn render(
     };
 
     quote! {
-        pub async fn run<Arguments, Argument>(
+        pub #run_asyncness fn run<Arguments, Argument>(
             #container: &super::container::Container,
             args: Arguments,
         ) -> margaret_console::command_outcome::CommandOutcome
