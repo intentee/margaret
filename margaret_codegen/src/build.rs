@@ -15,6 +15,7 @@ use crate::middleware_pass::middleware_pass;
 use crate::model_pass::model_pass;
 use crate::serve_arguments::serve_arguments;
 use crate::services_pass::services_pass;
+use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 use crate::views_pass::views_pass;
 use crate::websocket_pass::websocket_pass;
 
@@ -25,6 +26,7 @@ pub fn build(
     embed_relative: &str,
 ) -> Result<GeneratedCode, CodegenError> {
     let index = AttributeIndexBuilder::new()
+        .exclude_root_module(UMBRELLA_MODULE_NAME)
         .index_crate(crate_root)?
         .build();
     let mut context = BuildContext::new(&index, metafile_contents);
@@ -75,6 +77,7 @@ mod tests {
     use crate::serve_arguments::serve_arguments;
     use crate::services_pass::services_pass;
     use crate::umbrella::umbrella;
+    use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
     use crate::views_pass::views_pass;
     use crate::websocket_pass::websocket_pass;
 
@@ -187,19 +190,10 @@ struct Room;
         directory
     }
 
-    fn bootstrap(directory: &TempDir) {
-        let generated_directory = directory.path().join("src/margaret");
-
-        fs::create_dir_all(&generated_directory).expect("the generated directory exists");
-        fs::write(generated_directory.join("mod.rs"), "").expect("the umbrella stub is written");
-    }
-
     const EMBED_RELATIVE: &str = ".";
 
     fn generate(lib_source: &str) -> Result<GeneratedCode, CodegenError> {
         let directory = crate_with(lib_source);
-
-        bootstrap(&directory);
 
         build(
             &CrateRoot::new("crate", directory.path().join("src")),
@@ -211,6 +205,7 @@ struct Room;
 
     fn generate_unformatted(source: &Path) -> GeneratedCode {
         let index = AttributeIndexBuilder::new()
+            .exclude_root_module(UMBRELLA_MODULE_NAME)
             .index_crate(&CrateRoot::new("crate", source))
             .expect("the crate is indexed")
             .build();
@@ -301,7 +296,6 @@ struct Room;
     #[test]
     fn generates_the_asset_bag_module_when_a_metafile_is_present() {
         let directory = crate_with(PLAIN_CRATE);
-        bootstrap(&directory);
 
         let code = build(
             &CrateRoot::new("crate", directory.path().join("src")),
@@ -340,7 +334,6 @@ impl AssetRoute {
     #[test]
     fn generates_the_asset_responder_when_a_constructor_injects_it() {
         let directory = crate_with(ASSET_RESPONDER_CRATE);
-        bootstrap(&directory);
         let assets = directory.path().join("assets");
         fs::create_dir(&assets).expect("the assets directory exists");
         fs::write(assets.join("app_ABC.js"), "console.log(1)")
@@ -376,7 +369,6 @@ impl AssetRoute {
     #[test]
     fn reports_a_missing_asset_directory_when_the_responder_is_injected() {
         let directory = crate_with(ASSET_RESPONDER_CRATE);
-        bootstrap(&directory);
 
         let message = build(
             &CrateRoot::new("crate", directory.path().join("src")),
@@ -402,43 +394,6 @@ impl AssetRoute {
         assert!(message.contains("no esbuild metafile was found at the workspace root"));
     }
 
-    const ASSET_RESPONDER_COLLISION_CRATE: &str = "\
-#[singleton]
-struct AssetRoute {
-    responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
-}
-
-impl AssetRoute {
-    #[constructor]
-    fn create(
-        responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
-    ) -> Self {}
-}
-
-pub mod margaret {
-    pub mod asset_bag {
-        pub mod asset_responder {
-            #[singleton]
-            pub struct AssetResponder;
-
-            impl AssetResponder {
-                #[constructor]
-                pub fn create() -> Self {}
-            }
-        }
-    }
-}
-";
-
-    #[test]
-    fn reports_a_user_singleton_colliding_with_the_asset_responder() {
-        let message = generate(ASSET_RESPONDER_COLLISION_CRATE)
-            .expect_err("a singleton at the asset responder path is rejected")
-            .to_string();
-
-        assert!(message.contains("collides with a singleton declared at the same path"));
-    }
-
     #[test]
     fn omits_the_asset_bag_module_without_a_metafile() {
         let code = generate(PLAIN_CRATE).expect("the build succeeds");
@@ -450,7 +405,6 @@ pub mod margaret {
     #[test]
     fn propagates_an_asset_bag_failure() {
         let directory = crate_with(PLAIN_CRATE);
-        bootstrap(&directory);
 
         let message = build(
             &CrateRoot::new("crate", directory.path().join("src")),
@@ -613,9 +567,8 @@ impl RequestLog {
     #[test]
     fn removes_the_server_when_responders_are_removed() {
         let directory = crate_with(WEB_CRATE);
-        bootstrap(&directory);
         let source = directory.path().join("src");
-        let generated = source.join("margaret");
+        let generated = directory.path().join(UMBRELLA_MODULE_NAME);
 
         generate_unformatted(&source)
             .write_to(&generated)
@@ -643,7 +596,6 @@ impl RequestLog {
     #[test]
     fn is_idempotent() {
         let directory = crate_with(WEB_CRATE);
-        bootstrap(&directory);
         let source = directory.path().join("src");
 
         let first = generate_unformatted(&source);
@@ -709,9 +661,10 @@ impl Config {
 
     #[test]
     fn propagates_a_console_failure() {
-        let message = generate("#[rustfmt::skip]\npub mod margaret;\n\n#[console_command]\nstruct Bad;\n")
-            .expect_err("the build fails")
-            .to_string();
+        let message =
+            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[console_command]\nstruct Bad;\n")
+                .expect_err("the build fails")
+                .to_string();
 
         assert!(message.contains("failed to generate the console"));
     }

@@ -14,4 +14,5 @@ pub mod tickers;
 pub mod views;
 
 #[rustfmt::skip]
+#[path = "../margaret/mod.rs"]
 pub mod margaret;
