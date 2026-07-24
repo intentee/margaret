@@ -42,11 +42,12 @@ impl RespondsToWebSocketMessage for Storyboard {
         session.record(prompt.clone()).await;
 
         let turn_count = session.turn_count().await;
+        let viewer = session.viewer_name().unwrap_or("a guest");
 
         socket
             .send(message.chunk(ResponseChunk {
                 text: format!(
-                    "{} {} storyboard '{}' about '{}' turn {turn_count}: {prompt}",
+                    "{} {} for {viewer} storyboard '{}' about '{}' turn {turn_count}: {prompt}",
                     session.board_url(),
                     session.greeting(),
                     session.topic(),
