@@ -3,6 +3,7 @@ use chrono::Utc;
 
 use margaret_macros::model;
 
+use crate::models::article_status::ArticleStatus;
 use crate::models::author::Author;
 
 #[model(table = "articles")]
@@ -18,6 +19,8 @@ pub struct Article {
     pub cover: Option<Vec<u8>>,
     #[column]
     pub published: bool,
+    #[column]
+    pub status: ArticleStatus,
     #[column]
     #[index]
     pub created_at: DateTime<Utc>,

@@ -201,6 +201,17 @@ struct Second {
     }
 
     #[test]
+    fn generates_a_text_column_from_an_enum_field() {
+        let source = schema_source(
+            "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n}\n",
+        );
+
+        assert!(source.contains(
+            "column_type:margaret_model::column_type::ColumnType::Text,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"status\".to_string(),nullable:false,"
+        ));
+    }
+
+    #[test]
     fn generates_a_unique_constraint_from_a_scalar_column() {
         let source = schema_source(
             "#[model(table = \"users\")]\nstruct User {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: String,\n}\n",

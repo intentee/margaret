@@ -26,7 +26,9 @@ use margaret_toposort::topological_order::topological_order;
 
 use crate::collected_model::CollectedModel;
 use crate::column_arguments::ColumnArguments;
+use crate::column_type_context::ColumnTypeContext;
 use crate::deferred_foreign_key::DeferredForeignKey;
+use crate::enum_column::enum_column;
 use crate::foreign_key_arguments::ForeignKeyArguments;
 use crate::foreign_key_target::ForeignKeyTarget;
 use crate::foreign_key_target_column::ForeignKeyTargetColumn;
@@ -265,6 +267,7 @@ fn resolve_scalar_column(
     PositionedField { field, position }: PositionedField,
     model: &str,
     seen_columns: &mut HashSet<String>,
+    mut column_type_context: ColumnTypeContext,
 ) -> Result<ResolvedColumn, ModelCodegenError> {
     let column_name = resolve_column_name(name, field.identifier(), model)?;
 
@@ -276,7 +279,22 @@ fn resolve_scalar_column(
     }
 
     let column_name = register_column_name(column_name, model, seen_columns)?;
-    let inferred = infer_column_type(field.ty(), model, &column_name)?;
+
+    let (base, nullable) = match option_inner(field.ty()) {
+        Some(inner) => (inner, true),
+        None => (field.ty(), false),
+    };
+
+    let inferred = match enum_column(
+        &mut column_type_context,
+        base,
+        nullable,
+        model,
+        &column_name,
+    )? {
+        Some(inferred) => inferred,
+        None => infer_column_type(field.ty(), model, &column_name)?,
+    };
 
     Ok(ResolvedColumn {
         indexes,
@@ -366,6 +384,7 @@ fn collect_models(
     let index_selector = AttributeSelector::from_marker("index");
     let mut collected: Vec<CollectedModel> = Vec::new();
     let mut seen_models: HashSet<String> = HashSet::new();
+    let mut validated_enums: HashSet<CanonicalPath> = HashSet::new();
 
     for matched in attribute_index.select(&selector) {
         let item = matched.item();
@@ -437,6 +456,11 @@ fn collect_models(
                                 PositionedField { field, position },
                                 &model,
                                 &mut seen_columns,
+                                ColumnTypeContext {
+                                    attribute_index,
+                                    item,
+                                    validated_enums: &mut validated_enums,
+                                },
                             )?);
                         }
                         Some(foreign_key_attribute) => {

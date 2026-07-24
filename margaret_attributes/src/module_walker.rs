@@ -8,6 +8,7 @@ use syn::Fields;
 use syn::Ident;
 use syn::ImplItem;
 use syn::Item;
+use syn::ItemEnum;
 use syn::ItemImpl;
 use syn::ItemMod;
 use syn::ItemUse;
@@ -23,6 +24,7 @@ use crate::indexed_field::IndexedField;
 use crate::indexed_item::IndexedItem;
 use crate::indexed_method::IndexedMethod;
 use crate::indexed_trait_impl::IndexedTraitImpl;
+use crate::indexed_variant::IndexedVariant;
 use crate::item_kind::ItemKind;
 use crate::module_imports::ModuleImports;
 use crate::resolve_type::resolve_type;
@@ -34,6 +36,7 @@ struct Recordable<'item> {
     fields: Vec<IndexedField>,
     identifier: &'item Ident,
     kind: ItemKind,
+    variants: Vec<IndexedVariant>,
 }
 
 enum PendingMemberKind {
@@ -74,6 +77,19 @@ fn index_fields(fields: &Fields) -> Vec<IndexedField> {
             };
 
             IndexedField::new(identifier, field.ty.clone(), field.attrs.clone())
+        })
+        .collect()
+}
+
+fn index_variants(item_enum: &ItemEnum) -> Vec<IndexedVariant> {
+    item_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            IndexedVariant::new(
+                variant.ident.to_string(),
+                StructShape::from(&variant.fields),
+            )
         })
         .collect()
 }
@@ -213,6 +229,7 @@ impl ModuleWalker {
             fields,
             identifier,
             kind,
+            variants,
         } = recordable;
         let mut segments = module_path.to_vec();
         segments.push(identifier.to_string());
@@ -232,6 +249,7 @@ impl ModuleWalker {
             canonical_path,
             attributes.to_vec(),
             fields,
+            variants,
         ));
 
         Ok(())
@@ -318,24 +336,28 @@ impl ModuleWalker {
                 fields: index_fields(&item_struct.fields),
                 identifier: &item_struct.ident,
                 kind: ItemKind::Struct(StructShape::from(&item_struct.fields)),
+                variants: Vec::new(),
             }),
             Item::Enum(item_enum) => Some(Recordable {
                 attributes: &item_enum.attrs,
                 fields: Vec::new(),
                 identifier: &item_enum.ident,
                 kind: ItemKind::Enum,
+                variants: index_variants(item_enum),
             }),
             Item::Fn(item_fn) => Some(Recordable {
                 attributes: &item_fn.attrs,
                 fields: Vec::new(),
                 identifier: &item_fn.sig.ident,
                 kind: ItemKind::Function,
+                variants: Vec::new(),
             }),
             Item::Trait(item_trait) => Some(Recordable {
                 attributes: &item_trait.attrs,
                 fields: Vec::new(),
                 identifier: &item_trait.ident,
                 kind: ItemKind::Trait,
+                variants: Vec::new(),
             }),
             Item::Mod(item_mod) => {
                 self.walk_module(item_mod, module_path, file_path, directory)?;
@@ -345,6 +367,7 @@ impl ModuleWalker {
                     fields: Vec::new(),
                     identifier: &item_mod.ident,
                     kind: ItemKind::Module,
+                    variants: Vec::new(),
                 })
             }
             Item::Use(item_use) => {
