@@ -121,7 +121,7 @@ impl Banner {
 ";
 
     #[test]
-    fn threads_a_console_argument_into_the_view_builder() {
+    fn weaves_a_console_argument_into_the_view_builder() {
         let artifacts = generated(CONSOLE_ARGUMENT_VIEW);
         let source = formatted(artifacts.modules);
         let slot = artifacts.console_arguments.len();

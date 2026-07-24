@@ -6,7 +6,7 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 
 use crate::console_argument::ConsoleArgument;
 use crate::required_flag_read::required_flag_read;
-use crate::threading_kind::ThreadingKind;
+use crate::weaving_kind::WeavingKind;
 
 fn value_expression(
     id: &str,
@@ -36,23 +36,23 @@ pub fn argument_value(argument: &ConsoleArgument) -> TokenStream {
         ConsoleArgument::Named {
             name,
             required,
-            threading,
+            weaving,
             value_type,
         } => value_expression(
             name,
             *required,
-            matches!(threading, ThreadingKind::Copy),
+            matches!(weaving, WeavingKind::Copy),
             value_type,
         ),
         ConsoleArgument::Positional {
             id,
             required,
-            threading,
+            weaving,
             value_type,
         } => value_expression(
             id,
             *required,
-            matches!(threading, ThreadingKind::Copy),
+            matches!(weaving, WeavingKind::Copy),
             value_type,
         ),
     }
@@ -63,7 +63,7 @@ mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
 
     use crate::console_argument::ConsoleArgument;
-    use crate::threading_kind::ThreadingKind;
+    use crate::weaving_kind::WeavingKind;
 
     use super::argument_value;
 
@@ -92,7 +92,7 @@ mod tests {
         let named = ConsoleArgument::Named {
             name: "retries".to_string(),
             required: true,
-            threading: ThreadingKind::Copy,
+            weaving: WeavingKind::Copy,
             value_type: path(&["u16"]),
         };
 
@@ -106,7 +106,7 @@ mod tests {
         let named = ConsoleArgument::Named {
             name: "label".to_string(),
             required: true,
-            threading: ThreadingKind::BorrowedStr,
+            weaving: WeavingKind::BorrowedStr,
             value_type: path(&["std", "string", "String"]),
         };
 
@@ -120,7 +120,7 @@ mod tests {
         let named = ConsoleArgument::Named {
             name: "note".to_string(),
             required: false,
-            threading: ThreadingKind::Cloned,
+            weaving: WeavingKind::Cloned,
             value_type: path(&["std", "string", "String"]),
         };
 
@@ -135,7 +135,7 @@ mod tests {
         let positional = ConsoleArgument::Positional {
             id: "point".to_string(),
             required: true,
-            threading: ThreadingKind::Cloned,
+            weaving: WeavingKind::Cloned,
             value_type: path(&["crate", "geometry", "Point"]),
         };
 

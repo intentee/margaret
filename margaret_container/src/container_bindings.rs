@@ -13,8 +13,8 @@ use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::console_argument_parameter::console_argument_parameter;
 use margaret_codegen_tokens::console_argument_to_owned::console_argument_to_owned;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_console_argument_codegen::threading_kind::ThreadingKind;
 use margaret_console_argument_codegen::unify_by_key::unify_by_key;
+use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 
 use crate::console_closures::ConsoleClosures;
 use crate::container_error::ContainerError;
@@ -132,22 +132,6 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn console_threads(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
-        arguments
-            .iter()
-            .map(|argument| self.materialize(argument, false))
-            .collect()
-    }
-
-    #[must_use]
-    pub fn console_threads_owned(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
-        arguments
-            .iter()
-            .map(|argument| self.materialize(argument, true))
-            .collect()
-    }
-
-    #[must_use]
     pub fn console_union(&self, arguments: &[ConsoleArgument]) -> Vec<ConsoleArgument> {
         let mut seen: BTreeSet<String> = BTreeSet::new();
         let mut unified: Vec<ConsoleArgument> = Vec::new();
@@ -161,6 +145,22 @@ impl ContainerBindings {
         unified.sort_by_key(|argument| self.console_slot(argument.name()));
 
         unified
+    }
+
+    #[must_use]
+    pub fn console_weaves(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
+        arguments
+            .iter()
+            .map(|argument| self.materialize(argument, false))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn console_weaves_owned(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
+        arguments
+            .iter()
+            .map(|argument| self.materialize(argument, true))
+            .collect()
     }
 
     #[must_use]
@@ -188,7 +188,7 @@ impl ContainerBindings {
     pub fn serve_arguments(
         &self,
         roots: &[CanonicalPath],
-        threaded: &[ConsoleArgument],
+        woven: &[ConsoleArgument],
     ) -> Result<Vec<ConsoleArgument>, ContainerError> {
         let mut collected: Vec<ConsoleArgument> = Vec::new();
 
@@ -196,7 +196,7 @@ impl ContainerBindings {
             collected.extend_from_slice(self.console_arguments(root));
         }
 
-        collected.extend_from_slice(threaded);
+        collected.extend_from_slice(woven);
 
         Ok(unify_by_key(&collected)?)
     }
@@ -219,8 +219,8 @@ impl ContainerBindings {
     fn materialize(&self, argument: &ConsoleArgument, owned_source: bool) -> TokenStream {
         let slot = self.console_slot(argument.name());
 
-        match argument.threading() {
-            ThreadingKind::Copy => {
+        match argument.weaving() {
+            WeavingKind::Copy => {
                 if owned_source {
                     let ident = console_argument_ident(slot);
 
@@ -229,10 +229,8 @@ impl ContainerBindings {
                     console_argument_deref(slot)
                 }
             }
-            ThreadingKind::BorrowedStr | ThreadingKind::BorrowedPath => {
-                console_argument_to_owned(slot)
-            }
-            ThreadingKind::Cloned => console_argument_clone(slot),
+            WeavingKind::BorrowedStr | WeavingKind::BorrowedPath => console_argument_to_owned(slot),
+            WeavingKind::Cloned => console_argument_clone(slot),
         }
     }
 }

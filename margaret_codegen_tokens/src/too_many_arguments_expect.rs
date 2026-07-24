@@ -9,7 +9,7 @@ pub fn too_many_arguments_expect(parameter_count: usize) -> TokenStream {
         quote! {
             #[expect(
                 clippy::too_many_arguments,
-                reason = "generated bootstrap threads one parameter per declared console argument"
+                reason = "generated bootstrap weaves one parameter per declared console argument"
             )]
         }
     } else {

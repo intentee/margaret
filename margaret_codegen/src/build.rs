@@ -223,8 +223,13 @@ struct Room;
         let registry = console_arguments_pass(&index).expect("the console arguments pass succeeds");
         let bindings =
             container_pass(&mut context, &registry).expect("the container pass succeeds");
-        asset_bag_pass(&mut context, &bindings, &source.join("assets"), EMBED_RELATIVE)
-            .expect("the asset bag pass succeeds");
+        asset_bag_pass(
+            &mut context,
+            &bindings,
+            &source.join("assets"),
+            EMBED_RELATIVE,
+        )
+        .expect("the asset bag pass succeeds");
         middleware_pass(&mut context).expect("the middleware pass succeeds");
         websocket_pass(&mut context, &bindings).expect("the websocket pass succeeds");
         views_pass(&mut context, &bindings).expect("the views pass succeeds");
@@ -344,8 +349,11 @@ impl AssetRoute {
         fs::create_dir(&assets).expect("the assets directory exists");
         fs::write(assets.join("app_ABC.js"), "console.log(1)")
             .expect("the fingerprinted asset exists");
-        fs::write(assets.join("service_worker.js"), "self.addEventListener('install', () => {})")
-            .expect("the un-fingerprinted asset exists");
+        fs::write(
+            assets.join("service_worker.js"),
+            "self.addEventListener('install', () => {})",
+        )
+        .expect("the un-fingerprinted asset exists");
 
         let code = build(
             &CrateRoot::new("crate", directory.path().join("src")),
@@ -1018,7 +1026,7 @@ impl Page {
 ";
 
     #[test]
-    fn threads_a_console_argument_from_serve_into_the_http_server() {
+    fn weaves_a_console_argument_from_serve_into_the_http_server() {
         let code = generate(CONSOLE_ARGUMENT_RESPONDER_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
@@ -1053,7 +1061,7 @@ impl Page {
 ";
 
     #[test]
-    fn threads_a_console_argument_from_serve_into_the_view_builder() {
+    fn weaves_a_console_argument_from_serve_into_the_view_builder() {
         let code = generate(CONSOLE_ARGUMENT_VIEW_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
@@ -1093,7 +1101,7 @@ impl RespondsToWebSocketMessage for Chatter {
 ";
 
     #[test]
-    fn threads_a_console_argument_from_serve_into_the_websocket_handler() {
+    fn weaves_a_console_argument_from_serve_into_the_websocket_handler() {
         let code = generate(CONSOLE_ARGUMENT_WEBSOCKET_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
