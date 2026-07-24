@@ -15,28 +15,14 @@ use crate::console_argument_arguments::ConsoleArgumentArguments;
 use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument_registry::ConsoleArgumentRegistry;
 
-fn method_has_attribute(method: &IndexedMethod, name: &str) -> bool {
-    let selector = AttributeSelector::from_marker(name);
-
-    method
-        .attributes()
-        .iter()
-        .any(|attribute| selector.matches(attribute.path()))
-}
-
-fn item_has_attribute(item: &IndexedItem, name: &str) -> bool {
-    let selector = AttributeSelector::from_marker(name);
-
-    item.attributes()
-        .iter()
-        .any(|attribute| selector.matches(attribute.path()))
-}
-
 fn single_constructor(item: &IndexedItem) -> Option<&IndexedMethod> {
-    let mut constructors = item
-        .methods()
-        .iter()
-        .filter(|method| method_has_attribute(method, "constructor"));
+    let mut constructors = item.methods().iter().filter(|method| {
+        marker(
+            method.attributes(),
+            &AttributeSelector::from_marker("constructor"),
+        )
+        .is_some()
+    });
 
     let constructor = constructors.next()?;
 
@@ -93,7 +79,7 @@ pub fn scan(
 
         let owner = item.canonical_path();
         let owner_text = owner.to_string();
-        let is_command = item_has_attribute(item, "console_command");
+        let is_command = item.has_attribute(&AttributeSelector::from_marker("console_command"));
 
         for view in parameters(constructor.signature()) {
             let Some(attribute) = marker(view.attributes, &console_argument_selector) else {

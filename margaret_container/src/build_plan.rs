@@ -50,7 +50,7 @@ fn build_drafts<'index>(
     let mut provider_drafts: Vec<Draft> = Vec::new();
 
     for matched in index.select(&singleton_selector()) {
-        if has_marker(matched.item(), &provides_endpoint_selector()) {
+        if matched.item().has_attribute(&provides_endpoint_selector()) {
             continue;
         }
 
@@ -73,7 +73,7 @@ fn build_drafts<'index>(
         for matched in index.select(&selector) {
             let item = matched.item();
 
-            if has_marker(item, &singleton_selector()) {
+            if item.has_attribute(&singleton_selector()) {
                 continue;
             }
 
@@ -213,13 +213,7 @@ fn build_construction_draft<'index>(
 fn has_concrete_role(item: &IndexedItem) -> bool {
     concrete_role_selectors()
         .iter()
-        .any(|selector| has_marker(item, selector))
-}
-
-pub(crate) fn has_marker(item: &IndexedItem, selector: &AttributeSelector) -> bool {
-    item.attributes()
-        .iter()
-        .any(|attribute| selector.matches(attribute.path()))
+        .any(|selector| item.has_attribute(selector))
 }
 
 fn implements_provides_endpoint(index: &AttributeIndex, item: &IndexedItem) -> bool {

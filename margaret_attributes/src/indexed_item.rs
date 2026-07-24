@@ -1,5 +1,6 @@
 use syn::Attribute;
 
+use crate::attribute_selector::AttributeSelector;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_field::IndexedField;
@@ -49,6 +50,13 @@ impl IndexedItem {
     #[must_use]
     pub fn fields(&self) -> &[IndexedField] {
         &self.fields
+    }
+
+    #[must_use]
+    pub fn has_attribute(&self, selector: &AttributeSelector) -> bool {
+        self.attributes
+            .iter()
+            .any(|attribute| selector.matches(attribute.path()))
     }
 
     #[must_use]

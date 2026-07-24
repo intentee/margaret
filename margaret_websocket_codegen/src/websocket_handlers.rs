@@ -65,11 +65,7 @@ pub(crate) fn websocket_handlers(
             };
             let handler = item.canonical_path().to_string();
 
-            if !item
-                .attributes()
-                .iter()
-                .any(|attribute| singleton_selector.matches(attribute.path()))
-            {
+            if !item.has_attribute(&singleton_selector) {
                 return Err(WebSocketCodegenError::HandlerNotSingleton { handler });
             }
 

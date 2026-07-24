@@ -30,10 +30,13 @@ impl CapturedProviderKind {
                 RequestBinding::AuthenticatedUser {
                     application: bound, ..
                 },
-            ) => application.field == bound.field,
-            (Self::Binder { accessor, .. }, RequestBinding::Bound { binder_field, .. }) => {
-                accessor == binder_field
-            }
+            ) => application.concrete == bound.concrete,
+            (
+                Self::Binder { provider, .. },
+                RequestBinding::Bound {
+                    binder_provider, ..
+                },
+            ) => provider == binder_provider,
             _ => false,
         }
     }

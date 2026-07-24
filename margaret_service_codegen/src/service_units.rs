@@ -95,13 +95,9 @@ fn has_conflicting_roles(item: &IndexedItem, role: Role) -> bool {
         Role::Ticker => ["console_command", "service"],
     };
 
-    others.iter().any(|other| {
-        let selector = selector(other);
-
-        item.attributes()
-            .iter()
-            .any(|attribute| selector.matches(attribute.path()))
-    })
+    others
+        .iter()
+        .any(|other| item.has_attribute(&selector(other)))
 }
 
 fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, method: &IndexedMethod) -> bool {

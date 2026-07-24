@@ -1,6 +1,7 @@
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
+use margaret_attributes::marker::marker;
 
 use crate::injection_error::InjectionError;
 
@@ -9,12 +10,7 @@ pub fn process_method(item: &IndexedItem) -> Result<&IndexedMethod, InjectionErr
     let mut found: Vec<&IndexedMethod> = item
         .methods()
         .iter()
-        .filter(|method| {
-            method
-                .attributes()
-                .iter()
-                .any(|attribute| selector.matches(attribute.path()))
-        })
+        .filter(|method| marker(method.attributes(), &selector).is_some())
         .collect();
 
     if found.len() > 1 {
