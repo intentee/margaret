@@ -1845,6 +1845,7 @@ dependencies = [
  "margaret_codegen",
  "margaret_console",
  "margaret_http",
+ "margaret_identity",
  "margaret_macros",
  "margaret_service",
  "margaret_spiffe_svid",

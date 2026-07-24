@@ -74,14 +74,14 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
             response.into(),
         )
     };
-    let provider_owner = TokenStream::new();
+    let provider_access = TokenStream::new();
     let extractions = parameters.iter().map(|parameter| {
         render_request_extraction(
             &parameter.binding,
             &parameter.holder,
             &ExtractionContext {
                 continuation_return: &continuation_return,
-                provider_owner: &provider_owner,
+                provider_access: &provider_access,
                 request_local: &request_binding,
                 response_return: &response_return,
             },

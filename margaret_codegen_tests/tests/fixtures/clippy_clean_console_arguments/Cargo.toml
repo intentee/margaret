@@ -11,6 +11,7 @@ clap = { workspace = true }
 margaret_asset_bag = { path = "../../../../margaret_asset_bag" }
 margaret_console = { path = "../../../../margaret_console" }
 margaret_http = { path = "../../../../margaret_http" }
+margaret_identity = { path = "../../../../margaret_identity" }
 margaret_macros = { path = "../../../../margaret_macros" }
 margaret_service = { path = "../../../../margaret_service" }
 margaret_spiffe_svid = { path = "../../../../margaret_spiffe_svid" }

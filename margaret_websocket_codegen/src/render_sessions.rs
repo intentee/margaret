@@ -1,12 +1,10 @@
-use std::collections::BTreeMap;
-
 use heck::ToUpperCamelCase;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
@@ -14,6 +12,9 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
+use margaret_request_binding_codegen::captured_provider::CapturedProvider;
+use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
+use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -75,21 +76,19 @@ fn injected_field_value(
     }
 }
 
-fn binder_fields(session: &WebSocketSession) -> BTreeMap<String, &CanonicalPath> {
-    let mut fields = BTreeMap::new();
+fn captured_providers(session: &WebSocketSession) -> CapturedProviders {
+    let mut allocator = NameAllocator::new();
 
     for parameter in &session.parameters {
-        if let RequestBinding::Bound {
-            binder_field,
-            binder_provider,
-            ..
-        } = &parameter.binding
-        {
-            fields.insert(binder_field.clone(), binder_provider);
+        if matches!(
+            parameter.binding,
+            RequestBinding::Injectable { .. } | RequestBinding::Routes
+        ) {
+            allocator.reserve(&parameter.holder.to_string());
         }
     }
 
-    fields
+    CapturedProviders::capture(&session.parameters, &mut allocator)
 }
 
 fn factory_fields(session: &WebSocketSession) -> TokenStream {
@@ -108,25 +107,25 @@ fn factory_fields(session: &WebSocketSession) -> TokenStream {
             _ => None,
         }
     });
-    let binders = binder_fields(session).into_iter().map(|(field, provider)| {
-        let field = format_ident!("{field}");
-        let provider = path_tokens(provider);
+    let captured = captured_providers(session);
+    let fields = captured
+        .entries()
+        .map(|CapturedProvider { kind, local }| match kind {
+            CapturedProviderKind::AuthenticatedUser { application } => {
+                let wrapper = &application.wrapper;
 
-        quote! { #field: ::std::sync::Arc<#provider>, }
-    });
-    let providers = session
-        .authenticated_user_providers()
-        .into_iter()
-        .map(|application| {
-            let field = format_ident!("{}", application.field);
-            let wrapper = &application.wrapper;
+                quote! {
+                    #local: ::std::sync::Arc<super::super::authenticated_users::#wrapper>,
+                }
+            }
+            CapturedProviderKind::Binder { provider, .. } => {
+                let provider = path_tokens(provider);
 
-            quote! {
-                #field: ::std::sync::Arc<super::super::authenticated_users::#wrapper>,
+                quote! { #local: ::std::sync::Arc<#provider>, }
             }
         });
 
-    quote! { #(#holders)* #(#binders)* #(#providers)* }
+    quote! { #(#holders)* #(#fields)* }
 }
 
 fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings) -> TokenStream {
@@ -143,48 +142,53 @@ fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings
             _ => None,
         }
     });
-    let binders = binder_fields(session).into_iter().map(|(field, provider)| {
-        let field = format_ident!("{field}");
-        let arguments = bindings.console_weaves(bindings.console_arguments(provider));
+    let captured = captured_providers(session);
+    let initializers = captured.entries().map(|CapturedProvider { kind, local }| {
+        let accessor = format_ident!("{}", kind.accessor());
 
-        quote! { #field: container.#field(#(#arguments),*).await, }
-    });
-    let providers = session
-        .authenticated_user_providers()
-        .into_iter()
-        .map(|application| {
-            let field = format_ident!("{}", application.field);
-            let wrapper = &application.wrapper;
-            let arguments =
-                bindings.console_weaves(bindings.console_arguments(&application.concrete));
-            let routes_init = application
-                .injects_routes
-                .then(|| quote! { routes: routes.clone(), });
+        match kind {
+            CapturedProviderKind::AuthenticatedUser { application } => {
+                let wrapper = &application.wrapper;
+                let arguments =
+                    bindings.console_weaves(bindings.console_arguments(&application.concrete));
+                let routes_init = application
+                    .injects_routes
+                    .then(|| quote! { routes: routes.clone(), });
 
-            quote! {
-                #field: ::std::sync::Arc::new(
-                    super::super::authenticated_users::#wrapper {
-                        inner: container.#field(#(#arguments),*).await,
-                        #routes_init
-                    },
-                ),
+                quote! {
+                    #local: ::std::sync::Arc::new(
+                        super::super::authenticated_users::#wrapper {
+                            inner: container.#accessor(#(#arguments),*).await,
+                            #routes_init
+                        },
+                    ),
+                }
             }
-        });
+            CapturedProviderKind::Binder { provider, .. } => {
+                let arguments = bindings.console_weaves(bindings.console_arguments(provider));
 
-    quote! { #(#holders)* #(#binders)* #(#providers)* }
+                quote! { #local: container.#accessor(#(#arguments),*).await, }
+            }
+        }
+    });
+
+    quote! { #(#holders)* #(#initializers)* }
 }
 
 fn create_extractions(session: &WebSocketSession, handshake: &Ident) -> TokenStream {
     let continuation_return = quote! { return ::std::result::Result::Err(response) };
     let response_return = quote! { return ::std::result::Result::Err(response.into()) };
-    let provider_owner = quote! { self. };
+    let captured = captured_providers(session);
+    let owner = quote! { self. };
     let extractions = session.parameters.iter().map(|parameter| {
+        let provider_access = captured.access(&parameter.binding, &owner);
+
         render_request_extraction(
             &parameter.binding,
             &parameter.holder,
             &ExtractionContext {
                 continuation_return: &continuation_return,
-                provider_owner: &provider_owner,
+                provider_access: &provider_access,
                 request_local: handshake,
                 response_return: &response_return,
             },

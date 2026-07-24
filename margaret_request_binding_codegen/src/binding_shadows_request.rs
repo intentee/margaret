@@ -4,7 +4,8 @@ use crate::request_binding::RequestBinding;
 pub fn binding_shadows_request(binding: &RequestBinding) -> bool {
     matches!(
         binding,
-        RequestBinding::AuthenticatedUser { .. }
+        RequestBinding::AssetBag
+            | RequestBinding::AuthenticatedUser { .. }
             | RequestBinding::Raw { .. }
             | RequestBinding::Bound { .. }
             | RequestBinding::FormRequest { .. }

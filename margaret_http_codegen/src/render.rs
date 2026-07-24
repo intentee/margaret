@@ -19,6 +19,9 @@ use margaret_request_binding_codegen::binding_console_arguments::binding_console
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
 use margaret_request_binding_codegen::binding_shadows_request::binding_shadows_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
+use margaret_request_binding_codegen::captured_provider::CapturedProvider;
+use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
+use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::injects_routes::injects_routes;
 use margaret_request_binding_codegen::injects_views::injects_views;
@@ -29,11 +32,6 @@ use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::route_group::RouteGroup;
-
-struct CaptureBinder {
-    field: Ident,
-    provider: CanonicalPath,
-}
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
@@ -51,16 +49,22 @@ fn responder_injects_views(route: &HttpRoute) -> bool {
     injects_views(&route.arguments)
 }
 
+fn route_applications(route: &HttpRoute) -> impl Iterator<Item = &AuthenticatedUserApplication> {
+    route.arguments.iter().filter_map(|argument| {
+        let RequestBinding::AuthenticatedUser { application, .. } = &argument.binding else {
+            return None;
+        };
+
+        Some(application)
+    })
+}
+
 fn providers_inject_routes(route: &HttpRoute) -> bool {
-    capture_providers(route)
-        .iter()
-        .any(|application| application.injects_routes)
+    route_applications(route).any(|application| application.injects_routes)
 }
 
 fn providers_inject_views(route: &HttpRoute) -> bool {
-    capture_providers(route)
-        .iter()
-        .any(|application| application.injects_views)
+    route_applications(route).any(|application| application.injects_views)
 }
 
 fn route_references_routes(route: &HttpRoute) -> bool {
@@ -84,23 +88,12 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let responder_type = path_tokens(&route.responder_path);
     let responder_woven = console_weave(&route.responder_path, bindings);
     let responder_access = access(quote! { container.#responder(#(#responder_woven),*) });
-    let captures = capture_binders(route);
-    let providers = capture_providers(route);
-
     let mut allocator = NameAllocator::new();
 
     for argument in &route.arguments {
         if binding_shadows_request(&argument.binding) {
             allocator.reserve(&argument.holder.to_string());
         }
-    }
-
-    for binder in &captures {
-        allocator.reserve(&binder.field.to_string());
-    }
-
-    for application in &providers {
-        allocator.reserve(&application.field);
     }
 
     let request_binding = if route
@@ -122,11 +115,12 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let responder_binding = format_ident!("{}", allocator.allocate("responder").field());
     let routes_local = format_ident!("{}", allocator.allocate("routes").field());
     let views_local = format_ident!("{}", allocator.allocate("views").field());
+    let captured = CapturedProviders::capture(&route.arguments, &mut allocator);
 
     let bindings_tokens = route
         .arguments
         .iter()
-        .map(|argument| argument_binding(argument, &request_binding));
+        .map(|argument| argument_binding(argument, &request_binding, &captured));
     let server = format_ident!("{}", route.server);
     let argument_values = route
         .arguments
@@ -152,91 +146,54 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         >
     };
 
-    let handler =
-        if captures.is_empty() && providers.is_empty() && !captures_routes && !captures_views {
-            quote! {
+    let handler = if captured.is_empty() && !captures_routes && !captures_views {
+        quote! {
+            margaret_http::responder_handler::responder_handler(
+                #responder_access,
+                |#responder_binding: std::sync::Arc<#responder_type>,
+                 #request_binding: &margaret_http::request::Request|
+                 -> #outcome_future {
+                    std::boxed::Box::pin(async move {
+                        #body
+                    })
+                },
+            )
+        }
+    } else {
+        let capture_bindings = captured
+            .entries()
+            .map(|capture| capture_binding(capture, bindings));
+        let capture_clones = captured.entries().map(|CapturedProvider { local, .. }| {
+            quote! { let #local = #local.clone(); }
+        });
+        let routes_setup = captures_routes.then(|| quote! { let #routes_local = routes.clone(); });
+        let routes_reclone =
+            captures_routes.then(|| quote! { let #routes_local = #routes_local.clone(); });
+        let views_setup = captures_views.then(|| quote! { let #views_local = views.clone(); });
+        let views_reclone =
+            captures_views.then(|| quote! { let #views_local = #views_local.clone(); });
+
+        quote! {
+            {
+                #(#capture_bindings)*
+                #routes_setup
+                #views_setup
                 margaret_http::responder_handler::responder_handler(
                     #responder_access,
-                    |#responder_binding: std::sync::Arc<#responder_type>,
-                     #request_binding: &margaret_http::request::Request|
-                     -> #outcome_future {
+                    move |#responder_binding: std::sync::Arc<#responder_type>,
+                          #request_binding: &margaret_http::request::Request|
+                          -> #outcome_future {
+                        #(#capture_clones)*
+                        #routes_reclone
+                        #views_reclone
                         std::boxed::Box::pin(async move {
                             #body
                         })
                     },
                 )
             }
-        } else {
-            let capture_bindings = captures.iter().map(|binder| {
-                let field = &binder.field;
-                let binder_woven = console_weave(&binder.provider, bindings);
-                let field_access = access(quote! { container.#field(#(#binder_woven),*) });
-
-                quote! { let #field = #field_access; }
-            });
-            let provider_bindings = providers.iter().map(|application| {
-                let field = format_ident!("{}", application.field);
-                let wrapper = &application.wrapper;
-                let provider_woven = console_weave(&application.concrete, bindings);
-                let inner_access = access(quote! { container.#field(#(#provider_woven),*) });
-                let routes_init = application
-                    .injects_routes
-                    .then(|| quote! { routes: routes.clone(), });
-                let views_init = application
-                    .injects_views
-                    .then(|| quote! { views: views.clone(), });
-
-                quote! {
-                    let #field = std::sync::Arc::new(
-                        super::super::authenticated_users::#wrapper {
-                            inner: #inner_access,
-                            #routes_init
-                            #views_init
-                        },
-                    );
-                }
-            });
-            let provider_clones = providers.iter().map(|application| {
-                let field = format_ident!("{}", application.field);
-
-                quote! { let #field = #field.clone(); }
-            });
-            let capture_clones = captures.iter().map(|binder| {
-                let field = &binder.field;
-
-                quote! { let #field = #field.clone(); }
-            });
-            let routes_setup =
-                captures_routes.then(|| quote! { let #routes_local = routes.clone(); });
-            let routes_reclone =
-                captures_routes.then(|| quote! { let #routes_local = #routes_local.clone(); });
-            let views_setup = captures_views.then(|| quote! { let #views_local = views.clone(); });
-            let views_reclone =
-                captures_views.then(|| quote! { let #views_local = #views_local.clone(); });
-
-            quote! {
-                {
-                    #(#capture_bindings)*
-                    #(#provider_bindings)*
-                    #routes_setup
-                    #views_setup
-                    margaret_http::responder_handler::responder_handler(
-                        #responder_access,
-                        move |#responder_binding: std::sync::Arc<#responder_type>,
-                              #request_binding: &margaret_http::request::Request|
-                              -> #outcome_future {
-                            #(#capture_clones)*
-                            #(#provider_clones)*
-                            #routes_reclone
-                            #views_reclone
-                            std::boxed::Box::pin(async move {
-                                #body
-                            })
-                        },
-                    )
-                }
-            }
-        };
+        }
+    };
 
     fold_layers(
         &route.layers,
@@ -266,52 +223,60 @@ fn argument_value(
     }
 }
 
-fn argument_binding(argument: &BoundParameter, request: &Ident) -> TokenStream {
+fn capture_binding(
+    CapturedProvider { kind, local }: &CapturedProvider,
+    bindings: &ContainerBindings,
+) -> TokenStream {
+    let accessor = format_ident!("{}", kind.accessor());
+
+    match kind {
+        CapturedProviderKind::AuthenticatedUser { application } => {
+            let wrapper = &application.wrapper;
+            let woven = console_weave(&application.concrete, bindings);
+            let inner_access = access(quote! { container.#accessor(#(#woven),*) });
+            let routes_init = application
+                .injects_routes
+                .then(|| quote! { routes: routes.clone(), });
+            let views_init = application
+                .injects_views
+                .then(|| quote! { views: views.clone(), });
+
+            quote! {
+                let #local = std::sync::Arc::new(
+                    super::super::authenticated_users::#wrapper {
+                        inner: #inner_access,
+                        #routes_init
+                        #views_init
+                    },
+                );
+            }
+        }
+        CapturedProviderKind::Binder { provider, .. } => {
+            let woven = console_weave(provider, bindings);
+            let binder_access = access(quote! { container.#accessor(#(#woven),*) });
+
+            quote! { let #local = #binder_access; }
+        }
+    }
+}
+
+fn argument_binding(
+    argument: &BoundParameter,
+    request: &Ident,
+    captured: &CapturedProviders,
+) -> TokenStream {
+    let provider_access = captured.access(&argument.binding, &TokenStream::new());
+
     render_request_extraction(
         &argument.binding,
         &argument.holder,
         &ExtractionContext {
             continuation_return: &quote! { return response },
-            provider_owner: &TokenStream::new(),
+            provider_access: &provider_access,
             request_local: request,
             response_return: &quote! { return response.into() },
         },
     )
-}
-
-fn capture_providers(route: &HttpRoute) -> Vec<AuthenticatedUserApplication> {
-    let mut providers: BTreeMap<String, AuthenticatedUserApplication> = BTreeMap::new();
-
-    for argument in &route.arguments {
-        if let RequestBinding::AuthenticatedUser { application, .. } = &argument.binding {
-            providers.insert(application.field.clone(), application.clone());
-        }
-    }
-
-    providers.into_values().collect()
-}
-
-fn capture_binders(route: &HttpRoute) -> Vec<CaptureBinder> {
-    let mut binders: BTreeMap<String, CanonicalPath> = BTreeMap::new();
-
-    for argument in &route.arguments {
-        if let RequestBinding::Bound {
-            binder_field,
-            binder_provider,
-            ..
-        } = &argument.binding
-        {
-            binders.insert(binder_field.clone(), binder_provider.clone());
-        }
-    }
-
-    binders
-        .into_iter()
-        .map(|(field, provider)| CaptureBinder {
-            field: format_ident!("{}", field),
-            provider,
-        })
-        .collect()
 }
 
 fn server_routes<'table>(table: &'table HttpRouteTable, server: &str) -> Vec<&'table HttpRoute> {

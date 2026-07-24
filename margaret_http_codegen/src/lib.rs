@@ -254,6 +254,225 @@ impl GetProfile {
         );
     }
 
+    const COLLIDING_PROVIDER: &str = r#"
+use margaret_http::request::Request;
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
+
+struct User;
+
+struct SessionError;
+
+impl RespondsToInferenceFailure for SessionError {}
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct Session;
+
+impl Session {
+    #[infer_from_request]
+    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/profile", server = "public")]
+struct GetProfile;
+
+impl GetProfile {
+    #[process]
+    fn respond(&self, session: &Request, #[authenticated_user] user: User) -> Response {}
+}
+"#;
+
+    #[test]
+    fn keeps_a_captured_provider_clear_of_a_parameter_that_takes_its_name() {
+        let source: String = source_for(COLLIDING_PROVIDER).split_whitespace().collect();
+
+        assert!(source.contains(
+            "letsession_2=std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session().await,});"
+        ));
+        assert!(source.contains("letsession_2=session_2.clone();"));
+        assert!(source.contains("letsession=request;"));
+        assert!(source.contains(
+            "margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(session_2.as_ref(),request,)"
+        ));
+    }
+
+    const COLLIDING_BINDER: &str = r#"
+struct User;
+
+struct Filters;
+
+#[singleton]
+#[provides_route_parameter]
+struct Store;
+
+impl HttpRouteParameterBinder for Store {
+    type Model = User;
+    async fn bind(&self, value: String) -> Option<User> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/users/{user}", server = "public")]
+struct GetUser;
+
+impl GetUser {
+    #[process]
+    fn respond(
+        &self,
+        #[form_request(from = Query)] store: Filters,
+        #[route_parameter(from = "user")] user: User,
+    ) -> Response {}
+}
+"#;
+
+    #[test]
+    fn keeps_a_captured_binder_clear_of_a_parameter_that_takes_its_name() {
+        let source: String = source_for(COLLIDING_BINDER).split_whitespace().collect();
+
+        assert!(source.contains("letstore_2=container.store().await;"));
+        assert!(source.contains("letstore_2=store_2.clone();"));
+        assert!(source.contains(
+            "margaret_http::require_bound_route_parameter::require_bound_route_parameter(request,\"user\",store_2.as_ref(),)"
+        ));
+    }
+
+    const ASSET_BAG_NAMED_REQUEST: &str = r#"
+#[singleton]
+#[responds_to_http(method = "get", path = "/assets/{id}", server = "public")]
+struct GetAsset;
+
+impl GetAsset {
+    #[process]
+    fn respond(
+        &self,
+        request: margaret_asset_bag::asset_bag::AssetBag,
+        #[route_parameter(from = "id")] id: String,
+    ) -> Response {}
+}
+"#;
+
+    #[test]
+    fn keeps_the_request_clear_of_an_asset_bag_that_takes_its_name() {
+        let source: String = source_for(ASSET_BAG_NAMED_REQUEST)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains("request_2:&margaret_http::request::Request"));
+        assert!(source.contains("letrequest=::margaret_asset_bag::asset_bag::AssetBag::new();"));
+        assert!(source.contains(
+            "margaret_http::require_route_parameter::require_route_parameter(request_2,\"id\",)"
+        ));
+    }
+
+    const PROVIDER_THAT_ALSO_BINDS: &str = r#"
+use margaret_http::request::Request;
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
+
+struct User;
+
+struct Article;
+
+struct SessionError;
+
+impl RespondsToInferenceFailure for SessionError {}
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+#[provides_route_parameter]
+struct Store;
+
+impl Store {
+    #[infer_from_request]
+    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+}
+
+impl HttpRouteParameterBinder for Store {
+    type Model = Article;
+    async fn bind(&self, value: String) -> Option<Article> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/articles/{article}", server = "public")]
+struct GetArticle;
+
+impl GetArticle {
+    #[process]
+    fn respond(
+        &self,
+        #[authenticated_user] user: User,
+        #[route_parameter(from = "article")] article: Article,
+    ) -> Response {}
+}
+"#;
+
+    #[test]
+    fn captures_a_struct_that_provides_a_user_and_binds_a_route_parameter_separately() {
+        let source: String = source_for(PROVIDER_THAT_ALSO_BINDS)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(
+            "letstore=std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store().await,});"
+        ));
+        assert!(source.contains("letstore_2=container.store().await;"));
+        assert!(source.contains(
+            "margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(store.as_ref(),request,)"
+        ));
+        assert!(source.contains(
+            "margaret_http::require_bound_route_parameter::require_bound_route_parameter(request,\"article\",store_2.as_ref(),)"
+        ));
+    }
+
+    const TWICE_BOUND_MODEL: &str = r#"
+struct User;
+
+#[singleton]
+#[provides_route_parameter]
+struct UserBinder;
+
+impl HttpRouteParameterBinder for UserBinder {
+    type Model = User;
+    async fn bind(&self, value: String) -> Option<User> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/pairs/{author}/{editor}", server = "public")]
+struct GetPair;
+
+impl GetPair {
+    #[process]
+    fn respond(
+        &self,
+        #[route_parameter(from = "author")] author: User,
+        #[route_parameter(from = "editor")] editor: User,
+    ) -> Response {}
+}
+"#;
+
+    #[test]
+    fn captures_a_binder_shared_by_two_route_parameters_once() {
+        let source: String = source_for(TWICE_BOUND_MODEL).split_whitespace().collect();
+
+        assert_eq!(
+            source
+                .matches("letuser_binder=container.user_binder().await;")
+                .count(),
+            1
+        );
+        assert_eq!(
+            source
+                .matches(
+                    "margaret_http::require_bound_route_parameter::require_bound_route_parameter(request,"
+                )
+                .count(),
+            2
+        );
+        assert!(source.contains("\"author\",user_binder.as_ref(),"));
+        assert!(source.contains("\"editor\",user_binder.as_ref(),"));
+    }
+
     const BOUND_MODEL: &str = r#"
 struct User;
 

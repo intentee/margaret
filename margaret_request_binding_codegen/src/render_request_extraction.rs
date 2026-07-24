@@ -1,9 +1,7 @@
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
-use quote::format_ident;
 use quote::quote;
 
-use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
 use crate::extraction_context::ExtractionContext;
 use crate::form_request_extraction::FormRequestExtraction;
@@ -27,22 +25,18 @@ pub fn render_request_extraction(
     context: &ExtractionContext,
 ) -> TokenStream {
     let continuation_return = context.continuation_return;
-    let provider_owner = context.provider_owner;
+    let provider_access = context.provider_access;
     let request_local = context.request_local;
     let error_return = context.response_return;
 
     match binding {
-        RequestBinding::AuthenticatedUser {
-            application: AuthenticatedUserApplication { field, .. },
-            requirement,
-        } => {
-            let provider = format_ident!("{}", field);
+        RequestBinding::AuthenticatedUser { requirement, .. } => {
             let resolver = authenticated_user_resolver(*requirement);
 
             quote! {
                 let #holder = match #resolver(
                     margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(
-                        #provider_owner #provider.as_ref(),
+                        #provider_access.as_ref(),
                         #request_local,
                     ).await,
                 ) {
@@ -60,24 +54,16 @@ pub fn render_request_extraction(
                 Err(response) => #error_return,
             };
         },
-        RequestBinding::Bound {
-            binder_field,
-            path_key,
-            ..
-        } => {
-            let binder = format_ident!("{}", binder_field);
-
-            quote! {
-                let #holder = match margaret_http::require_bound_route_parameter::require_bound_route_parameter(
-                    #request_local,
-                    #path_key,
-                    #provider_owner #binder.as_ref(),
-                ).await {
-                    Ok(value) => value,
-                    Err(response) => #error_return,
-                };
-            }
-        }
+        RequestBinding::Bound { path_key, .. } => quote! {
+            let #holder = match margaret_http::require_bound_route_parameter::require_bound_route_parameter(
+                #request_local,
+                #path_key,
+                #provider_access.as_ref(),
+            ).await {
+                Ok(value) => value,
+                Err(response) => #error_return,
+            };
+        },
         RequestBinding::FormRequest { source, extraction } => {
             let variant = source.variant();
 

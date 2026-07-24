@@ -862,6 +862,71 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(source.contains("routes:routes.clone(),"));
     }
 
+    #[test]
+    fn keeps_a_captured_provider_clear_of_a_session_parameter_that_takes_its_name() {
+        let source = generated(
+            r#"
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+trait Clock {}
+
+#[singleton(provides = Clock)]
+struct SystemClock;
+
+impl SystemClock {
+    #[constructor]
+    fn create() -> Self {}
+}
+
+impl Clock for SystemClock {}
+
+struct User;
+
+struct SessionError;
+
+impl RespondsToInferenceFailure for SessionError {}
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct Session;
+
+impl Session {
+    #[infer_from_request]
+    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build(session: std::sync::Arc<dyn Clock>, #[authenticated_user] viewer: User) -> Self {}
+}
+
+#[websocket_message(request, method = "chat", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+"#,
+        );
+
+        assert!(source.contains("session:::std::sync::Arc<dyncrate::Clock>,"));
+        assert!(
+            source.contains(
+                "session_2:::std::sync::Arc<super::super::authenticated_users::Session>,"
+            )
+        );
+        assert!(source.contains("self.session_2.as_ref()"));
+    }
+
     const CONSOLE_ARGUMENT_PROVIDER: &str = r#"
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
