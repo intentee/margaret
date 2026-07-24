@@ -32,7 +32,7 @@ impl PatchArticle {
             cover,
             published,
             created_at,
-            author,
+            author_id,
         }: Article,
         #[form_request(from = Form)] PatchArticleForm { title, body }: PatchArticleForm,
     ) -> Response {
@@ -46,7 +46,7 @@ impl PatchArticle {
             cover,
             published,
             created_at,
-            author,
+            author_id,
         });
 
         Response::text(200, format!("updated \"{title}\""))

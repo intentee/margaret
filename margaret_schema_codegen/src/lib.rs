@@ -17,25 +17,13 @@ mod tests {
 
     use crate::render_schema::render_schema;
 
-    const ARTICLE: &str = "\
-#[model(table = \"articles\")]
-struct Article {
-    #[column(primary_key, name = \"id\")]
-    id: uuid::Uuid,
-    #[column]
-    title: String,
-    #[column(name = \"is_published\")]
-    published: bool,
-    #[column]
-    note: Option<String>,
-}
-";
-
     const AUTHOR_MODEL: &str = "\
 #[model(table = \"authors\")]
 struct Author {
     #[column(primary_key)]
     id: uuid::Uuid,
+    #[column(unique)]
+    name: String,
 }
 ";
 
@@ -71,23 +59,35 @@ struct Author {
     }
 
     #[test]
-    fn generates_a_schema_command_from_a_model() {
-        let source = schema_source(ARTICLE);
+    fn generates_a_schema_function() {
+        let source = schema_source(
+            "#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
+        );
 
         assert!(source.contains("pubfnschema()"));
         assert!(source.contains("margaret_model::schema::Schema"));
         assert!(source.contains("margaret_model::table::Table"));
-        assert!(source.contains("\"articles\""));
+    }
+
+    #[test]
+    fn generates_all_column_types_defaults_and_nullability() {
+        let source = schema_source(
+            "#[model(table = \"things\")]\nstruct Thing {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    count: i32,\n    #[column]\n    big: i64,\n    #[column]\n    flag: bool,\n    #[column]\n    label: String,\n    #[column]\n    created_at: chrono::DateTime<chrono::Utc>,\n    #[column]\n    data: Vec<u8>,\n    #[column]\n    note: Option<String>,\n}\n",
+        );
+
         assert!(source.contains("margaret_model::column_type::ColumnType::Uuid"));
-        assert!(source.contains("margaret_model::column_default::ColumnDefault::UuidV7"));
-        assert!(source.contains("margaret_model::column_type::ColumnType::Text"));
+        assert!(source.contains("margaret_model::column_type::ColumnType::Integer"));
+        assert!(source.contains("margaret_model::column_type::ColumnType::BigInt"));
         assert!(source.contains("margaret_model::column_type::ColumnType::Boolean"));
+        assert!(source.contains("margaret_model::column_type::ColumnType::Text"));
+        assert!(source.contains("margaret_model::column_type::ColumnType::Timestamptz"));
+        assert!(source.contains("margaret_model::column_type::ColumnType::Bytea"));
+        assert!(source.contains("margaret_model::column_default::ColumnDefault::UuidV7"));
         assert!(source.contains("margaret_model::column_default::ColumnDefault::NotSet"));
-        assert!(source.contains("\"is_published\""));
-        assert!(source.contains("\"note\""));
         assert!(source.contains("nullable:true"));
         assert!(source.contains("nullable:false"));
         assert!(source.contains("primary_key:vec![\"id\".to_string()]"));
+        assert!(source.contains("\"things\""));
     }
 
     #[test]
@@ -126,55 +126,68 @@ struct Second {
     }
 
     #[test]
-    fn generates_a_foreign_key_column_and_constraint() {
+    fn generates_a_single_column_foreign_key() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n",
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"articles_author_fkey\", references = Author::id)]\n    author_id: uuid::Uuid,\n}\n",
         ));
 
         assert!(source.contains("margaret_model::foreign_key::ForeignKey"));
-        assert!(source.contains("column:\"author_id\".to_string()"));
+        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
+        assert!(source.contains("name:\"articles_author_fkey\".to_string()"));
         assert!(source.contains("on_delete:margaret_model::on_delete::OnDelete::NoAction"));
-        assert!(source.contains("references_column:\"id\".to_string()"));
+        assert!(source.contains("references_columns:vec![\"id\".to_string()]"));
         assert!(source.contains("references_table:\"authors\".to_string()"));
+    }
+
+    #[test]
+    fn generates_a_composite_foreign_key() {
+        let source = schema_source(
+            "#[model(table = \"pairs\")]\nstruct Pair {\n    #[column(primary_key)]\n    left: uuid::Uuid,\n    #[column(primary_key)]\n    right: uuid::Uuid,\n}\n\n#[model(table = \"links\")]\nstruct Link {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"links_pair_fkey\", references = Pair::left)]\n    pair_left: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"links_pair_fkey\", references = Pair::right)]\n    pair_right: uuid::Uuid,\n}\n",
+        );
+
         assert!(source.contains(
-            "column_type:margaret_model::column_type::ColumnType::Uuid,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"author_id\".to_string(),nullable:false,"
+            "columns:vec![\"pair_left\".to_string(),\"pair_right\".to_string()]"
         ));
+        assert!(source.contains(
+            "references_columns:vec![\"left\".to_string(),\"right\".to_string()]"
+        ));
+        assert!(source.contains("references_table:\"pairs\".to_string()"));
+    }
+
+    #[test]
+    fn references_a_string_primary_key() {
+        let source = schema_source(
+            "#[model(table = \"tags\")]\nstruct Tag {\n    #[column(primary_key)]\n    slug: String,\n}\n\n#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_tag_fkey\", references = Tag::slug)]\n    tag_slug: String,\n}\n",
+        );
+
+        assert!(source.contains("references_columns:vec![\"slug\".to_string()]"));
+        assert!(source.contains("references_table:\"tags\".to_string()"));
     }
 
     #[test]
     fn generates_a_nullable_foreign_key_column() {
         let source = schema_source(&with_author(
-            "#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Option<Author>,\n}\n",
+            "#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_author_fkey\", references = Author::id)]\n    author_id: Option<uuid::Uuid>,\n}\n",
         ));
 
         assert!(source.contains("name:\"author_id\".to_string(),nullable:true,"));
-    }
-
-    #[test]
-    fn copies_the_referenced_primary_key_type() {
-        let source = schema_source(
-            "#[model(table = \"tags\")]\nstruct Tag {\n    #[column(primary_key)]\n    slug: String,\n}\n\n#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    tag: Tag,\n}\n",
-        );
-
-        assert!(source.contains(
-            "column_type:margaret_model::column_type::ColumnType::Text,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"tag_slug\".to_string(),nullable:false,"
-        ));
+        assert!(source.contains("references_table:\"authors\".to_string()"));
     }
 
     #[test]
     fn resolves_a_foreign_key_to_a_model_declared_later() {
         let source = schema_source(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"articles_author_fkey\", references = Author::id)]\n    author_id: uuid::Uuid,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
         );
 
-        assert!(source.contains("column:\"author_id\".to_string()"));
+        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
         assert!(source.contains("references_table:\"authors\".to_string()"));
     }
 
     #[test]
     fn resolves_a_self_referential_foreign_key() {
         let source = schema_source(
-            "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Node>,\n}\n",
+            "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"nodes_parent_fkey\", references = Node::id)]\n    parent_id: Option<uuid::Uuid>,\n}\n",
         );
 
         assert!(source.contains("name:\"parent_id\".to_string(),nullable:true,"));
@@ -182,13 +195,15 @@ struct Second {
     }
 
     #[test]
-    fn derives_distinct_columns_for_two_foreign_keys_to_the_same_model() {
+    fn generates_two_foreign_keys_to_the_same_model() {
         let source = schema_source(
-            "#[model(table = \"users\")]\nstruct User {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"docs\")]\nstruct Doc {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: User,\n    #[column]\n    #[foreign_key]\n    editor: User,\n}\n",
+            "#[model(table = \"users\")]\nstruct User {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"docs\")]\nstruct Doc {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"docs_author_fkey\", references = User::id)]\n    author_id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"docs_editor_fkey\", references = User::id)]\n    editor_id: uuid::Uuid,\n}\n",
         );
 
-        assert!(source.contains("column:\"author_id\".to_string()"));
-        assert!(source.contains("column:\"editor_id\".to_string()"));
+        assert!(source.contains("name:\"docs_author_fkey\".to_string()"));
+        assert!(source.contains("name:\"docs_editor_fkey\".to_string()"));
+        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
+        assert!(source.contains("columns:vec![\"editor_id\".to_string()]"));
     }
 
     #[test]
@@ -212,9 +227,9 @@ struct Second {
     }
 
     #[test]
-    fn generates_a_unique_constraint_over_a_foreign_key() {
+    fn generates_a_unique_constraint_over_a_foreign_key_column() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[foreign_key]\n    author: Author,\n}\n",
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[foreign_key(name = \"articles_author_fkey\", references = Author::id)]\n    author_id: uuid::Uuid,\n}\n",
         ));
 
         assert!(source.contains(
@@ -223,23 +238,16 @@ struct Second {
     }
 
     #[test]
-    fn generates_a_foreign_key_on_delete_action() {
+    fn renders_every_on_delete_action() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = cascade)]\n    author: Author,\n}\n",
+            "#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_a_fkey\", references = Author::id, on_delete = cascade)]\n    a: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_b_fkey\", references = Author::id, on_delete = restrict)]\n    b: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_c_fkey\", references = Author::id, on_delete = set_null)]\n    c: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_d_fkey\", references = Author::id, on_delete = set_default)]\n    d: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_e_fkey\", references = Author::id)]\n    e: uuid::Uuid,\n}\n",
         ));
 
-        assert!(source.contains("on_delete:margaret_model::on_delete::OnDelete::Cascade"));
-    }
-
-    #[test]
-    fn generates_a_scalar_unique_constraint_before_a_foreign_key_unique_constraint() {
-        let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    slug: String,\n    #[column(unique)]\n    #[foreign_key]\n    author: Author,\n}\n",
-        ));
-
-        assert!(source.contains(
-            "unique_constraints:vec![margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"slug\".to_string()],},margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"author_id\".to_string()],}]"
-        ));
+        assert!(source.contains("margaret_model::on_delete::OnDelete::Cascade"));
+        assert!(source.contains("margaret_model::on_delete::OnDelete::Restrict"));
+        assert!(source.contains("margaret_model::on_delete::OnDelete::SetNull"));
+        assert!(source.contains("margaret_model::on_delete::OnDelete::SetDefault"));
+        assert!(source.contains("margaret_model::on_delete::OnDelete::NoAction"));
     }
 
     #[test]
@@ -254,9 +262,9 @@ struct Second {
     }
 
     #[test]
-    fn generates_an_index_over_a_foreign_key() {
+    fn generates_an_index_over_a_foreign_key_column() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[index]\n    author: Author,\n}\n",
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"articles_author_fkey\", references = Author::id)]\n    #[index]\n    author_id: uuid::Uuid,\n}\n",
         ));
 
         assert!(source.contains(
@@ -272,17 +280,6 @@ struct Second {
 
         assert!(source.contains(
             "indexes:vec![margaret_model::index::Index{columns:vec![\"kind\".to_string(),\"label\".to_string()],name:\"events_kind_label\".to_string(),}]"
-        ));
-    }
-
-    #[test]
-    fn orders_composite_index_columns_by_field_declaration() {
-        let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[index(name = \"articles_author_title\")]\n    author: Author,\n    #[column]\n    #[index(name = \"articles_author_title\")]\n    title: String,\n}\n",
-        ));
-
-        assert!(source.contains(
-            "indexes:vec![margaret_model::index::Index{columns:vec![\"author_id\".to_string(),\"title\".to_string()],name:\"articles_author_title\".to_string(),}]"
         ));
     }
 

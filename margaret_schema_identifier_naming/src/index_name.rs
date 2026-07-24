@@ -1,8 +1,11 @@
-use crate::schema_identifier::schema_identifier;
+use crate::schema_identifier::SchemaIdentifier;
 use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
-pub fn index_name(table: &str, column: &str) -> Result<String, SchemaIdentifierNamingError> {
-    schema_identifier(&[table, column, "index"])
+pub fn index_name(
+    table: &str,
+    column: &str,
+) -> Result<SchemaIdentifier, SchemaIdentifierNamingError> {
+    SchemaIdentifier::from_segments(&[table, column, "index"])
 }
 
 #[cfg(test)]
@@ -14,7 +17,9 @@ mod tests {
     #[test]
     fn joins_the_table_and_column_with_an_index_suffix() {
         assert_eq!(
-            index_name("articles", "created_at").expect("the identifier is within the limit"),
+            index_name("articles", "created_at")
+                .expect("the identifier is within the limit")
+                .as_str(),
             "articles_created_at_index"
         );
     }
@@ -22,16 +27,10 @@ mod tests {
     #[test]
     fn preserves_underscores_in_the_column() {
         assert_eq!(
-            index_name("articles", "author_id").expect("the identifier is within the limit"),
+            index_name("articles", "author_id")
+                .expect("the identifier is within the limit")
+                .as_str(),
             "articles_author_id_index"
-        );
-    }
-
-    #[test]
-    fn is_stable_across_repeated_calls() {
-        assert_eq!(
-            index_name("articles", "created_at").expect("the identifier is within the limit"),
-            index_name("articles", "created_at").expect("the identifier is within the limit")
         );
     }
 

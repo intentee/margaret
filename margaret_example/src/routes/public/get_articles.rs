@@ -34,7 +34,10 @@ impl GetArticles {
             .all()
             .into_iter()
             .filter(|article| match author {
-                Some(author) => article.author.name == author,
+                Some(author) => self
+                    .articles
+                    .find_author_by_id(article.author_id)
+                    .is_some_and(|found| found.name == author),
                 None => true,
             })
             .map(|article| {

@@ -1,6 +1,8 @@
 use quote::ToTokens;
-use quote::quote;
 use syn::Type;
+
+use margaret_model::column_default::ColumnDefault;
+use margaret_model::column_type::ColumnType;
 
 use crate::inferred_column::InferredColumn;
 use crate::model_codegen_error::ModelCodegenError;
@@ -22,41 +24,41 @@ fn base_column_type(ty: &Type) -> Option<InferredColumn> {
 
     match type_path.path.segments.last() {
         Some(segment) if segment.ident == "Uuid" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Uuid),
-            default: quote!(margaret_model::column_default::ColumnDefault::UuidV7),
+            column_type: ColumnType::Uuid,
+            default: ColumnDefault::UuidV7,
             nullable: false,
         }),
         Some(segment) if segment.ident == "String" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Text),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: ColumnType::Text,
+            default: ColumnDefault::NotSet,
             nullable: false,
         }),
         Some(segment) if segment.ident == "bool" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Boolean),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: ColumnType::Boolean,
+            default: ColumnDefault::NotSet,
             nullable: false,
         }),
         Some(segment) if segment.ident == "i32" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Integer),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: ColumnType::Integer,
+            default: ColumnDefault::NotSet,
             nullable: false,
         }),
         Some(segment) if segment.ident == "i64" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::BigInt),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: ColumnType::BigInt,
+            default: ColumnDefault::NotSet,
             nullable: false,
         }),
         Some(segment) if segment.ident == "DateTime" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Timestamptz),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: ColumnType::Timestamptz,
+            default: ColumnDefault::NotSet,
             nullable: false,
         }),
         Some(segment)
             if segment.ident == "Vec" && single_generic_argument(segment).is_some_and(is_u8) =>
         {
             Some(InferredColumn {
-                column_type: quote!(margaret_model::column_type::ColumnType::Bytea),
-                default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+                column_type: ColumnType::Bytea,
+                default: ColumnDefault::NotSet,
                 nullable: false,
             })
         }
@@ -89,8 +91,10 @@ pub(crate) fn infer_column_type(
 
 #[cfg(test)]
 mod tests {
-    use quote::quote;
     use syn::Type;
+
+    use margaret_model::column_default::ColumnDefault;
+    use margaret_model::column_type::ColumnType;
 
     use crate::infer_column_type::infer_column_type;
     use crate::inferred_column::InferredColumn;
@@ -102,57 +106,44 @@ mod tests {
         infer_column_type(&ty, "crate::Model", "value")
     }
 
-    fn column_type(type_source: &str) -> String {
-        infer(type_source)
-            .expect("the type is inferable")
-            .column_type
-            .to_string()
-    }
-
     #[test]
     fn infers_a_uuid_column_with_a_v7_default() {
         let inferred = infer("uuid::Uuid").expect("a uuid is inferable");
 
-        assert_eq!(
-            inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Uuid).to_string()
-        );
-        assert_eq!(
-            inferred.default.to_string(),
-            quote!(margaret_model::column_default::ColumnDefault::UuidV7).to_string()
-        );
+        assert_eq!(inferred.column_type, ColumnType::Uuid);
+        assert_eq!(inferred.default, ColumnDefault::UuidV7);
         assert!(!inferred.nullable);
     }
 
     #[test]
     fn infers_text_from_string() {
         assert_eq!(
-            column_type("String"),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+            infer("String").expect("a string is inferable").column_type,
+            ColumnType::Text
         );
     }
 
     #[test]
     fn infers_boolean_from_bool() {
         assert_eq!(
-            column_type("bool"),
-            quote!(margaret_model::column_type::ColumnType::Boolean).to_string()
+            infer("bool").expect("a bool is inferable").column_type,
+            ColumnType::Boolean
         );
     }
 
     #[test]
     fn infers_integer_from_i32() {
         assert_eq!(
-            column_type("i32"),
-            quote!(margaret_model::column_type::ColumnType::Integer).to_string()
+            infer("i32").expect("an i32 is inferable").column_type,
+            ColumnType::Integer
         );
     }
 
     #[test]
     fn infers_big_int_from_i64() {
         assert_eq!(
-            column_type("i64"),
-            quote!(margaret_model::column_type::ColumnType::BigInt).to_string()
+            infer("i64").expect("an i64 is inferable").column_type,
+            ColumnType::BigInt
         );
     }
 
@@ -160,14 +151,8 @@ mod tests {
     fn infers_timestamptz_from_datetime() {
         let inferred = infer("chrono::DateTime<chrono::Utc>").expect("a datetime is inferable");
 
-        assert_eq!(
-            inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Timestamptz).to_string()
-        );
-        assert_eq!(
-            inferred.default.to_string(),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet).to_string()
-        );
+        assert_eq!(inferred.column_type, ColumnType::Timestamptz);
+        assert_eq!(inferred.default, ColumnDefault::NotSet);
         assert!(!inferred.nullable);
     }
 
@@ -176,28 +161,16 @@ mod tests {
         let inferred = infer("Option<String>").expect("an optional string is inferable");
 
         assert!(inferred.nullable);
-        assert_eq!(
-            inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
-        );
-        assert_eq!(
-            inferred.default.to_string(),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet).to_string()
-        );
+        assert_eq!(inferred.column_type, ColumnType::Text);
+        assert_eq!(inferred.default, ColumnDefault::NotSet);
     }
 
     #[test]
     fn infers_bytea_from_a_byte_vector() {
         let inferred = infer("Vec<u8>").expect("a byte vector is inferable");
 
-        assert_eq!(
-            inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Bytea).to_string()
-        );
-        assert_eq!(
-            inferred.default.to_string(),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet).to_string()
-        );
+        assert_eq!(inferred.column_type, ColumnType::Bytea);
+        assert_eq!(inferred.default, ColumnDefault::NotSet);
         assert!(!inferred.nullable);
     }
 
@@ -206,10 +179,7 @@ mod tests {
         let inferred = infer("Option<Vec<u8>>").expect("an optional byte vector is inferable");
 
         assert!(inferred.nullable);
-        assert_eq!(
-            inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Bytea).to_string()
-        );
+        assert_eq!(inferred.column_type, ColumnType::Bytea);
     }
 
     #[test]

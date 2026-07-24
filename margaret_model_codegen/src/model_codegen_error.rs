@@ -1,7 +1,10 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_model::column_type::ColumnType;
 use margaret_schema_identifier_naming::schema_identifier_naming_error::SchemaIdentifierNamingError;
+
+use crate::object_kind::ObjectKind;
 
 #[derive(Debug, Error)]
 pub enum ModelCodegenError {
@@ -63,44 +66,96 @@ pub enum ModelCodegenError {
     ForeignKeyRequiresColumn { field: String, model: String },
 
     #[error(
-        "foreign key field '{field}' of model '{model}' must not set a column name; foreign key column names are derived"
+        "foreign key field '{field}' of model '{model}' is missing the required 'name' argument"
     )]
-    ForeignKeyColumnNameIsDerived { field: String, model: String },
-
-    #[error("foreign key field '{field}' of model '{model}' cannot be a primary key")]
-    ForeignKeyCannotBePrimaryKey { field: String, model: String },
+    ForeignKeyMissingName { field: String, model: String },
 
     #[error(
-        "the positional foreign key field at index {position} of model '{model}' requires a named field"
+        "model '{model}' has an invalid foreign key name '{name}' on field '{field}'; it must be a snake_case identifier"
     )]
-    ForeignKeyRequiresNamedField { model: String, position: usize },
+    InvalidForeignKeyName {
+        field: String,
+        model: String,
+        name: String,
+    },
 
     #[error(
-        "foreign key field '{field}' of model '{model}' has the type '{rust_type}', which is not a #[model]"
+        "foreign key '{name}' on field '{field}' of model '{model}' has a name that is too long: {source}"
+    )]
+    ForeignKeyNameTooLong {
+        field: String,
+        model: String,
+        name: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
+    },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' is missing the required 'references' argument"
+    )]
+    ForeignKeyMissingReferences { field: String, model: String },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' references '{reference}', which does not name a column of the target model; use '<Model>::<field>'"
+    )]
+    ForeignKeyReferenceMissingField {
+        field: String,
+        model: String,
+        reference: String,
+    },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' references '{reference}', whose target is not a #[model]"
     )]
     ForeignKeyTargetNotAModel {
         field: String,
         model: String,
-        rust_type: String,
+        reference: String,
     },
 
     #[error(
-        "foreign key field '{field}' of model '{model}' references '{target}', which has no primary key"
+        "foreign key field '{field}' of model '{model}' references '{reference}', but '{target}' has no such column"
     )]
-    ForeignKeyTargetWithoutPrimaryKey {
+    ForeignKeyUnknownReferencedField {
         field: String,
         model: String,
+        reference: String,
         target: String,
     },
 
     #[error(
-        "foreign key field '{field}' of model '{model}' references '{target}', which has a composite primary key; foreign keys are single-column"
+        "foreign key '{name}' of model '{model}' references columns of '{target}' that are not a primary key or unique constraint"
     )]
-    ForeignKeyTargetHasCompositePrimaryKey {
-        field: String,
+    ForeignKeyReferencedColumnsNotAKey {
         model: String,
+        name: String,
         target: String,
     },
+
+    #[error(
+        "foreign key '{name}' of model '{model}' references more than one target model; every member of a foreign key must reference the same model"
+    )]
+    ForeignKeyAmbiguousTarget { model: String, name: String },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' has the local type '{local_type:?}', which does not match the referenced type '{referenced_type:?}'"
+    )]
+    ForeignKeyColumnTypeMismatch {
+        field: String,
+        local_type: ColumnType,
+        model: String,
+        referenced_type: ColumnType,
+    },
+
+    #[error(
+        "foreign key '{name}' of model '{model}' references the same target column more than once"
+    )]
+    ForeignKeyDuplicateReferencedColumn { model: String, name: String },
+
+    #[error(
+        "foreign key '{name}' of model '{model}' declares more than one distinct ON DELETE action across its columns"
+    )]
+    InconsistentForeignKeyOnDelete { model: String, name: String },
 
     #[error(
         "foreign key dependency cycle detected between tables: {path}; inline foreign keys require an acyclic table order"
@@ -116,16 +171,6 @@ pub enum ModelCodegenError {
 
     #[error("model '{model}' has a column name that is too long: {source}")]
     ColumnNameTooLong {
-        model: String,
-        #[source]
-        source: SchemaIdentifierNamingError,
-    },
-
-    #[error(
-        "foreign key field '{field}' of model '{model}' derives a column name that is too long: {source}"
-    )]
-    ForeignKeyColumnNameTooLong {
-        field: String,
         model: String,
         #[source]
         source: SchemaIdentifierNamingError,
@@ -170,56 +215,48 @@ pub enum ModelCodegenError {
         source: SchemaIdentifierNamingError,
     },
 
-    #[error("duplicate index name '{name}' declared by tables '{first}' and '{second}'")]
-    DuplicateIndexName {
-        first: String,
-        name: String,
-        second: String,
+    #[error("table '{table}' derives a primary key index name that is too long: {source}")]
+    PrimaryKeyIndexNameTooLong {
+        #[source]
+        source: SchemaIdentifierNamingError,
+        table: String,
+    },
+
+    #[error("table '{table}' derives a unique index name that is too long: {source}")]
+    UniqueIndexNameTooLong {
+        #[source]
+        source: SchemaIdentifierNamingError,
+        table: String,
     },
 
     #[error(
-        "index name '{name}' on table '{index_table}' collides with the table name declared by model '{table_model}'"
+        "the index over columns '{columns}' of model '{model}' is redundant; its columns are a leading prefix of the primary key, which is already indexed"
     )]
-    IndexNameCollidesWithTableName {
-        index_table: String,
-        name: String,
-        table_model: String,
-    },
+    RedundantIndexOnPrimaryKeyPrefix { columns: String, model: String },
 
     #[error(
-        "the constraint-backing index '{name}' generated for table '{constraint_table}' collides with the table name declared by model '{table_model}'"
+        "the index over columns '{columns}' of model '{model}' is redundant; its columns are a leading prefix of a unique constraint, which is already indexed"
     )]
-    ConstraintIndexCollidesWithTableName {
-        constraint_table: String,
-        name: String,
-        table_model: String,
-    },
+    RedundantIndexOnUniquePrefix { columns: String, model: String },
 
     #[error(
-        "constraint-backing index name '{name}' is generated for both table '{first_table}' and table '{second_table}'"
+        "the {first_kind} named '{name}' on table '{first_table}' collides with the {second_kind} of table '{second_table}'; schema-wide relation names must be unique"
     )]
-    DuplicateConstraintIndexName {
+    RelationNameCollision {
+        first_kind: ObjectKind,
         first_table: String,
         name: String,
+        second_kind: ObjectKind,
         second_table: String,
     },
 
     #[error(
-        "index name '{name}' on table '{index_table}' collides with the constraint-backing index generated for table '{constraint_table}'"
+        "the {first_kind} named '{name}' on table '{table}' collides with the {second_kind} on the same table; constraint names must be unique per table"
     )]
-    IndexNameCollidesWithConstraintIndex {
-        constraint_table: String,
-        index_table: String,
+    ConstraintNameCollision {
+        first_kind: ObjectKind,
         name: String,
+        second_kind: ObjectKind,
+        table: String,
     },
-
-    #[error(
-        "the single-column index on column '{column}' of model '{model}' is redundant; a unique constraint is already indexed"
-    )]
-    RedundantIndexOnUniqueColumn { column: String, model: String },
-
-    #[error(
-        "the single-column index on column '{column}' of model '{model}' is redundant; a primary key is already indexed"
-    )]
-    RedundantIndexOnPrimaryKeyColumn { column: String, model: String },
 }

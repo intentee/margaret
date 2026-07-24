@@ -1,13 +1,14 @@
-use std::collections::HashSet;
+use margaret_schema_identifier_naming::schema_identifier::SchemaIdentifier;
 
-use crate::deferred_foreign_key::DeferredForeignKey;
+use crate::column_id::ColumnId;
+use crate::deferred_foreign_key_member::DeferredForeignKeyMember;
 use crate::resolved_column::ResolvedColumn;
 
 pub(crate) struct CollectedModel {
-    pub(crate) deferred_foreign_keys: Vec<DeferredForeignKey>,
+    pub(crate) columns: Vec<ResolvedColumn>,
+    pub(crate) deferred_foreign_key_members: Vec<DeferredForeignKeyMember>,
     pub(crate) model: String,
-    pub(crate) primary_key: Vec<String>,
-    pub(crate) scalar_columns: Vec<ResolvedColumn>,
-    pub(crate) seen_columns: HashSet<String>,
-    pub(crate) table: String,
+    pub(crate) primary_key: Vec<ColumnId>,
+    pub(crate) table: SchemaIdentifier,
+    pub(crate) unique_keys: Vec<Vec<ColumnId>>,
 }

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
+margaret_model = { path = "../margaret_model" }
 margaret_schema_identifier_naming = { path = "../margaret_schema_identifier_naming" }
 margaret_toposort = { path = "../margaret_toposort" }
 proc-macro2 = { workspace = true }

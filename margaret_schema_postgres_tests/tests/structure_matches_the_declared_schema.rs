@@ -89,24 +89,32 @@ async fn assert_primary_key_matches(pool: &PgPool, table: &Table) {
 
 async fn assert_foreign_keys_match(pool: &PgPool, table: &Table) {
     for foreign_key in &table.foreign_keys {
-        let (referenced_table, referenced_column): (String, String) = query_as(
-            "SELECT ccu.table_name, ccu.column_name \
-             FROM information_schema.table_constraints tc \
-             JOIN information_schema.key_column_usage kcu \
-               ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema \
-             JOIN information_schema.constraint_column_usage ccu \
-               ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema \
-             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' \
-               AND tc.table_name = $1 AND kcu.column_name = $2",
-        )
-        .bind(&table.name)
-        .bind(&foreign_key.column)
-        .fetch_one(pool)
-        .await
-        .expect("the foreign key is introspected");
+        let (columns, referenced_table, referenced_columns): (Vec<String>, String, Vec<String>) =
+            query_as(
+                "SELECT \
+                 (SELECT array_agg(att.attname ORDER BY k.ord) \
+                    FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) \
+                    JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = k.attnum), \
+                 refc.relname, \
+                 (SELECT array_agg(att.attname ORDER BY k.ord) \
+                    FROM unnest(con.confkey) WITH ORDINALITY AS k(attnum, ord) \
+                    JOIN pg_attribute att ON att.attrelid = con.confrelid AND att.attnum = k.attnum) \
+                 FROM pg_constraint con \
+                 JOIN pg_class tc ON tc.oid = con.conrelid \
+                 JOIN pg_class refc ON refc.oid = con.confrelid \
+                 JOIN pg_namespace n ON n.oid = tc.relnamespace \
+                 WHERE con.contype = 'f' AND n.nspname = 'public' \
+                   AND tc.relname = $1 AND con.conname = $2",
+            )
+            .bind(&table.name)
+            .bind(&foreign_key.name)
+            .fetch_one(pool)
+            .await
+            .expect("the foreign key is introspected");
 
+        assert_eq!(columns, foreign_key.columns);
         assert_eq!(referenced_table, foreign_key.references_table);
-        assert_eq!(referenced_column, foreign_key.references_column);
+        assert_eq!(referenced_columns, foreign_key.references_columns);
     }
 }
 

@@ -59,7 +59,7 @@ fn seed() -> Vec<Article> {
             cover: None,
             published: true,
             created_at: at_epoch_seconds(1_704_067_200),
-            author: milo(),
+            author_id: milo().id,
         },
         Article {
             id: Uuid::from_u128(101),
@@ -68,7 +68,7 @@ fn seed() -> Vec<Article> {
             cover: None,
             published: false,
             created_at: at_epoch_seconds(1_704_153_600),
-            author: milo(),
+            author_id: milo().id,
         },
         Article {
             id: Uuid::from_u128(102),
@@ -77,7 +77,7 @@ fn seed() -> Vec<Article> {
             cover: None,
             published: false,
             created_at: at_epoch_seconds(1_704_240_000),
-            author: mona(),
+            author_id: mona().id,
         },
     ]
 }
@@ -127,6 +127,10 @@ impl ArticleStore {
             .map(|article| article.value().clone())
     }
 
+    pub fn find_author_by_id(&self, id: Uuid) -> Option<Author> {
+        self.authors.iter().find(|author| author.id == id).cloned()
+    }
+
     pub fn insert(
         &self,
         title: String,
@@ -134,10 +138,7 @@ impl ArticleStore {
         author_id: Uuid,
     ) -> Result<Article, ArticleStoreError> {
         let author = self
-            .authors
-            .iter()
-            .find(|author| author.id == author_id)
-            .cloned()
+            .find_author_by_id(author_id)
             .ok_or(ArticleStoreError::AuthorNotFound { author_id })?;
 
         let id = Uuid::from_u128(u128::from(self.next_id.fetch_add(1, Ordering::Relaxed)));
@@ -148,7 +149,7 @@ impl ArticleStore {
             cover: None,
             published: false,
             created_at: self.clock.now(),
-            author,
+            author_id: author.id,
         };
 
         self.articles.insert(id, article.clone());
@@ -199,7 +200,13 @@ mod tests {
             .expect("the featured article is seeded");
 
         assert_eq!(article.title, "Shipping Margaret");
-        assert_eq!(article.author.name, "Milo");
+        assert_eq!(
+            store()
+                .find_author_by_id(article.author_id)
+                .expect("the author is seeded")
+                .name,
+            "Milo"
+        );
     }
 
     #[test]
@@ -209,7 +216,13 @@ mod tests {
             .insert("Title".to_string(), "Body".to_string(), Uuid::from_u128(3))
             .expect("the article is inserted for a known author");
 
-        assert_eq!(article.author.name, "Milo");
+        assert_eq!(
+            store
+                .find_author_by_id(article.author_id)
+                .expect("the author is known")
+                .name,
+            "Milo"
+        );
         assert!(store.find_article_by_id(article.id).is_some());
     }
 

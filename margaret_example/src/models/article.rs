@@ -3,8 +3,6 @@ use chrono::Utc;
 
 use margaret_macros::model;
 
-use crate::models::author::Author;
-
 #[model(table = "articles")]
 #[derive(Clone)]
 pub struct Article {
@@ -22,7 +20,11 @@ pub struct Article {
     #[index]
     pub created_at: DateTime<Utc>,
     #[column]
-    #[foreign_key(on_delete = cascade)]
+    #[foreign_key(
+        name = "articles_author_fkey",
+        references = crate::models::author::Author::id,
+        on_delete = cascade
+    )]
     #[index]
-    pub author: Author,
+    pub author_id: uuid::Uuid,
 }
