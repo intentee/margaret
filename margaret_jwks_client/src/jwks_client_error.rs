@@ -1,5 +1,4 @@
 use thiserror::Error;
-use url::ParseError;
 
 use margaret_endpoint::endpoint_error::EndpointError;
 use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
@@ -11,13 +10,6 @@ pub enum JwksClientError {
 
     #[error("the jwks endpoint could not be resolved: {0}")]
     EndpointResolution(#[source] EndpointError),
-
-    #[error("the issuer url '{issuer_url}' cannot carry the well known jwks path: {source}")]
-    IssuerUrlNotABase {
-        issuer_url: String,
-        #[source]
-        source: ParseError,
-    },
 
     #[error("the jwks document has not been fetched from the issuer yet")]
     NotReady,

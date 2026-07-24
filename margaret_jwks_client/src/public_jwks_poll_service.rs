@@ -18,7 +18,6 @@ use crate::jwks_client_error::JwksClientError;
 use crate::jwks_poll_interval_after_ready::JWKS_POLL_INTERVAL_AFTER_READY;
 use crate::jwks_poll_interval_before_ready::JWKS_POLL_INTERVAL_BEFORE_READY;
 use crate::public_jwks_holder::PublicJwksHolder;
-use crate::well_known_jwks_url::well_known_jwks_url;
 
 pub struct PublicJwksPollService {
     pub endpoint_provider: Arc<dyn ProvidesEndpoint>,
@@ -28,12 +27,11 @@ pub struct PublicJwksPollService {
 
 impl PublicJwksPollService {
     pub async fn fetch_public_jwks(&self) -> Result<PublicJwks, JwksClientError> {
-        let issuer_url = self
+        let jwks_url = self
             .endpoint_provider
             .provide()
             .await
             .map_err(JwksClientError::EndpointResolution)?;
-        let jwks_url = well_known_jwks_url(&issuer_url)?;
 
         self.http_client
             .get(jwks_url)

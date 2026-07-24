@@ -2109,7 +2109,6 @@ dependencies = [
  "margaret_endpoint",
  "margaret_identity_session",
  "margaret_jwks_keygen",
- "margaret_jwks_roller",
  "margaret_sync_holder",
  "reqwest",
  "serde",
