@@ -13,6 +13,8 @@ impl MiddlewareAttributeArguments {
         arguments: &AttributeArgs,
         middleware: &str,
     ) -> Result<Self, MiddlewareCodegenError> {
+        arguments.expect_only(&["attribute"], &[])?;
+
         let handles = arguments.path("attribute")?.ok_or_else(|| {
             MiddlewareCodegenError::MissingMiddlewareHandles {
                 middleware: middleware.to_string(),

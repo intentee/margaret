@@ -1,6 +1,5 @@
 #[derive(Debug)]
-pub enum ColumnIndex {
-    None,
+pub enum IndexMembership {
     Derived,
     Named(String),
 }

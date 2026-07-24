@@ -28,6 +28,8 @@ impl HttpResponderArguments {
         arguments: &AttributeArgs,
         responder: &str,
     ) -> Result<Self, HttpCodegenError> {
+        arguments.expect_only(&["method", "name", "path", "server"], &[])?;
+
         let method = normalized_method(
             arguments
                 .string("method")?

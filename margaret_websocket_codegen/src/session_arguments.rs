@@ -13,6 +13,8 @@ impl SessionArguments {
         arguments: &AttributeArgs,
         session: &str,
     ) -> Result<Self, WebSocketCodegenError> {
+        arguments.expect_only(&["path", "server"], &[])?;
+
         let path =
             arguments
                 .string("path")?

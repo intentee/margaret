@@ -22,6 +22,11 @@ impl MessageKind {
         arguments: &AttributeArgs,
         message: &str,
     ) -> Result<Self, WebSocketCodegenError> {
+        arguments.expect_only(
+            &["method", "response"],
+            &["notification", "request", "response"],
+        )?;
+
         let is_request = arguments.has_positional_flag("request");
         let is_notification = arguments.has_positional_flag("notification");
         let is_response = arguments.has_positional_flag("response");

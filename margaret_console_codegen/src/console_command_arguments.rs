@@ -12,6 +12,8 @@ impl ConsoleCommandArguments {
         arguments: &AttributeArgs,
         command: &str,
     ) -> Result<Self, ConsoleCodegenError> {
+        arguments.expect_only(&["description", "name"], &[])?;
+
         let name =
             arguments
                 .string("name")?

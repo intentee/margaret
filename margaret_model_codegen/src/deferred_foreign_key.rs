@@ -2,11 +2,11 @@ use proc_macro2::TokenStream;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 
-use crate::column_index::ColumnIndex;
+use crate::index_membership::IndexMembership;
 
 pub(crate) struct DeferredForeignKey {
     pub(crate) field_name: String,
-    pub(crate) index: ColumnIndex,
+    pub(crate) indexes: Vec<IndexMembership>,
     pub(crate) nullable: bool,
     pub(crate) on_delete: TokenStream,
     pub(crate) position: usize,

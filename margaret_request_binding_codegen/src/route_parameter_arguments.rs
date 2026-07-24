@@ -12,6 +12,8 @@ impl RouteParameterArguments {
         subject: &str,
         position: usize,
     ) -> Result<Self, RequestBindingError> {
+        arguments.expect_only(&["from"], &[])?;
+
         let from = arguments.string("from")?.ok_or_else(|| {
             RequestBindingError::RouteParameterMissingFrom {
                 subject: subject.to_string(),

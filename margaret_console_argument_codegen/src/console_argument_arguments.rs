@@ -13,6 +13,8 @@ impl ConsoleArgumentArguments {
         owner: &str,
         parameter: &str,
     ) -> Result<Self, ConsoleArgumentCodegenError> {
+        arguments.expect_only(&["from"], &["positional"])?;
+
         let named = arguments.string("from")?;
         let positional = arguments.has_positional_flag("positional");
 

@@ -14,6 +14,8 @@ impl TickTimerArguments {
         arguments: &AttributeArgs,
         ticker: &str,
     ) -> Result<Self, ServiceCodegenError> {
+        arguments.expect_only(&["behavior", "interval"], &[])?;
+
         let behavior = arguments.path("behavior")?;
         let interval = arguments.path("interval")?.ok_or_else(|| {
             ServiceCodegenError::TickerMissingInterval {

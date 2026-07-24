@@ -146,6 +146,11 @@ pub enum ModelCodegenError {
     IndexRequiresColumn { field: String, model: String },
 
     #[error(
+        "field '{field}' of model '{model}' carries a repeated #[index]; a bare #[index] may appear at most once and each index name at most once per column"
+    )]
+    RepeatedIndexOnColumn { field: String, model: String },
+
+    #[error(
         "model '{model}' has an invalid index name '{index}'; it must be a snake_case identifier"
     )]
     InvalidIndexName { index: String, model: String },
@@ -179,6 +184,33 @@ pub enum ModelCodegenError {
         index_table: String,
         name: String,
         table_model: String,
+    },
+
+    #[error(
+        "the constraint-backing index '{name}' generated for table '{constraint_table}' collides with the table name declared by model '{table_model}'"
+    )]
+    ConstraintIndexCollidesWithTableName {
+        constraint_table: String,
+        name: String,
+        table_model: String,
+    },
+
+    #[error(
+        "constraint-backing index name '{name}' is generated for both table '{first_table}' and table '{second_table}'"
+    )]
+    DuplicateConstraintIndexName {
+        first_table: String,
+        name: String,
+        second_table: String,
+    },
+
+    #[error(
+        "index name '{name}' on table '{index_table}' collides with the constraint-backing index generated for table '{constraint_table}'"
+    )]
+    IndexNameCollidesWithConstraintIndex {
+        constraint_table: String,
+        index_table: String,
+        name: String,
     },
 
     #[error(

@@ -50,8 +50,16 @@ fn collect_kind(
 
 fn declared_tag_path(args: &AttributeArgs, kind: TagKind) -> Result<Option<Path>, TagError> {
     match kind {
-        TagKind::Endpoint => Ok(args.positional_path(0).cloned()),
-        TagKind::Middleware => Ok(args.path("attribute")?),
+        TagKind::Endpoint => {
+            args.reject_unknown_named(&[])?;
+
+            Ok(args.positional_path(0).cloned())
+        }
+        TagKind::Middleware => {
+            args.expect_only(&["attribute"], &[])?;
+
+            Ok(args.path("attribute")?)
+        }
     }
 }
 

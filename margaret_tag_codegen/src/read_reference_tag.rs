@@ -4,6 +4,8 @@ use margaret_attributes::tag::Tag;
 use crate::tag_error::TagError;
 
 pub fn read_reference_tag(args: &AttributeArgs, site: &str) -> Result<Tag, TagError> {
+    args.reject_unknown_named(&[])?;
+
     let (Some(path), None) = (args.positional_path(0), args.positional(1)) else {
         return Err(TagError::MalformedReference {
             site: site.to_string(),

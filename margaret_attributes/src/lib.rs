@@ -23,6 +23,7 @@ pub mod module_imports;
 pub mod name_allocator;
 pub mod resolve_path;
 pub mod resolve_type;
+pub mod select_matching_attributes;
 pub mod select_unique_attribute;
 pub mod struct_shape;
 pub mod tag;

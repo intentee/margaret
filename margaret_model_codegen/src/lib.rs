@@ -1,5 +1,5 @@
-pub mod column_index;
 pub mod has_models;
+pub mod index_membership;
 pub mod inferred_column;
 pub mod model;
 pub mod model_codegen_error;
@@ -404,12 +404,22 @@ struct S {
     }
 
     #[test]
-    fn rejects_a_repeated_index_attribute() {
+    fn rejects_a_repeated_bare_index_attribute() {
         assert!(
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index]\n    #[index]\n    value: String,\n}\n",
             )
-            .contains("failed to read the model attributes")
+            .contains("carries a repeated #[index]")
+        );
+    }
+
+    #[test]
+    fn rejects_a_repeated_named_index_on_a_column() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index(name = \"combo\")]\n    #[index(name = \"combo\")]\n    value: String,\n}\n",
+            )
+            .contains("carries a repeated #[index]")
         );
     }
 

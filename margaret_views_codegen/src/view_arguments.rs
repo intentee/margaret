@@ -8,6 +8,8 @@ pub(crate) struct ViewArguments {
 
 impl ViewArguments {
     pub(crate) fn parse(arguments: &AttributeArgs, view: &str) -> Result<Self, ViewsCodegenError> {
+        arguments.expect_only(&["name"], &[])?;
+
         let name = arguments
             .string("name")?
             .ok_or_else(|| ViewsCodegenError::ViewMissingName {

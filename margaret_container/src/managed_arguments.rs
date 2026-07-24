@@ -11,6 +11,8 @@ pub(crate) struct ManagedArguments {
 
 impl ManagedArguments {
     pub(crate) fn parse(arguments: &AttributeArgs) -> Result<Self, ContainerError> {
+        arguments.expect_only(&["collection", "provides"], &[])?;
+
         let collection = arguments.path("collection")?;
         let provides = arguments.path("provides")?;
 

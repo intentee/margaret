@@ -10,6 +10,8 @@ pub(crate) struct ColumnArguments {
 
 impl ColumnArguments {
     pub(crate) fn parse(arguments: &AttributeArgs) -> Result<Self, ModelCodegenError> {
+        arguments.expect_only(&["name"], &["primary_key", "unique"])?;
+
         let name = arguments.string("name")?;
         let primary_key = arguments.has_positional_flag("primary_key");
         let unique = arguments.has_positional_flag("unique");

@@ -70,4 +70,13 @@ pub enum AttributeError {
         key: String,
         expected: String,
     },
+
+    #[error("attribute '{attribute_path}' has an unexpected positional argument '{argument}'")]
+    UnexpectedPositionalArgument {
+        argument: String,
+        attribute_path: String,
+    },
+
+    #[error("attribute '{attribute_path}' has an unknown argument '{key}'")]
+    UnknownNamedArgument { attribute_path: String, key: String },
 }

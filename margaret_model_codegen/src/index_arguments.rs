@@ -8,6 +8,8 @@ pub(crate) struct IndexArguments {
 
 impl IndexArguments {
     pub(crate) fn parse(arguments: &AttributeArgs) -> Result<Self, ModelCodegenError> {
+        arguments.expect_only(&["name"], &[])?;
+
         let name = arguments.string("name")?;
 
         Ok(Self { name })

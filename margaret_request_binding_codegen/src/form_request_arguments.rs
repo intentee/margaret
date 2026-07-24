@@ -15,6 +15,8 @@ impl FormRequestArguments {
         subject: &str,
         position: usize,
     ) -> Result<Self, RequestBindingError> {
+        arguments.expect_only(&["from"], &[])?;
+
         let from = arguments.path("from")?.ok_or_else(|| {
             RequestBindingError::FormRequestMissingSource {
                 subject: subject.to_string(),

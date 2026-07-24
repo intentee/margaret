@@ -16,6 +16,8 @@ impl ForeignKeyArguments {
         model: &str,
         field: &str,
     ) -> Result<Self, ModelCodegenError> {
+        arguments.expect_only(&["on_delete"], &[])?;
+
         let on_delete = match arguments.path("on_delete")? {
             None => quote!(margaret_model::on_delete::OnDelete::NoAction),
             Some(path) if path.is_ident("cascade") => {

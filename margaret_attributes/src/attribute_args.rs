@@ -1,3 +1,4 @@
+use quote::ToTokens;
 use syn::Attribute;
 use syn::Expr;
 use syn::Lit;
@@ -104,6 +105,32 @@ impl AttributeArgs {
         }
     }
 
+    pub fn expect_only(
+        &self,
+        allowed_named: &[&str],
+        allowed_positional_flags: &[&str],
+    ) -> Result<(), AttributeError> {
+        self.reject_unknown_named(allowed_named)?;
+
+        for expression in &self.positional {
+            let is_allowed_flag = match expression {
+                Expr::Path(path_expression) => allowed_positional_flags
+                    .iter()
+                    .any(|flag| path_expression.path.is_ident(*flag)),
+                _ => false,
+            };
+
+            if !is_allowed_flag {
+                return Err(AttributeError::UnexpectedPositionalArgument {
+                    argument: expression.to_token_stream().to_string(),
+                    attribute_path: self.attribute_path.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+
     #[must_use]
     pub fn has_positional_flag(&self, name: &str) -> bool {
         self.positional.iter().any(|expression| match expression {
@@ -144,6 +171,19 @@ impl AttributeArgs {
             Some(Expr::Path(expression)) => Some(&expression.path),
             _ => None,
         }
+    }
+
+    pub fn reject_unknown_named(&self, allowed_named: &[&str]) -> Result<(), AttributeError> {
+        for argument in &self.named {
+            if !allowed_named.contains(&argument.name.as_str()) {
+                return Err(AttributeError::UnknownNamedArgument {
+                    attribute_path: self.attribute_path.clone(),
+                    key: argument.name.clone(),
+                });
+            }
+        }
+
+        Ok(())
     }
 
     pub fn string(&self, key: &str) -> Result<Option<String>, AttributeError> {
@@ -276,5 +316,55 @@ mod tests {
 
         assert!(parsed.has_positional_flag("primary_key"));
         assert!(!parsed.has_positional_flag("unique"));
+    }
+
+    #[test]
+    fn expect_only_accepts_declared_named_and_positional_flags() {
+        let parsed = args(parse_quote!(#[column(primary_key, name = "id")]));
+
+        parsed
+            .expect_only(&["name"], &["primary_key", "unique"])
+            .expect("the declared arguments are accepted");
+    }
+
+    #[test]
+    fn expect_only_rejects_an_unknown_named_argument() {
+        let parsed = args(parse_quote!(#[index(nmae = "id")]));
+
+        let message = parsed
+            .expect_only(&["name"], &[])
+            .expect_err("the unknown named argument is rejected")
+            .to_string();
+
+        assert!(message.contains("unknown argument 'nmae'"));
+    }
+
+    #[test]
+    fn expect_only_rejects_an_unexpected_positional_flag() {
+        let parsed = args(parse_quote!(#[index(unexpected)]));
+
+        let message = parsed
+            .expect_only(&["name"], &[])
+            .expect_err("the unexpected positional is rejected")
+            .to_string();
+
+        assert!(message.contains("unexpected positional argument 'unexpected'"));
+    }
+
+    #[test]
+    fn expect_only_rejects_a_non_path_positional_argument() {
+        let parsed = args(parse_quote!(#[index(5)]));
+
+        assert!(parsed.expect_only(&["name"], &[]).is_err());
+    }
+
+    #[test]
+    fn reject_unknown_named_accepts_only_declared_keys() {
+        let parsed = args(parse_quote!(#[tagged(crate::Tag, attribute = Foo)]));
+
+        parsed
+            .reject_unknown_named(&["attribute"])
+            .expect("the declared named key is accepted");
+        assert!(parsed.reject_unknown_named(&[]).is_err());
     }
 }
