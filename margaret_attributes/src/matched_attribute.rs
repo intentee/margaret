@@ -54,6 +54,7 @@ mod tests {
             CanonicalPath::new(vec!["crate".to_string(), "Service".to_string()]),
             vec![attribute],
             Vec::new(),
+            Vec::new(),
         )
     }
 

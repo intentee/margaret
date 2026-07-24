@@ -26,13 +26,14 @@ async fn deleting_an_author_cascades_to_its_articles() {
         .expect("the author is inserted");
 
     query(
-        "INSERT INTO articles (id, title, body, cover, published, created_at, author_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "INSERT INTO articles (id, title, body, cover, published, status, created_at, author_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(Uuid::new_v4())
     .bind("A Discipline of Programming")
     .bind("the body text")
     .bind(None::<Vec<u8>>)
     .bind(true)
+    .bind("Published")
     .bind(Utc::now())
     .bind(author_id)
     .execute(pool)

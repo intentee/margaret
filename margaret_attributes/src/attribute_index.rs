@@ -65,6 +65,14 @@ impl AttributeIndex {
     }
 
     #[must_use]
+    pub fn item(&self, path: &CanonicalPath) -> Option<&IndexedItem> {
+        self.items
+            .binary_search_by(|item| item.canonical_path().cmp(path))
+            .ok()
+            .map(|index| &self.items[index])
+    }
+
+    #[must_use]
     pub fn items(&self) -> &[IndexedItem] {
         &self.items
     }

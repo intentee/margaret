@@ -58,6 +58,25 @@ pub enum ModelCodegenError {
     },
 
     #[error(
+        "column '{column}' of model '{model}' maps to enum '{enum_type}', which has no variants; an enum column requires at least one variant"
+    )]
+    EmptyEnumColumn {
+        column: String,
+        enum_type: String,
+        model: String,
+    },
+
+    #[error(
+        "column '{column}' of model '{model}' maps to enum '{enum_type}', whose variant '{variant}' carries data; only fieldless (unit) variants are supported"
+    )]
+    EnumColumnVariantNotUnit {
+        column: String,
+        enum_type: String,
+        model: String,
+        variant: String,
+    },
+
+    #[error(
         "foreign key field '{field}' of model '{model}' must also carry a #[column] attribute; #[foreign_key] layers on top of #[column]"
     )]
     ForeignKeyRequiresColumn { field: String, model: String },

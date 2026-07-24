@@ -15,6 +15,7 @@ pub mod indexed_field;
 pub mod indexed_item;
 pub mod indexed_method;
 pub mod indexed_trait_impl;
+pub mod indexed_variant;
 pub mod is_copy_primitive;
 pub mod is_snake_case_identifier;
 pub mod item_kind;

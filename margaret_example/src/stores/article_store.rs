@@ -14,6 +14,7 @@ use margaret_macros::provides_route_parameter;
 use margaret_macros::singleton;
 
 use crate::models::article::Article;
+use crate::models::article_status::ArticleStatus;
 use crate::models::author::Author;
 use crate::stores::article_store_error::ArticleStoreError;
 use crate::system_clock::SystemClock;
@@ -58,6 +59,7 @@ fn seed() -> Vec<Article> {
             body: "A public note from Milo.".to_string(),
             cover: None,
             published: true,
+            status: ArticleStatus::Published,
             created_at: at_epoch_seconds(1_704_067_200),
             author: milo(),
         },
@@ -67,6 +69,7 @@ fn seed() -> Vec<Article> {
             body: "An unpublished draft from Milo.".to_string(),
             cover: None,
             published: false,
+            status: ArticleStatus::Draft,
             created_at: at_epoch_seconds(1_704_153_600),
             author: milo(),
         },
@@ -76,6 +79,7 @@ fn seed() -> Vec<Article> {
             body: "An unpublished draft from Mona.".to_string(),
             cover: None,
             published: false,
+            status: ArticleStatus::Draft,
             created_at: at_epoch_seconds(1_704_240_000),
             author: mona(),
         },
@@ -147,6 +151,7 @@ impl ArticleStore {
             body,
             cover: None,
             published: false,
+            status: ArticleStatus::Draft,
             created_at: self.clock.now(),
             author,
         };

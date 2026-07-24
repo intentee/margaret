@@ -6,6 +6,7 @@ use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_field::IndexedField;
 use crate::indexed_method::IndexedMethod;
 use crate::indexed_trait_impl::IndexedTraitImpl;
+use crate::indexed_variant::IndexedVariant;
 use crate::item_kind::ItemKind;
 
 pub struct IndexedItem {
@@ -16,6 +17,7 @@ pub struct IndexedItem {
     kind: ItemKind,
     methods: Vec<IndexedMethod>,
     trait_impls: Vec<IndexedTraitImpl>,
+    variants: Vec<IndexedVariant>,
 }
 
 impl IndexedItem {
@@ -25,6 +27,7 @@ impl IndexedItem {
         canonical_path: CanonicalPath,
         attributes: Vec<Attribute>,
         fields: Vec<IndexedField>,
+        variants: Vec<IndexedVariant>,
     ) -> Self {
         Self {
             attributes: attributes.into_iter().map(IndexedAttribute::new).collect(),
@@ -34,6 +37,7 @@ impl IndexedItem {
             kind,
             methods: Vec::new(),
             trait_impls: Vec::new(),
+            variants,
         }
     }
 
@@ -77,6 +81,11 @@ impl IndexedItem {
     #[must_use]
     pub fn trait_impls(&self) -> &[IndexedTraitImpl] {
         &self.trait_impls
+    }
+
+    #[must_use]
+    pub fn variants(&self) -> &[IndexedVariant] {
+        &self.variants
     }
 
     pub(crate) fn add_method(&mut self, method: IndexedMethod) {

@@ -29,13 +29,14 @@ async fn applies_the_generated_schema_and_round_trips_a_model() {
     let cover: Vec<u8> = vec![0x89, 0x50, 0x4e, 0x47];
 
     query(
-        "INSERT INTO articles (id, title, body, cover, published, created_at, author_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "INSERT INTO articles (id, title, body, cover, published, status, created_at, author_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(article_id)
     .bind("On Computable Numbers")
     .bind("the body text")
     .bind(&cover)
     .bind(true)
+    .bind("Published")
     .bind(Utc::now())
     .bind(author_id)
     .execute(pool)
