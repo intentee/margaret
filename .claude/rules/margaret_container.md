@@ -13,4 +13,3 @@ paths:
 - all the dependencies must be constructed lazily - exactly when they are needed, but at most once over the entire application's lifecycle
 - injected dependencies must not put any overhead on runtime (there must be no dependency on the container from the point of view of a `#[singleton]`, once the `#[singleton]` is constructed)
 - container needs to be async by default; sync initialization must not be supported
-- `#[singleton(provides = Trait)]` is the single way to bind a trait to its implementation

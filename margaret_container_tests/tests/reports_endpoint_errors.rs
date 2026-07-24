@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use margaret_attributes::attribute_error::AttributeError;
 use margaret_container::container_error::ContainerError;
 use margaret_container_tests::generate_container_source::generate_container_source;
 
@@ -20,10 +21,36 @@ fn rejects_a_provides_endpoint_on_a_non_struct() {
 }
 
 #[test]
-fn rejects_an_endpoint_provider_that_is_also_a_singleton() {
+fn rejects_an_endpoint_provider_that_is_also_a_service() {
     assert!(matches!(
         error("endpoint_conflicting_role"),
         ContainerError::ConflictingEndpointRole { .. }
+    ));
+}
+
+#[test]
+fn rejects_an_endpoint_provider_without_a_singleton() {
+    assert!(matches!(
+        error("endpoint_without_singleton"),
+        ContainerError::EndpointProviderRequiresSingleton { .. }
+    ));
+}
+
+#[test]
+fn rejects_an_endpoint_provider_that_carries_singleton_arguments() {
+    assert!(matches!(
+        error("endpoint_singleton_with_arguments"),
+        ContainerError::SingletonHasArguments { .. }
+    ));
+}
+
+#[test]
+fn rejects_an_endpoint_provider_with_malformed_singleton_arguments() {
+    assert!(matches!(
+        error("endpoint_malformed_singleton_arguments"),
+        ContainerError::Index {
+            source: AttributeError::AttributeArguments { .. }
+        }
     ));
 }
 

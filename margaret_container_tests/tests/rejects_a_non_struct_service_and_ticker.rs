@@ -10,7 +10,7 @@ fn rejects_a_non_struct_service() {
     let error = generate_container_source("crate", &directory)
         .expect_err("a #[service] on a non-struct must be rejected");
 
-    assert!(matches!(error, ContainerError::NotASingletonStruct { .. }));
+    assert!(matches!(error, ContainerError::RoleNotAStruct { .. }));
 }
 
 #[test]
@@ -20,5 +20,5 @@ fn rejects_a_non_struct_ticker() {
     let error = generate_container_source("crate", &directory)
         .expect_err("a #[scheduled_with_tick_timer] on a non-struct must be rejected");
 
-    assert!(matches!(error, ContainerError::NotASingletonStruct { .. }));
+    assert!(matches!(error, ContainerError::RoleNotAStruct { .. }));
 }

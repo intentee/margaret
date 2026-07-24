@@ -27,10 +27,14 @@ pub enum ContainerError {
     #[error("#[provides_endpoint] is only supported on structs, but '{path}' is not a struct")]
     NotAnEndpointStruct { path: String },
 
-    #[error(
-        "the endpoint provider '{path}' must not also be declared as a #[singleton], #[service], or #[scheduled_with_tick_timer]"
-    )]
+    #[error("the endpoint provider '{path}' must not also carry a role attribute")]
     ConflictingEndpointRole { path: String },
+
+    #[error("#[singleton] does not take any arguments, but '{path}' declares some")]
+    SingletonHasArguments { path: String },
+
+    #[error("the endpoint provider '{path}' must also be declared as a #[singleton]")]
+    EndpointProviderRequiresSingleton { path: String },
 
     #[error(
         "the endpoint provider '{path}' does not implement margaret_endpoint::provides_endpoint::ProvidesEndpoint"
@@ -39,6 +43,9 @@ pub enum ContainerError {
 
     #[error("#[singleton] is only supported on structs, but '{path}' is not a struct")]
     NotASingletonStruct { path: String },
+
+    #[error("a role attribute is only supported on structs, but '{path}' is not a struct")]
+    RoleNotAStruct { path: String },
 
     #[error(
         "singleton '{singleton}' has {field_count} field(s) but no #[constructor] method; only fieldless singletons may omit a #[constructor]"
@@ -54,23 +61,10 @@ pub enum ContainerError {
     #[error("the #[constructor] of singleton '{singleton}' must return Self")]
     ConstructorReturnTypeMismatch { singleton: String },
 
-    #[error("two singletons provide the same type '{provided}': '{first}' and '{second}'")]
-    DuplicateProvider {
-        provided: String,
-        first: String,
-        second: String,
-    },
-
     #[error(
         "the framework-provided injectable '{path}' collides with a singleton declared at the same path"
     )]
     AmbiguousFrameworkProvider { path: String },
-
-    #[error("the provided interface '{written}' of singleton '{singleton}' matches no trait")]
-    ProvidesUnresolvable { singleton: String, written: String },
-
-    #[error("the collection trait '{written}' of singleton '{singleton}' matches no trait")]
-    CollectionUnresolvable { singleton: String, written: String },
 
     #[error(
         "parameter '{parameter}' of singleton '{singleton}' has an unsupported type '{written}'"

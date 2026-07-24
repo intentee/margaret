@@ -3,7 +3,7 @@ use std::path::Path;
 use margaret_container_tests::generate_container_source::generate_container_source;
 
 #[test]
-fn registers_services_and_tickers_as_singletons() {
+fn constructs_services_and_tickers_lazily() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/services");
     let generated = generate_container_source("crate", &directory)
         .expect("the services fixture generates a container");

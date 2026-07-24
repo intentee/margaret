@@ -4,9 +4,7 @@ use chrono::Utc;
 use margaret_macros::constructor;
 use margaret_macros::singleton;
 
-use crate::clock::Clock;
-
-#[singleton(provides = Clock)]
+#[singleton]
 pub struct SystemClock;
 
 impl SystemClock {
@@ -15,10 +13,9 @@ impl SystemClock {
     pub fn create() -> Self {
         Self
     }
-}
 
-impl Clock for SystemClock {
-    fn now(&self) -> DateTime<Utc> {
+    #[must_use]
+    pub fn now(&self) -> DateTime<Utc> {
         Utc::now()
     }
 }

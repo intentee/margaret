@@ -141,21 +141,11 @@ impl Banner {
     }
 
     #[test]
-    fn rejects_a_view_without_a_singleton() {
-        assert!(
-            rejection("#[renders_view(name = \"bad\")]\nstruct Bad;\n")
-                .contains("must also carry #[singleton]")
-        );
-    }
+    fn accepts_a_view_without_a_singleton() {
+        let source = formatted(generated("#[renders_view(name = \"plain\")]\nstruct Plain;\n").modules);
 
-    #[test]
-    fn rejects_a_view_that_provides_an_interface() {
-        assert!(
-            rejection(
-                "#[renders_view(name = \"bad\")]\n#[singleton(provides = SomeTrait)]\nstruct Bad;\n"
-            )
-            .contains("renders as its concrete type")
-        );
+        assert!(source.contains("pub plain: ::std::sync::Arc<crate::Plain>"));
+        assert!(source.contains("plain: container.plain().await"));
     }
 
     #[test]
@@ -207,24 +197,6 @@ impl Banner {
         assert!(
             rejection("#[renders_view(name = 5)]\n#[singleton]\nstruct Bad;\n")
                 .contains("failed to index the crate")
-        );
-    }
-
-    #[test]
-    fn propagates_malformed_singleton_arguments() {
-        assert!(
-            rejection("#[renders_view(name = \"bad\")]\n#[singleton(= 5)]\nstruct Bad;\n")
-                .contains("failed to index the crate")
-        );
-    }
-
-    #[test]
-    fn propagates_a_non_path_singleton_provides() {
-        assert!(
-            rejection(
-                "#[renders_view(name = \"bad\")]\n#[singleton(provides = \"s\")]\nstruct Bad;\n"
-            )
-            .contains("failed to index the crate")
         );
     }
 

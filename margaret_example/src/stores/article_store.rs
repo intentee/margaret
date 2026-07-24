@@ -13,10 +13,10 @@ use margaret_macros::constructor;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::singleton;
 
-use crate::clock::Clock;
 use crate::models::article::Article;
 use crate::models::author::Author;
 use crate::stores::article_store_error::ArticleStoreError;
+use crate::system_clock::SystemClock;
 
 const FIRST_AUTHORED_ID: u64 = 103;
 
@@ -87,13 +87,14 @@ fn seed() -> Vec<Article> {
 pub struct ArticleStore {
     articles: DashMap<Uuid, Article>,
     authors: Vec<Author>,
-    clock: Arc<dyn Clock>,
+    clock: Arc<SystemClock>,
     next_id: AtomicU64,
 }
 
 impl ArticleStore {
     #[constructor]
-    pub fn create(clock: Arc<dyn Clock>) -> Self {
+    #[must_use]
+    pub fn create(clock: Arc<SystemClock>) -> Self {
         let articles = DashMap::new();
 
         for article in seed() {
