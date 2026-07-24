@@ -151,27 +151,8 @@ fn resolve_index_memberships(
     Ok(memberships)
 }
 
-fn ensure_index_not_redundant(
-    column: &str,
-    primary_key_names: &HashSet<String>,
-    unique_column_names: &HashSet<String>,
-    model: &str,
-) -> Result<(), ModelCodegenError> {
-    if primary_key_names.contains(column) {
-        return Err(ModelCodegenError::RedundantIndexOnPrimaryKeyColumn {
-            column: column.to_string(),
-            model: model.to_string(),
-        });
-    }
-
-    if unique_column_names.contains(column) {
-        return Err(ModelCodegenError::RedundantIndexOnUniqueColumn {
-            column: column.to_string(),
-            model: model.to_string(),
-        });
-    }
-
-    Ok(())
+fn column_list(columns: &[String]) -> String {
+    columns.join(", ")
 }
 
 fn register_table_name(
@@ -497,8 +478,6 @@ fn collect_models(
 fn resolve_indexes(
     table: &str,
     columns: &[ResolvedColumn],
-    primary_key_names: &HashSet<String>,
-    unique_column_names: &HashSet<String>,
     model: &str,
 ) -> Result<Vec<ResolvedIndex>, ModelCodegenError> {
     let mut indexes: Vec<ResolvedIndex> = Vec::new();
@@ -508,13 +487,6 @@ fn resolve_indexes(
         for membership in &column.indexes {
             match membership {
                 IndexMembership::Derived => {
-                    ensure_index_not_redundant(
-                        &column.name,
-                        primary_key_names,
-                        unique_column_names,
-                        model,
-                    )?;
-
                     let name = index_name(table, &column.name).map_err(|source| {
                         ModelCodegenError::IndexNameTooLong {
                             model: model.to_string(),
@@ -540,17 +512,11 @@ fn resolve_indexes(
     for (name, mut members) in named_groups {
         members.sort_by_key(|(position, _)| *position);
 
-        let index_columns: Vec<String> = members
-            .into_iter()
-            .map(|(_, column_name)| column_name)
-            .collect();
-
-        if let [only] = index_columns.as_slice() {
-            ensure_index_not_redundant(only, primary_key_names, unique_column_names, model)?;
-        }
-
         indexes.push(ResolvedIndex {
-            columns: index_columns,
+            columns: members
+                .into_iter()
+                .map(|(_, column_name)| column_name)
+                .collect(),
             name,
         });
     }
@@ -558,6 +524,50 @@ fn resolve_indexes(
     indexes.sort_by(|left, right| left.name.cmp(&right.name));
 
     Ok(indexes)
+}
+
+fn validate_index_redundancy(
+    indexes: &[ResolvedIndex],
+    primary_key: &[String],
+    unique_constraints: &[ResolvedUniqueConstraint],
+    model: &str,
+) -> Result<(), ModelCodegenError> {
+    let mut covered_column_lists: HashMap<&[String], &str> = HashMap::new();
+
+    for index in indexes {
+        if primary_key.starts_with(&index.columns) {
+            return Err(ModelCodegenError::IndexCoveredByPrimaryKey {
+                columns: column_list(&index.columns),
+                index: index.name.clone(),
+                model: model.to_string(),
+                primary_key: column_list(primary_key),
+            });
+        }
+
+        for unique_constraint in unique_constraints {
+            if unique_constraint.columns.starts_with(&index.columns) {
+                return Err(ModelCodegenError::IndexCoveredByUniqueConstraint {
+                    columns: column_list(&index.columns),
+                    index: index.name.clone(),
+                    model: model.to_string(),
+                    unique_constraint: column_list(&unique_constraint.columns),
+                });
+            }
+        }
+
+        if let Some(first) = covered_column_lists.get(index.columns.as_slice()) {
+            return Err(ModelCodegenError::DuplicateIndexColumns {
+                columns: column_list(&index.columns),
+                first: (*first).to_string(),
+                model: model.to_string(),
+                second: index.name.clone(),
+            });
+        }
+
+        covered_column_lists.insert(&index.columns, &index.name);
+    }
+
+    Ok(())
 }
 
 fn resolve_model(
@@ -649,14 +659,12 @@ fn resolve_model(
     }
 
     let mut unique_constraints: Vec<ResolvedUniqueConstraint> = Vec::new();
-    let mut unique_column_names: HashSet<String> = HashSet::new();
 
     for column in &columns {
         if column.unique {
             unique_constraints.push(ResolvedUniqueConstraint {
                 columns: vec![column.name.clone()],
             });
-            unique_column_names.insert(column.name.clone());
         }
     }
 
@@ -665,19 +673,12 @@ fn resolve_model(
             unique_constraints.push(ResolvedUniqueConstraint {
                 columns: vec![foreign_key.column.clone()],
             });
-            unique_column_names.insert(foreign_key.column.clone());
         }
     }
 
-    let primary_key_names: HashSet<String> = primary_key.iter().cloned().collect();
+    let indexes = resolve_indexes(&table, &columns, &model)?;
 
-    let indexes = resolve_indexes(
-        &table,
-        &columns,
-        &primary_key_names,
-        &unique_column_names,
-        &model,
-    )?;
+    validate_index_redundancy(&indexes, &primary_key, &unique_constraints, &model)?;
 
     Ok(Model {
         columns,

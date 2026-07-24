@@ -35,7 +35,34 @@ mod tests {
     use margaret_attributes::crate_root::CrateRoot;
 
     use crate::has_models::has_models;
+    use crate::model::Model;
     use crate::models::models;
+
+    const LORE_LOCK_INDEXED_BY_HASH: &str = "\
+#[model(table = \"lore_locks\")]
+struct LoreLock {
+    #[column(primary_key)]
+    repository: String,
+    #[column(primary_key)]
+    branch: String,
+    #[column(primary_key)]
+    #[index]
+    hash: String,
+}
+";
+
+    const LORE_LOCK_INDEXED_BY_REPOSITORY: &str = "\
+#[model(table = \"lore_locks\")]
+struct LoreLock {
+    #[column(primary_key)]
+    #[index]
+    repository: String,
+    #[column(primary_key)]
+    branch: String,
+    #[column(primary_key)]
+    hash: String,
+}
+";
 
     const ARTICLE: &str = "\
 #[model(table = \"articles\")]
@@ -439,7 +466,7 @@ struct S {
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[index]\n    email: String,\n}\n",
             )
-            .contains("a unique constraint is already indexed")
+            .contains("a leading prefix of the unique constraint (email)")
         );
     }
 
@@ -449,7 +476,7 @@ struct S {
             error_message(&with_author(
                 "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[foreign_key]\n    #[index]\n    author: Author,\n}\n",
             ))
-            .contains("a unique constraint is already indexed")
+            .contains("a leading prefix of the unique constraint (author_id)")
         );
     }
 
@@ -459,7 +486,7 @@ struct S {
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    #[index]\n    id: uuid::Uuid,\n}\n",
             )
-            .contains("a primary key is already indexed")
+            .contains("a leading prefix of the primary key (id)")
         );
     }
 
@@ -509,7 +536,7 @@ struct S {
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[index(name = \"solo\")]\n    email: String,\n}\n",
             )
-            .contains("is redundant")
+            .contains("index 'solo' of model 'crate::S' over (email) is redundant")
         );
     }
 
@@ -664,14 +691,77 @@ struct Book {
         );
     }
 
-    fn table_order(lib_source: &str) -> Vec<String> {
+    fn resolved_models(lib_source: &str) -> Vec<Model> {
         let directory = crate_with(lib_source);
 
-        models(&index_of(directory.path()))
-            .expect("the models resolve")
+        models(&index_of(directory.path())).expect("the models resolve")
+    }
+
+    fn index_columns(model: &Model) -> Vec<Vec<String>> {
+        model
+            .indexes
+            .iter()
+            .map(|index| index.columns.clone())
+            .collect()
+    }
+
+    fn index_names(model: &Model) -> Vec<String> {
+        model
+            .indexes
+            .iter()
+            .map(|index| index.name.clone())
+            .collect()
+    }
+
+    fn sole_model(lib_source: &str) -> Model {
+        let mut resolved = resolved_models(lib_source);
+
+        assert_eq!(resolved.len(), 1, "the source declares exactly one model");
+
+        resolved.remove(0)
+    }
+
+    fn table_order(lib_source: &str) -> Vec<String> {
+        resolved_models(lib_source)
             .into_iter()
             .map(|model| model.table)
             .collect()
+    }
+
+    #[test]
+    fn accepts_an_index_on_a_non_leading_primary_key_column() {
+        let model = sole_model(LORE_LOCK_INDEXED_BY_HASH);
+
+        assert_eq!(model.primary_key, ["repository", "branch", "hash"]);
+        assert_eq!(index_names(&model), ["lore_locks_hash_index"]);
+        assert_eq!(index_columns(&model), [["hash"]]);
+    }
+
+    #[test]
+    fn rejects_an_index_on_a_leading_prefix_of_a_composite_primary_key() {
+        assert!(
+            error_message(LORE_LOCK_INDEXED_BY_REPOSITORY)
+                .contains("a leading prefix of the primary key (repository, branch, hash)")
+        );
+    }
+
+    #[test]
+    fn accepts_an_index_that_extends_the_primary_key() {
+        let model = sole_model(
+            "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    #[index(name = \"wide\")]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"wide\")]\n    title: String,\n}\n",
+        );
+
+        assert_eq!(index_columns(&model), [["id", "title"]]);
+    }
+
+    #[test]
+    fn rejects_two_indexes_over_the_same_columns() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    #[index(name = \"solo\")]\n    value: String,\n}\n",
+            )
+            .contains("indexes 'solo' and 't_value_index' of model 'crate::S' both cover (value)")
+        );
     }
 
     #[test]

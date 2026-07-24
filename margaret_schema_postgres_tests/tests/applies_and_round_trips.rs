@@ -3,6 +3,8 @@ use sqlx::query;
 use sqlx::query_as;
 use uuid::Uuid;
 
+use margaret_example::margaret::schema::schema;
+
 use margaret_schema_postgres_tests::apply_schema::apply_schema;
 use margaret_schema_postgres_tests::start_database::start_database;
 
@@ -11,7 +13,7 @@ async fn applies_the_generated_schema_and_round_trips_a_model() {
     let database = start_database().await;
     let pool = database.pool();
 
-    apply_schema(pool).await;
+    apply_schema(pool, &schema()).await;
 
     let author_id = Uuid::new_v4();
 

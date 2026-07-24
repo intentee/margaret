@@ -214,12 +214,32 @@ pub enum ModelCodegenError {
     },
 
     #[error(
-        "the single-column index on column '{column}' of model '{model}' is redundant; a unique constraint is already indexed"
+        "index '{index}' of model '{model}' over ({columns}) is redundant; those columns are a leading prefix of the primary key ({primary_key}), which PostgreSQL already indexes"
     )]
-    RedundantIndexOnUniqueColumn { column: String, model: String },
+    IndexCoveredByPrimaryKey {
+        columns: String,
+        index: String,
+        model: String,
+        primary_key: String,
+    },
 
     #[error(
-        "the single-column index on column '{column}' of model '{model}' is redundant; a primary key is already indexed"
+        "index '{index}' of model '{model}' over ({columns}) is redundant; those columns are a leading prefix of the unique constraint ({unique_constraint}), which PostgreSQL already indexes"
     )]
-    RedundantIndexOnPrimaryKeyColumn { column: String, model: String },
+    IndexCoveredByUniqueConstraint {
+        columns: String,
+        index: String,
+        model: String,
+        unique_constraint: String,
+    },
+
+    #[error(
+        "indexes '{first}' and '{second}' of model '{model}' both cover ({columns}); each index must cover a distinct column list"
+    )]
+    DuplicateIndexColumns {
+        columns: String,
+        first: String,
+        model: String,
+        second: String,
+    },
 }
