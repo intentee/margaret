@@ -9,8 +9,8 @@ use margaret_injection_codegen::process_method::process_method;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
+use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
-use margaret_request_binding_codegen::route_parameter_binders::route_parameter_binders;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::http_codegen_error::HttpCodegenError;
@@ -21,9 +21,9 @@ use crate::http_route_table::HttpRouteTable;
 pub(crate) fn http_routes(
     index: &AttributeIndex,
     middleware_plans: &[MiddlewarePlan],
+    registries: &BindingRegistries,
 ) -> Result<HttpRouteTable, HttpCodegenError> {
     let selector = AttributeSelector::from_marker("responds_to_http");
-    let binders = route_parameter_binders(index)?;
     let mut table = HttpRouteTable::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
 
@@ -64,7 +64,7 @@ pub(crate) fn http_routes(
                 server: &server,
                 subject: &subject,
             },
-            &binders,
+            registries,
         )?;
 
         if let Some(name) = &name {
@@ -91,6 +91,7 @@ pub(crate) fn http_routes(
             HttpRoute {
                 layers,
                 method,
+                method_name: format_ident!("{}", handler_method.identifier()),
                 name,
                 responder_field: format_ident!("{}", identifier.field()),
                 responder_path: item.canonical_path().clone(),

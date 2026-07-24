@@ -1,12 +1,16 @@
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::middleware_plans::middleware_plans;
 use margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers;
+use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 
 use crate::build_context::BuildContext;
 use crate::codegen_error::CodegenError;
 
-pub(crate) fn middleware_pass(context: &mut BuildContext) -> Result<(), CodegenError> {
-    let plans = middleware_plans(context.index())?;
+pub(crate) fn middleware_pass(
+    context: &mut BuildContext,
+    registries: &BindingRegistries,
+) -> Result<(), CodegenError> {
+    let plans = middleware_plans(context.index(), registries)?;
     let capabilities = context.capabilities();
 
     if capabilities.has_middleware && (capabilities.has_http || capabilities.has_websockets) {

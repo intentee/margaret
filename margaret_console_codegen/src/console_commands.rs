@@ -10,6 +10,7 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
+use margaret_injection_codegen::request_binding_marker::request_binding_marker;
 
 use crate::console_codegen_error::ConsoleCodegenError;
 use crate::console_command::ConsoleCommand;
@@ -28,6 +29,14 @@ fn validate_runner(
     command: &str,
 ) -> Result<(), ConsoleCodegenError> {
     for view in parameters(runner.signature()) {
+        if let Some(name) = request_binding_marker(view.attributes) {
+            return Err(ConsoleCodegenError::ConsoleCommandRunnerRequestBinding {
+                command: command.to_string(),
+                parameter: view.holder.to_string(),
+                marker: name.to_string(),
+            });
+        }
+
         if !is_cancellation_token(index, item, view.declared) {
             return Err(ConsoleCodegenError::ConsoleCommandRunnerArgument {
                 command: command.to_string(),

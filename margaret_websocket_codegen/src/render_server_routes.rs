@@ -30,7 +30,6 @@ pub(crate) fn server_console_arguments(
 pub(crate) fn render_server_routes(
     server: &str,
     sessions: &[&SessionPlan],
-    has_views: bool,
     bindings: &ContainerBindings,
 ) -> TokenStream {
     let function = format_ident!("{server}_routes");
@@ -42,16 +41,6 @@ pub(crate) fn render_server_routes(
     } else {
         format_ident!("_routes")
     };
-    let views_name = if sessions
-        .iter()
-        .any(|session_plan| session_plan.session.injects_views())
-    {
-        format_ident!("views")
-    } else {
-        format_ident!("_views")
-    };
-    let views_parameter =
-        has_views.then(|| quote! { #views_name: &::std::sync::Arc<super::views::Views>, });
     let console_parameters =
         bindings.console_parameters(&server_console_arguments(sessions, bindings));
     let entries = sessions.iter().map(|session_plan| {
@@ -61,10 +50,6 @@ pub(crate) fn render_server_routes(
             .session
             .injects_routes()
             .then(|| quote! { routes, });
-        let views_argument = session_plan
-            .session
-            .injects_views()
-            .then(|| quote! { views, });
         let console_forward =
             bindings.console_forwards(&session_console_arguments(session_plan, bindings));
         let middleware = if session_plan.session.layers.is_empty() {
@@ -80,13 +65,13 @@ pub(crate) fn render_server_routes(
         quote! {
             margaret_http::route_entry::RouteEntry::web_socket(
                 #path,
-                #module::upgrade_entry(container, #(#console_forward)* #routes_argument #views_argument).await,
+                #module::upgrade_entry(container, #(#console_forward)* #routes_argument).await,
                 #middleware,
             ),
         }
     });
 
-    let parameter_count = 2 + console_parameters.len() + usize::from(views_parameter.is_some());
+    let parameter_count = 2 + console_parameters.len();
     let too_many_arguments = too_many_arguments_expect(parameter_count);
 
     quote! {
@@ -95,7 +80,6 @@ pub(crate) fn render_server_routes(
             container: &super::container::Container,
             #(#console_parameters)*
             #routes_name: &::std::sync::Arc<super::routes::Routes>,
-            #views_parameter
         ) -> ::std::vec::Vec<margaret_http::route_entry::RouteEntry> {
             ::std::vec::Vec::from([#(#entries)*])
         }

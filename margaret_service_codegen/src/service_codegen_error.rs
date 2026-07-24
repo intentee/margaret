@@ -22,6 +22,15 @@ pub enum ServiceCodegenError {
     )]
     RunnerArgument { path: String, parameter: String },
 
+    #[error(
+        "parameter '{parameter}' of the #[process] runner of '{path}' carries #[{marker}], which is only available in an HTTP responder, an HTTP middleware, a WebSocket session builder, or an #[infer_from_request] method"
+    )]
+    RunnerRequestBinding {
+        marker: String,
+        parameter: String,
+        path: String,
+    },
+
     #[error("#[service] is only supported on structs, but '{path}' is not a struct")]
     ServiceNotAStruct { path: String },
 

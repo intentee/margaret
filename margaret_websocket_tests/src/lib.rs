@@ -11,6 +11,7 @@ pub mod ping_dispatch;
 pub mod ping_handler;
 pub mod ping_message;
 pub mod raw_http_exchange;
+pub mod redirecting_session_factory;
 pub mod rejecting_session_factory;
 pub mod response_chunk;
 pub mod running_websocket_server;

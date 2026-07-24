@@ -6,6 +6,9 @@ use syn::FnArg;
 use syn::ImplItemFn;
 use syn::ItemStruct;
 
+const REQUEST_BINDING_MARKERS: [&str; 3] =
+    ["authenticated_user", "route_parameter", "form_request"];
+
 #[proc_macro_attribute]
 pub fn singleton(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
@@ -28,7 +31,7 @@ pub fn scheduled_with_tick_timer(_attributes: TokenStream, item: TokenStream) ->
 
 #[proc_macro_attribute]
 pub fn process(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, &["route_parameter", "form_request"])
+    strip_parameter_markers(item, &REQUEST_BINDING_MARKERS)
 }
 
 #[proc_macro_attribute]
@@ -54,6 +57,16 @@ pub fn provides_endpoint(_attributes: TokenStream, item: TokenStream) -> TokenSt
 #[proc_macro_attribute]
 pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
+}
+
+#[proc_macro_attribute]
+pub fn infers_authenticated_user(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn infer_from_request(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    strip_parameter_markers(item, &REQUEST_BINDING_MARKERS)
 }
 
 #[proc_macro_attribute]
@@ -83,7 +96,7 @@ pub fn websocket_message(_attributes: TokenStream, item: TokenStream) -> TokenSt
 
 #[proc_macro_attribute]
 pub fn build_for_session(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, &["route_parameter", "form_request"])
+    strip_parameter_markers(item, &REQUEST_BINDING_MARKERS)
 }
 
 fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {
@@ -209,6 +222,27 @@ mod tests {
         assert!(!stripped.contains("form_request"));
         assert!(stripped.contains("id"));
         assert!(stripped.contains("form"));
+    }
+
+    #[test]
+    fn removes_authenticated_user_markers_from_parameters() {
+        let stripped = strip_or_compile_error(
+            quote! {
+                pub async fn respond(
+                    &self,
+                    #[authenticated_user] author: Author,
+                    #[authenticated_user] moderator: Option<Moderator>,
+                ) -> Response {
+                    Response::text(200, author.name)
+                }
+            },
+            &["authenticated_user", "route_parameter", "form_request"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("authenticated_user"));
+        assert!(stripped.contains("author"));
+        assert!(stripped.contains("moderator"));
     }
 
     #[test]

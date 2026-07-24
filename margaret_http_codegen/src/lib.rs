@@ -34,6 +34,8 @@ mod tests {
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
+    use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+    use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 
     use crate::has_responders::has_responders;
     use crate::http_codegen_error::HttpCodegenError;
@@ -52,6 +54,19 @@ mod tests {
         BTreeMap::new()
     }
 
+    fn views_availability(has_views: bool) -> ViewsAvailability {
+        if has_views {
+            ViewsAvailability::Available
+        } else {
+            ViewsAvailability::Unavailable
+        }
+    }
+
+    fn registries_for(index: &AttributeIndex, has_views: bool) -> BindingRegistries {
+        BindingRegistries::collect(index, views_availability(has_views))
+            .expect("the binding registries are collected")
+    }
+
     fn http_source(
         crate_name: &str,
         source_directory: &Path,
@@ -60,7 +75,8 @@ mod tests {
         let index = AttributeIndexBuilder::new()
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
-        let plans = middleware_plans(&index)?;
+        let registries = BindingRegistries::collect(&index, views_availability(has_views))?;
+        let plans = middleware_plans(&index, &registries)?;
         let bindings = bindings_for(&index);
 
         Ok(render_http(
@@ -70,6 +86,7 @@ mod tests {
             &plans,
             &bindings,
             &no_websocket_arguments(),
+            &registries,
         )?
         .into_modules()
         .into_iter()
@@ -141,9 +158,310 @@ impl GetUser {
 }
 "#;
 
+    const AUTHENTICATED_RESPONDER: &str = r#"
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[constructor]
+    fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
+
+    #[infer_from_request]
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> AuthenticatedUserOutcome<User> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/profile", server = "public")]
+struct GetProfile;
+
+impl GetProfile {
+    #[process]
+    fn present(&self, #[authenticated_user] user: User) -> Response {}
+}
+"#;
+
+    #[test]
+    fn builds_the_authenticated_user_provider_once_per_route_handler() {
+        let source: String = source_for(AUTHENTICATED_RESPONDER)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(
+            "letsession_user_provider=std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(console_argument_0.to_owned()).await,routes:routes.clone(),});"
+        ));
+        assert!(source.contains("letsession_user_provider=session_user_provider.clone();"));
+        assert!(source.contains(
+            "margaret_identity::require_authenticated_user::require_authenticated_user(margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(session_user_provider.as_ref(),request,).await,)"
+        ));
+    }
+
+    #[test]
+    fn registers_the_console_arguments_of_an_authenticated_user_provider() {
+        let source: String = source_for(AUTHENTICATED_RESPONDER)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains("console_argument_0:&str,"));
+    }
+
+    #[test]
+    fn calls_the_process_method_by_the_name_the_responder_declares() {
+        let source: String = source_for(AUTHENTICATED_RESPONDER)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains("responder.present(user).await"));
+    }
+
+    #[test]
+    fn hands_the_views_to_an_authenticated_user_provider_that_renders_them() {
+        let source: String = source_for_with_views(
+            "use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> AuthenticatedUserOutcome<User> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n",
+        )
+        .split_whitespace()
+        .collect();
+
+        assert!(source.contains("views:views.clone(),"));
+    }
+
+    #[test]
+    fn rejects_a_route_parameter_binder_that_is_not_a_singleton() {
+        assert!(
+            error_for(
+                "struct User;\n\n#[provides_route_parameter]\nstruct UserBinder;\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n"
+            )
+            .contains("must also be declared as a #[singleton]")
+        );
+    }
+
+    #[test]
+    fn rejects_an_authenticated_user_in_a_middleware() {
+        assert!(
+            error_for(
+                "use margaret_http::next::Next;\nuse margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> ResponseContinuation {}\n}\n"
+            )
+            .contains("only available in an HTTP responder")
+        );
+    }
+
+    const COLLIDING_PROVIDER: &str = r#"
+use margaret_http::request::Request;
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct Session;
+
+impl Session {
+    #[infer_from_request]
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/profile", server = "public")]
+struct GetProfile;
+
+impl GetProfile {
+    #[process]
+    fn respond(&self, session: &Request, #[authenticated_user] user: User) -> Response {}
+}
+"#;
+
+    #[test]
+    fn keeps_a_captured_provider_clear_of_a_parameter_that_takes_its_name() {
+        let source: String = source_for(COLLIDING_PROVIDER).split_whitespace().collect();
+
+        assert!(source.contains(
+            "letsession_2=std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session().await,});"
+        ));
+        assert!(source.contains("letsession_2=session_2.clone();"));
+        assert!(source.contains("letsession=request;"));
+        assert!(source.contains(
+            "margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(session_2.as_ref(),request,)"
+        ));
+    }
+
+    const COLLIDING_BINDER: &str = r#"
+struct User;
+
+struct Filters;
+
+#[singleton]
+#[provides_route_parameter]
+struct Store;
+
+impl HttpRouteParameterBinder for Store {
+    type Model = User;
+    async fn bind(&self, value: String) -> Option<User> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/users/{user}", server = "public")]
+struct GetUser;
+
+impl GetUser {
+    #[process]
+    fn respond(
+        &self,
+        #[form_request(from = Query)] store: Filters,
+        #[route_parameter(from = "user")] user: User,
+    ) -> Response {}
+}
+"#;
+
+    #[test]
+    fn keeps_a_captured_binder_clear_of_a_parameter_that_takes_its_name() {
+        let source: String = source_for(COLLIDING_BINDER).split_whitespace().collect();
+
+        assert!(source.contains("letstore_2=container.store().await;"));
+        assert!(source.contains("letstore_2=store_2.clone();"));
+        assert!(source.contains(
+            "margaret_http::require_bound_route_parameter::require_bound_route_parameter(request,\"user\",store_2.as_ref(),)"
+        ));
+    }
+
+    const ASSET_BAG_NAMED_REQUEST: &str = r#"
+#[singleton]
+#[responds_to_http(method = "get", path = "/assets/{id}", server = "public")]
+struct GetAsset;
+
+impl GetAsset {
+    #[process]
+    fn respond(
+        &self,
+        request: margaret_asset_bag::asset_bag::AssetBag,
+        #[route_parameter(from = "id")] id: String,
+    ) -> Response {}
+}
+"#;
+
+    #[test]
+    fn keeps_the_request_clear_of_an_asset_bag_that_takes_its_name() {
+        let source: String = source_for(ASSET_BAG_NAMED_REQUEST)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains("request_2:&margaret_http::request::Request"));
+        assert!(source.contains("letrequest=::margaret_asset_bag::asset_bag::AssetBag::new();"));
+        assert!(source.contains(
+            "margaret_http::require_route_parameter::require_route_parameter(request_2,\"id\",)"
+        ));
+    }
+
+    const PROVIDER_THAT_ALSO_BINDS: &str = r#"
+use margaret_http::request::Request;
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+
+struct User;
+
+struct Article;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+#[provides_route_parameter]
+struct Store;
+
+impl Store {
+    #[infer_from_request]
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+}
+
+impl HttpRouteParameterBinder for Store {
+    type Model = Article;
+    async fn bind(&self, value: String) -> Option<Article> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/articles/{article}", server = "public")]
+struct GetArticle;
+
+impl GetArticle {
+    #[process]
+    fn respond(
+        &self,
+        #[authenticated_user] user: User,
+        #[route_parameter(from = "article")] article: Article,
+    ) -> Response {}
+}
+"#;
+
+    #[test]
+    fn captures_a_struct_that_provides_a_user_and_binds_a_route_parameter_separately() {
+        let source: String = source_for(PROVIDER_THAT_ALSO_BINDS)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(
+            "letstore=std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store().await,});"
+        ));
+        assert!(source.contains("letstore_2=container.store().await;"));
+        assert!(source.contains(
+            "margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(store.as_ref(),request,)"
+        ));
+        assert!(source.contains(
+            "margaret_http::require_bound_route_parameter::require_bound_route_parameter(request,\"article\",store_2.as_ref(),)"
+        ));
+    }
+
+    const TWICE_BOUND_MODEL: &str = r#"
+struct User;
+
+#[singleton]
+#[provides_route_parameter]
+struct UserBinder;
+
+impl HttpRouteParameterBinder for UserBinder {
+    type Model = User;
+    async fn bind(&self, value: String) -> Option<User> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/pairs/{author}/{editor}", server = "public")]
+struct GetPair;
+
+impl GetPair {
+    #[process]
+    fn respond(
+        &self,
+        #[route_parameter(from = "author")] author: User,
+        #[route_parameter(from = "editor")] editor: User,
+    ) -> Response {}
+}
+"#;
+
+    #[test]
+    fn captures_a_binder_shared_by_two_route_parameters_once() {
+        let source: String = source_for(TWICE_BOUND_MODEL).split_whitespace().collect();
+
+        assert_eq!(
+            source
+                .matches("letuser_binder=container.user_binder().await;")
+                .count(),
+            1
+        );
+        assert_eq!(
+            source
+                .matches(
+                    "margaret_http::require_bound_route_parameter::require_bound_route_parameter(request,"
+                )
+                .count(),
+            2
+        );
+        assert!(source.contains("\"author\",user_binder.as_ref(),"));
+        assert!(source.contains("\"editor\",user_binder.as_ref(),"));
+    }
+
     const BOUND_MODEL: &str = r#"
 struct User;
 
+#[singleton]
 #[provides_route_parameter]
 struct UserBinder;
 
@@ -164,6 +482,7 @@ impl GetUser {
     const DESTRUCTURED_ROUTE_PARAMETER: &str = r#"
 struct User;
 
+#[singleton]
 #[provides_route_parameter]
 struct UserBinder;
 
@@ -270,7 +589,7 @@ impl GetHealth {
     fn rejects_views_injection_without_declared_views() {
         let message = error_for(VIEWS_INJECTION);
 
-        assert!(message.contains("injects &Views, but the crate defines no #[renders_view]"));
+        assert!(message.contains("requests the views, but this crate generates none"));
     }
 
     const HEALTH_RESPONDER: &str = r#"
@@ -293,7 +612,9 @@ impl Health {
         has_views: bool,
     ) -> String {
         let index = index_for(lib_source);
-        let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let registries = registries_for(&index, false);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         render_http(
@@ -303,6 +624,7 @@ impl Health {
             &plans,
             &bindings,
             &no_websocket_arguments(),
+            &registries,
         )
         .expect("the http source is generated")
         .into_modules()
@@ -339,14 +661,12 @@ impl Health {
     }
 
     #[test]
-    fn weaves_views_into_the_websocket_routes_of_a_server_with_views() {
+    fn keeps_the_views_out_of_the_websocket_routes_of_a_server_with_views() {
         let source =
             websocket_http_source_with_views(HEALTH_RESPONDER, &["public".to_string()], true);
 
-        assert!(
-            source.contains("super::super::websocket::public_routes(container,routes,views).await")
-        );
-        assert!(source.contains("views:&::std::sync::Arc<super::super::views::Views>"));
+        assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
+        assert!(source.contains("_views:&::std::sync::Arc<super::super::views::Views>"));
     }
 
     fn routes_source_for(lib_source: &str) -> String {
@@ -355,7 +675,9 @@ impl Health {
             .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
             .expect("the crate is indexed")
             .build();
-        let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let registries = registries_for(&index, false);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         crate::render_http::render_http(
@@ -365,6 +687,7 @@ impl Health {
             &plans,
             &bindings,
             &no_websocket_arguments(),
+            &registries,
         )
         .expect("the http source is generated")
         .into_modules()
@@ -719,7 +1042,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn ignores_an_unrelated_trait_impl_when_resolving_the_binder_model() {
         let source = source_for(
-            "struct User;\n\ntrait Marker {}\n\n#[provides_route_parameter]\nstruct UserBinder;\n\nimpl Marker for UserBinder {}\n\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\n\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> Response {}\n}\n",
+            "struct User;\n\ntrait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct UserBinder;\n\nimpl Marker for UserBinder {}\n\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\n\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> Response {}\n}\n",
         );
 
         assert!(source.contains("container.user_binder().await"));
@@ -727,7 +1050,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
 
     #[test]
     fn reports_a_binder_without_a_model_associated_type() {
-        let message = error_for("#[provides_route_parameter]\nstruct Bare;\n");
+        let message = error_for("#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n");
 
         assert!(message.contains("type Model"));
     }
@@ -735,7 +1058,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn reports_a_binder_with_a_non_struct_model() {
         let message = error_for(
-            "#[provides_route_parameter]\nstruct UnitBinder;\nimpl HttpRouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> Option<()> {}\n}\n",
+            "#[singleton]\n#[provides_route_parameter]\nstruct UnitBinder;\nimpl HttpRouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> Option<()> {}\n}\n",
         );
 
         assert!(message.contains("type Model"));
@@ -744,7 +1067,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn reports_a_binder_whose_model_resolves_to_a_non_struct() {
         let message = error_for(
-            "trait Marker {}\n\n#[provides_route_parameter]\nstruct MarkerBinder;\nimpl HttpRouteParameterBinder for MarkerBinder {\n    type Model = Marker;\n    async fn bind(&self, value: String) -> Option<Marker> {}\n}\n",
+            "trait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct MarkerBinder;\nimpl HttpRouteParameterBinder for MarkerBinder {\n    type Model = Marker;\n    async fn bind(&self, value: String) -> Option<Marker> {}\n}\n",
         );
 
         assert!(message.contains("type Model"));
@@ -771,7 +1094,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn rejects_two_binders_for_the_same_model() {
         let message = error_for(
-            "struct User;\n\n#[provides_route_parameter]\nstruct First;\nimpl HttpRouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[provides_route_parameter]\nstruct Second;\nimpl HttpRouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n",
+            "struct User;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\nimpl HttpRouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\nimpl HttpRouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n",
         );
 
         assert!(message.contains("more than one route parameter binder"));
@@ -1335,7 +1658,7 @@ impl Tracer {
 "#,
         );
 
-        assert!(message.contains("injects &Views, but the crate defines no #[renders_view]"));
+        assert!(message.contains("requests the views, but this crate generates none"));
     }
 
     #[test]
@@ -1363,7 +1686,9 @@ impl Guard {
 }
 "#,
         );
-        let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let registries = registries_for(&index, false);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
         let artifacts = render_http(
             &index,
@@ -1372,6 +1697,7 @@ impl Guard {
             &plans,
             &bindings,
             &no_websocket_arguments(),
+            &registries,
         )
         .expect("the http source is generated");
 

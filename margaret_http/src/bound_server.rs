@@ -631,14 +631,14 @@ mod tests {
             handshake: &Request,
             _on_upgrade: OnUpgrade,
             _cancellation_token: CancellationToken,
-        ) -> Response {
-            Response::text(
+        ) -> ResponseContinuation {
+            ResponseContinuation::from(Response::text(
                 200,
                 handshake
                     .path_param("id")
                     .expect("the room route binds the id path parameter")
                     .to_string(),
-            )
+            ))
         }
     }
 

@@ -17,7 +17,8 @@ fn fixture(name: &str) -> String {
 
 #[test]
 fn rejects_injecting_a_non_singleton_role() {
-    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/injecting_a_service");
+    let directory =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/injecting_a_service");
     let error = generate_container_source("injecting_a_service", &directory)
         .expect_err("injecting a non-singleton service must be rejected");
 

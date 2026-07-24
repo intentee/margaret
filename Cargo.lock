@@ -1823,6 +1823,7 @@ dependencies = [
  "margaret_http_codegen",
  "margaret_middleware_codegen",
  "margaret_model_codegen",
+ "margaret_request_binding_codegen",
  "margaret_schema_codegen",
  "margaret_service_codegen",
  "margaret_views_codegen",
@@ -1844,6 +1845,7 @@ dependencies = [
  "margaret_codegen",
  "margaret_console",
  "margaret_http",
+ "margaret_identity",
  "margaret_macros",
  "margaret_service",
  "margaret_spiffe_svid",
@@ -1870,6 +1872,34 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "margaret_codegen_websocket_fixture"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "clap",
+ "margaret_asset_bag",
+ "margaret_codegen",
+ "margaret_console",
+ "margaret_http",
+ "margaret_http_validation",
+ "margaret_identity",
+ "margaret_macros",
+ "margaret_service",
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_server",
+ "margaret_views",
+ "margaret_websocket",
+ "maud",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "validator",
 ]
 
 [[package]]
@@ -1962,6 +1992,7 @@ dependencies = [
  "margaret_endpoint",
  "margaret_http",
  "margaret_http_validation",
+ "margaret_identity",
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
  "margaret_macros",
@@ -2073,6 +2104,14 @@ dependencies = [
  "serde",
  "serde_json",
  "validator",
+]
+
+[[package]]
+name = "margaret_identity"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "margaret_http",
 ]
 
 [[package]]
@@ -2282,12 +2321,15 @@ name = "margaret_request_binding_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_codegen_tokens",
+ "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_injection_codegen",
  "margaret_route_parameter_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+ "tempfile",
  "thiserror",
 ]
 

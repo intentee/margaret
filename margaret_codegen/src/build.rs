@@ -4,6 +4,7 @@ use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
 
 use crate::asset_bag_pass::asset_bag_pass;
+use crate::binding_pass::binding_pass;
 use crate::build_context::BuildContext;
 use crate::codegen_error::CodegenError;
 use crate::console_arguments_pass::console_arguments_pass;
@@ -32,10 +33,11 @@ pub fn build(
     let registry = console_arguments_pass(&index)?;
     let bindings = container_pass(&mut context, &registry)?;
     asset_bag_pass(&mut context, &bindings, assets_directory, embed_relative)?;
-    middleware_pass(&mut context)?;
-    websocket_pass(&mut context, &bindings)?;
+    let registries = binding_pass(&mut context)?;
+    middleware_pass(&mut context, &registries)?;
+    websocket_pass(&mut context, &bindings, &registries)?;
     views_pass(&mut context, &bindings)?;
-    http_pass(&mut context, &bindings)?;
+    http_pass(&mut context, &bindings, &registries)?;
     let serve_arguments = serve_arguments(
         &index,
         &bindings,
@@ -63,6 +65,7 @@ mod tests {
 
     use super::build;
     use crate::asset_bag_pass::asset_bag_pass;
+    use crate::binding_pass::binding_pass;
     use crate::build_context::BuildContext;
     use crate::codegen_error::CodegenError;
     use crate::console_arguments_pass::console_arguments_pass;
@@ -226,10 +229,11 @@ struct Room;
             EMBED_RELATIVE,
         )
         .expect("the asset bag pass succeeds");
-        middleware_pass(&mut context).expect("the middleware pass succeeds");
-        websocket_pass(&mut context, &bindings).expect("the websocket pass succeeds");
+        let registries = binding_pass(&mut context).expect("the binding pass succeeds");
+        middleware_pass(&mut context, &registries).expect("the middleware pass succeeds");
+        websocket_pass(&mut context, &bindings, &registries).expect("the websocket pass succeeds");
         views_pass(&mut context, &bindings).expect("the views pass succeeds");
-        http_pass(&mut context, &bindings).expect("the http pass succeeds");
+        http_pass(&mut context, &bindings, &registries).expect("the http pass succeeds");
         let serve_arguments = serve_arguments(
             &index,
             &bindings,
@@ -539,6 +543,74 @@ impl RequestLog {
         assert!(concatenated(&code).contains("super::super::middleware::RequestLog"));
     }
 
+    const AUTHENTICATED_USER_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[infer_from_request]
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]
+struct GetProfile;
+
+impl GetProfile {
+    #[process]
+    fn respond(&self, #[authenticated_user] user: User) -> Response {}
+}
+";
+
+    #[test]
+    fn generates_the_authenticated_users_module_for_a_declared_provider() {
+        let code = generate(AUTHENTICATED_USER_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod authenticated_users;"));
+        assert!(module(&code, "authenticated_users").contains("pub struct SessionUserProvider"));
+        assert!(
+            concatenated(&code).contains("super::super::authenticated_users::SessionUserProvider")
+        );
+    }
+
+    #[test]
+    fn omits_the_authenticated_users_module_without_a_provider() {
+        let code = generate(WEB_CRATE).expect("the build succeeds");
+
+        assert!(!module(&code, "mod").contains("pub mod authenticated_users;"));
+        assert!(!has_module(&code, "authenticated_users"));
+    }
+
+    #[test]
+    fn omits_the_authenticated_users_module_without_a_served_request() {
+        let code = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n",
+        )
+        .expect("the build succeeds");
+
+        assert!(!module(&code, "mod").contains("pub mod authenticated_users;"));
+        assert!(!has_module(&code, "authenticated_users"));
+    }
+
+    #[test]
+    fn propagates_a_request_binding_failure() {
+        let message = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n",
+        )
+        .expect_err("the invalid provider is rejected")
+        .to_string();
+
+        assert!(message.contains("failed to bind the request parameters"));
+    }
+
     #[test]
     fn omits_the_middleware_module_without_attached_middleware() {
         let code = generate(WEB_CRATE).expect("the build succeeds");
@@ -709,9 +781,10 @@ impl Config {
 
     #[test]
     fn propagates_a_console_failure() {
-        let message = generate("#[rustfmt::skip]\npub mod margaret;\n\n#[console_command]\nstruct Bad;\n")
-            .expect_err("the build fails")
-            .to_string();
+        let message =
+            generate("#[rustfmt::skip]\npub mod margaret;\n\n#[console_command]\nstruct Bad;\n")
+                .expect_err("the build fails")
+                .to_string();
 
         assert!(message.contains("failed to generate the console"));
     }
@@ -809,6 +882,46 @@ impl GetCard {
         assert!(module(&code, "views").contains("card"));
         assert!(module(&code, "views/build").contains("pub async fn build"));
         assert!(concatenated(&code).contains("super::views::build::build(container)"));
+    }
+
+    const WEBSOCKET_ONLY_VIEW_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[singleton]
+#[renders_view(name = \"banner\")]
+struct Banner;
+
+#[websocket_session(path = \"/room\", server = \"public\")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[websocket_message(request, method = \"chat\", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+";
+
+    #[test]
+    fn omits_the_views_module_for_a_crate_that_serves_no_responders() {
+        let code = generate(WEBSOCKET_ONLY_VIEW_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod websocket;"));
+        assert!(!module(&code, "mod").contains("pub mod views;"));
+        assert!(!has_module(&code, "views"));
+        assert!(!concatenated(&code).contains("views::build::build"));
     }
 
     #[test]

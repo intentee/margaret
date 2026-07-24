@@ -9,7 +9,7 @@ pub(crate) fn views_pass(
 ) -> Result<(), CodegenError> {
     let capabilities = context.capabilities();
 
-    if !(capabilities.has_views && capabilities.has_http) {
+    if !capabilities.has_views {
         return Ok(());
     }
 

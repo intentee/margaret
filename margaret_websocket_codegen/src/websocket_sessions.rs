@@ -1,3 +1,4 @@
+use quote::format_ident;
 use syn::ReturnType;
 use syn::Type;
 
@@ -8,8 +9,8 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
+use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
-use margaret_request_binding_codegen::route_parameter_binders::route_parameter_binders;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::build_for_session_method::build_for_session_method;
@@ -29,9 +30,9 @@ pub(crate) fn websocket_sessions(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     middleware_plans: &[MiddlewarePlan],
+    registries: &BindingRegistries,
 ) -> Result<Vec<WebSocketSession>, WebSocketCodegenError> {
     let selector = AttributeSelector::from_marker("websocket_session");
-    let binders = route_parameter_binders(index)?;
     let mut sessions = Vec::new();
 
     for matched in index.select(&selector) {
@@ -61,12 +62,20 @@ pub(crate) fn websocket_sessions(
                 server: &server,
                 subject: &subject,
             },
-            &binders,
+            registries,
         )?;
         let layers = resolve_layers(item, middleware_plans, &subject)?;
 
+        if let Some(application) = layers.iter().find(|application| application.injects_views) {
+            return Err(WebSocketCodegenError::SessionMiddlewareRendersViews {
+                session,
+                middleware: application.concrete.to_string(),
+            });
+        }
+
         sessions.push(WebSocketSession {
             layers,
+            method_name: format_ident!("{}", method.identifier()),
             module_name: identifier.field().to_string(),
             parameters,
             path,

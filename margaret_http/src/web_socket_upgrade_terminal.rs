@@ -37,12 +37,12 @@ impl Handler for WebSocketUpgradeTerminal {
         let on_upgrade = self.on_upgrade.lock().await.take();
 
         match on_upgrade {
-            Some(on_upgrade) => ResponseContinuation::Done(
+            Some(on_upgrade) => {
                 self.upgrade
                     .clone()
                     .upgrade(request, on_upgrade, self.cancellation_token.clone())
-                    .await,
-            ),
+                    .await
+            }
             None => {
                 eprintln!(
                     "margaret_http: the websocket upgrade terminal was entered more than once for a single handshake"
@@ -81,8 +81,8 @@ mod tests {
             _handshake: &Request,
             _on_upgrade: OnUpgrade,
             _cancellation_token: CancellationToken,
-        ) -> Response {
-            Response::text(101, "")
+        ) -> ResponseContinuation {
+            ResponseContinuation::from(Response::text(101, ""))
         }
     }
 

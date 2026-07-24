@@ -69,6 +69,11 @@ pub enum WebSocketCodegenError {
     #[error("the #[build_for_session] method of '{session}' must return Self")]
     BuildForSessionReturnTypeMismatch { session: String },
 
+    #[error(
+        "session '{session}' attaches the middleware '{middleware}', which renders the views, but a WebSocket upgrade handshake has no views"
+    )]
+    SessionMiddlewareRendersViews { session: String, middleware: String },
+
     #[error("'{handler}' implements a websocket handler trait but is not a #[singleton]")]
     HandlerNotSingleton { handler: String },
 

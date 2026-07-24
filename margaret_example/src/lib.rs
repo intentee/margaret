@@ -1,4 +1,5 @@
 pub mod app_name;
+pub mod auth;
 pub mod commands;
 pub mod english_greeter;
 pub mod forms;

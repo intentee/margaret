@@ -59,8 +59,9 @@ mod tests {
             greeting_view: Arc::new(GreetingView::create(card_layout)),
         };
         let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
-        let responder =
-            GetGreetingCard::create(Arc::new(EnglishGreeter::create(Arc::new(AppName::create()))));
+        let responder = GetGreetingCard::create(Arc::new(EnglishGreeter::create(Arc::new(
+            AppName::create(),
+        ))));
 
         assert_eq!(responder.respond(&routes, &views).await.status(), 200);
     }

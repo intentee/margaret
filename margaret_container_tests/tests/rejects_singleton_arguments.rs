@@ -10,5 +10,8 @@ fn rejects_singleton_arguments() {
     let error = generate_container_source("crate", &directory)
         .expect_err("#[singleton] with arguments must be rejected");
 
-    assert!(matches!(error, ContainerError::SingletonHasArguments { .. }));
+    assert!(matches!(
+        error,
+        ContainerError::SingletonHasArguments { .. }
+    ));
 }

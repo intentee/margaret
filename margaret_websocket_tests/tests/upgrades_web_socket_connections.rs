@@ -1,6 +1,7 @@
 use futures_util::SinkExt;
 use futures_util::StreamExt;
 use margaret_websocket_tests::raw_http_exchange::raw_http_exchange;
+use margaret_websocket_tests::redirecting_session_factory::RedirectingSessionFactory;
 use margaret_websocket_tests::rejecting_session_factory::RejectingSessionFactory;
 use margaret_websocket_tests::running_websocket_server::RunningWebSocketServer;
 use margaret_websocket_tests::validating_session_factory::ValidatingSessionFactory;
@@ -113,6 +114,23 @@ async fn rejects_the_upgrade_when_the_query_form_is_invalid() {
     .await;
 
     assert!(response.contains(" 422 "));
+    assert!(!response.contains(" 101 "));
+
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn redirects_instead_of_upgrading_when_the_session_factory_interrupts() {
+    let server = RunningWebSocketServer::start_with(RedirectingSessionFactory).await;
+
+    let response = raw_http_exchange(
+        server.address(),
+        b"GET /ws HTTP/1.1\r\nHost: test\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nConnection: close\r\n\r\n",
+    )
+    .await;
+
+    assert!(response.contains(" 303 "));
+    assert!(response.contains("location: http://localhost/sign-in"));
     assert!(!response.contains(" 101 "));
 
     server.stop().await;

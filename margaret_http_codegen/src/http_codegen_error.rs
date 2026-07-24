@@ -98,14 +98,4 @@ pub enum HttpCodegenError {
         "responder '{responder}' names the server '{server}', which must be a snake_case identifier usable as a `routes` accessor"
     )]
     InvalidServerName { responder: String, server: String },
-
-    #[error(
-        "responder '{responder}' injects &Views, but the crate defines no #[renders_view]; a view must exist to be injected"
-    )]
-    ViewInjectedWithoutViews { responder: String },
-
-    #[error(
-        "middleware '{middleware}' injects &Views, but the crate defines no #[renders_view]; a view must exist to be injected"
-    )]
-    MiddlewareViewInjectedWithoutViews { middleware: String },
 }

@@ -11,6 +11,7 @@ use margaret_generated_module::generated_module_error::GeneratedModuleError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_model_codegen::model_codegen_error::ModelCodegenError;
+use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 use margaret_service_codegen::service_codegen_error::ServiceCodegenError;
 use margaret_views_codegen::views_codegen_error::ViewsCodegenError;
 use margaret_websocket_codegen::websocket_codegen_error::WebSocketCodegenError;
@@ -50,6 +51,12 @@ pub enum CodegenError {
     Http {
         #[from]
         source: HttpCodegenError,
+    },
+
+    #[error("failed to bind the request parameters: {source}")]
+    RequestBinding {
+        #[from]
+        source: RequestBindingError,
     },
 
     #[error("failed to generate the middleware: {source}")]
@@ -142,7 +149,9 @@ pub enum CodegenError {
     #[error("the asset file name '{path}' is not valid UTF-8")]
     NonUtf8AssetPath { path: PathBuf },
 
-    #[error("the asset '{path}' is a symbolic link, which is not allowed under the asset directory")]
+    #[error(
+        "the asset '{path}' is a symbolic link, which is not allowed under the asset directory"
+    )]
     SymlinkAsset { path: PathBuf },
 
     #[error("the asset '{path}' is not a regular file")]

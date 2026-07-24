@@ -73,12 +73,17 @@ impl Response {
         Self::new(status, Bytes::from_static(body)).header("content-type", content_type)
     }
 
+    pub fn status(&self) -> u16 {
+        self.status
+    }
+
     pub fn text(status: u16, body: impl Into<String>) -> Self {
         Self::new(status, Bytes::from(body.into()))
     }
 
-    pub fn status(&self) -> u16 {
-        self.status
+    #[must_use]
+    pub fn unauthorized() -> Self {
+        Self::text(401, "Unauthorized")
     }
 
     pub(crate) fn into_http(self) -> http::Response<Full<Bytes>> {
@@ -231,6 +236,13 @@ mod tests {
         let response = Response::forbidden().into_http();
 
         assert_eq!(response.status().as_u16(), 403);
+    }
+
+    #[test]
+    fn builds_an_unauthorized_response() {
+        let response = Response::unauthorized().into_http();
+
+        assert_eq!(response.status().as_u16(), 401);
     }
 
     #[test]
