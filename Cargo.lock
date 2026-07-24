@@ -1962,8 +1962,8 @@ dependencies = [
  "margaret_endpoint",
  "margaret_http",
  "margaret_http_validation",
- "margaret_jwks_roller",
  "margaret_jwks_roller_server",
+ "margaret_jwks_secret_storage_selection",
  "margaret_macros",
  "margaret_model",
  "margaret_service",
@@ -2144,6 +2144,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_jwks_file_secret_storage"
+version = "0.1.0"
+dependencies = [
+ "margaret_jwks_keygen",
+ "margaret_jwks_roller",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "margaret_jwks_file_secret_storage_tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "margaret_jwks_file_secret_storage",
+ "margaret_jwks_keygen",
+ "margaret_jwks_roller",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "margaret_jwks_keygen"
 version = "0.1.0"
 dependencies = [
@@ -2211,6 +2233,28 @@ dependencies = [
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "thiserror",
+]
+
+[[package]]
+name = "margaret_jwks_secret_storage_selection"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "margaret_jwks_file_secret_storage",
+ "margaret_jwks_roller",
+ "thiserror",
+]
+
+[[package]]
+name = "margaret_jwks_secret_storage_selection_tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "margaret_jwks_keygen",
+ "margaret_jwks_roller",
+ "margaret_jwks_secret_storage_selection",
+ "tempfile",
 ]
 
 [[package]]

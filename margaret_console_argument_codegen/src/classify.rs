@@ -6,6 +6,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
 
+use crate::argument_relation::ArgumentRelation;
 use crate::console_argument::ConsoleArgument;
 use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument_form::ConsoleArgumentForm;
@@ -29,6 +30,21 @@ fn has_generic_arguments(value_type: &Type) -> bool {
             .map(|segment| &segment.arguments),
         Some(PathArguments::AngleBracketed(_))
     )
+}
+
+fn reject_relations(
+    relations: &[ArgumentRelation],
+    owner: &str,
+    parameter: &str,
+) -> Result<(), ConsoleArgumentCodegenError> {
+    if relations.is_empty() {
+        Ok(())
+    } else {
+        Err(ConsoleArgumentCodegenError::RelationOnUnsupportedArgument {
+            owner: owner.to_string(),
+            parameter: parameter.to_string(),
+        })
+    }
 }
 
 fn value_type_canonical(
@@ -68,12 +84,17 @@ pub fn classify(
     parameter: &str,
     declared: &Type,
     owner: &str,
+    relations: Vec<ArgumentRelation>,
 ) -> Result<ConsoleArgument, ConsoleArgumentCodegenError> {
     let canonical_declared = index.resolve_item_type(item, declared);
 
     if canonical_declared.as_ref() == Some(&bool_path()) {
         return match form {
-            ConsoleArgumentForm::Named { key } => Ok(ConsoleArgument::Flag { name: key }),
+            ConsoleArgumentForm::Named { key } => {
+                reject_relations(&relations, owner, parameter)?;
+
+                Ok(ConsoleArgument::Flag { name: key })
+            }
             ConsoleArgumentForm::Positional => {
                 Err(ConsoleArgumentCodegenError::BooleanPositional {
                     owner: owner.to_string(),
@@ -98,18 +119,23 @@ pub fn classify(
     )?;
     let weaving = WeavingKind::from_canonical(&canonical, required);
 
-    Ok(match form {
-        ConsoleArgumentForm::Named { key } => ConsoleArgument::Named {
+    match form {
+        ConsoleArgumentForm::Named { key } => Ok(ConsoleArgument::Named {
             name: key,
             required,
             weaving,
             value_type: canonical,
-        },
-        ConsoleArgumentForm::Positional => ConsoleArgument::Positional {
-            id: parameter.to_string(),
-            required,
-            weaving,
-            value_type: canonical,
-        },
-    })
+            relations,
+        }),
+        ConsoleArgumentForm::Positional => {
+            reject_relations(&relations, owner, parameter)?;
+
+            Ok(ConsoleArgument::Positional {
+                id: parameter.to_string(),
+                required,
+                weaving,
+                value_type: canonical,
+            })
+        }
+    }
 }

@@ -1,10 +1,32 @@
 use margaret_attributes::attribute_args::AttributeArgs;
 
+use crate::argument_relation::ArgumentRelation;
 use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument_form::ConsoleArgumentForm;
 
+fn build_relations(
+    required_if: Option<String>,
+    equals: Option<String>,
+    owner: &str,
+    parameter: &str,
+) -> Result<Vec<ArgumentRelation>, ConsoleArgumentCodegenError> {
+    match (required_if, equals) {
+        (None, None) => Ok(Vec::new()),
+        (Some(argument), Some(value)) => {
+            Ok(vec![ArgumentRelation::RequiredIfEq { argument, value }])
+        }
+        (Some(_), None) | (None, Some(_)) => {
+            Err(ConsoleArgumentCodegenError::IncompleteRequiredIf {
+                owner: owner.to_string(),
+                parameter: parameter.to_string(),
+            })
+        }
+    }
+}
+
 pub struct ConsoleArgumentArguments {
     pub form: ConsoleArgumentForm,
+    pub relations: Vec<ArgumentRelation>,
 }
 
 impl ConsoleArgumentArguments {
@@ -16,6 +38,8 @@ impl ConsoleArgumentArguments {
         arguments.interpret(|reader| {
             let named = reader.take_string("from")?;
             let positional = reader.take_flag("positional");
+            let required_if = reader.take_string("required_if")?;
+            let equals = reader.take_string("equals")?;
 
             let form = match (named, positional) {
                 (Some(key), false) => ConsoleArgumentForm::Named { key },
@@ -33,8 +57,9 @@ impl ConsoleArgumentArguments {
                     });
                 }
             };
+            let relations = build_relations(required_if, equals, owner, parameter)?;
 
-            Ok(Self { form })
+            Ok(Self { form, relations })
         })
     }
 }

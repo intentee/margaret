@@ -1,4 +1,5 @@
 pub mod argument_registration;
+pub mod argument_relation;
 pub mod argument_value;
 mod classify;
 pub mod console_argument;

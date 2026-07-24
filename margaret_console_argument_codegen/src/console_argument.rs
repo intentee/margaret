@@ -4,6 +4,7 @@ use quote::quote;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 
+use crate::argument_relation::ArgumentRelation;
 use crate::weaving_kind::WeavingKind;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -16,6 +17,7 @@ pub enum ConsoleArgument {
         required: bool,
         weaving: WeavingKind,
         value_type: CanonicalPath,
+        relations: Vec<ArgumentRelation>,
     },
     Positional {
         id: String,
@@ -112,6 +114,7 @@ mod tests {
             required: true,
             weaving: WeavingKind::BorrowedPath,
             value_type: path(&["std", "path", "PathBuf"]),
+            relations: Vec::new(),
         };
 
         assert_eq!(collapsed(named.field_type()), "std::path::PathBuf");
@@ -125,6 +128,7 @@ mod tests {
             required: false,
             weaving: WeavingKind::Cloned,
             value_type: path(&["std", "string", "String"]),
+            relations: Vec::new(),
         };
 
         assert_eq!(
@@ -175,6 +179,7 @@ mod tests {
             required: true,
             weaving: WeavingKind::BorrowedStr,
             value_type: path(&["std", "string", "String"]),
+            relations: Vec::new(),
         };
 
         assert_eq!(collapsed(named.parameter_referent()), "str");
@@ -187,6 +192,7 @@ mod tests {
             required: true,
             weaving: WeavingKind::BorrowedPath,
             value_type: path(&["std", "path", "PathBuf"]),
+            relations: Vec::new(),
         };
 
         assert_eq!(collapsed(named.parameter_referent()), "::std::path::Path");

@@ -38,6 +38,7 @@ pub fn argument_value(argument: &ConsoleArgument) -> TokenStream {
             required,
             weaving,
             value_type,
+            ..
         } => value_expression(
             name,
             *required,
@@ -94,6 +95,7 @@ mod tests {
             required: true,
             weaving: WeavingKind::Copy,
             value_type: path(&["u16"]),
+            relations: Vec::new(),
         };
 
         assert!(
@@ -108,6 +110,7 @@ mod tests {
             required: true,
             weaving: WeavingKind::BorrowedStr,
             value_type: path(&["std", "string", "String"]),
+            relations: Vec::new(),
         };
 
         assert!(collapsed(&named).contains(
@@ -122,6 +125,7 @@ mod tests {
             required: false,
             weaving: WeavingKind::Cloned,
             value_type: path(&["std", "string", "String"]),
+            relations: Vec::new(),
         };
 
         assert_eq!(

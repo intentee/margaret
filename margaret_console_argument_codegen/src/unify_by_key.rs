@@ -56,6 +56,7 @@ mod tests {
             required: true,
             weaving: WeavingKind::BorrowedStr,
             value_type: string_type(),
+            relations: Vec::new(),
         }
     }
 
