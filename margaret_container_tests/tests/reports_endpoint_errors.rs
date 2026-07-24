@@ -20,10 +20,18 @@ fn rejects_a_provides_endpoint_on_a_non_struct() {
 }
 
 #[test]
-fn rejects_an_endpoint_provider_that_is_also_a_singleton() {
+fn rejects_an_endpoint_provider_that_is_also_a_service() {
     assert!(matches!(
         error("endpoint_conflicting_role"),
         ContainerError::ConflictingEndpointRole { .. }
+    ));
+}
+
+#[test]
+fn rejects_an_endpoint_provider_without_a_singleton() {
+    assert!(matches!(
+        error("endpoint_without_singleton"),
+        ContainerError::EndpointProviderRequiresSingleton { .. }
     ));
 }
 

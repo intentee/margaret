@@ -37,32 +37,35 @@ use crate::raw_target::RawTarget;
 use crate::resolve_construction::resolve_construction;
 use crate::type_text::type_text;
 
-fn managed_selectors() -> [AttributeSelector; 3] {
+fn construction_role_selectors() -> [AttributeSelector; 4] {
     [
-        singleton_selector(),
         service_selector(),
         scheduled_with_tick_timer_selector(),
+        handles_middleware_attribute_selector(),
+        renders_view_selector(),
     ]
 }
 
 fn build_drafts<'index>(
     index: &'index AttributeIndex,
-) -> Result<DraftedProviders<'index>, ContainerError> {
-    let mut drafts: Vec<SingletonDraft> = Vec::new();
+) -> Result<DraftedContainer<'index>, ContainerError> {
+    let mut provider_drafts: Vec<Draft> = Vec::new();
 
-    for selector in managed_selectors() {
-        for matched in index.select(&selector) {
-            drafts.push(build_draft(&matched, index)?);
+    for matched in index.select(&singleton_selector()) {
+        if has_marker(matched.item(), &provides_endpoint_selector()) {
+            continue;
         }
+
+        provider_drafts.push(build_provider_draft(&matched, index)?);
     }
 
     for matched in index.select(&provides_endpoint_selector()) {
-        drafts.push(build_endpoint_draft(&matched, index)?);
+        provider_drafts.push(build_endpoint_draft(&matched, index)?);
     }
 
     let mut provided_keys: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
 
-    for draft in &drafts {
+    for draft in &provider_drafts {
         if let Some(first) =
             provided_keys.insert(draft.provided.key().clone(), draft.concrete_path.clone())
         {
@@ -74,16 +77,37 @@ fn build_drafts<'index>(
         }
     }
 
-    Ok(DraftedProviders {
-        drafts,
+    let mut construction_items: BTreeMap<CanonicalPath, &IndexedItem> = BTreeMap::new();
+
+    for selector in construction_role_selectors() {
+        for matched in index.select(&selector) {
+            let item = matched.item();
+
+            if has_marker(item, &singleton_selector()) {
+                continue;
+            }
+
+            construction_items.insert(item.canonical_path().clone(), item);
+        }
+    }
+
+    let mut construction_drafts: Vec<Draft> = Vec::new();
+
+    for item in construction_items.into_values() {
+        construction_drafts.push(build_construction_draft(item, index)?);
+    }
+
+    Ok(DraftedContainer {
+        construction_drafts,
         provided_keys,
+        provider_drafts,
     })
 }
 
-fn build_draft<'index>(
+fn build_provider_draft<'index>(
     matched: &MatchedAttribute<'index>,
     index: &AttributeIndex,
-) -> Result<SingletonDraft<'index>, ContainerError> {
+) -> Result<Draft<'index>, ContainerError> {
     let item = matched.item();
     let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
         (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
@@ -105,7 +129,7 @@ fn build_draft<'index>(
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
     let collection = resolve_collection(index, item, collection.as_ref(), &concrete_path)?;
 
-    Ok(SingletonDraft {
+    Ok(Draft {
         collection,
         concrete_path,
         construction,
@@ -118,7 +142,7 @@ fn build_draft<'index>(
 fn build_endpoint_draft<'index>(
     matched: &MatchedAttribute<'index>,
     index: &AttributeIndex,
-) -> Result<SingletonDraft<'index>, ContainerError> {
+) -> Result<Draft<'index>, ContainerError> {
     let item = matched.item();
     let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
         (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
@@ -129,7 +153,13 @@ fn build_endpoint_draft<'index>(
         }
     };
 
-    if conflicts_with_managed_role(item) {
+    if !has_marker(item, &singleton_selector()) {
+        return Err(ContainerError::EndpointProviderRequiresSingleton {
+            path: item.canonical_path().to_string(),
+        });
+    }
+
+    if conflicts_with_role(item) {
         return Err(ContainerError::ConflictingEndpointRole {
             path: item.canonical_path().to_string(),
         });
@@ -144,7 +174,7 @@ fn build_endpoint_draft<'index>(
     let concrete_path = item.canonical_path().clone();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
 
-    Ok(SingletonDraft {
+    Ok(Draft {
         collection: None,
         concrete_path: concrete_path.clone(),
         construction,
@@ -154,10 +184,34 @@ fn build_endpoint_draft<'index>(
     })
 }
 
-fn conflicts_with_managed_role(item: &IndexedItem) -> bool {
-    managed_selectors()
-        .iter()
-        .any(|selector| has_marker(item, selector))
+fn build_construction_draft<'index>(
+    item: &'index IndexedItem,
+    index: &AttributeIndex,
+) -> Result<Draft<'index>, ContainerError> {
+    let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
+        (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
+        _ => {
+            return Err(ContainerError::RoleNotAStruct {
+                path: item.canonical_path().to_string(),
+            });
+        }
+    };
+
+    let concrete_path = item.canonical_path().clone();
+    let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
+
+    Ok(Draft {
+        collection: None,
+        concrete_path: concrete_path.clone(),
+        construction,
+        field_name: identifier.field().to_string(),
+        item,
+        provided: ProvidedType::Concrete(concrete_path),
+    })
+}
+
+fn conflicts_with_role(item: &IndexedItem) -> bool {
+    has_marker(item, &service_selector()) || has_marker(item, &scheduled_with_tick_timer_selector())
 }
 
 fn has_marker(item: &IndexedItem, selector: &AttributeSelector) -> bool {
@@ -387,6 +441,14 @@ fn scheduled_with_tick_timer_selector() -> AttributeSelector {
     AttributeSelector::from_marker("scheduled_with_tick_timer")
 }
 
+fn handles_middleware_attribute_selector() -> AttributeSelector {
+    AttributeSelector::from_marker("handles_middleware_attribute")
+}
+
+fn renders_view_selector() -> AttributeSelector {
+    AttributeSelector::from_marker("renders_view")
+}
+
 fn provides_endpoint_selector() -> AttributeSelector {
     AttributeSelector::from_marker("provides_endpoint")
 }
@@ -395,7 +457,7 @@ fn endpoint_provider_selector() -> AttributeSelector {
     AttributeSelector::from_marker("endpoint_provider")
 }
 
-struct SingletonDraft<'index> {
+struct Draft<'index> {
     collection: Option<CanonicalPath>,
     concrete_path: CanonicalPath,
     construction: ConstructionSource<'index>,
@@ -404,21 +466,25 @@ struct SingletonDraft<'index> {
     provided: ProvidedType,
 }
 
-struct DraftedProviders<'index> {
-    drafts: Vec<SingletonDraft<'index>>,
+struct DraftedContainer<'index> {
+    construction_drafts: Vec<Draft<'index>>,
     provided_keys: HashMap<CanonicalPath, CanonicalPath>,
+    provider_drafts: Vec<Draft<'index>>,
 }
 
 fn resolve_framework_providers(
     index: &AttributeIndex,
-    drafts: &[SingletonDraft],
+    provider_drafts: &[Draft],
+    construction_drafts: &[Draft],
     provided_keys: &mut HashMap<CanonicalPath, CanonicalPath>,
     framework_provided: &[CanonicalPath],
 ) -> Result<Vec<Provider>, ContainerError> {
     let mut providers = Vec::new();
 
     for path in framework_provided {
-        if !is_framework_path_referenced(index, drafts, path) {
+        if !is_framework_path_referenced(index, provider_drafts, path)
+            && !is_framework_path_referenced(index, construction_drafts, path)
+        {
             continue;
         }
 
@@ -443,7 +509,7 @@ fn resolve_framework_providers(
 
 fn is_framework_path_referenced(
     index: &AttributeIndex,
-    drafts: &[SingletonDraft],
+    drafts: &[Draft],
     path: &CanonicalPath,
 ) -> bool {
     drafts
@@ -451,11 +517,7 @@ fn is_framework_path_referenced(
         .any(|draft| draft_references_path(index, draft, path))
 }
 
-fn draft_references_path(
-    index: &AttributeIndex,
-    draft: &SingletonDraft,
-    path: &CanonicalPath,
-) -> bool {
+fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &CanonicalPath) -> bool {
     let ConstructionSource::Constructor(constructor) = &draft.construction else {
         return false;
     };
@@ -479,19 +541,26 @@ pub(crate) fn build_plan(
     framework_provided: &[CanonicalPath],
     pool: &TagPool,
 ) -> Result<ContainerPlan, ContainerError> {
-    let DraftedProviders {
-        drafts,
+    let DraftedContainer {
+        construction_drafts,
         mut provided_keys,
+        provider_drafts,
     } = build_drafts(index)?;
 
-    let framework_providers =
-        resolve_framework_providers(index, &drafts, &mut provided_keys, framework_provided)?;
+    let framework_providers = resolve_framework_providers(
+        index,
+        &provider_drafts,
+        &construction_drafts,
+        &mut provided_keys,
+        framework_provided,
+    )?;
 
     let mut collections = CollectionTable::new();
     let mut providers = BTreeMap::new();
+    let mut constructions = BTreeMap::new();
 
-    for draft in drafts {
-        let SingletonDraft {
+    for draft in provider_drafts {
+        let Draft {
             collection,
             concrete_path,
             construction,
@@ -527,12 +596,44 @@ pub(crate) fn build_plan(
         );
     }
 
+    for draft in construction_drafts {
+        let Draft {
+            concrete_path,
+            construction,
+            field_name,
+            item,
+            provided,
+            ..
+        } = draft;
+
+        let construction = resolve_direct(
+            index,
+            item,
+            construction,
+            &concrete_path,
+            &provided_keys,
+            registry,
+            pool,
+        )?;
+
+        constructions.insert(
+            concrete_path.clone(),
+            Provider {
+                concrete_path,
+                construction,
+                field_name,
+                provided,
+            },
+        );
+    }
+
     for provider in framework_providers {
         providers.insert(provider.provided.key().clone(), provider);
     }
 
     Ok(ContainerPlan {
         collections,
+        constructions,
         providers,
     })
 }

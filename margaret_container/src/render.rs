@@ -204,7 +204,8 @@ fn dependency_expression(
 }
 
 pub(crate) fn render(plan: &ContainerPlan, closures: &ConsoleClosures) -> TokenStream {
-    let mut ordered: Vec<(&CanonicalPath, &Provider)> = plan.providers.iter().collect();
+    let mut ordered: Vec<(&CanonicalPath, &Provider)> =
+        plan.providers.iter().chain(plan.constructions.iter()).collect();
 
     ordered.sort_by(|(_, first), (_, second)| first.field_name.cmp(&second.field_name));
 

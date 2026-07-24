@@ -28,9 +28,12 @@ pub enum ContainerError {
     NotAnEndpointStruct { path: String },
 
     #[error(
-        "the endpoint provider '{path}' must not also be declared as a #[singleton], #[service], or #[scheduled_with_tick_timer]"
+        "the endpoint provider '{path}' must not also be declared as a #[service] or #[scheduled_with_tick_timer]"
     )]
     ConflictingEndpointRole { path: String },
+
+    #[error("the endpoint provider '{path}' must also be declared as a #[singleton]")]
+    EndpointProviderRequiresSingleton { path: String },
 
     #[error(
         "the endpoint provider '{path}' does not implement margaret_endpoint::provides_endpoint::ProvidesEndpoint"
@@ -39,6 +42,9 @@ pub enum ContainerError {
 
     #[error("#[singleton] is only supported on structs, but '{path}' is not a struct")]
     NotASingletonStruct { path: String },
+
+    #[error("a role attribute is only supported on structs, but '{path}' is not a struct")]
+    RoleNotAStruct { path: String },
 
     #[error(
         "singleton '{singleton}' has {field_count} field(s) but no #[constructor] method; only fieldless singletons may omit a #[constructor]"

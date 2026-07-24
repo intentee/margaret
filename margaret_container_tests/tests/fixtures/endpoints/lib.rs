@@ -15,6 +15,7 @@ impl DnsResolver {
 impl Resolver for DnsResolver {}
 
 #[provides_endpoint(jwks)]
+#[singleton]
 struct JwksEndpoint;
 
 impl JwksEndpoint {

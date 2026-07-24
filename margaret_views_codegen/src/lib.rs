@@ -141,11 +141,11 @@ impl Banner {
     }
 
     #[test]
-    fn rejects_a_view_without_a_singleton() {
-        assert!(
-            rejection("#[renders_view(name = \"bad\")]\nstruct Bad;\n")
-                .contains("must also carry #[singleton]")
-        );
+    fn accepts_a_view_without_a_singleton() {
+        let source = formatted(generated("#[renders_view(name = \"plain\")]\nstruct Plain;\n").modules);
+
+        assert!(source.contains("pub plain: ::std::sync::Arc<crate::Plain>"));
+        assert!(source.contains("plain: container.plain().await"));
     }
 
     #[test]

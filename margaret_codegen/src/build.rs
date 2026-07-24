@@ -606,7 +606,7 @@ impl RequestLog {
     #[test]
     fn propagates_a_middleware_codegen_error() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> ResponseContinuation {}\n}\n",
         )
         .expect_err("the invalid middleware handler is rejected")
         .to_string();

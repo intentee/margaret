@@ -13,9 +13,6 @@ pub enum ViewsCodegenError {
     #[error("#[renders_view] is only supported on structs, but '{view}' is not a struct")]
     ViewNotAStruct { view: String },
 
-    #[error("#[renders_view] '{view}' must also carry #[singleton]")]
-    ViewNotSingleton { view: String },
-
     #[error(
         "#[renders_view] '{view}' must not use #[singleton(provides = ...)]; a view renders as its concrete type"
     )]

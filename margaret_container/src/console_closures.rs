@@ -17,9 +17,13 @@ fn collect(
         return Ok(existing.clone());
     }
 
+    let entry = plan
+        .providers
+        .get(key)
+        .unwrap_or_else(|| &plan.constructions[key]);
     let mut collected: Vec<ConsoleArgument> = Vec::new();
 
-    for dependency in plan.providers[key].dependencies() {
+    for dependency in entry.dependencies() {
         match dependency {
             DependencyKind::ConsoleArgument { argument } => {
                 collected.push(argument.as_ref().clone());
@@ -51,7 +55,7 @@ impl ConsoleClosures {
     pub(crate) fn from_plan(plan: &ContainerPlan) -> Result<Self, ContainerError> {
         let mut closures: BTreeMap<CanonicalPath, Vec<ConsoleArgument>> = BTreeMap::new();
 
-        for key in plan.providers.keys() {
+        for key in plan.providers.keys().chain(plan.constructions.keys()) {
             collect(key, plan, &mut closures)?;
         }
 

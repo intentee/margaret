@@ -30,11 +30,9 @@ pub(crate) fn views(index: &AttributeIndex) -> Result<Vec<View>, ViewsCodegenErr
         }
 
         let singletons = AttributeQuery::new(item).find_all(&singleton_selector);
-        let Some(singleton) = singletons.first() else {
-            return Err(ViewsCodegenError::ViewNotSingleton { view });
-        };
-
-        if singleton.args()?.path("provides")?.is_some() {
+        if let Some(singleton) = singletons.first()
+            && singleton.args()?.path("provides")?.is_some()
+        {
             return Err(ViewsCodegenError::ViewProvidesInterface { view });
         }
 

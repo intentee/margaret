@@ -61,22 +61,16 @@ impl ContainerBindings {
         let console_arguments = plan
             .providers
             .iter()
-            .map(|(provider_key, provider)| {
-                (
-                    provider.concrete_path.clone(),
-                    closures.of(provider_key).to_vec(),
-                )
+            .chain(plan.constructions.iter())
+            .map(|(entry_key, entry)| {
+                (entry.concrete_path.clone(), closures.of(entry_key).to_vec())
             })
             .collect();
         let accessor_console_arguments = plan
             .providers
             .iter()
-            .map(|(provider_key, provider)| {
-                (
-                    provider.field_name.clone(),
-                    closures.of(provider_key).to_vec(),
-                )
-            })
+            .chain(plan.constructions.iter())
+            .map(|(entry_key, entry)| (entry.field_name.clone(), closures.of(entry_key).to_vec()))
             .collect();
         let console_slots = closures.slots().clone();
 
