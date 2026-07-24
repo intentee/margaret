@@ -16,6 +16,8 @@ mod foreign_key_arguments;
 mod foreign_key_target;
 mod foreign_key_target_column;
 mod index_arguments;
+mod index_column_member;
+mod index_redundancy;
 mod infer_column_type;
 mod model_arguments;
 mod option_inner;
@@ -459,7 +461,27 @@ struct S {
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    #[index]\n    id: uuid::Uuid,\n}\n",
             )
-            .contains("a primary key is already indexed")
+            .contains("leading column of the primary key")
+        );
+    }
+
+    #[test]
+    fn rejects_an_index_on_the_leading_primary_key_column_of_a_composite_key() {
+        assert!(
+            error_message(
+                "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    #[index]\n    repository: String,\n    #[column(primary_key)]\n    branch: String,\n    #[column(primary_key)]\n    hash: String,\n}\n",
+            )
+            .contains("leading column of the primary key")
+        );
+    }
+
+    #[test]
+    fn accepts_an_index_on_a_non_leading_primary_key_column() {
+        let source = "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    repository: String,\n    #[column(primary_key)]\n    branch: String,\n    #[column(primary_key)]\n    #[index]\n    hash: String,\n}\n";
+
+        assert_eq!(
+            resolved_index_columns(source),
+            vec![vec!["hash".to_string()]]
         );
     }
 
@@ -671,6 +693,17 @@ struct Book {
             .expect("the models resolve")
             .into_iter()
             .map(|model| model.table)
+            .collect()
+    }
+
+    fn resolved_index_columns(lib_source: &str) -> Vec<Vec<String>> {
+        let directory = crate_with(lib_source);
+
+        models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .flat_map(|model| model.indexes)
+            .map(|index| index.columns)
             .collect()
     }
 
