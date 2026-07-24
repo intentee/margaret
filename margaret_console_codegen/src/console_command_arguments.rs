@@ -12,16 +12,15 @@ impl ConsoleCommandArguments {
         arguments: &AttributeArgs,
         command: &str,
     ) -> Result<Self, ConsoleCodegenError> {
-        arguments.expect_only(&["description", "name"], &[])?;
-
-        let name =
-            arguments
-                .string("name")?
-                .ok_or_else(|| ConsoleCodegenError::MissingCommandName {
+        arguments.interpret(|reader| {
+            let name = reader.take_string("name")?.ok_or_else(|| {
+                ConsoleCodegenError::MissingCommandName {
                     command: command.to_string(),
-                })?;
-        let description = arguments.string("description")?;
+                }
+            })?;
+            let description = reader.take_string("description")?;
 
-        Ok(Self { name, description })
+            Ok(Self { name, description })
+        })
     }
 }

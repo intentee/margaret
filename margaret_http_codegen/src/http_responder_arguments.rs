@@ -28,34 +28,34 @@ impl HttpResponderArguments {
         arguments: &AttributeArgs,
         responder: &str,
     ) -> Result<Self, HttpCodegenError> {
-        arguments.expect_only(&["method", "name", "path", "server"], &[])?;
-
-        let method = normalized_method(
-            arguments
-                .string("method")?
-                .ok_or_else(|| HttpCodegenError::MissingHttpMethod {
-                    responder: responder.to_string(),
+        arguments.interpret(|reader| {
+            let method = normalized_method(
+                reader.take_string("method")?.ok_or_else(|| {
+                    HttpCodegenError::MissingHttpMethod {
+                        responder: responder.to_string(),
+                    }
                 })?,
-            responder,
-        )?;
-        let path = arguments
-            .string("path")?
-            .ok_or_else(|| HttpCodegenError::MissingHttpPath {
-                responder: responder.to_string(),
-            })?;
-        let name = arguments.string("name")?;
-        let server =
-            arguments
-                .string("server")?
-                .ok_or_else(|| HttpCodegenError::MissingHttpServer {
+                responder,
+            )?;
+            let path =
+                reader
+                    .take_string("path")?
+                    .ok_or_else(|| HttpCodegenError::MissingHttpPath {
+                        responder: responder.to_string(),
+                    })?;
+            let name = reader.take_string("name")?;
+            let server = reader.take_string("server")?.ok_or_else(|| {
+                HttpCodegenError::MissingHttpServer {
                     responder: responder.to_string(),
-                })?;
+                }
+            })?;
 
-        Ok(Self {
-            method,
-            name,
-            path,
-            server,
+            Ok(Self {
+                method,
+                name,
+                path,
+                server,
+            })
         })
     }
 }

@@ -1,35 +1,15 @@
-use quote::ToTokens;
 use syn::Attribute;
 use syn::Expr;
-use syn::Lit;
 use syn::Meta;
-use syn::Path;
 use syn::Token;
 use syn::punctuated::Punctuated;
 
+use crate::attribute_arguments_reader::AttributeArgumentsReader;
 use crate::attribute_error::AttributeError;
 use crate::format_path::format_path;
+use crate::named_argument::NamedArgument;
 
-struct NamedArgument {
-    name: String,
-    value: Expr,
-}
-
-fn named_argument(expression: &Expr) -> Option<NamedArgument> {
-    let Expr::Assign(assign) = expression else {
-        return None;
-    };
-    let Expr::Path(left) = assign.left.as_ref() else {
-        return None;
-    };
-    let name = left.path.get_ident()?;
-
-    Some(NamedArgument {
-        name: name.to_string(),
-        value: assign.right.as_ref().clone(),
-    })
-}
-
+#[derive(Clone)]
 pub struct AttributeArgs {
     attribute_path: String,
     named: Vec<NamedArgument>,
@@ -70,7 +50,7 @@ impl AttributeArgs {
                 let mut positional = Vec::new();
 
                 for expression in expressions {
-                    match named_argument(&expression) {
+                    match NamedArgument::from_expression(&expression) {
                         Some(found) => {
                             if named.iter().any(|existing| existing.name == found.name) {
                                 return Err(AttributeError::DuplicateNamedArgument {
@@ -94,115 +74,28 @@ impl AttributeArgs {
         }
     }
 
-    pub fn boolean(&self, key: &str) -> Result<Option<bool>, AttributeError> {
-        match self.named(key) {
-            None => Ok(None),
-            Some(Expr::Lit(expression)) => match &expression.lit {
-                Lit::Bool(literal) => Ok(Some(literal.value)),
-                _ => Err(self.unexpected_argument(key, "boolean literal")),
-            },
-            Some(_) => Err(self.unexpected_argument(key, "boolean literal")),
-        }
-    }
-
-    pub fn expect_only(
+    pub fn interpret<Interpreted, InterpretError>(
         &self,
-        allowed_named: &[&str],
-        allowed_positional_flags: &[&str],
-    ) -> Result<(), AttributeError> {
-        self.reject_unknown_named(allowed_named)?;
+        interpret: impl FnOnce(&mut AttributeArgumentsReader) -> Result<Interpreted, InterpretError>,
+    ) -> Result<Interpreted, InterpretError>
+    where
+        InterpretError: From<AttributeError>,
+    {
+        let mut reader = AttributeArgumentsReader::new(
+            self.attribute_path.clone(),
+            self.named.clone(),
+            self.positional.clone(),
+        );
+        let interpreted = interpret(&mut reader)?;
 
-        for expression in &self.positional {
-            let is_allowed_flag = match expression {
-                Expr::Path(path_expression) => allowed_positional_flags
-                    .iter()
-                    .any(|flag| path_expression.path.is_ident(*flag)),
-                _ => false,
-            };
+        reader.into_result()?;
 
-            if !is_allowed_flag {
-                return Err(AttributeError::UnexpectedPositionalArgument {
-                    argument: expression.to_token_stream().to_string(),
-                    attribute_path: self.attribute_path.clone(),
-                });
-            }
-        }
-
-        Ok(())
-    }
-
-    #[must_use]
-    pub fn has_positional_flag(&self, name: &str) -> bool {
-        self.positional.iter().any(|expression| match expression {
-            Expr::Path(expression) => expression.path.is_ident(name),
-            _ => false,
-        })
+        Ok(interpreted)
     }
 
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.named.is_empty() && self.positional.is_empty()
-    }
-
-    #[must_use]
-    pub fn named(&self, key: &str) -> Option<&Expr> {
-        self.named
-            .iter()
-            .find(|argument| argument.name == key)
-            .map(|argument| &argument.value)
-    }
-
-    pub fn path(&self, key: &str) -> Result<Option<Path>, AttributeError> {
-        match self.named(key) {
-            None => Ok(None),
-            Some(Expr::Path(expression)) => Ok(Some(expression.path.clone())),
-            Some(_) => Err(self.unexpected_argument(key, "path")),
-        }
-    }
-
-    #[must_use]
-    pub fn positional(&self, index: usize) -> Option<&Expr> {
-        self.positional.get(index)
-    }
-
-    #[must_use]
-    pub fn positional_path(&self, index: usize) -> Option<&Path> {
-        match self.positional.get(index) {
-            Some(Expr::Path(expression)) => Some(&expression.path),
-            _ => None,
-        }
-    }
-
-    pub fn reject_unknown_named(&self, allowed_named: &[&str]) -> Result<(), AttributeError> {
-        for argument in &self.named {
-            if !allowed_named.contains(&argument.name.as_str()) {
-                return Err(AttributeError::UnknownNamedArgument {
-                    attribute_path: self.attribute_path.clone(),
-                    key: argument.name.clone(),
-                });
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn string(&self, key: &str) -> Result<Option<String>, AttributeError> {
-        match self.named(key) {
-            None => Ok(None),
-            Some(Expr::Lit(expression)) => match &expression.lit {
-                Lit::Str(literal) => Ok(Some(literal.value())),
-                _ => Err(self.unexpected_argument(key, "string literal")),
-            },
-            Some(_) => Err(self.unexpected_argument(key, "string literal")),
-        }
-    }
-
-    fn unexpected_argument(&self, key: &str, expected: &str) -> AttributeError {
-        AttributeError::UnexpectedArgument {
-            attribute_path: self.attribute_path.clone(),
-            key: key.to_string(),
-            expected: expected.to_string(),
-        }
     }
 }
 
@@ -212,159 +105,195 @@ mod tests {
     use syn::parse_quote;
 
     use crate::attribute_args::AttributeArgs;
+    use crate::attribute_error::AttributeError;
 
-    fn args(attribute: Attribute) -> AttributeArgs {
-        AttributeArgs::from_attribute(&attribute).expect("the arguments parse")
+    fn parse(attribute: Attribute) -> Result<AttributeArgs, AttributeError> {
+        AttributeArgs::from_attribute(&attribute)
+    }
+
+    fn parsed(attribute: Attribute) -> AttributeArgs {
+        parse(attribute).expect("the arguments parse")
     }
 
     #[test]
-    fn a_bare_attribute_has_no_arguments() {
-        assert!(args(parse_quote!(#[singleton])).is_empty());
+    fn a_bare_attribute_is_empty() {
+        assert!(parsed(parse_quote!(#[singleton])).is_empty());
     }
 
     #[test]
-    fn a_name_value_attribute_exposes_its_named_argument() {
-        assert!(args(parse_quote!(#[doc = "text"])).named("doc").is_some());
+    fn a_name_value_attribute_carries_one_named_argument() {
+        let arguments = parsed(parse_quote!(#[doc = "text"]));
+
+        assert!(!arguments.is_empty());
+        assert_eq!(
+            arguments
+                .interpret(|reader| reader.take_string("doc"))
+                .expect("the value reads"),
+            Some("text".to_string())
+        );
     }
 
     #[test]
-    fn a_list_attribute_splits_named_and_positional_arguments() {
-        let parsed = args(parse_quote!(#[route(method = Get, "/home")]));
-
-        assert!(!parsed.is_empty());
-        assert!(parsed.named("method").is_some());
-        assert!(parsed.named("absent").is_none());
-        assert!(parsed.positional(0).is_some());
-        assert!(parsed.positional(99).is_none());
+    fn a_list_attribute_is_empty_when_it_has_no_arguments() {
+        assert!(parsed(parse_quote!(#[column()])).is_empty());
     }
 
     #[test]
-    fn non_identifier_assignments_are_treated_as_positional() {
-        let parsed = args(parse_quote!(#[route(0 = 1, outer::inner = 2)]));
+    fn interpret_reads_named_and_positional_arguments_together() {
+        let arguments =
+            parsed(parse_quote!(#[route(method = Get, pattern = "/home", primary, tag)]));
 
-        assert!(parsed.named("outer").is_none());
-        assert!(parsed.positional(0).is_some());
-        assert!(parsed.positional(1).is_some());
-    }
+        let outcome = arguments
+            .interpret(|reader| {
+                let method = reader.take_path("method").expect("method is a path");
+                let pattern = reader.take_string("pattern").expect("pattern is a string");
 
-    #[test]
-    fn reads_a_string_argument_and_rejects_non_strings() {
-        let parsed = args(parse_quote!(#[route(pattern = "/home", count = 5, method = Get)]));
+                Ok::<_, AttributeError>((
+                    method.map(|path| path.is_ident("Get")),
+                    pattern,
+                    reader.take_flag("primary"),
+                    reader
+                        .take_positional_path()
+                        .map(|path| path.is_ident("tag")),
+                ))
+            })
+            .expect("every argument is consumed");
 
         assert_eq!(
-            parsed.string("pattern").expect("a string argument"),
-            Some("/home".to_string())
+            outcome,
+            (Some(true), Some("/home".to_string()), true, Some(true))
         );
-        assert_eq!(parsed.string("absent").expect("an absent argument"), None);
-        assert!(parsed.string("count").is_err());
-        assert!(parsed.string("method").is_err());
     }
 
     #[test]
-    fn reads_a_path_argument_and_rejects_non_paths() {
-        let parsed = args(parse_quote!(#[route(method = Get, pattern = "/home")]));
+    fn interpret_rejects_a_leftover_named_argument() {
+        let error = parsed(parse_quote!(#[index(name = "title", bogus = "x")]))
+            .interpret(|reader| reader.take_string("name"))
+            .expect_err("the stray named argument is rejected");
 
-        assert!(parsed.path("method").expect("a path argument").is_some());
-        assert!(parsed.path("absent").expect("an absent argument").is_none());
-        assert!(parsed.path("pattern").is_err());
+        assert!(matches!(
+            error,
+            AttributeError::UnrecognizedArgument { argument, attribute_path }
+                if argument == "bogus" && attribute_path == "index"
+        ));
     }
 
     #[test]
-    fn reads_a_boolean_argument_and_rejects_non_booleans() {
-        let parsed =
-            args(parse_quote!(#[console_argument(required = true, name = "x", kind = Flag)]));
+    fn interpret_rejects_a_leftover_positional_argument() {
+        let error = parsed(parse_quote!(#[singleton(bogus)]))
+            .interpret(|_reader| Ok::<(), AttributeError>(()))
+            .expect_err("the stray positional argument is rejected");
 
-        assert_eq!(parsed.boolean("required").expect("a boolean"), Some(true));
-        assert_eq!(parsed.boolean("absent").expect("an absent argument"), None);
-        assert!(parsed.boolean("name").is_err());
-        assert!(parsed.boolean("kind").is_err());
+        assert!(matches!(
+            error,
+            AttributeError::UnrecognizedArgument { argument, attribute_path }
+                if argument == "bogus" && attribute_path == "singleton"
+        ));
     }
 
     #[test]
-    fn reports_malformed_list_arguments() {
-        let message = AttributeArgs::from_attribute(&parse_quote!(#[route(= 5)]))
-            .err()
-            .expect("malformed arguments fail to parse")
-            .to_string();
+    fn take_string_returns_none_when_the_argument_is_absent() {
+        let value = parsed(parse_quote!(#[column]))
+            .interpret(|reader| reader.take_string("name"))
+            .expect("an absent string reads as none");
 
-        assert!(message.contains("could not be parsed"));
+        assert_eq!(value, None);
     }
 
     #[test]
-    fn rejects_a_duplicate_named_argument() {
-        let message =
-            AttributeArgs::from_attribute(&parse_quote!(#[route(method = Get, method = Post)]))
-                .err()
-                .expect("a duplicate named argument is rejected")
-                .to_string();
+    fn take_string_rejects_a_non_string_literal() {
+        let error = parsed(parse_quote!(#[column(name = 5)]))
+            .interpret(|reader| reader.take_string("name"))
+            .expect_err("an integer is not a string literal");
 
-        assert!(message.contains("provided more than once"));
+        assert!(matches!(
+            error,
+            AttributeError::UnexpectedArgument { key, expected, .. }
+                if key == "name" && expected == "string literal"
+        ));
     }
 
     #[test]
-    fn reads_a_positional_path_and_ignores_non_paths() {
-        let parsed = args(parse_quote!(#[tagged(crate::markers::Tag, 5)]));
+    fn take_string_rejects_a_non_literal_expression() {
+        let error = parsed(parse_quote!(#[column(name = some::path)]))
+            .interpret(|reader| reader.take_string("name"))
+            .expect_err("a path is not a string literal");
 
-        assert!(parsed.positional_path(0).is_some());
-        assert!(parsed.positional_path(1).is_none());
-        assert!(parsed.positional_path(99).is_none());
+        assert!(matches!(
+            error,
+            AttributeError::UnexpectedArgument { expected, .. }
+                if expected == "string literal"
+        ));
     }
 
     #[test]
-    fn detects_a_bare_positional_flag() {
-        let parsed = args(parse_quote!(#[column(primary_key, name = "id", 5)]));
+    fn take_path_returns_none_when_the_argument_is_absent() {
+        let value = parsed(parse_quote!(#[foreign_key]))
+            .interpret(|reader| reader.take_path("on_delete"))
+            .expect("an absent path reads as none");
 
-        assert!(parsed.has_positional_flag("primary_key"));
-        assert!(!parsed.has_positional_flag("unique"));
+        assert!(value.is_none());
     }
 
     #[test]
-    fn expect_only_accepts_declared_named_and_positional_flags() {
-        let parsed = args(parse_quote!(#[column(primary_key, name = "id")]));
+    fn take_path_rejects_a_non_path_expression() {
+        let error = parsed(parse_quote!(#[foreign_key(on_delete = "cascade")]))
+            .interpret(|reader| reader.take_path("on_delete"))
+            .expect_err("a string literal is not a path");
 
-        parsed
-            .expect_only(&["name"], &["primary_key", "unique"])
-            .expect("the declared arguments are accepted");
+        assert!(matches!(
+            error,
+            AttributeError::UnexpectedArgument { key, expected, .. }
+                if key == "on_delete" && expected == "path"
+        ));
     }
 
     #[test]
-    fn expect_only_rejects_an_unknown_named_argument() {
-        let parsed = args(parse_quote!(#[index(nmae = "id")]));
+    fn take_flag_reports_absent_and_present_flags() {
+        let outcome = parsed(parse_quote!(#[column(unique)]))
+            .interpret(|reader| {
+                let unique = reader.take_flag("unique");
+                let primary_key = reader.take_flag("primary_key");
 
-        let message = parsed
-            .expect_only(&["name"], &[])
-            .expect_err("the unknown named argument is rejected")
-            .to_string();
+                Ok::<_, AttributeError>((unique, primary_key))
+            })
+            .expect("the flags are consumed");
 
-        assert!(message.contains("unknown argument 'nmae'"));
+        assert_eq!(outcome, (true, false));
     }
 
     #[test]
-    fn expect_only_rejects_an_unexpected_positional_flag() {
-        let parsed = args(parse_quote!(#[index(unexpected)]));
+    fn take_positional_path_returns_none_when_there_is_no_positional_argument() {
+        let value = parsed(parse_quote!(#[provides]))
+            .interpret(|reader| Ok::<_, AttributeError>(reader.take_positional_path()))
+            .expect("an absent positional path reads as none");
 
-        let message = parsed
-            .expect_only(&["name"], &[])
-            .expect_err("the unexpected positional is rejected")
-            .to_string();
-
-        assert!(message.contains("unexpected positional argument 'unexpected'"));
+        assert!(value.is_none());
     }
 
     #[test]
-    fn expect_only_rejects_a_non_path_positional_argument() {
-        let parsed = args(parse_quote!(#[index(5)]));
+    fn from_attribute_rejects_a_duplicated_named_argument() {
+        let error = parse(parse_quote!(#[index(name = "a", name = "b")]))
+            .map(|_| ())
+            .expect_err("duplicates fail");
 
-        assert!(parsed.expect_only(&["name"], &[]).is_err());
+        assert!(matches!(
+            error,
+            AttributeError::DuplicateNamedArgument { attribute_path, key }
+                if attribute_path == "index" && key == "name"
+        ));
     }
 
     #[test]
-    fn reject_unknown_named_accepts_only_declared_keys() {
-        let parsed = args(parse_quote!(#[tagged(crate::Tag, attribute = Foo)]));
+    fn from_attribute_rejects_a_malformed_argument_list() {
+        let error = parse(parse_quote!(#[index(= 5)]))
+            .map(|_| ())
+            .expect_err("malformed lists fail");
 
-        parsed
-            .reject_unknown_named(&["attribute"])
-            .expect("the declared named key is accepted");
-        assert!(parsed.reject_unknown_named(&[]).is_err());
+        assert!(matches!(
+            error,
+            AttributeError::AttributeArguments { attribute_path, .. }
+                if attribute_path == "index"
+        ));
     }
 }

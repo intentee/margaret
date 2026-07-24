@@ -71,12 +71,9 @@ pub enum AttributeError {
         expected: String,
     },
 
-    #[error("attribute '{attribute_path}' has an unexpected positional argument '{argument}'")]
-    UnexpectedPositionalArgument {
+    #[error("attribute '{attribute_path}' has an unrecognized argument '{argument}'")]
+    UnrecognizedArgument {
         argument: String,
         attribute_path: String,
     },
-
-    #[error("attribute '{attribute_path}' has an unknown argument '{key}'")]
-    UnknownNamedArgument { attribute_path: String, key: String },
 }

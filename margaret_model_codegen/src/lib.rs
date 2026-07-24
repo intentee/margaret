@@ -581,6 +581,70 @@ struct Article {
     }
 
     #[test]
+    fn rejects_a_constraint_index_name_that_collides_with_a_table_name() {
+        let source = "\
+#[model(table = \"articles_pkey\")]
+struct Reserved {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+}
+
+#[model(table = \"articles\")]
+struct Article {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+}
+";
+
+        assert!(error_message(source).contains("collides with the table name"));
+    }
+
+    #[test]
+    fn rejects_two_tables_that_generate_the_same_constraint_index_name() {
+        let source = "\
+#[model(table = \"a\")]
+struct First {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+    #[column(unique)]
+    b_c: String,
+}
+
+#[model(table = \"a_b\")]
+struct Second {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+    #[column(unique)]
+    c: String,
+}
+";
+
+        assert!(error_message(source).contains("generated for both table"));
+    }
+
+    #[test]
+    fn rejects_an_index_name_that_collides_with_a_constraint_index() {
+        let source = "\
+#[model(table = \"author\")]
+struct Author {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+}
+
+#[model(table = \"book\")]
+struct Book {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+    #[column]
+    #[index(name = \"author_pkey\")]
+    title: String,
+}
+";
+
+        assert!(error_message(source).contains("collides with the constraint-backing index"));
+    }
+
+    #[test]
     fn rejects_malformed_index_arguments() {
         assert!(
             error_message(

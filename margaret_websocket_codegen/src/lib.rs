@@ -553,6 +553,17 @@ impl Guard {
     }
 
     #[test]
+    fn rejects_a_notification_whose_response_argument_is_not_a_path() {
+        assert!(
+            error(
+                r#"#[websocket_message(notification, method = "x", response = "single")] struct Bad;"#
+            )
+            .to_string()
+            .contains("is not a path")
+        );
+    }
+
+    #[test]
     fn rejects_a_session_that_is_not_a_struct() {
         assert!(
             error(r#"#[websocket_session(path = "/x", server = "public")] enum Bad {}"#)

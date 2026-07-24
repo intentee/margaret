@@ -12,15 +12,15 @@ impl RouteParameterArguments {
         subject: &str,
         position: usize,
     ) -> Result<Self, RequestBindingError> {
-        arguments.expect_only(&["from"], &[])?;
+        arguments.interpret(|reader| {
+            let from = reader.take_string("from")?.ok_or_else(|| {
+                RequestBindingError::RouteParameterMissingFrom {
+                    subject: subject.to_string(),
+                    parameter: position.to_string(),
+                }
+            })?;
 
-        let from = arguments.string("from")?.ok_or_else(|| {
-            RequestBindingError::RouteParameterMissingFrom {
-                subject: subject.to_string(),
-                parameter: position.to_string(),
-            }
-        })?;
-
-        Ok(Self { from })
+            Ok(Self { from })
+        })
     }
 }
