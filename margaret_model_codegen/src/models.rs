@@ -11,12 +11,16 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_identifier::FieldIdentifier;
+use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_attributes::indexed_field::IndexedField;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_attributes::select_matching_attributes::select_matching_attributes;
 use margaret_attributes::select_unique_attribute::select_unique_attribute;
 use margaret_schema_identifier_naming::index_name::index_name;
+use margaret_schema_identifier_naming::primary_key_index_name::primary_key_index_name;
 use margaret_schema_identifier_naming::schema_identifier::schema_identifier;
+use margaret_schema_identifier_naming::unique_index_name::unique_index_name;
 use margaret_schema_identifier_naming::validate_identifier_length::validate_identifier_length;
 use margaret_toposort::topological_order::topological_order;
 
@@ -26,15 +30,19 @@ use crate::deferred_foreign_key::DeferredForeignKey;
 use crate::foreign_key_arguments::ForeignKeyArguments;
 use crate::foreign_key_target::ForeignKeyTarget;
 use crate::foreign_key_target_column::ForeignKeyTargetColumn;
+use crate::index_arguments::IndexArguments;
+use crate::index_membership::IndexMembership;
 use crate::infer_column_type::infer_column_type;
 use crate::inferred_column::InferredColumn;
 use crate::model::Model;
 use crate::model_arguments::ModelArguments;
 use crate::model_codegen_error::ModelCodegenError;
 use crate::option_inner::option_inner;
+use crate::positioned_field::PositionedField;
 use crate::resolved_column::ResolvedColumn;
 use crate::resolved_foreign_key::ResolvedForeignKey;
 use crate::resolved_index::ResolvedIndex;
+use crate::resolved_unique_constraint::ResolvedUniqueConstraint;
 
 fn field_display(identifier: &FieldIdentifier) -> String {
     match identifier {
@@ -84,20 +92,167 @@ fn register_column_name(
     Ok(column_name)
 }
 
-fn resolve_index(
-    table: &str,
-    column: &str,
+fn resolve_index_membership(
+    arguments: &AttributeArgs,
     model: &str,
-) -> Result<ResolvedIndex, ModelCodegenError> {
-    let name = index_name(table, column).map_err(|source| ModelCodegenError::IndexNameTooLong {
-        model: model.to_string(),
-        source,
-    })?;
+) -> Result<IndexMembership, ModelCodegenError> {
+    let IndexArguments { name } = IndexArguments::parse(arguments)?;
 
-    Ok(ResolvedIndex {
-        column: column.to_string(),
-        name,
-    })
+    match name {
+        None => Ok(IndexMembership::Derived),
+        Some(name) => {
+            if !is_snake_case_identifier(&name) {
+                return Err(ModelCodegenError::InvalidIndexName {
+                    index: name,
+                    model: model.to_string(),
+                });
+            }
+
+            if let Err(source) = validate_identifier_length(&name) {
+                return Err(ModelCodegenError::ExplicitIndexNameTooLong {
+                    index: name,
+                    model: model.to_string(),
+                    source,
+                });
+            }
+
+            Ok(IndexMembership::Named(name))
+        }
+    }
+}
+
+fn resolve_index_memberships(
+    index_attributes: &[&IndexedAttribute],
+    field: &IndexedField,
+    model: &str,
+) -> Result<Vec<IndexMembership>, ModelCodegenError> {
+    let mut memberships: Vec<IndexMembership> = Vec::new();
+    let mut has_derived = false;
+    let mut seen_names: HashSet<String> = HashSet::new();
+
+    for index_attribute in index_attributes {
+        let membership = resolve_index_membership(index_attribute.args()?, model)?;
+
+        let repeated = match &membership {
+            IndexMembership::Derived => std::mem::replace(&mut has_derived, true),
+            IndexMembership::Named(name) => !seen_names.insert(name.clone()),
+        };
+
+        if repeated {
+            return Err(ModelCodegenError::RepeatedIndexOnColumn {
+                field: field_display(field.identifier()),
+                model: model.to_string(),
+            });
+        }
+
+        memberships.push(membership);
+    }
+
+    Ok(memberships)
+}
+
+fn ensure_index_not_redundant(
+    column: &str,
+    primary_key_names: &HashSet<String>,
+    unique_column_names: &HashSet<String>,
+    model: &str,
+) -> Result<(), ModelCodegenError> {
+    if primary_key_names.contains(column) {
+        return Err(ModelCodegenError::RedundantIndexOnPrimaryKeyColumn {
+            column: column.to_string(),
+            model: model.to_string(),
+        });
+    }
+
+    if unique_column_names.contains(column) {
+        return Err(ModelCodegenError::RedundantIndexOnUniqueColumn {
+            column: column.to_string(),
+            model: model.to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+fn register_table_name(
+    seen_table_names: &mut HashMap<String, String>,
+    table: String,
+    model: &str,
+) -> Result<(), ModelCodegenError> {
+    if let Some(first) = seen_table_names.get(&table) {
+        return Err(ModelCodegenError::DuplicateTableName {
+            first: first.clone(),
+            second: model.to_string(),
+            table,
+        });
+    }
+
+    seen_table_names.insert(table, model.to_string());
+
+    Ok(())
+}
+
+fn register_constraint_index_name(
+    seen_table_names: &HashMap<String, String>,
+    constraint_index_names: &mut HashMap<String, String>,
+    name: String,
+    table: &str,
+) -> Result<(), ModelCodegenError> {
+    if let Some(table_model) = seen_table_names.get(&name) {
+        return Err(ModelCodegenError::ConstraintIndexCollidesWithTableName {
+            constraint_table: table.to_string(),
+            name,
+            table_model: table_model.clone(),
+        });
+    }
+
+    if let Some(first_table) = constraint_index_names.get(&name) {
+        return Err(ModelCodegenError::DuplicateConstraintIndexName {
+            first_table: first_table.clone(),
+            name,
+            second_table: table.to_string(),
+        });
+    }
+
+    constraint_index_names.insert(name, table.to_string());
+
+    Ok(())
+}
+
+fn register_index_name(
+    seen_table_names: &HashMap<String, String>,
+    constraint_index_names: &HashMap<String, String>,
+    index_names: &mut HashMap<String, String>,
+    name: String,
+    table: &str,
+) -> Result<(), ModelCodegenError> {
+    if let Some(table_model) = seen_table_names.get(&name) {
+        return Err(ModelCodegenError::IndexNameCollidesWithTableName {
+            index_table: table.to_string(),
+            name,
+            table_model: table_model.clone(),
+        });
+    }
+
+    if let Some(constraint_table) = constraint_index_names.get(&name) {
+        return Err(ModelCodegenError::IndexNameCollidesWithConstraintIndex {
+            constraint_table: constraint_table.clone(),
+            index_table: table.to_string(),
+            name,
+        });
+    }
+
+    if let Some(first) = index_names.get(&name) {
+        return Err(ModelCodegenError::DuplicateIndexName {
+            first: first.clone(),
+            name,
+            second: table.to_string(),
+        });
+    }
+
+    index_names.insert(name, table.to_string());
+
+    Ok(())
 }
 
 fn resolve_scalar_column(
@@ -106,8 +261,8 @@ fn resolve_scalar_column(
         primary_key,
         unique,
     }: ColumnArguments,
-    index: bool,
-    field: &IndexedField,
+    indexes: Vec<IndexMembership>,
+    PositionedField { field, position }: PositionedField,
     model: &str,
     seen_columns: &mut HashSet<String>,
 ) -> Result<ResolvedColumn, ModelCodegenError> {
@@ -121,27 +276,13 @@ fn resolve_scalar_column(
     }
 
     let column_name = register_column_name(column_name, model, seen_columns)?;
-
-    if index && unique {
-        return Err(ModelCodegenError::RedundantIndexOnUniqueColumn {
-            field: field_display(field.identifier()),
-            model: model.to_string(),
-        });
-    }
-
-    if index && primary_key {
-        return Err(ModelCodegenError::RedundantIndexOnPrimaryKeyColumn {
-            field: field_display(field.identifier()),
-            model: model.to_string(),
-        });
-    }
-
     let inferred = infer_column_type(field.ty(), model, &column_name)?;
 
     Ok(ResolvedColumn {
-        index,
+        indexes,
         inferred,
         name: column_name,
+        position,
         primary_key,
         unique,
     })
@@ -153,9 +294,9 @@ fn defer_foreign_key(
         primary_key,
         unique,
     }: ColumnArguments,
-    index: bool,
+    indexes: Vec<IndexMembership>,
+    PositionedField { field, position }: PositionedField,
     foreign_key_arguments: &AttributeArgs,
-    field: &IndexedField,
     model: &str,
     attribute_index: &AttributeIndex,
     item: &IndexedItem,
@@ -176,20 +317,13 @@ fn defer_foreign_key(
 
     let field_name = match field.identifier() {
         FieldIdentifier::Named(field_name) => field_name.clone(),
-        FieldIdentifier::Positional(position) => {
+        FieldIdentifier::Positional(field_position) => {
             return Err(ModelCodegenError::ForeignKeyRequiresNamedField {
                 model: model.to_string(),
-                position: *position,
+                position: *field_position,
             });
         }
     };
-
-    if index && unique {
-        return Err(ModelCodegenError::RedundantIndexOnUniqueColumn {
-            field: field_name,
-            model: model.to_string(),
-        });
-    }
 
     let ForeignKeyArguments { on_delete } =
         ForeignKeyArguments::parse(foreign_key_arguments, model, &field_name)?;
@@ -211,9 +345,10 @@ fn defer_foreign_key(
 
     Ok(DeferredForeignKey {
         field_name,
-        index,
+        indexes,
         nullable,
         on_delete,
+        position,
         rust_type,
         target_path,
         unique,
@@ -223,6 +358,7 @@ fn defer_foreign_key(
 fn collect_models(
     attribute_index: &AttributeIndex,
     targets: &mut HashMap<CanonicalPath, ForeignKeyTarget>,
+    seen_table_names: &mut HashMap<String, String>,
 ) -> Result<Vec<CollectedModel>, ModelCodegenError> {
     let selector = AttributeSelector::from_marker("model");
     let column_selector = AttributeSelector::from_marker("column");
@@ -230,7 +366,6 @@ fn collect_models(
     let index_selector = AttributeSelector::from_marker("index");
     let mut collected: Vec<CollectedModel> = Vec::new();
     let mut seen_models: HashSet<String> = HashSet::new();
-    let mut seen_tables: HashMap<String, String> = HashMap::new();
 
     for matched in attribute_index.select(&selector) {
         let item = matched.item();
@@ -254,37 +389,29 @@ fn collect_models(
             return Err(ModelCodegenError::TableNameTooLong { model, source });
         }
 
-        if let Some(first) = seen_tables.get(&table) {
-            return Err(ModelCodegenError::DuplicateTableName {
-                first: first.clone(),
-                second: model,
-                table,
-            });
-        }
-
-        seen_tables.insert(table.clone(), model.clone());
+        register_table_name(seen_table_names, table.clone(), &model)?;
 
         let mut scalar_columns: Vec<ResolvedColumn> = Vec::new();
         let mut deferred_foreign_keys: Vec<DeferredForeignKey> = Vec::new();
         let mut seen_columns: HashSet<String> = HashSet::new();
 
-        for field in item.fields() {
+        for (position, field) in item.fields().iter().enumerate() {
             let column_attribute =
                 select_unique_attribute(field.attributes(), &column_selector, || model.clone())?;
             let foreign_key_attribute =
                 select_unique_attribute(field.attributes(), &foreign_key_selector, || {
                     model.clone()
                 })?;
-            let index =
-                select_unique_attribute(field.attributes(), &index_selector, || model.clone())?
-                    .is_some();
+            let index_attributes = select_matching_attributes(field.attributes(), &index_selector);
 
-            if index && column_attribute.is_none() {
+            if !index_attributes.is_empty() && column_attribute.is_none() {
                 return Err(ModelCodegenError::IndexRequiresColumn {
                     field: field_display(field.identifier()),
                     model,
                 });
             }
+
+            let indexes = resolve_index_memberships(&index_attributes, field, &model)?;
 
             match (column_attribute, foreign_key_attribute) {
                 (None, None) => {
@@ -306,8 +433,8 @@ fn collect_models(
                         None => {
                             scalar_columns.push(resolve_scalar_column(
                                 column_arguments,
-                                index,
-                                field,
+                                indexes,
+                                PositionedField { field, position },
                                 &model,
                                 &mut seen_columns,
                             )?);
@@ -315,9 +442,9 @@ fn collect_models(
                         Some(foreign_key_attribute) => {
                             deferred_foreign_keys.push(defer_foreign_key(
                                 column_arguments,
-                                index,
+                                indexes,
+                                PositionedField { field, position },
                                 foreign_key_attribute.args()?,
-                                field,
                                 &model,
                                 attribute_index,
                                 item,
@@ -328,19 +455,28 @@ fn collect_models(
             }
         }
 
-        let primary_key: Vec<ForeignKeyTargetColumn> = scalar_columns
+        let primary_key_columns: Vec<&ResolvedColumn> = scalar_columns
             .iter()
             .filter(|column| column.primary_key)
+            .collect();
+
+        let target_primary_key: Vec<ForeignKeyTargetColumn> = primary_key_columns
+            .iter()
             .map(|column| ForeignKeyTargetColumn {
                 column_type: column.inferred.column_type.clone(),
                 name: column.name.clone(),
             })
             .collect();
 
+        let primary_key: Vec<String> = primary_key_columns
+            .iter()
+            .map(|column| column.name.clone())
+            .collect();
+
         targets.insert(
             item.canonical_path().clone(),
             ForeignKeyTarget {
-                primary_key,
+                primary_key: target_primary_key,
                 table: table.clone(),
             },
         );
@@ -348,6 +484,7 @@ fn collect_models(
         collected.push(CollectedModel {
             deferred_foreign_keys,
             model,
+            primary_key,
             scalar_columns,
             seen_columns,
             table,
@@ -357,6 +494,72 @@ fn collect_models(
     Ok(collected)
 }
 
+fn resolve_indexes(
+    table: &str,
+    columns: &[ResolvedColumn],
+    primary_key_names: &HashSet<String>,
+    unique_column_names: &HashSet<String>,
+    model: &str,
+) -> Result<Vec<ResolvedIndex>, ModelCodegenError> {
+    let mut indexes: Vec<ResolvedIndex> = Vec::new();
+    let mut named_groups: BTreeMap<String, Vec<(usize, String)>> = BTreeMap::new();
+
+    for column in columns {
+        for membership in &column.indexes {
+            match membership {
+                IndexMembership::Derived => {
+                    ensure_index_not_redundant(
+                        &column.name,
+                        primary_key_names,
+                        unique_column_names,
+                        model,
+                    )?;
+
+                    let name = index_name(table, &column.name).map_err(|source| {
+                        ModelCodegenError::IndexNameTooLong {
+                            model: model.to_string(),
+                            source,
+                        }
+                    })?;
+
+                    indexes.push(ResolvedIndex {
+                        columns: vec![column.name.clone()],
+                        name,
+                    });
+                }
+                IndexMembership::Named(name) => {
+                    named_groups
+                        .entry(name.clone())
+                        .or_default()
+                        .push((column.position, column.name.clone()));
+                }
+            }
+        }
+    }
+
+    for (name, mut members) in named_groups {
+        members.sort_by_key(|(position, _)| *position);
+
+        let index_columns: Vec<String> = members
+            .into_iter()
+            .map(|(_, column_name)| column_name)
+            .collect();
+
+        if let [only] = index_columns.as_slice() {
+            ensure_index_not_redundant(only, primary_key_names, unique_column_names, model)?;
+        }
+
+        indexes.push(ResolvedIndex {
+            columns: index_columns,
+            name,
+        });
+    }
+
+    indexes.sort_by(|left, right| left.name.cmp(&right.name));
+
+    Ok(indexes)
+}
+
 fn resolve_model(
     collected: CollectedModel,
     targets: &HashMap<CanonicalPath, ForeignKeyTarget>,
@@ -364,20 +567,21 @@ fn resolve_model(
     let CollectedModel {
         deferred_foreign_keys,
         model,
+        primary_key,
         scalar_columns: mut columns,
         mut seen_columns,
         table,
     } = collected;
 
     let mut foreign_keys: Vec<ResolvedForeignKey> = Vec::new();
-    let mut indexes: Vec<ResolvedIndex> = Vec::new();
 
     for deferred in deferred_foreign_keys {
         let DeferredForeignKey {
             field_name,
-            index,
+            indexes,
             nullable,
             on_delete,
+            position,
             rust_type,
             target_path,
             unique,
@@ -423,13 +627,14 @@ fn resolve_model(
         let column_name = register_column_name(column_name, &model, &mut seen_columns)?;
 
         columns.push(ResolvedColumn {
-            index,
+            indexes,
             inferred: InferredColumn {
                 column_type: referenced.column_type.clone(),
                 default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
                 nullable,
             },
             name: column_name.clone(),
+            position,
             primary_key: false,
             unique: false,
         });
@@ -443,18 +648,88 @@ fn resolve_model(
         });
     }
 
+    let mut unique_constraints: Vec<ResolvedUniqueConstraint> = Vec::new();
+    let mut unique_column_names: HashSet<String> = HashSet::new();
+
     for column in &columns {
-        if column.index {
-            indexes.push(resolve_index(&table, &column.name, &model)?);
+        if column.unique {
+            unique_constraints.push(ResolvedUniqueConstraint {
+                columns: vec![column.name.clone()],
+            });
+            unique_column_names.insert(column.name.clone());
         }
     }
+
+    for foreign_key in &foreign_keys {
+        if foreign_key.unique {
+            unique_constraints.push(ResolvedUniqueConstraint {
+                columns: vec![foreign_key.column.clone()],
+            });
+            unique_column_names.insert(foreign_key.column.clone());
+        }
+    }
+
+    let primary_key_names: HashSet<String> = primary_key.iter().cloned().collect();
+
+    let indexes = resolve_indexes(
+        &table,
+        &columns,
+        &primary_key_names,
+        &unique_column_names,
+        &model,
+    )?;
 
     Ok(Model {
         columns,
         foreign_keys,
         indexes,
+        primary_key,
         table,
+        unique_constraints,
     })
+}
+
+fn validate_relation_namespace(
+    models: &[Model],
+    seen_table_names: &HashMap<String, String>,
+) -> Result<(), ModelCodegenError> {
+    let mut constraint_index_names: HashMap<String, String> = HashMap::new();
+
+    for model in models {
+        if !model.primary_key.is_empty() {
+            register_constraint_index_name(
+                seen_table_names,
+                &mut constraint_index_names,
+                primary_key_index_name(&model.table),
+                &model.table,
+            )?;
+        }
+
+        for unique_constraint in &model.unique_constraints {
+            register_constraint_index_name(
+                seen_table_names,
+                &mut constraint_index_names,
+                unique_index_name(&model.table, &unique_constraint.columns),
+                &model.table,
+            )?;
+        }
+    }
+
+    let mut index_names: HashMap<String, String> = HashMap::new();
+
+    for model in models {
+        for index in &model.indexes {
+            register_index_name(
+                seen_table_names,
+                &constraint_index_names,
+                &mut index_names,
+                index.name.clone(),
+                &model.table,
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 fn order_by_dependencies(resolved: Vec<Model>) -> Result<Vec<Model>, ModelCodegenError> {
@@ -490,12 +765,15 @@ fn order_by_dependencies(resolved: Vec<Model>) -> Result<Vec<Model>, ModelCodege
 
 pub fn models(attribute_index: &AttributeIndex) -> Result<Vec<Model>, ModelCodegenError> {
     let mut targets: HashMap<CanonicalPath, ForeignKeyTarget> = HashMap::new();
-    let collected = collect_models(attribute_index, &mut targets)?;
+    let mut seen_table_names: HashMap<String, String> = HashMap::new();
+    let collected = collect_models(attribute_index, &mut targets, &mut seen_table_names)?;
 
     let resolved: Vec<Model> = collected
         .into_iter()
         .map(|collected_model| resolve_model(collected_model, &targets))
         .collect::<Result<Vec<Model>, ModelCodegenError>>()?;
+
+    validate_relation_namespace(&resolved, &seen_table_names)?;
 
     order_by_dependencies(resolved)
 }

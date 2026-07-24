@@ -16,30 +16,32 @@ impl ForeignKeyArguments {
         model: &str,
         field: &str,
     ) -> Result<Self, ModelCodegenError> {
-        let on_delete = match arguments.path("on_delete")? {
-            None => quote!(margaret_model::on_delete::OnDelete::NoAction),
-            Some(path) if path.is_ident("cascade") => {
-                quote!(margaret_model::on_delete::OnDelete::Cascade)
-            }
-            Some(path) if path.is_ident("restrict") => {
-                quote!(margaret_model::on_delete::OnDelete::Restrict)
-            }
-            Some(path) if path.is_ident("set_null") => {
-                quote!(margaret_model::on_delete::OnDelete::SetNull)
-            }
-            Some(path) if path.is_ident("set_default") => {
-                quote!(margaret_model::on_delete::OnDelete::SetDefault)
-            }
-            Some(path) => {
-                return Err(ModelCodegenError::UnknownOnDeleteAction {
-                    action: format_path(&path),
-                    field: field.to_string(),
-                    model: model.to_string(),
-                });
-            }
-        };
+        arguments.interpret(|reader| {
+            let on_delete = match reader.take_path("on_delete")? {
+                None => quote!(margaret_model::on_delete::OnDelete::NoAction),
+                Some(path) if path.is_ident("cascade") => {
+                    quote!(margaret_model::on_delete::OnDelete::Cascade)
+                }
+                Some(path) if path.is_ident("restrict") => {
+                    quote!(margaret_model::on_delete::OnDelete::Restrict)
+                }
+                Some(path) if path.is_ident("set_null") => {
+                    quote!(margaret_model::on_delete::OnDelete::SetNull)
+                }
+                Some(path) if path.is_ident("set_default") => {
+                    quote!(margaret_model::on_delete::OnDelete::SetDefault)
+                }
+                Some(path) => {
+                    return Err(ModelCodegenError::UnknownOnDeleteAction {
+                        action: format_path(&path),
+                        field: field.to_string(),
+                        model: model.to_string(),
+                    });
+                }
+            };
 
-        Ok(Self { on_delete })
+            Ok(Self { on_delete })
+        })
     }
 }
 

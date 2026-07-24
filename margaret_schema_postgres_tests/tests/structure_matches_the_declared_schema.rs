@@ -110,21 +110,28 @@ async fn assert_foreign_keys_match(pool: &PgPool, table: &Table) {
     }
 }
 
-async fn assert_indexes_exist(pool: &PgPool, table: &Table) {
+async fn assert_indexes_match(pool: &PgPool, table: &Table) {
     for index in &table.indexes {
-        let count: i64 = query_scalar(
-            "SELECT COUNT(*) FROM pg_indexes \
-             WHERE schemaname = 'public' AND tablename = $1 AND indexname = $2",
+        let observed: Vec<String> = query_scalar(
+            "SELECT a.attname::text \
+             FROM pg_index i \
+             JOIN pg_class ic ON ic.oid = i.indexrelid \
+             JOIN pg_class tc ON tc.oid = i.indrelid \
+             JOIN pg_namespace n ON n.oid = tc.relnamespace \
+             JOIN LATERAL unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord) ON true \
+             JOIN pg_attribute a ON a.attrelid = tc.oid AND a.attnum = k.attnum \
+             WHERE n.nspname = 'public' AND tc.relname = $1 AND ic.relname = $2 \
+             ORDER BY k.ord",
         )
         .bind(&table.name)
         .bind(&index.name)
-        .fetch_one(pool)
+        .fetch_all(pool)
         .await
-        .expect("the index is introspected");
+        .expect("the index columns are introspected");
 
         assert_eq!(
-            count, 1,
-            "index '{}' of table '{}' is missing",
+            observed, index.columns,
+            "index '{}' of table '{}' does not cover the expected columns in order",
             index.name, table.name
         );
     }
@@ -159,7 +166,7 @@ async fn the_applied_schema_matches_the_declared_structure() {
         assert_columns_match(pool, table).await;
         assert_primary_key_matches(pool, table).await;
         assert_foreign_keys_match(pool, table).await;
-        assert_indexes_exist(pool, table).await;
+        assert_indexes_match(pool, table).await;
         assert_unique_constraints_exist(pool, table).await;
     }
 }

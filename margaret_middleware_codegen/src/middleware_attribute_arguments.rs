@@ -1,6 +1,7 @@
 use syn::Path;
 
 use margaret_attributes::attribute_args::AttributeArgs;
+use margaret_tag_codegen::read_middleware_attribute::read_middleware_attribute;
 
 use crate::middleware_codegen_error::MiddlewareCodegenError;
 
@@ -13,7 +14,7 @@ impl MiddlewareAttributeArguments {
         arguments: &AttributeArgs,
         middleware: &str,
     ) -> Result<Self, MiddlewareCodegenError> {
-        let handles = arguments.path("attribute")?.ok_or_else(|| {
+        let handles = read_middleware_attribute(arguments)?.ok_or_else(|| {
             MiddlewareCodegenError::MissingMiddlewareHandles {
                 middleware: middleware.to_string(),
             }

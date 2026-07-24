@@ -1,4 +1,4 @@
 pub struct Index {
-    pub column: String,
+    pub columns: Vec<String>,
     pub name: String,
 }

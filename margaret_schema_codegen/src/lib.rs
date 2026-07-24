@@ -232,13 +232,24 @@ struct Second {
     }
 
     #[test]
+    fn generates_a_scalar_unique_constraint_before_a_foreign_key_unique_constraint() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    slug: String,\n    #[column(unique)]\n    #[foreign_key]\n    author: Author,\n}\n",
+        ));
+
+        assert!(source.contains(
+            "unique_constraints:vec![margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"slug\".to_string()],},margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"author_id\".to_string()],}]"
+        ));
+    }
+
+    #[test]
     fn generates_an_index_from_a_scalar_column() {
         let source = schema_source(
             "#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    slug: String,\n}\n",
         );
 
         assert!(source.contains(
-            "indexes:vec![margaret_model::index::Index{column:\"slug\".to_string(),name:\"posts_slug_index\".to_string(),}]"
+            "indexes:vec![margaret_model::index::Index{columns:vec![\"slug\".to_string()],name:\"posts_slug_index\".to_string(),}]"
         ));
     }
 
@@ -249,7 +260,54 @@ struct Second {
         ));
 
         assert!(source.contains(
-            "indexes:vec![margaret_model::index::Index{column:\"author_id\".to_string(),name:\"articles_author_id_index\".to_string(),}]"
+            "indexes:vec![margaret_model::index::Index{columns:vec![\"author_id\".to_string()],name:\"articles_author_id_index\".to_string(),}]"
+        ));
+    }
+
+    #[test]
+    fn combines_columns_that_share_an_index_name_into_one_index() {
+        let source = schema_source(
+            "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"events_kind_label\")]\n    kind: String,\n    #[column]\n    #[index(name = \"events_kind_label\")]\n    label: String,\n}\n",
+        );
+
+        assert!(source.contains(
+            "indexes:vec![margaret_model::index::Index{columns:vec![\"kind\".to_string(),\"label\".to_string()],name:\"events_kind_label\".to_string(),}]"
+        ));
+    }
+
+    #[test]
+    fn orders_composite_index_columns_by_field_declaration() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[index(name = \"articles_author_title\")]\n    author: Author,\n    #[column]\n    #[index(name = \"articles_author_title\")]\n    title: String,\n}\n",
+        ));
+
+        assert!(source.contains(
+            "indexes:vec![margaret_model::index::Index{columns:vec![\"author_id\".to_string(),\"title\".to_string()],name:\"articles_author_title\".to_string(),}]"
+        ));
+    }
+
+    #[test]
+    fn allows_a_unique_column_inside_a_composite_index() {
+        let source = schema_source(
+            "#[model(table = \"members\")]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[index(name = \"members_email_label\")]\n    email: String,\n    #[column]\n    #[index(name = \"members_email_label\")]\n    label: String,\n}\n",
+        );
+
+        assert!(source.contains(
+            "indexes:vec![margaret_model::index::Index{columns:vec![\"email\".to_string(),\"label\".to_string()],name:\"members_email_label\".to_string(),}]"
+        ));
+        assert!(source.contains(
+            "unique_constraints:vec![margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"email\".to_string()],}]"
+        ));
+    }
+
+    #[test]
+    fn orders_multiple_indexes_by_name() {
+        let source = schema_source(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    slug: String,\n    #[column]\n    #[index]\n    created_at: String,\n}\n",
+        );
+
+        assert!(source.contains(
+            "indexes:vec![margaret_model::index::Index{columns:vec![\"created_at\".to_string()],name:\"articles_created_at_index\".to_string(),},margaret_model::index::Index{columns:vec![\"slug\".to_string()],name:\"articles_slug_index\".to_string(),}]"
         ));
     }
 }

@@ -13,25 +13,26 @@ impl SessionArguments {
         arguments: &AttributeArgs,
         session: &str,
     ) -> Result<Self, WebSocketCodegenError> {
-        let path =
-            arguments
-                .string("path")?
-                .ok_or_else(|| WebSocketCodegenError::MissingSessionPath {
+        arguments.interpret(|reader| {
+            let path = reader.take_string("path")?.ok_or_else(|| {
+                WebSocketCodegenError::MissingSessionPath {
                     session: session.to_string(),
-                })?;
-        let server = arguments.string("server")?.ok_or_else(|| {
-            WebSocketCodegenError::MissingSessionServer {
-                session: session.to_string(),
+                }
+            })?;
+            let server = reader.take_string("server")?.ok_or_else(|| {
+                WebSocketCodegenError::MissingSessionServer {
+                    session: session.to_string(),
+                }
+            })?;
+
+            if !is_snake_case_identifier(&server) {
+                return Err(WebSocketCodegenError::InvalidSessionServer {
+                    session: session.to_string(),
+                    server,
+                });
             }
-        })?;
 
-        if !is_snake_case_identifier(&server) {
-            return Err(WebSocketCodegenError::InvalidSessionServer {
-                session: session.to_string(),
-                server,
-            });
-        }
-
-        Ok(Self { path, server })
+            Ok(Self { path, server })
+        })
     }
 }

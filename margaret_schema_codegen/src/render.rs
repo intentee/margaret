@@ -50,12 +50,12 @@ fn render_foreign_key(foreign_key: &ResolvedForeignKey) -> TokenStream {
 }
 
 fn render_index(index: &ResolvedIndex) -> TokenStream {
-    let column = Literal::string(&index.column);
+    let columns = string_vec(&index.columns);
     let name = Literal::string(&index.name);
 
     quote! {
         margaret_model::index::Index {
-            column: #column.to_string(),
+            columns: #columns,
             name: #name.to_string(),
         }
     }
@@ -76,26 +76,11 @@ fn render_table(model: &Model) -> TokenStream {
     let columns = model.columns.iter().map(render_column);
     let foreign_keys = model.foreign_keys.iter().map(render_foreign_key);
     let indexes = model.indexes.iter().map(render_index);
-
-    let primary_key_columns: Vec<String> = model
-        .columns
+    let primary_key = string_vec(&model.primary_key);
+    let unique_constraints = model
+        .unique_constraints
         .iter()
-        .filter(|column| column.primary_key)
-        .map(|column| column.name.clone())
-        .collect();
-    let primary_key = string_vec(&primary_key_columns);
-
-    let scalar_unique = model
-        .columns
-        .iter()
-        .filter(|column| column.unique)
-        .map(|column| render_unique_constraint(std::slice::from_ref(&column.name)));
-    let foreign_key_unique = model
-        .foreign_keys
-        .iter()
-        .filter(|foreign_key| foreign_key.unique)
-        .map(|foreign_key| render_unique_constraint(std::slice::from_ref(&foreign_key.column)));
-    let unique_constraints = scalar_unique.chain(foreign_key_unique);
+        .map(|unique_constraint| render_unique_constraint(&unique_constraint.columns));
 
     quote! {
         margaret_model::table::Table {

@@ -1,5 +1,4 @@
 #[derive(Debug)]
-pub struct ResolvedIndex {
+pub struct ResolvedUniqueConstraint {
     pub columns: Vec<String>,
-    pub name: String,
 }

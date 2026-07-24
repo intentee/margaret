@@ -10,14 +10,16 @@ pub(crate) struct ColumnArguments {
 
 impl ColumnArguments {
     pub(crate) fn parse(arguments: &AttributeArgs) -> Result<Self, ModelCodegenError> {
-        let name = arguments.string("name")?;
-        let primary_key = arguments.has_positional_flag("primary_key");
-        let unique = arguments.has_positional_flag("unique");
+        arguments.interpret(|reader| {
+            let name = reader.take_string("name")?;
+            let primary_key = reader.take_flag("primary_key");
+            let unique = reader.take_flag("unique");
 
-        Ok(Self {
-            name,
-            primary_key,
-            unique,
+            Ok(Self {
+                name,
+                primary_key,
+                unique,
+            })
         })
     }
 }

@@ -62,7 +62,7 @@ fn render_index(table_name: &str, index: &Index) -> String {
         "CREATE INDEX {} ON {} ({});",
         quote_identifier(&index.name),
         quote_identifier(table_name),
-        quote_identifier(&index.column)
+        quote_identifier_list(&index.columns)
     )
 }
 
@@ -180,9 +180,9 @@ mod tests {
         }
     }
 
-    fn index(column: &str, name: &str) -> Index {
+    fn index(columns: &[&str], name: &str) -> Index {
         Index {
-            column: column.to_string(),
+            columns: columns.iter().map(|column| column.to_string()).collect(),
             name: name.to_string(),
         }
     }
@@ -586,7 +586,7 @@ mod tests {
                     ),
                 ],
                 foreign_keys: Vec::new(),
-                indexes: vec![index("created_at", "articles_created_at_index")],
+                indexes: vec![index(&["created_at"], "articles_created_at_index")],
                 name: "articles".to_string(),
                 primary_key: vec!["id".to_string()],
                 unique_constraints: Vec::new(),
@@ -596,6 +596,39 @@ mod tests {
         assert_eq!(
             render_postgres(&schema),
             "CREATE TABLE \"articles\" (\n    \"id\" UUID NOT NULL DEFAULT uuidv7(),\n    \"created_at\" TIMESTAMPTZ NOT NULL,\n    PRIMARY KEY (\"id\")\n);\n\nCREATE INDEX \"articles_created_at_index\" ON \"articles\" (\"created_at\");"
+        );
+    }
+
+    #[test]
+    fn renders_a_multi_column_index() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![
+                    column("id", ColumnType::Uuid, false, ColumnDefault::UuidV7),
+                    column(
+                        "is_active",
+                        ColumnType::Boolean,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
+                    column(
+                        "joined_at",
+                        ColumnType::Timestamptz,
+                        false,
+                        ColumnDefault::NotSet,
+                    ),
+                ],
+                foreign_keys: Vec::new(),
+                indexes: vec![index(&["is_active", "joined_at"], "authors_active_joined")],
+                name: "authors".to_string(),
+                primary_key: vec!["id".to_string()],
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"authors\" (\n    \"id\" UUID NOT NULL DEFAULT uuidv7(),\n    \"is_active\" BOOLEAN NOT NULL,\n    \"joined_at\" TIMESTAMPTZ NOT NULL,\n    PRIMARY KEY (\"id\")\n);\n\nCREATE INDEX \"authors_active_joined\" ON \"authors\" (\"is_active\", \"joined_at\");"
         );
     }
 
@@ -614,8 +647,8 @@ mod tests {
                 ],
                 foreign_keys: Vec::new(),
                 indexes: vec![
-                    index("created_at", "articles_created_at_index"),
-                    index("author_id", "articles_author_id_index"),
+                    index(&["created_at"], "articles_created_at_index"),
+                    index(&["author_id"], "articles_author_id_index"),
                 ],
                 name: "articles".to_string(),
                 primary_key: Vec::new(),
