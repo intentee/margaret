@@ -54,7 +54,7 @@ fn injected_field_value(
         InjectedDependency::SingleConcrete { field, .. }
         | InjectedDependency::SingleInterface { field, .. } => {
             let accessor = format_ident!("{}", field);
-            let arguments = bindings.console_threads(&accessor_arguments[0]);
+            let arguments = bindings.console_weaves(&accessor_arguments[0]);
 
             quote! { container.#accessor(#(#arguments),*).await }
         }
@@ -65,7 +65,7 @@ fn injected_field_value(
                     .zip(accessor_arguments)
                     .map(|(member, arguments)| {
                         let accessor = format_ident!("{}", member);
-                        let arguments = bindings.console_threads(&arguments);
+                        let arguments = bindings.console_weaves(&arguments);
 
                         quote! { container.#accessor(#(#arguments),*).await }
                     });
@@ -138,7 +138,7 @@ fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings
     });
     let binders = binder_fields(session).into_iter().map(|(field, provider)| {
         let field = format_ident!("{field}");
-        let arguments = bindings.console_threads(bindings.console_arguments(provider));
+        let arguments = bindings.console_weaves(bindings.console_arguments(provider));
 
         quote! { #field: container.#field(#(#arguments),*).await, }
     });
@@ -303,7 +303,7 @@ fn dispatch_insert(
     let dispatch = dispatch_struct_ident(binding);
     let method = &binding.method;
     let accessor = format_ident!("{}", binding.handler_path.field_name());
-    let arguments = bindings.console_threads(bindings.console_arguments(&binding.handler_path));
+    let arguments = bindings.console_weaves(bindings.console_arguments(&binding.handler_path));
 
     quote! {
         #map.insert(

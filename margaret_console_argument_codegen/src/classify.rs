@@ -10,7 +10,7 @@ use crate::console_argument::ConsoleArgument;
 use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument_form::ConsoleArgumentForm;
 use crate::optional_parameter::OptionalParameter;
-use crate::threading_kind::ThreadingKind;
+use crate::weaving_kind::WeavingKind;
 
 fn bool_path() -> CanonicalPath {
     CanonicalPath::new(vec!["bool".to_string()])
@@ -96,19 +96,19 @@ pub fn classify(
         owner,
         parameter,
     )?;
-    let threading = ThreadingKind::from_canonical(&canonical, required);
+    let weaving = WeavingKind::from_canonical(&canonical, required);
 
     Ok(match form {
         ConsoleArgumentForm::Named { key } => ConsoleArgument::Named {
             name: key,
             required,
-            threading,
+            weaving,
             value_type: canonical,
         },
         ConsoleArgumentForm::Positional => ConsoleArgument::Positional {
             id: parameter.to_string(),
             required,
-            threading,
+            weaving,
             value_type: canonical,
         },
     })

@@ -29,13 +29,13 @@ pub(crate) fn serve_arguments(
     server_console_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
     views_console_arguments: &[ConsoleArgument],
 ) -> Result<Vec<ConsoleArgument>, CodegenError> {
-    let mut threaded: Vec<ConsoleArgument> = Vec::new();
+    let mut woven: Vec<ConsoleArgument> = Vec::new();
 
     for arguments in server_console_arguments.values() {
-        threaded.extend_from_slice(arguments);
+        woven.extend_from_slice(arguments);
     }
 
-    threaded.extend_from_slice(views_console_arguments);
+    woven.extend_from_slice(views_console_arguments);
 
-    Ok(bindings.serve_arguments(&serve_roots(index), &threaded)?)
+    Ok(bindings.serve_arguments(&serve_roots(index), &woven)?)
 }

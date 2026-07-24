@@ -5,11 +5,11 @@ use margaret_codegen_tokens::console_argument_clone::console_argument_clone;
 use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 
 use crate::console_argument::ConsoleArgument;
-use crate::threading_kind::ThreadingKind;
+use crate::weaving_kind::WeavingKind;
 
 #[must_use]
-pub fn owned_thread(argument: &ConsoleArgument, slot: usize, is_final_use: bool) -> TokenStream {
-    if is_final_use || argument.threading() == ThreadingKind::Copy {
+pub fn owned_weave(argument: &ConsoleArgument, slot: usize, is_final_use: bool) -> TokenStream {
+    if is_final_use || argument.weaving() == WeavingKind::Copy {
         let ident = console_argument_ident(slot);
 
         quote! { #ident }
@@ -23,16 +23,16 @@ mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
 
     use crate::console_argument::ConsoleArgument;
-    use crate::threading_kind::ThreadingKind;
+    use crate::weaving_kind::WeavingKind;
 
-    use super::owned_thread;
+    use super::owned_weave;
 
     fn path(segments: &[&str]) -> CanonicalPath {
         CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
     }
 
     fn collapsed(argument: &ConsoleArgument, slot: usize, is_final_use: bool) -> String {
-        owned_thread(argument, slot, is_final_use)
+        owned_weave(argument, slot, is_final_use)
             .to_string()
             .split_whitespace()
             .collect()
@@ -42,7 +42,7 @@ mod tests {
         ConsoleArgument::Named {
             name: "note".to_string(),
             required: false,
-            threading: ThreadingKind::Cloned,
+            weaving: WeavingKind::Cloned,
             value_type: path(&["std", "string", "String"]),
         }
     }
@@ -83,7 +83,7 @@ mod tests {
         let named = ConsoleArgument::Named {
             name: "label".to_string(),
             required: true,
-            threading: ThreadingKind::BorrowedStr,
+            weaving: WeavingKind::BorrowedStr,
             value_type: path(&["std", "string", "String"]),
         };
 

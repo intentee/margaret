@@ -211,7 +211,7 @@ impl RespondsToWebSocketMessage for Chatter {
 "#;
 
     #[test]
-    fn threads_a_console_argument_through_the_websocket_dispatch_chain() {
+    fn weaves_a_console_argument_through_the_websocket_dispatch_chain() {
         let source = generated(CONSOLE_ARGUMENT_HANDLER);
 
         assert!(source.contains("console_argument_0:&str"));
@@ -358,7 +358,7 @@ impl Guard {
 "#;
 
     #[test]
-    fn threads_a_console_argument_into_a_session_middleware() {
+    fn weaves_a_console_argument_into_a_session_middleware() {
         let source = generated(SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE);
 
         assert!(source.contains(
@@ -379,7 +379,7 @@ impl Guard {
     }
 
     #[test]
-    fn threads_routes_when_only_a_middleware_injects_them() {
+    fn weaves_routes_when_only_a_middleware_injects_them() {
         let source = generated(SESSION_WITH_ROUTES_MIDDLEWARE);
 
         assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));

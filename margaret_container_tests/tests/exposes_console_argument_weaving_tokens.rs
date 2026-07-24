@@ -2,14 +2,14 @@ use std::path::Path;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_console_argument_codegen::threading_kind::ThreadingKind;
+use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 use margaret_container_tests::bindings_for_fixture::bindings_for_fixture;
 
 fn named(name: &str) -> ConsoleArgument {
     ConsoleArgument::Named {
         name: name.to_string(),
         required: true,
-        threading: ThreadingKind::BorrowedStr,
+        weaving: WeavingKind::BorrowedStr,
         value_type: CanonicalPath::new(vec![
             "std".to_string(),
             "string".to_string(),
@@ -42,7 +42,7 @@ fn unifies_and_orders_a_console_argument_union_by_slot() {
 }
 
 #[test]
-fn renders_the_console_argument_threading_tokens() {
+fn renders_the_console_argument_weaving_tokens() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/console_argument_propagation");
     let bindings = bindings_for_fixture("crate", &directory);
@@ -52,7 +52,7 @@ fn renders_the_console_argument_threading_tokens() {
     let parameters = bindings.console_parameters(&arguments);
     let borrows = bindings.console_borrows(&arguments);
     let forwards = bindings.console_forwards(&arguments);
-    let threads = bindings.console_threads(&arguments);
+    let weaves = bindings.console_weaves(&arguments);
 
     assert_eq!(
         collapsed(&parameters[0]),
@@ -61,7 +61,7 @@ fn renders_the_console_argument_threading_tokens() {
     assert_eq!(collapsed(&borrows[0]), format!("&console_argument_{slot},"));
     assert_eq!(collapsed(&forwards[0]), format!("console_argument_{slot},"));
     assert_eq!(
-        collapsed(&threads[0]),
+        collapsed(&weaves[0]),
         format!("console_argument_{slot}.to_owned()")
     );
 }

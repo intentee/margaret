@@ -382,7 +382,7 @@ struct Site;
 "#;
 
     #[test]
-    fn threads_a_console_argument_into_the_middleware_instance() {
+    fn weaves_a_console_argument_into_the_middleware_instance() {
         let layers = layers_for(CONSOLE_ARGUMENT_MIDDLEWARE).expect("the layers resolve");
         let bindings = bindings_for(&index_for(CONSOLE_ARGUMENT_MIDDLEWARE));
         let folded = fold_layers(

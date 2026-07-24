@@ -20,29 +20,29 @@ fn is_path_buf(canonical: &CanonicalPath) -> bool {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum ThreadingKind {
+pub enum WeavingKind {
     Copy,
     BorrowedStr,
     BorrowedPath,
     Cloned,
 }
 
-impl ThreadingKind {
+impl WeavingKind {
     #[must_use]
     pub fn from_canonical(canonical: &CanonicalPath, required: bool) -> Self {
         if matches!(canonical.segments(), [name] if is_copy_primitive(name)) {
-            return ThreadingKind::Copy;
+            return WeavingKind::Copy;
         }
 
         if required && is_string(canonical) {
-            return ThreadingKind::BorrowedStr;
+            return WeavingKind::BorrowedStr;
         }
 
         if required && is_path_buf(canonical) {
-            return ThreadingKind::BorrowedPath;
+            return WeavingKind::BorrowedPath;
         }
 
-        ThreadingKind::Cloned
+        WeavingKind::Cloned
     }
 }
 
@@ -50,7 +50,7 @@ impl ThreadingKind {
 mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
 
-    use super::ThreadingKind;
+    use super::WeavingKind;
 
     fn path(segments: &[&str]) -> CanonicalPath {
         CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
@@ -59,56 +59,56 @@ mod tests {
     #[test]
     fn a_required_copy_primitive_is_copy() {
         assert_eq!(
-            ThreadingKind::from_canonical(&path(&["u16"]), true),
-            ThreadingKind::Copy
+            WeavingKind::from_canonical(&path(&["u16"]), true),
+            WeavingKind::Copy
         );
     }
 
     #[test]
     fn an_optional_copy_primitive_is_still_copy() {
         assert_eq!(
-            ThreadingKind::from_canonical(&path(&["u16"]), false),
-            ThreadingKind::Copy
+            WeavingKind::from_canonical(&path(&["u16"]), false),
+            WeavingKind::Copy
         );
     }
 
     #[test]
     fn a_required_string_borrows_as_str() {
         assert_eq!(
-            ThreadingKind::from_canonical(&path(&["std", "string", "String"]), true),
-            ThreadingKind::BorrowedStr
+            WeavingKind::from_canonical(&path(&["std", "string", "String"]), true),
+            WeavingKind::BorrowedStr
         );
     }
 
     #[test]
     fn an_optional_string_is_cloned() {
         assert_eq!(
-            ThreadingKind::from_canonical(&path(&["std", "string", "String"]), false),
-            ThreadingKind::Cloned
+            WeavingKind::from_canonical(&path(&["std", "string", "String"]), false),
+            WeavingKind::Cloned
         );
     }
 
     #[test]
     fn a_required_path_buf_borrows_as_path() {
         assert_eq!(
-            ThreadingKind::from_canonical(&path(&["std", "path", "PathBuf"]), true),
-            ThreadingKind::BorrowedPath
+            WeavingKind::from_canonical(&path(&["std", "path", "PathBuf"]), true),
+            WeavingKind::BorrowedPath
         );
     }
 
     #[test]
     fn a_single_segment_non_primitive_is_cloned() {
         assert_eq!(
-            ThreadingKind::from_canonical(&path(&["Widget"]), true),
-            ThreadingKind::Cloned
+            WeavingKind::from_canonical(&path(&["Widget"]), true),
+            WeavingKind::Cloned
         );
     }
 
     #[test]
     fn a_resolved_custom_type_is_cloned() {
         assert_eq!(
-            ThreadingKind::from_canonical(&path(&["crate", "Marker"]), true),
-            ThreadingKind::Cloned
+            WeavingKind::from_canonical(&path(&["crate", "Marker"]), true),
+            WeavingKind::Cloned
         );
     }
 }

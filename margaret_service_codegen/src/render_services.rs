@@ -284,17 +284,17 @@ fn service_adapter(unit: &ServiceUnit) -> TokenStream {
     }
 }
 
-fn threaded_arguments(unit: &ServiceUnit, bindings: &ContainerBindings) -> Vec<TokenStream> {
-    bindings.console_threads_owned(bindings.console_arguments(&unit.concrete_path))
+fn woven_arguments(unit: &ServiceUnit, bindings: &ContainerBindings) -> Vec<TokenStream> {
+    bindings.console_weaves_owned(bindings.console_arguments(&unit.concrete_path))
 }
 
 fn registration(unit: &ServiceUnit, bindings: &ContainerBindings) -> TokenStream {
     let name = adapter_ident(unit);
     let accessor = format_ident!("{}", unit.field_name);
-    let threaded = threaded_arguments(unit, bindings);
+    let woven = woven_arguments(unit, bindings);
 
     quote! {
-        manager.register_service(#name { inner: container.#accessor(#(#threaded),*).await });
+        manager.register_service(#name { inner: container.#accessor(#(#woven),*).await });
     }
 }
 
