@@ -14,10 +14,17 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::fold_layers::fold_layers;
+use margaret_request_binding_codegen::authenticated_user_application::AuthenticatedUserApplication;
+use margaret_request_binding_codegen::binding_console_arguments::binding_console_arguments;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
 use margaret_request_binding_codegen::binding_shadows_request::binding_shadows_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
+use margaret_request_binding_codegen::captured_provider::CapturedProvider;
+use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
+use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::injects_routes::injects_routes;
+use margaret_request_binding_codegen::injects_views::injects_views;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
@@ -25,11 +32,6 @@ use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::route_group::RouteGroup;
-
-struct CaptureBinder {
-    field: Ident,
-    provider: CanonicalPath,
-}
 
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
@@ -40,25 +42,41 @@ fn console_weave(path: &CanonicalPath, bindings: &ContainerBindings) -> Vec<Toke
 }
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
-    route
-        .arguments
-        .iter()
-        .any(|argument| matches!(argument.binding, RequestBinding::Routes))
+    injects_routes(&route.arguments)
 }
 
-pub(crate) fn responder_injects_views(route: &HttpRoute) -> bool {
-    route
-        .arguments
-        .iter()
-        .any(|argument| matches!(argument.binding, RequestBinding::Views))
+fn responder_injects_views(route: &HttpRoute) -> bool {
+    injects_views(&route.arguments)
+}
+
+fn route_applications(route: &HttpRoute) -> impl Iterator<Item = &AuthenticatedUserApplication> {
+    route.arguments.iter().filter_map(|argument| {
+        let RequestBinding::AuthenticatedUser { application, .. } = &argument.binding else {
+            return None;
+        };
+
+        Some(application)
+    })
+}
+
+fn providers_inject_routes(route: &HttpRoute) -> bool {
+    route_applications(route).any(|application| application.injects_routes)
+}
+
+fn providers_inject_views(route: &HttpRoute) -> bool {
+    route_applications(route).any(|application| application.injects_views)
 }
 
 fn route_references_routes(route: &HttpRoute) -> bool {
-    responder_injects_routes(route) || route.layers.iter().any(|layer| layer.injects_routes)
+    responder_injects_routes(route)
+        || providers_inject_routes(route)
+        || route.layers.iter().any(|layer| layer.injects_routes)
 }
 
 fn route_references_views(route: &HttpRoute) -> bool {
-    responder_injects_views(route) || route.layers.iter().any(|layer| layer.injects_views)
+    responder_injects_views(route)
+        || providers_inject_views(route)
+        || route.layers.iter().any(|layer| layer.injects_views)
 }
 
 fn handler_binding(route: &HttpRoute) -> Ident {
@@ -70,18 +88,12 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let responder_type = path_tokens(&route.responder_path);
     let responder_woven = console_weave(&route.responder_path, bindings);
     let responder_access = access(quote! { container.#responder(#(#responder_woven),*) });
-    let captures = capture_binders(route);
-
     let mut allocator = NameAllocator::new();
 
     for argument in &route.arguments {
         if binding_shadows_request(&argument.binding) {
             allocator.reserve(&argument.holder.to_string());
         }
-    }
-
-    for binder in &captures {
-        allocator.reserve(&binder.field.to_string());
     }
 
     let request_binding = if route
@@ -103,17 +115,19 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let responder_binding = format_ident!("{}", allocator.allocate("responder").field());
     let routes_local = format_ident!("{}", allocator.allocate("routes").field());
     let views_local = format_ident!("{}", allocator.allocate("views").field());
+    let captured = CapturedProviders::capture(&route.arguments, &mut allocator);
 
     let bindings_tokens = route
         .arguments
         .iter()
-        .map(|argument| argument_binding(argument, &request_binding));
+        .map(|argument| argument_binding(argument, &request_binding, &captured));
     let server = format_ident!("{}", route.server);
     let argument_values = route
         .arguments
         .iter()
         .map(|argument| argument_value(argument, &routes_local, &views_local, &server));
-    let respond_call = quote! { #responder_binding.respond(#(#argument_values),*).await };
+    let method_name = &route.method_name;
+    let respond_call = quote! { #responder_binding.#method_name(#(#argument_values),*).await };
     let body = quote! {
         #(#bindings_tokens)*
         margaret_http::response_continuation::ResponseContinuation::from(#respond_call)
@@ -132,7 +146,7 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         >
     };
 
-    let handler = if captures.is_empty() && !captures_routes && !captures_views {
+    let handler = if captured.is_empty() && !captures_routes && !captures_views {
         quote! {
             margaret_http::responder_handler::responder_handler(
                 #responder_access,
@@ -146,17 +160,11 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
             )
         }
     } else {
-        let capture_bindings = captures.iter().map(|binder| {
-            let field = &binder.field;
-            let binder_woven = console_weave(&binder.provider, bindings);
-            let field_access = access(quote! { container.#field(#(#binder_woven),*) });
-
-            quote! { let #field = #field_access; }
-        });
-        let capture_clones = captures.iter().map(|binder| {
-            let field = &binder.field;
-
-            quote! { let #field = #field.clone(); }
+        let capture_bindings = captured
+            .entries()
+            .map(|capture| capture_binding(capture, bindings));
+        let capture_clones = captured.entries().map(|CapturedProvider { local, .. }| {
+            quote! { let #local = #local.clone(); }
         });
         let routes_setup = captures_routes.then(|| quote! { let #routes_local = routes.clone(); });
         let routes_reclone =
@@ -215,39 +223,60 @@ fn argument_value(
     }
 }
 
-fn argument_binding(argument: &BoundParameter, request: &Ident) -> TokenStream {
+fn capture_binding(
+    CapturedProvider { kind, local }: &CapturedProvider,
+    bindings: &ContainerBindings,
+) -> TokenStream {
+    let accessor = format_ident!("{}", kind.accessor());
+
+    match kind {
+        CapturedProviderKind::AuthenticatedUser { application } => {
+            let wrapper = &application.wrapper;
+            let woven = console_weave(&application.concrete, bindings);
+            let inner_access = access(quote! { container.#accessor(#(#woven),*) });
+            let routes_init = application
+                .injects_routes
+                .then(|| quote! { routes: routes.clone(), });
+            let views_init = application
+                .injects_views
+                .then(|| quote! { views: views.clone(), });
+
+            quote! {
+                let #local = std::sync::Arc::new(
+                    super::super::authenticated_users::#wrapper {
+                        inner: #inner_access,
+                        #routes_init
+                        #views_init
+                    },
+                );
+            }
+        }
+        CapturedProviderKind::Binder { provider, .. } => {
+            let woven = console_weave(provider, bindings);
+            let binder_access = access(quote! { container.#accessor(#(#woven),*) });
+
+            quote! { let #local = #binder_access; }
+        }
+    }
+}
+
+fn argument_binding(
+    argument: &BoundParameter,
+    request: &Ident,
+    captured: &CapturedProviders,
+) -> TokenStream {
+    let provider_access = captured.access(&argument.binding, &TokenStream::new());
+
     render_request_extraction(
         &argument.binding,
         &argument.holder,
         &ExtractionContext {
-            binder_owner: &TokenStream::new(),
-            error_return: &quote! { return response.into() },
+            continuation_return: &quote! { return response },
+            provider_access: &provider_access,
             request_local: request,
+            response_return: &quote! { return response.into() },
         },
     )
-}
-
-fn capture_binders(route: &HttpRoute) -> Vec<CaptureBinder> {
-    let mut binders: BTreeMap<String, CanonicalPath> = BTreeMap::new();
-
-    for argument in &route.arguments {
-        if let RequestBinding::Bound {
-            binder_field,
-            binder_provider,
-            ..
-        } = &argument.binding
-        {
-            binders.insert(binder_field.clone(), binder_provider.clone());
-        }
-    }
-
-    binders
-        .into_iter()
-        .map(|(field, provider)| CaptureBinder {
-            field: format_ident!("{}", field),
-            provider,
-        })
-        .collect()
 }
 
 fn server_routes<'table>(table: &'table HttpRouteTable, server: &str) -> Vec<&'table HttpRoute> {
@@ -267,12 +296,7 @@ fn responder_and_binder_arguments(
         collected.extend_from_slice(bindings.console_arguments(&route.responder_path));
 
         for argument in &route.arguments {
-            if let RequestBinding::Bound {
-                binder_provider, ..
-            } = &argument.binding
-            {
-                collected.extend_from_slice(bindings.console_arguments(binder_provider));
-            }
+            collected.extend(binding_console_arguments(&argument.binding, bindings));
         }
 
         for layer in &route.layers {
@@ -327,9 +351,7 @@ fn server_module(
         } else {
             format_ident!("_routes")
         };
-    let views_param = if (has_websocket_routes && has_views)
-        || server_routes.iter().copied().any(route_references_views)
-    {
+    let views_param = if server_routes.iter().copied().any(route_references_views) {
         format_ident!("views")
     } else {
         format_ident!("_views")
@@ -385,7 +407,6 @@ fn server_module(
     let named_handlers = vec_literal_tokens(named_handlers);
     let router = if has_websocket_routes {
         let websocket_routes = format_ident!("{}_routes", server.name());
-        let views_argument = has_views.then(|| quote! { , #views_param });
         let websocket_forward = bindings.console_forwards(websocket_arguments);
 
         quote! {
@@ -393,7 +414,7 @@ fn server_module(
                 let mut route_entries = #route_entries;
 
                 route_entries.extend(
-                    super::super::websocket::#websocket_routes(container, #(#websocket_forward)* #routes_param #views_argument).await,
+                    super::super::websocket::#websocket_routes(container, #(#websocket_forward)* #routes_param).await,
                 );
 
                 margaret_http::router::Router::build(route_entries)

@@ -142,7 +142,10 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn injected_console_arguments(&self, dependency: &InjectedDependency) -> Vec<ConsoleArgument> {
+    pub fn injected_console_arguments(
+        &self,
+        dependency: &InjectedDependency,
+    ) -> Vec<ConsoleArgument> {
         self.accessor_console_arguments(&dependency.field).to_vec()
     }
 

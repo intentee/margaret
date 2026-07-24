@@ -15,28 +15,14 @@ use crate::console_argument_arguments::ConsoleArgumentArguments;
 use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument_registry::ConsoleArgumentRegistry;
 
-fn method_has_attribute(method: &IndexedMethod, name: &str) -> bool {
-    let selector = AttributeSelector::from_marker(name);
-
-    method
-        .attributes()
-        .iter()
-        .any(|attribute| selector.matches(attribute.path()))
-}
-
-fn item_has_attribute(item: &IndexedItem, name: &str) -> bool {
-    let selector = AttributeSelector::from_marker(name);
-
-    item.attributes()
-        .iter()
-        .any(|attribute| selector.matches(attribute.path()))
-}
-
 fn single_constructor(item: &IndexedItem) -> Option<&IndexedMethod> {
-    let mut constructors = item
-        .methods()
-        .iter()
-        .filter(|method| method_has_attribute(method, "constructor"));
+    let mut constructors = item.methods().iter().filter(|method| {
+        marker(
+            method.attributes(),
+            &AttributeSelector::from_marker("constructor"),
+        )
+        .is_some()
+    });
 
     let constructor = constructors.next()?;
 
@@ -93,7 +79,7 @@ pub fn scan(
 
         let owner = item.canonical_path();
         let owner_text = owner.to_string();
-        let is_command = item_has_attribute(item, "console_command");
+        let is_command = item.has_attribute(&AttributeSelector::from_marker("console_command"));
 
         for view in parameters(constructor.signature()) {
             let Some(attribute) = marker(view.attributes, &console_argument_selector) else {
@@ -102,17 +88,9 @@ pub fn scan(
 
             let parameter = view.holder.to_string();
             let attribute_arguments = AttributeArgs::from_attribute(attribute)?;
-            let ConsoleArgumentArguments { form, relations } =
+            let ConsoleArgumentArguments { form } =
                 ConsoleArgumentArguments::parse(&attribute_arguments, &owner_text, &parameter)?;
-            let argument = classify(
-                index,
-                item,
-                form,
-                &parameter,
-                view.declared,
-                &owner_text,
-                relations,
-            )?;
+            let argument = classify(index, item, form, &parameter, view.declared, &owner_text)?;
 
             if matches!(argument, ConsoleArgument::Positional { .. }) && !is_command {
                 return Err(ConsoleArgumentCodegenError::PositionalOutsideCommand {
@@ -144,7 +122,6 @@ mod tests {
     use margaret_attributes::crate_root::CrateRoot;
 
     use super::scan;
-    use crate::argument_relation::ArgumentRelation;
     use crate::console_argument::ConsoleArgument;
     use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
     use crate::console_argument_registry::ConsoleArgumentRegistry;
@@ -425,86 +402,6 @@ mod tests {
         assert!(
             error_message(
                 "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(= 5)] value: String) -> Self {}\n}\n",
-            )
-            .contains("failed to index the crate")
-        );
-    }
-
-    #[test]
-    fn scans_a_required_if_relation_on_a_named_argument() {
-        let registry = registry_for(
-            "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"path\", required_if = \"storage\", equals = \"file\")] path: Option<String>) -> Self {}\n}\n",
-        )
-        .expect("the crate scans");
-
-        assert!(matches!(
-            registry
-                .argument(&owner("Config"), 0)
-                .expect("the argument is scanned"),
-            ConsoleArgument::Named { relations, .. }
-                if relations
-                    == &vec![ArgumentRelation::RequiredIfEq {
-                        argument: "storage".to_string(),
-                        value: "file".to_string(),
-                    }]
-        ));
-    }
-
-    #[test]
-    fn rejects_a_required_if_without_an_equals_value() {
-        assert!(
-            error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"path\", required_if = \"storage\")] path: Option<String>) -> Self {}\n}\n",
-            )
-            .contains("incomplete `required_if` relation")
-        );
-    }
-
-    #[test]
-    fn rejects_an_equals_without_a_required_if_argument() {
-        assert!(
-            error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"path\", equals = \"file\")] path: Option<String>) -> Self {}\n}\n",
-            )
-            .contains("incomplete `required_if` relation")
-        );
-    }
-
-    #[test]
-    fn rejects_a_required_if_relation_on_a_flag() {
-        assert!(
-            error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"loud\", required_if = \"storage\", equals = \"file\")] loud: bool) -> Self {}\n}\n",
-            )
-            .contains("only supported on named value arguments")
-        );
-    }
-
-    #[test]
-    fn rejects_a_required_if_relation_on_a_positional() {
-        assert!(
-            error_message(
-                "#[singleton]\n#[console_command(name = \"greet\")]\nstruct Greet;\n\nimpl Greet {\n    #[constructor]\n    fn create(#[console_argument(positional, required_if = \"storage\", equals = \"file\")] name: String) -> Self {}\n}\n",
-            )
-            .contains("only supported on named value arguments")
-        );
-    }
-
-    #[test]
-    fn reports_a_non_string_required_if_value() {
-        assert!(
-            error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"path\", required_if = 5, equals = \"file\")] path: Option<String>) -> Self {}\n}\n",
-            )
-            .contains("failed to index the crate")
-        );
-    }
-
-    #[test]
-    fn reports_a_non_string_equals_value() {
-        assert!(
-            error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"path\", required_if = \"storage\", equals = 5)] path: Option<String>) -> Self {}\n}\n",
             )
             .contains("failed to index the crate")
         );

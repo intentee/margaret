@@ -61,14 +61,4 @@ pub enum ConsoleArgumentCodegenError {
         parameter: String,
         value_type: String,
     },
-
-    #[error(
-        "console argument '{parameter}' of '{owner}' declares an incomplete `required_if` relation; `required_if` and `equals` must be provided together"
-    )]
-    IncompleteRequiredIf { owner: String, parameter: String },
-
-    #[error(
-        "console argument '{parameter}' of '{owner}' declares a `required_if` relation but is not a named value argument; `required_if` is only supported on named value arguments"
-    )]
-    RelationOnUnsupportedArgument { owner: String, parameter: String },
 }

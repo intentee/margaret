@@ -5,6 +5,7 @@ use crate::capabilities::Capabilities;
 pub(crate) fn umbrella(
     Capabilities {
         has_asset_bag,
+        has_authenticated_users,
         has_console,
         has_http,
         has_middleware,
@@ -19,6 +20,10 @@ pub(crate) fn umbrella(
 
     if has_asset_bag {
         source.push_str("#[rustfmt::skip]\npub mod asset_bag;\n");
+    }
+
+    if has_authenticated_users && serves_http {
+        source.push_str("#[rustfmt::skip]\npub mod authenticated_users;\n");
     }
 
     if serves_http {
@@ -39,7 +44,7 @@ pub(crate) fn umbrella(
         source.push_str("#[rustfmt::skip]\npub mod schema;\n");
     }
 
-    if has_views && serves_http {
+    if has_views {
         source.push_str("#[rustfmt::skip]\npub mod views;\n");
     }
 

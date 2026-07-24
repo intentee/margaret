@@ -16,9 +16,7 @@ pub struct IssuerAnnouncer {
 impl IssuerAnnouncer {
     #[constructor]
     #[must_use]
-    pub fn create(
-        #[endpoint_provider(issuer)] issuer_endpoint: Arc<dyn ProvidesEndpoint>,
-    ) -> Self {
+    pub fn create(#[endpoint_provider(issuer)] issuer_endpoint: Arc<dyn ProvidesEndpoint>) -> Self {
         Self { issuer_endpoint }
     }
 

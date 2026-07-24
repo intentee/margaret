@@ -4,6 +4,7 @@ use std::mem::take;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 
 use crate::handler_binding::HandlerBinding;
 use crate::handler_kind::HandlerKind;
@@ -72,12 +73,13 @@ pub(crate) fn websocket_plan(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     middleware_plans: &[MiddlewarePlan],
+    registries: &BindingRegistries,
 ) -> Result<WebSocketPlan, WebSocketCodegenError> {
     let messages = websocket_messages(index)?;
 
     reject_duplicate_response_methods(&messages)?;
 
-    let sessions = websocket_sessions(index, bindings, middleware_plans)?;
+    let sessions = websocket_sessions(index, bindings, middleware_plans, registries)?;
     let handlers = websocket_handlers(index)?;
 
     let message_by_path: HashMap<String, &WebSocketMessage> = messages

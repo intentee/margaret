@@ -10,6 +10,7 @@ mod direct_construction;
 mod field_ident;
 pub mod injectable_resolution;
 pub mod injected_dependency;
+pub mod is_singleton;
 mod ordered_providers;
 mod path_text;
 mod peel_target;

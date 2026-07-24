@@ -1,12 +1,10 @@
-use std::collections::BTreeMap;
-
 use heck::ToUpperCamelCase;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
@@ -14,6 +12,9 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
+use margaret_request_binding_codegen::captured_provider::CapturedProvider;
+use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
+use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -40,24 +41,22 @@ fn injected_field_value(
     quote! { container.#accessor(#(#arguments),*).await }
 }
 
-fn binder_fields(session: &WebSocketSession) -> BTreeMap<String, &CanonicalPath> {
-    let mut fields = BTreeMap::new();
+fn captured_providers(session: &WebSocketSession) -> CapturedProviders {
+    let mut allocator = NameAllocator::new();
 
     for parameter in &session.parameters {
-        if let RequestBinding::Bound {
-            binder_field,
-            binder_provider,
-            ..
-        } = &parameter.binding
-        {
-            fields.insert(binder_field.clone(), binder_provider);
+        if matches!(
+            parameter.binding,
+            RequestBinding::Injectable { .. } | RequestBinding::Routes
+        ) {
+            allocator.reserve(&parameter.holder.to_string());
         }
     }
 
-    fields
+    CapturedProviders::capture(&session.parameters, &mut allocator)
 }
 
-fn factory_fields(session: &WebSocketSession) -> TokenStream {
+fn factory_fields(session: &WebSocketSession, captured: &CapturedProviders) -> TokenStream {
     let holders = session.parameters.iter().filter_map(|parameter| {
         let holder = &parameter.holder;
 
@@ -70,23 +69,34 @@ fn factory_fields(session: &WebSocketSession) -> TokenStream {
             RequestBinding::Routes => Some(quote! {
                 #holder: ::std::sync::Arc<super::super::routes::Routes>,
             }),
-            RequestBinding::Views => Some(quote! {
-                #holder: ::std::sync::Arc<super::super::views::Views>,
-            }),
             _ => None,
         }
     });
-    let binders = binder_fields(session).into_iter().map(|(field, provider)| {
-        let field = format_ident!("{field}");
-        let provider = path_tokens(provider);
+    let fields = captured
+        .entries()
+        .map(|CapturedProvider { kind, local }| match kind {
+            CapturedProviderKind::AuthenticatedUser { application } => {
+                let wrapper = &application.wrapper;
 
-        quote! { #field: ::std::sync::Arc<#provider>, }
-    });
+                quote! {
+                    #local: ::std::sync::Arc<super::super::authenticated_users::#wrapper>,
+                }
+            }
+            CapturedProviderKind::Binder { provider, .. } => {
+                let provider = path_tokens(provider);
 
-    quote! { #(#holders)* #(#binders)* }
+                quote! { #local: ::std::sync::Arc<#provider>, }
+            }
+        });
+
+    quote! { #(#holders)* #(#fields)* }
 }
 
-fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings) -> TokenStream {
+fn factory_initializers(
+    session: &WebSocketSession,
+    bindings: &ContainerBindings,
+    captured: &CapturedProviders,
+) -> TokenStream {
     let holders = session.parameters.iter().filter_map(|parameter| {
         let holder = &parameter.holder;
 
@@ -97,31 +107,60 @@ fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings
                 Some(quote! { #holder: #value, })
             }
             RequestBinding::Routes => Some(quote! { #holder: routes.clone(), }),
-            RequestBinding::Views => Some(quote! { #holder: views.clone(), }),
             _ => None,
         }
     });
-    let binders = binder_fields(session).into_iter().map(|(field, provider)| {
-        let field = format_ident!("{field}");
-        let arguments = bindings.console_weaves(bindings.console_arguments(provider));
+    let initializers = captured.entries().map(|CapturedProvider { kind, local }| {
+        let accessor = format_ident!("{}", kind.accessor());
 
-        quote! { #field: container.#field(#(#arguments),*).await, }
+        match kind {
+            CapturedProviderKind::AuthenticatedUser { application } => {
+                let wrapper = &application.wrapper;
+                let arguments =
+                    bindings.console_weaves(bindings.console_arguments(&application.concrete));
+                let routes_init = application
+                    .injects_routes
+                    .then(|| quote! { routes: routes.clone(), });
+
+                quote! {
+                    #local: ::std::sync::Arc::new(
+                        super::super::authenticated_users::#wrapper {
+                            inner: container.#accessor(#(#arguments),*).await,
+                            #routes_init
+                        },
+                    ),
+                }
+            }
+            CapturedProviderKind::Binder { provider, .. } => {
+                let arguments = bindings.console_weaves(bindings.console_arguments(provider));
+
+                quote! { #local: container.#accessor(#(#arguments),*).await, }
+            }
+        }
     });
 
-    quote! { #(#holders)* #(#binders)* }
+    quote! { #(#holders)* #(#initializers)* }
 }
 
-fn create_extractions(session: &WebSocketSession, handshake: &Ident) -> TokenStream {
-    let error_return = quote! { return ::std::result::Result::Err(response) };
-    let binder_owner = quote! { self. };
+fn create_extractions(
+    session: &WebSocketSession,
+    handshake: &Ident,
+    captured: &CapturedProviders,
+) -> TokenStream {
+    let continuation_return = quote! { return ::std::result::Result::Err(response) };
+    let response_return = quote! { return ::std::result::Result::Err(response.into()) };
+    let owner = quote! { self. };
     let extractions = session.parameters.iter().map(|parameter| {
+        let provider_access = captured.access(&parameter.binding, &owner);
+
         render_request_extraction(
             &parameter.binding,
             &parameter.holder,
             &ExtractionContext {
-                binder_owner: &binder_owner,
-                error_return: &error_return,
+                continuation_return: &continuation_return,
+                provider_access: &provider_access,
                 request_local: handshake,
+                response_return: &response_return,
             },
         )
     });
@@ -135,7 +174,7 @@ fn build_arguments(session: &WebSocketSession) -> TokenStream {
 
         match &parameter.binding {
             RequestBinding::Injectable { .. } => quote! { self.#holder.clone() },
-            RequestBinding::Routes | RequestBinding::Views => quote! { self.#holder.as_ref() },
+            RequestBinding::Routes => quote! { self.#holder.as_ref() },
             _ => quote! { #holder },
         }
     });
@@ -143,9 +182,9 @@ fn build_arguments(session: &WebSocketSession) -> TokenStream {
     quote! { #(#arguments),* }
 }
 
-fn render_factory(session: &WebSocketSession) -> TokenStream {
+fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> TokenStream {
     let session_path = path_tokens(&session.session_path);
-    let fields = factory_fields(session);
+    let fields = factory_fields(session, captured);
     let handshake = if session
         .parameters
         .iter()
@@ -155,8 +194,9 @@ fn render_factory(session: &WebSocketSession) -> TokenStream {
     } else {
         format_ident!("_handshake")
     };
-    let extractions = create_extractions(session, &handshake);
+    let extractions = create_extractions(session, &handshake, captured);
     let arguments = build_arguments(session);
+    let method_name = &session.method_name;
 
     quote! {
         struct Factory {
@@ -172,12 +212,12 @@ fn render_factory(session: &WebSocketSession) -> TokenStream {
                 #handshake: &margaret_http::request::Request,
             ) -> ::std::result::Result<
                 ::std::sync::Arc<Self::Session>,
-                margaret_http::response::Response,
+                margaret_http::response_continuation::ResponseContinuation,
             > {
                 #extractions
 
                 ::std::result::Result::Ok(::std::sync::Arc::new(
-                    #session_path::build_for_session(#arguments),
+                    #session_path::#method_name(#arguments),
                 ))
             }
         }
@@ -280,6 +320,14 @@ fn dispatch_insert(
     }
 }
 
+fn mutability(has_inserts: bool) -> TokenStream {
+    if has_inserts {
+        quote! { mut }
+    } else {
+        TokenStream::new()
+    }
+}
+
 fn render_dispatch_table(
     plan: &SessionPlan,
     session_path: &TokenStream,
@@ -303,6 +351,8 @@ fn render_dispatch_table(
         .iter()
         .map(|binding| dispatch_insert(binding, &notifications, &container, bindings));
 
+    let requests_mutability = mutability(!plan.request_handlers.is_empty());
+    let notifications_mutability = mutability(!plan.notification_handlers.is_empty());
     let parameter_count = 1 + parameters.len();
     let too_many_arguments = too_many_arguments_expect(parameter_count);
 
@@ -314,7 +364,7 @@ fn render_dispatch_table(
         ) -> ::std::sync::Arc<
             margaret_websocket::web_socket_dispatch_table::WebSocketDispatchTable<#session_path>,
         > {
-            let mut #requests: ::std::collections::HashMap<
+            let #requests_mutability #requests: ::std::collections::HashMap<
                 ::std::string::String,
                 ::std::sync::Arc<
                     dyn margaret_websocket::web_socket_message_dispatch::WebSocketMessageDispatch<
@@ -324,7 +374,7 @@ fn render_dispatch_table(
             > = ::std::collections::HashMap::new();
             #(#request_inserts)*
 
-            let mut #notifications: ::std::collections::HashMap<
+            let #notifications_mutability #notifications: ::std::collections::HashMap<
                 ::std::string::String,
                 ::std::sync::Arc<
                     dyn margaret_websocket::web_socket_notification_dispatch::WebSocketNotificationDispatch<
@@ -346,17 +396,15 @@ fn render_dispatch_table(
 
 fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStream {
     let session_path = path_tokens(&plan.session.session_path);
-    let factory = render_factory(&plan.session);
-    let initializers = factory_initializers(&plan.session, bindings);
+    let captured = captured_providers(&plan.session);
+    let factory = render_factory(&plan.session, &captured);
+    let initializers = factory_initializers(&plan.session, bindings, &captured);
     let session_arguments = session_console_arguments(plan, bindings);
     let dispatch_arguments = dispatch_table_console_arguments(plan, bindings);
     let upgrade_parameters = bindings.console_parameters(&session_arguments);
     let dispatch_forward = bindings.console_forwards(&dispatch_arguments);
     let routes_parameter = plan.session.injects_routes().then(|| {
         quote! { routes: &::std::sync::Arc<super::super::routes::Routes>, }
-    });
-    let views_parameter = plan.session.injects_views().then(|| {
-        quote! { views: &::std::sync::Arc<super::super::views::Views>, }
     });
     let request_dispatches = plan
         .request_handlers
@@ -367,10 +415,7 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
         .iter()
         .map(|binding| render_notification_dispatch(binding, &session_path));
     let dispatch_table = render_dispatch_table(plan, &session_path, &dispatch_arguments, bindings);
-    let parameter_count = 1
-        + upgrade_parameters.len()
-        + usize::from(routes_parameter.is_some())
-        + usize::from(views_parameter.is_some());
+    let parameter_count = 1 + upgrade_parameters.len() + usize::from(routes_parameter.is_some());
     let too_many_arguments = too_many_arguments_expect(parameter_count);
 
     quote! {
@@ -386,7 +431,6 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
             container: &super::super::container::Container,
             #(#upgrade_parameters)*
             #routes_parameter
-            #views_parameter
         ) -> ::std::sync::Arc<dyn margaret_http::web_socket_upgrade::WebSocketUpgrade> {
             ::std::sync::Arc::new(
                 margaret_websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry::new(

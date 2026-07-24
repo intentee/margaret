@@ -4,6 +4,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
+use margaret_container::is_singleton::is_singleton;
 
 use crate::request_binding_error::RequestBindingError;
 use crate::route_parameter_binder::RouteParameterBinder;
@@ -41,6 +42,13 @@ pub fn route_parameter_binders(
                 binder: provider.to_string(),
             });
         };
+
+        if !is_singleton(item) {
+            return Err(RequestBindingError::RouteParameterBinderRequiresSingleton {
+                binder: provider.to_string(),
+            });
+        }
+
         let field = identifier.field().to_string();
         let model = associated_model(index, item).ok_or_else(|| {
             RequestBindingError::RouteParameterBinderModel {

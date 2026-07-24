@@ -2,6 +2,7 @@ use crate::attribute_error::AttributeError;
 use crate::attribute_selector::AttributeSelector;
 use crate::indexed_item::IndexedItem;
 use crate::matched_attribute::MatchedAttribute;
+use crate::select_matching_attributes::select_matching_attributes;
 use crate::select_unique_attribute::select_unique_attribute;
 
 pub struct AttributeQuery<'index> {
@@ -27,10 +28,8 @@ impl<'index> AttributeQuery<'index> {
 
     #[must_use]
     pub fn find_all(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'index>> {
-        self.item
-            .attributes()
-            .iter()
-            .filter(|attribute| selector.matches(attribute.path()))
+        select_matching_attributes(self.item.attributes(), selector)
+            .into_iter()
             .map(|attribute| MatchedAttribute::new(self.item, attribute))
             .collect()
     }

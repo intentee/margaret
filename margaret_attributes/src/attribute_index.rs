@@ -61,10 +61,7 @@ impl AttributeIndex {
 
     #[must_use]
     pub fn has(&self, selector: &AttributeSelector) -> bool {
-        self.items
-            .iter()
-            .flat_map(|item| item.attributes())
-            .any(|attribute| selector.matches(attribute.path()))
+        self.items.iter().any(|item| item.has_attribute(selector))
     }
 
     #[must_use]

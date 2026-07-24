@@ -15,7 +15,6 @@ fn named(name: &str) -> ConsoleArgument {
             "string".to_string(),
             "String".to_string(),
         ]),
-        relations: Vec::new(),
     }
 }
 

@@ -3,6 +3,8 @@ use proc_macro2::Ident;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
+use margaret_request_binding_codegen::injects_routes::injects_routes;
+use margaret_request_binding_codegen::injects_views::injects_views;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 pub struct MiddlewarePlan {
@@ -23,15 +25,11 @@ impl MiddlewarePlan {
 
     #[must_use]
     pub fn injects_routes(&self) -> bool {
-        self.parameters
-            .iter()
-            .any(|parameter| matches!(parameter.binding, RequestBinding::Routes))
+        injects_routes(&self.parameters)
     }
 
     #[must_use]
     pub fn injects_views(&self) -> bool {
-        self.parameters
-            .iter()
-            .any(|parameter| matches!(parameter.binding, RequestBinding::Views))
+        injects_views(&self.parameters)
     }
 }

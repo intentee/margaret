@@ -44,7 +44,6 @@ mod tests {
             required: false,
             weaving: WeavingKind::Cloned,
             value_type: path(&["std", "string", "String"]),
-            relations: Vec::new(),
         }
     }
 
@@ -86,7 +85,6 @@ mod tests {
             required: true,
             weaving: WeavingKind::BorrowedStr,
             value_type: path(&["std", "string", "String"]),
-            relations: Vec::new(),
         };
 
         assert_eq!(collapsed(&named, 2, false), "console_argument_2.clone()");

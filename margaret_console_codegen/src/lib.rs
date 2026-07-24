@@ -383,6 +383,16 @@ impl Farewell {
     }
 
     #[test]
+    fn rejects_a_request_binding_marker_on_a_runner_parameter() {
+        let message = error_for(
+            "use tokio_util::sync::CancellationToken;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = Query)] token: CancellationToken) -> CommandOutcome {}\n}\n",
+        );
+
+        assert!(message.contains("carries #[form_request]"));
+        assert!(message.contains("only available in an HTTP responder"));
+    }
+
+    #[test]
     fn binds_a_destructured_positional_console_argument() {
         let source = source_for(
             "struct Point {\n    x: i32,\n    y: i32,\n}\n\n#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",

@@ -34,6 +34,8 @@ mod tests {
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
+    use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+    use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 
     use crate::has_websocket_sessions::has_websocket_sessions;
     use crate::render_websocket::render_websocket;
@@ -144,15 +146,18 @@ impl RespondsToWebSocketNotification for Typist {
             .bindings
     }
 
-    fn generated(source: &str) -> String {
-        generated_with_views(source, false)
+    fn registries_for(index: &AttributeIndex) -> BindingRegistries {
+        BindingRegistries::collect(index, ViewsAvailability::Available)
+            .expect("the binding registries are collected")
     }
 
-    fn generated_with_views(source: &str, has_views: bool) -> String {
+    fn generated(source: &str) -> String {
         let index = index_for(source);
-        let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let registries = registries_for(&index);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
 
-        render_websocket(&index, &bindings(&index), has_views, &plans)
+        render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect("the websocket module is generated")
             .modules
             .into_iter()
@@ -170,9 +175,14 @@ impl RespondsToWebSocketNotification for Typist {
 
     fn error(source: &str) -> WebSocketCodegenError {
         let index = index_for(source);
-        let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let registries = match BindingRegistries::collect(&index, ViewsAvailability::Available) {
+            Ok(registries) => registries,
+            Err(rejection) => return WebSocketCodegenError::from(rejection),
+        };
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
 
-        render_websocket(&index, &bindings(&index), false, &plans)
+        render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect_err("the websocket module is rejected")
     }
 
@@ -727,6 +737,346 @@ impl Bad {
         );
     }
 
+    const AUTHENTICATED_HANDSHAKE: &str = r#"
+use margaret_http::request::Request;
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+struct User;
+
+struct SessionCookie;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[infer_from_request]
+    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> AuthenticatedUserOutcome<User> {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn assemble(#[authenticated_user] viewer: Option<User>) -> Self {}
+}
+
+#[websocket_message(request, method = "chat", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+"#;
+
+    #[test]
+    fn holds_the_authenticated_user_provider_on_the_session_factory() {
+        let source = generated(AUTHENTICATED_HANDSHAKE);
+
+        assert!(source.contains(
+            "structFactory{session_user_provider:::std::sync::Arc<super::super::authenticated_users::SessionUserProvider,>,}"
+        ));
+        assert!(source.contains(
+            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider().await,}),}"
+        ));
+    }
+
+    #[test]
+    fn infers_the_authenticated_user_during_the_handshake() {
+        let source = generated(AUTHENTICATED_HANDSHAKE);
+
+        assert!(source.contains(
+            "margaret_identity::optional_authenticated_user::optional_authenticated_user(margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await,)"
+        ));
+        assert!(source.contains("Err(response)=>return::std::result::Result::Err(response)"));
+    }
+
+    #[test]
+    fn builds_the_session_through_the_method_the_session_declares() {
+        assert!(generated(AUTHENTICATED_HANDSHAKE).contains("crate::Room::assemble(viewer)"));
+    }
+
+    #[test]
+    fn interrupts_the_handshake_with_a_continuation() {
+        let source = generated(AUTHENTICATED_HANDSHAKE);
+
+        assert!(source.contains(
+            "->::std::result::Result<::std::sync::Arc<Self::Session>,margaret_http::response_continuation::ResponseContinuation,>"
+        ));
+    }
+
+    #[test]
+    fn hands_the_routes_to_a_handshake_authenticated_user_provider() {
+        let source = generated(
+            r#"
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[infer_from_request]
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> AuthenticatedUserOutcome<User> {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build(#[authenticated_user] viewer: User) -> Self {}
+}
+
+#[websocket_message(request, method = "chat", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+"#,
+        );
+
+        assert!(source.contains("routes:routes.clone(),"));
+    }
+
+    #[test]
+    fn keeps_a_captured_provider_clear_of_a_session_parameter_that_takes_its_name() {
+        let source = generated(
+            r#"
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[singleton]
+struct SystemClock;
+
+impl SystemClock {
+    #[constructor]
+    fn create() -> Self {}
+}
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct Session;
+
+impl Session {
+    #[infer_from_request]
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build(session: std::sync::Arc<SystemClock>, #[authenticated_user] viewer: User) -> Self {}
+}
+
+#[websocket_message(request, method = "chat", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+"#,
+        );
+
+        assert!(source.contains("session:::std::sync::Arc<crate::SystemClock>,"));
+        assert!(
+            source.contains(
+                "session_2:::std::sync::Arc<super::super::authenticated_users::Session>,"
+            )
+        );
+        assert!(source.contains("self.session_2.as_ref()"));
+    }
+
+    const CONSOLE_ARGUMENT_PROVIDER: &str = r#"
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[constructor]
+    fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
+
+    #[infer_from_request]
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build(#[authenticated_user] viewer: User) -> Self {}
+}
+
+#[websocket_message(request, method = "chat", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+"#;
+
+    #[test]
+    fn threads_the_console_arguments_of_an_authenticated_user_provider_through_the_handshake() {
+        let source = generated(CONSOLE_ARGUMENT_PROVIDER);
+
+        assert!(source.contains("pubasyncfnupgrade_entry(container:&super::super::container::Container,console_argument_0:&str,)"));
+        assert!(source.contains(
+            "inner:container.session_user_provider(console_argument_0.to_owned()).await,"
+        ));
+        assert!(source.contains(
+            "pubasyncfnpublic_routes(container:&super::container::Container,console_argument_0:&str,_routes:"
+        ));
+        assert!(source.contains("upgrade_entry(container,console_argument_0).await"));
+    }
+
+    #[test]
+    fn rejects_a_middleware_that_renders_the_views_on_a_session() {
+        assert!(
+            error(
+                r#"
+use margaret_http::next::Next;
+
+#[singleton]
+#[handles_middleware_attribute(attribute = decorated)]
+struct Decorator;
+
+impl Decorator {
+    #[process]
+    fn process(&self, views: &crate::margaret::views::Views, next: Next) -> ResponseContinuation {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+#[middleware(decorated)]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+"#
+            )
+            .to_string()
+            .contains("which renders the views, but a WebSocket upgrade handshake has no views")
+        );
+    }
+
+    #[test]
+    fn rejects_an_authenticated_user_whose_provider_renders_the_views() {
+        assert!(
+            error(
+                r#"
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[infer_from_request]
+    fn infer(&self, views: &crate::margaret::views::Views) -> AuthenticatedUserOutcome<User> {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build(#[authenticated_user] viewer: User) -> Self {}
+}
+"#
+            )
+            .to_string()
+            .contains("but a WebSocket upgrade handshake has no views")
+        );
+    }
+
+    #[test]
+    fn rejects_the_views_in_a_session_builder() {
+        assert!(
+            error(
+                r#"
+#[websocket_session(path = "/x", server = "public")]
+struct Bad;
+
+impl Bad {
+    #[build_for_session]
+    fn build(views: &crate::margaret::views::Views) -> Self {}
+}
+"#
+            )
+            .to_string()
+            .contains("render them from an HTTP responder instead")
+        );
+    }
+
+    #[test]
+    fn rejects_an_authenticated_user_whose_provider_reads_the_request_body() {
+        assert!(
+            error(
+                r#"
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+
+struct User;
+
+struct Credentials;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[infer_from_request]
+    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> AuthenticatedUserOutcome<User> {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build(#[authenticated_user] viewer: User) -> Self {}
+}
+"#
+            )
+            .to_string()
+            .contains("but a WebSocket upgrade handshake has no body")
+        );
+    }
+
     const PARITY_SESSION: &str = r#"
 use std::sync::Arc;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
@@ -772,7 +1122,6 @@ impl BoardSession {
         request: &margaret_http::request::Request,
         peer: &spiffe::spiffe_id::SpiffeId,
         routes: &crate::margaret::routes::Routes,
-        views: &crate::margaret::views::Views,
         assets: margaret_asset_bag::asset_bag::AssetBag,
     ) -> Self {}
 }
@@ -796,7 +1145,7 @@ impl RespondsToWebSocketMessage for Poster {
 
     #[test]
     fn generates_a_session_factory_for_every_supported_binding() {
-        let source = generated_with_views(PARITY_SESSION, true);
+        let source = generated(PARITY_SESSION);
 
         assert!(source.contains("require_bound_route_parameter::require_bound_route_parameter"));
         assert!(source.contains("RequestInput::Query"));
@@ -804,11 +1153,10 @@ impl RespondsToWebSocketMessage for Poster {
         assert!(source.contains("require_peer_spiffe_id::require_peer_spiffe_id"));
         assert!(source.contains("::margaret_asset_bag::asset_bag::AssetBag::new()"));
         assert!(source.contains("self.routes.as_ref()"));
-        assert!(source.contains("self.views.as_ref()"));
         assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
-        assert!(source.contains("views:&::std::sync::Arc<super::super::views::Views>"));
-        assert!(source.contains("upgrade_entry(container,routes,views)"));
+        assert!(source.contains("upgrade_entry(container,routes)"));
         assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
+        assert!(!source.contains("views"));
     }
 
     #[test]

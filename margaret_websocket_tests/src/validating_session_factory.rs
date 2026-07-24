@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use margaret_http::request::Request;
-use margaret_http::response::Response;
+use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_validation::request_input::RequestInput;
 use margaret_http_validation::require_input::require_input;
 use margaret_websocket::web_socket_session_factory::WebSocketSessionFactory;
@@ -17,7 +17,7 @@ pub struct ValidatingSessionFactory;
 impl WebSocketSessionFactory for ValidatingSessionFactory {
     type Session = TestSession;
 
-    async fn create(&self, handshake: &Request) -> Result<Arc<TestSession>, Response> {
+    async fn create(&self, handshake: &Request) -> Result<Arc<TestSession>, ResponseContinuation> {
         require_input::<UpgradeQuery>(handshake, RequestInput::Query)?;
 
         Ok(Arc::new(TestSession::default()))

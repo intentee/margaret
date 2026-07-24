@@ -1,5 +1,4 @@
 pub mod argument_registration;
-pub mod argument_relation;
 pub mod argument_value;
 mod classify;
 pub mod console_argument;
@@ -7,7 +6,6 @@ mod console_argument_arguments;
 pub mod console_argument_codegen_error;
 mod console_argument_form;
 pub mod console_argument_registry;
-pub mod optional_parameter;
 pub mod owned_weave;
 pub mod required_flag_read;
 pub mod scan;

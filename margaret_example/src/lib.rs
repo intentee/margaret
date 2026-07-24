@@ -1,4 +1,5 @@
 pub mod app_name;
+pub mod auth;
 pub mod commands;
 pub mod english_greeter;
 pub mod forms;
@@ -14,4 +15,5 @@ pub mod tickers;
 pub mod views;
 
 #[rustfmt::skip]
+#[path = "../margaret/mod.rs"]
 pub mod margaret;
