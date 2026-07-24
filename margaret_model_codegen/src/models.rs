@@ -22,6 +22,8 @@ use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::select_matching_attributes::select_matching_attributes;
 use margaret_attributes::select_unique_attribute::select_unique_attribute;
 
+use margaret_model::on_delete::OnDelete;
+
 use margaret_schema_identifier_naming::index_name::index_name;
 use margaret_schema_identifier_naming::primary_key_index_name::primary_key_index_name;
 use margaret_schema_identifier_naming::schema_identifier::SchemaIdentifier;
@@ -44,6 +46,7 @@ use crate::model::Model;
 use crate::model_arguments::ModelArguments;
 use crate::model_codegen_error::ModelCodegenError;
 use crate::object_kind::ObjectKind;
+use crate::resolve_column_default::resolve_column_default;
 use crate::resolved_column::ResolvedColumn;
 use crate::resolved_foreign_key::ResolvedForeignKey;
 use crate::resolved_index::ResolvedIndex;
@@ -71,8 +74,8 @@ struct RelationEntry {
 }
 
 struct ResolvedReference {
-    referenced_field: String,
     reference_display: String,
+    referenced_column: String,
     target_path: CanonicalPath,
 }
 
@@ -184,6 +187,14 @@ fn resolve_index_memberships(
 
 fn is_leading_prefix(index: &[ColumnId], key: &[ColumnId]) -> bool {
     index.len() <= key.len() && index == &key[..index.len()]
+}
+
+fn nulling_action_label(on_delete: OnDelete) -> Option<&'static str> {
+    match on_delete {
+        OnDelete::SetNull => Some("SET NULL"),
+        OnDelete::SetDefault => Some("SET DEFAULT"),
+        OnDelete::Cascade | OnDelete::NoAction | OnDelete::Restrict => None,
+    }
 }
 
 fn ensure_index_not_redundant(
@@ -306,7 +317,7 @@ fn canonicalize_reference(
     let reference_display = format_path(references);
     let field_count = references.segments.len();
 
-    let referenced_field = match references.segments.last() {
+    let referenced_column = match references.segments.last() {
         Some(segment) if field_count >= 2 => segment.ident.to_string(),
         _ => {
             return Err(ModelCodegenError::ForeignKeyReferenceMissingField {
@@ -342,7 +353,7 @@ fn canonicalize_reference(
 
     Ok(ResolvedReference {
         reference_display,
-        referenced_field,
+        referenced_column,
         target_path,
     })
 }
@@ -358,6 +369,7 @@ fn resolve_scalar_column(
     position: usize,
     model: &str,
     seen_columns: &mut HashSet<String>,
+    is_foreign_key: bool,
 ) -> Result<ResolvedColumn, ModelCodegenError> {
     let column_name = resolve_column_name(name, field.identifier(), model)?;
 
@@ -370,8 +382,10 @@ fn resolve_scalar_column(
 
     let column_name = register_column_name(column_name, model, seen_columns)?;
     let inferred = infer_column_type(field.ty(), model, &column_name)?;
+    let default = resolve_column_default(inferred.column_type, primary_key, is_foreign_key);
 
     Ok(ResolvedColumn {
+        default,
         indexes,
         inferred,
         name: column_name,
@@ -420,7 +434,7 @@ fn collect_models(
 
         let mut columns: Vec<ResolvedColumn> = Vec::new();
         let mut deferred_foreign_key_members: Vec<DeferredForeignKeyMember> = Vec::new();
-        let mut columns_by_field: HashMap<String, ForeignKeyTargetColumn> = HashMap::new();
+        let mut columns_by_name: HashMap<String, ForeignKeyTargetColumn> = HashMap::new();
         let mut primary_key: Vec<ColumnId> = Vec::new();
         let mut unique_keys: Vec<Vec<ColumnId>> = Vec::new();
         let mut seen_columns: HashSet<String> = HashSet::new();
@@ -467,6 +481,7 @@ fn collect_models(
                 position,
                 &model,
                 &mut seen_columns,
+                foreign_key_attribute.is_some(),
             )?;
             let column_id = ColumnId::new(position);
 
@@ -478,16 +493,14 @@ fn collect_models(
                 unique_keys.push(vec![column_id]);
             }
 
-            if let FieldIdentifier::Named(field_name) = field.identifier() {
-                columns_by_field.insert(
-                    field_name.clone(),
-                    ForeignKeyTargetColumn {
-                        column_type: column.inferred.column_type,
-                        id: column_id,
-                        name: column.name.clone(),
-                    },
-                );
-            }
+            columns_by_name.insert(
+                column.name.clone(),
+                ForeignKeyTargetColumn {
+                    column_type: column.inferred.column_type,
+                    id: column_id,
+                    name: column.name.clone(),
+                },
+            );
 
             if let Some(foreign_key_attribute) = foreign_key_attribute {
                 let display = field_display(field.identifier());
@@ -519,18 +532,19 @@ fn collect_models(
 
                 let ResolvedReference {
                     reference_display,
-                    referenced_field,
+                    referenced_column,
                     target_path,
                 } = canonicalize_reference(attribute_index, item, &references, &display, &model)?;
 
                 deferred_foreign_key_members.push(DeferredForeignKeyMember {
                     field_display: display,
                     local_column: column.name.clone(),
+                    local_nullable: column.inferred.nullable,
                     local_type: column.inferred.column_type,
                     name: fk_name,
                     on_delete,
                     reference_display,
-                    referenced_field,
+                    referenced_column,
                     target_path,
                 });
             }
@@ -541,7 +555,7 @@ fn collect_models(
         targets.insert(
             item.canonical_path().clone(),
             ForeignKeyTarget {
-                columns_by_field,
+                columns_by_name,
                 primary_key: primary_key.clone(),
                 table: table.as_str().to_string(),
                 unique_keys: unique_keys.clone(),
@@ -611,7 +625,7 @@ fn resolve_foreign_key_group(
     let mut referenced_ids: Vec<ColumnId> = Vec::new();
 
     for member in &members {
-        let referenced = target.columns_by_field.get(&member.referenced_field).ok_or_else(|| {
+        let referenced = target.columns_by_name.get(&member.referenced_column).ok_or_else(|| {
             ModelCodegenError::ForeignKeyUnknownReferencedField {
                 field: member.field_display.clone(),
                 model: model.to_string(),
@@ -650,6 +664,16 @@ fn resolve_foreign_key_group(
                 name: name.as_str().to_string(),
             });
         }
+    }
+
+    if let Some(action) = nulling_action_label(on_delete)
+        && members.iter().any(|member| !member.local_nullable)
+    {
+        return Err(ModelCodegenError::ForeignKeyNullingActionRequiresNullableColumns {
+            action: action.to_string(),
+            model: model.to_string(),
+            name: name.as_str().to_string(),
+        });
     }
 
     let matches_key = references_match_key(&referenced_ids, &target.primary_key)

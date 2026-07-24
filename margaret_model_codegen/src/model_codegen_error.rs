@@ -158,6 +158,15 @@ pub enum ModelCodegenError {
     InconsistentForeignKeyOnDelete { model: String, name: String },
 
     #[error(
+        "foreign key '{name}' of model '{model}' uses ON DELETE {action}, which nulls its columns on delete, but not all of its columns are nullable"
+    )]
+    ForeignKeyNullingActionRequiresNullableColumns {
+        action: String,
+        model: String,
+        name: String,
+    },
+
+    #[error(
         "foreign key dependency cycle detected between tables: {path}; inline foreign keys require an acyclic table order"
     )]
     ForeignKeyCycle { path: String },

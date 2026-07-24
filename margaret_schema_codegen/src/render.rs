@@ -51,7 +51,7 @@ fn on_delete_tokens(on_delete: OnDelete) -> TokenStream {
 
 fn render_column(column: &ResolvedColumn) -> TokenStream {
     let column_type = column_type_tokens(column.inferred.column_type);
-    let default = column_default_tokens(column.inferred.default);
+    let default = column_default_tokens(column.default);
     let nullable = column.inferred.nullable;
     let name = Literal::string(&column.name);
 

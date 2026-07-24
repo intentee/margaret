@@ -21,6 +21,7 @@ mod index_arguments;
 mod infer_column_type;
 mod model_arguments;
 mod option_inner;
+mod resolve_column_default;
 mod single_generic_argument;
 
 #[cfg(test)]
@@ -35,11 +36,13 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
 
+    use margaret_model::column_default::ColumnDefault;
     use margaret_model::on_delete::OnDelete;
 
     use crate::has_models::has_models;
     use crate::model::Model;
     use crate::models::models;
+    use crate::resolved_column::ResolvedColumn;
     use crate::resolved_foreign_key::ResolvedForeignKey;
 
     const ARTICLE: &str = "\
@@ -112,6 +115,14 @@ struct Author {
             .iter()
             .find(|foreign_key| foreign_key.name.as_str() == name)
             .expect("the foreign key is resolved")
+    }
+
+    fn column_named<'model>(model: &'model Model, name: &str) -> &'model ResolvedColumn {
+        model
+            .columns
+            .iter()
+            .find(|column| column.name == name)
+            .expect("the column is resolved")
     }
 
     fn with_author(referencing: &str) -> String {
@@ -499,6 +510,102 @@ struct Link {
             ))
             .contains("unknown ON DELETE action")
         );
+    }
+
+    #[test]
+    fn a_uuid_primary_key_column_auto_generates() {
+        let models = resolve(
+            "#[model(table = \"t\")]\nstruct T {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
+        );
+
+        assert_eq!(column_named(model_named(&models, "t"), "id").default, ColumnDefault::UuidV7);
+    }
+
+    #[test]
+    fn plain_and_foreign_key_uuid_columns_have_no_default() {
+        let models = resolve(&with_author(
+            "#[model(table = \"pairs\")]\nstruct Pair {\n    #[column(primary_key)]\n    left: uuid::Uuid,\n    #[column(primary_key)]\n    right: uuid::Uuid,\n}\n\n#[model(table = \"records\")]\nstruct Record {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    plain: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"records_author_fkey\", references = Author::id)]\n    author_id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"records_optional_author_fkey\", references = Author::id)]\n    optional_author_id: Option<uuid::Uuid>,\n    #[column]\n    #[foreign_key(name = \"records_pair_fkey\", references = Pair::left)]\n    pair_left: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"records_pair_fkey\", references = Pair::right)]\n    pair_right: uuid::Uuid,\n}\n",
+        ));
+        let record = model_named(&models, "records");
+
+        assert_eq!(column_named(record, "id").default, ColumnDefault::UuidV7);
+        assert_eq!(column_named(record, "plain").default, ColumnDefault::NotSet);
+        assert_eq!(column_named(record, "author_id").default, ColumnDefault::NotSet);
+        assert_eq!(column_named(record, "optional_author_id").default, ColumnDefault::NotSet);
+        assert_eq!(column_named(record, "pair_left").default, ColumnDefault::NotSet);
+        assert_eq!(column_named(record, "pair_right").default, ColumnDefault::NotSet);
+    }
+
+    #[test]
+    fn rejects_set_null_on_a_non_nullable_foreign_key() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"articles_author_fkey\", references = Author::id, on_delete = set_null)]\n    author_id: uuid::Uuid,\n}\n",
+            ))
+            .contains("nulls its columns on delete")
+        );
+    }
+
+    #[test]
+    fn rejects_set_default_on_a_non_nullable_foreign_key() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"articles_author_fkey\", references = Author::id, on_delete = set_default)]\n    author_id: uuid::Uuid,\n}\n",
+            ))
+            .contains("nulls its columns on delete")
+        );
+    }
+
+    #[test]
+    fn rejects_set_null_on_a_partially_nullable_composite_foreign_key() {
+        let source = "\
+#[model(table = \"pairs\")]
+struct Pair {
+    #[column(primary_key)]
+    left: uuid::Uuid,
+    #[column(primary_key)]
+    right: uuid::Uuid,
+}
+
+#[model(table = \"links\")]
+struct Link {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+    #[column]
+    #[foreign_key(name = \"links_pair_fkey\", references = Pair::left, on_delete = set_null)]
+    pair_left: Option<uuid::Uuid>,
+    #[column]
+    #[foreign_key(name = \"links_pair_fkey\", references = Pair::right, on_delete = set_null)]
+    pair_right: uuid::Uuid,
+}
+";
+
+        assert!(error_message(source).contains("nulls its columns on delete"));
+    }
+
+    #[test]
+    fn resolves_set_null_on_a_nullable_foreign_key() {
+        let models = resolve(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"articles_author_fkey\", references = Author::id, on_delete = set_null)]\n    author_id: Option<uuid::Uuid>,\n}\n",
+        ));
+        let article = model_named(&models, "articles");
+
+        assert_eq!(
+            foreign_key_named(article, "articles_author_fkey").on_delete,
+            OnDelete::SetNull
+        );
+    }
+
+    #[test]
+    fn references_a_positional_primary_key_column() {
+        let models = resolve(
+            "#[model(table = \"codes\")]\nstruct Code(#[column(primary_key, name = \"value\")] String);\n\n#[model(table = \"usages\")]\nstruct Usage {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"usages_code_fkey\", references = Code::value)]\n    code_value: String,\n}\n",
+        );
+        let usage = model_named(&models, "usages");
+        let foreign_key = foreign_key_named(usage, "usages_code_fkey");
+
+        assert_eq!(foreign_key.references_columns, ["value"]);
+        assert_eq!(foreign_key.references_table, "codes");
     }
 
     #[test]

@@ -240,7 +240,7 @@ struct Second {
     #[test]
     fn renders_every_on_delete_action() {
         let source = schema_source(&with_author(
-            "#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_a_fkey\", references = Author::id, on_delete = cascade)]\n    a: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_b_fkey\", references = Author::id, on_delete = restrict)]\n    b: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_c_fkey\", references = Author::id, on_delete = set_null)]\n    c: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_d_fkey\", references = Author::id, on_delete = set_default)]\n    d: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_e_fkey\", references = Author::id)]\n    e: uuid::Uuid,\n}\n",
+            "#[model(table = \"posts\")]\nstruct Post {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_a_fkey\", references = Author::id, on_delete = cascade)]\n    a: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_b_fkey\", references = Author::id, on_delete = restrict)]\n    b: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"posts_c_fkey\", references = Author::id, on_delete = set_null)]\n    c: Option<uuid::Uuid>,\n    #[column]\n    #[foreign_key(name = \"posts_d_fkey\", references = Author::id, on_delete = set_default)]\n    d: Option<uuid::Uuid>,\n    #[column]\n    #[foreign_key(name = \"posts_e_fkey\", references = Author::id)]\n    e: uuid::Uuid,\n}\n",
         ));
 
         assert!(source.contains("margaret_model::on_delete::OnDelete::Cascade"));
@@ -248,6 +248,17 @@ struct Second {
         assert!(source.contains("margaret_model::on_delete::OnDelete::SetNull"));
         assert!(source.contains("margaret_model::on_delete::OnDelete::SetDefault"));
         assert!(source.contains("margaret_model::on_delete::OnDelete::NoAction"));
+    }
+
+    #[test]
+    fn a_uuid_foreign_key_column_has_no_generated_default() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(name = \"articles_author_fkey\", references = Author::id)]\n    author_id: uuid::Uuid,\n}\n",
+        ));
+
+        assert!(source.contains(
+            "column_type:margaret_model::column_type::ColumnType::Uuid,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"author_id\".to_string(),nullable:false,"
+        ));
     }
 
     #[test]
