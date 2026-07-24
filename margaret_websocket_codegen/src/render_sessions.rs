@@ -56,7 +56,7 @@ fn captured_providers(session: &WebSocketSession) -> CapturedProviders {
     CapturedProviders::capture(&session.parameters, &mut allocator)
 }
 
-fn factory_fields(session: &WebSocketSession) -> TokenStream {
+fn factory_fields(session: &WebSocketSession, captured: &CapturedProviders) -> TokenStream {
     let holders = session.parameters.iter().filter_map(|parameter| {
         let holder = &parameter.holder;
 
@@ -72,7 +72,6 @@ fn factory_fields(session: &WebSocketSession) -> TokenStream {
             _ => None,
         }
     });
-    let captured = captured_providers(session);
     let fields = captured
         .entries()
         .map(|CapturedProvider { kind, local }| match kind {
@@ -93,7 +92,11 @@ fn factory_fields(session: &WebSocketSession) -> TokenStream {
     quote! { #(#holders)* #(#fields)* }
 }
 
-fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings) -> TokenStream {
+fn factory_initializers(
+    session: &WebSocketSession,
+    bindings: &ContainerBindings,
+    captured: &CapturedProviders,
+) -> TokenStream {
     let holders = session.parameters.iter().filter_map(|parameter| {
         let holder = &parameter.holder;
 
@@ -107,7 +110,6 @@ fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings
             _ => None,
         }
     });
-    let captured = captured_providers(session);
     let initializers = captured.entries().map(|CapturedProvider { kind, local }| {
         let accessor = format_ident!("{}", kind.accessor());
 
@@ -140,10 +142,13 @@ fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings
     quote! { #(#holders)* #(#initializers)* }
 }
 
-fn create_extractions(session: &WebSocketSession, handshake: &Ident) -> TokenStream {
+fn create_extractions(
+    session: &WebSocketSession,
+    handshake: &Ident,
+    captured: &CapturedProviders,
+) -> TokenStream {
     let continuation_return = quote! { return ::std::result::Result::Err(response) };
     let response_return = quote! { return ::std::result::Result::Err(response.into()) };
-    let captured = captured_providers(session);
     let owner = quote! { self. };
     let extractions = session.parameters.iter().map(|parameter| {
         let provider_access = captured.access(&parameter.binding, &owner);
@@ -177,9 +182,9 @@ fn build_arguments(session: &WebSocketSession) -> TokenStream {
     quote! { #(#arguments),* }
 }
 
-fn render_factory(session: &WebSocketSession) -> TokenStream {
+fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> TokenStream {
     let session_path = path_tokens(&session.session_path);
-    let fields = factory_fields(session);
+    let fields = factory_fields(session, captured);
     let handshake = if session
         .parameters
         .iter()
@@ -189,7 +194,7 @@ fn render_factory(session: &WebSocketSession) -> TokenStream {
     } else {
         format_ident!("_handshake")
     };
-    let extractions = create_extractions(session, &handshake);
+    let extractions = create_extractions(session, &handshake, captured);
     let arguments = build_arguments(session);
     let method_name = &session.method_name;
 
@@ -391,8 +396,9 @@ fn render_dispatch_table(
 
 fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStream {
     let session_path = path_tokens(&plan.session.session_path);
-    let factory = render_factory(&plan.session);
-    let initializers = factory_initializers(&plan.session, bindings);
+    let captured = captured_providers(&plan.session);
+    let factory = render_factory(&plan.session, &captured);
+    let initializers = factory_initializers(&plan.session, bindings, &captured);
     let session_arguments = session_console_arguments(plan, bindings);
     let dispatch_arguments = dispatch_table_console_arguments(plan, bindings);
     let upgrade_parameters = bindings.console_parameters(&session_arguments);
