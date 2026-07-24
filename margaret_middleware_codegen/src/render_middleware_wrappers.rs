@@ -74,16 +74,18 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
         format_ident!("_next")
     };
 
-    let error_return = quote! { return response.into() };
-    let binder_owner = TokenStream::new();
+    let continuation_return = quote! { return response };
+    let response_return = quote! { return response.into() };
+    let provider_owner = TokenStream::new();
     let extractions = parameters.iter().map(|parameter| {
         render_request_extraction(
             &parameter.binding,
             &parameter.holder,
             &ExtractionContext {
-                binder_owner: &binder_owner,
-                error_return: &error_return,
+                continuation_return: &continuation_return,
+                provider_owner: &provider_owner,
                 request_local: &request_binding,
+                response_return: &response_return,
             },
         )
     });

@@ -8,6 +8,7 @@ pub(crate) struct HttpRoute {
     pub(crate) arguments: Vec<BoundParameter>,
     pub(crate) layers: Vec<LayerApplication>,
     pub(crate) method: String,
+    pub(crate) method_name: Ident,
     pub(crate) name: Option<String>,
     pub(crate) responder_field: Ident,
     pub(crate) responder_path: CanonicalPath,

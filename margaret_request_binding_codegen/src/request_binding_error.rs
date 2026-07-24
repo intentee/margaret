@@ -53,7 +53,7 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "argument #{parameter} of {subject} carries #[route_parameter], but an HTTP middleware has no route path to bind from"
+        "argument #{parameter} of {subject} carries #[route_parameter], but {subject} has no route path to bind from"
     )]
     RouteParameterUnavailable { subject: String, parameter: String },
 
@@ -95,7 +95,7 @@ pub enum RequestBindingError {
     ConflictingArgumentMarkers { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} is the peer SPIFFE id and must not also carry #[route_parameter] or #[form_request]"
+        "argument #{parameter} of {subject} is the peer SPIFFE id and must not also carry #[authenticated_user], #[route_parameter], or #[form_request]"
     )]
     MarkedPeerSpiffeIdParameter { subject: String, parameter: String },
 
@@ -125,4 +125,123 @@ pub enum RequestBindingError {
         first: String,
         second: String,
     },
+
+    #[error(
+        "#[provides_route_parameter] '{binder}' is not managed by the container; add #[singleton] to it"
+    )]
+    RouteParameterBinderNotManaged { binder: String },
+
+    #[error(
+        "#[infers_authenticated_user] is only supported on structs, but '{provider}' is not a struct"
+    )]
+    AuthenticatedUserProviderNotAStruct { provider: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' is not managed by the container; add #[singleton] to it"
+    )]
+    AuthenticatedUserProviderNotManaged { provider: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' is missing `user_model = <struct>`; it must name the user model it infers"
+    )]
+    AuthenticatedUserProviderMissingUserModel { provider: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' names the user model '{written}', which matches no struct"
+    )]
+    AuthenticatedUserProviderUnknownUserModel { provider: String, written: String },
+
+    #[error("#[infers_authenticated_user] '{provider}' has no #[infer_from_request] method")]
+    MissingInferFromRequest { provider: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' has more than one #[infer_from_request] method: {methods}"
+    )]
+    AmbiguousInferFromRequest { provider: String, methods: String },
+
+    #[error(
+        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return Result<margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>, Error>"
+    )]
+    InferenceReturnTypeMismatch { provider: String, written: String },
+
+    #[error(
+        "the #[infer_from_request] method of '{provider}' infers '{written}', but the provider declares the user model '{model}'"
+    )]
+    InferredUserModelMismatch {
+        provider: String,
+        model: String,
+        written: String,
+    },
+
+    #[error(
+        "the #[infer_from_request] method of '{provider}' fails with '{written}', which is not a type declared in this crate; declare an error type here so it can convert itself into a response"
+    )]
+    InferenceErrorUnresolvable { provider: String, written: String },
+
+    #[error(
+        "the #[infer_from_request] method of '{provider}' fails with '{error}', which does not implement margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure"
+    )]
+    InferenceErrorMissingConversion { provider: String, error: String },
+
+    #[error(
+        "user model '{model}' has more than one authenticated user provider: '{first}' and '{second}'"
+    )]
+    AmbiguousAuthenticatedUserProvider {
+        model: String,
+        first: String,
+        second: String,
+    },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[authenticated_user] on '{written}', which matches no struct"
+    )]
+    UnknownAuthenticatedUserModel {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "argument #{parameter} of {subject} requests the authenticated user '{model}', which no #[infers_authenticated_user] provides"
+    )]
+    MissingAuthenticatedUserProvider {
+        subject: String,
+        parameter: String,
+        model: String,
+    },
+
+    #[error(
+        "argument #{parameter} of {subject} requests the authenticated user by reference; it must be taken by value, optionally wrapped in Option<..>"
+    )]
+    AuthenticatedUserByReference { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[authenticated_user] together with #[route_parameter] or #[form_request]; an argument may use at most one"
+    )]
+    ConflictingAuthenticatedUserMarkers { subject: String, parameter: String },
+
+    #[error(
+        "{subject} requests the authenticated user '{model}' more than once; a request infers it exactly once"
+    )]
+    MultipleAuthenticatedUserParameters { subject: String, model: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[authenticated_user], which is only available in an HTTP responder or a WebSocket session builder; let the provider return AuthenticatedUserOutcome::Interrupted to gate a request elsewhere"
+    )]
+    AuthenticatedUserUnavailable { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} requests the authenticated user from '{provider}', which reads the request body via '{input_source}', but a WebSocket upgrade handshake has no body"
+    )]
+    AuthenticatedUserBodyUnavailable {
+        subject: String,
+        parameter: String,
+        provider: String,
+        input_source: String,
+    },
+
+    #[error(
+        "parameter '{parameter}' of {subject} must be the current request, a form request, the peer SPIFFE id, the views, an asset bag, or the routes"
+    )]
+    UnmarkedProviderParameter { subject: String, parameter: String },
 }

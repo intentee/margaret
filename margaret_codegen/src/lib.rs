@@ -1,5 +1,6 @@
 mod asset_bag_pass;
 mod asset_responder_path;
+mod binding_pass;
 pub mod build;
 mod build_context;
 mod capabilities;

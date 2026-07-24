@@ -4,6 +4,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 
 use crate::active_servers::active_servers;
 use crate::http_artifacts::HttpArtifacts;
@@ -45,8 +46,9 @@ pub fn render_http(
     middleware_plans: &[MiddlewarePlan],
     bindings: &ContainerBindings,
     websocket_server_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
+    registries: &BindingRegistries,
 ) -> Result<HttpArtifacts, HttpCodegenError> {
-    let table = http_routes(index, middleware_plans)?;
+    let table = http_routes(index, middleware_plans, registries)?;
 
     if !has_views {
         if let Some(route) = table.routes().find(|route| responder_injects_views(route)) {

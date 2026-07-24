@@ -421,6 +421,16 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_request_binding_marker_on_a_runner_parameter() {
+        let message = error_for(
+            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+        );
+
+        assert!(message.contains("carries #[authenticated_user]"));
+        assert!(message.contains("only available in an HTTP responder"));
+    }
+
+    #[test]
     fn rejects_a_cancellation_token_passed_by_reference() {
         let message = error_for(
             "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> Result<(), Infallible> {}\n}\n",

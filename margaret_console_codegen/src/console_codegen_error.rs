@@ -32,6 +32,15 @@ pub enum ConsoleCodegenError {
     )]
     ConsoleCommandRunnerArgument { command: String, parameter: String },
 
+    #[error(
+        "parameter '{parameter}' of the #[process] runner of console command '{command}' carries #[{marker}], which is only available in an HTTP responder, an HTTP middleware, a WebSocket session builder, or an #[infer_from_request] method"
+    )]
+    ConsoleCommandRunnerRequestBinding {
+        command: String,
+        marker: String,
+        parameter: String,
+    },
+
     #[error("console command '{command}' is missing the 'name' argument")]
     MissingCommandName { command: String },
 

@@ -5,11 +5,11 @@ use syn::Type;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
+use margaret_injection_codegen::optional_parameter::OptionalParameter;
 
 use crate::console_argument::ConsoleArgument;
 use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument_form::ConsoleArgumentForm;
-use crate::optional_parameter::OptionalParameter;
 use crate::weaving_kind::WeavingKind;
 
 fn bool_path() -> CanonicalPath {

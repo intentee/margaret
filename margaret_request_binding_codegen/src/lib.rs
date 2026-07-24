@@ -1,11 +1,18 @@
+pub mod authenticated_user_application;
+pub mod authenticated_user_provider;
+pub mod authenticated_user_providers;
+pub mod authenticated_user_requirement;
 pub mod binding_context;
 pub mod binding_reads_request;
+pub mod binding_registries;
 pub mod binding_shadows_request;
 pub mod bound_parameter;
 pub mod classify_parameters;
 pub mod extraction_context;
 mod form_request_arguments;
 pub mod form_request_extraction;
+pub mod has_authenticated_users;
+pub mod render_authenticated_user_wrappers;
 pub mod render_request_extraction;
 pub mod request_binding;
 pub mod request_binding_error;
@@ -14,3 +21,556 @@ pub mod request_input_source;
 mod route_parameter_arguments;
 pub mod route_parameter_binder;
 pub mod route_parameter_binders;
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use tempfile::tempdir;
+
+    use margaret_attributes::attribute_index::AttributeIndex;
+    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_injection_codegen::process_method::process_method;
+    use margaret_route_parameter_codegen::route_path::RoutePath;
+
+    use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
+    use crate::binding_context::BindingContext;
+    use crate::binding_registries::BindingRegistries;
+    use crate::bound_parameter::BoundParameter;
+    use crate::classify_parameters::classify_parameters;
+    use crate::has_authenticated_users::has_authenticated_users;
+    use crate::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
+    use crate::request_binding::RequestBinding;
+    use crate::request_binding_error::RequestBindingError;
+
+    const PRELUDE: &str = "\
+use margaret_http::next::Next;
+use margaret_http::request::Request;
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
+
+struct User;
+
+struct SessionError;
+
+impl RespondsToInferenceFailure for SessionError {}
+";
+
+    fn index_for(lib_source: &str) -> AttributeIndex {
+        let directory = tempdir().expect("a temporary crate directory is created");
+        let source_directory = directory.path().join("src");
+
+        fs::create_dir(&source_directory).expect("the src directory is created");
+        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
+
+        AttributeIndexBuilder::new()
+            .index_crate(&CrateRoot::new("crate", source_directory))
+            .expect("the crate is indexed")
+            .build()
+    }
+
+    fn provider_source(declaration: &str) -> String {
+        format!("{PRELUDE}{declaration}")
+    }
+
+    fn registries_for(declaration: &str) -> BindingRegistries {
+        BindingRegistries::collect(&index_for(&provider_source(declaration)))
+            .expect("the binding registries are collected")
+    }
+
+    fn rejection_for(declaration: &str) -> String {
+        BindingRegistries::collect(&index_for(&provider_source(declaration)))
+            .err()
+            .expect("the binding registries are rejected")
+            .to_string()
+    }
+
+    const SESSION_PROVIDER: &str = "\
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[infer_from_request]
+    fn infer(&self, request: &Request) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+}
+";
+
+    #[test]
+    fn registers_a_provider_under_the_user_model_it_infers() {
+        let registries = registries_for(SESSION_PROVIDER);
+        let providers = registries.providers();
+
+        assert_eq!(providers.len(), 1);
+        assert_eq!(providers[0].application.model.to_string(), "crate::User");
+        assert_eq!(providers[0].application.field, "session_user_provider");
+        assert_eq!(
+            providers[0].application.wrapper.to_string(),
+            "SessionUserProvider"
+        );
+        assert_eq!(providers[0].method_name.to_string(), "infer");
+    }
+
+    #[test]
+    fn reports_a_crate_with_a_provider() {
+        assert!(has_authenticated_users(&index_for(&provider_source(
+            SESSION_PROVIDER
+        ))));
+    }
+
+    #[test]
+    fn reports_a_crate_without_a_provider() {
+        assert!(!has_authenticated_users(&index_for(
+            "#[singleton]\nstruct Config;\n"
+        )));
+    }
+
+    #[test]
+    fn rejects_a_provider_on_a_non_struct() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nenum Bad {}\n"
+            )
+            .contains("is only supported on structs")
+        );
+    }
+
+    #[test]
+    fn rejects_a_repeated_provider_attribute() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
+            )
+            .contains("is repeated on")
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_the_container_does_not_manage() {
+        assert!(
+            rejection_for("#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n")
+                .contains("is not managed by the container")
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_without_a_user_model() {
+        assert!(
+            rejection_for("#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n")
+                .contains("is missing `user_model")
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_whose_user_model_is_not_a_path() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = \"User\")]\nstruct Bad;\n"
+            )
+            .contains("is not a path")
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_whose_user_model_matches_no_struct() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = Ghost)]\nstruct Bad;\n"
+            )
+            .contains("matches no struct")
+        );
+    }
+
+    #[test]
+    fn propagates_malformed_provider_arguments() {
+        assert!(
+            rejection_for("#[singleton]\n#[infers_authenticated_user(= 5)]\nstruct Bad;\n")
+                .contains("could not be parsed")
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_without_an_inference_method() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
+            )
+            .contains("no #[infer_from_request] method")
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_with_more_than_one_inference_method() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn first(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n\n    #[infer_from_request]\n    fn second(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n"
+            )
+            .contains("more than one #[infer_from_request] method")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_that_does_not_return_a_result() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n"
+            )
+            .contains("it must return Result<")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_that_does_not_infer_an_outcome() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<User, SessionError> {}\n}\n"
+            )
+            .contains("it must return Result<")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_without_a_return_type() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) {}\n}\n"
+            )
+            .contains("it must return Result<")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_that_returns_a_type_that_is_not_a_path() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> (u8, u8) {}\n}\n"
+            )
+            .contains("it must return Result<")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_that_returns_a_result_without_arguments() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result {}\n}\n"
+            )
+            .contains("it must return Result<")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_whose_result_carries_no_outcome() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<'static, SessionError> {}\n}\n"
+            )
+            .contains("it must return Result<")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_error_that_is_not_a_named_type() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, (u8, u8)> {}\n}\n"
+            )
+            .contains("which is not a type declared in this crate")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_that_infers_a_borrowed_outcome() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<&AuthenticatedUserOutcome<User>, SessionError> {}\n}\n"
+            )
+            .contains("but the provider declares the user model 'crate::User'")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_whose_outcome_carries_no_user_model() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<'static>, SessionError> {}\n}\n"
+            )
+            .contains("but the provider declares the user model 'crate::User'")
+        );
+    }
+
+    #[test]
+    fn orders_the_providers_by_the_struct_that_declares_them() {
+        let registries = registries_for(
+            "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct SecondProvider;\n\nimpl SecondProvider {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<Admin>, SessionError> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct FirstProvider;\n\nimpl FirstProvider {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n",
+        );
+        let providers = registries.providers();
+
+        assert_eq!(
+            providers
+                .iter()
+                .map(|provider| provider.application.concrete.to_string())
+                .collect::<Vec<String>>(),
+            vec![
+                "crate::FirstProvider".to_string(),
+                "crate::SecondProvider".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_that_infers_another_user_model() {
+        assert!(
+            rejection_for(
+                "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<Admin>, SessionError> {}\n}\n"
+            )
+            .contains("but the provider declares the user model 'crate::User'")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_error_declared_outside_this_crate() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, std::io::Error> {}\n}\n"
+            )
+            .contains("which is not a type declared in this crate")
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_error_that_cannot_convert_itself_into_a_response() {
+        assert!(
+            rejection_for(
+                "struct Silent;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, Silent> {}\n}\n"
+            )
+            .contains("does not implement margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure")
+        );
+    }
+
+    #[test]
+    fn rejects_two_providers_for_the_same_user_model() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct First;\n\nimpl First {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Second;\n\nimpl Second {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n"
+            )
+            .contains("has more than one authenticated user provider")
+        );
+    }
+
+    #[test]
+    fn rejects_the_next_handler_in_an_inference_method() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, next: Next) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n"
+            )
+            .contains("only available inside an HTTP middleware")
+        );
+    }
+
+    #[test]
+    fn rejects_a_route_parameter_in_an_inference_method() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[route_parameter(from = \"id\")] id: String) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n"
+            )
+            .contains("has no route path to bind from")
+        );
+    }
+
+    #[test]
+    fn rejects_an_authenticated_user_in_an_inference_method() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[authenticated_user] user: User) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n"
+            )
+            .contains("only available in an HTTP responder")
+        );
+    }
+
+    #[test]
+    fn rejects_an_unmarked_parameter_in_an_inference_method() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, flag: bool) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n"
+            )
+            .contains("must be the current request, a form request")
+        );
+    }
+
+    fn responder_binding(
+        identifier: &str,
+        declaration: &str,
+    ) -> Result<Vec<BoundParameter>, RequestBindingError> {
+        let index = index_for(&provider_source(&format!(
+            "{SESSION_PROVIDER}{declaration}"
+        )));
+        let registries =
+            BindingRegistries::collect(&index).expect("the binding registries are collected");
+        let item = index
+            .items()
+            .iter()
+            .find(|item| item.identifier() == identifier)
+            .expect("the responder is indexed");
+        let route_path = RoutePath::parse("/x");
+        let method = process_method(item).expect("the responder has a #[process] method");
+
+        classify_parameters(
+            &index,
+            item,
+            method.signature(),
+            &BindingContext::Responder {
+                route_path: &route_path,
+                server: "public",
+                subject: "responder 'Page'",
+            },
+            &registries,
+        )
+    }
+
+    fn responder_rejection(declaration: &str) -> String {
+        responder_binding("Page", declaration)
+            .err()
+            .expect("the responder is rejected")
+            .to_string()
+    }
+
+    fn authenticated_user_requirements(declaration: &str) -> Vec<AuthenticatedUserRequirement> {
+        responder_binding("Page", declaration)
+            .expect("the responder binds")
+            .iter()
+            .filter_map(|parameter| match &parameter.binding {
+                RequestBinding::AuthenticatedUser { requirement, .. } => Some(*requirement),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn binds_a_required_authenticated_user() {
+        assert_eq!(
+            authenticated_user_requirements(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n"
+            ),
+            vec![AuthenticatedUserRequirement::Required]
+        );
+    }
+
+    #[test]
+    fn binds_an_optional_authenticated_user() {
+        assert_eq!(
+            authenticated_user_requirements(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: Option<User>) -> Response {}\n}\n"
+            ),
+            vec![AuthenticatedUserRequirement::Optional]
+        );
+    }
+
+    #[test]
+    fn binds_an_authenticated_user_alongside_the_current_request() {
+        assert_eq!(
+            authenticated_user_requirements(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, request: &Request, #[authenticated_user] user: User) -> Response {}\n}\n"
+            ),
+            vec![AuthenticatedUserRequirement::Required]
+        );
+    }
+
+    #[test]
+    fn rejects_an_authenticated_user_taken_by_reference() {
+        assert!(
+            responder_rejection(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: &User) -> Response {}\n}\n"
+            )
+            .contains("must be taken by value")
+        );
+    }
+
+    #[test]
+    fn rejects_an_authenticated_user_model_that_matches_no_struct() {
+        assert!(
+            responder_rejection(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: (u8, u8)) -> Response {}\n}\n"
+            )
+            .contains("which matches no struct")
+        );
+    }
+
+    #[test]
+    fn rejects_an_authenticated_user_model_without_a_provider() {
+        assert!(
+            responder_rejection(
+                "struct Admin;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] admin: Admin) -> Response {}\n}\n"
+            )
+            .contains("which no #[infers_authenticated_user] provides")
+        );
+    }
+
+    #[test]
+    fn rejects_an_authenticated_user_that_also_carries_a_route_parameter() {
+        assert!(
+            responder_rejection(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] #[route_parameter(from = \"x\")] user: User) -> Response {}\n}\n"
+            )
+            .contains("an argument may use at most one")
+        );
+    }
+
+    #[test]
+    fn rejects_the_same_authenticated_user_requested_twice() {
+        assert!(
+            responder_rejection(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] first: User, #[authenticated_user] second: Option<User>) -> Response {}\n}\n"
+            )
+            .contains("more than once")
+        );
+    }
+
+    #[test]
+    fn renders_a_wrapper_that_infers_through_the_declared_method() {
+        let registries = registries_for(SESSION_PROVIDER);
+        let source: String = render_authenticated_user_wrappers(&registries.providers())
+            .to_string()
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(
+            "pubstructSessionUserProvider{pubinner:std::sync::Arc<crate::SessionUserProvider>,}"
+        ));
+        assert!(source.contains("typeUser=crate::User;"));
+        assert!(source.contains(
+            "margaret_identity::resolve_inference::resolve_inference(self.inner.infer(request).await,)"
+        ));
+    }
+
+    #[test]
+    fn renders_a_wrapper_that_carries_the_routes_and_views_it_infers_from() {
+        let registries = registries_for(
+            "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, routes: &crate::margaret::routes::Routes, views: &crate::margaret::views::Views) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n",
+        );
+        let source: String = render_authenticated_user_wrappers(&registries.providers())
+            .to_string()
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains("pubroutes:std::sync::Arc<super::routes::Routes>,"));
+        assert!(source.contains("pubviews:std::sync::Arc<super::views::Views>,"));
+        assert!(source.contains("self.inner.infer(&self.routes,&self.views).await"));
+    }
+
+    #[test]
+    fn renders_a_wrapper_that_interrupts_a_failed_form_request() {
+        let registries = registries_for(
+            "struct Cookie;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, #[form_request(from = Cookie)] cookie: Cookie) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n",
+        );
+        let source: String = render_authenticated_user_wrappers(&registries.providers())
+            .to_string()
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(
+            "returnmargaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response.into(),)"
+        ));
+    }
+}

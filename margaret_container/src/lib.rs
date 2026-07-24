@@ -11,6 +11,7 @@ mod direct_construction;
 mod field_ident;
 pub mod injectable_resolution;
 pub mod injected_dependency;
+pub mod is_managed;
 mod managed_arguments;
 mod ordered_providers;
 mod path_text;

@@ -34,6 +34,7 @@ mod tests {
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
+    use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 
     use crate::has_responders::has_responders;
     use crate::http_codegen_error::HttpCodegenError;
@@ -52,6 +53,10 @@ mod tests {
         BTreeMap::new()
     }
 
+    fn registries_for(index: &AttributeIndex) -> BindingRegistries {
+        BindingRegistries::collect(index).expect("the binding registries are collected")
+    }
+
     fn http_source(
         crate_name: &str,
         source_directory: &Path,
@@ -60,7 +65,8 @@ mod tests {
         let index = AttributeIndexBuilder::new()
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
-        let plans = middleware_plans(&index)?;
+        let registries = BindingRegistries::collect(&index)?;
+        let plans = middleware_plans(&index, &registries)?;
         let bindings = bindings_for(&index);
 
         Ok(render_http(
@@ -70,6 +76,7 @@ mod tests {
             &plans,
             &bindings,
             &no_websocket_arguments(),
+            &registries,
         )?
         .into_modules()
         .into_iter()
@@ -141,9 +148,106 @@ impl GetUser {
 }
 "#;
 
+    const AUTHENTICATED_RESPONDER: &str = r#"
+use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
+
+struct User;
+
+struct SessionError;
+
+impl RespondsToInferenceFailure for SessionError {}
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[constructor]
+    fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
+
+    #[infer_from_request]
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/profile", server = "public")]
+struct GetProfile;
+
+impl GetProfile {
+    #[process]
+    fn present(&self, #[authenticated_user] user: User) -> Response {}
+}
+"#;
+
+    #[test]
+    fn builds_the_authenticated_user_provider_once_per_route_handler() {
+        let source: String = source_for(AUTHENTICATED_RESPONDER)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains(
+            "letsession_user_provider=std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(console_argument_0.to_owned()).await,routes:routes.clone(),});"
+        ));
+        assert!(source.contains("letsession_user_provider=session_user_provider.clone();"));
+        assert!(source.contains(
+            "margaret_identity::require_authenticated_user::require_authenticated_user(margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(session_user_provider.as_ref(),request,).await,)"
+        ));
+    }
+
+    #[test]
+    fn registers_the_console_arguments_of_an_authenticated_user_provider() {
+        let source: String = source_for(AUTHENTICATED_RESPONDER)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains("console_argument_0:&str,"));
+    }
+
+    #[test]
+    fn calls_the_process_method_by_the_name_the_responder_declares() {
+        let source: String = source_for(AUTHENTICATED_RESPONDER)
+            .split_whitespace()
+            .collect();
+
+        assert!(source.contains("responder.present(user).await"));
+    }
+
+    #[test]
+    fn hands_the_views_to_an_authenticated_user_provider_that_renders_them() {
+        let source: String = source_for_with_views(
+            "use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\nuse margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;\n\nstruct User;\n\nstruct SessionError;\n\nimpl RespondsToInferenceFailure for SessionError {}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n",
+        )
+        .split_whitespace()
+        .collect();
+
+        assert!(source.contains("views:views.clone(),"));
+    }
+
+    #[test]
+    fn rejects_a_route_parameter_binder_the_container_does_not_manage() {
+        assert!(
+            error_for(
+                "struct User;\n\n#[provides_route_parameter]\nstruct UserBinder;\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n"
+            )
+            .contains("is not managed by the container")
+        );
+    }
+
+    #[test]
+    fn rejects_an_authenticated_user_in_a_middleware() {
+        assert!(
+            error_for(
+                "use margaret_http::next::Next;\nuse margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\nuse margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;\n\nstruct User;\n\nstruct SessionError;\n\nimpl RespondsToInferenceFailure for SessionError {}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> ResponseContinuation {}\n}\n"
+            )
+            .contains("only available in an HTTP responder")
+        );
+    }
+
     const BOUND_MODEL: &str = r#"
 struct User;
 
+#[singleton]
 #[provides_route_parameter]
 struct UserBinder;
 
@@ -164,6 +268,7 @@ impl GetUser {
     const DESTRUCTURED_ROUTE_PARAMETER: &str = r#"
 struct User;
 
+#[singleton]
 #[provides_route_parameter]
 struct UserBinder;
 
@@ -293,7 +398,9 @@ impl Health {
         has_views: bool,
     ) -> String {
         let index = index_for(lib_source);
-        let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let registries = registries_for(&index);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         render_http(
@@ -303,6 +410,7 @@ impl Health {
             &plans,
             &bindings,
             &no_websocket_arguments(),
+            &registries,
         )
         .expect("the http source is generated")
         .into_modules()
@@ -355,7 +463,9 @@ impl Health {
             .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
             .expect("the crate is indexed")
             .build();
-        let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let registries = registries_for(&index);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         crate::render_http::render_http(
@@ -365,6 +475,7 @@ impl Health {
             &plans,
             &bindings,
             &no_websocket_arguments(),
+            &registries,
         )
         .expect("the http source is generated")
         .into_modules()
@@ -719,7 +830,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn ignores_an_unrelated_trait_impl_when_resolving_the_binder_model() {
         let source = source_for(
-            "struct User;\n\ntrait Marker {}\n\n#[provides_route_parameter]\nstruct UserBinder;\n\nimpl Marker for UserBinder {}\n\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\n\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> Response {}\n}\n",
+            "struct User;\n\ntrait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct UserBinder;\n\nimpl Marker for UserBinder {}\n\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\n\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> Response {}\n}\n",
         );
 
         assert!(source.contains("container.user_binder().await"));
@@ -727,7 +838,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
 
     #[test]
     fn reports_a_binder_without_a_model_associated_type() {
-        let message = error_for("#[provides_route_parameter]\nstruct Bare;\n");
+        let message = error_for("#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n");
 
         assert!(message.contains("type Model"));
     }
@@ -735,7 +846,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn reports_a_binder_with_a_non_struct_model() {
         let message = error_for(
-            "#[provides_route_parameter]\nstruct UnitBinder;\nimpl HttpRouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> Option<()> {}\n}\n",
+            "#[singleton]\n#[provides_route_parameter]\nstruct UnitBinder;\nimpl HttpRouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> Option<()> {}\n}\n",
         );
 
         assert!(message.contains("type Model"));
@@ -744,7 +855,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn reports_a_binder_whose_model_resolves_to_a_non_struct() {
         let message = error_for(
-            "trait Marker {}\n\n#[provides_route_parameter]\nstruct MarkerBinder;\nimpl HttpRouteParameterBinder for MarkerBinder {\n    type Model = Marker;\n    async fn bind(&self, value: String) -> Option<Marker> {}\n}\n",
+            "trait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct MarkerBinder;\nimpl HttpRouteParameterBinder for MarkerBinder {\n    type Model = Marker;\n    async fn bind(&self, value: String) -> Option<Marker> {}\n}\n",
         );
 
         assert!(message.contains("type Model"));
@@ -771,7 +882,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     #[test]
     fn rejects_two_binders_for_the_same_model() {
         let message = error_for(
-            "struct User;\n\n#[provides_route_parameter]\nstruct First;\nimpl HttpRouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[provides_route_parameter]\nstruct Second;\nimpl HttpRouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n",
+            "struct User;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\nimpl HttpRouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\nimpl HttpRouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n",
         );
 
         assert!(message.contains("more than one route parameter binder"));
@@ -1363,7 +1474,9 @@ impl Guard {
 }
 "#,
         );
-        let plans = middleware_plans(&index).expect("the middleware plans are collected");
+        let registries = registries_for(&index);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
         let artifacts = render_http(
             &index,
@@ -1372,6 +1485,7 @@ impl Guard {
             &plans,
             &bindings,
             &no_websocket_arguments(),
+            &registries,
         )
         .expect("the http source is generated");
 

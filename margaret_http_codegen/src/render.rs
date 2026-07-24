@@ -14,6 +14,7 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::fold_layers::fold_layers;
+use margaret_request_binding_codegen::authenticated_user_application::AuthenticatedUserApplication;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
 use margaret_request_binding_codegen::binding_shadows_request::binding_shadows_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
@@ -53,12 +54,28 @@ pub(crate) fn responder_injects_views(route: &HttpRoute) -> bool {
         .any(|argument| matches!(argument.binding, RequestBinding::Views))
 }
 
+fn providers_inject_routes(route: &HttpRoute) -> bool {
+    capture_providers(route)
+        .iter()
+        .any(|application| application.injects_routes)
+}
+
+fn providers_inject_views(route: &HttpRoute) -> bool {
+    capture_providers(route)
+        .iter()
+        .any(|application| application.injects_views)
+}
+
 fn route_references_routes(route: &HttpRoute) -> bool {
-    responder_injects_routes(route) || route.layers.iter().any(|layer| layer.injects_routes)
+    responder_injects_routes(route)
+        || providers_inject_routes(route)
+        || route.layers.iter().any(|layer| layer.injects_routes)
 }
 
 fn route_references_views(route: &HttpRoute) -> bool {
-    responder_injects_views(route) || route.layers.iter().any(|layer| layer.injects_views)
+    responder_injects_views(route)
+        || providers_inject_views(route)
+        || route.layers.iter().any(|layer| layer.injects_views)
 }
 
 fn handler_binding(route: &HttpRoute) -> Ident {
@@ -71,6 +88,7 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let responder_woven = console_weave(&route.responder_path, bindings);
     let responder_access = access(quote! { container.#responder(#(#responder_woven),*) });
     let captures = capture_binders(route);
+    let providers = capture_providers(route);
 
     let mut allocator = NameAllocator::new();
 
@@ -82,6 +100,10 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
 
     for binder in &captures {
         allocator.reserve(&binder.field.to_string());
+    }
+
+    for application in &providers {
+        allocator.reserve(&application.field);
     }
 
     let request_binding = if route
@@ -113,7 +135,8 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         .arguments
         .iter()
         .map(|argument| argument_value(argument, &routes_local, &views_local, &server));
-    let respond_call = quote! { #responder_binding.respond(#(#argument_values),*).await };
+    let method_name = &route.method_name;
+    let respond_call = quote! { #responder_binding.#method_name(#(#argument_values),*).await };
     let body = quote! {
         #(#bindings_tokens)*
         margaret_http::response_continuation::ResponseContinuation::from(#respond_call)
@@ -132,60 +155,91 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         >
     };
 
-    let handler = if captures.is_empty() && !captures_routes && !captures_views {
-        quote! {
-            margaret_http::responder_handler::responder_handler(
-                #responder_access,
-                |#responder_binding: std::sync::Arc<#responder_type>,
-                 #request_binding: &margaret_http::request::Request|
-                 -> #outcome_future {
-                    std::boxed::Box::pin(async move {
-                        #body
-                    })
-                },
-            )
-        }
-    } else {
-        let capture_bindings = captures.iter().map(|binder| {
-            let field = &binder.field;
-            let binder_woven = console_weave(&binder.provider, bindings);
-            let field_access = access(quote! { container.#field(#(#binder_woven),*) });
-
-            quote! { let #field = #field_access; }
-        });
-        let capture_clones = captures.iter().map(|binder| {
-            let field = &binder.field;
-
-            quote! { let #field = #field.clone(); }
-        });
-        let routes_setup = captures_routes.then(|| quote! { let #routes_local = routes.clone(); });
-        let routes_reclone =
-            captures_routes.then(|| quote! { let #routes_local = #routes_local.clone(); });
-        let views_setup = captures_views.then(|| quote! { let #views_local = views.clone(); });
-        let views_reclone =
-            captures_views.then(|| quote! { let #views_local = #views_local.clone(); });
-
-        quote! {
-            {
-                #(#capture_bindings)*
-                #routes_setup
-                #views_setup
+    let handler =
+        if captures.is_empty() && providers.is_empty() && !captures_routes && !captures_views {
+            quote! {
                 margaret_http::responder_handler::responder_handler(
                     #responder_access,
-                    move |#responder_binding: std::sync::Arc<#responder_type>,
-                          #request_binding: &margaret_http::request::Request|
-                          -> #outcome_future {
-                        #(#capture_clones)*
-                        #routes_reclone
-                        #views_reclone
+                    |#responder_binding: std::sync::Arc<#responder_type>,
+                     #request_binding: &margaret_http::request::Request|
+                     -> #outcome_future {
                         std::boxed::Box::pin(async move {
                             #body
                         })
                     },
                 )
             }
-        }
-    };
+        } else {
+            let capture_bindings = captures.iter().map(|binder| {
+                let field = &binder.field;
+                let binder_woven = console_weave(&binder.provider, bindings);
+                let field_access = access(quote! { container.#field(#(#binder_woven),*) });
+
+                quote! { let #field = #field_access; }
+            });
+            let provider_bindings = providers.iter().map(|application| {
+                let field = format_ident!("{}", application.field);
+                let wrapper = &application.wrapper;
+                let provider_woven = console_weave(&application.concrete, bindings);
+                let inner_access = access(quote! { container.#field(#(#provider_woven),*) });
+                let routes_init = application
+                    .injects_routes
+                    .then(|| quote! { routes: routes.clone(), });
+                let views_init = application
+                    .injects_views
+                    .then(|| quote! { views: views.clone(), });
+
+                quote! {
+                    let #field = std::sync::Arc::new(
+                        super::super::authenticated_users::#wrapper {
+                            inner: #inner_access,
+                            #routes_init
+                            #views_init
+                        },
+                    );
+                }
+            });
+            let provider_clones = providers.iter().map(|application| {
+                let field = format_ident!("{}", application.field);
+
+                quote! { let #field = #field.clone(); }
+            });
+            let capture_clones = captures.iter().map(|binder| {
+                let field = &binder.field;
+
+                quote! { let #field = #field.clone(); }
+            });
+            let routes_setup =
+                captures_routes.then(|| quote! { let #routes_local = routes.clone(); });
+            let routes_reclone =
+                captures_routes.then(|| quote! { let #routes_local = #routes_local.clone(); });
+            let views_setup = captures_views.then(|| quote! { let #views_local = views.clone(); });
+            let views_reclone =
+                captures_views.then(|| quote! { let #views_local = #views_local.clone(); });
+
+            quote! {
+                {
+                    #(#capture_bindings)*
+                    #(#provider_bindings)*
+                    #routes_setup
+                    #views_setup
+                    margaret_http::responder_handler::responder_handler(
+                        #responder_access,
+                        move |#responder_binding: std::sync::Arc<#responder_type>,
+                              #request_binding: &margaret_http::request::Request|
+                              -> #outcome_future {
+                            #(#capture_clones)*
+                            #(#provider_clones)*
+                            #routes_reclone
+                            #views_reclone
+                            std::boxed::Box::pin(async move {
+                                #body
+                            })
+                        },
+                    )
+                }
+            }
+        };
 
     fold_layers(
         &route.layers,
@@ -220,11 +274,24 @@ fn argument_binding(argument: &BoundParameter, request: &Ident) -> TokenStream {
         &argument.binding,
         &argument.holder,
         &ExtractionContext {
-            binder_owner: &TokenStream::new(),
-            error_return: &quote! { return response.into() },
+            continuation_return: &quote! { return response },
+            provider_owner: &TokenStream::new(),
             request_local: request,
+            response_return: &quote! { return response.into() },
         },
     )
+}
+
+fn capture_providers(route: &HttpRoute) -> Vec<AuthenticatedUserApplication> {
+    let mut providers: BTreeMap<String, AuthenticatedUserApplication> = BTreeMap::new();
+
+    for argument in &route.arguments {
+        if let RequestBinding::AuthenticatedUser { application, .. } = &argument.binding {
+            providers.insert(application.field.clone(), application.clone());
+        }
+    }
+
+    providers.into_values().collect()
 }
 
 fn capture_binders(route: &HttpRoute) -> Vec<CaptureBinder> {
@@ -267,11 +334,16 @@ fn responder_and_binder_arguments(
         collected.extend_from_slice(bindings.console_arguments(&route.responder_path));
 
         for argument in &route.arguments {
-            if let RequestBinding::Bound {
-                binder_provider, ..
-            } = &argument.binding
-            {
-                collected.extend_from_slice(bindings.console_arguments(binder_provider));
+            match &argument.binding {
+                RequestBinding::AuthenticatedUser { application, .. } => {
+                    collected.extend_from_slice(bindings.console_arguments(&application.concrete));
+                }
+                RequestBinding::Bound {
+                    binder_provider, ..
+                } => {
+                    collected.extend_from_slice(bindings.console_arguments(binder_provider));
+                }
+                _ => {}
             }
         }
 

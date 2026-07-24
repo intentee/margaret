@@ -14,6 +14,7 @@ use crate::greeter::Greeter;
 use crate::margaret::routes::Routes;
 use crate::margaret::views::Views;
 use crate::models::article::Article;
+use crate::models::user::User;
 use crate::views::greeting_view::GreetingViewProps;
 
 #[middleware(logged)]
@@ -23,6 +24,7 @@ pub struct StoryboardSession {
     greeter: Arc<dyn Greeter>,
     topic: String,
     turns: Mutex<Vec<String>>,
+    viewer: Option<User>,
     welcome: String,
 }
 
@@ -34,6 +36,7 @@ impl StoryboardSession {
         #[route_parameter(from = "topic")] topic: String,
         #[route_parameter(from = "article")] article: Article,
         #[form_request(from = Query)] filters: GetArticlesForm,
+        #[authenticated_user] viewer: Option<User>,
         routes: &Routes,
         views: &Views,
     ) -> Self {
@@ -54,6 +57,7 @@ impl StoryboardSession {
             greeter,
             topic,
             turns: Mutex::new(Vec::new()),
+            viewer,
             welcome,
         }
     }
@@ -79,6 +83,11 @@ impl StoryboardSession {
 
     pub async fn turn_count(&self) -> usize {
         self.turns.lock().await.len()
+    }
+
+    #[must_use]
+    pub fn viewer_name(&self) -> Option<&str> {
+        self.viewer.as_ref().map(|viewer| viewer.name.as_str())
     }
 
     #[must_use]

@@ -6,6 +6,7 @@ use margaret_attributes::matched_attribute::MatchedAttribute;
 use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
+use margaret_injection_codegen::request_binding_marker::request_binding_marker;
 
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
@@ -25,6 +26,14 @@ fn validate_runner(
     path: &str,
 ) -> Result<(), ServiceCodegenError> {
     for view in parameters(runner.signature()) {
+        if let Some(name) = request_binding_marker(view.attributes) {
+            return Err(ServiceCodegenError::RunnerRequestBinding {
+                path: path.to_string(),
+                parameter: view.holder.to_string(),
+                marker: name.to_string(),
+            });
+        }
+
         if !is_cancellation_token(index, item, view.declared) {
             return Err(ServiceCodegenError::RunnerArgument {
                 path: path.to_string(),

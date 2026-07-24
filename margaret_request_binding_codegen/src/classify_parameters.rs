@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use quote::ToTokens;
 use syn::Attribute;
@@ -13,10 +14,14 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::marker::marker;
 use margaret_container::injectable_resolution::InjectableResolution;
 use margaret_container::resolve_injectable::resolve_injectable;
+use margaret_injection_codegen::optional_parameter::OptionalParameter;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
 
+use crate::authenticated_user_provider::AuthenticatedUserProvider;
+use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
 use crate::binding_context::BindingContext;
+use crate::binding_registries::BindingRegistries;
 use crate::bound_parameter::BoundParameter;
 use crate::form_request_arguments::FormRequestArguments;
 use crate::form_request_extraction::FormRequestExtraction;
@@ -49,6 +54,89 @@ fn string_path() -> CanonicalPath {
     ])
 }
 
+fn body_backed_source(provider: &AuthenticatedUserProvider) -> Option<String> {
+    provider.parameters.iter().find_map(|parameter| {
+        let RequestBinding::FormRequest { source, .. } = &parameter.binding else {
+            return None;
+        };
+
+        match source {
+            RequestInputSource::Form | RequestInputSource::Json => {
+                Some(source.variant().to_string())
+            }
+            RequestInputSource::Cookie | RequestInputSource::Query => None,
+        }
+    })
+}
+
+fn classify_authenticated_user(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    declared: &Type,
+    context: &BindingContext,
+    position: usize,
+    providers: &HashMap<CanonicalPath, AuthenticatedUserProvider>,
+) -> Result<RequestBinding, RequestBindingError> {
+    let subject = context.subject();
+
+    match context {
+        BindingContext::AuthenticatedUserProvider { .. } | BindingContext::Middleware { .. } => {
+            return Err(RequestBindingError::AuthenticatedUserUnavailable {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+            });
+        }
+        BindingContext::Handshake { .. } | BindingContext::Responder { .. } => {}
+    }
+
+    let OptionalParameter {
+        required,
+        value_type,
+    } = OptionalParameter::from_type(declared);
+
+    if matches!(value_type, Type::Reference(_)) {
+        return Err(RequestBindingError::AuthenticatedUserByReference {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    let model = index.resolve_item_type(item, &value_type).ok_or_else(|| {
+        RequestBindingError::UnknownAuthenticatedUserModel {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+            written: value_type.to_token_stream().to_string(),
+        }
+    })?;
+    let provider = providers.get(&model).ok_or_else(|| {
+        RequestBindingError::MissingAuthenticatedUserProvider {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+            model: model.to_string(),
+        }
+    })?;
+
+    if let BindingContext::Handshake { .. } = context
+        && let Some(source) = body_backed_source(provider)
+    {
+        return Err(RequestBindingError::AuthenticatedUserBodyUnavailable {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+            provider: provider.application.concrete.to_string(),
+            input_source: source,
+        });
+    }
+
+    Ok(RequestBinding::AuthenticatedUser {
+        application: provider.application.clone(),
+        requirement: if required {
+            AuthenticatedUserRequirement::Required
+        } else {
+            AuthenticatedUserRequirement::Optional
+        },
+    })
+}
+
 fn classify_context_specific(
     index: &AttributeIndex,
     item: &IndexedItem,
@@ -61,6 +149,12 @@ fn classify_context_specific(
     let subject = context.subject();
 
     match context {
+        BindingContext::AuthenticatedUserProvider { .. } => {
+            Err(RequestBindingError::UnmarkedProviderParameter {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+            })
+        }
         BindingContext::Responder { server, .. } => {
             if is_forwarder(resolved, is_reference, server) {
                 Ok(RequestBinding::Forwarder)
@@ -160,11 +254,14 @@ fn classify_route_parameter(
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
 
-    if let BindingContext::Middleware { .. } = context {
-        return Err(RequestBindingError::RouteParameterUnavailable {
-            subject: subject.to_string(),
-            parameter: position.to_string(),
-        });
+    match context {
+        BindingContext::AuthenticatedUserProvider { .. } | BindingContext::Middleware { .. } => {
+            return Err(RequestBindingError::RouteParameterUnavailable {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+            });
+        }
+        BindingContext::Handshake { .. } | BindingContext::Responder { .. } => {}
     }
 
     let arguments = AttributeArgs::from_attribute(attribute)?;
@@ -198,14 +295,35 @@ fn classify_route_parameter(
     })
 }
 
+fn verify_single_inference(
+    bound: &[BoundParameter],
+    subject: &str,
+) -> Result<(), RequestBindingError> {
+    let mut inferred: HashSet<&CanonicalPath> = HashSet::new();
+
+    for parameter in bound {
+        if let RequestBinding::AuthenticatedUser { application, .. } = &parameter.binding
+            && !inferred.insert(&application.model)
+        {
+            return Err(RequestBindingError::MultipleAuthenticatedUserParameters {
+                subject: subject.to_string(),
+                model: application.model.to_string(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 pub fn classify_parameters(
     index: &AttributeIndex,
     item: &IndexedItem,
     signature: &Signature,
     context: &BindingContext,
-    binders: &HashMap<CanonicalPath, RouteParameterBinder>,
+    registries: &BindingRegistries,
 ) -> Result<Vec<BoundParameter>, RequestBindingError> {
     let subject = context.subject();
+    let authenticated_user_selector = AttributeSelector::from_marker("authenticated_user");
     let route_parameter_selector = AttributeSelector::from_marker("route_parameter");
     let form_request_selector = AttributeSelector::from_marker("form_request");
     let mut bound = Vec::new();
@@ -217,6 +335,7 @@ pub fn classify_parameters(
         position,
     } in parameters(signature)
     {
+        let authenticated_user = marker(attributes, &authenticated_user_selector);
         let route_parameter = marker(attributes, &route_parameter_selector);
         let form_request = marker(attributes, &form_request_selector);
         let resolved = index.resolve_item_type(item, declared);
@@ -237,21 +356,49 @@ pub fn classify_parameters(
             });
         }
 
-        if is_peer_spiffe_id && (route_parameter.is_some() || form_request.is_some()) {
+        if authenticated_user.is_some() && (route_parameter.is_some() || form_request.is_some()) {
+            return Err(RequestBindingError::ConflictingAuthenticatedUserMarkers {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+            });
+        }
+
+        if is_peer_spiffe_id
+            && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
+        {
             return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
                 subject: subject.to_string(),
                 parameter: position.to_string(),
             });
         }
 
-        let binding = if let Some(attribute) = form_request {
+        let binding = if authenticated_user.is_some() {
+            classify_authenticated_user(
+                index,
+                item,
+                declared,
+                context,
+                position,
+                &registries.authenticated_users,
+            )?
+        } else if let Some(attribute) = form_request {
             classify_form_request(index, item, attribute, declared, context, position)?
         } else if let Some(attribute) = route_parameter {
-            classify_route_parameter(index, item, context, attribute, declared, position, binders)?
+            classify_route_parameter(
+                index,
+                item,
+                context,
+                attribute,
+                declared,
+                position,
+                &registries.route_parameters,
+            )?
         } else if is_next {
             match context {
                 BindingContext::Middleware { .. } => RequestBinding::Next,
-                BindingContext::Handshake { .. } | BindingContext::Responder { .. } => {
+                BindingContext::AuthenticatedUserProvider { .. }
+                | BindingContext::Handshake { .. }
+                | BindingContext::Responder { .. } => {
                     return Err(RequestBindingError::NextOutsideMiddleware {
                         subject: subject.to_string(),
                         parameter: position.to_string(),
@@ -305,6 +452,8 @@ pub fn classify_parameters(
         });
     }
 
+    verify_single_inference(&bound, subject)?;
+
     match context {
         BindingContext::Handshake { route_path, .. }
         | BindingContext::Responder { route_path, .. } => {
@@ -320,7 +469,7 @@ pub fn classify_parameters(
                 }
             }
         }
-        BindingContext::Middleware { .. } => {}
+        BindingContext::AuthenticatedUserProvider { .. } | BindingContext::Middleware { .. } => {}
     }
 
     Ok(bound)

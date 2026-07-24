@@ -37,7 +37,7 @@ use crate::raw_target::RawTarget;
 use crate::resolve_construction::resolve_construction;
 use crate::type_text::type_text;
 
-fn managed_selectors() -> [AttributeSelector; 3] {
+pub(crate) fn managed_selectors() -> [AttributeSelector; 3] {
     [
         singleton_selector(),
         service_selector(),
@@ -160,7 +160,7 @@ fn conflicts_with_managed_role(item: &IndexedItem) -> bool {
         .any(|selector| has_marker(item, selector))
 }
 
-fn has_marker(item: &IndexedItem, selector: &AttributeSelector) -> bool {
+pub(crate) fn has_marker(item: &IndexedItem, selector: &AttributeSelector) -> bool {
     item.attributes()
         .iter()
         .any(|attribute| selector.matches(attribute.path()))
@@ -387,7 +387,7 @@ fn scheduled_with_tick_timer_selector() -> AttributeSelector {
     AttributeSelector::from_marker("scheduled_with_tick_timer")
 }
 
-fn provides_endpoint_selector() -> AttributeSelector {
+pub(crate) fn provides_endpoint_selector() -> AttributeSelector {
     AttributeSelector::from_marker("provides_endpoint")
 }
 

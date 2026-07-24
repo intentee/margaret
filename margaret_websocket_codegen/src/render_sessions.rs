@@ -117,8 +117,19 @@ fn factory_fields(session: &WebSocketSession) -> TokenStream {
 
         quote! { #field: ::std::sync::Arc<#provider>, }
     });
+    let providers = session
+        .authenticated_user_providers()
+        .into_iter()
+        .map(|application| {
+            let field = format_ident!("{}", application.field);
+            let wrapper = &application.wrapper;
 
-    quote! { #(#holders)* #(#binders)* }
+            quote! {
+                #field: ::std::sync::Arc<super::super::authenticated_users::#wrapper>,
+            }
+        });
+
+    quote! { #(#holders)* #(#binders)* #(#providers)* }
 }
 
 fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings) -> TokenStream {
@@ -142,21 +153,48 @@ fn factory_initializers(session: &WebSocketSession, bindings: &ContainerBindings
 
         quote! { #field: container.#field(#(#arguments),*).await, }
     });
+    let providers = session
+        .authenticated_user_providers()
+        .into_iter()
+        .map(|application| {
+            let field = format_ident!("{}", application.field);
+            let wrapper = &application.wrapper;
+            let arguments =
+                bindings.console_weaves(bindings.console_arguments(&application.concrete));
+            let routes_init = application
+                .injects_routes
+                .then(|| quote! { routes: routes.clone(), });
+            let views_init = application
+                .injects_views
+                .then(|| quote! { views: views.clone(), });
 
-    quote! { #(#holders)* #(#binders)* }
+            quote! {
+                #field: ::std::sync::Arc::new(
+                    super::super::authenticated_users::#wrapper {
+                        inner: container.#field(#(#arguments),*).await,
+                        #routes_init
+                        #views_init
+                    },
+                ),
+            }
+        });
+
+    quote! { #(#holders)* #(#binders)* #(#providers)* }
 }
 
 fn create_extractions(session: &WebSocketSession, handshake: &Ident) -> TokenStream {
-    let error_return = quote! { return ::std::result::Result::Err(response) };
-    let binder_owner = quote! { self. };
+    let continuation_return = quote! { return ::std::result::Result::Err(response) };
+    let response_return = quote! { return ::std::result::Result::Err(response.into()) };
+    let provider_owner = quote! { self. };
     let extractions = session.parameters.iter().map(|parameter| {
         render_request_extraction(
             &parameter.binding,
             &parameter.holder,
             &ExtractionContext {
-                binder_owner: &binder_owner,
-                error_return: &error_return,
+                continuation_return: &continuation_return,
+                provider_owner: &provider_owner,
                 request_local: handshake,
+                response_return: &response_return,
             },
         )
     });
@@ -192,6 +230,7 @@ fn render_factory(session: &WebSocketSession) -> TokenStream {
     };
     let extractions = create_extractions(session, &handshake);
     let arguments = build_arguments(session);
+    let method_name = &session.method_name;
 
     quote! {
         struct Factory {
@@ -207,12 +246,12 @@ fn render_factory(session: &WebSocketSession) -> TokenStream {
                 #handshake: &margaret_http::request::Request,
             ) -> ::std::result::Result<
                 ::std::sync::Arc<Self::Session>,
-                margaret_http::response::Response,
+                margaret_http::response_continuation::ResponseContinuation,
             > {
                 #extractions
 
                 ::std::result::Result::Ok(::std::sync::Arc::new(
-                    #session_path::build_for_session(#arguments),
+                    #session_path::#method_name(#arguments),
                 ))
             }
         }

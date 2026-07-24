@@ -3,6 +3,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 #[derive(Clone, Copy)]
 pub(crate) struct Capabilities {
     pub(crate) has_asset_bag: bool,
+    pub(crate) has_authenticated_users: bool,
     pub(crate) has_console: bool,
     pub(crate) has_http: bool,
     pub(crate) has_middleware: bool,
@@ -14,6 +15,10 @@ pub(crate) struct Capabilities {
 
 impl Capabilities {
     pub(crate) fn detect(index: &AttributeIndex, has_asset_bag: bool) -> Self {
+        let has_authenticated_users =
+            margaret_request_binding_codegen::has_authenticated_users::has_authenticated_users(
+                index,
+            );
         let has_http = margaret_http_codegen::has_responders::has_responders(index);
         let has_middleware = margaret_middleware_codegen::has_middleware::has_middleware(index);
         let has_models = margaret_model_codegen::has_models::has_models(index);
@@ -27,6 +32,7 @@ impl Capabilities {
 
         Self {
             has_asset_bag,
+            has_authenticated_users,
             has_console,
             has_http,
             has_middleware,

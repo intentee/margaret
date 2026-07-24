@@ -20,6 +20,7 @@ members = [
     "margaret_http_codegen",
     "margaret_http_tests",
     "margaret_http_validation",
+    "margaret_identity",
     "margaret_identity_session",
     "margaret_injection_codegen",
     "margaret_jwks_client",

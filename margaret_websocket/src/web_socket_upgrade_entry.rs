@@ -10,6 +10,7 @@ use tokio_util::sync::CancellationToken;
 
 use margaret_http::request::Request;
 use margaret_http::response::Response;
+use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::web_socket_upgrade::WebSocketUpgrade;
 
 use crate::serve_web_socket_connection::serve_web_socket_connection;
@@ -61,28 +62,28 @@ where
         handshake: &Request,
         on_upgrade: OnUpgrade,
         cancellation_token: CancellationToken,
-    ) -> Response {
+    ) -> ResponseContinuation {
         let Ok(Some(key)) = handshake.inputs.server.header("sec-websocket-key") else {
-            return Response::text(
+            return ResponseContinuation::from(Response::text(
                 400,
                 "the websocket handshake is missing the Sec-WebSocket-Key header",
-            );
+            ));
         };
 
         match handshake.inputs.server.header("sec-websocket-version") {
             Ok(Some("13")) => {}
             _ => {
-                return Response::text(
+                return ResponseContinuation::from(Response::text(
                     400,
                     "the websocket handshake must request Sec-WebSocket-Version 13",
-                );
+                ));
             }
         }
 
         let accept = derive_accept_key(key.as_bytes());
         let session = match self.factory.create(handshake).await {
             Ok(session) => session,
-            Err(response) => return response,
+            Err(continuation) => return continuation,
         };
 
         tokio::spawn(drive_web_socket_upgrade(
@@ -92,10 +93,12 @@ where
             self.dispatch_table.clone(),
         ));
 
-        Response::text(101, "")
-            .header("connection", "Upgrade")
-            .header("sec-websocket-accept", accept)
-            .header("upgrade", "websocket")
+        ResponseContinuation::from(
+            Response::text(101, "")
+                .header("connection", "Upgrade")
+                .header("sec-websocket-accept", accept)
+                .header("upgrade", "websocket"),
+        )
     }
 }
 
