@@ -9,6 +9,7 @@ use tokio_util::sync::CancellationToken;
 use trzcina::ServiceBundle as _;
 use url::Url;
 
+use margaret_endpoint::static_endpoint::StaticEndpoint;
 use margaret_http_tests::mtls_fixture::MtlsFixture;
 use margaret_jwks_client::JwksClientBundle;
 use margaret_jwks_client::JwksClientBundleParams;
@@ -17,6 +18,7 @@ use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
 use margaret_jwks_keygen::signs_claims::SignsClaims as _;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
+use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
 use margaret_jwks_roller_server::JwksRollerServerBundle;
 use margaret_jwks_roller_server::JwksRollerServerBundleParams;
 
@@ -69,16 +71,17 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
         .timeout(Duration::from_secs(60))
         .build()
         .expect("the test jwks http client builds");
+    let jwks_url = Url::parse(&format!(
+        "https://{}:{}{}",
+        fixture.server_name,
+        jwks_server.port(),
+        WELL_KNOWN_JWKS_PATH,
+    ))
+    .expect("the jwks url parses");
     let client_bundle = JwksClientBundle::new(JwksClientBundleParams {
+        endpoint_provider: Arc::new(StaticEndpoint::new(jwks_url)),
         http_client,
-        issuer_url: Url::parse(&format!(
-            "https://{}:{}",
-            fixture.server_name,
-            jwks_server.port()
-        ))
-        .expect("the issuer url parses"),
-    })
-    .expect("the client bundle builds");
+    });
     let verifier = client_bundle.verifier();
     let mut poll_services = client_bundle
         .services()

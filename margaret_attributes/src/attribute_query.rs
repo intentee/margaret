@@ -34,15 +34,6 @@ impl<'index> AttributeQuery<'index> {
             .map(|attribute| MatchedAttribute::new(self.item, attribute))
             .collect()
     }
-
-    #[must_use]
-    pub fn matched_attributes(&self) -> Vec<MatchedAttribute<'index>> {
-        self.item
-            .attributes()
-            .iter()
-            .map(|attribute| MatchedAttribute::new(self.item, attribute))
-            .collect()
-    }
 }
 
 #[cfg(test)]
@@ -116,20 +107,6 @@ mod tests {
                 .find_all(&selector("singleton"))
                 .len(),
             2
-        );
-    }
-
-    #[test]
-    fn matched_attributes_preserves_declaration_order() {
-        let item = item(vec![parse_quote!(#[first]), parse_quote!(#[second])]);
-        let matched = AttributeQuery::new(&item).matched_attributes();
-
-        assert_eq!(
-            matched
-                .iter()
-                .map(|attribute| attribute.path())
-                .collect::<Vec<String>>(),
-            vec!["first".to_string(), "second".to_string()]
         );
     }
 }

@@ -1,7 +1,7 @@
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_attributes::format_path::format_path;
 use margaret_attributes::indexed_item::IndexedItem;
+use margaret_tag_codegen::read_reference_tag::read_reference_tag;
 
 use crate::layer_application::LayerApplication;
 use crate::middleware_codegen_error::MiddlewareCodegenError;
@@ -16,26 +16,13 @@ pub fn resolve_layers(
     let mut layers = Vec::new();
 
     for matched in AttributeQuery::new(item).find_all(&selector) {
-        let arguments = matched.args()?;
-        let (Some(tag), None) = (arguments.positional_path(0), arguments.positional(1)) else {
-            return Err(MiddlewareCodegenError::MalformedMiddleware {
-                site: site.to_string(),
-            });
-        };
-        let mut matching = plans.iter().filter(|plan| plan.selector.matches(tag));
-        let Some(plan) = matching.next() else {
+        let tag = read_reference_tag(matched.args()?, site)?;
+        let Some(plan) = plans.iter().find(|plan| plan.tag == tag) else {
             return Err(MiddlewareCodegenError::UnknownMiddleware {
                 site: site.to_string(),
-                tag: format_path(tag),
+                tag: tag.to_string(),
             });
         };
-
-        if matching.next().is_some() {
-            return Err(MiddlewareCodegenError::AmbiguousMiddleware {
-                site: site.to_string(),
-                tag: format_path(tag),
-            });
-        }
 
         layers.push(LayerApplication {
             concrete: plan.concrete.clone(),

@@ -25,6 +25,7 @@ pub mod resolve_path;
 pub mod resolve_type;
 pub mod select_unique_attribute;
 pub mod struct_shape;
+pub mod tag;
 
 mod flatten_use_tree;
 pub mod format_path;

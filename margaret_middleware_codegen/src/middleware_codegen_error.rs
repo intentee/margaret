@@ -3,6 +3,7 @@ use thiserror::Error;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_injection_codegen::injection_error::InjectionError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+use margaret_tag_codegen::tag_error::TagError;
 
 #[derive(Debug, Error)]
 pub enum MiddlewareCodegenError {
@@ -24,6 +25,12 @@ pub enum MiddlewareCodegenError {
         source: RequestBindingError,
     },
 
+    #[error(transparent)]
+    Tag {
+        #[from]
+        source: TagError,
+    },
+
     #[error(
         "#[handles_middleware_attribute] is only supported on structs, but '{target}' is not a struct"
     )]
@@ -32,16 +39,11 @@ pub enum MiddlewareCodegenError {
     #[error("middleware '{middleware}' is missing the 'attribute' argument")]
     MissingMiddlewareHandles { middleware: String },
 
-    #[error("{site} has a #[middleware(...)] attribute that must name exactly one middleware tag")]
-    MalformedMiddleware { site: String },
+    #[error("middleware '{middleware}' names a tag that is not a single plain name")]
+    MalformedMiddlewareTag { middleware: String },
 
     #[error(
         "{site} attaches the middleware tag '{tag}', but no #[handles_middleware_attribute] handles it"
     )]
     UnknownMiddleware { site: String, tag: String },
-
-    #[error(
-        "{site} attaches the middleware tag '{tag}', which is handled by more than one #[handles_middleware_attribute]"
-    )]
-    AmbiguousMiddleware { site: String, tag: String },
 }

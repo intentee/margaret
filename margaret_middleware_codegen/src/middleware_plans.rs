@@ -4,6 +4,7 @@ use quote::format_ident;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::tag::Tag;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
@@ -31,6 +32,9 @@ pub fn middleware_plans(
         let middleware = item.canonical_path().to_string();
         let MiddlewareAttributeArguments { handles } =
             MiddlewareAttributeArguments::parse(matched.args()?, &middleware)?;
+        let Some(tag) = Tag::from_path(&handles) else {
+            return Err(MiddlewareCodegenError::MalformedMiddlewareTag { middleware });
+        };
         let method = process_method(item)?;
         let subject = format!("middleware '{middleware}'");
         let parameters = classify_parameters(
@@ -45,7 +49,7 @@ pub fn middleware_plans(
             concrete: item.canonical_path().clone(),
             field: format_ident!("{}", identifier.field()),
             parameters,
-            selector: AttributeSelector::from_path(handles),
+            tag,
             wrapper: format_ident!("{}", identifier.type_name()),
         });
     }

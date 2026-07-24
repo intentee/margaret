@@ -48,24 +48,6 @@ pub enum HttpCodegenError {
     #[error("responder '{responder}' is missing the 'path' argument")]
     MissingHttpPath { responder: String },
 
-    #[error(
-        "#[handles_middleware_attribute] is only supported on structs, but '{target}' is not a struct"
-    )]
-    HttpMiddlewareNotOnStruct { target: String },
-
-    #[error("middleware '{middleware}' is missing the 'attribute' argument")]
-    MissingMiddlewareHandles { middleware: String },
-
-    #[error(
-        "responder '{responder}' has a #[middleware(...)] attribute that must name exactly one middleware tag"
-    )]
-    MalformedMiddleware { responder: String },
-
-    #[error(
-        "responder '{responder}' attaches the middleware tag '{tag}', but no #[handles_middleware_attribute] handles it"
-    )]
-    UnknownMiddleware { responder: String, tag: String },
-
     #[error("responder '{responder}' has a malformed route path '{path}': {source}")]
     InvalidRoutePath {
         responder: String,

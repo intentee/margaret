@@ -55,6 +55,6 @@ impl WebSocket {
         self.sender
             .send(Message::text(text))
             .await
-            .map_err(|_| WebSocketError::Send)
+            .map_err(|source| WebSocketError::Send { source })
     }
 }

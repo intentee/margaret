@@ -979,7 +979,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
-        assert!(message.contains("must name exactly one middleware tag"));
+        assert!(message.contains("must reference exactly one tag"));
     }
 
     #[test]

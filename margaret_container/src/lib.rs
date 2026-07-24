@@ -18,6 +18,7 @@ mod peel_target;
 mod provided_type;
 mod provider;
 mod provider_binding;
+mod provides_endpoint_path;
 mod raw_target;
 mod render;
 mod render_build;

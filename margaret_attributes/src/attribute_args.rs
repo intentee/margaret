@@ -65,12 +65,21 @@ impl AttributeArgs {
                     }
                 };
 
-                let mut named = Vec::new();
+                let mut named: Vec<NamedArgument> = Vec::new();
                 let mut positional = Vec::new();
 
                 for expression in expressions {
                     match named_argument(&expression) {
-                        Some(found) => named.push(found),
+                        Some(found) => {
+                            if named.iter().any(|existing| existing.name == found.name) {
+                                return Err(AttributeError::DuplicateNamedArgument {
+                                    attribute_path,
+                                    key: found.name,
+                                });
+                            }
+
+                            named.push(found);
+                        }
                         None => positional.push(expression),
                     }
                 }
@@ -239,6 +248,17 @@ mod tests {
             .to_string();
 
         assert!(message.contains("could not be parsed"));
+    }
+
+    #[test]
+    fn rejects_a_duplicate_named_argument() {
+        let message =
+            AttributeArgs::from_attribute(&parse_quote!(#[route(method = Get, method = Post)]))
+                .err()
+                .expect("a duplicate named argument is rejected")
+                .to_string();
+
+        assert!(message.contains("provided more than once"));
     }
 
     #[test]

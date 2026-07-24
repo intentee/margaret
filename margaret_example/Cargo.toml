@@ -11,6 +11,7 @@ clap = { workspace = true }
 dashmap = { workspace = true }
 margaret_asset_bag = { path = "../margaret_asset_bag" }
 margaret_console = { path = "../margaret_console" }
+margaret_endpoint = { path = "../margaret_endpoint" }
 margaret_http = { path = "../margaret_http" }
 margaret_http_validation = { path = "../margaret_http_validation" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
@@ -31,6 +32,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
+url = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
 validator = { workspace = true, features = ["derive"] }
 
