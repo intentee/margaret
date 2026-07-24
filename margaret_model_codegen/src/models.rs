@@ -36,6 +36,7 @@ use crate::index_arguments::IndexArguments;
 use crate::index_column_member::IndexColumnMember;
 use crate::index_membership::IndexMembership;
 use crate::index_redundancy::IndexRedundancy;
+use crate::indirection_inner::indirection_inner;
 use crate::infer_column_type::infer_column_type;
 use crate::inferred_column::InferredColumn;
 use crate::model::Model;
@@ -348,9 +349,14 @@ fn defer_foreign_key(
     let ForeignKeyArguments { on_delete } =
         ForeignKeyArguments::parse(foreign_key_arguments, model, &field_name)?;
 
-    let (target_type, nullable) = match option_inner(field.ty()) {
+    let (after_option, nullable) = match option_inner(field.ty()) {
         Some(inner) => (inner, true),
         None => (field.ty(), false),
+    };
+
+    let (target_type, indirected) = match indirection_inner(after_option) {
+        Some(inner) => (inner, true),
+        None => (after_option, false),
     };
 
     let rust_type = field.ty().to_token_stream().to_string();
@@ -362,6 +368,13 @@ fn defer_foreign_key(
             model: model.to_string(),
             rust_type: rust_type.clone(),
         })?;
+
+    if &target_path == item.canonical_path() && !indirected {
+        return Err(ModelCodegenError::SelfReferentialForeignKeyRequiresIndirection {
+            field: field_name,
+            model: model.to_string(),
+        });
+    }
 
     Ok(DeferredForeignKey {
         field_name,

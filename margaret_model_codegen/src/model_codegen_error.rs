@@ -126,6 +126,11 @@ pub enum ModelCodegenError {
     )]
     ForeignKeyCycle { path: String },
 
+    #[error(
+        "self-referential foreign key field '{field}' of model '{model}' must be placed behind heap indirection to break its infinite type size; wrap it in Box, Rc, or Arc, e.g. `Option<Box<...>>`"
+    )]
+    SelfReferentialForeignKeyRequiresIndirection { field: String, model: String },
+
     #[error("model '{model}' has a table name that is too long: {source}")]
     TableNameTooLong {
         model: String,

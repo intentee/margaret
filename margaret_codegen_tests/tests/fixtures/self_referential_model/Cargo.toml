@@ -1,0 +1,12 @@
+[package]
+name = "margaret_self_referential_model_fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+margaret_macros = { path = "../../../../margaret_macros" }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

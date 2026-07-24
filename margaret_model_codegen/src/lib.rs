@@ -20,6 +20,7 @@ mod foreign_key_target_column;
 mod index_arguments;
 mod index_column_member;
 mod index_redundancy;
+mod indirection_inner;
 mod infer_column_type;
 mod model_arguments;
 mod option_inner;
@@ -722,9 +723,16 @@ struct Book {
 
     #[test]
     fn orders_a_self_referential_foreign_key_without_a_cycle() {
-        let source = "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Node,\n}\n";
+        let source = "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Box<Node>>,\n}\n";
 
         assert_eq!(table_order(source), ["nodes"]);
+    }
+
+    #[test]
+    fn rejects_an_unboxed_self_referential_foreign_key() {
+        let source = "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Node>,\n}\n";
+
+        assert!(error_message(source).contains("heap indirection"));
     }
 
     #[test]

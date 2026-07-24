@@ -174,7 +174,7 @@ struct Second {
     #[test]
     fn resolves_a_self_referential_foreign_key() {
         let source = schema_source(
-            "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Node>,\n}\n",
+            "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Box<Node>>,\n}\n",
         );
 
         assert!(source.contains("name:\"parent_id\".to_string(),nullable:true,"));

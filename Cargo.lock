@@ -2370,6 +2370,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_self_referential_model_fixture"
+version = "0.1.0"
+dependencies = [
+ "margaret_macros",
+ "uuid",
+]
+
+[[package]]
 name = "margaret_service"
 version = "0.1.0"
 dependencies = [
