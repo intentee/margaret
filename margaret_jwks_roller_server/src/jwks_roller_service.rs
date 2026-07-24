@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -6,11 +7,32 @@ use tokio_util::sync::CancellationToken;
 use trzcina::TickContext;
 use trzcina::Ticker;
 
+use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
+
+use crate::jwks_document_holder::JwksDocumentHolder;
 use crate::jwks_roll_interval::JWKS_ROLL_INTERVAL;
-use crate::jwks_roller_server_bundle::JwksRollerServerBundle;
+use crate::roll_and_publish::roll_and_publish;
 
 pub struct JwksRollerService {
-    pub bundle: JwksRollerServerBundle,
+    jwks_document_holder: JwksDocumentHolder,
+    jwks_secret_holder: JwksSecretHolder,
+    storage: Arc<dyn JwksSecretStorage>,
+}
+
+impl JwksRollerService {
+    #[must_use]
+    pub fn new(
+        jwks_document_holder: JwksDocumentHolder,
+        jwks_secret_holder: JwksSecretHolder,
+        storage: Arc<dyn JwksSecretStorage>,
+    ) -> Self {
+        Self {
+            jwks_document_holder,
+            jwks_secret_holder,
+            storage,
+        }
+    }
 }
 
 #[async_trait]
@@ -24,7 +46,11 @@ impl Ticker for JwksRollerService {
         _cancellation_token: CancellationToken,
         _tick_context: TickContext,
     ) -> Result<()> {
-        self.bundle.roll_and_publish()?;
+        roll_and_publish(
+            self.storage.as_ref(),
+            &self.jwks_secret_holder,
+            &self.jwks_document_holder,
+        )?;
 
         Ok(())
     }

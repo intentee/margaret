@@ -1,4 +1,5 @@
 mod canonicalizes_console_argument_types;
 mod emits_conditional_too_many_arguments_expectations;
+mod generates_the_jwks_client_poller;
 mod rejects_invalid_console_argument_types;
 mod weaves_console_arguments_by_type;

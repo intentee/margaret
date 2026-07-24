@@ -27,6 +27,8 @@ use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
+use crate::framework_provider::FrameworkProvider;
+use crate::framework_provider_construction::FrameworkProviderConstruction;
 use crate::path_text::path_text;
 use crate::peel_target::peel_target;
 use crate::provided_type::ProvidedType;
@@ -416,16 +418,29 @@ struct DraftedContainer<'index> {
     provider_drafts: Vec<Draft<'index>>,
 }
 
+fn framework_construction(construction: FrameworkProviderConstruction) -> DirectConstruction {
+    match construction {
+        FrameworkProviderConstruction::Fieldless => DirectConstruction::Fieldless {
+            shape: StructShape::Unit,
+        },
+        FrameworkProviderConstruction::NewConstructor => DirectConstruction::Constructor {
+            dependencies: Vec::new(),
+            is_async: false,
+            method: "new".to_string(),
+        },
+    }
+}
+
 fn resolve_framework_providers(
     index: &AttributeIndex,
     provider_drafts: &[Draft],
     construction_drafts: &[Draft],
     provided_keys: &mut HashMap<CanonicalPath, CanonicalPath>,
-    framework_provided: &[CanonicalPath],
+    framework_provided: &[FrameworkProvider],
 ) -> Result<Vec<Provider>, ContainerError> {
     let mut providers = Vec::new();
 
-    for path in framework_provided {
+    for FrameworkProvider { construction, path } in framework_provided {
         if !is_framework_path_referenced(index, provider_drafts, path)
             && !is_framework_path_referenced(index, construction_drafts, path)
         {
@@ -440,9 +455,7 @@ fn resolve_framework_providers(
 
         providers.push(Provider {
             concrete_path: path.clone(),
-            construction: DirectConstruction::Fieldless {
-                shape: StructShape::Unit,
-            },
+            construction: framework_construction(*construction),
             field_name: path.field_name(),
             provided: ProvidedType::Concrete(path.clone()),
         });
@@ -481,7 +494,7 @@ fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &Canonical
 pub(crate) fn build_plan(
     index: &AttributeIndex,
     registry: &ConsoleArgumentRegistry,
-    framework_provided: &[CanonicalPath],
+    framework_provided: &[FrameworkProvider],
     pool: &TagPool,
 ) -> Result<ContainerPlan, ContainerError> {
     let DraftedContainer {

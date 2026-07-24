@@ -1,4 +1,8 @@
 pub mod has_services;
+pub mod identity_framework_providers;
+pub mod jwks_client_endpoint;
+pub mod jwks_client_verifier_path;
+pub mod jwks_server_publication_path;
 pub mod render_services;
 pub mod service_codegen_error;
 
@@ -27,6 +31,8 @@ mod tests {
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 
     use crate::has_services::has_services;
+    use crate::identity_framework_providers::identity_framework_providers;
+    use crate::jwks_client_endpoint::JwksClientEndpoint;
     use crate::render_services::render_services;
 
     fn crate_with(lib_source: &str) -> TempDir {
@@ -119,6 +125,55 @@ mod tests {
         )
         .expect_err("the services source fails to generate")
         .to_string()
+    }
+
+    fn identity_bindings(index: &AttributeIndex) -> ContainerBindings {
+        let registry = scan(index).expect("the console arguments are scanned");
+
+        render_container(index, &registry, &identity_framework_providers())
+            .expect("the container is rendered")
+            .bindings
+    }
+
+    fn rendered_with_identity(lib_source: &str) -> String {
+        let index = index_for(lib_source);
+        let bindings = identity_bindings(&index);
+        let mut roots = serve_roots(&index);
+
+        if let Some(endpoint) =
+            JwksClientEndpoint::resolve(&index, &bindings).expect("the jwks endpoint resolves")
+        {
+            roots.push(endpoint.path);
+        }
+
+        let serve_arguments = bindings
+            .serve_arguments(&roots, &[])
+            .expect("the serve arguments unify");
+
+        render_services(
+            &index,
+            &[],
+            false,
+            &bindings,
+            &serve_arguments,
+            &BTreeMap::new(),
+            &[],
+        )
+        .expect("the services source is generated")
+        .format()
+        .expect("the module formats")
+        .source()
+        .split_whitespace()
+        .collect()
+    }
+
+    fn identity_error_for(lib_source: &str) -> String {
+        let index = index_for(lib_source);
+        let bindings = identity_bindings(&index);
+
+        render_services(&index, &[], false, &bindings, &[], &BTreeMap::new(), &[])
+            .expect_err("the services source fails to generate")
+            .to_string()
     }
 
     fn public() -> Vec<HttpServer> {
@@ -214,7 +269,6 @@ mod tests {
         assert!(source.contains(
             "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
-        assert!(!source.contains("margaret_service::bundle_services::bundle_services"));
         assert!(!source.contains("letmutbundle_services"));
         assert!(source.contains("letbundle_services:"));
         assert!(source.contains("letmutmanager"));
@@ -262,13 +316,11 @@ mod tests {
         assert!(source.contains(
             "margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
         ));
-        assert!(source.contains(
-            "margaret_spiffe_svid_server::SvidServerBundle::new(margaret_spiffe_svid::SvidServiceBundleParams{"
-        ));
+        assert!(source.contains("margaret_spiffe_svid_server::SvidServer::new("));
         assert!(source.contains(r#"matches.get_one::<String>("spiffe-trust-domain")"#));
         assert!(source.contains(r#"matches.get_one::<String>("spire-agent-addr")"#));
         assert!(source.contains(
-            "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
+            "letspiffe_server_config=::std::sync::Arc::new(spiffe_server.server_config());"
         ));
         assert!(source.contains(
             "transport:margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
@@ -280,9 +332,7 @@ mod tests {
             r#"Some("spiffe_mtls")=>{margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
         ));
         assert!(source.contains("_=>margaret_http::transport_config::TransportConfig::Plain,"));
-        assert!(source.contains(
-            "matchmargaret_service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
-        ));
+        assert!(source.contains("bundle_services.extend(spiffe_server.into_services());"));
         assert!(source.contains(
             "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
@@ -624,5 +674,54 @@ impl Second {
         );
 
         assert!(message.contains("failed to index"));
+    }
+
+    const JWKS_SERVER: &str = "use std::sync::Arc;\nuse margaret_jwks_roller_server::jwks_publication::JwksPublication;\n\n#[singleton]\nstruct WellKnownJwks {\n    jwks: Arc<JwksPublication>,\n}\n\nimpl WellKnownJwks {\n    #[constructor]\n    fn create(jwks: Arc<JwksPublication>) -> Self {}\n}\n";
+    const JWKS_CLIENT: &str = "use std::sync::Arc;\nuse margaret_endpoint::provides_endpoint::ProvidesEndpoint;\nuse margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;\n\n#[singleton]\n#[provides_endpoint(issuer)]\nstruct IssuerEndpoint;\n\nimpl IssuerEndpoint {\n    #[constructor]\n    fn create() -> Self {}\n}\n\nimpl ProvidesEndpoint for IssuerEndpoint {}\n\n#[singleton]\nstruct Guard {\n    verifier: Arc<PublicJwksVerifier>,\n}\n\nimpl Guard {\n    #[constructor]\n    fn create(verifier: Arc<PublicJwksVerifier>) -> Self {}\n}\n";
+    const JWKS_CLIENT_WITHOUT_ENDPOINT: &str = "use std::sync::Arc;\nuse margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;\n\n#[singleton]\nstruct Guard {\n    verifier: Arc<PublicJwksVerifier>,\n}\n\nimpl Guard {\n    #[constructor]\n    fn create(verifier: Arc<PublicJwksVerifier>) -> Self {}\n}\n";
+    const JWKS_CLIENT_WITH_TWO_ENDPOINTS: &str = "use std::sync::Arc;\nuse margaret_endpoint::provides_endpoint::ProvidesEndpoint;\nuse margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;\n\n#[singleton]\n#[provides_endpoint(issuer)]\nstruct IssuerEndpoint;\n\nimpl IssuerEndpoint {\n    #[constructor]\n    fn create() -> Self {}\n}\n\nimpl ProvidesEndpoint for IssuerEndpoint {}\n\n#[singleton]\n#[provides_endpoint(backup)]\nstruct BackupEndpoint;\n\nimpl BackupEndpoint {\n    #[constructor]\n    fn create() -> Self {}\n}\n\nimpl ProvidesEndpoint for BackupEndpoint {}\n\n#[singleton]\nstruct Guard {\n    verifier: Arc<PublicJwksVerifier>,\n}\n\nimpl Guard {\n    #[constructor]\n    fn create(verifier: Arc<PublicJwksVerifier>) -> Self {}\n}\n";
+
+    #[test]
+    fn registers_the_jwks_roller_when_the_publication_is_injected() {
+        let source = rendered_with_identity(JWKS_SERVER);
+
+        assert!(
+            source.contains(
+                "letjwks_publication=container.jwks_publication_jwks_publication().await;"
+            )
+        );
+        assert!(source.contains(
+            "manager.register_service(margaret_jwks_roller_server::jwks_roller_service::JwksRollerService::new(jwks_publication.jwks_document_holder(),jwks_publication.jwks_secret_holder(),::std::sync::Arc::new(margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage,),),);"
+        ));
+    }
+
+    #[test]
+    fn registers_the_jwks_poll_service_when_the_verifier_is_injected() {
+        let source = rendered_with_identity(JWKS_CLIENT);
+
+        assert!(source.contains(
+            "letpublic_jwks_verifier=container.public_jwks_verifier_public_jwks_verifier().await;"
+        ));
+        assert!(source.contains(
+            "manager.register_service(margaret_jwks_client::public_jwks_poll_service::PublicJwksPollService::new(public_jwks_verifier.public_jwks_holder(),container."
+        ));
+        assert!(
+            source
+                .contains("margaret_jwks_client::default_http_client::default_http_client(),),);")
+        );
+    }
+
+    #[test]
+    fn rejects_the_jwks_verifier_without_an_endpoint() {
+        let message = identity_error_for(JWKS_CLIENT_WITHOUT_ENDPOINT);
+
+        assert!(message.contains("no #[provides_endpoint] declares the jwks endpoint to poll"));
+    }
+
+    #[test]
+    fn rejects_the_jwks_verifier_with_more_than_one_endpoint() {
+        let message = identity_error_for(JWKS_CLIENT_WITH_TWO_ENDPOINTS);
+
+        assert!(message.contains("the jwks endpoint to poll is ambiguous"));
     }
 }

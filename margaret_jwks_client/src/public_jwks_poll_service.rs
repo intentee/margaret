@@ -20,12 +20,25 @@ use crate::jwks_poll_interval_before_ready::JWKS_POLL_INTERVAL_BEFORE_READY;
 use crate::public_jwks_holder::PublicJwksHolder;
 
 pub struct PublicJwksPollService {
-    pub endpoint_provider: Arc<dyn ProvidesEndpoint>,
-    pub http_client: Client,
-    pub public_jwks_holder: PublicJwksHolder,
+    endpoint_provider: Arc<dyn ProvidesEndpoint>,
+    http_client: Client,
+    public_jwks_holder: PublicJwksHolder,
 }
 
 impl PublicJwksPollService {
+    #[must_use]
+    pub fn new(
+        public_jwks_holder: PublicJwksHolder,
+        endpoint_provider: Arc<dyn ProvidesEndpoint>,
+        http_client: Client,
+    ) -> Self {
+        Self {
+            endpoint_provider,
+            http_client,
+            public_jwks_holder,
+        }
+    }
+
     pub async fn fetch_public_jwks(&self) -> Result<PublicJwks, JwksClientError> {
         let jwks_url = self
             .endpoint_provider

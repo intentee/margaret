@@ -8,6 +8,8 @@ mod container_plan;
 mod dependency_kind;
 mod direct_construction;
 mod field_ident;
+pub mod framework_provider;
+pub mod framework_provider_construction;
 pub mod injectable_resolution;
 pub mod injected_dependency;
 mod ordered_providers;

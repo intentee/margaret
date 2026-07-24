@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use reqwest::Client;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use trzcina::Ticker as _;
 
+use margaret_jwks_client::default_http_client::default_http_client;
 use margaret_jwks_client::jwks_poll_interval_after_ready::JWKS_POLL_INTERVAL_AFTER_READY;
 use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_poll_service::PublicJwksPollService;
@@ -21,11 +21,11 @@ async fn public_jwks_poll_service_returns_promptly_when_cancelled_during_the_wai
 
     public_jwks_holder.set(Some(Arc::new(PublicJwks::from(known_good))));
 
-    let mut service = PublicJwksPollService {
-        endpoint_provider: unreachable_endpoint(),
-        http_client: Client::new(),
+    let mut service = PublicJwksPollService::new(
         public_jwks_holder,
-    };
+        unreachable_endpoint(),
+        default_http_client(),
+    );
 
     let cancellation_token = CancellationToken::new();
 

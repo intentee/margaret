@@ -9,14 +9,25 @@ use margaret_jwks_keygen::verifies_token::VerifiesToken as _;
 use crate::jwks_client_error::JwksClientError;
 use crate::public_jwks_holder::PublicJwksHolder;
 
+#[derive(Default)]
 pub struct PublicJwksVerifier {
     public_jwks_holder: PublicJwksHolder,
 }
 
 impl PublicJwksVerifier {
     #[must_use]
-    pub fn new(public_jwks_holder: PublicJwksHolder) -> Self {
-        Self { public_jwks_holder }
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn is_ready(&self) -> bool {
+        self.public_jwks_holder.is_ready()
+    }
+
+    #[must_use]
+    pub fn public_jwks_holder(&self) -> PublicJwksHolder {
+        self.public_jwks_holder.clone()
     }
 
     pub fn verify<TClaims: DeserializeOwned + IsExpired>(

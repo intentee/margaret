@@ -37,4 +37,14 @@ pub enum ServiceCodegenError {
 
     #[error("#[scheduled_with_tick_timer] '{ticker}' is missing the 'interval' argument")]
     TickerMissingInterval { ticker: String },
+
+    #[error(
+        "a margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier is injected, but no #[provides_endpoint] declares the jwks endpoint to poll"
+    )]
+    JwksClientRequiresEndpoint,
+
+    #[error(
+        "a margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier is injected, but more than one #[provides_endpoint] is declared, so the jwks endpoint to poll is ambiguous: {endpoints}"
+    )]
+    JwksClientAmbiguousEndpoint { endpoints: String },
 }

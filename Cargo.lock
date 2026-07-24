@@ -2431,6 +2431,7 @@ dependencies = [
 name = "margaret_spiffe_svid_integration_tests"
 version = "0.1.0"
 dependencies = [
+ "margaret_service",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_client",
  "margaret_spiffe_svid_server",

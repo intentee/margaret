@@ -5,6 +5,7 @@ edition = "2024"
 autotests = false
 
 [dev-dependencies]
+margaret_service = { path = "../margaret_service" }
 margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
 margaret_spiffe_svid_client = { path = "../margaret_spiffe_svid_client" }
 margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server" }

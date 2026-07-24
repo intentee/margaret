@@ -142,8 +142,18 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn injected_console_arguments(&self, dependency: &InjectedDependency) -> Vec<ConsoleArgument> {
+    pub fn injected_console_arguments(
+        &self,
+        dependency: &InjectedDependency,
+    ) -> Vec<ConsoleArgument> {
         self.accessor_console_arguments(&dependency.field).to_vec()
+    }
+
+    #[must_use]
+    pub fn provider_field(&self, provider_key: &CanonicalPath) -> Option<&str> {
+        self.providers
+            .get(provider_key)
+            .map(|binding| binding.field_name.as_str())
     }
 
     #[must_use]

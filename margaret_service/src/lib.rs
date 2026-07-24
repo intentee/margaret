@@ -1,4 +1,3 @@
-pub mod bundle_services;
 pub mod dispatch_serve;
 pub mod install;
 pub mod resolved_services;

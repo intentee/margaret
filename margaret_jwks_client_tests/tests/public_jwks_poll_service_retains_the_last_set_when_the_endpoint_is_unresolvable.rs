@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use reqwest::Client;
 use tokio_util::sync::CancellationToken;
 use trzcina::Ticker as _;
 
+use margaret_jwks_client::default_http_client::default_http_client;
 use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_poll_service::PublicJwksPollService;
 use margaret_jwks_client_tests::failing_endpoint::FailingEndpoint;
@@ -20,11 +20,11 @@ async fn public_jwks_poll_service_retains_the_last_set_when_the_endpoint_is_unre
 
     public_jwks_holder.set(Some(Arc::new(PublicJwks::from(known_good))));
 
-    let mut service = PublicJwksPollService {
-        endpoint_provider: Arc::new(FailingEndpoint),
-        http_client: Client::new(),
-        public_jwks_holder: public_jwks_holder.clone(),
-    };
+    let mut service = PublicJwksPollService::new(
+        public_jwks_holder.clone(),
+        Arc::new(FailingEndpoint),
+        default_http_client(),
+    );
 
     service
         .handle_tick(CancellationToken::new(), first_tick_context())

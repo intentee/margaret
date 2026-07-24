@@ -19,10 +19,58 @@ use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
+use crate::jwks_client_endpoint::JwksClientEndpoint;
+use crate::jwks_client_verifier_path::jwks_client_verifier_path;
+use crate::jwks_server_publication_path::jwks_server_publication_path;
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
 use crate::service_units::service_units;
+
+fn framework_service_registrations(
+    index: &AttributeIndex,
+    bindings: &ContainerBindings,
+) -> Result<Vec<TokenStream>, ServiceCodegenError> {
+    let mut registrations = Vec::new();
+
+    if bindings.provides(&jwks_server_publication_path()) {
+        let field = format_ident!("{}", jwks_server_publication_path().field_name());
+
+        registrations.push(quote! {
+            let jwks_publication = container.#field().await;
+
+            manager.register_service(
+                margaret_jwks_roller_server::jwks_roller_service::JwksRollerService::new(
+                    jwks_publication.jwks_document_holder(),
+                    jwks_publication.jwks_secret_holder(),
+                    ::std::sync::Arc::new(
+                        margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage,
+                    ),
+                ),
+            );
+        });
+    }
+
+    if let Some(endpoint) = JwksClientEndpoint::resolve(index, bindings)? {
+        let verifier_field = format_ident!("{}", jwks_client_verifier_path().field_name());
+        let endpoint_field = format_ident!("{}", endpoint.field_name);
+        let endpoint_woven = bindings.console_weaves_owned(&endpoint.console_arguments);
+
+        registrations.push(quote! {
+            let public_jwks_verifier = container.#verifier_field().await;
+
+            manager.register_service(
+                margaret_jwks_client::public_jwks_poll_service::PublicJwksPollService::new(
+                    public_jwks_verifier.public_jwks_holder(),
+                    container.#endpoint_field(#(#endpoint_woven),*).await,
+                    margaret_jwks_client::default_http_client::default_http_client(),
+                ),
+            );
+        });
+    }
+
+    Ok(registrations)
+}
 
 fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
     if !spiffe_secured {
@@ -80,13 +128,11 @@ fn server_manager_setup(
         quote! {
             margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
 
-            let spiffe_bundle = margaret_spiffe_svid_server::SvidServerBundle::new(
-                margaret_spiffe_svid::SvidServiceBundleParams {
-                    spiffe_trust_domain: #spiffe_trust_domain,
-                    spire_agent_addr: #spire_agent_addr,
-                },
+            let spiffe_server = margaret_spiffe_svid_server::SvidServer::new(
+                #spiffe_trust_domain,
+                #spire_agent_addr,
             );
-            let spiffe_server_config = ::std::sync::Arc::new(spiffe_bundle.server_config());
+            let spiffe_server_config = ::std::sync::Arc::new(spiffe_server.server_config());
         }
     });
 
@@ -144,10 +190,7 @@ fn server_manager_setup(
     };
     let bundle_services = spiffe_secured.then(|| {
         quote! {
-            match margaret_service::bundle_services::bundle_services(spiffe_bundle).await {
-                Ok(services) => bundle_services.extend(services),
-                Err(outcome) => return outcome,
-            }
+            bundle_services.extend(spiffe_server.into_services());
         }
     });
     let views_setup = has_views.then(|| {
@@ -323,12 +366,13 @@ pub fn render_services(
     views_console_arguments: &[ConsoleArgument],
 ) -> Result<GeneratedModuleTokens, ServiceCodegenError> {
     let units = service_units(index)?;
+    let framework_registrations = framework_service_registrations(index, bindings)?;
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(|unit| registration(unit, bindings));
     let manager_setup = server_manager_setup(
         servers,
         has_views,
-        !units.is_empty(),
+        !units.is_empty() || !framework_registrations.is_empty(),
         bindings,
         server_console_arguments,
         views_console_arguments,
@@ -350,6 +394,8 @@ pub fn render_services(
         ) -> margaret_console::command_outcome::CommandOutcome {
             #prelude
             #manager_setup
+
+            #(#framework_registrations)*
 
             #(#registrations)*
 
