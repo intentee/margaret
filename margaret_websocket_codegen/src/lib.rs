@@ -740,14 +740,9 @@ impl Bad {
     const AUTHENTICATED_HANDSHAKE: &str = r#"
 use margaret_http::request::Request;
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 struct User;
-
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
 
 struct SessionCookie;
 
@@ -757,7 +752,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> AuthenticatedUserOutcome<User> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -821,14 +816,9 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(
             r#"
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 struct User;
-
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
 
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
@@ -836,7 +826,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, routes: &crate::margaret::routes::Routes) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> AuthenticatedUserOutcome<User> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -868,7 +858,6 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(
             r#"
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
@@ -881,17 +870,13 @@ impl SystemClock {
 
 struct User;
 
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
-
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
 struct Session;
 
 impl Session {
     #[infer_from_request]
-    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -926,14 +911,9 @@ impl RespondsToWebSocketMessage for Chatter {
 
     const CONSOLE_ARGUMENT_PROVIDER: &str = r#"
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 struct User;
-
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
 
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
@@ -944,7 +924,7 @@ impl SessionUserProvider {
     fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
 
     #[infer_from_request]
-    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1018,13 +998,8 @@ impl Room {
             error(
                 r#"
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 
 struct User;
-
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
 
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
@@ -1032,7 +1007,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, views: &crate::margaret::views::Views) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self, views: &crate::margaret::views::Views) -> AuthenticatedUserOutcome<User> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1074,13 +1049,8 @@ impl Bad {
             error(
                 r#"
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 
 struct User;
-
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
 
 struct Credentials;
 
@@ -1090,7 +1060,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> AuthenticatedUserOutcome<User> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]

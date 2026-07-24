@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
+use margaret_http::response::Response;
+use margaret_http::response_continuation::ResponseContinuation;
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret_macros::constructor;
 use margaret_macros::infer_from_request;
 use margaret_macros::infers_authenticated_user;
 use margaret_macros::singleton;
 
-use crate::auth::session_user_error::SessionUserError;
 use crate::forms::session_cookie::SessionCookie;
 use crate::models::user::User;
 use crate::stores::user_store::UserStore;
@@ -30,16 +31,19 @@ impl SessionUserProvider {
     pub async fn infer_session_user(
         &self,
         #[form_request(from = Cookie)] cookie: SessionCookie,
-    ) -> Result<AuthenticatedUserOutcome<User>, SessionUserError> {
+    ) -> AuthenticatedUserOutcome<User> {
         let Some(session) = cookie.session else {
-            return Ok(AuthenticatedUserOutcome::Anonymous);
+            return AuthenticatedUserOutcome::Anonymous;
         };
-        let session = Uuid::parse_str(&session)
-            .map_err(|source| SessionUserError::MalformedSession { source })?;
+        let Ok(session) = Uuid::parse_str(&session) else {
+            return AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(
+                Response::text(400, "Malformed session cookie"),
+            ));
+        };
 
-        Ok(match self.users.find_user_by_session(session) {
+        match self.users.find_user_by_session(session) {
             Some(user) => AuthenticatedUserOutcome::Authenticated(user),
             None => AuthenticatedUserOutcome::Anonymous,
-        })
+        }
     }
 }

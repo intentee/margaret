@@ -548,13 +548,8 @@ impl RequestLog {
 pub mod margaret;
 
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 
 struct User;
-
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
 
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
@@ -562,7 +557,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
 }
 
 #[singleton]
@@ -597,7 +592,7 @@ impl GetProfile {
     #[test]
     fn omits_the_authenticated_users_module_without_a_served_request() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\nuse margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;\n\nstruct User;\n\nstruct SessionError;\n\nimpl RespondsToInferenceFailure for SessionError {}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n",
         )
         .expect("the build succeeds");
 

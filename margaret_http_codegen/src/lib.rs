@@ -160,13 +160,8 @@ impl GetUser {
 
     const AUTHENTICATED_RESPONDER: &str = r#"
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 
 struct User;
-
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
 
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
@@ -177,7 +172,7 @@ impl SessionUserProvider {
     fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
 
     #[infer_from_request]
-    fn infer(&self, routes: &crate::margaret::routes::Routes) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> AuthenticatedUserOutcome<User> {}
 }
 
 #[singleton]
@@ -226,7 +221,7 @@ impl GetProfile {
     #[test]
     fn hands_the_views_to_an_authenticated_user_provider_that_renders_them() {
         let source: String = source_for_with_views(
-            "use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\nuse margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;\n\nstruct User;\n\nstruct SessionError;\n\nimpl RespondsToInferenceFailure for SessionError {}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n",
+            "use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> AuthenticatedUserOutcome<User> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n",
         )
         .split_whitespace()
         .collect();
@@ -248,7 +243,7 @@ impl GetProfile {
     fn rejects_an_authenticated_user_in_a_middleware() {
         assert!(
             error_for(
-                "use margaret_http::next::Next;\nuse margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\nuse margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;\n\nstruct User;\n\nstruct SessionError;\n\nimpl RespondsToInferenceFailure for SessionError {}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> ResponseContinuation {}\n}\n"
+                "use margaret_http::next::Next;\nuse margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> ResponseContinuation {}\n}\n"
             )
             .contains("only available in an HTTP responder")
         );
@@ -257,13 +252,8 @@ impl GetProfile {
     const COLLIDING_PROVIDER: &str = r#"
 use margaret_http::request::Request;
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 
 struct User;
-
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
 
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
@@ -271,7 +261,7 @@ struct Session;
 
 impl Session {
     #[infer_from_request]
-    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
 }
 
 #[singleton]
@@ -368,15 +358,10 @@ impl GetAsset {
     const PROVIDER_THAT_ALSO_BINDS: &str = r#"
 use margaret_http::request::Request;
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 
 struct User;
 
 struct Article;
-
-struct SessionError;
-
-impl RespondsToInferenceFailure for SessionError {}
 
 #[singleton]
 #[infers_authenticated_user(user_model = User)]
@@ -385,7 +370,7 @@ struct Store;
 
 impl Store {
     #[infer_from_request]
-    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
 }
 
 impl HttpRouteParameterBinder for Store {

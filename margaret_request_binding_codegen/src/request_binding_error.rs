@@ -156,7 +156,7 @@ pub enum RequestBindingError {
     AmbiguousInferFromRequest { provider: String, methods: String },
 
     #[error(
-        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return Result<margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>, Error>"
+        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>"
     )]
     InferenceReturnTypeMismatch { provider: String, written: String },
 
@@ -168,16 +168,6 @@ pub enum RequestBindingError {
         model: String,
         written: String,
     },
-
-    #[error(
-        "the #[infer_from_request] method of '{provider}' fails with '{written}', which is not a type declared in this crate; declare an error type here so it can convert itself into a response"
-    )]
-    InferenceErrorUnresolvable { provider: String, written: String },
-
-    #[error(
-        "the #[infer_from_request] method of '{provider}' fails with '{error}', which does not implement margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure"
-    )]
-    InferenceErrorMissingConversion { provider: String, error: String },
 
     #[error(
         "user model '{model}' has more than one authenticated user provider: '{first}' and '{second}'"

@@ -105,9 +105,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
                 #request_binding: &margaret_http::request::Request,
             ) -> margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User> {
                 #(#extractions)*
-                margaret_identity::resolve_inference::resolve_inference(
-                    self.inner.#method_name(#(#call_arguments),*).await,
-                )
+                self.inner.#method_name(#(#call_arguments),*).await
             }
         }
     }

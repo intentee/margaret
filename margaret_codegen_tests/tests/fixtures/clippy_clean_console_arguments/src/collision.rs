@@ -1,8 +1,6 @@
 use margaret_http::request::Request;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 use margaret_macros::constructor;
 use margaret_macros::infer_from_request;
 use margaret_macros::infers_authenticated_user;
@@ -12,14 +10,6 @@ use margaret_macros::singleton;
 
 pub struct Reader {
     pub name: String,
-}
-
-pub struct ReaderUnavailable;
-
-impl RespondsToInferenceFailure for ReaderUnavailable {
-    fn into_response_continuation(self) -> ResponseContinuation {
-        ResponseContinuation::from(Response::forbidden())
-    }
 }
 
 #[singleton]
@@ -34,12 +24,10 @@ impl Session {
     }
 
     #[infer_from_request]
-    pub async fn infer_reader(
-        &self,
-    ) -> Result<AuthenticatedUserOutcome<Reader>, ReaderUnavailable> {
-        Ok(AuthenticatedUserOutcome::Authenticated(Reader {
+    pub async fn infer_reader(&self) -> AuthenticatedUserOutcome<Reader> {
+        AuthenticatedUserOutcome::Authenticated(Reader {
             name: "milo".to_string(),
-        }))
+        })
     }
 }
 
