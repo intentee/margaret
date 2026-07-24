@@ -37,6 +37,11 @@ fn field_type(provider: &Provider) -> TokenStream {
 
             quote! { std::sync::Arc<dyn #interface> }
         }
+        ProvidedType::UriSelected(trait_path) => {
+            let interface = path_tokens(trait_path);
+
+            quote! { std::sync::Arc<dyn #interface> }
+        }
     }
 }
 
@@ -82,7 +87,12 @@ fn construction(
         closures,
     );
 
-    quote! { std::sync::Arc::new(#value) }
+    match &provider.provided {
+        ProvidedType::UriSelected(_) => value,
+        ProvidedType::Concrete(_) | ProvidedType::Endpoint(_) => {
+            quote! { std::sync::Arc::new(#value) }
+        }
+    }
 }
 
 fn direct_value(
@@ -100,11 +110,7 @@ fn direct_value(
             method,
         } => {
             let constructor = format_ident!("{}", method);
-            let mut ledger = ConsoleWeaveLedger::new(&body_slot_uses(dependencies, closures));
-            let arguments: Vec<TokenStream> = dependencies
-                .iter()
-                .map(|dependency| dependency_expression(dependency, plan, closures, &mut ledger))
-                .collect();
+            let arguments = woven_dependency_expressions(dependencies, plan, closures);
 
             if *constructor_is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
@@ -113,7 +119,29 @@ fn direct_value(
             }
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
+        DirectConstruction::Resolved {
+            dependencies,
+            resolver,
+        } => {
+            let resolver = path_tokens(resolver);
+            let arguments = woven_dependency_expressions(dependencies, plan, closures);
+
+            quote! { #resolver(#(#arguments),*) }
+        }
     }
+}
+
+fn woven_dependency_expressions(
+    dependencies: &[DependencyKind],
+    plan: &ContainerPlan,
+    closures: &ConsoleClosures,
+) -> Vec<TokenStream> {
+    let mut ledger = ConsoleWeaveLedger::new(&body_slot_uses(dependencies, closures));
+
+    dependencies
+        .iter()
+        .map(|dependency| dependency_expression(dependency, plan, closures, &mut ledger))
+        .collect()
 }
 
 fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {

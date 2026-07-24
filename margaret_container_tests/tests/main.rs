@@ -12,6 +12,7 @@ mod generates_fieldless_singletons;
 mod generates_parameterized_accessor_for_console_arguments;
 mod generation_is_deterministic;
 mod injectability_is_gated_by_singleton;
+mod injects_a_uri_selected_framework_provider;
 mod moves_a_copy_console_argument_shared_by_dependencies;
 mod propagates_index_failure;
 mod propagates_malformed_singleton_arguments;

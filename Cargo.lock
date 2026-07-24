@@ -2279,7 +2279,6 @@ dependencies = [
 name = "margaret_jwks_secret_storage_selection"
 version = "0.1.0"
 dependencies = [
- "clap",
  "margaret_jwks_file_secret_storage",
  "margaret_jwks_roller",
  "thiserror",
