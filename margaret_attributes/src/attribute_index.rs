@@ -8,7 +8,6 @@ use crate::attribute_selector::AttributeSelector;
 use crate::canonical_path::CanonicalPath;
 use crate::identifier::Identifier;
 use crate::indexed_item::IndexedItem;
-use crate::item_kind::ItemKind;
 use crate::matched_attribute::MatchedAttribute;
 use crate::module_imports::ModuleImports;
 use crate::name_allocator::NameAllocator;
@@ -21,7 +20,6 @@ pub struct AttributeIndex {
     imports: HashMap<CanonicalPath, ModuleImports>,
     item_paths: HashSet<CanonicalPath>,
     items: Vec<IndexedItem>,
-    trait_paths: HashSet<CanonicalPath>,
 }
 
 fn allocate_identifiers(items: &[IndexedItem]) -> HashMap<CanonicalPath, Identifier> {
@@ -47,14 +45,9 @@ impl AttributeIndex {
         imports: HashMap<CanonicalPath, ModuleImports>,
     ) -> Self {
         let mut item_paths = HashSet::new();
-        let mut trait_paths = HashSet::new();
 
         for item in &items {
             item_paths.insert(item.canonical_path().clone());
-
-            if item.kind() == ItemKind::Trait {
-                trait_paths.insert(item.canonical_path().clone());
-            }
         }
 
         Self {
@@ -63,7 +56,6 @@ impl AttributeIndex {
             imports,
             item_paths,
             items,
-            trait_paths,
         }
     }
 
@@ -73,11 +65,6 @@ impl AttributeIndex {
             .iter()
             .flat_map(|item| item.attributes())
             .any(|attribute| selector.matches(attribute.path()))
-    }
-
-    #[must_use]
-    pub fn is_indexed_trait(&self, path: &CanonicalPath) -> bool {
-        self.trait_paths.contains(path)
     }
 
     #[must_use]

@@ -9,9 +9,7 @@ impl Config {
     fn helper(&self) {}
 }
 
-trait Greeter {}
-
-#[singleton(provides = Greeter)]
+#[singleton]
 struct EnglishGreeter;
 
 impl EnglishGreeter {
@@ -19,35 +17,12 @@ impl EnglishGreeter {
     fn new(config: Arc<Config>) -> Self {}
 }
 
-trait Plugin {}
-
-#[singleton(collection = Plugin)]
-struct LoggingPlugin;
-
-impl LoggingPlugin {
-    #[constructor]
-    fn new() -> Self {}
-}
-
-#[singleton(collection = Plugin)]
-struct MetricsPlugin;
-
-impl MetricsPlugin {
-    #[constructor]
-    fn new(_: Arc<Config>) -> Self {}
-}
-
-trait Hook {}
+struct Unprovided;
 
 #[singleton]
 struct App;
 
 impl App {
     #[constructor]
-    fn new(
-        greeter: Arc<dyn Greeter>,
-        plugins: Vec<Arc<dyn Plugin>>,
-        hooks: Vec<Arc<dyn Hook>>,
-    ) -> Self {
-    }
+    fn new(english_greeter: Arc<EnglishGreeter>, _: Arc<Config>) -> Self {}
 }

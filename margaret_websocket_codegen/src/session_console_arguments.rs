@@ -41,9 +41,7 @@ pub(crate) fn session_console_arguments(
     for parameter in &plan.session.parameters {
         match &parameter.binding {
             RequestBinding::Injectable { dependency } => {
-                for accessor_arguments in bindings.injected_console_arguments(dependency) {
-                    collected.extend(accessor_arguments);
-                }
+                collected.extend(bindings.injected_console_arguments(dependency));
             }
             RequestBinding::Bound {
                 binder_provider, ..

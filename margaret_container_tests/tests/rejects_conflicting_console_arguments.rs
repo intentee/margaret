@@ -43,17 +43,3 @@ fn rejects_a_collision_reached_through_a_dependency() {
             .contains("declared both as a positional and as a named argument")
     );
 }
-
-#[test]
-fn rejects_a_collision_reached_through_a_collection_member() {
-    let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/console_argument_collection_collision");
-    let error = generate_container_source("crate", &directory)
-        .expect_err("a collision inside a collection member is rejected");
-
-    assert!(
-        error
-            .to_string()
-            .contains("declared both as a positional and as a named argument")
-    );
-}

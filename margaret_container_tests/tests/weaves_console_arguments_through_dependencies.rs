@@ -12,17 +12,17 @@ fn weaves_console_arguments_through_dependencies() {
         .split_whitespace()
         .collect();
 
-    assert!(source.contains("pubasyncfnconfig(&self,console_argument_0:std::string::String,)"));
-    assert!(source.contains("crate::Config::create(console_argument_0)"));
+    assert!(source.contains("pubasyncfnconfig(&self,console_argument_1:std::string::String,)"));
+    assert!(source.contains("crate::Config::create(console_argument_1)"));
     assert!(
-        source.contains("pubasyncfnalpha_plugin(&self,console_argument_1:std::string::String,)")
+        source.contains("pubasyncfnalpha_plugin(&self,console_argument_0:std::string::String,)")
     );
     assert!(
         source.contains(
-            "pubasyncfnservice(&self,console_argument_0:std::string::String,console_argument_1:std::string::String,)"
+            "pubasyncfnservice(&self,console_argument_1:std::string::String,console_argument_0:std::string::String,)"
         )
     );
     assert!(source.contains(
-        "crate::Service::create(self.config(console_argument_0).await,vec![self.alpha_plugin(console_argument_1).await],)"
+        "crate::Service::create(self.config(console_argument_1).await,self.alpha_plugin(console_argument_0).await,)"
     ));
 }

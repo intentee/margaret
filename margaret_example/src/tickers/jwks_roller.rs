@@ -8,7 +8,9 @@ use margaret_jwks_roller_server::public_jwks_handler::PublicJwksHandler;
 use margaret_macros::constructor;
 use margaret_macros::process;
 use margaret_macros::scheduled_with_tick_timer;
+use margaret_macros::singleton;
 
+#[singleton]
 #[scheduled_with_tick_timer(
     interval = margaret_jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL,
     behavior = tokio::time::MissedTickBehavior::Delay
