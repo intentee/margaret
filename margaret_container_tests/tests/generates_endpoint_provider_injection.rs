@@ -36,3 +36,8 @@ fn injects_the_endpoint_provider_into_a_consumer_by_tag() {
             .contains("endpoints::JwksClient::new(self.jwks_endpoint(console_argument_0).await,)")
     );
 }
+
+#[test]
+fn constructs_the_endpoint_provider_wrapped_in_an_arc() {
+    assert!(endpoints_container().contains("=std::sync::Arc::new(endpoints::JwksEndpoint::new"));
+}
