@@ -1,3 +1,4 @@
+pub mod column_index;
 pub mod has_models;
 pub mod inferred_column;
 pub mod model;
@@ -6,6 +7,7 @@ pub mod models;
 pub mod resolved_column;
 pub mod resolved_foreign_key;
 pub mod resolved_index;
+pub mod resolved_unique_constraint;
 
 mod collected_model;
 mod column_arguments;
@@ -13,9 +15,11 @@ mod deferred_foreign_key;
 mod foreign_key_arguments;
 mod foreign_key_target;
 mod foreign_key_target_column;
+mod index_arguments;
 mod infer_column_type;
 mod model_arguments;
 mod option_inner;
+mod positioned_field;
 mod single_generic_argument;
 
 #[cfg(test)]
@@ -457,6 +461,133 @@ struct S {
         );
 
         assert!(error_message(&source).contains("derives an index name"));
+    }
+
+    #[test]
+    fn rejects_an_index_name_that_is_not_snake_case() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index(name = \"Bad\")]\n    value: String,\n}\n",
+            )
+            .contains("invalid index name")
+        );
+    }
+
+    #[test]
+    fn rejects_an_empty_index_name() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index(name = \"\")]\n    value: String,\n}\n",
+            )
+            .contains("invalid index name")
+        );
+    }
+
+    #[test]
+    fn rejects_an_explicit_index_name_that_is_too_long() {
+        let name = "a".repeat(64);
+        let source = format!(
+            "#[model(table = \"t\")]\nstruct S {{\n    #[column]\n    #[index(name = \"{name}\")]\n    value: String,\n}}\n"
+        );
+
+        assert!(error_message(&source).contains("declares an index name"));
+    }
+
+    #[test]
+    fn rejects_a_single_column_named_index_on_a_unique_column() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[index(name = \"solo\")]\n    email: String,\n}\n",
+            )
+            .contains("is redundant")
+        );
+    }
+
+    #[test]
+    fn rejects_a_duplicate_index_name_across_tables() {
+        let source = "\
+#[model(table = \"a\")]
+struct A {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+    #[column]
+    #[index(name = \"shared\")]
+    x: String,
+}
+
+#[model(table = \"b\")]
+struct B {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+    #[column]
+    #[index(name = \"shared\")]
+    y: String,
+}
+";
+
+        assert!(error_message(source).contains("duplicate index name"));
+    }
+
+    #[test]
+    fn rejects_an_explicit_index_name_that_collides_with_a_derived_name() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    c: String,\n    #[column]\n    #[index(name = \"t_c_index\")]\n    d: String,\n}\n",
+            )
+            .contains("duplicate index name")
+        );
+    }
+
+    #[test]
+    fn rejects_an_index_name_that_collides_with_a_table_name() {
+        assert!(
+            error_message(&with_author(
+                "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"authors\")]\n    title: String,\n}\n",
+            ))
+            .contains("collides with the table name")
+        );
+    }
+
+    #[test]
+    fn rejects_a_derived_index_name_that_collides_with_a_table_name() {
+        let source = "\
+#[model(table = \"articles_title_index\")]
+struct Reserved {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+}
+
+#[model(table = \"articles\")]
+struct Article {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+    #[column]
+    #[index]
+    title: String,
+}
+";
+
+        assert!(error_message(source).contains("collides with the table name"));
+    }
+
+    #[test]
+    fn rejects_malformed_index_arguments() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index(= 5)]\n    value: String,\n}\n",
+            )
+            .contains("failed to read the model attributes")
+        );
+    }
+
+    #[test]
+    fn rejects_a_non_string_index_name() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index(name = 5)]\n    value: String,\n}\n",
+            )
+            .contains("failed to read the model attributes")
+        );
     }
 
     fn table_order(lib_source: &str) -> Vec<String> {

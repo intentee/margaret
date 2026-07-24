@@ -145,6 +145,11 @@ pub enum ModelCodegenError {
     )]
     IndexRequiresColumn { field: String, model: String },
 
+    #[error(
+        "model '{model}' has an invalid index name '{index}'; it must be a snake_case identifier"
+    )]
+    InvalidIndexName { index: String, model: String },
+
     #[error("model '{model}' derives an index name that is too long: {source}")]
     IndexNameTooLong {
         model: String,
@@ -152,13 +157,37 @@ pub enum ModelCodegenError {
         source: SchemaIdentifierNamingError,
     },
 
-    #[error(
-        "field '{field}' of model '{model}' is both #[column(unique)] and #[index]; a unique constraint is already indexed"
-    )]
-    RedundantIndexOnUniqueColumn { field: String, model: String },
+    #[error("model '{model}' declares an index name '{index}' that is too long: {source}")]
+    ExplicitIndexNameTooLong {
+        index: String,
+        model: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
+    },
+
+    #[error("duplicate index name '{name}' declared by tables '{first}' and '{second}'")]
+    DuplicateIndexName {
+        first: String,
+        name: String,
+        second: String,
+    },
 
     #[error(
-        "field '{field}' of model '{model}' is both #[column(primary_key)] and #[index]; a primary key is already indexed"
+        "index name '{name}' on table '{index_table}' collides with the table name declared by model '{table_model}'"
     )]
-    RedundantIndexOnPrimaryKeyColumn { field: String, model: String },
+    IndexNameCollidesWithTableName {
+        index_table: String,
+        name: String,
+        table_model: String,
+    },
+
+    #[error(
+        "the single-column index on column '{column}' of model '{model}' is redundant; a unique constraint is already indexed"
+    )]
+    RedundantIndexOnUniqueColumn { column: String, model: String },
+
+    #[error(
+        "the single-column index on column '{column}' of model '{model}' is redundant; a primary key is already indexed"
+    )]
+    RedundantIndexOnPrimaryKeyColumn { column: String, model: String },
 }
