@@ -21,7 +21,6 @@ use crate::websocket_plan::websocket_plan;
 pub fn render_websocket(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
-    has_views: bool,
     middleware_plans: &[MiddlewarePlan],
     registries: &BindingRegistries,
 ) -> Result<WebSocketArtifacts, WebSocketCodegenError> {
@@ -46,7 +45,7 @@ pub fn render_websocket(
     });
     let server_routes = sessions_by_server
         .iter()
-        .map(|(server, sessions)| render_server_routes(server, sessions, has_views, bindings));
+        .map(|(server, sessions)| render_server_routes(server, sessions, bindings));
     let message_implementations = render_messages(&plan.messages);
 
     let mut modules = vec![GeneratedModuleTokens::new(

@@ -35,6 +35,7 @@ mod tests {
     use margaret_container::render_container::render_container;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+    use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 
     use crate::has_responders::has_responders;
     use crate::http_codegen_error::HttpCodegenError;
@@ -53,8 +54,17 @@ mod tests {
         BTreeMap::new()
     }
 
-    fn registries_for(index: &AttributeIndex) -> BindingRegistries {
-        BindingRegistries::collect(index).expect("the binding registries are collected")
+    fn views_availability(has_views: bool) -> ViewsAvailability {
+        if has_views {
+            ViewsAvailability::Available
+        } else {
+            ViewsAvailability::Unavailable
+        }
+    }
+
+    fn registries_for(index: &AttributeIndex, has_views: bool) -> BindingRegistries {
+        BindingRegistries::collect(index, views_availability(has_views))
+            .expect("the binding registries are collected")
     }
 
     fn http_source(
@@ -65,7 +75,7 @@ mod tests {
         let index = AttributeIndexBuilder::new()
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
-        let registries = BindingRegistries::collect(&index)?;
+        let registries = BindingRegistries::collect(&index, views_availability(has_views))?;
         let plans = middleware_plans(&index, &registries)?;
         let bindings = bindings_for(&index);
 
@@ -375,7 +385,7 @@ impl GetHealth {
     fn rejects_views_injection_without_declared_views() {
         let message = error_for(VIEWS_INJECTION);
 
-        assert!(message.contains("injects &Views, but the crate defines no #[renders_view]"));
+        assert!(message.contains("requests the views, but this crate generates none"));
     }
 
     const HEALTH_RESPONDER: &str = r#"
@@ -398,7 +408,7 @@ impl Health {
         has_views: bool,
     ) -> String {
         let index = index_for(lib_source);
-        let registries = registries_for(&index);
+        let registries = registries_for(&index, false);
         let plans =
             middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
@@ -447,14 +457,12 @@ impl Health {
     }
 
     #[test]
-    fn weaves_views_into_the_websocket_routes_of_a_server_with_views() {
+    fn keeps_the_views_out_of_the_websocket_routes_of_a_server_with_views() {
         let source =
             websocket_http_source_with_views(HEALTH_RESPONDER, &["public".to_string()], true);
 
-        assert!(
-            source.contains("super::super::websocket::public_routes(container,routes,views).await")
-        );
-        assert!(source.contains("views:&::std::sync::Arc<super::super::views::Views>"));
+        assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
+        assert!(source.contains("_views:&::std::sync::Arc<super::super::views::Views>"));
     }
 
     fn routes_source_for(lib_source: &str) -> String {
@@ -463,7 +471,7 @@ impl Health {
             .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
             .expect("the crate is indexed")
             .build();
-        let registries = registries_for(&index);
+        let registries = registries_for(&index, false);
         let plans =
             middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
@@ -1446,7 +1454,7 @@ impl Tracer {
 "#,
         );
 
-        assert!(message.contains("injects &Views, but the crate defines no #[renders_view]"));
+        assert!(message.contains("requests the views, but this crate generates none"));
     }
 
     #[test]
@@ -1474,7 +1482,7 @@ impl Guard {
 }
 "#,
         );
-        let registries = registries_for(&index);
+        let registries = registries_for(&index, false);
         let plans =
             middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);

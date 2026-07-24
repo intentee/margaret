@@ -6,26 +6,23 @@ use std::sync::Arc;
 use margaret_macros::build_for_session;
 use margaret_macros::middleware;
 use margaret_macros::websocket_session;
-use margaret_views::renders_view::RendersView;
 use tokio::sync::Mutex;
 
 use crate::forms::get_articles_form::GetArticlesForm;
 use crate::greeter::Greeter;
 use crate::margaret::routes::Routes;
-use crate::margaret::views::Views;
 use crate::models::article::Article;
 use crate::models::user::User;
-use crate::views::greeting_view::GreetingViewProps;
 
 #[middleware(logged)]
 #[websocket_session(path = "/storyboard/{topic}/{article}", server = "public")]
 pub struct StoryboardSession {
     article_title: String,
+    board_url: String,
     greeter: Arc<dyn Greeter>,
     topic: String,
     turns: Mutex<Vec<String>>,
     viewer: Option<User>,
-    welcome: String,
 }
 
 impl StoryboardSession {
@@ -38,15 +35,8 @@ impl StoryboardSession {
         #[form_request(from = Query)] filters: GetArticlesForm,
         #[authenticated_user] viewer: Option<User>,
         routes: &Routes,
-        views: &Views,
     ) -> Self {
-        let welcome = views
-            .greeting_view
-            .render(GreetingViewProps {
-                greeting: greeter.greet(),
-                routes,
-            })
-            .into_string();
+        let board_url = routes.public.get_feed.url();
         let article_title = match filters.author {
             Some(author) => format!("{} by {author}", article.title),
             None => article.title,
@@ -54,17 +44,22 @@ impl StoryboardSession {
 
         Self {
             article_title,
+            board_url,
             greeter,
             topic,
             turns: Mutex::new(Vec::new()),
             viewer,
-            welcome,
         }
     }
 
     #[must_use]
     pub fn article_title(&self) -> &str {
         &self.article_title
+    }
+
+    #[must_use]
+    pub fn board_url(&self) -> &str {
+        &self.board_url
     }
 
     #[must_use]
@@ -88,10 +83,5 @@ impl StoryboardSession {
     #[must_use]
     pub fn viewer_name(&self) -> Option<&str> {
         self.viewer.as_ref().map(|viewer| viewer.name.as_str())
-    }
-
-    #[must_use]
-    pub fn welcome(&self) -> &str {
-        &self.welcome
     }
 }

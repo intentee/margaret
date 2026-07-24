@@ -894,6 +894,46 @@ impl GetCard {
         assert!(concatenated(&code).contains("super::views::build::build(container)"));
     }
 
+    const WEBSOCKET_ONLY_VIEW_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[singleton]
+#[renders_view(name = \"banner\")]
+struct Banner;
+
+#[websocket_session(path = \"/room\", server = \"public\")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[websocket_message(request, method = \"chat\", response = single)]
+struct Chat;
+
+#[singleton]
+struct Chatter;
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Room;
+    type Message = Chat;
+}
+";
+
+    #[test]
+    fn omits_the_views_module_for_a_crate_that_serves_no_responders() {
+        let code = generate(WEBSOCKET_ONLY_VIEW_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod websocket;"));
+        assert!(!module(&code, "mod").contains("pub mod views;"));
+        assert!(!has_module(&code, "views"));
+        assert!(!concatenated(&code).contains("views::build::build"));
+    }
+
     #[test]
     fn propagates_a_views_failure() {
         let message = generate(

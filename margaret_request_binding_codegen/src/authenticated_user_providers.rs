@@ -21,9 +21,9 @@ use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
-use crate::bound_parameter::BoundParameter;
 use crate::classify_parameters::classify_parameters;
-use crate::request_binding::RequestBinding;
+use crate::injects_routes::injects_routes;
+use crate::injects_views::injects_views;
 use crate::request_binding_error::RequestBindingError;
 
 struct InferenceReturn<'signature> {
@@ -194,18 +194,6 @@ fn verify_error(
             error: error_path.to_string(),
         })
     }
-}
-
-fn injects_routes(parameters: &[BoundParameter]) -> bool {
-    parameters
-        .iter()
-        .any(|parameter| matches!(parameter.binding, RequestBinding::Routes))
-}
-
-fn injects_views(parameters: &[BoundParameter]) -> bool {
-    parameters
-        .iter()
-        .any(|parameter| matches!(parameter.binding, RequestBinding::Views))
 }
 
 pub fn authenticated_user_providers(

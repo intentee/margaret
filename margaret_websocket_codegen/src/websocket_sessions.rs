@@ -66,6 +66,13 @@ pub(crate) fn websocket_sessions(
         )?;
         let layers = resolve_layers(item, middleware_plans, &subject)?;
 
+        if let Some(application) = layers.iter().find(|application| application.injects_views) {
+            return Err(WebSocketCodegenError::SessionMiddlewareRendersViews {
+                session,
+                middleware: application.concrete.to_string(),
+            });
+        }
+
         sessions.push(WebSocketSession {
             layers,
             method_name: format_ident!("{}", method.identifier()),

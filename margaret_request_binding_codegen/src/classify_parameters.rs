@@ -25,12 +25,14 @@ use crate::binding_registries::BindingRegistries;
 use crate::bound_parameter::BoundParameter;
 use crate::form_request_arguments::FormRequestArguments;
 use crate::form_request_extraction::FormRequestExtraction;
+use crate::injects_views::injects_views;
 use crate::request_binding::RequestBinding;
 use crate::request_binding_error::RequestBindingError;
 use crate::request_injectable::RequestInjectable;
 use crate::request_input_source::RequestInputSource;
 use crate::route_parameter_arguments::RouteParameterArguments;
 use crate::route_parameter_binder::RouteParameterBinder;
+use crate::views_availability::ViewsAvailability;
 
 fn forwarder_path(server: &str) -> CanonicalPath {
     CanonicalPath::new(vec![
@@ -116,15 +118,23 @@ fn classify_authenticated_user(
         }
     })?;
 
-    if let BindingContext::Handshake { .. } = context
-        && let Some(source) = body_backed_source(provider)
-    {
-        return Err(RequestBindingError::AuthenticatedUserBodyUnavailable {
-            subject: subject.to_string(),
-            parameter: position.to_string(),
-            provider: provider.application.concrete.to_string(),
-            input_source: source,
-        });
+    if let BindingContext::Handshake { .. } = context {
+        if let Some(source) = body_backed_source(provider) {
+            return Err(RequestBindingError::AuthenticatedUserBodyUnavailable {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+                provider: provider.application.concrete.to_string(),
+                input_source: source,
+            });
+        }
+
+        if injects_views(&provider.parameters) {
+            return Err(RequestBindingError::AuthenticatedUserViewsUnavailable {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+                provider: provider.application.concrete.to_string(),
+            });
+        }
     }
 
     Ok(RequestBinding::AuthenticatedUser {
@@ -135,6 +145,29 @@ fn classify_authenticated_user(
             AuthenticatedUserRequirement::Optional
         },
     })
+}
+
+fn classify_views(
+    context: &BindingContext,
+    position: usize,
+    views: ViewsAvailability,
+) -> Result<RequestBinding, RequestBindingError> {
+    let subject = context.subject();
+
+    if let BindingContext::Handshake { .. } = context {
+        return Err(RequestBindingError::ViewsUnavailableInHandshake {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    match views {
+        ViewsAvailability::Available => Ok(RequestBinding::Views),
+        ViewsAvailability::Unavailable => Err(RequestBindingError::ViewsUnavailable {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        }),
+    }
 }
 
 fn classify_context_specific(
@@ -410,7 +443,7 @@ pub fn classify_parameters(
         } else if is_routes {
             RequestBinding::Routes
         } else if is_views {
-            RequestBinding::Views
+            classify_views(context, position, registries.views)?
         } else if is_asset_bag {
             RequestBinding::AssetBag
         } else if is_current_request {

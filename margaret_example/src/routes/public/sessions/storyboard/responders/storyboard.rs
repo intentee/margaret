@@ -47,7 +47,7 @@ impl RespondsToWebSocketMessage for Storyboard {
             .send(message.chunk(ResponseChunk {
                 text: format!(
                     "{} {} storyboard '{}' about '{}' turn {turn_count}: {prompt}",
-                    session.welcome(),
+                    session.board_url(),
                     session.greeting(),
                     session.topic(),
                     session.article_title(),

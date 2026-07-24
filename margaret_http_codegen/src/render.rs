@@ -15,10 +15,13 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::fold_layers::fold_layers;
 use margaret_request_binding_codegen::authenticated_user_application::AuthenticatedUserApplication;
+use margaret_request_binding_codegen::binding_console_arguments::binding_console_arguments;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
 use margaret_request_binding_codegen::binding_shadows_request::binding_shadows_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::injects_routes::injects_routes;
+use margaret_request_binding_codegen::injects_views::injects_views;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
@@ -41,17 +44,11 @@ fn console_weave(path: &CanonicalPath, bindings: &ContainerBindings) -> Vec<Toke
 }
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
-    route
-        .arguments
-        .iter()
-        .any(|argument| matches!(argument.binding, RequestBinding::Routes))
+    injects_routes(&route.arguments)
 }
 
-pub(crate) fn responder_injects_views(route: &HttpRoute) -> bool {
-    route
-        .arguments
-        .iter()
-        .any(|argument| matches!(argument.binding, RequestBinding::Views))
+fn responder_injects_views(route: &HttpRoute) -> bool {
+    injects_views(&route.arguments)
 }
 
 fn providers_inject_routes(route: &HttpRoute) -> bool {
@@ -334,17 +331,7 @@ fn responder_and_binder_arguments(
         collected.extend_from_slice(bindings.console_arguments(&route.responder_path));
 
         for argument in &route.arguments {
-            match &argument.binding {
-                RequestBinding::AuthenticatedUser { application, .. } => {
-                    collected.extend_from_slice(bindings.console_arguments(&application.concrete));
-                }
-                RequestBinding::Bound {
-                    binder_provider, ..
-                } => {
-                    collected.extend_from_slice(bindings.console_arguments(binder_provider));
-                }
-                _ => {}
-            }
+            collected.extend(binding_console_arguments(&argument.binding, bindings));
         }
 
         for layer in &route.layers {
@@ -399,9 +386,7 @@ fn server_module(
         } else {
             format_ident!("_routes")
         };
-    let views_param = if (has_websocket_routes && has_views)
-        || server_routes.iter().copied().any(route_references_views)
-    {
+    let views_param = if server_routes.iter().copied().any(route_references_views) {
         format_ident!("views")
     } else {
         format_ident!("_views")
@@ -457,7 +442,6 @@ fn server_module(
     let named_handlers = vec_literal_tokens(named_handlers);
     let router = if has_websocket_routes {
         let websocket_routes = format_ident!("{}_routes", server.name());
-        let views_argument = has_views.then(|| quote! { , #views_param });
         let websocket_forward = bindings.console_forwards(websocket_arguments);
 
         quote! {
@@ -465,7 +449,7 @@ fn server_module(
                 let mut route_entries = #route_entries;
 
                 route_entries.extend(
-                    super::super::websocket::#websocket_routes(container, #(#websocket_forward)* #routes_param #views_argument).await,
+                    super::super::websocket::#websocket_routes(container, #(#websocket_forward)* #routes_param).await,
                 );
 
                 margaret_http::router::Router::build(route_entries)

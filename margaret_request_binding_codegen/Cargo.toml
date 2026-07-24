@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
+margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
 margaret_container = { path = "../margaret_container" }
 margaret_injection_codegen = { path = "../margaret_injection_codegen" }
 margaret_route_parameter_codegen = { path = "../margaret_route_parameter_codegen" }

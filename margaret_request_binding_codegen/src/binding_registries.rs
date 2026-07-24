@@ -8,17 +8,23 @@ use crate::authenticated_user_providers::authenticated_user_providers;
 use crate::request_binding_error::RequestBindingError;
 use crate::route_parameter_binder::RouteParameterBinder;
 use crate::route_parameter_binders::route_parameter_binders;
+use crate::views_availability::ViewsAvailability;
 
 pub struct BindingRegistries {
     pub authenticated_users: HashMap<CanonicalPath, AuthenticatedUserProvider>,
     pub route_parameters: HashMap<CanonicalPath, RouteParameterBinder>,
+    pub views: ViewsAvailability,
 }
 
 impl BindingRegistries {
-    pub fn collect(index: &AttributeIndex) -> Result<Self, RequestBindingError> {
+    pub fn collect(
+        index: &AttributeIndex,
+        views: ViewsAvailability,
+    ) -> Result<Self, RequestBindingError> {
         let mut registries = Self {
             authenticated_users: HashMap::new(),
             route_parameters: route_parameter_binders(index)?,
+            views,
         };
 
         registries.authenticated_users = authenticated_user_providers(index, &registries)?;

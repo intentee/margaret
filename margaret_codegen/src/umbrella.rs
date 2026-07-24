@@ -44,7 +44,7 @@ pub(crate) fn umbrella(
         source.push_str("#[rustfmt::skip]\npub mod schema;\n");
     }
 
-    if has_views && serves_http {
+    if has_views {
         source.push_str("#[rustfmt::skip]\npub mod views;\n");
     }
 

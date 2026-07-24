@@ -12,7 +12,6 @@ use crate::http_codegen_error::HttpCodegenError;
 use crate::http_routes::http_routes;
 use crate::http_server::HttpServer;
 use crate::render::render;
-use crate::render::responder_injects_views;
 use crate::render::server_console_arguments;
 use crate::render_forwarders::render_forwarders;
 use crate::render_routes::render_routes;
@@ -49,21 +48,6 @@ pub fn render_http(
     registries: &BindingRegistries,
 ) -> Result<HttpArtifacts, HttpCodegenError> {
     let table = http_routes(index, middleware_plans, registries)?;
-
-    if !has_views {
-        if let Some(route) = table.routes().find(|route| responder_injects_views(route)) {
-            return Err(HttpCodegenError::ViewInjectedWithoutViews {
-                responder: route.responder_path.to_string(),
-            });
-        }
-
-        if let Some(plan) = middleware_plans.iter().find(|plan| plan.injects_views()) {
-            return Err(HttpCodegenError::MiddlewareViewInjectedWithoutViews {
-                middleware: plan.concrete.to_string(),
-            });
-        }
-    }
-
     let servers = merge_websocket_servers(active_servers(&table), websocket_servers);
     let server_arguments =
         server_console_arguments(&table, &servers, bindings, websocket_server_arguments);

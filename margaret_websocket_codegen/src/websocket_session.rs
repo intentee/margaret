@@ -6,6 +6,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_middleware_codegen::layer_application::LayerApplication;
 use margaret_request_binding_codegen::authenticated_user_application::AuthenticatedUserApplication;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
+use margaret_request_binding_codegen::injects_routes::injects_routes;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 pub(crate) struct WebSocketSession {
@@ -32,23 +33,11 @@ impl WebSocketSession {
     }
 
     pub(crate) fn injects_routes(&self) -> bool {
-        self.parameters
-            .iter()
-            .any(|parameter| matches!(parameter.binding, RequestBinding::Routes))
+        injects_routes(&self.parameters)
             || self
                 .authenticated_user_providers()
                 .iter()
                 .any(|application| application.injects_routes)
-    }
-
-    pub(crate) fn injects_views(&self) -> bool {
-        self.parameters
-            .iter()
-            .any(|parameter| matches!(parameter.binding, RequestBinding::Views))
-            || self
-                .authenticated_user_providers()
-                .iter()
-                .any(|application| application.injects_views)
     }
 
     pub(crate) fn references_routes(&self) -> bool {

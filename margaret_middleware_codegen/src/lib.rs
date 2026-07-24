@@ -28,6 +28,7 @@ mod tests {
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+    use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 
     use crate::fold_layers::fold_layers;
     use crate::has_middleware::has_middleware;
@@ -70,7 +71,8 @@ mod tests {
     }
 
     fn registries_for(index: &AttributeIndex) -> BindingRegistries {
-        BindingRegistries::collect(index).expect("the binding registries are collected")
+        BindingRegistries::collect(index, ViewsAvailability::Available)
+            .expect("the binding registries are collected")
     }
 
     fn wrappers_for(lib_source: &str) -> String {

@@ -244,4 +244,23 @@ pub enum RequestBindingError {
         "parameter '{parameter}' of {subject} must be the current request, a form request, the peer SPIFFE id, the views, an asset bag, or the routes"
     )]
     UnmarkedProviderParameter { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} requests the authenticated user from '{provider}', which renders the views, but a WebSocket upgrade handshake has no views"
+    )]
+    AuthenticatedUserViewsUnavailable {
+        subject: String,
+        parameter: String,
+        provider: String,
+    },
+
+    #[error(
+        "parameter '{parameter}' of {subject} requests the views, but a WebSocket upgrade handshake has no views; render them from an HTTP responder instead"
+    )]
+    ViewsUnavailableInHandshake { subject: String, parameter: String },
+
+    #[error(
+        "parameter '{parameter}' of {subject} requests the views, but this crate generates none; the views are generated for a crate that declares #[renders_view] and serves at least one #[responds_to_http] responder"
+    )]
+    ViewsUnavailable { subject: String, parameter: String },
 }

@@ -2,6 +2,7 @@ pub mod authenticated_user_application;
 pub mod authenticated_user_provider;
 pub mod authenticated_user_providers;
 pub mod authenticated_user_requirement;
+pub mod binding_console_arguments;
 pub mod binding_context;
 pub mod binding_reads_request;
 pub mod binding_registries;
@@ -12,6 +13,8 @@ pub mod extraction_context;
 mod form_request_arguments;
 pub mod form_request_extraction;
 pub mod has_authenticated_users;
+pub mod injects_routes;
+pub mod injects_views;
 pub mod render_authenticated_user_wrappers;
 pub mod render_request_extraction;
 pub mod request_binding;
@@ -21,6 +24,7 @@ pub mod request_input_source;
 mod route_parameter_arguments;
 pub mod route_parameter_binder;
 pub mod route_parameter_binders;
+pub mod views_availability;
 
 #[cfg(test)]
 mod tests {
@@ -31,10 +35,13 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_console_argument_codegen::scan::scan;
+    use margaret_container::render_container::render_container;
     use margaret_injection_codegen::process_method::process_method;
     use margaret_route_parameter_codegen::route_path::RoutePath;
 
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
+    use crate::binding_console_arguments::binding_console_arguments;
     use crate::binding_context::BindingContext;
     use crate::binding_registries::BindingRegistries;
     use crate::bound_parameter::BoundParameter;
@@ -43,6 +50,7 @@ mod tests {
     use crate::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
     use crate::request_binding::RequestBinding;
     use crate::request_binding_error::RequestBindingError;
+    use crate::views_availability::ViewsAvailability;
 
     const PRELUDE: &str = "\
 use margaret_http::next::Next;
@@ -74,16 +82,23 @@ impl RespondsToInferenceFailure for SessionError {}
         format!("{PRELUDE}{declaration}")
     }
 
-    fn registries_for(declaration: &str) -> BindingRegistries {
-        BindingRegistries::collect(&index_for(&provider_source(declaration)))
+    fn registries_with(declaration: &str, views: ViewsAvailability) -> BindingRegistries {
+        BindingRegistries::collect(&index_for(&provider_source(declaration)), views)
             .expect("the binding registries are collected")
     }
 
+    fn registries_for(declaration: &str) -> BindingRegistries {
+        registries_with(declaration, ViewsAvailability::Available)
+    }
+
     fn rejection_for(declaration: &str) -> String {
-        BindingRegistries::collect(&index_for(&provider_source(declaration)))
-            .err()
-            .expect("the binding registries are rejected")
-            .to_string()
+        BindingRegistries::collect(
+            &index_for(&provider_source(declaration)),
+            ViewsAvailability::Available,
+        )
+        .err()
+        .expect("the binding registries are rejected")
+        .to_string()
     }
 
     const SESSION_PROVIDER: &str = "\
@@ -406,8 +421,8 @@ impl SessionUserProvider {
         let index = index_for(&provider_source(&format!(
             "{SESSION_PROVIDER}{declaration}"
         )));
-        let registries =
-            BindingRegistries::collect(&index).expect("the binding registries are collected");
+        let registries = BindingRegistries::collect(&index, ViewsAvailability::Available)
+            .expect("the binding registries are collected");
         let item = index
             .items()
             .iter()
@@ -525,6 +540,64 @@ impl SessionUserProvider {
             )
             .contains("more than once")
         );
+    }
+
+    #[test]
+    fn rejects_a_provider_that_renders_views_this_crate_does_not_generate() {
+        let rejection = BindingRegistries::collect(
+            &index_for(&provider_source(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}\n}\n",
+            )),
+            ViewsAvailability::Unavailable,
+        )
+        .err()
+        .expect("the binding registries are rejected")
+        .to_string();
+
+        assert!(rejection.contains("requests the views, but this crate generates none"));
+    }
+
+    const CONSOLE_ARGUMENT_PROVIDER: &str = "\
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[constructor]
+    fn create(#[console_argument(from = \"realm\")] realm: String) -> Self {}
+
+    #[infer_from_request]
+    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, SessionError> {}
+}
+";
+
+    #[test]
+    fn collects_the_console_arguments_a_binding_pulls_in() {
+        let index = index_for(&provider_source(CONSOLE_ARGUMENT_PROVIDER));
+        let registry = scan(&index).expect("the console arguments are scanned");
+        let bindings = render_container(&index, &registry, &[])
+            .expect("the container renders")
+            .bindings;
+        let registries = BindingRegistries::collect(&index, ViewsAvailability::Available)
+            .expect("the binding registries are collected");
+        let providers = registries.providers();
+        let application = providers
+            .first()
+            .map(|provider| provider.application.clone())
+            .expect("the provider is registered");
+        let names: Vec<String> = binding_console_arguments(
+            &RequestBinding::AuthenticatedUser {
+                application,
+                requirement: AuthenticatedUserRequirement::Required,
+            },
+            &bindings,
+        )
+        .iter()
+        .map(|argument| argument.name().to_string())
+        .collect();
+
+        assert_eq!(names, vec!["realm".to_string()]);
+        assert!(binding_console_arguments(&RequestBinding::CurrentRequest, &bindings).is_empty());
     }
 
     #[test]
