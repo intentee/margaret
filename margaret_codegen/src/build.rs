@@ -136,9 +136,7 @@ pub mod margaret;
 
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
-trait Clock {}
-
-#[singleton(provides = Clock)]
+#[singleton]
 struct SystemClock;
 
 impl SystemClock {
@@ -146,14 +144,12 @@ impl SystemClock {
     fn create() -> Self {}
 }
 
-impl Clock for SystemClock {}
-
 #[websocket_session(path = \"/room/{name}\", server = \"public\")]
 struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(clock: std::sync::Arc<dyn Clock>, #[route_parameter(from = \"name\")] name: String) -> Self {}
+    fn build(clock: std::sync::Arc<SystemClock>, #[route_parameter(from = \"name\")] name: String) -> Self {}
 }
 
 #[websocket_message(request, method = \"chat\", response = single)]
@@ -713,11 +709,9 @@ impl Config {
 
     #[test]
     fn propagates_a_console_failure() {
-        let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create() -> Self {}\n}\n\n#[console_command(name = \"bad\")]\nenum Bad {}\n",
-        )
-        .expect_err("the build fails")
-        .to_string();
+        let message = generate("#[rustfmt::skip]\npub mod margaret;\n\n#[console_command]\nstruct Bad;\n")
+            .expect_err("the build fails")
+            .to_string();
 
         assert!(message.contains("failed to generate the console"));
     }
@@ -1116,9 +1110,7 @@ pub mod margaret;
 use std::sync::Arc;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
-trait Clock {}
-
-#[singleton(provides = Clock)]
+#[singleton]
 struct SystemClock;
 
 impl SystemClock {
@@ -1126,14 +1118,12 @@ impl SystemClock {
     fn create(#[console_argument(from = \"timezone\")] timezone: String) -> Self {}
 }
 
-impl Clock for SystemClock {}
-
 #[websocket_session(path = \"/room\", server = \"public\")]
 struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(clock: Arc<dyn Clock>) -> Self {}
+    fn build(clock: Arc<SystemClock>) -> Self {}
 }
 
 #[websocket_message(request, method = \"chat\", response = single)]

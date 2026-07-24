@@ -149,16 +149,6 @@ impl Banner {
     }
 
     #[test]
-    fn rejects_a_view_that_provides_an_interface() {
-        assert!(
-            rejection(
-                "#[renders_view(name = \"bad\")]\n#[singleton(provides = SomeTrait)]\nstruct Bad;\n"
-            )
-            .contains("renders as its concrete type")
-        );
-    }
-
-    #[test]
     fn rejects_a_struct_declaring_more_than_one_view() {
         assert!(
             rejection(
@@ -207,24 +197,6 @@ impl Banner {
         assert!(
             rejection("#[renders_view(name = 5)]\n#[singleton]\nstruct Bad;\n")
                 .contains("failed to index the crate")
-        );
-    }
-
-    #[test]
-    fn propagates_malformed_singleton_arguments() {
-        assert!(
-            rejection("#[renders_view(name = \"bad\")]\n#[singleton(= 5)]\nstruct Bad;\n")
-                .contains("failed to index the crate")
-        );
-    }
-
-    #[test]
-    fn propagates_a_non_path_singleton_provides() {
-        assert!(
-            rejection(
-                "#[renders_view(name = \"bad\")]\n#[singleton(provides = \"s\")]\nstruct Bad;\n"
-            )
-            .contains("failed to index the crate")
         );
     }
 

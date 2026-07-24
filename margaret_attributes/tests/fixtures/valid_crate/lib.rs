@@ -1,7 +1,7 @@
 #[singleton]
 struct RootStruct;
 
-#[singleton(provides = LoggerInterface)]
+#[singleton]
 struct WithProvides;
 
 #[singleton]

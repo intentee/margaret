@@ -28,9 +28,7 @@ mod tests {
     const COMMANDS: &str = r#"
 use std::sync::Arc;
 
-pub trait Greeter: Send + Sync {}
-
-#[singleton(provides = Greeter)]
+#[singleton]
 struct EnglishGreeter;
 
 impl EnglishGreeter {
@@ -38,12 +36,10 @@ impl EnglishGreeter {
     fn create() -> Self {}
 }
 
-impl Greeter for EnglishGreeter {}
-
 #[singleton]
 #[console_command(name = "demo", description = "Demonstrates arguments")]
 struct Demo {
-    greeter: Arc<dyn Greeter>,
+    greeter: Arc<EnglishGreeter>,
     name: String,
     salutation: Option<String>,
     loud: bool,
@@ -52,7 +48,7 @@ struct Demo {
 impl Demo {
     #[constructor]
     fn create(
-        greeter: Arc<dyn Greeter>,
+        greeter: Arc<EnglishGreeter>,
         #[console_argument(positional)] name: String,
         #[console_argument(from = "salutation")] salutation: Option<String>,
         #[console_argument(from = "loud")] loud: bool,

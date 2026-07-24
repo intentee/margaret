@@ -1,4 +1,4 @@
-#[singleton(provides = Nonexistent)]
+#[singleton(unexpected = Thing)]
 struct Service;
 
 impl Service {

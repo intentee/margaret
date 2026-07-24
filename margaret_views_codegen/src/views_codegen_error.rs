@@ -14,11 +14,6 @@ pub enum ViewsCodegenError {
     ViewNotAStruct { view: String },
 
     #[error(
-        "#[renders_view] '{view}' must not use #[singleton(provides = ...)]; a view renders as its concrete type"
-    )]
-    ViewProvidesInterface { view: String },
-
-    #[error(
         "#[renders_view] '{view}' is declared more than once; a view struct maps to exactly one view"
     )]
     DuplicateViewDeclaration { view: String },

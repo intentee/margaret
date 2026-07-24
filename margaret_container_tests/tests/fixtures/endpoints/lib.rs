@@ -2,17 +2,13 @@ use std::sync::Arc;
 
 use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
 
-trait Resolver {}
-
-#[singleton(provides = Resolver)]
+#[singleton]
 struct DnsResolver;
 
 impl DnsResolver {
     #[constructor]
     fn new() -> Self {}
 }
-
-impl Resolver for DnsResolver {}
 
 #[provides_endpoint(jwks)]
 #[singleton]
@@ -21,7 +17,7 @@ struct JwksEndpoint;
 impl JwksEndpoint {
     #[constructor]
     fn new(
-        resolver: Arc<dyn Resolver>,
+        resolver: Arc<DnsResolver>,
         #[console_argument(from = "issuer")] issuer: String,
     ) -> Self {}
 }

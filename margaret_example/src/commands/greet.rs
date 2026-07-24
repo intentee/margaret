@@ -6,12 +6,12 @@ use margaret_macros::constructor;
 use margaret_macros::process;
 use margaret_macros::singleton;
 
-use crate::greeter::Greeter;
+use crate::english_greeter::EnglishGreeter;
 
 #[singleton]
 #[console_command(name = "greet", description = "Greets a person by name")]
 pub struct Greet {
-    greeter: Arc<dyn Greeter>,
+    greeter: Arc<EnglishGreeter>,
     name: String,
     salutation: Option<String>,
     loud: bool,
@@ -19,8 +19,9 @@ pub struct Greet {
 
 impl Greet {
     #[constructor]
+    #[must_use]
     pub fn create(
-        greeter: Arc<dyn Greeter>,
+        greeter: Arc<EnglishGreeter>,
         #[console_argument(positional)] name: String,
         #[console_argument(from = "salutation")] salutation: Option<String>,
         #[console_argument(from = "loud")] loud: bool,

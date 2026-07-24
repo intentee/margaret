@@ -31,11 +31,6 @@ fn collect(
             DependencyKind::Single { provider_key } => {
                 collected.extend(collect(provider_key, plan, closures)?);
             }
-            DependencyKind::Collection { trait_path } => {
-                for member_key in plan.collections.members_of(trait_path) {
-                    collected.extend(collect(member_key, plan, closures)?);
-                }
-            }
         }
     }
 

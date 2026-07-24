@@ -8,6 +8,7 @@ use syn::Path;
 
 use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
@@ -21,23 +22,20 @@ use margaret_tag_codegen::read_reference_tag::read_reference_tag;
 use margaret_tag_codegen::tag_kind::TagKind;
 use margaret_tag_codegen::tag_pool::TagPool;
 
-use crate::collection_table::CollectionTable;
 use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
-use crate::managed_arguments::ManagedArguments;
 use crate::path_text::path_text;
 use crate::peel_target::peel_target;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provides_endpoint_path::provides_endpoint_path;
-use crate::raw_target::RawTarget;
 use crate::resolve_construction::resolve_construction;
 use crate::type_text::type_text;
 
-fn construction_role_selectors() -> [AttributeSelector; 4] {
+fn concrete_role_selectors() -> [AttributeSelector; 4] {
     [
         service_selector(),
         scheduled_with_tick_timer_selector(),
@@ -66,20 +64,12 @@ fn build_drafts<'index>(
     let mut provided_keys: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
 
     for draft in &provider_drafts {
-        if let Some(first) =
-            provided_keys.insert(draft.provided.key().clone(), draft.concrete_path.clone())
-        {
-            return Err(ContainerError::DuplicateProvider {
-                provided: draft.provided.key().to_string(),
-                first: first.to_string(),
-                second: draft.concrete_path.to_string(),
-            });
-        }
+        provided_keys.insert(draft.provided.key().clone(), draft.concrete_path.clone());
     }
 
     let mut construction_items: BTreeMap<CanonicalPath, &IndexedItem> = BTreeMap::new();
 
-    for selector in construction_role_selectors() {
+    for selector in concrete_role_selectors() {
         for matched in index.select(&selector) {
             let item = matched.item();
 
@@ -104,6 +94,19 @@ fn build_drafts<'index>(
     })
 }
 
+fn reject_singleton_arguments(
+    arguments: &AttributeArgs,
+    concrete_path: &CanonicalPath,
+) -> Result<(), ContainerError> {
+    if arguments.is_empty() {
+        Ok(())
+    } else {
+        Err(ContainerError::SingletonHasArguments {
+            path: concrete_path.to_string(),
+        })
+    }
+}
+
 fn build_provider_draft<'index>(
     matched: &MatchedAttribute<'index>,
     index: &AttributeIndex,
@@ -119,23 +122,18 @@ fn build_provider_draft<'index>(
     };
 
     let concrete_path = item.canonical_path().clone();
-    let field_name = identifier.field().to_string();
-    let ManagedArguments {
-        collection,
-        provides,
-    } = ManagedArguments::parse(matched.args()?)?;
-    let provided = resolve_provided(index, item, provides.as_ref(), &concrete_path)?;
 
+    reject_singleton_arguments(matched.args()?, &concrete_path)?;
+
+    let field_name = identifier.field().to_string();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
-    let collection = resolve_collection(index, item, collection.as_ref(), &concrete_path)?;
 
     Ok(Draft {
-        collection,
-        concrete_path,
+        concrete_path: concrete_path.clone(),
         construction,
         field_name,
         item,
-        provided,
+        provided: ProvidedType::Concrete(concrete_path),
     })
 }
 
@@ -153,29 +151,32 @@ fn build_endpoint_draft<'index>(
         }
     };
 
-    if !has_marker(item, &singleton_selector()) {
-        return Err(ContainerError::EndpointProviderRequiresSingleton {
-            path: item.canonical_path().to_string(),
-        });
-    }
+    let concrete_path = item.canonical_path().clone();
 
-    if conflicts_with_role(item) {
+    let singletons = AttributeQuery::new(item).find_all(&singleton_selector());
+    let Some(singleton) = singletons.first() else {
+        return Err(ContainerError::EndpointProviderRequiresSingleton {
+            path: concrete_path.to_string(),
+        });
+    };
+
+    reject_singleton_arguments(singleton.args()?, &concrete_path)?;
+
+    if has_concrete_role(item) {
         return Err(ContainerError::ConflictingEndpointRole {
-            path: item.canonical_path().to_string(),
+            path: concrete_path.to_string(),
         });
     }
 
     if !implements_provides_endpoint(index, item) {
         return Err(ContainerError::EndpointProviderMissingTrait {
-            path: item.canonical_path().to_string(),
+            path: concrete_path.to_string(),
         });
     }
 
-    let concrete_path = item.canonical_path().clone();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
 
     Ok(Draft {
-        collection: None,
         concrete_path: concrete_path.clone(),
         construction,
         field_name: identifier.field().to_string(),
@@ -201,7 +202,6 @@ fn build_construction_draft<'index>(
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
 
     Ok(Draft {
-        collection: None,
         concrete_path: concrete_path.clone(),
         construction,
         field_name: identifier.field().to_string(),
@@ -210,8 +210,10 @@ fn build_construction_draft<'index>(
     })
 }
 
-fn conflicts_with_role(item: &IndexedItem) -> bool {
-    has_marker(item, &service_selector()) || has_marker(item, &scheduled_with_tick_timer_selector())
+fn has_concrete_role(item: &IndexedItem) -> bool {
+    concrete_role_selectors()
+        .iter()
+        .any(|selector| has_marker(item, selector))
 }
 
 fn has_marker(item: &IndexedItem, selector: &AttributeSelector) -> bool {
@@ -227,51 +229,6 @@ fn implements_provides_endpoint(index: &AttributeIndex, item: &IndexedItem) -> b
             .as_ref()
             == Some(&provides_endpoint_path())
     })
-}
-
-fn resolve_provided(
-    index: &AttributeIndex,
-    item: &IndexedItem,
-    provides: Option<&Path>,
-    concrete_path: &CanonicalPath,
-) -> Result<ProvidedType, ContainerError> {
-    match provides {
-        Some(written) => resolve_interface(index, item, written, concrete_path),
-        None => Ok(ProvidedType::Concrete(concrete_path.clone())),
-    }
-}
-
-fn resolve_interface(
-    index: &AttributeIndex,
-    item: &IndexedItem,
-    written: &Path,
-    concrete_path: &CanonicalPath,
-) -> Result<ProvidedType, ContainerError> {
-    match index.resolve_item_path(item, written) {
-        Some(path) if index.is_indexed_trait(&path) => Ok(ProvidedType::Interface(path)),
-        _ => Err(ContainerError::ProvidesUnresolvable {
-            singleton: concrete_path.to_string(),
-            written: path_text(written),
-        }),
-    }
-}
-
-fn resolve_collection(
-    index: &AttributeIndex,
-    item: &IndexedItem,
-    collection: Option<&Path>,
-    concrete_path: &CanonicalPath,
-) -> Result<Option<CanonicalPath>, ContainerError> {
-    match collection {
-        Some(written) => match index.resolve_item_path(item, written) {
-            Some(path) if index.is_indexed_trait(&path) => Ok(Some(path)),
-            _ => Err(ContainerError::CollectionUnresolvable {
-                singleton: concrete_path.to_string(),
-                written: path_text(written),
-            }),
-        },
-        None => Ok(None),
-    }
 }
 
 fn resolve_direct(
@@ -348,7 +305,7 @@ fn resolve_dependencies(
             continue;
         }
 
-        let Some(target) = peel_target(&pattern_type.ty) else {
+        let Some(written) = peel_target(&pattern_type.ty) else {
             return Err(ContainerError::UnsupportedParameterShape {
                 singleton: concrete_path.to_string(),
                 parameter,
@@ -359,7 +316,7 @@ fn resolve_dependencies(
         dependencies.push(resolve_target(
             index,
             item,
-            target,
+            &written,
             concrete_path,
             &parameter,
             provided_keys,
@@ -385,29 +342,17 @@ fn resolve_endpoint_provider(
 fn resolve_target(
     index: &AttributeIndex,
     item: &IndexedItem,
-    target: RawTarget,
+    written: &Path,
     concrete_path: &CanonicalPath,
     parameter: &str,
     provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
 ) -> Result<DependencyKind, ContainerError> {
-    match target {
-        RawTarget::Single(written) => {
-            let provider_key = index
-                .resolve_item_path(item, &written)
-                .filter(|path| provided_keys.contains_key(path))
-                .ok_or_else(|| missing_provider(concrete_path, parameter, &written))?;
+    let provider_key = index
+        .resolve_item_path(item, written)
+        .filter(|path| provided_keys.contains_key(path))
+        .ok_or_else(|| missing_provider(concrete_path, parameter, written))?;
 
-            Ok(DependencyKind::Single { provider_key })
-        }
-        RawTarget::Collection(written) => {
-            let trait_path = index
-                .resolve_item_path(item, &written)
-                .filter(|path| index.is_indexed_trait(path))
-                .ok_or_else(|| missing_provider(concrete_path, parameter, &written))?;
-
-            Ok(DependencyKind::Collection { trait_path })
-        }
-    }
+    Ok(DependencyKind::Single { provider_key })
 }
 
 fn missing_provider(
@@ -458,7 +403,6 @@ fn endpoint_provider_selector() -> AttributeSelector {
 }
 
 struct Draft<'index> {
-    collection: Option<CanonicalPath>,
     concrete_path: CanonicalPath,
     construction: ConstructionSource<'index>,
     field_name: String,
@@ -529,8 +473,7 @@ fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &Canonical
 
         matches!(
             peel_target(&pattern_type.ty),
-            Some(RawTarget::Single(written))
-                if index.resolve_item_path(draft.item, &written).as_ref() == Some(path)
+            Some(written) if index.resolve_item_path(draft.item, &written).as_ref() == Some(path)
         )
     })
 }
@@ -555,13 +498,11 @@ pub(crate) fn build_plan(
         framework_provided,
     )?;
 
-    let mut collections = CollectionTable::new();
     let mut providers = BTreeMap::new();
     let mut constructions = BTreeMap::new();
 
     for draft in provider_drafts {
         let Draft {
-            collection,
             concrete_path,
             construction,
             field_name,
@@ -570,10 +511,6 @@ pub(crate) fn build_plan(
         } = draft;
 
         let provider_key = provided.key().clone();
-
-        if let Some(trait_path) = collection {
-            collections.add(trait_path, provider_key.clone());
-        }
 
         let construction = resolve_direct(
             index,
@@ -603,7 +540,6 @@ pub(crate) fn build_plan(
             field_name,
             item,
             provided,
-            ..
         } = draft;
 
         let construction = resolve_direct(
@@ -632,7 +568,6 @@ pub(crate) fn build_plan(
     }
 
     Ok(ContainerPlan {
-        collections,
         constructions,
         providers,
     })

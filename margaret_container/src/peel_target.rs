@@ -6,33 +6,12 @@ use syn::Type;
 use syn::TypeParamBound;
 use syn::TypeTraitObject;
 
-use crate::raw_target::RawTarget;
-
-fn peel_arc_inner(inner: &Type) -> Option<RawTarget> {
+fn peel_arc_inner(inner: &Type) -> Option<Path> {
     match inner {
-        Type::Path(type_path) => Some(RawTarget::Single(type_path.path.clone())),
-        Type::TraitObject(trait_object) => {
-            Some(RawTarget::Single(single_trait_bound(trait_object)?))
-        }
+        Type::Path(type_path) => Some(type_path.path.clone()),
+        Type::TraitObject(trait_object) => single_trait_bound(trait_object),
         _ => None,
     }
-}
-
-fn peel_collection_inner(inner: &Type) -> Option<Path> {
-    let Type::Path(type_path) = inner else {
-        return None;
-    };
-    let segment = type_path
-        .path
-        .segments
-        .last()
-        .filter(|segment| segment.ident == "Arc" || segment.ident == "Rc")?;
-
-    let Type::TraitObject(trait_object) = single_generic_argument(segment)? else {
-        return None;
-    };
-
-    single_trait_bound(trait_object)
 }
 
 fn single_generic_argument(segment: &PathSegment) -> Option<&Type> {
@@ -70,7 +49,7 @@ fn is_marker_trait(path: &Path) -> bool {
     path.is_ident("Send") || path.is_ident("Sync")
 }
 
-pub(crate) fn peel_target(parameter_type: &Type) -> Option<RawTarget> {
+pub(crate) fn peel_target(parameter_type: &Type) -> Option<Path> {
     let Type::Path(type_path) = parameter_type else {
         return None;
     };
@@ -79,9 +58,6 @@ pub(crate) fn peel_target(parameter_type: &Type) -> Option<RawTarget> {
         Some(segment) if segment.ident == "Arc" || segment.ident == "Rc" => {
             peel_arc_inner(single_generic_argument(segment)?)
         }
-        Some(segment) if segment.ident == "Vec" => Some(RawTarget::Collection(
-            peel_collection_inner(single_generic_argument(segment)?)?,
-        )),
         _ => None,
     }
 }
@@ -91,14 +67,12 @@ mod tests {
     use syn::Type;
 
     use super::peel_target;
-    use crate::raw_target::RawTarget;
 
     fn label(parameter_type: &str) -> &'static str {
         let parsed: Type = syn::parse_str(parameter_type).expect("a type fixture parses");
 
         match peel_target(&parsed) {
-            Some(RawTarget::Single(_)) => "single",
-            Some(RawTarget::Collection(_)) => "collection",
+            Some(_) => "single",
             None => "none",
         }
     }
@@ -116,16 +90,6 @@ mod tests {
     #[test]
     fn peels_arc_of_trait_object() {
         assert_eq!(label("Arc<dyn Greeter>"), "single");
-    }
-
-    #[test]
-    fn peels_vec_of_arc_trait_object() {
-        assert_eq!(label("Vec<Arc<dyn Plugin>>"), "collection");
-    }
-
-    #[test]
-    fn peels_vec_of_rc_trait_object() {
-        assert_eq!(label("Vec<Rc<dyn Plugin>>"), "collection");
     }
 
     #[test]
@@ -181,30 +145,5 @@ mod tests {
     #[test]
     fn rejects_arc_with_lifetime_argument() {
         assert_eq!(label("Arc<'static>"), "none");
-    }
-
-    #[test]
-    fn rejects_vec_without_arguments() {
-        assert_eq!(label("Vec"), "none");
-    }
-
-    #[test]
-    fn rejects_vec_of_bare_type() {
-        assert_eq!(label("Vec<Config>"), "none");
-    }
-
-    #[test]
-    fn rejects_vec_of_reference() {
-        assert_eq!(label("Vec<&Plugin>"), "none");
-    }
-
-    #[test]
-    fn rejects_vec_of_arc_concrete() {
-        assert_eq!(label("Vec<Arc<Config>>"), "none");
-    }
-
-    #[test]
-    fn rejects_vec_of_arc_without_arguments() {
-        assert_eq!(label("Vec<Arc>"), "none");
     }
 }

@@ -25,54 +25,19 @@ use crate::session_plan::SessionPlan;
 use crate::websocket_session::WebSocketSession;
 
 fn injected_field_type(dependency: &InjectedDependency) -> TokenStream {
-    match dependency {
-        InjectedDependency::SingleConcrete { concrete, .. } => {
-            let concrete = path_tokens(concrete);
+    let concrete = path_tokens(&dependency.concrete);
 
-            quote! { ::std::sync::Arc<#concrete> }
-        }
-        InjectedDependency::SingleInterface { interface, .. } => {
-            let interface = path_tokens(interface);
-
-            quote! { ::std::sync::Arc<dyn #interface> }
-        }
-        InjectedDependency::Collection { trait_path, .. } => {
-            let trait_path = path_tokens(trait_path);
-
-            quote! { ::std::vec::Vec<::std::sync::Arc<dyn #trait_path>> }
-        }
-    }
+    quote! { ::std::sync::Arc<#concrete> }
 }
 
 fn injected_field_value(
     dependency: &InjectedDependency,
     bindings: &ContainerBindings,
 ) -> TokenStream {
-    let accessor_arguments = bindings.injected_console_arguments(dependency);
+    let accessor = format_ident!("{}", dependency.field);
+    let arguments = bindings.console_weaves(&bindings.injected_console_arguments(dependency));
 
-    match dependency {
-        InjectedDependency::SingleConcrete { field, .. }
-        | InjectedDependency::SingleInterface { field, .. } => {
-            let accessor = format_ident!("{}", field);
-            let arguments = bindings.console_weaves(&accessor_arguments[0]);
-
-            quote! { container.#accessor(#(#arguments),*).await }
-        }
-        InjectedDependency::Collection { member_fields, .. } => {
-            let members =
-                member_fields
-                    .iter()
-                    .zip(accessor_arguments)
-                    .map(|(member, arguments)| {
-                        let accessor = format_ident!("{}", member);
-                        let arguments = bindings.console_weaves(&arguments);
-
-                        quote! { container.#accessor(#(#arguments),*).await }
-                    });
-
-            quote! { ::std::vec::Vec::from([#(#members),*]) }
-        }
-    }
+    quote! { container.#accessor(#(#arguments),*).await }
 }
 
 fn binder_fields(session: &WebSocketSession) -> BTreeMap<String, &CanonicalPath> {
