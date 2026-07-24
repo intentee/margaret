@@ -126,20 +126,16 @@ pub enum RequestBindingError {
         second: String,
     },
 
-    #[error(
-        "#[provides_route_parameter] '{binder}' is not managed by the container; add #[singleton] to it"
-    )]
-    RouteParameterBinderNotManaged { binder: String },
+    #[error("#[provides_route_parameter] '{binder}' must also be declared as a #[singleton]")]
+    RouteParameterBinderRequiresSingleton { binder: String },
 
     #[error(
         "#[infers_authenticated_user] is only supported on structs, but '{provider}' is not a struct"
     )]
     AuthenticatedUserProviderNotAStruct { provider: String },
 
-    #[error(
-        "#[infers_authenticated_user] '{provider}' is not managed by the container; add #[singleton] to it"
-    )]
-    AuthenticatedUserProviderNotManaged { provider: String },
+    #[error("#[infers_authenticated_user] '{provider}' must also be declared as a #[singleton]")]
+    AuthenticatedUserProviderRequiresSingleton { provider: String },
 
     #[error(
         "#[infers_authenticated_user] '{provider}' is missing `user_model = <struct>`; it must name the user model it infers"

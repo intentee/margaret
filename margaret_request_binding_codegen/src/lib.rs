@@ -16,6 +16,7 @@ pub mod extraction_context;
 mod form_request_arguments;
 pub mod form_request_extraction;
 pub mod has_authenticated_users;
+mod infers_authenticated_user_arguments;
 pub mod injects_routes;
 pub mod injects_views;
 pub mod render_authenticated_user_wrappers;
@@ -165,10 +166,10 @@ impl SessionUserProvider {
     }
 
     #[test]
-    fn rejects_a_provider_the_container_does_not_manage() {
+    fn rejects_a_provider_that_is_not_a_singleton() {
         assert!(
             rejection_for("#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n")
-                .contains("is not managed by the container")
+                .contains("must also be declared as a #[singleton]")
         );
     }
 

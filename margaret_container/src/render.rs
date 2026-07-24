@@ -32,11 +32,6 @@ fn field_type(provider: &Provider) -> TokenStream {
 
             quote! { std::sync::Arc<#concrete> }
         }
-        ProvidedType::Interface(path) => {
-            let interface = path_tokens(path);
-
-            quote! { std::sync::Arc<dyn #interface> }
-        }
         ProvidedType::Endpoint(_) => {
             let interface = path_tokens(&provides_endpoint_path());
 
@@ -105,7 +100,7 @@ fn direct_value(
             method,
         } => {
             let constructor = format_ident!("{}", method);
-            let mut ledger = ConsoleWeaveLedger::new(&body_slot_uses(dependencies, plan, closures));
+            let mut ledger = ConsoleWeaveLedger::new(&body_slot_uses(dependencies, closures));
             let arguments: Vec<TokenStream> = dependencies
                 .iter()
                 .map(|dependency| dependency_expression(dependency, plan, closures, &mut ledger))
@@ -131,29 +126,18 @@ fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream 
 
 fn dependency_arguments<'plan>(
     dependency: &'plan DependencyKind,
-    plan: &'plan ContainerPlan,
     closures: &'plan ConsoleClosures,
 ) -> Vec<&'plan ConsoleArgument> {
     match dependency {
         DependencyKind::ConsoleArgument { argument } => vec![argument.as_ref()],
         DependencyKind::Single { provider_key } => closures.of(provider_key).iter().collect(),
-        DependencyKind::Collection { trait_path } => plan
-            .collections
-            .members_of(trait_path)
-            .iter()
-            .flat_map(|member_key| closures.of(member_key).iter())
-            .collect(),
     }
 }
 
-fn body_slot_uses(
-    dependencies: &[DependencyKind],
-    plan: &ContainerPlan,
-    closures: &ConsoleClosures,
-) -> Vec<usize> {
+fn body_slot_uses(dependencies: &[DependencyKind], closures: &ConsoleClosures) -> Vec<usize> {
     dependencies
         .iter()
-        .flat_map(|dependency| dependency_arguments(dependency, plan, closures))
+        .flat_map(|dependency| dependency_arguments(dependency, closures))
         .map(|argument| closures.slot(argument.name()))
         .collect()
 }
@@ -185,26 +169,15 @@ fn dependency_expression(
 
             quote! { self.#accessor(#(#woven),*).await }
         }
-        DependencyKind::Collection { trait_path } => {
-            let elements: Vec<TokenStream> = plan
-                .collections
-                .members_of(trait_path)
-                .iter()
-                .map(|member_key| {
-                    let accessor = field_ident(&plan.providers[member_key]);
-                    let woven = woven_arguments(closures.of(member_key), closures, ledger);
-
-                    quote! { self.#accessor(#(#woven),*).await }
-                })
-                .collect();
-
-            quote! { vec![#(#elements),*] }
-        }
     }
 }
 
 pub(crate) fn render(plan: &ContainerPlan, closures: &ConsoleClosures) -> TokenStream {
-    let mut ordered: Vec<(&CanonicalPath, &Provider)> = plan.providers.iter().collect();
+    let mut ordered: Vec<(&CanonicalPath, &Provider)> = plan
+        .providers
+        .iter()
+        .chain(plan.constructions.iter())
+        .collect();
 
     ordered.sort_by(|(_, first), (_, second)| first.field_name.cmp(&second.field_name));
 

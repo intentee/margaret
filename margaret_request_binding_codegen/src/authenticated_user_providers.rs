@@ -15,13 +15,14 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::format_path::format_path;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
-use margaret_container::is_managed::is_managed;
+use margaret_container::is_singleton::is_singleton;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
 use crate::classify_parameters::classify_parameters;
+use crate::infers_authenticated_user_arguments::InfersAuthenticatedUserArguments;
 use crate::injects_routes::injects_routes;
 use crate::injects_views::injects_views;
 use crate::request_binding_error::RequestBindingError;
@@ -215,15 +216,15 @@ pub fn authenticated_user_providers(
             return Err(RequestBindingError::AuthenticatedUserProviderNotAStruct { provider });
         };
 
-        if !is_managed(item) {
-            return Err(RequestBindingError::AuthenticatedUserProviderNotManaged { provider });
+        if !is_singleton(item) {
+            return Err(
+                RequestBindingError::AuthenticatedUserProviderRequiresSingleton { provider },
+            );
         }
 
-        let Some(declared_model) = matched.args()?.path("user_model")? else {
-            return Err(
-                RequestBindingError::AuthenticatedUserProviderMissingUserModel { provider },
-            );
-        };
+        let InfersAuthenticatedUserArguments {
+            user_model: declared_model,
+        } = InfersAuthenticatedUserArguments::parse(matched.args()?, &provider)?;
         let model = index
             .resolve_item_path(item, &declared_model)
             .filter(|resolved| index.struct_identifier(resolved).is_some())

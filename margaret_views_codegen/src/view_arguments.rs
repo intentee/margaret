@@ -8,12 +8,15 @@ pub(crate) struct ViewArguments {
 
 impl ViewArguments {
     pub(crate) fn parse(arguments: &AttributeArgs, view: &str) -> Result<Self, ViewsCodegenError> {
-        let name = arguments
-            .string("name")?
-            .ok_or_else(|| ViewsCodegenError::ViewMissingName {
-                view: view.to_string(),
-            })?;
+        arguments.interpret(|reader| {
+            let name =
+                reader
+                    .take_string("name")?
+                    .ok_or_else(|| ViewsCodegenError::ViewMissingName {
+                        view: view.to_string(),
+                    })?;
 
-        Ok(Self { name })
+            Ok(Self { name })
+        })
     }
 }

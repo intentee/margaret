@@ -4,22 +4,20 @@ pub mod responders;
 use std::sync::Arc;
 
 use margaret_macros::build_for_session;
-use margaret_macros::middleware;
 use margaret_macros::websocket_session;
 use tokio::sync::Mutex;
 
+use crate::english_greeter::EnglishGreeter;
 use crate::forms::get_articles_form::GetArticlesForm;
-use crate::greeter::Greeter;
 use crate::margaret::routes::Routes;
 use crate::models::article::Article;
 use crate::models::user::User;
 
-#[middleware(logged)]
 #[websocket_session(path = "/storyboard/{topic}/{article}", server = "public")]
 pub struct StoryboardSession {
     article_title: String,
     board_url: String,
-    greeter: Arc<dyn Greeter>,
+    greeter: Arc<EnglishGreeter>,
     topic: String,
     turns: Mutex<Vec<String>>,
     viewer: Option<User>,
@@ -29,7 +27,7 @@ impl StoryboardSession {
     #[build_for_session]
     #[must_use]
     pub fn build_for_session(
-        greeter: Arc<dyn Greeter>,
+        greeter: Arc<EnglishGreeter>,
         #[route_parameter(from = "topic")] topic: String,
         #[route_parameter(from = "article")] article: Article,
         #[form_request(from = Query)] filters: GetArticlesForm,

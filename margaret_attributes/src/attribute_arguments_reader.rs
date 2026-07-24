@@ -1,0 +1,105 @@
+use quote::ToTokens;
+use syn::Expr;
+use syn::Lit;
+use syn::Path;
+
+use crate::attribute_error::AttributeError;
+use crate::named_argument::NamedArgument;
+
+pub struct AttributeArgumentsReader {
+    attribute_path: String,
+    named: Vec<NamedArgument>,
+    positional: Vec<Expr>,
+}
+
+impl AttributeArgumentsReader {
+    pub(crate) fn new(
+        attribute_path: String,
+        named: Vec<NamedArgument>,
+        positional: Vec<Expr>,
+    ) -> Self {
+        Self {
+            attribute_path,
+            named,
+            positional,
+        }
+    }
+
+    pub fn take_flag(&mut self, name: &str) -> bool {
+        match self.positional.iter().position(|expression| {
+            matches!(expression, Expr::Path(path_expression) if path_expression.path.is_ident(name))
+        }) {
+            Some(index) => {
+                self.positional.remove(index);
+
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn take_path(&mut self, key: &str) -> Result<Option<Path>, AttributeError> {
+        match self.take_named(key) {
+            None => Ok(None),
+            Some(Expr::Path(expression)) => Ok(Some(expression.path)),
+            Some(_) => Err(self.unexpected_argument(key, "path")),
+        }
+    }
+
+    pub fn take_positional_path(&mut self) -> Option<Path> {
+        match self.positional.first() {
+            Some(Expr::Path(expression)) => {
+                let path = expression.path.clone();
+
+                self.positional.remove(0);
+
+                Some(path)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn take_string(&mut self, key: &str) -> Result<Option<String>, AttributeError> {
+        match self.take_named(key) {
+            None => Ok(None),
+            Some(Expr::Lit(expression)) => match expression.lit {
+                Lit::Str(literal) => Ok(Some(literal.value())),
+                _ => Err(self.unexpected_argument(key, "string literal")),
+            },
+            Some(_) => Err(self.unexpected_argument(key, "string literal")),
+        }
+    }
+
+    pub(crate) fn into_result(self) -> Result<(), AttributeError> {
+        if let Some(argument) = self.named.first() {
+            return Err(AttributeError::UnrecognizedArgument {
+                argument: argument.name.clone(),
+                attribute_path: self.attribute_path,
+            });
+        }
+
+        if let Some(argument) = self.positional.first() {
+            return Err(AttributeError::UnrecognizedArgument {
+                argument: argument.to_token_stream().to_string(),
+                attribute_path: self.attribute_path,
+            });
+        }
+
+        Ok(())
+    }
+
+    fn take_named(&mut self, key: &str) -> Option<Expr> {
+        self.named
+            .iter()
+            .position(|argument| argument.name == key)
+            .map(|index| self.named.remove(index).value)
+    }
+
+    fn unexpected_argument(&self, key: &str, expected: &str) -> AttributeError {
+        AttributeError::UnexpectedArgument {
+            attribute_path: self.attribute_path.clone(),
+            key: key.to_string(),
+            expected: expected.to_string(),
+        }
+    }
+}

@@ -8,12 +8,15 @@ pub(crate) struct ModelArguments {
 
 impl ModelArguments {
     pub(crate) fn parse(arguments: &AttributeArgs, model: &str) -> Result<Self, ModelCodegenError> {
-        let table = arguments
-            .string("table")?
-            .ok_or_else(|| ModelCodegenError::MissingTable {
-                model: model.to_string(),
-            })?;
+        arguments.interpret(|reader| {
+            let table =
+                reader
+                    .take_string("table")?
+                    .ok_or_else(|| ModelCodegenError::MissingTable {
+                        model: model.to_string(),
+                    })?;
 
-        Ok(Self { table })
+            Ok(Self { table })
+        })
     }
 }

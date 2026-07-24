@@ -1,5 +1,5 @@
 #[derive(Debug)]
 pub struct ResolvedIndex {
-    pub column: String,
+    pub columns: Vec<String>,
     pub name: String,
 }

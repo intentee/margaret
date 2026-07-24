@@ -62,7 +62,7 @@ mod tests {
             field.attributes()[0]
                 .args()
                 .expect("the column arguments parse")
-                .string("name")
+                .interpret(|reader| reader.take_string("name"))
                 .expect("the name is a string literal"),
             Some("title".to_string())
         );

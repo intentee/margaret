@@ -8,6 +8,7 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 
+use crate::read_middleware_attribute::read_middleware_attribute;
 use crate::tag_error::TagError;
 use crate::tag_kind::TagKind;
 
@@ -50,8 +51,10 @@ fn collect_kind(
 
 fn declared_tag_path(args: &AttributeArgs, kind: TagKind) -> Result<Option<Path>, TagError> {
     match kind {
-        TagKind::Endpoint => Ok(args.positional_path(0).cloned()),
-        TagKind::Middleware => Ok(args.path("attribute")?),
+        TagKind::Endpoint => {
+            args.interpret(|reader| Ok::<_, TagError>(reader.take_positional_path()))
+        }
+        TagKind::Middleware => Ok(read_middleware_attribute(args)?),
     }
 }
 

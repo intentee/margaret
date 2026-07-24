@@ -2,6 +2,7 @@ use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[provides_endpoint(jwks)]
 #[singleton]
+#[service]
 struct JwksEndpoint;
 
 impl JwksEndpoint {

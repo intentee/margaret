@@ -50,17 +50,13 @@ use std::sync::Arc;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret_websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;
 
-trait Clock {}
-
-#[singleton(provides = Clock)]
+#[singleton]
 struct SystemClock;
 
 impl SystemClock {
     #[constructor]
     fn new() -> Self {}
 }
-
-impl Clock for SystemClock {}
 
 #[singleton]
 struct Config;
@@ -70,9 +66,7 @@ impl Config {
     fn new() -> Self {}
 }
 
-trait Plugin {}
-
-#[singleton(collection = Plugin)]
+#[singleton]
 struct LogPlugin;
 
 impl LogPlugin {
@@ -86,9 +80,9 @@ struct ChatSession;
 impl ChatSession {
     #[build_for_session]
     fn build_for_session(
-        clock: Arc<dyn Clock>,
+        clock: Arc<SystemClock>,
         config: Arc<Config>,
-        plugins: Vec<Arc<dyn Plugin>>,
+        plugin: Arc<LogPlugin>,
         #[route_parameter(from = "room")] room: String,
     ) -> Self {}
 }
@@ -281,9 +275,7 @@ impl Tracer {
     const INJECTED_ONLY_SESSION: &str = r#"
 use std::sync::Arc;
 
-trait Clock {}
-
-#[singleton(provides = Clock)]
+#[singleton]
 struct SystemClock;
 
 impl SystemClock {
@@ -291,14 +283,12 @@ impl SystemClock {
     fn new() -> Self {}
 }
 
-impl Clock for SystemClock {}
-
 #[websocket_session(path = "/room", server = "public")]
 struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build_for_session(clock: Arc<dyn Clock>) -> Self {}
+    fn build_for_session(clock: Arc<SystemClock>) -> Self {}
 }
 "#;
 
@@ -425,15 +415,15 @@ impl Guard {
     }
 
     #[test]
-    fn generates_a_factory_with_every_dependency_shape() {
+    fn generates_a_factory_with_concrete_dependencies() {
         let source = generated(FULL_SESSION);
 
-        assert!(source.contains("clock:::std::sync::Arc<dyncrate::Clock>"));
+        assert!(source.contains("clock:::std::sync::Arc<crate::SystemClock>"));
         assert!(source.contains("config:::std::sync::Arc<crate::Config>"));
-        assert!(source.contains("plugins:::std::vec::Vec<::std::sync::Arc<dyncrate::Plugin>>"));
+        assert!(source.contains("plugin:::std::sync::Arc<crate::LogPlugin>"));
         assert!(source.contains("container.system_clock().await"));
         assert!(source.contains("container.config().await"));
-        assert!(source.contains("::std::vec::Vec::from([container.log_plugin().await])"));
+        assert!(source.contains("container.log_plugin().await"));
     }
 
     #[test]
@@ -569,6 +559,17 @@ impl Guard {
             )
             .to_string()
             .contains("declares a response cardinality but is not a request")
+        );
+    }
+
+    #[test]
+    fn rejects_a_notification_whose_response_argument_is_not_a_path() {
+        assert!(
+            error(
+                r#"#[websocket_message(notification, method = "x", response = "single")] struct Bad;"#
+            )
+            .to_string()
+            .contains("is not a path")
         );
     }
 
@@ -870,17 +871,13 @@ use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret_identity::responds_to_inference_failure::RespondsToInferenceFailure;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
-trait Clock {}
-
-#[singleton(provides = Clock)]
+#[singleton]
 struct SystemClock;
 
 impl SystemClock {
     #[constructor]
     fn create() -> Self {}
 }
-
-impl Clock for SystemClock {}
 
 struct User;
 
@@ -902,7 +899,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(session: std::sync::Arc<dyn Clock>, #[authenticated_user] viewer: User) -> Self {}
+    fn build(session: std::sync::Arc<SystemClock>, #[authenticated_user] viewer: User) -> Self {}
 }
 
 #[websocket_message(request, method = "chat", response = single)]
@@ -918,7 +915,7 @@ impl RespondsToWebSocketMessage for Chatter {
 "#,
         );
 
-        assert!(source.contains("session:::std::sync::Arc<dyncrate::Clock>,"));
+        assert!(source.contains("session:::std::sync::Arc<crate::SystemClock>,"));
         assert!(
             source.contains(
                 "session_2:::std::sync::Arc<super::super::authenticated_users::Session>,"
@@ -1133,7 +1130,7 @@ impl ArticleStore {
     fn new() -> Self {}
 }
 
-impl HttpRouteParameterBinder for ArticleStore {
+impl margaret_http::http_route_parameter_binder::HttpRouteParameterBinder for ArticleStore {
     type Model = Article;
 }
 

@@ -70,4 +70,10 @@ pub enum AttributeError {
         key: String,
         expected: String,
     },
+
+    #[error("attribute '{attribute_path}' has an unrecognized argument '{argument}'")]
+    UnrecognizedArgument {
+        argument: String,
+        attribute_path: String,
+    },
 }

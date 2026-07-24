@@ -21,7 +21,7 @@ pub fn render_container(
     let tag_pool = TagPool::collect(index)?;
     let plan = build_plan(index, registry, framework_provided, &tag_pool)?;
 
-    topological_order(&plan.providers, &plan.collections)?;
+    topological_order(&plan.providers)?;
 
     let closures = ConsoleClosures::from_plan(&plan)?;
     let bindings = ContainerBindings::from_plan(&plan, &closures);

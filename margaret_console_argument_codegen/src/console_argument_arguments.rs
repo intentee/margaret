@@ -13,26 +13,28 @@ impl ConsoleArgumentArguments {
         owner: &str,
         parameter: &str,
     ) -> Result<Self, ConsoleArgumentCodegenError> {
-        let named = arguments.string("from")?;
-        let positional = arguments.has_positional_flag("positional");
+        arguments.interpret(|reader| {
+            let named = reader.take_string("from")?;
+            let positional = reader.take_flag("positional");
 
-        let form = match (named, positional) {
-            (Some(key), false) => ConsoleArgumentForm::Named { key },
-            (None, true) => ConsoleArgumentForm::Positional,
-            (Some(_), true) => {
-                return Err(ConsoleArgumentCodegenError::NamedAndPositional {
-                    owner: owner.to_string(),
-                    parameter: parameter.to_string(),
-                });
-            }
-            (None, false) => {
-                return Err(ConsoleArgumentCodegenError::NeitherNamedNorPositional {
-                    owner: owner.to_string(),
-                    parameter: parameter.to_string(),
-                });
-            }
-        };
+            let form = match (named, positional) {
+                (Some(key), false) => ConsoleArgumentForm::Named { key },
+                (None, true) => ConsoleArgumentForm::Positional,
+                (Some(_), true) => {
+                    return Err(ConsoleArgumentCodegenError::NamedAndPositional {
+                        owner: owner.to_string(),
+                        parameter: parameter.to_string(),
+                    });
+                }
+                (None, false) => {
+                    return Err(ConsoleArgumentCodegenError::NeitherNamedNorPositional {
+                        owner: owner.to_string(),
+                        parameter: parameter.to_string(),
+                    });
+                }
+            };
 
-        Ok(Self { form })
+            Ok(Self { form })
+        })
     }
 }

@@ -235,12 +235,12 @@ impl GetProfile {
     }
 
     #[test]
-    fn rejects_a_route_parameter_binder_the_container_does_not_manage() {
+    fn rejects_a_route_parameter_binder_that_is_not_a_singleton() {
         assert!(
             error_for(
                 "struct User;\n\n#[provides_route_parameter]\nstruct UserBinder;\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> Option<User> {}\n}\n"
             )
-            .contains("is not managed by the container")
+            .contains("must also be declared as a #[singleton]")
         );
     }
 

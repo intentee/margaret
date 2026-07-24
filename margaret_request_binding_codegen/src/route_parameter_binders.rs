@@ -4,7 +4,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
-use margaret_container::is_managed::is_managed;
+use margaret_container::is_singleton::is_singleton;
 
 use crate::request_binding_error::RequestBindingError;
 use crate::route_parameter_binder::RouteParameterBinder;
@@ -43,8 +43,8 @@ pub fn route_parameter_binders(
             });
         };
 
-        if !is_managed(item) {
-            return Err(RequestBindingError::RouteParameterBinderNotManaged {
+        if !is_singleton(item) {
+            return Err(RequestBindingError::RouteParameterBinderRequiresSingleton {
                 binder: provider.to_string(),
             });
         }

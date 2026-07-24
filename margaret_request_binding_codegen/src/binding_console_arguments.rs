@@ -15,11 +15,9 @@ pub fn binding_console_arguments(
         RequestBinding::Bound {
             binder_provider, ..
         } => bindings.console_arguments(binder_provider).to_vec(),
-        RequestBinding::Injectable { dependency } => bindings
-            .injected_console_arguments(dependency)
-            .into_iter()
-            .flatten()
-            .collect(),
+        RequestBinding::Injectable { dependency } => {
+            bindings.injected_console_arguments(dependency)
+        }
         RequestBinding::AssetBag
         | RequestBinding::CurrentRequest
         | RequestBinding::FormRequest { .. }
