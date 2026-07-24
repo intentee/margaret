@@ -31,7 +31,9 @@ use crate::foreign_key_arguments::ForeignKeyArguments;
 use crate::foreign_key_target::ForeignKeyTarget;
 use crate::foreign_key_target_column::ForeignKeyTargetColumn;
 use crate::index_arguments::IndexArguments;
+use crate::index_column_member::IndexColumnMember;
 use crate::index_membership::IndexMembership;
+use crate::index_redundancy::IndexRedundancy;
 use crate::infer_column_type::infer_column_type;
 use crate::inferred_column::InferredColumn;
 use crate::model::Model;
@@ -152,26 +154,26 @@ fn resolve_index_memberships(
 }
 
 fn ensure_index_not_redundant(
+    position: usize,
+    index_redundancy: &HashMap<usize, IndexRedundancy>,
     column: &str,
-    primary_key_names: &HashSet<String>,
-    unique_column_names: &HashSet<String>,
     model: &str,
 ) -> Result<(), ModelCodegenError> {
-    if primary_key_names.contains(column) {
-        return Err(ModelCodegenError::RedundantIndexOnPrimaryKeyColumn {
-            column: column.to_string(),
-            model: model.to_string(),
-        });
+    match index_redundancy.get(&position) {
+        Some(IndexRedundancy::PrimaryKeyLeadingColumn) => {
+            Err(ModelCodegenError::RedundantIndexOnPrimaryKeyColumn {
+                column: column.to_string(),
+                model: model.to_string(),
+            })
+        }
+        Some(IndexRedundancy::UniqueConstraint) => {
+            Err(ModelCodegenError::RedundantIndexOnUniqueColumn {
+                column: column.to_string(),
+                model: model.to_string(),
+            })
+        }
+        None => Ok(()),
     }
-
-    if unique_column_names.contains(column) {
-        return Err(ModelCodegenError::RedundantIndexOnUniqueColumn {
-            column: column.to_string(),
-            model: model.to_string(),
-        });
-    }
-
-    Ok(())
 }
 
 fn register_table_name(
@@ -497,21 +499,20 @@ fn collect_models(
 fn resolve_indexes(
     table: &str,
     columns: &[ResolvedColumn],
-    primary_key_names: &HashSet<String>,
-    unique_column_names: &HashSet<String>,
+    index_redundancy: &HashMap<usize, IndexRedundancy>,
     model: &str,
 ) -> Result<Vec<ResolvedIndex>, ModelCodegenError> {
     let mut indexes: Vec<ResolvedIndex> = Vec::new();
-    let mut named_groups: BTreeMap<String, Vec<(usize, String)>> = BTreeMap::new();
+    let mut named_groups: BTreeMap<String, Vec<IndexColumnMember>> = BTreeMap::new();
 
     for column in columns {
         for membership in &column.indexes {
             match membership {
                 IndexMembership::Derived => {
                     ensure_index_not_redundant(
+                        column.position,
+                        index_redundancy,
                         &column.name,
-                        primary_key_names,
-                        unique_column_names,
                         model,
                     )?;
 
@@ -531,26 +532,24 @@ fn resolve_indexes(
                     named_groups
                         .entry(name.clone())
                         .or_default()
-                        .push((column.position, column.name.clone()));
+                        .push(IndexColumnMember {
+                            name: column.name.clone(),
+                            position: column.position,
+                        });
                 }
             }
         }
     }
 
     for (name, mut members) in named_groups {
-        members.sort_by_key(|(position, _)| *position);
+        members.sort_by_key(|member| member.position);
 
-        let index_columns: Vec<String> = members
-            .into_iter()
-            .map(|(_, column_name)| column_name)
-            .collect();
-
-        if let [only] = index_columns.as_slice() {
-            ensure_index_not_redundant(only, primary_key_names, unique_column_names, model)?;
+        if let [member] = members.as_slice() {
+            ensure_index_not_redundant(member.position, index_redundancy, &member.name, model)?;
         }
 
         indexes.push(ResolvedIndex {
-            columns: index_columns,
+            columns: members.into_iter().map(|member| member.name).collect(),
             name,
         });
     }
@@ -574,6 +573,7 @@ fn resolve_model(
     } = collected;
 
     let mut foreign_keys: Vec<ResolvedForeignKey> = Vec::new();
+    let mut unique_column_positions: HashSet<usize> = HashSet::new();
 
     for deferred in deferred_foreign_keys {
         let DeferredForeignKey {
@@ -639,6 +639,10 @@ fn resolve_model(
             unique: false,
         });
 
+        if unique {
+            unique_column_positions.insert(position);
+        }
+
         foreign_keys.push(ResolvedForeignKey {
             column: column_name,
             on_delete,
@@ -649,14 +653,13 @@ fn resolve_model(
     }
 
     let mut unique_constraints: Vec<ResolvedUniqueConstraint> = Vec::new();
-    let mut unique_column_names: HashSet<String> = HashSet::new();
 
     for column in &columns {
         if column.unique {
             unique_constraints.push(ResolvedUniqueConstraint {
                 columns: vec![column.name.clone()],
             });
-            unique_column_names.insert(column.name.clone());
+            unique_column_positions.insert(column.position);
         }
     }
 
@@ -665,19 +668,26 @@ fn resolve_model(
             unique_constraints.push(ResolvedUniqueConstraint {
                 columns: vec![foreign_key.column.clone()],
             });
-            unique_column_names.insert(foreign_key.column.clone());
         }
     }
 
-    let primary_key_names: HashSet<String> = primary_key.iter().cloned().collect();
+    let leading_primary_key_position: Option<usize> = columns
+        .iter()
+        .filter(|column| column.primary_key)
+        .map(|column| column.position)
+        .min();
 
-    let indexes = resolve_indexes(
-        &table,
-        &columns,
-        &primary_key_names,
-        &unique_column_names,
-        &model,
-    )?;
+    let mut index_redundancy: HashMap<usize, IndexRedundancy> = HashMap::new();
+
+    for position in unique_column_positions {
+        index_redundancy.insert(position, IndexRedundancy::UniqueConstraint);
+    }
+
+    if let Some(position) = leading_primary_key_position {
+        index_redundancy.insert(position, IndexRedundancy::PrimaryKeyLeadingColumn);
+    }
+
+    let indexes = resolve_indexes(&table, &columns, &index_redundancy, &model)?;
 
     Ok(Model {
         columns,

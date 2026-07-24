@@ -219,7 +219,7 @@ pub enum ModelCodegenError {
     RedundantIndexOnUniqueColumn { column: String, model: String },
 
     #[error(
-        "the single-column index on column '{column}' of model '{model}' is redundant; a primary key is already indexed"
+        "the single-column index on column '{column}' of model '{model}' is redundant; it is the leading column of the primary key, which is already indexed"
     )]
     RedundantIndexOnPrimaryKeyColumn { column: String, model: String },
 }
