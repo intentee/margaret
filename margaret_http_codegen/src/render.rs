@@ -35,8 +35,8 @@ fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
 }
 
-fn console_thread(path: &CanonicalPath, bindings: &ContainerBindings) -> Vec<TokenStream> {
-    bindings.console_threads(bindings.console_arguments(path))
+fn console_weave(path: &CanonicalPath, bindings: &ContainerBindings) -> Vec<TokenStream> {
+    bindings.console_weaves(bindings.console_arguments(path))
 }
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
@@ -68,8 +68,8 @@ fn handler_binding(route: &HttpRoute) -> Ident {
 fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let responder = &route.responder_field;
     let responder_type = path_tokens(&route.responder_path);
-    let responder_threaded = console_thread(&route.responder_path, bindings);
-    let responder_access = access(quote! { container.#responder(#(#responder_threaded),*) });
+    let responder_woven = console_weave(&route.responder_path, bindings);
+    let responder_access = access(quote! { container.#responder(#(#responder_woven),*) });
     let captures = capture_binders(route);
 
     let mut allocator = NameAllocator::new();
@@ -148,8 +148,8 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     } else {
         let capture_bindings = captures.iter().map(|binder| {
             let field = &binder.field;
-            let binder_threaded = console_thread(&binder.provider, bindings);
-            let field_access = access(quote! { container.#field(#(#binder_threaded),*) });
+            let binder_woven = console_weave(&binder.provider, bindings);
+            let field_access = access(quote! { container.#field(#(#binder_woven),*) });
 
             quote! { let #field = #field_access; }
         });

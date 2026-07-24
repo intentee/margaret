@@ -40,7 +40,7 @@ mod tests {
 
     use super::unify_by_key;
     use crate::console_argument::ConsoleArgument;
-    use crate::threading_kind::ThreadingKind;
+    use crate::weaving_kind::WeavingKind;
 
     fn string_type() -> CanonicalPath {
         CanonicalPath::new(vec![
@@ -54,7 +54,7 @@ mod tests {
         ConsoleArgument::Named {
             name: name.to_string(),
             required: true,
-            threading: ThreadingKind::BorrowedStr,
+            weaving: WeavingKind::BorrowedStr,
             value_type: string_type(),
         }
     }
@@ -63,7 +63,7 @@ mod tests {
         ConsoleArgument::Positional {
             id: id.to_string(),
             required: true,
-            threading: ThreadingKind::BorrowedStr,
+            weaving: WeavingKind::BorrowedStr,
             value_type: string_type(),
         }
     }

@@ -4,7 +4,7 @@ use quote::quote;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 
-use crate::threading_kind::ThreadingKind;
+use crate::weaving_kind::WeavingKind;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConsoleArgument {
@@ -14,13 +14,13 @@ pub enum ConsoleArgument {
     Named {
         name: String,
         required: bool,
-        threading: ThreadingKind,
+        weaving: WeavingKind,
         value_type: CanonicalPath,
     },
     Positional {
         id: String,
         required: bool,
-        threading: ThreadingKind,
+        weaving: WeavingKind,
         value_type: CanonicalPath,
     },
 }
@@ -62,19 +62,19 @@ impl ConsoleArgument {
 
     #[must_use]
     pub fn parameter_referent(&self) -> TokenStream {
-        match self.threading() {
-            ThreadingKind::BorrowedStr => quote! { str },
-            ThreadingKind::BorrowedPath => quote! { ::std::path::Path },
-            ThreadingKind::Copy | ThreadingKind::Cloned => self.field_type(),
+        match self.weaving() {
+            WeavingKind::BorrowedStr => quote! { str },
+            WeavingKind::BorrowedPath => quote! { ::std::path::Path },
+            WeavingKind::Copy | WeavingKind::Cloned => self.field_type(),
         }
     }
 
     #[must_use]
-    pub fn threading(&self) -> ThreadingKind {
+    pub fn weaving(&self) -> WeavingKind {
         match self {
-            ConsoleArgument::Flag { .. } => ThreadingKind::Copy,
-            ConsoleArgument::Named { threading, .. }
-            | ConsoleArgument::Positional { threading, .. } => threading.clone(),
+            ConsoleArgument::Flag { .. } => WeavingKind::Copy,
+            ConsoleArgument::Named { weaving, .. }
+            | ConsoleArgument::Positional { weaving, .. } => weaving.clone(),
         }
     }
 }
@@ -83,7 +83,7 @@ impl ConsoleArgument {
 mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
 
-    use crate::threading_kind::ThreadingKind;
+    use crate::weaving_kind::WeavingKind;
 
     use super::ConsoleArgument;
 
@@ -110,7 +110,7 @@ mod tests {
         let named = ConsoleArgument::Named {
             name: "config".to_string(),
             required: true,
-            threading: ThreadingKind::BorrowedPath,
+            weaving: WeavingKind::BorrowedPath,
             value_type: path(&["std", "path", "PathBuf"]),
         };
 
@@ -123,7 +123,7 @@ mod tests {
         let named = ConsoleArgument::Named {
             name: "label".to_string(),
             required: false,
-            threading: ThreadingKind::Cloned,
+            weaving: WeavingKind::Cloned,
             value_type: path(&["std", "string", "String"]),
         };
 
@@ -138,7 +138,7 @@ mod tests {
         let positional = ConsoleArgument::Positional {
             id: "point".to_string(),
             required: true,
-            threading: ThreadingKind::Cloned,
+            weaving: WeavingKind::Cloned,
             value_type: path(&["crate", "geometry", "Point"]),
         };
 
@@ -152,20 +152,20 @@ mod tests {
             name: "loud".to_string(),
         };
 
-        assert_eq!(flag.threading(), ThreadingKind::Copy);
+        assert_eq!(flag.weaving(), WeavingKind::Copy);
         assert_eq!(collapsed(flag.parameter_referent()), "bool");
     }
 
     #[test]
-    fn a_positional_threads_by_its_stored_kind() {
+    fn a_positional_weaves_by_its_stored_kind() {
         let positional = ConsoleArgument::Positional {
             id: "count".to_string(),
             required: true,
-            threading: ThreadingKind::Copy,
+            weaving: WeavingKind::Copy,
             value_type: path(&["u16"]),
         };
 
-        assert_eq!(positional.threading(), ThreadingKind::Copy);
+        assert_eq!(positional.weaving(), WeavingKind::Copy);
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
         let named = ConsoleArgument::Named {
             name: "label".to_string(),
             required: true,
-            threading: ThreadingKind::BorrowedStr,
+            weaving: WeavingKind::BorrowedStr,
             value_type: path(&["std", "string", "String"]),
         };
 
@@ -185,7 +185,7 @@ mod tests {
         let named = ConsoleArgument::Named {
             name: "config".to_string(),
             required: true,
-            threading: ThreadingKind::BorrowedPath,
+            weaving: WeavingKind::BorrowedPath,
             value_type: path(&["std", "path", "PathBuf"]),
         };
 

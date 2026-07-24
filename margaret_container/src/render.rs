@@ -1,14 +1,15 @@
-use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::struct_shape::StructShape;
+use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 
 use crate::console_closures::ConsoleClosures;
+use crate::console_weave_ledger::ConsoleWeaveLedger;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
@@ -44,18 +45,6 @@ fn field_type(provider: &Provider) -> TokenStream {
     }
 }
 
-fn console_argument_ident(closures: &ConsoleClosures, argument: &ConsoleArgument) -> Ident {
-    format_ident!("console_argument_{}", closures.slot(argument.name()))
-}
-
-fn threaded_arguments(dependency_key: &CanonicalPath, closures: &ConsoleClosures) -> Vec<Ident> {
-    closures
-        .of(dependency_key)
-        .iter()
-        .map(|argument| console_argument_ident(closures, argument))
-        .collect()
-}
-
 fn accessor(
     key: &CanonicalPath,
     provider: &Provider,
@@ -65,7 +54,7 @@ fn accessor(
     let name = field_ident(provider);
     let field_type = field_type(provider);
     let parameters = closures.of(key).iter().map(|argument| {
-        let ident = console_argument_ident(closures, argument);
+        let ident = console_argument_ident(closures.slot(argument.name()));
         let value_type = argument.field_type();
 
         quote! { #ident: #value_type }
@@ -116,9 +105,11 @@ fn direct_value(
             method,
         } => {
             let constructor = format_ident!("{}", method);
-            let arguments = dependencies
+            let mut ledger = ConsoleWeaveLedger::new(&body_slot_uses(dependencies, plan, closures));
+            let arguments: Vec<TokenStream> = dependencies
                 .iter()
-                .map(|dependency| dependency_expression(dependency, plan, closures));
+                .map(|dependency| dependency_expression(dependency, plan, closures, &mut ledger))
+                .collect();
 
             if *constructor_is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
@@ -138,34 +129,74 @@ fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream 
     }
 }
 
+fn dependency_arguments<'plan>(
+    dependency: &'plan DependencyKind,
+    plan: &'plan ContainerPlan,
+    closures: &'plan ConsoleClosures,
+) -> Vec<&'plan ConsoleArgument> {
+    match dependency {
+        DependencyKind::ConsoleArgument { argument } => vec![argument.as_ref()],
+        DependencyKind::Single { provider_key } => closures.of(provider_key).iter().collect(),
+        DependencyKind::Collection { trait_path } => plan
+            .collections
+            .members_of(trait_path)
+            .iter()
+            .flat_map(|member_key| closures.of(member_key).iter())
+            .collect(),
+    }
+}
+
+fn body_slot_uses(
+    dependencies: &[DependencyKind],
+    plan: &ContainerPlan,
+    closures: &ConsoleClosures,
+) -> Vec<usize> {
+    dependencies
+        .iter()
+        .flat_map(|dependency| dependency_arguments(dependency, plan, closures))
+        .map(|argument| closures.slot(argument.name()))
+        .collect()
+}
+
+fn woven_arguments(
+    arguments: &[ConsoleArgument],
+    closures: &ConsoleClosures,
+    ledger: &mut ConsoleWeaveLedger,
+) -> Vec<TokenStream> {
+    arguments
+        .iter()
+        .map(|argument| ledger.weave(argument, closures.slot(argument.name())))
+        .collect()
+}
+
 fn dependency_expression(
     dependency: &DependencyKind,
     plan: &ContainerPlan,
     closures: &ConsoleClosures,
+    ledger: &mut ConsoleWeaveLedger,
 ) -> TokenStream {
     match dependency {
         DependencyKind::ConsoleArgument { argument } => {
-            let ident = console_argument_ident(closures, argument);
-
-            quote! { #ident }
+            ledger.weave(argument, closures.slot(argument.name()))
         }
         DependencyKind::Single { provider_key } => {
             let accessor = field_ident(&plan.providers[provider_key]);
-            let threaded = threaded_arguments(provider_key, closures);
+            let woven = woven_arguments(closures.of(provider_key), closures, ledger);
 
-            quote! { self.#accessor(#(#threaded),*).await }
+            quote! { self.#accessor(#(#woven),*).await }
         }
         DependencyKind::Collection { trait_path } => {
-            let elements = plan
+            let elements: Vec<TokenStream> = plan
                 .collections
                 .members_of(trait_path)
                 .iter()
                 .map(|member_key| {
                     let accessor = field_ident(&plan.providers[member_key]);
-                    let threaded = threaded_arguments(member_key, closures);
+                    let woven = woven_arguments(closures.of(member_key), closures, ledger);
 
-                    quote! { self.#accessor(#(#threaded),*).await }
-                });
+                    quote! { self.#accessor(#(#woven),*).await }
+                })
+                .collect();
 
             quote! { vec![#(#elements),*] }
         }

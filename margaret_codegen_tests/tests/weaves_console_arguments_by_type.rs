@@ -2,7 +2,7 @@ use margaret_codegen_tests::generate_fixture::generate_fixture;
 use margaret_codegen_tests::generated_module_source::generated_module_source;
 
 #[test]
-fn threads_each_console_argument_category_with_its_type_appropriate_operation() {
+fn weaves_each_console_argument_category_with_its_type_appropriate_operation() {
     let generated =
         generate_fixture("type_aware_console_arguments").expect("the fixture generates");
     let source: String = generated_module_source(&generated, "http/server_public")

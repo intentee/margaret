@@ -17,9 +17,9 @@ pub(crate) fn render_build(
     let initializers = views.iter().map(|view| {
         let name = format_ident!("{}", view.name);
         let accessor = format_ident!("{}", view.accessor);
-        let threaded = bindings.console_threads(bindings.console_arguments(&view.concrete_path));
+        let woven = bindings.console_weaves(bindings.console_arguments(&view.concrete_path));
 
-        quote! { #name: container.#accessor(#(#threaded),*).await, }
+        quote! { #name: container.#accessor(#(#woven),*).await, }
     });
 
     let parameter_count = 1 + parameters.len();

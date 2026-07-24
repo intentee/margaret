@@ -339,7 +339,7 @@ impl Health {
     }
 
     #[test]
-    fn threads_views_into_the_websocket_routes_of_a_server_with_views() {
+    fn weaves_views_into_the_websocket_routes_of_a_server_with_views() {
         let source =
             websocket_http_source_with_views(HEALTH_RESPONDER, &["public".to_string()], true);
 
@@ -618,7 +618,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     }
 
     #[test]
-    fn threads_routes_into_a_routes_injecting_middleware_onion() {
+    fn weaves_routes_into_a_routes_injecting_middleware_onion() {
         let source = source_for(
             "use crate::margaret::routes::Routes;\nuse margaret_http::next::Next;\nuse margaret_http::request::Request;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(traced)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, request: &Request, next: Next, routes: &Routes) -> ResponseContinuation {}\n}\n",
         );
@@ -1280,7 +1280,7 @@ impl GetMetrics {
     }
 
     #[test]
-    fn threads_views_into_a_views_injecting_middleware_onion() {
+    fn weaves_views_into_a_views_injecting_middleware_onion() {
         let source = source_for_with_views(
             r#"
 use margaret_http::next::Next;
@@ -1412,7 +1412,7 @@ impl Greeting {
 "#;
 
     #[test]
-    fn threads_a_console_argument_into_a_responder_and_its_server() {
+    fn weaves_a_console_argument_into_a_responder_and_its_server() {
         let source = source_for(CONSOLE_ARGUMENT_RESPONDER);
 
         assert!(source.contains(
@@ -1448,7 +1448,7 @@ impl GetUser {
 "#;
 
     #[test]
-    fn threads_a_console_argument_into_a_route_parameter_binder() {
+    fn weaves_a_console_argument_into_a_route_parameter_binder() {
         let source = source_for(CONSOLE_ARGUMENT_BINDER);
 
         assert!(source.contains("console_argument_0:&str,"));
@@ -1482,7 +1482,7 @@ impl Guard {
 "#;
 
     #[test]
-    fn threads_a_console_argument_into_a_middleware_and_its_server() {
+    fn weaves_a_console_argument_into_a_middleware_and_its_server() {
         let source = source_for(CONSOLE_ARGUMENT_MIDDLEWARE);
 
         assert!(source.contains(
@@ -1515,7 +1515,7 @@ impl Configured {
 "#;
 
     #[test]
-    fn expects_too_many_arguments_and_threads_each_category_by_its_type() {
+    fn expects_too_many_arguments_and_weaves_each_category_by_its_type() {
         let source = source_for(CONSOLE_ARGUMENT_MIXED_CATEGORIES);
 
         assert!(source.contains("#[expect(clippy::too_many_arguments"));

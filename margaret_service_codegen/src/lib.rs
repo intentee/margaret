@@ -233,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_views_once_and_threads_them_into_each_server() {
+    fn builds_views_once_and_weaves_them_into_each_server() {
         let source = rendered_with_views("#[singleton]\nstruct Store;\n", &public());
 
         assert!(source.contains(
@@ -290,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_the_routes_once_and_threads_them_into_the_server_builders() {
+    fn builds_the_routes_once_and_weaves_them_into_the_server_builders() {
         let source = rendered(
             SERVICE,
             &[
@@ -431,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    fn threads_a_console_argument_into_a_ticker() {
+    fn weaves_a_console_argument_into_a_ticker() {
         let source = rendered(
             r#"use std::path::PathBuf;
 
@@ -464,7 +464,7 @@ impl Roller {
     }
 
     #[test]
-    fn threads_a_console_argument_and_the_token_into_a_ticker() {
+    fn weaves_a_console_argument_and_the_token_into_a_ticker() {
         let source = rendered(
             r#"use std::path::PathBuf;
 use tokio_util::sync::CancellationToken;
@@ -496,7 +496,7 @@ impl Roller {
     }
 
     #[test]
-    fn threads_a_console_argument_into_a_service_with_a_token() {
+    fn weaves_a_console_argument_into_a_service_with_a_token() {
         let source = rendered(
             r#"use tokio_util::sync::CancellationToken;
 
@@ -523,7 +523,7 @@ impl Worker {
     }
 
     #[test]
-    fn threads_a_console_argument_into_a_service() {
+    fn weaves_a_console_argument_into_a_service() {
         let source = rendered(
             r#"#[service]
 struct Worker {
@@ -552,7 +552,7 @@ impl Worker {
     }
 
     #[test]
-    fn threads_a_copy_console_argument_into_a_service_by_value() {
+    fn weaves_a_copy_console_argument_into_a_service_by_value() {
         let source = rendered(
             r#"#[service]
 struct Watcher {
@@ -577,7 +577,7 @@ impl Watcher {
     }
 
     #[test]
-    fn threads_a_shared_console_argument_into_both_services_once() {
+    fn weaves_a_shared_console_argument_into_both_services_once() {
         let source = rendered(
             r#"#[service]
 struct First {

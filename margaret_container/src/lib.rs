@@ -1,6 +1,7 @@
 mod build_plan;
 mod collection_table;
 mod console_closures;
+mod console_weave_ledger;
 mod construction_source;
 pub mod container_bindings;
 pub mod container_error;
