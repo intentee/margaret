@@ -19,6 +19,7 @@ mod rejects_a_non_struct_service_and_ticker;
 mod rejects_conflicting_console_arguments;
 mod rejects_non_struct_singleton;
 mod rejects_singleton_arguments;
+mod reports_a_framework_provider_colliding_with_a_user_singleton;
 mod reports_ambiguous_constructor;
 mod reports_constructor_return_type_mismatch;
 mod reports_dependency_cycle;

@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
@@ -54,6 +55,10 @@ fn has_path_attribute(attributes: &[Attribute]) -> bool {
     attributes
         .iter()
         .any(|attribute| attribute.path().is_ident("path"))
+}
+
+fn is_crate_root(module_path: &[String]) -> bool {
+    module_path.len() == 1
 }
 
 fn member_path(module_path: &[String], identifier: &Ident) -> String {
@@ -118,6 +123,7 @@ fn resolve_module_file(directory: &Path, identifier: &Ident) -> Result<PathBuf, 
 }
 
 pub(crate) struct ModuleWalker {
+    excluded_root_modules: BTreeSet<String>,
     imports: HashMap<CanonicalPath, ModuleImports>,
     items: Vec<IndexedItem>,
     pending_members: Vec<PendingMember>,
@@ -128,8 +134,10 @@ impl ModuleWalker {
     pub(crate) fn walk_crate(
         crate_name: &str,
         source_directory: &Path,
+        excluded_root_modules: &BTreeSet<String>,
     ) -> Result<WalkOutput, AttributeError> {
         let mut walker = Self {
+            excluded_root_modules: excluded_root_modules.clone(),
             imports: HashMap::new(),
             items: Vec::new(),
             pending_members: Vec::new(),
@@ -145,6 +153,7 @@ impl ModuleWalker {
 
     fn into_output(self) -> WalkOutput {
         let Self {
+            excluded_root_modules: _,
             imports,
             mut items,
             pending_members,
@@ -338,6 +347,14 @@ impl ModuleWalker {
                 kind: ItemKind::Trait,
             }),
             Item::Mod(item_mod) => {
+                if is_crate_root(module_path)
+                    && self
+                        .excluded_root_modules
+                        .contains(&item_mod.ident.to_string())
+                {
+                    return Ok(());
+                }
+
                 self.walk_module(item_mod, module_path, file_path, directory)?;
 
                 Some(Recordable {

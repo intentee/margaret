@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 
 use crate::attribute_error::AttributeError;
@@ -11,6 +12,7 @@ use crate::walk_output::WalkOutput;
 
 #[derive(Default)]
 pub struct AttributeIndexBuilder {
+    excluded_root_modules: BTreeSet<String>,
     imports: HashMap<CanonicalPath, ModuleImports>,
     items: Vec<IndexedItem>,
 }
@@ -26,9 +28,19 @@ impl AttributeIndexBuilder {
         AttributeIndex::new(self.items, self.imports)
     }
 
+    #[must_use]
+    pub fn exclude_root_module(mut self, name: impl Into<String>) -> Self {
+        self.excluded_root_modules.insert(name.into());
+
+        self
+    }
+
     pub fn index_crate(mut self, crate_root: &CrateRoot) -> Result<Self, AttributeError> {
-        let WalkOutput { imports, items } =
-            ModuleWalker::walk_crate(&crate_root.name, &crate_root.source_directory)?;
+        let WalkOutput { imports, items } = ModuleWalker::walk_crate(
+            &crate_root.name,
+            &crate_root.source_directory,
+            &self.excluded_root_modules,
+        )?;
 
         self.imports.extend(imports);
         self.items.extend(items);

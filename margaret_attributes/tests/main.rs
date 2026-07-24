@@ -1,4 +1,6 @@
+mod does_not_exclude_a_nested_module_with_the_excluded_name;
 mod drops_members_without_an_indexed_item;
+mod excludes_the_named_crate_root_module;
 mod exposes_item_identifier;
 mod ignores_items_that_are_not_named_definitions;
 mod indexes_associated_types;

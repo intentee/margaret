@@ -17,6 +17,7 @@ mod model_pass;
 mod serve_arguments;
 mod services_pass;
 mod umbrella;
+mod umbrella_module_name;
 mod views_pass;
 mod walk_asset_directory;
 mod websocket_pass;
