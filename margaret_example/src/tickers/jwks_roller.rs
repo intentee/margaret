@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
+use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller_server::JwksRollerServerBundle;
 use margaret_jwks_roller_server::JwksRollerServerBundleParams;
 use margaret_jwks_roller_server::jwks_roller_server_error::JwksRollerServerError;
@@ -23,10 +23,8 @@ pub struct JwksRoller {
 impl JwksRoller {
     #[constructor]
     #[must_use]
-    pub fn create() -> Self {
-        let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
-            storage: Arc::new(MemoryJwksSecretStorage),
-        });
+    pub fn create(storage: Arc<dyn JwksSecretStorage>) -> Self {
+        let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams { storage });
         let public_jwks_handler = bundle.public_jwks_handler();
 
         Self {

@@ -21,11 +21,15 @@ COVERAGE_PACKAGES := \
 	-p margaret_injection_codegen \
 	-p margaret_jwks_client \
 	-p margaret_jwks_client_tests \
+	-p margaret_jwks_file_secret_storage \
+	-p margaret_jwks_file_secret_storage_tests \
 	-p margaret_jwks_keygen \
 	-p margaret_jwks_keygen_tests \
 	-p margaret_jwks_roller \
 	-p margaret_jwks_roller_server \
 	-p margaret_jwks_roller_tests \
+	-p margaret_jwks_secret_storage_selection \
+	-p margaret_jwks_secret_storage_selection_tests \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
@@ -110,11 +114,15 @@ coverage: node_modules postgres-image
 		--gated margaret_injection_codegen=100 \
 		--gated margaret_jwks_client=100 \
 		--gated margaret_jwks_client_tests=100 \
+		--gated margaret_jwks_file_secret_storage=100 \
+		--gated margaret_jwks_file_secret_storage_tests=100 \
 		--gated margaret_jwks_keygen=100 \
 		--gated margaret_jwks_keygen_tests=100 \
 		--gated margaret_jwks_roller=100 \
 		--gated margaret_jwks_roller_server=100 \
 		--gated margaret_jwks_roller_tests=100 \
+		--gated margaret_jwks_secret_storage_selection=100 \
+		--gated margaret_jwks_secret_storage_selection_tests=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_middleware_codegen=100 \
 		--gated margaret_model=100 \

@@ -17,6 +17,7 @@ margaret_http_validation = { path = "../margaret_http_validation" }
 margaret_identity = { path = "../margaret_identity" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
 margaret_jwks_roller_server = { path = "../margaret_jwks_roller_server" }
+margaret_jwks_secret_storage_selection = { path = "../margaret_jwks_secret_storage_selection" }
 margaret_macros = { path = "../margaret_macros" }
 margaret_model = { path = "../margaret_model" }
 margaret_service = { path = "../margaret_service" }

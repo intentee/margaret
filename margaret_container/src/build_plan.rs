@@ -17,7 +17,9 @@ use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::marker::marker;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 use margaret_attributes::struct_shape::StructShape;
+use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
+use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 use margaret_tag_codegen::read_reference_tag::read_reference_tag;
 use margaret_tag_codegen::tag_kind::TagKind;
 use margaret_tag_codegen::tag_pool::TagPool;
@@ -27,6 +29,7 @@ use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
+use crate::framework_provider::FrameworkProvider;
 use crate::path_text::path_text;
 use crate::peel_target::peel_target;
 use crate::provided_type::ProvidedType;
@@ -410,36 +413,64 @@ struct DraftedContainer<'index> {
     provider_drafts: Vec<Draft<'index>>,
 }
 
-fn resolve_framework_providers(
-    index: &AttributeIndex,
-    provider_drafts: &[Draft],
-    construction_drafts: &[Draft],
-    provided_keys: &mut HashMap<CanonicalPath, CanonicalPath>,
-    framework_provided: &[CanonicalPath],
-) -> Result<Vec<Provider>, ContainerError> {
-    let mut providers = Vec::new();
-
-    for path in framework_provided {
-        if !is_framework_path_referenced(index, provider_drafts, path)
-            && !is_framework_path_referenced(index, construction_drafts, path)
-        {
-            continue;
-        }
-
-        if provided_keys.insert(path.clone(), path.clone()).is_some() {
-            return Err(ContainerError::AmbiguousFrameworkProvider {
-                path: path.to_string(),
-            });
-        }
-
-        providers.push(Provider {
+fn framework_provider_definition(framework_provider: &FrameworkProvider) -> Provider {
+    match framework_provider {
+        FrameworkProvider::Unit(path) => Provider {
             concrete_path: path.clone(),
             construction: DirectConstruction::Fieldless {
                 shape: StructShape::Unit,
             },
             field_name: path.field_name(),
             provided: ProvidedType::Concrete(path.clone()),
-        });
+        },
+        FrameworkProvider::UriSelected(provider) => {
+            let argument = ConsoleArgument::Named {
+                name: provider.argument_name.clone(),
+                required: true,
+                weaving: WeavingKind::from_canonical(&provider.value_type, true),
+                value_type: provider.value_type.clone(),
+            };
+
+            Provider {
+                concrete_path: provider.trait_path.clone(),
+                construction: DirectConstruction::Resolved {
+                    dependencies: vec![DependencyKind::ConsoleArgument {
+                        argument: Box::new(argument),
+                    }],
+                    resolver: provider.resolver.clone(),
+                },
+                field_name: provider.trait_path.field_name(),
+                provided: ProvidedType::UriSelected(provider.trait_path.clone()),
+            }
+        }
+    }
+}
+
+fn resolve_framework_providers(
+    index: &AttributeIndex,
+    provider_drafts: &[Draft],
+    construction_drafts: &[Draft],
+    provided_keys: &mut HashMap<CanonicalPath, CanonicalPath>,
+    framework_provided: &[FrameworkProvider],
+) -> Result<Vec<Provider>, ContainerError> {
+    let mut providers = Vec::new();
+
+    for framework_provider in framework_provided {
+        let key = framework_provider.key();
+
+        if !is_framework_path_referenced(index, provider_drafts, key)
+            && !is_framework_path_referenced(index, construction_drafts, key)
+        {
+            continue;
+        }
+
+        if provided_keys.insert(key.clone(), key.clone()).is_some() {
+            return Err(ContainerError::AmbiguousFrameworkProvider {
+                path: key.to_string(),
+            });
+        }
+
+        providers.push(framework_provider_definition(framework_provider));
     }
 
     Ok(providers)
@@ -475,7 +506,7 @@ fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &Canonical
 pub(crate) fn build_plan(
     index: &AttributeIndex,
     registry: &ConsoleArgumentRegistry,
-    framework_provided: &[CanonicalPath],
+    framework_provided: &[FrameworkProvider],
     pool: &TagPool,
 ) -> Result<ContainerPlan, ContainerError> {
     let DraftedContainer {

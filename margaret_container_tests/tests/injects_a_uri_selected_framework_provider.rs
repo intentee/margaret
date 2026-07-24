@@ -1,0 +1,72 @@
+use std::path::Path;
+
+use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::crate_root::CrateRoot;
+use margaret_console_argument_codegen::scan::scan;
+use margaret_container::framework_provider::FrameworkProvider;
+use margaret_container::render_container::render_container;
+use margaret_container::uri_selected_provider::UriSelectedProvider;
+use margaret_container_tests::container_module_source::container_module_source;
+
+fn uri_selected_provider() -> FrameworkProvider {
+    FrameworkProvider::UriSelected(UriSelectedProvider {
+        argument_name: "test-storage".to_string(),
+        resolver: CanonicalPath::new(vec![
+            "crate".to_string(),
+            "resolve_test_storage".to_string(),
+        ]),
+        trait_path: CanonicalPath::new(vec!["crate".to_string(), "TestStorage".to_string()]),
+        value_type: CanonicalPath::new(vec!["crate".to_string(), "TestStorageUri".to_string()]),
+    })
+}
+
+fn render_with_provider(fixture: &str) -> String {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(fixture);
+    let index = AttributeIndexBuilder::new()
+        .index_crate(&CrateRoot::new("crate", &directory))
+        .expect("the fixture crate is indexed")
+        .build();
+    let registry = scan(&index).expect("the console arguments are scanned");
+
+    container_module_source(
+        render_container(&index, &registry, &[uri_selected_provider()])
+            .expect("the fixture renders")
+            .modules,
+    )
+    .split_whitespace()
+    .collect()
+}
+
+#[test]
+fn materializes_the_provider_as_a_trait_object_field() {
+    assert!(
+        render_with_provider("uri_selected_provider")
+            .contains("test_storage:tokio::sync::OnceCell<std::sync::Arc<dyncrate::TestStorage>>")
+    );
+}
+
+#[test]
+fn parameterizes_the_accessor_with_the_uri_console_argument() {
+    assert!(
+        render_with_provider("uri_selected_provider")
+            .contains("pubasyncfntest_storage(&self,console_argument_0:crate::TestStorageUri,)")
+    );
+}
+
+#[test]
+fn injects_the_resolver_result_without_rewrapping_it_in_a_new_arc() {
+    let source = render_with_provider("uri_selected_provider");
+
+    assert!(source.contains(
+        "std::sync::Arc<dyncrate::TestStorage>=crate::resolve_test_storage(console_argument_0,)"
+    ));
+    assert!(!source.contains("Arc::new(crate::resolve_test_storage"));
+}
+
+#[test]
+fn skips_a_provider_that_no_singleton_references() {
+    assert!(!render_with_provider("fieldless").contains("TestStorage"));
+}

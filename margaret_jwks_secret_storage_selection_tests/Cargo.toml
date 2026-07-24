@@ -1,0 +1,20 @@
+[package]
+name = "margaret_jwks_secret_storage_selection_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dev-dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
+margaret_jwks_roller = { path = "../margaret_jwks_roller" }
+margaret_jwks_secret_storage_selection = { path = "../margaret_jwks_secret_storage_selection" }
+tempfile = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

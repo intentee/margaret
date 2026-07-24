@@ -12,6 +12,7 @@ mod format_pass;
 pub mod generate;
 pub mod generated_code;
 mod http_pass;
+mod jwks_secret_storage_provider;
 mod middleware_pass;
 mod model_pass;
 mod serve_arguments;

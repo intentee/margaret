@@ -7,6 +7,8 @@ use margaret_container::container_error::ContainerError;
 use margaret_container::render_container::render_container;
 use margaret_generated_module::generated_module::GeneratedModule;
 
+use crate::container_module_source::container_module_source;
+
 pub fn generate_container_source(
     crate_name: &str,
     source_directory: &Path,
@@ -15,19 +17,7 @@ pub fn generate_container_source(
         .index_crate(&CrateRoot::new(crate_name, source_directory))?
         .build();
     let registry = scan(&index)?;
-
-    let source = render_container(&index, &registry, &[])?
-        .modules
-        .into_iter()
-        .map(|module| {
-            module
-                .format()
-                .expect("the module formats")
-                .source()
-                .to_string()
-        })
-        .collect::<Vec<String>>()
-        .join("\n");
+    let source = container_module_source(render_container(&index, &registry, &[])?.modules);
 
     Ok(GeneratedModule::new("container", source))
 }
