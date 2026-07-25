@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use margaret_endpoint::endpoint_error::EndpointError;
+use margaret_jwks_endpoint::endpoint_error::EndpointError;
 use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 
 #[derive(Debug, Error)]

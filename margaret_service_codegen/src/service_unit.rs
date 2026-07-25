@@ -41,6 +41,7 @@ impl ServiceUnit {
     pub(crate) fn from_framework(
         FrameworkService {
             concrete_path,
+            field_name,
             kind,
             runner,
             takes_token,
@@ -49,7 +50,7 @@ impl ServiceUnit {
     ) -> Self {
         Self {
             concrete_path: concrete_path.clone(),
-            field_name: concrete_path.field_name(),
+            field_name: field_name.clone(),
             kind: match kind {
                 FrameworkServiceKind::Service => ServiceKind::Service,
                 FrameworkServiceKind::Ticker { interval } => ServiceKind::Ticker {

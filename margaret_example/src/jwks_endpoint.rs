@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use url::Url;
 
-use margaret::framework::endpoint::endpoint_error::EndpointError;
-use margaret::framework::endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwks_endpoint::endpoint_error::EndpointError;
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 use margaret::framework::macros::provides_jwks_endpoint;
 use margaret::framework::macros::singleton;
 

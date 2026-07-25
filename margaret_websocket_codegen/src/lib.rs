@@ -40,6 +40,7 @@ mod tests {
     use crate::has_websocket_sessions::has_websocket_sessions;
     use crate::render_websocket::render_websocket;
     use crate::websocket_codegen_error::WebSocketCodegenError;
+    use crate::websocket_handlers::websocket_handlers;
 
     const REQUEST_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
     const NOTIFICATION_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;\n";
@@ -224,6 +225,116 @@ impl RespondsToWebSocketMessage for Chatter {
             "public_routes(container:&super::container::Container,console_argument_0:&str,"
         ));
         assert!(source.contains("upgrade_entry(container,console_argument_0"));
+    }
+
+    const NON_STRUCT_HANDLER: &str = r#"
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[websocket_message(request, method = "chat", response = single)]
+struct Chat;
+
+#[singleton]
+enum Chatter {}
+
+impl RespondsToWebSocketMessage for Chatter {
+    type Session = Chat;
+    type Message = Chat;
+}
+"#;
+
+    #[test]
+    fn rejects_a_handler_that_is_not_a_struct() {
+        let error = websocket_handlers(&index_for(NON_STRUCT_HANDLER))
+            .err()
+            .expect("a non-struct websocket handler is rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("handler trait but is not a struct")
+        );
+    }
+
+    const COLLIDING_HANDLER_FIELD: &str = r#"
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[websocket_message(request, method = "chat", response = single)]
+struct Chat;
+
+mod a {
+    pub mod b {
+        #[singleton]
+        pub struct Handler;
+
+        impl Handler {
+            #[constructor]
+            fn new() -> Self {}
+        }
+    }
+}
+
+mod a_b {
+    use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+    #[singleton]
+    pub struct Handler;
+
+    impl RespondsToWebSocketMessage for Handler {
+        type Session = crate::Chat;
+        type Message = crate::Chat;
+    }
+}
+"#;
+
+    #[test]
+    fn resolves_a_handler_to_its_disambiguated_container_field() {
+        let handlers = websocket_handlers(&index_for(COLLIDING_HANDLER_FIELD))
+            .expect("the handlers are discovered");
+
+        assert_eq!(handlers.len(), 1);
+        assert_eq!(handlers[0].handler_field, "a_b_handler_2");
+    }
+
+    const COLLIDING_DISPATCH_METHODS: &str = r#"
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[websocket_message(request, method = "say_hi", response = single)]
+struct SayHi;
+
+#[websocket_message(request, method = "say__hi", response = single)]
+struct SayHiToo;
+
+#[singleton]
+struct FirstHandler;
+
+impl RespondsToWebSocketMessage for FirstHandler {
+    type Session = Room;
+    type Message = SayHi;
+}
+
+#[singleton]
+struct SecondHandler;
+
+impl RespondsToWebSocketMessage for SecondHandler {
+    type Session = Room;
+    type Message = SayHiToo;
+}
+"#;
+
+    #[test]
+    fn disambiguates_dispatch_structs_whose_methods_share_an_upper_camel_form() {
+        let source = generated(COLLIDING_DISPATCH_METHODS);
+
+        assert!(source.contains("structSayHiDispatch"));
+        assert!(source.contains("structSayHi2Dispatch"));
     }
 
     const SESSION_WITH_MIDDLEWARE: &str = r#"

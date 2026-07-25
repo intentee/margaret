@@ -39,6 +39,7 @@ impl ContainerBindings {
                     provider_key.clone(),
                     ProviderBinding {
                         field_name: provider.field_name.clone(),
+                        type_name: provider.type_name.clone(),
                     },
                 )
             })
@@ -150,6 +151,11 @@ impl ContainerBindings {
     }
 
     #[must_use]
+    pub fn provider(&self, provider_key: &CanonicalPath) -> Option<&ProviderBinding> {
+        self.providers.get(provider_key)
+    }
+
+    #[must_use]
     pub fn provides(&self, provider_key: &CanonicalPath) -> bool {
         self.providers.contains_key(provider_key)
     }
@@ -168,10 +174,6 @@ impl ContainerBindings {
         collected.extend_from_slice(woven);
 
         Ok(unify_by_key(&collected)?)
-    }
-
-    pub(crate) fn provider(&self, provider_key: &CanonicalPath) -> Option<&ProviderBinding> {
-        self.providers.get(provider_key)
     }
 
     fn accessor_console_arguments(&self, field: &str) -> &[ConsoleArgument] {

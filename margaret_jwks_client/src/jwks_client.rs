@@ -6,7 +6,7 @@ use reqwest::ClientBuilder;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service as _;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 use crate::public_jwks_holder::PublicJwksHolder;
 use crate::public_jwks_poll_service::PublicJwksPollService;
@@ -60,7 +60,7 @@ mod tests {
     use tokio_util::sync::CancellationToken;
     use url::Url;
 
-    use margaret_endpoint::static_endpoint::StaticEndpoint;
+    use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 
     use super::JwksClient;
 

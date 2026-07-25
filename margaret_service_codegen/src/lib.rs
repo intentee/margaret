@@ -196,6 +196,7 @@ mod tests {
                     "jwks_roller",
                     "JwksRoller",
                 ]),
+                field_name: "framework_jwks_roller_server_jwks_roller_jwks_roller".to_string(),
                 kind: FrameworkServiceKind::Ticker {
                     interval: canonical(&[
                         "margaret",
@@ -217,6 +218,7 @@ mod tests {
                     "jwks_client",
                     "JwksClient",
                 ]),
+                field_name: "framework_jwks_client_jwks_client_jwks_client".to_string(),
                 kind: FrameworkServiceKind::Service,
                 runner: "run".to_string(),
                 takes_token: true,

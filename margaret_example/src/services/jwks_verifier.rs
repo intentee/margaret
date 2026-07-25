@@ -11,7 +11,7 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
 
-use crate::margaret::jwks::auth::PublicJwksVerifier;
+use crate::margaret::jwks::jwks_endpoint_jwks_endpoint::PublicJwksVerifier;
 use crate::system_clock::SystemClock;
 
 #[derive(Deserialize)]

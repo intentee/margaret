@@ -7,8 +7,6 @@ pub use margaret_codegen as codegen;
 #[cfg(feature = "runtime")]
 pub use margaret_console as console;
 #[cfg(feature = "runtime")]
-pub use margaret_endpoint as endpoint;
-#[cfg(feature = "runtime")]
 pub use margaret_http as http;
 #[cfg(feature = "runtime")]
 pub use margaret_http_validation as http_validation;
@@ -18,6 +16,8 @@ pub use margaret_identity as identity;
 pub use margaret_identity_session as identity_session;
 #[cfg(feature = "runtime")]
 pub use margaret_jwks_client as jwks_client;
+#[cfg(feature = "runtime")]
+pub use margaret_jwks_endpoint as jwks_endpoint;
 #[cfg(feature = "runtime")]
 pub use margaret_jwks_file_secret_storage as jwks_file_secret_storage;
 #[cfg(feature = "runtime")]
