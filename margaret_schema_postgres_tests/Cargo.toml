@@ -5,15 +5,16 @@ edition = "2024"
 autotests = false
 
 [dependencies]
+chrono = { workspace = true, features = ["clock"] }
 ephemeral-postgres = { workspace = true }
+margaret = { path = "../margaret" }
 margaret_example = { path = "../margaret_example" }
 margaret_model = { path = "../margaret_model" }
 sqlx = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
-chrono = { workspace = true, features = ["clock"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-uuid = { workspace = true, features = ["v4"] }
 
 [features]
 tests_that_use_postgres = []

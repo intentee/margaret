@@ -18,6 +18,7 @@ pub struct GetArticles {
 
 impl GetArticles {
     #[constructor]
+    #[must_use]
     pub fn create(articles: Arc<ArticleStore>) -> Self {
         Self { articles }
     }
@@ -29,9 +30,11 @@ impl GetArticles {
         #[form_request(from = Query)] GetArticlesForm { author }: GetArticlesForm,
     ) -> Response {
         let author = author.as_deref();
-        let links = self
-            .articles
-            .all()
+        let articles = match self.articles.all().await {
+            Ok(articles) => articles,
+            Err(error) => return Response::text(500, error.to_string()),
+        };
+        let links = articles
             .into_iter()
             .filter(|article| match author {
                 Some(author) => article.author.name == author,

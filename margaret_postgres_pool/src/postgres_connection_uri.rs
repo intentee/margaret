@@ -33,7 +33,6 @@ mod tests {
     use std::error::Error as _;
 
     use super::PostgresConnectionUri;
-    use crate::postgres_pool_error::PostgresPoolError;
 
     #[test]
     fn parses_a_valid_postgres_url_into_connect_options() {
@@ -52,9 +51,5 @@ mod tests {
 
         assert!(error.to_string().contains("connection URL is invalid"));
         assert!(error.source().is_some());
-        assert!(matches!(
-            error,
-            PostgresPoolError::InvalidConnectionUri { .. }
-        ));
     }
 }

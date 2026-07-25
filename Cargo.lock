@@ -2017,6 +2017,7 @@ dependencies = [
  "serde",
  "serde_json",
  "spiffe",
+ "sqlx",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -2479,6 +2480,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "ephemeral-postgres",
+ "margaret",
  "margaret_example",
  "margaret_model",
  "sqlx",

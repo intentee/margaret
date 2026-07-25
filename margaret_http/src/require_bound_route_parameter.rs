@@ -12,8 +12,15 @@ where
 {
     match request.path_param(name) {
         Some(value) => match binder.bind(value.to_string()).await {
-            Some(model) => Ok(model),
-            None => Err(Response::not_found()),
+            Ok(Some(model)) => Ok(model),
+            Ok(None) => Err(Response::not_found()),
+            Err(error) => {
+                eprintln!(
+                    "margaret_http: the route parameter binder for `{name}` failed: {error}"
+                );
+
+                Err(Response::text(500, "Internal Server Error"))
+            }
         },
         None => Err(Response::not_found()),
     }
@@ -22,6 +29,8 @@ where
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::convert::Infallible;
+    use std::fmt;
 
     use async_trait::async_trait;
     use http::Method;
@@ -35,9 +44,30 @@ mod tests {
     #[async_trait]
     impl HttpRouteParameterBinder for EvenNumberBinder {
         type Model = u32;
+        type Error = Infallible;
 
-        async fn bind(&self, value: String) -> Option<u32> {
-            value.parse::<u32>().ok().filter(|number| number % 2 == 0)
+        async fn bind(&self, value: String) -> Result<Option<u32>, Infallible> {
+            Ok(value.parse::<u32>().ok().filter(|number| number % 2 == 0))
+        }
+    }
+
+    struct FailingBinder;
+
+    struct BinderFailure;
+
+    impl fmt::Display for BinderFailure {
+        fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("the binder could not reach its backing store")
+        }
+    }
+
+    #[async_trait]
+    impl HttpRouteParameterBinder for FailingBinder {
+        type Model = u32;
+        type Error = BinderFailure;
+
+        async fn bind(&self, _value: String) -> Result<Option<u32>, BinderFailure> {
+            Err(BinderFailure)
         }
     }
 
@@ -81,6 +111,19 @@ mod tests {
                 .err()
                 .map(|response| response.status()),
             Some(404)
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_a_server_error_when_the_binder_fails() {
+        let request = request_with_parameter("42");
+
+        assert_eq!(
+            require_bound_route_parameter(&request, "number", &FailingBinder)
+                .await
+                .err()
+                .map(|response| response.status()),
+            Some(500)
         );
     }
 }

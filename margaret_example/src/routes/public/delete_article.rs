@@ -17,6 +17,7 @@ pub struct DeleteArticle {
 
 impl DeleteArticle {
     #[constructor]
+    #[must_use]
     pub fn create(articles: Arc<ArticleStore>) -> Self {
         Self { articles }
     }
@@ -26,7 +27,9 @@ impl DeleteArticle {
         &self,
         #[route_parameter(from = "article")] Article { id, title, .. }: Article,
     ) -> Response {
-        self.articles.remove(id);
+        if let Err(error) = self.articles.remove(id).await {
+            return Response::text(500, error.to_string());
+        }
 
         Response::text(200, format!("deleted \"{title}\""))
     }

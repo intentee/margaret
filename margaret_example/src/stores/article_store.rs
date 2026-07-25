@@ -1,11 +1,11 @@
 use std::sync::Arc;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
 
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use dashmap::DashMap;
+use sqlx::AssertSqlSafe;
+use sqlx::query;
+use sqlx::query_as;
 use uuid::Uuid;
 
 use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
@@ -13,245 +13,212 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::provides_route_parameter;
 use margaret::framework::macros::singleton;
 
+use crate::margaret::postgres_pool::PgPool;
 use crate::models::article::Article;
 use crate::models::article_status::ArticleStatus;
 use crate::models::author::Author;
 use crate::stores::article_store_error::ArticleStoreError;
 use crate::system_clock::SystemClock;
 
-const FIRST_AUTHORED_ID: u64 = 103;
-
 pub const FEATURED_ARTICLE_ID: Uuid = Uuid::from_u128(100);
 
-fn at_epoch_seconds(seconds: i64) -> DateTime<Utc> {
-    DateTime::from_timestamp_nanos(seconds * 1_000_000_000)
-}
+const SELECT_ARTICLES: &str = "\
+SELECT \
+articles.id, articles.title, articles.body, articles.cover, articles.published, \
+articles.status, articles.created_at, \
+authors.id, authors.name, authors.is_active, authors.joined_at, authors.bio \
+FROM articles JOIN authors ON articles.author_id = authors.id";
 
-fn milo() -> Author {
+type ArticleRow = (
+    Uuid,
+    String,
+    String,
+    Option<Vec<u8>>,
+    bool,
+    String,
+    DateTime<Utc>,
+    Uuid,
+    String,
+    bool,
+    DateTime<Utc>,
+    Option<String>,
+);
+
+type AuthorRow = (Uuid, String, bool, DateTime<Utc>, Option<String>);
+
+fn author_from_row(row: AuthorRow) -> Author {
+    let (id, name, active, joined_at, bio) = row;
+
     Author {
-        id: Uuid::from_u128(3),
-        name: "Milo".to_string(),
-        active: true,
-        joined_at: at_epoch_seconds(1_600_000_000),
-        bio: Some("Writes public notes.".to_string()),
+        id,
+        name,
+        active,
+        joined_at,
+        bio,
     }
 }
 
-fn mona() -> Author {
-    Author {
-        id: Uuid::from_u128(2),
-        name: "Mona".to_string(),
-        active: true,
-        joined_at: at_epoch_seconds(1_610_000_000),
-        bio: None,
-    }
-}
+fn article_from_row(row: ArticleRow) -> Result<Article, ArticleStoreError> {
+    let (
+        id,
+        title,
+        body,
+        cover,
+        published,
+        status_text,
+        created_at,
+        author_id,
+        author_name,
+        author_active,
+        author_joined_at,
+        author_bio,
+    ) = row;
+    let status = match ArticleStatus::from_text(&status_text) {
+        Some(status) => status,
+        None => return Err(ArticleStoreError::UnknownStatus { value: status_text }),
+    };
 
-fn known_authors() -> Vec<Author> {
-    vec![milo(), mona()]
-}
-
-fn seed() -> Vec<Article> {
-    vec![
-        Article {
-            id: FEATURED_ARTICLE_ID,
-            title: "Shipping Margaret".to_string(),
-            body: "A public note from Milo.".to_string(),
-            cover: None,
-            published: true,
-            status: ArticleStatus::Published,
-            created_at: at_epoch_seconds(1_704_067_200),
-            author: milo(),
+    Ok(Article {
+        id,
+        title,
+        body,
+        cover,
+        published,
+        status,
+        created_at,
+        author: Author {
+            id: author_id,
+            name: author_name,
+            active: author_active,
+            joined_at: author_joined_at,
+            bio: author_bio,
         },
-        Article {
-            id: Uuid::from_u128(101),
-            title: "Milo's draft".to_string(),
-            body: "An unpublished draft from Milo.".to_string(),
-            cover: None,
-            published: false,
-            status: ArticleStatus::Draft,
-            created_at: at_epoch_seconds(1_704_153_600),
-            author: milo(),
-        },
-        Article {
-            id: Uuid::from_u128(102),
-            title: "Mona's draft".to_string(),
-            body: "An unpublished draft from Mona.".to_string(),
-            cover: None,
-            published: false,
-            status: ArticleStatus::Draft,
-            created_at: at_epoch_seconds(1_704_240_000),
-            author: mona(),
-        },
-    ]
+    })
 }
 
 #[singleton]
 #[provides_route_parameter]
 pub struct ArticleStore {
-    articles: DashMap<Uuid, Article>,
-    authors: Vec<Author>,
     clock: Arc<SystemClock>,
-    next_id: AtomicU64,
+    pool: sqlx::PgPool,
 }
 
 impl ArticleStore {
     #[constructor]
     #[must_use]
-    pub fn create(clock: Arc<SystemClock>) -> Self {
-        let articles = DashMap::new();
-
-        for article in seed() {
-            articles.insert(article.id, article);
-        }
-
+    pub fn create(clock: Arc<SystemClock>, pool: Arc<PgPool>) -> Self {
         Self {
-            articles,
-            authors: known_authors(),
             clock,
-            next_id: AtomicU64::new(FIRST_AUTHORED_ID),
+            pool: (**pool).clone(),
         }
     }
 
-    pub fn all(&self) -> Vec<Article> {
-        let mut all: Vec<Article> = self
-            .articles
-            .iter()
-            .map(|article| article.value().clone())
-            .collect();
+    pub async fn all(&self) -> Result<Vec<Article>, ArticleStoreError> {
+        let rows: Vec<ArticleRow> =
+            query_as(AssertSqlSafe(format!("{SELECT_ARTICLES} ORDER BY articles.id")))
+                .fetch_all(&self.pool)
+                .await?;
 
-        all.sort_by_key(|article| article.id);
-
-        all
+        rows.into_iter().map(article_from_row).collect()
     }
 
-    pub fn find_article_by_id(&self, id: Uuid) -> Option<Article> {
-        self.articles
-            .get(&id)
-            .map(|article| article.value().clone())
+    pub async fn find_article_by_id(&self, id: Uuid) -> Result<Option<Article>, ArticleStoreError> {
+        let row: Option<ArticleRow> =
+            query_as(AssertSqlSafe(format!("{SELECT_ARTICLES} WHERE articles.id = $1")))
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await?;
+
+        row.map(article_from_row).transpose()
     }
 
-    pub fn insert(
+    pub async fn insert(
         &self,
         title: String,
         body: String,
         author_id: Uuid,
     ) -> Result<Article, ArticleStoreError> {
         let author = self
-            .authors
-            .iter()
-            .find(|author| author.id == author_id)
-            .cloned()
+            .find_author_by_id(author_id)
+            .await?
             .ok_or(ArticleStoreError::AuthorNotFound { author_id })?;
+        let created_at = self.clock.now();
+        let (id,): (Uuid,) = query_as(
+            "INSERT INTO articles \
+             (title, body, cover, published, status, created_at, author_id) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+        )
+        .bind(&title)
+        .bind(&body)
+        .bind(None::<Vec<u8>>)
+        .bind(false)
+        .bind(ArticleStatus::Draft.as_text())
+        .bind(created_at)
+        .bind(author_id)
+        .fetch_one(&self.pool)
+        .await?;
 
-        let id = Uuid::from_u128(u128::from(self.next_id.fetch_add(1, Ordering::Relaxed)));
-        let article = Article {
+        Ok(Article {
             id,
             title,
             body,
             cover: None,
             published: false,
             status: ArticleStatus::Draft,
-            created_at: self.clock.now(),
+            created_at,
             author,
-        };
-
-        self.articles.insert(id, article.clone());
-
-        Ok(article)
+        })
     }
 
-    pub fn remove(&self, id: Uuid) {
-        self.articles.remove(&id);
+    pub async fn remove(&self, id: Uuid) -> Result<(), ArticleStoreError> {
+        query("DELETE FROM articles WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 
-    pub fn save(&self, article: Article) {
-        self.articles.insert(article.id, article);
+    pub async fn save(&self, article: Article) -> Result<(), ArticleStoreError> {
+        query(
+            "UPDATE articles SET \
+             title = $2, body = $3, cover = $4, published = $5, status = $6, \
+             created_at = $7, author_id = $8 WHERE id = $1",
+        )
+        .bind(article.id)
+        .bind(&article.title)
+        .bind(&article.body)
+        .bind(&article.cover)
+        .bind(article.published)
+        .bind(article.status.as_text())
+        .bind(article.created_at)
+        .bind(article.author.id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn find_author_by_id(&self, id: Uuid) -> Result<Option<Author>, ArticleStoreError> {
+        let row: Option<AuthorRow> =
+            query_as("SELECT id, name, is_active, joined_at, bio FROM authors WHERE id = $1")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await?;
+
+        Ok(row.map(author_from_row))
     }
 }
 
 #[async_trait]
 impl HttpRouteParameterBinder for ArticleStore {
     type Model = Article;
+    type Error = ArticleStoreError;
 
-    async fn bind(&self, value: String) -> Option<Article> {
-        Uuid::parse_str(&value)
-            .ok()
-            .and_then(|id| self.find_article_by_id(id))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use uuid::Uuid;
-
-    use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
-
-    use super::ArticleStore;
-    use super::FEATURED_ARTICLE_ID;
-    use crate::system_clock::SystemClock;
-
-    fn store() -> ArticleStore {
-        ArticleStore::create(Arc::new(SystemClock::create()))
-    }
-
-    #[test]
-    fn seeds_the_featured_article_with_its_author() {
-        let article = store()
-            .find_article_by_id(FEATURED_ARTICLE_ID)
-            .expect("the featured article is seeded");
-
-        assert_eq!(article.title, "Shipping Margaret");
-        assert_eq!(article.author.name, "Milo");
-    }
-
-    #[test]
-    fn inserts_an_article_for_a_known_author() {
-        let store = store();
-        let article = store
-            .insert("Title".to_string(), "Body".to_string(), Uuid::from_u128(3))
-            .expect("the article is inserted for a known author");
-
-        assert_eq!(article.author.name, "Milo");
-        assert!(store.find_article_by_id(article.id).is_some());
-    }
-
-    #[test]
-    fn rejects_an_article_for_an_unknown_author() {
-        assert!(
-            store()
-                .insert(
-                    "Title".to_string(),
-                    "Body".to_string(),
-                    Uuid::from_u128(999)
-                )
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn removes_an_article() {
-        let store = store();
-        store.remove(FEATURED_ARTICLE_ID);
-
-        assert!(store.find_article_by_id(FEATURED_ARTICLE_ID).is_none());
-    }
-
-    #[test]
-    fn lists_the_seeded_articles_in_id_order() {
-        let all = store().all();
-
-        assert_eq!(all.len(), 3);
-        assert_eq!(all[0].id, FEATURED_ARTICLE_ID);
-    }
-
-    #[tokio::test]
-    async fn binds_an_article_by_its_uuid() {
-        let store = store();
-
-        assert!(store.bind(FEATURED_ARTICLE_ID.to_string()).await.is_some());
-        assert!(store.bind("not-a-uuid".to_string()).await.is_none());
+    async fn bind(&self, value: String) -> Result<Option<Article>, ArticleStoreError> {
+        match Uuid::parse_str(&value) {
+            Ok(id) => self.find_article_by_id(id).await,
+            Err(_) => Ok(None),
+        }
     }
 }

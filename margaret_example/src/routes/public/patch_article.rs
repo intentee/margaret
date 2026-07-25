@@ -18,6 +18,7 @@ pub struct PatchArticle {
 
 impl PatchArticle {
     #[constructor]
+    #[must_use]
     pub fn create(articles: Arc<ArticleStore>) -> Self {
         Self { articles }
     }
@@ -40,16 +41,22 @@ impl PatchArticle {
         let title = title.unwrap_or(current_title);
         let body = body.unwrap_or(current_body);
 
-        self.articles.save(Article {
-            id,
-            title: title.clone(),
-            body,
-            cover,
-            published,
-            status,
-            created_at,
-            author,
-        });
+        if let Err(error) = self
+            .articles
+            .save(Article {
+                id,
+                title: title.clone(),
+                body,
+                cover,
+                published,
+                status,
+                created_at,
+                author,
+            })
+            .await
+        {
+            return Response::text(500, error.to_string());
+        }
 
         Response::text(200, format!("updated \"{title}\""))
     }

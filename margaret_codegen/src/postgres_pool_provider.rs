@@ -19,6 +19,16 @@ fn postgres_connection_uri_type() -> CanonicalPath {
     ])
 }
 
+fn postgres_max_connections_type() -> CanonicalPath {
+    CanonicalPath::new(vec![
+        "margaret".to_string(),
+        "framework".to_string(),
+        "postgres_pool".to_string(),
+        "postgres_max_connections".to_string(),
+        "PostgresMaxConnections".to_string(),
+    ])
+}
+
 fn required_named_argument(name: &str, value_type: CanonicalPath) -> FrameworkDependency {
     FrameworkDependency::ConsoleArgument(Box::new(ConsoleArgument::Named {
         name: name.to_string(),
@@ -35,7 +45,7 @@ pub(crate) fn postgres_pool_provider(enablement: FrameworkEnablement) -> Framewo
                 required_named_argument("postgres-url", postgres_connection_uri_type()),
                 required_named_argument(
                     "postgres-max-connections",
-                    CanonicalPath::new(vec!["u32".to_string()]),
+                    postgres_max_connections_type(),
                 ),
             ],
             is_async: false,

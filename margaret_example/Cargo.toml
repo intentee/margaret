@@ -14,6 +14,7 @@ maud = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types"] }
+sqlx = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-util = { workspace = true }

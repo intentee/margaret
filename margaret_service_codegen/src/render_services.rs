@@ -315,7 +315,9 @@ fn startup_constructions(
             bindings.console_weaves_owned(bindings.console_arguments(&singleton.concrete_path));
 
         quote! {
-            let _ = container.#accessor(#(#woven),*).await;
+            if let Err(error) = container.#accessor(#(#woven),*).await.ensure_reachable().await {
+                return margaret::framework::console::report_failure::report_failure(error);
+            }
         }
     });
 

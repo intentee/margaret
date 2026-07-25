@@ -1445,12 +1445,19 @@ impl Page {
         assert!(run.contains(
             r#"clap::Arg::new("postgres-max-connections").long("postgres-max-connections").required(true)"#
         ));
+        assert!(run.contains(
+            "clap::value_parser!(margaret::framework::postgres_pool::postgres_max_connections::PostgresMaxConnections)"
+        ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
         assert!(container.contains("crate::margaret::postgres_pool::PgPool::connect("));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains(".margaret_postgres_pool_pg_pool("));
+        assert!(serve.contains(".ensure_reachable().await"));
+        assert!(serve.contains(
+            "margaret::framework::console::report_failure::report_failure(error)"
+        ));
     }
 
     const POOL_INJECTION_CRATE: &str = "\
