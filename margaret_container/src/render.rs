@@ -54,7 +54,7 @@ fn accessor(
     let name = field_ident(provider);
     let field_type = field_type(provider);
     let parameters = closures.of(key).iter().map(|argument| {
-        let ident = console_argument_ident(closures.slot(argument.name()));
+        let ident = console_argument_ident(closures.slot(&argument.slot_key()));
         let value_type = argument.field_type();
 
         quote! { #ident: #value_type }
@@ -182,7 +182,7 @@ fn body_slot_uses(dependencies: &[DependencyKind], closures: &ConsoleClosures) -
     dependencies
         .iter()
         .flat_map(|dependency| dependency_arguments(dependency, closures))
-        .map(|argument| closures.slot(argument.name()))
+        .map(|argument| closures.slot(&argument.slot_key()))
         .collect()
 }
 
@@ -193,7 +193,7 @@ fn woven_arguments(
 ) -> Vec<TokenStream> {
     arguments
         .iter()
-        .map(|argument| ledger.weave(argument, closures.slot(argument.name())))
+        .map(|argument| ledger.weave(argument, closures.slot(&argument.slot_key())))
         .collect()
 }
 
@@ -205,7 +205,7 @@ fn dependency_expression(
 ) -> TokenStream {
     match dependency {
         DependencyKind::ConsoleArgument { argument } => {
-            ledger.weave(argument, closures.slot(argument.name()))
+            ledger.weave(argument, closures.slot(&argument.slot_key()))
         }
         DependencyKind::Single { provider_key } => {
             let accessor = field_ident(&plan.providers[provider_key]);

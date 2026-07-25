@@ -1,0 +1,21 @@
+[package]
+name = "margaret_spiffe_svid_bundle_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dev-dependencies]
+margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
+margaret_spiffe_svid_bundle = { path = "../margaret_spiffe_svid_bundle" }
+margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests" }
+margaret_sync_holder = { path = "../margaret_sync_holder" }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "integration"
+path = "tests/main.rs"

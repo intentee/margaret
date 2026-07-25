@@ -518,6 +518,226 @@ impl PostMint {
 }
 ";
 
+    const SPIFFE_HTTP_CLIENT_CRATE: &str = "\
+use reqwest::Client;
+use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
+
+#[singleton]
+struct OutboundCaller {
+    client: Client,
+}
+
+impl OutboundCaller {
+    #[constructor]
+    fn create(#[spiffe_http_client] client: Client) -> Self {}
+}
+
+#[service]
+struct Worker {
+    caller: Arc<OutboundCaller>,
+}
+
+impl Worker {
+    #[constructor]
+    fn create(caller: Arc<OutboundCaller>) -> Self {}
+
+    #[process]
+    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}
+}
+";
+
+    #[test]
+    fn provisions_a_spiffe_http_client_for_a_client_only_service() {
+        let code = generate(SPIFFE_HTTP_CLIENT_CRATE).expect("the build succeeds");
+
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+        assert!(serve.contains(
+            "margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
+        ));
+        assert!(serve.contains(
+            "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+        ));
+        assert!(serve.contains("letmutspiffe_client_readiness=spiffe_bundle.client_readiness();"));
+        assert!(serve.contains(
+            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
+        ));
+        assert!(serve.contains(
+            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
+        ));
+        assert!(serve.contains(
+            "letspiffe_identity_running=spiffe_identity_manager.start(cancellation_token.clone());"
+        ));
+        assert!(serve.contains(
+            "matchspiffe_client_readiness.wait_until_ready(&cancellation_token).await{margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Present=>{}margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Cancelled=>{returnmargaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running],trzcina::ServiceShutdownOptions::default(),).await;}}"
+        ));
+        assert!(serve.contains("letconsole_argument_0=spiffe_http_client.clone();"));
+        assert!(serve.contains(
+            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(!serve.contains("bundle_services"));
+        assert!(!serve.contains("spiffe_server_config"));
+
+        let container: String = module(&code, "container").split_whitespace().collect();
+        assert!(container.contains("console_argument_0:reqwest::Client"));
+
+        let run: String = module(&code, "run").split_whitespace().collect();
+        assert!(run.contains(r#"clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true)"#));
+        assert!(run.contains(r#"clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true)"#));
+    }
+
+    const SPIFFE_HTTP_SERVER_CLIENT_CRATE: &str = "\
+use reqwest::Client;
+use std::sync::Arc;
+
+#[singleton]
+struct OutboundCaller {
+    client: Client,
+}
+
+impl OutboundCaller {
+    #[constructor]
+    fn create(#[spiffe_http_client] client: Client) -> Self {}
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/call\", server = \"public\")]
+struct CallRoute {
+    caller: Arc<OutboundCaller>,
+}
+
+impl CallRoute {
+    #[constructor]
+    fn create(caller: Arc<OutboundCaller>) -> Self {}
+
+    #[process]
+    fn respond(&self) -> Response {}
+}
+";
+
+    #[test]
+    fn registers_the_client_bundle_alongside_a_plain_http_server() {
+        let code = generate(SPIFFE_HTTP_SERVER_CLIENT_CRATE).expect("the build succeeds");
+
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+        assert!(serve.contains(
+            "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+        ));
+        assert!(serve.contains(
+            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
+        ));
+        assert!(serve.contains(
+            "margaret::framework::service::serve_application::serve_application(matches,servers,margaret::framework::service::resolved_services::ResolvedServices{services:bundle_services,},)"
+        ));
+        assert!(serve.contains(
+            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(!serve.contains("bundle_services.extend"));
+        assert!(!serve.contains("spiffe_server_config"));
+    }
+
+    const SPIFFE_BOTH_CRATE: &str = "\
+use reqwest::Client;
+use spiffe::spiffe_id::SpiffeId;
+use std::sync::Arc;
+
+#[singleton]
+struct OutboundCaller {
+    client: Client,
+}
+
+impl OutboundCaller {
+    #[constructor]
+    fn create(#[spiffe_http_client] client: Client) -> Self {}
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/identity\", server = \"internal\")]
+struct GetIdentity {
+    caller: Arc<OutboundCaller>,
+}
+
+impl GetIdentity {
+    #[constructor]
+    fn create(caller: Arc<OutboundCaller>) -> Self {}
+
+    #[process]
+    fn respond(&self, peer: &SpiffeId) -> Response {}
+}
+";
+
+    #[test]
+    fn shares_one_svid_bundle_when_a_server_is_pinned_and_a_client_is_injected() {
+        let code = generate(SPIFFE_BOTH_CRATE).expect("the build succeeds");
+
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+        assert!(serve.contains(
+            "letspiffe_bundle=margaret::framework::spiffe_svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+        ));
+        assert!(serve.contains(
+            "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
+        ));
+        assert!(serve.contains("letmutspiffe_client_readiness=spiffe_bundle.client_readiness();"));
+        assert!(serve.contains(
+            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
+        ));
+        assert!(serve.contains(
+            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
+        ));
+        assert!(serve.contains(
+            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
+        ));
+        assert!(serve.contains(
+            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(serve.matches("SvidBundle::new").count() == 1);
+        assert!(!serve.contains("bundle_services.extend"));
+    }
+
+    #[test]
+    fn rejects_a_spiffe_http_client_marker_with_arguments() {
+        let error = generate(
+            "use reqwest::Client;\n\n#[singleton]\nstruct Bad {\n    client: Client,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client(extra)] client: Client) -> Self {}\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(error.contains("#[spiffe_http_client] does not take any arguments"));
+    }
+
+    #[test]
+    fn rejects_a_parameter_that_is_both_a_spiffe_http_client_and_a_console_argument() {
+        let error = generate(
+            "#[singleton]\nstruct Bad {\n    endpoint: String,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client] #[console_argument(from = \"endpoint\")] endpoint: String) -> Self {}\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(error.contains("must resolve to exactly one source"));
+    }
+
+    #[test]
+    fn rejects_a_console_command_that_injects_the_spiffe_http_client() {
+        let error = generate(
+            "use reqwest::Client;\nuse std::sync::Arc;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> Self {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: Arc<OutboundCaller>) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(error.contains("injects the #[spiffe_http_client]"));
+    }
+
+    #[test]
+    fn allows_a_console_argument_named_after_the_spiffe_http_client() {
+        let code = generate(
+            "use reqwest::Client;\nuse std::sync::Arc;\nuse tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct IdentityClient {\n    client: Client,\n}\n\nimpl IdentityClient {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> Self {}\n}\n\n#[singleton]\nstruct Labeled {\n    label: String,\n}\n\nimpl Labeled {\n    #[constructor]\n    fn create(#[console_argument(from = \"spiffe_http_client\")] label: String) -> Self {}\n}\n\n#[service]\nstruct Worker {\n    client: Arc<IdentityClient>,\n    labeled: Arc<Labeled>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(client: Arc<IdentityClient>, labeled: Arc<Labeled>) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+        )
+        .expect("the framework binding and a console argument of the same name coexist");
+
+        let run: String = module(&code, "run").split_whitespace().collect();
+        assert!(run.contains(r#"clap::Arg::new("spiffe_http_client").long("spiffe_http_client")"#));
+    }
+
     #[test]
     fn generates_the_jwks_roller_when_the_handler_is_injected() {
         let code = generate(JWKS_ROLLER_CRATE).expect("the build succeeds");

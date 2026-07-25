@@ -2,8 +2,15 @@ use std::path::Path;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
 use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 use margaret_container_tests::bindings_for_fixture::bindings_for_fixture;
+
+fn console_key(name: &str) -> ServeInputKey {
+    ServeInputKey::ConsoleArgument {
+        name: name.to_string(),
+    }
+}
 
 fn named(name: &str) -> ConsoleArgument {
     ConsoleArgument::Named {
@@ -32,7 +39,7 @@ fn unifies_and_orders_a_console_argument_union_by_slot() {
     let names: Vec<&str> = union.iter().map(ConsoleArgument::name).collect();
     let slots: Vec<usize> = union
         .iter()
-        .map(|argument| bindings.console_slot(argument.name()))
+        .map(|argument| bindings.console_slot(&argument.slot_key()))
         .collect();
 
     assert_eq!(union.len(), 2);
@@ -46,7 +53,7 @@ fn renders_the_console_argument_weaving_tokens() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/console_argument_propagation");
     let bindings = bindings_for_fixture("crate", &directory);
-    let slot = bindings.console_slot("path");
+    let slot = bindings.console_slot(&console_key("path"));
     let arguments = [named("path")];
 
     let parameters = bindings.console_parameters(&arguments);

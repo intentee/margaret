@@ -1,25 +1,20 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::Client;
-use reqwest::tls::Version;
 use rustls::ClientConfig;
 use trzcina::Service;
 use trzcina::ServiceBundle;
 
 use margaret_spiffe_svid::SvidService;
 use margaret_spiffe_svid::SvidServiceBundleParams;
+use margaret_spiffe_svid::SvidSideParams;
 
-use crate::build_reqwest_client::build_reqwest_client;
+use crate::svid_client_readiness::SvidClientReadiness;
+use crate::svid_client_side::SvidClientSide;
 use crate::svid_error::SvidError;
-use crate::svid_server_cert_verifier_facade::SvidServerCertVerifierFacade;
-use crate::svid_server_cert_verifier_service::SvidServerCertVerifierService;
 
 pub struct SvidClientBundle {
-    client_config: ClientConfig,
-    spiffe_trust_domain: String,
-    svid_server_cert_verifier_facade: Arc<SvidServerCertVerifierFacade>,
+    svid_client_side: SvidClientSide,
     svid_service: SvidService,
 }
 
@@ -32,46 +27,39 @@ impl SvidClientBundle {
         }: SvidServiceBundleParams,
     ) -> Self {
         let svid_service = SvidService::new(spire_agent_addr);
-        let svid_server_cert_verifier_facade = Arc::new(SvidServerCertVerifierFacade::default());
-
-        let client_config: ClientConfig = ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(svid_server_cert_verifier_facade.clone())
-            .with_client_cert_resolver(Arc::new(svid_service.svid_certified_key_holder()));
+        let svid_client_side = SvidClientSide::new(SvidSideParams {
+            root_cert_store_holder: svid_service.root_cert_store_holder(),
+            spiffe_trust_domain,
+            svid_certified_key_holder: svid_service.svid_certified_key_holder(),
+        });
 
         Self {
-            client_config,
-            spiffe_trust_domain,
-            svid_server_cert_verifier_facade,
+            svid_client_side,
             svid_service,
         }
     }
 
     #[must_use]
     pub fn client_config(&self) -> ClientConfig {
-        self.client_config.clone()
+        self.svid_client_side.client_config()
+    }
+
+    #[must_use]
+    pub fn client_readiness(&self) -> SvidClientReadiness {
+        self.svid_client_side.client_readiness()
     }
 
     pub fn reqwest_client(&self) -> Result<Client, SvidError> {
-        build_reqwest_client(
-            Client::builder()
-                .use_preconfigured_tls(self.client_config())
-                .min_tls_version(Version::TLS_1_3),
-        )
+        self.svid_client_side.reqwest_client()
     }
 }
 
 #[async_trait]
 impl ServiceBundle for SvidClientBundle {
     async fn services(self) -> Result<Vec<Box<dyn Service>>> {
-        let root_cert_store_holder = self.svid_service.root_cert_store_holder();
         let mut services = self.svid_service.into_common_services();
 
-        services.push(Box::new(SvidServerCertVerifierService {
-            root_cert_store_holder,
-            spiffe_trust_domain: self.spiffe_trust_domain,
-            svid_server_cert_verifier_facade: self.svid_server_cert_verifier_facade,
-        }));
+        services.push(Box::new(self.svid_client_side.into_verifier_service()));
 
         Ok(services)
     }

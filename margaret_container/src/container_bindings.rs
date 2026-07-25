@@ -13,6 +13,7 @@ use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::console_argument_parameter::console_argument_parameter;
 use margaret_codegen_tokens::console_argument_to_owned::console_argument_to_owned;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
 use margaret_console_argument_codegen::unify_by_key::unify_by_key;
 use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 
@@ -25,7 +26,7 @@ use crate::provider_binding::ProviderBinding;
 pub struct ContainerBindings {
     accessor_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
     console_arguments: BTreeMap<CanonicalPath, Vec<ConsoleArgument>>,
-    console_slots: BTreeMap<String, usize>,
+    console_slots: BTreeMap<ServeInputKey, usize>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
 }
 
@@ -80,7 +81,7 @@ impl ContainerBindings {
     pub fn console_borrows(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
         arguments
             .iter()
-            .map(|argument| console_argument_borrow(self.console_slot(argument.name())))
+            .map(|argument| console_argument_borrow(self.console_slot(&argument.slot_key())))
             .collect()
     }
 
@@ -88,7 +89,7 @@ impl ContainerBindings {
     pub fn console_forwards(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
         arguments
             .iter()
-            .map(|argument| console_argument_argument(self.console_slot(argument.name())))
+            .map(|argument| console_argument_argument(self.console_slot(&argument.slot_key())))
             .collect()
     }
 
@@ -98,7 +99,7 @@ impl ContainerBindings {
             .iter()
             .map(|argument| {
                 console_argument_parameter(
-                    self.console_slot(argument.name()),
+                    self.console_slot(&argument.slot_key()),
                     &argument.parameter_referent(),
                 )
             })
@@ -106,22 +107,22 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn console_slot(&self, name: &str) -> usize {
-        self.console_slots[name]
+    pub fn console_slot(&self, key: &ServeInputKey) -> usize {
+        self.console_slots[key]
     }
 
     #[must_use]
     pub fn console_union(&self, arguments: &[ConsoleArgument]) -> Vec<ConsoleArgument> {
-        let mut seen: BTreeSet<String> = BTreeSet::new();
+        let mut seen: BTreeSet<ServeInputKey> = BTreeSet::new();
         let mut unified: Vec<ConsoleArgument> = Vec::new();
 
         for argument in arguments {
-            if seen.insert(argument.name().to_string()) {
+            if seen.insert(argument.slot_key()) {
                 unified.push(argument.clone());
             }
         }
 
-        unified.sort_by_key(|argument| self.console_slot(argument.name()));
+        unified.sort_by_key(|argument| self.console_slot(&argument.slot_key()));
 
         unified
     }
@@ -181,7 +182,7 @@ impl ContainerBindings {
     }
 
     fn materialize(&self, argument: &ConsoleArgument, owned_source: bool) -> TokenStream {
-        let slot = self.console_slot(argument.name());
+        let slot = self.console_slot(&argument.slot_key());
 
         match argument.weaving() {
             WeavingKind::Copy => {

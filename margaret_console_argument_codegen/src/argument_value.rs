@@ -3,6 +3,7 @@ use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
 
 use crate::console_argument::ConsoleArgument;
 use crate::required_flag_read::required_flag_read;
@@ -55,6 +56,11 @@ pub fn argument_value(argument: &ConsoleArgument) -> TokenStream {
             matches!(weaving, WeavingKind::Copy),
             value_type,
         ),
+        ConsoleArgument::SpiffeHttpClient => {
+            let spiffe_http_client = spiffe_http_client_ident();
+
+            quote! { #spiffe_http_client.clone() }
+        }
     }
 }
 
@@ -142,6 +148,14 @@ mod tests {
         assert!(
             collapsed(&positional)
                 .contains(r#"matches.get_one::<crate::geometry::Point>("point")"#)
+        );
+    }
+
+    #[test]
+    fn a_spiffe_http_client_clones_the_serve_local() {
+        assert_eq!(
+            collapsed(&ConsoleArgument::SpiffeHttpClient),
+            "spiffe_http_client.clone()"
         );
     }
 }

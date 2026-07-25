@@ -26,6 +26,7 @@ margaret_peer_identity = { path = "../margaret_peer_identity", optional = true }
 margaret_postgres_pool = { path = "../margaret_postgres_pool", optional = true }
 margaret_service = { path = "../margaret_service", optional = true }
 margaret_spiffe_svid = { path = "../margaret_spiffe_svid", optional = true }
+margaret_spiffe_svid_bundle = { path = "../margaret_spiffe_svid_bundle", optional = true }
 margaret_spiffe_svid_client = { path = "../margaret_spiffe_svid_client", optional = true }
 margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server", optional = true }
 margaret_sync_holder = { path = "../margaret_sync_holder", optional = true }
@@ -59,6 +60,7 @@ runtime = [
     "dep:margaret_postgres_pool",
     "dep:margaret_service",
     "dep:margaret_spiffe_svid",
+    "dep:margaret_spiffe_svid_bundle",
     "dep:margaret_spiffe_svid_client",
     "dep:margaret_spiffe_svid_server",
     "dep:margaret_sync_holder",

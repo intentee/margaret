@@ -2,35 +2,38 @@ use std::collections::BTreeMap;
 
 use crate::console_argument::ConsoleArgument;
 use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
+use crate::serve_input_key::ServeInputKey;
 
 pub fn unify_by_key(
     arguments: &[ConsoleArgument],
 ) -> Result<Vec<ConsoleArgument>, ConsoleArgumentCodegenError> {
-    let mut order: Vec<String> = Vec::new();
-    let mut unified: BTreeMap<String, ConsoleArgument> = BTreeMap::new();
+    let mut order: Vec<ServeInputKey> = Vec::new();
+    let mut unified: BTreeMap<ServeInputKey, ConsoleArgument> = BTreeMap::new();
 
     for argument in arguments {
-        let name = argument.name().to_string();
+        let key = argument.slot_key();
 
-        match unified.get(&name) {
+        match unified.get(&key) {
             Some(existing) => {
                 let collides = matches!(argument, ConsoleArgument::Positional { .. })
                     || matches!(existing, ConsoleArgument::Positional { .. });
 
                 if collides {
-                    return Err(ConsoleArgumentCodegenError::ConflictingConsoleArgumentId { name });
+                    return Err(ConsoleArgumentCodegenError::ConflictingConsoleArgumentId {
+                        name: argument.name().to_string(),
+                    });
                 }
             }
             None => {
-                unified.insert(name.clone(), argument.clone());
-                order.push(name);
+                unified.insert(key.clone(), argument.clone());
+                order.push(key);
             }
         }
     }
 
     Ok(order
         .into_iter()
-        .map(|name| unified[&name].clone())
+        .map(|key| unified[&key].clone())
         .collect())
 }
 
@@ -40,6 +43,7 @@ mod tests {
 
     use super::unify_by_key;
     use crate::console_argument::ConsoleArgument;
+    use crate::serve_input_key::ServeInputKey;
     use crate::weaving_kind::WeavingKind;
 
     fn string_type() -> CanonicalPath {
@@ -102,5 +106,26 @@ mod tests {
             .to_string();
 
         assert!(error.contains("declared both as a positional and as a named argument"));
+    }
+
+    #[test]
+    fn keeps_a_console_argument_named_after_the_spiffe_http_client_alongside_the_injection() {
+        let unified = unify_by_key(&[named("spiffe_http_client"), ConsoleArgument::SpiffeHttpClient])
+            .expect("the framework binding lives in a separate namespace from console arguments");
+
+        assert_eq!(unified.len(), 2);
+        assert_eq!(unified[0].name(), "spiffe_http_client");
+        assert_eq!(unified[1].slot_key(), ServeInputKey::SpiffeHttpClient);
+    }
+
+    #[test]
+    fn collapses_two_spiffe_http_client_inputs_into_one() {
+        let unified = unify_by_key(&[
+            ConsoleArgument::SpiffeHttpClient,
+            ConsoleArgument::SpiffeHttpClient,
+        ])
+        .expect("two injections of the one shared client unify");
+
+        assert_eq!(unified.len(), 1);
     }
 }
