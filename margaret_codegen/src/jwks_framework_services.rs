@@ -1,5 +1,3 @@
-use heck::ToUpperCamelCase;
-
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_jwks_codegen::jwks_roll_interval_path::jwks_roll_interval_path;
@@ -16,13 +14,13 @@ fn framework_service(
     kind: FrameworkServiceKind,
     takes_token: bool,
 ) -> Option<FrameworkService> {
-    bindings.accessor(&path).map(|field| FrameworkService {
+    bindings.provider(&path).map(|binding| FrameworkService {
         concrete_path: path,
-        field_name: field.to_string(),
+        field_name: binding.field_name.clone(),
         kind,
         runner: "run".to_string(),
         takes_token,
-        type_name: field.to_upper_camel_case(),
+        type_name: binding.type_name.clone(),
     })
 }
 

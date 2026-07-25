@@ -142,6 +142,7 @@ fn build_provider_draft<'index>(
         field_name,
         item,
         provided: ProvidedType::Concrete(concrete_path),
+        type_name: identifier.type_name().to_string(),
     })
 }
 
@@ -190,6 +191,7 @@ fn build_endpoint_draft<'index>(
         field_name: identifier.field().to_string(),
         item,
         provided: ProvidedType::Endpoint(concrete_path),
+        type_name: identifier.type_name().to_string(),
     })
 }
 
@@ -215,6 +217,7 @@ fn build_construction_draft<'index>(
         field_name: identifier.field().to_string(),
         item,
         provided: ProvidedType::Concrete(concrete_path),
+        type_name: identifier.type_name().to_string(),
     })
 }
 
@@ -438,6 +441,7 @@ struct Draft<'index> {
     field_name: String,
     item: &'index IndexedItem,
     provided: ProvidedType,
+    type_name: String,
 }
 
 struct DraftedContainer<'index> {
@@ -478,7 +482,9 @@ fn resolve_framework_providers(
             });
         }
 
-        let field_name = allocator.allocate(&field_base(&path)).field().to_string();
+        let identifier = allocator.allocate(&field_base(&path));
+        let field_name = identifier.field().to_string();
+        let type_name = identifier.type_name().to_string();
         let provided = framework_provided_type(&construction, path.clone());
 
         providers.push(Provider {
@@ -486,6 +492,7 @@ fn resolve_framework_providers(
             construction,
             field_name,
             provided,
+            type_name,
         });
     }
 
@@ -757,6 +764,7 @@ pub(crate) fn build_plan(
             field_name,
             item,
             provided,
+            type_name,
         } = draft;
 
         let provider_key = provided.key().clone();
@@ -778,6 +786,7 @@ pub(crate) fn build_plan(
                 construction,
                 field_name,
                 provided,
+                type_name,
             },
         );
     }
@@ -789,6 +798,7 @@ pub(crate) fn build_plan(
             field_name,
             item,
             provided,
+            type_name,
         } = draft;
 
         let construction = resolve_direct(
@@ -808,6 +818,7 @@ pub(crate) fn build_plan(
                 construction,
                 field_name,
                 provided,
+                type_name,
             },
         );
     }

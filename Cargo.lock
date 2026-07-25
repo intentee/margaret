@@ -1831,7 +1831,6 @@ dependencies = [
 name = "margaret_codegen"
 version = "0.1.0"
 dependencies = [
- "heck",
  "margaret_asset_bag_codegen",
  "margaret_attributes",
  "margaret_console_argument_codegen",
