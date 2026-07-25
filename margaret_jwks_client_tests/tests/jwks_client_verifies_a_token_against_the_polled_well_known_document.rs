@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 use trzcina::ServiceBundle as _;
 use url::Url;
 
-use margaret_endpoint::static_endpoint::StaticEndpoint;
+use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 use margaret_http_tests::mtls_fixture::MtlsFixture;
 use margaret_jwks_client::JwksClient;
 use margaret_jwks_client_tests::running_jwks_server::RunningJwksServer;

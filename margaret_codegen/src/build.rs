@@ -458,7 +458,7 @@ impl GetJwks {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -533,7 +533,7 @@ impl PostMint {
         ));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains("impltrzcina::TickerforCrateMargaretJwksJwksRoller"));
+        assert!(serve.contains("impltrzcina::TickerforMargaretJwksJwksRoller"));
         assert!(serve.contains("margaret_jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"));
         assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
@@ -559,8 +559,8 @@ impl PostMint {
         assert!(container.contains("crate::margaret::jwks::partner::JwksClient::create("));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains("impltrzcina::ServiceforCrateMargaretJwksAuthJwksClient"));
-        assert!(serve.contains("impltrzcina::ServiceforCrateMargaretJwksPartnerJwksClient"));
+        assert!(serve.contains("impltrzcina::ServiceforMargaretJwksAuthJwksClient"));
+        assert!(serve.contains("impltrzcina::ServiceforMargaretJwksPartnerJwksClient"));
         assert!(!concatenated(&code).contains("PublicJwksHandler"));
     }
 
@@ -586,7 +586,7 @@ impl PostMint {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -658,6 +658,41 @@ impl GetJwks {
         assert!(container.contains("std::sync::Arc<crate::margaret::jwks::JwksRoller>"));
     }
 
+    const JWKS_FIELD_COLLISION_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+pub mod margaret_jwks {
+    #[singleton]
+    pub struct JwksRoller;
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/.well-known/jwks.json\", server = \"internal\")]
+struct GetJwks {
+    handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>,
+}
+
+impl GetJwks {
+    #[constructor]
+    fn create(handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>) -> Self {}
+
+    #[process]
+    fn respond(&self) -> Response {}
+}
+";
+
+    #[test]
+    fn framework_jwks_field_is_disambiguated_from_a_colliding_user_component() {
+        let code = generate(JWKS_FIELD_COLLISION_CRATE)
+            .expect("a user component flattening to a framework field coexists");
+
+        let container: String = module(&code, "container").split_whitespace().collect();
+
+        assert!(container.contains("std::sync::Arc<crate::margaret_jwks::JwksRoller>"));
+        assert!(container.contains("margaret_jwks_jwks_roller_2"));
+    }
+
     #[test]
     fn omits_the_jwks_module_when_neither_is_used() {
         let code = generate(WEB_CRATE).expect("the build succeeds");
@@ -683,7 +718,7 @@ impl GetJwks {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]

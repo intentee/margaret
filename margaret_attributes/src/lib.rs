@@ -7,6 +7,7 @@ pub mod attribute_query;
 pub mod attribute_selector;
 pub mod canonical_path;
 pub mod crate_root;
+pub mod field_base;
 pub mod field_identifier;
 pub mod identifier;
 pub mod indexed_associated_type;

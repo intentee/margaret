@@ -747,7 +747,12 @@ fn validate_relation_namespace(
             register_constraint_index_name(
                 seen_table_names,
                 &mut constraint_index_names,
-                primary_key_index_name(&model.table),
+                primary_key_index_name(&model.table).map_err(|source| {
+                    ModelCodegenError::PrimaryKeyIndexNameTooLong {
+                        model: model.table.clone(),
+                        source,
+                    }
+                })?,
                 &model.table,
             )?;
         }
@@ -756,7 +761,12 @@ fn validate_relation_namespace(
             register_constraint_index_name(
                 seen_table_names,
                 &mut constraint_index_names,
-                unique_index_name(&model.table, &unique_constraint.columns),
+                unique_index_name(&model.table, &unique_constraint.columns).map_err(|source| {
+                    ModelCodegenError::UniqueIndexNameTooLong {
+                        model: model.table.clone(),
+                        source,
+                    }
+                })?,
                 &model.table,
             )?;
         }

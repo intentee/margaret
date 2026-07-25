@@ -12,6 +12,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::field_base::field_base;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
@@ -460,7 +461,11 @@ fn resolve_framework_providers(
         framework_providers,
         &buildable,
     );
+    let mut allocator = index.reserved_allocator();
     let mut providers = Vec::new();
+
+    let mut buildable: Vec<(CanonicalPath, DirectConstruction)> = buildable.into_iter().collect();
+    buildable.sort_by(|left, right| left.0.cmp(&right.0));
 
     for (path, construction) in buildable {
         if !included.contains(&path) {
@@ -473,7 +478,7 @@ fn resolve_framework_providers(
             });
         }
 
-        let field_name = path.field_name();
+        let field_name = allocator.allocate(&field_base(&path)).field().to_string();
         let provided = framework_provided_type(&construction, path.clone());
 
         providers.push(Provider {

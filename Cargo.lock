@@ -1988,16 +1988,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_endpoint"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "thiserror",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "margaret_example"
 version = "0.1.0"
 dependencies = [
@@ -2010,12 +2000,12 @@ dependencies = [
  "margaret_asset_bag",
  "margaret_codegen",
  "margaret_console",
- "margaret_endpoint",
  "margaret_http",
  "margaret_http_validation",
  "margaret_identity",
  "margaret_identity_session",
  "margaret_jwks_client",
+ "margaret_jwks_endpoint",
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
  "margaret_jwks_secret_storage_selection",
@@ -2170,8 +2160,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "log",
- "margaret_endpoint",
  "margaret_identity_session",
+ "margaret_jwks_endpoint",
  "margaret_jwks_keygen",
  "margaret_sync_holder",
  "reqwest",
@@ -2190,11 +2180,11 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "margaret_endpoint",
  "margaret_http",
  "margaret_http_tests",
  "margaret_identity_session",
  "margaret_jwks_client",
+ "margaret_jwks_endpoint",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
@@ -2211,11 +2201,20 @@ dependencies = [
 name = "margaret_jwks_codegen"
 version = "0.1.0"
 dependencies = [
- "heck",
  "margaret_attributes",
  "margaret_generated_module",
  "proc-macro2",
  "quote",
+]
+
+[[package]]
+name = "margaret_jwks_endpoint"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "thiserror",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -2737,7 +2736,6 @@ dependencies = [
 name = "margaret_websocket_codegen"
 version = "0.1.0"
 dependencies = [
- "heck",
  "margaret_attributes",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",

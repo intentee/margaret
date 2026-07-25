@@ -6,6 +6,7 @@ use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::tag::Tag;
 
 use crate::jwks_client_binding::JwksClientBinding;
@@ -35,6 +36,14 @@ fn collect_kind(
             concrete: concrete.to_string(),
             kind,
         })?;
+
+        if kind == TagKind::JwksClient && !is_snake_case_identifier(&tag.to_string()) {
+            return Err(TagError::TagNotSnakeCase {
+                concrete: concrete.to_string(),
+                kind,
+                tag: tag.to_string(),
+            });
+        }
 
         if let Some(existing) = entries.get(&tag) {
             return Err(TagError::DuplicateTag {
@@ -285,6 +294,14 @@ mod tests {
         assert!(
             error_for("#[provides_jwks_endpoint(endpoints::jwks)]\nstruct JwksEndpoint;\n")
                 .contains("not a single plain name")
+        );
+    }
+
+    #[test]
+    fn rejects_a_non_snake_case_jwks_endpoint_tag() {
+        assert!(
+            error_for("#[provides_jwks_endpoint(myClient)]\nstruct Endpoint;\n")
+                .contains("is not a snake_case identifier")
         );
     }
 

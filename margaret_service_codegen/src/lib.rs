@@ -185,6 +185,7 @@ mod tests {
         let framework_services = vec![
             FrameworkService {
                 concrete_path: canonical(&["margaret_jwks_roller_server", "jwks_roller", "JwksRoller"]),
+                field_name: "jwks_roller_jwks_roller".to_string(),
                 kind: FrameworkServiceKind::Ticker {
                     interval: canonical(&[
                         "margaret_jwks_roller_server",
@@ -198,6 +199,7 @@ mod tests {
             },
             FrameworkService {
                 concrete_path: canonical(&["margaret_jwks_client", "jwks_client", "JwksClient"]),
+                field_name: "jwks_client_jwks_client".to_string(),
                 kind: FrameworkServiceKind::Service,
                 runner: "run".to_string(),
                 takes_token: true,

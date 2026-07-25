@@ -68,6 +68,13 @@ impl ContainerBindings {
     }
 
     #[must_use]
+    pub fn accessor(&self, provider_key: &CanonicalPath) -> Option<&str> {
+        self.providers
+            .get(provider_key)
+            .map(|binding| binding.field_name.as_str())
+    }
+
+    #[must_use]
     pub fn console_arguments(&self, concrete_path: &CanonicalPath) -> &[ConsoleArgument] {
         match self.console_arguments.get(concrete_path) {
             Some(arguments) => arguments,

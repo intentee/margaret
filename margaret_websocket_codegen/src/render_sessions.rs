@@ -1,4 +1,3 @@
-use heck::ToUpperCamelCase;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -225,7 +224,7 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
 }
 
 fn dispatch_struct_ident(binding: &HandlerBinding) -> Ident {
-    format_ident!("{}Dispatch", binding.method.to_upper_camel_case())
+    format_ident!("{}", binding.dispatch_ident)
 }
 
 fn render_request_dispatch(binding: &HandlerBinding, session_path: &TokenStream) -> TokenStream {
@@ -307,7 +306,7 @@ fn dispatch_insert(
 ) -> TokenStream {
     let dispatch = dispatch_struct_ident(binding);
     let method = &binding.method;
-    let accessor = format_ident!("{}", binding.handler_path.field_name());
+    let accessor = format_ident!("{}", binding.handler_field);
     let arguments = bindings.console_weaves(bindings.console_arguments(&binding.handler_path));
 
     quote! {

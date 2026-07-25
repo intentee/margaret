@@ -6,6 +6,7 @@ use syn::Type;
 
 use crate::attribute_selector::AttributeSelector;
 use crate::canonical_path::CanonicalPath;
+use crate::field_base::field_base;
 use crate::identifier::Identifier;
 use crate::indexed_item::IndexedItem;
 use crate::matched_attribute::MatchedAttribute;
@@ -35,7 +36,7 @@ fn allocate_identifiers(items: &[IndexedItem]) -> HashMap<CanonicalPath, Identif
 
     paths
         .into_iter()
-        .map(|path| (path.clone(), allocator.allocate(&path.field_name())))
+        .map(|path| (path.clone(), allocator.allocate(&field_base(path))))
         .collect()
 }
 
@@ -75,6 +76,17 @@ impl AttributeIndex {
     #[must_use]
     pub fn items(&self) -> &[IndexedItem] {
         &self.items
+    }
+
+    #[must_use]
+    pub fn reserved_allocator(&self) -> NameAllocator {
+        let mut allocator = NameAllocator::new();
+
+        for identifier in self.identifiers.values() {
+            allocator.reserve(identifier.field());
+        }
+
+        allocator
     }
 
     #[must_use]

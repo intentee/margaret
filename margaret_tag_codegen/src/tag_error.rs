@@ -18,6 +18,15 @@ pub enum TagError {
     #[error("the {kind} '{concrete}' names a tag that is not a single plain name")]
     MalformedTag { concrete: String, kind: TagKind },
 
+    #[error(
+        "the {kind} '{concrete}' declares the tag '{tag}', which is not a snake_case identifier"
+    )]
+    TagNotSnakeCase {
+        concrete: String,
+        kind: TagKind,
+        tag: String,
+    },
+
     #[error("the tag '{tag}' is declared more than once: by '{first}' and by '{second}'")]
     DuplicateTag {
         tag: String,
