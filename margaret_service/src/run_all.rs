@@ -1,3 +1,4 @@
+use futures_util::future::join_all;
 use trzcina::RunningServiceCollection;
 use trzcina::ServiceShutdownOptions;
 
@@ -7,14 +8,17 @@ pub async fn run_all(
     collections: Vec<RunningServiceCollection>,
     options: ServiceShutdownOptions,
 ) -> CommandOutcome {
+    let shutdowns = join_all(
+        collections
+            .into_iter()
+            .map(|collection| collection.run_to_completion(options.clone())),
+    )
+    .await;
+
     let mut outcome = CommandOutcome::Succeeded;
 
-    for collection in collections {
-        if let Err(error) = collection
-            .run_to_completion(options.clone())
-            .await
-            .into_result()
-        {
+    for shutdown in shutdowns {
+        if let Err(error) = shutdown.into_result() {
             eprintln!("{error}");
 
             outcome = CommandOutcome::Failed;
