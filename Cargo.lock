@@ -2569,7 +2569,9 @@ dependencies = [
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_bundle",
  "margaret_spiffe_svid_tests",
+ "margaret_sync_holder",
  "tokio",
+ "tokio-util",
  "trzcina",
 ]
 
@@ -2598,6 +2600,7 @@ dependencies = [
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_client",
  "margaret_spiffe_svid_tests",
+ "margaret_sync_holder",
  "rustls",
  "spiffe",
  "tokio",
@@ -2672,6 +2675,7 @@ name = "margaret_sync_holder"
 version = "0.1.0"
 dependencies = [
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

@@ -395,12 +395,17 @@ mod tests {
         assert!(source.contains(
             "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
+        assert!(source.contains("letmutspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(source.contains(
             "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
         assert!(source.contains(
-            "margaret::framework::service::serve_application::serve_application(matches,::std::vec::Vec::new(),"
+            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
+        assert!(source.contains(
+            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(!source.contains("serve_application"));
         assert!(!source.contains("spiffe_server_config"));
     }
 

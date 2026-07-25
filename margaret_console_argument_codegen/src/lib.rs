@@ -10,5 +10,6 @@ pub mod has_spiffe_http_client;
 pub mod owned_weave;
 pub mod required_flag_read;
 pub mod scan;
+pub mod serve_input_key;
 pub mod unify_by_key;
 pub mod weaving_kind;

@@ -45,11 +45,6 @@ pub enum ConsoleArgumentCodegenError {
     ConflictingConsoleArgumentId { name: String },
 
     #[error(
-        "the command-line argument '{name}' collides with the framework-provided #[spiffe_http_client] injection; they cannot share a name, so rename the console argument"
-    )]
-    SpiffeHttpClientNameCollision { name: String },
-
-    #[error(
         "console argument '{parameter}' of '{owner}' has a generic value type '{value_type}'; a console argument value type must be a single concrete type, never a generic like Vec<T>"
     )]
     GenericValueType {

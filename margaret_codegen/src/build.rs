@@ -554,16 +554,24 @@ impl Worker {
         assert!(serve.contains(
             "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
+        assert!(serve.contains("letmutspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(serve.contains(
             "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
+        assert!(serve.contains(
+            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
+        ));
+        assert!(serve.contains(
+            "letspiffe_identity_running=spiffe_identity_manager.start(cancellation_token.clone());"
+        ));
+        assert!(serve.contains(
+            "matchspiffe_client_readiness.wait_until_ready(&cancellation_token).await{margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Present=>{}margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Cancelled=>{returnmargaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running],trzcina::ServiceShutdownOptions::default(),).await;}}"
+        ));
         assert!(serve.contains("letconsole_argument_0=spiffe_http_client.clone();"));
         assert!(serve.contains(
-            "matchmargaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
+            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
         ));
-        assert!(serve.contains(
-            "margaret::framework::service::serve_application::serve_application(matches,::std::vec::Vec::new(),margaret::framework::service::resolved_services::ResolvedServices{services:bundle_services,},)"
-        ));
+        assert!(!serve.contains("bundle_services"));
         assert!(!serve.contains("spiffe_server_config"));
 
         let container: String = module(&code, "container").split_whitespace().collect();
@@ -612,12 +620,15 @@ impl CallRoute {
             "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
         assert!(serve.contains(
-            "matchmargaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
+            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
-        assert!(serve.contains("letmutbundle_services"));
         assert!(serve.contains(
-            "margaret::framework::service::serve_application::serve_application(matches,servers,"
+            "margaret::framework::service::serve_application::serve_application(matches,servers,margaret::framework::service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
+        assert!(serve.contains(
+            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(!serve.contains("bundle_services.extend"));
         assert!(!serve.contains("spiffe_server_config"));
     }
 
@@ -662,12 +673,21 @@ impl GetIdentity {
         assert!(serve.contains(
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
         ));
+        assert!(serve.contains("letmutspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(serve.contains(
             "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
         assert!(serve.contains(
-            "matchmargaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await"
+            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
+        assert!(serve.contains(
+            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
+        ));
+        assert!(serve.contains(
+            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(serve.matches("SvidBundle::new").count() == 1);
+        assert!(!serve.contains("bundle_services.extend"));
     }
 
     #[test]
@@ -682,6 +702,17 @@ impl GetIdentity {
     }
 
     #[test]
+    fn rejects_a_parameter_that_is_both_a_spiffe_http_client_and_a_console_argument() {
+        let error = generate(
+            "#[singleton]\nstruct Bad {\n    endpoint: String,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client] #[console_argument(from = \"endpoint\")] endpoint: String) -> Self {}\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(error.contains("must resolve to exactly one source"));
+    }
+
+    #[test]
     fn rejects_a_console_command_that_injects_the_spiffe_http_client() {
         let error = generate(
             "use reqwest::Client;\nuse std::sync::Arc;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> Self {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: Arc<OutboundCaller>) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
@@ -693,14 +724,14 @@ impl GetIdentity {
     }
 
     #[test]
-    fn rejects_a_console_argument_named_after_the_spiffe_http_client() {
-        let error = generate(
+    fn allows_a_console_argument_named_after_the_spiffe_http_client() {
+        let code = generate(
             "use reqwest::Client;\nuse std::sync::Arc;\nuse tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct IdentityClient {\n    client: Client,\n}\n\nimpl IdentityClient {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> Self {}\n}\n\n#[singleton]\nstruct Labeled {\n    label: String,\n}\n\nimpl Labeled {\n    #[constructor]\n    fn create(#[console_argument(from = \"spiffe_http_client\")] label: String) -> Self {}\n}\n\n#[service]\nstruct Worker {\n    client: Arc<IdentityClient>,\n    labeled: Arc<Labeled>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(client: Arc<IdentityClient>, labeled: Arc<Labeled>) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
         )
-        .expect_err("the build fails")
-        .to_string();
+        .expect("the framework binding and a console argument of the same name coexist");
 
-        assert!(error.contains("collides with the framework-provided #[spiffe_http_client]"));
+        let run: String = module(&code, "run").split_whitespace().collect();
+        assert!(run.contains(r#"clap::Arg::new("spiffe_http_client").long("spiffe_http_client")"#));
     }
 
     #[test]

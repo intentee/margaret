@@ -84,6 +84,12 @@ fn svid_identity_prelude(
         }
     });
 
+    let client_readiness = client_active.then(|| {
+        quote! {
+            let mut spiffe_client_readiness = spiffe_bundle.client_readiness();
+        }
+    });
+
     let http_client = client_active.then(|| {
         let spiffe_http_client = spiffe_http_client_ident();
 
@@ -106,7 +112,39 @@ fn svid_identity_prelude(
         );
 
         #server_config
+        #client_readiness
         #http_client
+    }
+}
+
+fn spiffe_identity_gate(SpiffeActivation { client_active, .. }: SpiffeActivation) -> TokenStream {
+    if !client_active {
+        return quote! {};
+    }
+
+    quote! {
+        let mut spiffe_identity_manager = trzcina::ServiceManager::default();
+
+        if let Err(error) = spiffe_identity_manager.register_bundle(spiffe_bundle).await {
+            return margaret::framework::console::report_failure::report_failure(error);
+        }
+
+        let spiffe_identity_running =
+            spiffe_identity_manager.start(cancellation_token.clone());
+
+        match spiffe_client_readiness
+            .wait_until_ready(&cancellation_token)
+            .await
+        {
+            margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Present => {}
+            margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Cancelled => {
+                return margaret::framework::service::run_all::run_all(
+                    ::std::vec![spiffe_identity_running],
+                    trzcina::ServiceShutdownOptions::default(),
+                )
+                .await;
+            }
+        }
     }
 }
 
@@ -119,14 +157,14 @@ fn server_manager_setup(
     server_console_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
     views_console_arguments: &[ConsoleArgument],
 ) -> TokenStream {
-    let svid_active = activation.svid_active();
+    let svid_bundle_in_main = activation.server_active && !activation.client_active;
     let manager_binding = if registers_services {
         quote! { mut manager }
     } else {
         quote! { manager }
     };
 
-    let bundle_services_registration = svid_active.then(|| {
+    let bundle_services_registration = svid_bundle_in_main.then(|| {
         quote! {
             match margaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await {
                 Ok(services) => bundle_services.extend(services),
@@ -136,31 +174,8 @@ fn server_manager_setup(
     });
 
     if servers.is_empty() {
-        if !svid_active {
-            return quote! {
-                let #manager_binding = trzcina::ServiceManager::default();
-            };
-        }
-
         return quote! {
-            let mut bundle_services: ::std::vec::Vec<
-                ::std::boxed::Box<dyn trzcina::Service>,
-            > = ::std::vec::Vec::new();
-
-            #bundle_services_registration
-
-            let #manager_binding = match margaret::framework::service::serve_application::serve_application(
-                matches,
-                ::std::vec::Vec::new(),
-                margaret::framework::service::resolved_services::ResolvedServices {
-                    services: bundle_services,
-                },
-            )
-            .await
-            {
-                Ok(manager) => manager,
-                Err(outcome) => return outcome,
-            };
+            let #manager_binding = trzcina::ServiceManager::default();
         };
     }
 
@@ -211,7 +226,7 @@ fn server_manager_setup(
     });
     let assemblies = vec_literal_tokens(assemblies);
 
-    let bundle_services_binding = if svid_active {
+    let bundle_services_binding = if svid_bundle_in_main {
         quote! { mut bundle_services }
     } else {
         quote! { bundle_services }
@@ -368,7 +383,7 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
 
 fn serve_prelude(serve_arguments: &[ConsoleArgument], bindings: &ContainerBindings) -> TokenStream {
     let resolutions = serve_arguments.iter().map(|argument| {
-        let ident = console_argument_ident(bindings.console_slot(argument.name()));
+        let ident = console_argument_ident(bindings.console_slot(&argument.slot_key()));
         let value = argument_value(argument);
 
         quote! { let #ident = #value; }
@@ -401,6 +416,7 @@ pub fn render_services(
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(|unit| registration(unit, bindings));
     let identity_prelude = svid_identity_prelude(activation);
+    let identity_gate = spiffe_identity_gate(activation);
     let manager_setup = server_manager_setup(
         servers,
         has_views,
@@ -417,6 +433,27 @@ pub fn render_services(
         quote! { matches }
     };
 
+    let run_manager = if activation.client_active {
+        quote! {
+            let spiffe_application_running = manager.start(cancellation_token.clone());
+
+            margaret::framework::service::run_all::run_all(
+                ::std::vec![spiffe_identity_running, spiffe_application_running],
+                trzcina::ServiceShutdownOptions::default(),
+            )
+            .await
+        }
+    } else {
+        quote! {
+            margaret::framework::service::run::run(
+                manager,
+                cancellation_token,
+                trzcina::ServiceShutdownOptions::default(),
+            )
+            .await
+        }
+    };
+
     let tokens = quote! {
         #(#adapters)*
 
@@ -426,17 +463,13 @@ pub fn render_services(
             cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret::framework::console::command_outcome::CommandOutcome {
             #identity_prelude
+            #identity_gate
             #prelude
             #manager_setup
 
             #(#registrations)*
 
-            margaret::framework::service::run::run(
-                manager,
-                cancellation_token,
-                trzcina::ServiceShutdownOptions::default(),
-            )
-            .await
+            #run_manager
         }
     };
 

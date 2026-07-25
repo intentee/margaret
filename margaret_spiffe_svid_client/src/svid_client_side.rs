@@ -8,6 +8,7 @@ use margaret_spiffe_svid::SvidSideParams;
 use margaret_spiffe_svid::root_cert_store_holder::RootCertStoreHolder;
 
 use crate::build_reqwest_client::build_reqwest_client;
+use crate::svid_client_readiness::SvidClientReadiness;
 use crate::svid_error::SvidError;
 use crate::svid_server_cert_verifier_facade::SvidServerCertVerifierFacade;
 use crate::svid_server_cert_verifier_service::SvidServerCertVerifierService;
@@ -46,6 +47,11 @@ impl SvidClientSide {
     #[must_use]
     pub fn client_config(&self) -> ClientConfig {
         self.client_config.clone()
+    }
+
+    #[must_use]
+    pub fn client_readiness(&self) -> SvidClientReadiness {
+        SvidClientReadiness::new(self.svid_server_cert_verifier_facade.subscribe())
     }
 
     #[must_use]

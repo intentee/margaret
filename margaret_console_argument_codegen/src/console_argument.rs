@@ -4,6 +4,7 @@ use quote::quote;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 
+use crate::serve_input_key::ServeInputKey;
 use crate::weaving_kind::WeavingKind;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -73,6 +74,19 @@ impl ConsoleArgument {
     }
 
     #[must_use]
+    pub fn slot_key(&self) -> ServeInputKey {
+        match self {
+            ConsoleArgument::Flag { name } | ConsoleArgument::Named { name, .. } => {
+                ServeInputKey::ConsoleArgument { name: name.clone() }
+            }
+            ConsoleArgument::Positional { id, .. } => {
+                ServeInputKey::ConsoleArgument { name: id.clone() }
+            }
+            ConsoleArgument::SpiffeHttpClient => ServeInputKey::SpiffeHttpClient,
+        }
+    }
+
+    #[must_use]
     pub fn weaving(&self) -> WeavingKind {
         match self {
             ConsoleArgument::Flag { .. } => WeavingKind::Copy,
@@ -87,6 +101,7 @@ impl ConsoleArgument {
 mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
 
+    use crate::serve_input_key::ServeInputKey;
     use crate::weaving_kind::WeavingKind;
 
     use super::ConsoleArgument;
@@ -194,6 +209,48 @@ mod tests {
         };
 
         assert_eq!(collapsed(named.parameter_referent()), "::std::path::Path");
+    }
+
+    #[test]
+    fn a_named_argument_keys_its_slot_by_its_name() {
+        let named = ConsoleArgument::Named {
+            name: "label".to_string(),
+            required: true,
+            weaving: WeavingKind::BorrowedStr,
+            value_type: path(&["std", "string", "String"]),
+        };
+
+        assert_eq!(
+            named.slot_key(),
+            ServeInputKey::ConsoleArgument {
+                name: "label".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn a_positional_argument_keys_its_slot_by_its_id() {
+        let positional = ConsoleArgument::Positional {
+            id: "point".to_string(),
+            required: true,
+            weaving: WeavingKind::Cloned,
+            value_type: path(&["crate", "geometry", "Point"]),
+        };
+
+        assert_eq!(
+            positional.slot_key(),
+            ServeInputKey::ConsoleArgument {
+                name: "point".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn a_spiffe_http_client_keys_its_slot_in_the_framework_namespace() {
+        assert_eq!(
+            ConsoleArgument::SpiffeHttpClient.slot_key(),
+            ServeInputKey::SpiffeHttpClient
+        );
     }
 
     #[test]

@@ -49,6 +49,11 @@ pub enum ContainerError {
     )]
     SpiffeHttpClientTakesNoArguments { parameter: String, singleton: String },
 
+    #[error(
+        "parameter '{parameter}' of singleton '{singleton}' carries #[spiffe_http_client] together with another injection source; a parameter must resolve to exactly one source"
+    )]
+    AmbiguousSpiffeHttpClientInjection { parameter: String, singleton: String },
+
     #[error("#[singleton] is only supported on structs, but '{path}' is not a struct")]
     NotASingletonStruct { path: String },
 

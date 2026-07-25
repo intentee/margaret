@@ -9,6 +9,7 @@ use margaret_spiffe_svid::SvidService;
 use margaret_spiffe_svid::SvidServiceBundleParams;
 use margaret_spiffe_svid::SvidSideParams;
 
+use crate::svid_client_readiness::SvidClientReadiness;
 use crate::svid_client_side::SvidClientSide;
 use crate::svid_error::SvidError;
 
@@ -41,6 +42,11 @@ impl SvidClientBundle {
     #[must_use]
     pub fn client_config(&self) -> ClientConfig {
         self.svid_client_side.client_config()
+    }
+
+    #[must_use]
+    pub fn client_readiness(&self) -> SvidClientReadiness {
+        self.svid_client_side.client_readiness()
     }
 
     pub fn reqwest_client(&self) -> Result<Client, SvidError> {

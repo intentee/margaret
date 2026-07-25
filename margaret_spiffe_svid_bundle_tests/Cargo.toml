@@ -8,7 +8,9 @@ autotests = false
 margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
 margaret_spiffe_svid_bundle = { path = "../margaret_spiffe_svid_bundle" }
 margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests" }
+margaret_sync_holder = { path = "../margaret_sync_holder" }
 tokio = { workspace = true, features = ["macros", "rt"] }
+tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
 [lints]

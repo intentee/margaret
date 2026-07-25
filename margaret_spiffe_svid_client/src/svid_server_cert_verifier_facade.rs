@@ -13,6 +13,7 @@ use rustls::pki_types::UnixTime;
 
 use margaret_spiffe_svid::reject_tls12_signature::reject_tls12_signature;
 use margaret_sync_holder::sync_holder::SyncHolder;
+use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 
 use crate::svid_server_cert_verifier::SvidServerCertVerifier;
 
@@ -22,6 +23,11 @@ pub struct SvidServerCertVerifierFacade {
 }
 
 impl SvidServerCertVerifierFacade {
+    #[must_use]
+    pub fn subscribe(&self) -> SyncHolderSubscription<Arc<SvidServerCertVerifier>> {
+        self.current_verifier.subscribe()
+    }
+
     pub fn update_internal_verifier(&self, verifier: Arc<SvidServerCertVerifier>) {
         self.current_verifier.set(Some(verifier));
     }
