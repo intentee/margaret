@@ -29,18 +29,17 @@ pub(crate) fn jwks_pass(
         .iter()
         .map(|binding| JwksClientModule {
             has_client: bindings.provides(&jwks_client_canonical_path(&binding.module_segment)),
-            has_verifier: bindings
-                .provides(&public_jwks_verifier_canonical_path(&binding.module_segment)),
+            has_verifier: bindings.provides(&public_jwks_verifier_canonical_path(
+                &binding.module_segment,
+            )),
             segment: binding.module_segment.clone(),
         })
         .collect();
 
     context.set_framework_services(jwks_framework_services(bindings, client_bindings));
 
-    let any_server = server.has_handler
-        || server.has_minter
-        || server.has_roller
-        || server.has_secret_store;
+    let any_server =
+        server.has_handler || server.has_minter || server.has_roller || server.has_secret_store;
     let any_client = !clients.is_empty();
 
     if any_server || any_client {

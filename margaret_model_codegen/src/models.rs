@@ -370,10 +370,12 @@ fn defer_foreign_key(
         })?;
 
     if &target_path == item.canonical_path() && !indirected {
-        return Err(ModelCodegenError::SelfReferentialForeignKeyRequiresIndirection {
-            field: field_name,
-            model: model.to_string(),
-        });
+        return Err(
+            ModelCodegenError::SelfReferentialForeignKeyRequiresIndirection {
+                field: field_name,
+                model: model.to_string(),
+            },
+        );
     }
 
     Ok(DeferredForeignKey {

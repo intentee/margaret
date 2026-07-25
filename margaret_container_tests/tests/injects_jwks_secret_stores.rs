@@ -60,9 +60,11 @@ fn resolves_the_server_store_and_client_verifier_by_marker() {
     )
     .expect("the server and client stores resolve");
 
-    assert!(source.contains(
-        "crate::Consumer::new(self.server_store().await,self.auth_verifier().await,)"
-    ));
+    assert!(
+        source.contains(
+            "crate::Consumer::new(self.server_store().await,self.auth_verifier().await,)"
+        )
+    );
 }
 
 #[test]
@@ -77,7 +79,10 @@ fn reports_an_unavailable_jwks_server_store() {
 fn reports_an_unknown_jwks_client_store_tag() {
     let error = render(
         "jwks_secret_stores",
-        &[store_provider(FrameworkInjectionRole::JwksServerStore, "ServerStore")],
+        &[store_provider(
+            FrameworkInjectionRole::JwksServerStore,
+            "ServerStore",
+        )],
     )
     .expect_err("the client store tag must be unknown");
 
@@ -98,8 +103,8 @@ fn rejects_a_malformed_jwks_secret_store_marker() {
 
 #[test]
 fn rejects_an_unparseable_jwks_secret_store_marker() {
-    let error = render("jwks_unparseable_store", &[])
-        .expect_err("the unparseable marker must be rejected");
+    let error =
+        render("jwks_unparseable_store", &[]).expect_err("the unparseable marker must be rejected");
 
     assert!(matches!(error, ContainerError::Index { .. }));
 }

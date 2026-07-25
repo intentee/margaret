@@ -62,9 +62,11 @@ fn injects_the_endpoints_own_dependencies_and_console_argument() {
 
 #[test]
 fn injects_the_endpoint_into_the_framework_client_by_tag() {
-    assert!(endpoints_container().contains(
-        "crate::JwksClientRuntime::new(self.jwks_endpoint(console_argument_0).await,)"
-    ));
+    assert!(
+        endpoints_container().contains(
+            "crate::JwksClientRuntime::new(self.jwks_endpoint(console_argument_0).await,)"
+        )
+    );
 }
 
 #[test]

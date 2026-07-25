@@ -311,7 +311,9 @@ impl Farewell {
             false,
         );
 
-        assert!(source.contains("letcancellation_token=matchmargaret::framework::service::install::install()"));
+        assert!(source.contains(
+            "letcancellation_token=matchmargaret::framework::service::install::install()"
+        ));
         assert!(source.contains(".run(cancellation_token).await"));
     }
 

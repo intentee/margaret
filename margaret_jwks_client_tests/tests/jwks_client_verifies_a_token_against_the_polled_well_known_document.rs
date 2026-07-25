@@ -9,12 +9,12 @@ use tokio_util::sync::CancellationToken;
 use trzcina::ServiceBundle as _;
 use url::Url;
 
-use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 use margaret_http_tests::mtls_fixture::MtlsFixture;
 use margaret_jwks_client::JwksClient;
 use margaret_jwks_client_tests::running_jwks_server::RunningJwksServer;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
+use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 use margaret_jwks_keygen::signs_claims::SignsClaims as _;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;

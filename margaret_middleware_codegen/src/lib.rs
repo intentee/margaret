@@ -131,7 +131,10 @@ impl Guard {
         let source = wrappers_for(GUARD);
 
         assert!(source.contains("pubstructGuard{pubinner:std::sync::Arc<crate::Guard>,}"));
-        assert!(source.contains("implmargaret::framework::http::http_middleware::HttpMiddlewareforGuard"));
+        assert!(
+            source
+                .contains("implmargaret::framework::http::http_middleware::HttpMiddlewareforGuard")
+        );
         assert!(source.contains("self.inner.process(request,next).await"));
     }
 
@@ -438,10 +441,14 @@ impl Guard {
 "#,
         );
 
+        assert!(source.contains(
+            "margaret::framework::http_validation::validate_input::validate_input(request,"
+        ));
         assert!(
-            source.contains("margaret::framework::http_validation::validate_input::validate_input(request,")
+            source.contains(
+                "margaret::framework::http_validation::request_input::RequestInput::Json"
+            )
         );
-        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Json"));
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
@@ -462,8 +469,14 @@ impl Guard {
 "#,
         );
 
-        assert!(source.contains("margaret::framework::http_validation::require_input::require_input(request,"));
-        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Form"));
+        assert!(source.contains(
+            "margaret::framework::http_validation::require_input::require_input(request,"
+        ));
+        assert!(
+            source.contains(
+                "margaret::framework::http_validation::request_input::RequestInput::Form"
+            )
+        );
         assert!(source.contains("Ok(model)=>model"));
         assert!(source.contains("Err(response)=>returnresponse.into()"));
         assert!(source.contains(
@@ -489,7 +502,11 @@ impl Guard {
 "#,
         );
 
-        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Query"));
+        assert!(
+            source.contains(
+                "margaret::framework::http_validation::request_input::RequestInput::Query"
+            )
+        );
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
@@ -539,9 +556,9 @@ impl Guard {
             "asyncfnprocess(&self,request_2:&margaret::framework::http::request::Request,next_2:margaret::framework::http::next::Next,)"
         ));
         assert!(source.contains("letnext=request_2;"));
-        assert!(
-            source.contains("margaret::framework::http_validation::require_input::require_input(request_2,")
-        );
+        assert!(source.contains(
+            "margaret::framework::http_validation::require_input::require_input(request_2,"
+        ));
         assert!(source.contains("self.inner.process(next,request,next_2).await"));
     }
 

@@ -20,12 +20,16 @@ pub(crate) fn jwks_secret_storage_provider() -> FrameworkProvider {
         construction: FrameworkConstruction::UriSelected {
             argument_name: "jwks-secret-storage".to_string(),
             resolver: canonical_path(&[
-                "margaret", "framework", "jwks_secret_storage_selection",
+                "margaret",
+                "framework",
+                "jwks_secret_storage_selection",
                 "resolve_jwks_secret_storage",
                 "resolve_jwks_secret_storage",
             ]),
             value_type: canonical_path(&[
-                "margaret", "framework", "jwks_secret_storage_selection",
+                "margaret",
+                "framework",
+                "jwks_secret_storage_selection",
                 "jwks_secret_storage_uri",
                 "JwksSecretStorageUri",
             ]),

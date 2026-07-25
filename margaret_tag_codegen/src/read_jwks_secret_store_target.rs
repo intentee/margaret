@@ -42,9 +42,11 @@ mod tests {
 
     #[test]
     fn reads_the_server_target() {
-        let target =
-            read_jwks_secret_store_target(&args(parse_quote!(#[jwks_secret_store(server)])), "site")
-                .expect("the server target is read");
+        let target = read_jwks_secret_store_target(
+            &args(parse_quote!(#[jwks_secret_store(server)])),
+            "site",
+        )
+        .expect("the server target is read");
 
         assert_eq!(target, JwksSecretStoreTarget::Server);
     }
