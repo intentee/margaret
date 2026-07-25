@@ -1,6 +1,7 @@
 #[must_use]
 pub fn is_snake_case_identifier(name: &str) -> bool {
     syn::parse_str::<syn::Ident>(name).is_ok()
+        && !name.contains('#')
         && !name.chars().any(|character| character.is_ascii_uppercase())
 }
 
@@ -21,5 +22,10 @@ mod tests {
     #[test]
     fn rejects_a_reserved_keyword() {
         assert!(!is_snake_case_identifier("match"));
+    }
+
+    #[test]
+    fn rejects_a_raw_identifier() {
+        assert!(!is_snake_case_identifier("r#async"));
     }
 }
