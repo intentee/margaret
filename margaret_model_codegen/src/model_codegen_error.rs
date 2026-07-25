@@ -194,6 +194,20 @@ pub enum ModelCodegenError {
         source: SchemaIdentifierNamingError,
     },
 
+    #[error("model '{model}' derives a primary key index name that is too long: {source}")]
+    PrimaryKeyIndexNameTooLong {
+        model: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
+    },
+
+    #[error("model '{model}' derives a unique index name that is too long: {source}")]
+    UniqueIndexNameTooLong {
+        model: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
+    },
+
     #[error("duplicate index name '{name}' declared by tables '{first}' and '{second}'")]
     DuplicateIndexName {
         first: String,

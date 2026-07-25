@@ -46,9 +46,10 @@ fn endpoints_container() -> String {
 
 #[test]
 fn drafts_a_jwks_endpoint_as_the_provides_endpoint_interface() {
-    assert!(endpoints_container().contains(
-        "std::sync::Arc<dynmargaret::framework::endpoint::provides_endpoint::ProvidesEndpoint,>"
-    ));
+    assert!(
+        endpoints_container()
+            .contains("std::sync::Arc<dynmargaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint,>")
+    );
 }
 
 #[test]

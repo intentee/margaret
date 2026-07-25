@@ -9,6 +9,7 @@ pub(crate) struct Provider {
     pub(crate) construction: DirectConstruction,
     pub(crate) field_name: String,
     pub(crate) provided: ProvidedType,
+    pub(crate) type_name: String,
 }
 
 impl Provider {

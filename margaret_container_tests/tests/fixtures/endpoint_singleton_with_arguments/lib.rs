@@ -1,4 +1,4 @@
-use margaret::framework::endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[provides_jwks_endpoint(jwks)]
 #[singleton(unexpected = Thing)]

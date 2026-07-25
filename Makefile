@@ -12,7 +12,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_console_codegen \
 	-p margaret_container \
 	-p margaret_container_tests \
-	-p margaret_endpoint \
+	-p margaret_jwks_endpoint \
 	-p margaret_generated_module \
 	-p margaret_http \
 	-p margaret_http_codegen \
@@ -114,7 +114,7 @@ coverage: node_modules postgres-image
 		--gated margaret_console_codegen=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_tests=100 \
-		--gated margaret_endpoint=100 \
+		--gated margaret_jwks_endpoint=100 \
 		--gated margaret_generated_module=100 \
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \
