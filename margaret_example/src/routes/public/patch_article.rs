@@ -9,6 +9,7 @@ use margaret::framework::macros::singleton;
 use crate::forms::patch_article_form::PatchArticleForm;
 use crate::models::article::Article;
 use crate::stores::article_store::ArticleStore;
+use crate::stores::respond_to_article_store_error::respond_to_article_store_error;
 
 #[singleton]
 #[responds_to_http(method = "patch", path = "/articles/{article}", server = "public")]
@@ -55,7 +56,7 @@ impl PatchArticle {
             })
             .await
         {
-            return Response::text(500, error.to_string());
+            return respond_to_article_store_error(&error);
         }
 
         Response::text(200, format!("updated \"{title}\""))

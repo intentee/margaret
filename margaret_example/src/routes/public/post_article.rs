@@ -8,6 +8,7 @@ use margaret::framework::macros::singleton;
 
 use crate::forms::post_article_form::PostArticleForm;
 use crate::stores::article_store::ArticleStore;
+use crate::stores::respond_to_article_store_error::respond_to_article_store_error;
 
 #[singleton]
 #[responds_to_http(
@@ -38,7 +39,7 @@ impl PostArticle {
     ) -> Response {
         match self.articles.insert(title, body, author_id).await {
             Ok(article) => Response::text(201, format!("created \"{}\"", article.title)),
-            Err(error) => Response::text(500, error.to_string()),
+            Err(error) => respond_to_article_store_error(&error),
         }
     }
 }

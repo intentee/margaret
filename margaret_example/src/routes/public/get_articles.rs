@@ -9,6 +9,7 @@ use margaret::framework::macros::singleton;
 use crate::forms::get_articles_form::GetArticlesForm;
 use crate::margaret::routes::Routes;
 use crate::stores::article_store::ArticleStore;
+use crate::stores::respond_to_article_store_error::respond_to_article_store_error;
 
 #[singleton]
 #[responds_to_http(method = "get", path = "/articles", server = "public")]
@@ -32,7 +33,7 @@ impl GetArticles {
         let author = author.as_deref();
         let articles = match self.articles.all().await {
             Ok(articles) => articles,
-            Err(error) => return Response::text(500, error.to_string()),
+            Err(error) => return respond_to_article_store_error(&error),
         };
         let links = articles
             .into_iter()

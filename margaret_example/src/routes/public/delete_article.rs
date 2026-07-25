@@ -8,6 +8,7 @@ use margaret::framework::macros::singleton;
 
 use crate::models::article::Article;
 use crate::stores::article_store::ArticleStore;
+use crate::stores::respond_to_article_store_error::respond_to_article_store_error;
 
 #[singleton]
 #[responds_to_http(method = "delete", path = "/articles/{article}", server = "public")]
@@ -28,7 +29,7 @@ impl DeleteArticle {
         #[route_parameter(from = "article")] Article { id, title, .. }: Article,
     ) -> Response {
         if let Err(error) = self.articles.remove(id).await {
-            return Response::text(500, error.to_string());
+            return respond_to_article_store_error(&error);
         }
 
         Response::text(200, format!("deleted \"{title}\""))
