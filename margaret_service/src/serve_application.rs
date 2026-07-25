@@ -2,8 +2,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use clap::ArgMatches;
-use trzcina::ServiceBundle;
-use trzcina::ServiceManager;
 
 use margaret_console::command_outcome::CommandOutcome;
 use margaret_console::report_failure::report_failure;
@@ -16,12 +14,10 @@ use margaret_http::upload_config::UploadConfig;
 use crate::server_assembly::ServerAssembly;
 use crate::server_service::ServerService;
 
-pub async fn serve_application<TServiceBundle: ServiceBundle>(
+pub fn serve_application(
     matches: &ArgMatches,
     servers: Vec<ServerAssembly>,
-    bundle: TServiceBundle,
-) -> Result<ServiceManager, CommandOutcome> {
-    let mut manager = ServiceManager::default();
+) -> Result<Vec<ServerService>, CommandOutcome> {
     let mut server_models = Vec::new();
     let mut server_forward_targets = Vec::new();
 
@@ -66,34 +62,26 @@ pub async fn serve_application<TServiceBundle: ServiceBundle>(
         ));
     }
 
-    if let Err(error) = manager.register_bundle(bundle).await {
-        return Err(report_failure(error));
-    }
-
     let server_registry = Arc::new(ServerRegistry::new(server_models));
+    let mut server_services = Vec::new();
 
     for (forward_targets, name) in server_forward_targets {
-        manager.register_service(ServerService::new(
+        server_services.push(ServerService::new(
             server_registry.clone(),
             forward_targets,
             name,
         ));
     }
 
-    Ok(manager)
+    Ok(server_services)
 }
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
-    use anyhow::bail;
-    use async_trait::async_trait;
     use clap::Arg;
     use clap::ArgAction;
     use clap::ArgMatches;
     use clap::Command;
-    use trzcina::Service;
-    use trzcina::ServiceBundle;
 
     use margaret_console::command_outcome::CommandOutcome;
     use margaret_http::route_entry::RouteEntry;
@@ -102,17 +90,7 @@ mod tests {
     use margaret_http::transport_config::TransportConfig;
 
     use super::serve_application;
-    use crate::resolved_services::ResolvedServices;
     use crate::server_assembly::ServerAssembly;
-
-    struct FailingBundle;
-
-    #[async_trait]
-    impl ServiceBundle for FailingBundle {
-        async fn services(self) -> Result<Vec<Box<dyn Service>>> {
-            bail!("the bundle could not provide its services")
-        }
-    }
 
     fn matches(arguments: &[&str]) -> ArgMatches {
         Command::new("test")
@@ -147,22 +125,19 @@ mod tests {
         )
     }
 
-    #[tokio::test]
-    async fn assembles_a_manager_with_a_bundle() {
-        let outcome = serve_application(
+    #[test]
+    fn assembles_one_server_service_per_assembly() {
+        let server_services = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0"]),
             vec![public_assembly(Ok(empty_routes()))],
-            ResolvedServices {
-                services: Vec::new(),
-            },
         )
-        .await;
+        .expect("the assembly succeeds");
 
-        assert!(outcome.is_ok());
+        assert_eq!(server_services.len(), 1);
     }
 
-    #[tokio::test]
-    async fn enables_uploads_into_a_configured_directory() {
+    #[test]
+    fn enables_uploads_into_a_configured_directory() {
         let outcome = serve_application(
             &matches(&[
                 "--public-addr",
@@ -172,45 +147,30 @@ mod tests {
                 "/tmp/margaret-uploads",
             ]),
             vec![public_assembly(Ok(empty_routes()))],
-            ResolvedServices {
-                services: Vec::new(),
-            },
-        )
-        .await;
+        );
 
         assert!(outcome.is_ok());
     }
 
-    #[tokio::test]
-    async fn enables_uploads_into_the_temporary_directory_by_default() {
+    #[test]
+    fn enables_uploads_into_the_temporary_directory_by_default() {
         let outcome = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0", "--public-uploads"]),
             vec![public_assembly(Ok(empty_routes()))],
-            ResolvedServices {
-                services: Vec::new(),
-            },
-        )
-        .await;
+        );
 
         assert!(outcome.is_ok());
     }
 
-    #[tokio::test]
-    async fn reports_failure_when_a_server_address_is_missing() {
-        let outcome = serve_application(
-            &matches(&[]),
-            vec![public_assembly(Ok(empty_routes()))],
-            ResolvedServices {
-                services: Vec::new(),
-            },
-        )
-        .await;
+    #[test]
+    fn reports_failure_when_a_server_address_is_missing() {
+        let outcome = serve_application(&matches(&[]), vec![public_assembly(Ok(empty_routes()))]);
 
         assert_eq!(outcome.err(), Some(CommandOutcome::Failed));
     }
 
-    #[tokio::test]
-    async fn reports_failure_when_a_server_router_conflicts() {
+    #[test]
+    fn reports_failure_when_a_server_router_conflicts() {
         let conflict = Router::build(vec![
             RouteEntry::new("/conflict", Vec::new()),
             RouteEntry::new("/conflict", Vec::new()),
@@ -221,23 +181,7 @@ mod tests {
         let outcome = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0"]),
             vec![public_assembly(Err(conflict))],
-            ResolvedServices {
-                services: Vec::new(),
-            },
-        )
-        .await;
-
-        assert_eq!(outcome.err(), Some(CommandOutcome::Failed));
-    }
-
-    #[tokio::test]
-    async fn reports_failure_when_the_bundle_cannot_register() {
-        let outcome = serve_application(
-            &matches(&["--public-addr", "127.0.0.1:0"]),
-            vec![public_assembly(Ok(empty_routes()))],
-            FailingBundle,
-        )
-        .await;
+        );
 
         assert_eq!(outcome.err(), Some(CommandOutcome::Failed));
     }

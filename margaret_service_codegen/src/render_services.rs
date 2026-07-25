@@ -86,7 +86,7 @@ fn svid_identity_prelude(
 
     let client_readiness = client_active.then(|| {
         quote! {
-            let mut spiffe_client_readiness = spiffe_bundle.client_readiness();
+            let spiffe_client_readiness = spiffe_bundle.client_readiness();
         }
     });
 
@@ -117,66 +117,50 @@ fn svid_identity_prelude(
     }
 }
 
-fn spiffe_identity_gate(SpiffeActivation { client_active, .. }: SpiffeActivation) -> TokenStream {
-    if !client_active {
-        return quote! {};
-    }
-
-    quote! {
-        let mut spiffe_identity_manager = trzcina::ServiceManager::default();
-
-        if let Err(error) = spiffe_identity_manager.register_bundle(spiffe_bundle).await {
-            return margaret::framework::console::report_failure::report_failure(error);
+fn gated_registration(inner: &TokenStream, client_active: bool) -> TokenStream {
+    if client_active {
+        quote! {
+            manager.register_service(
+                margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(
+                    spiffe_client_readiness.clone(),
+                    #inner,
+                ),
+            );
         }
-
-        let spiffe_identity_running =
-            spiffe_identity_manager.start(cancellation_token.clone());
-
-        match spiffe_client_readiness
-            .wait_until_ready(&cancellation_token)
-            .await
-        {
-            margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Present => {}
-            margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Cancelled => {
-                return margaret::framework::service::run_all::run_all(
-                    ::std::vec![spiffe_identity_running],
-                    trzcina::ServiceShutdownOptions::default(),
-                )
-                .await;
-            }
+    } else {
+        quote! {
+            manager.register_service(#inner);
         }
     }
 }
 
-fn server_manager_setup(
+fn bundle_registration(
+    SpiffeActivation {
+        client_active,
+        server_active,
+    }: SpiffeActivation,
+) -> TokenStream {
+    if !server_active && !client_active {
+        return quote! {};
+    }
+
+    quote! {
+        if let Err(error) = manager.register_bundle(spiffe_bundle).await {
+            return margaret::framework::console::report_failure::report_failure(error);
+        }
+    }
+}
+
+fn server_registration(
     servers: &[HttpServer],
     has_views: bool,
-    registers_services: bool,
     activation: SpiffeActivation,
     bindings: &ContainerBindings,
     server_console_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
     views_console_arguments: &[ConsoleArgument],
 ) -> TokenStream {
-    let svid_bundle_in_main = activation.server_active && !activation.client_active;
-    let manager_binding = if registers_services {
-        quote! { mut manager }
-    } else {
-        quote! { manager }
-    };
-
-    let bundle_services_registration = svid_bundle_in_main.then(|| {
-        quote! {
-            match margaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await {
-                Ok(services) => bundle_services.extend(services),
-                Err(outcome) => return outcome,
-            }
-        }
-    });
-
     if servers.is_empty() {
-        return quote! {
-            let #manager_binding = trzcina::ServiceManager::default();
-        };
+        return quote! {};
     }
 
     let origins = servers.iter().map(|server| {
@@ -226,11 +210,6 @@ fn server_manager_setup(
     });
     let assemblies = vec_literal_tokens(assemblies);
 
-    let bundle_services_binding = if svid_bundle_in_main {
-        quote! { mut bundle_services }
-    } else {
-        quote! { bundle_services }
-    };
     let views_setup = has_views.then(|| {
         let views_borrows = bindings.console_borrows(views_console_arguments);
 
@@ -238,6 +217,8 @@ fn server_manager_setup(
             let views = ::std::sync::Arc::new(super::views::build::build(container, #(#views_borrows)*).await);
         }
     });
+
+    let register_server = gated_registration(&quote! { server_service }, activation.client_active);
 
     quote! {
         #(#origins)*
@@ -248,24 +229,17 @@ fn server_manager_setup(
         #views_setup
         let servers = #assemblies;
 
-        let #bundle_services_binding: ::std::vec::Vec<
-            ::std::boxed::Box<dyn trzcina::Service>,
-        > = ::std::vec::Vec::new();
-
-        #bundle_services_registration
-
-        let #manager_binding = match margaret::framework::service::serve_application::serve_application(
+        let server_services = match margaret::framework::service::serve_application::serve_application(
             matches,
             servers,
-            margaret::framework::service::resolved_services::ResolvedServices {
-                services: bundle_services,
-            },
-        )
-        .await
-        {
-            Ok(manager) => manager,
+        ) {
+            Ok(server_services) => server_services,
             Err(outcome) => return outcome,
         };
+
+        for server_service in server_services {
+            #register_server
+        }
     }
 }
 
@@ -367,14 +341,13 @@ fn woven_arguments(unit: &ServiceUnit, bindings: &ContainerBindings) -> Vec<Toke
     bindings.console_weaves_owned(bindings.console_arguments(&unit.concrete_path))
 }
 
-fn registration(unit: &ServiceUnit, bindings: &ContainerBindings) -> TokenStream {
+fn registration(unit: &ServiceUnit, bindings: &ContainerBindings, client_active: bool) -> TokenStream {
     let name = adapter_ident(unit);
     let accessor = format_ident!("{}", unit.field_name);
     let woven = woven_arguments(unit, bindings);
+    let inner = quote! { #name { inner: container.#accessor(#(#woven),*).await } };
 
-    quote! {
-        manager.register_service(#name { inner: container.#accessor(#(#woven),*).await });
-    }
+    gated_registration(&inner, client_active)
 }
 
 fn adapter_ident(unit: &ServiceUnit) -> Ident {
@@ -414,13 +387,14 @@ pub fn render_services(
     };
 
     let adapters = units.iter().map(adapter);
-    let registrations = units.iter().map(|unit| registration(unit, bindings));
+    let unit_registrations = units
+        .iter()
+        .map(|unit| registration(unit, bindings, activation.client_active));
     let identity_prelude = svid_identity_prelude(activation);
-    let identity_gate = spiffe_identity_gate(activation);
-    let manager_setup = server_manager_setup(
+    let bundle_registration = bundle_registration(activation);
+    let server_registration = server_registration(
         servers,
         has_views,
-        !units.is_empty(),
         activation,
         bindings,
         server_console_arguments,
@@ -433,27 +407,6 @@ pub fn render_services(
         quote! { matches }
     };
 
-    let run_manager = if activation.client_active {
-        quote! {
-            let spiffe_application_running = manager.start(cancellation_token.clone());
-
-            margaret::framework::service::run_all::run_all(
-                ::std::vec![spiffe_identity_running, spiffe_application_running],
-                trzcina::ServiceShutdownOptions::default(),
-            )
-            .await
-        }
-    } else {
-        quote! {
-            margaret::framework::service::run::run(
-                manager,
-                cancellation_token,
-                trzcina::ServiceShutdownOptions::default(),
-            )
-            .await
-        }
-    };
-
     let tokens = quote! {
         #(#adapters)*
 
@@ -463,13 +416,20 @@ pub fn render_services(
             cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret::framework::console::command_outcome::CommandOutcome {
             #identity_prelude
-            #identity_gate
             #prelude
-            #manager_setup
 
-            #(#registrations)*
+            let mut manager = trzcina::ServiceManager::default();
 
-            #run_manager
+            #bundle_registration
+            #server_registration
+            #(#unit_registrations)*
+
+            margaret::framework::service::run::run(
+                manager,
+                cancellation_token,
+                trzcina::ServiceShutdownOptions::default(),
+            )
+            .await
         }
     };
 

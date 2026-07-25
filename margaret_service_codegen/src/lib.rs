@@ -309,22 +309,24 @@ mod tests {
             r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            "margaret::framework::service::serve_application::serve_application(matches,servers,margaret::framework::service::resolved_services::ResolvedServices{services:bundle_services,},)"
+            "letserver_services=matchmargaret::framework::service::serve_application::serve_application(matches,servers,){Ok(server_services)=>server_services,Err(outcome)=>returnoutcome,};"
         ));
-        assert!(!source.contains("margaret::framework::service::bundle_services::bundle_services"));
-        assert!(!source.contains("letmutbundle_services"));
-        assert!(source.contains("letbundle_services:"));
-        assert!(source.contains("letmutmanager"));
+        assert!(source.contains(
+            "forserver_serviceinserver_services{manager.register_service(server_service);}"
+        ));
+        assert!(source.contains("manager.register_service(Pump{inner:container.pump().await,});"));
+        assert!(!source.contains("bundle_services"));
+        assert!(!source.contains("resolved_services"));
+        assert!(source.contains("letmutmanager=trzcina::ServiceManager::default();"));
     }
 
     #[test]
-    fn binds_the_manager_immutably_when_no_services_are_registered() {
-        let source = rendered("#[singleton]\nstruct Store;\n", &public());
+    fn builds_one_mutable_manager_for_a_units_only_application() {
+        let source = rendered(SERVICE, &[]);
 
-        assert!(source.contains(
-            "letmanager=matchmargaret::framework::service::serve_application::serve_application("
-        ));
-        assert!(!source.contains("letmutmanager"));
+        assert!(source.contains("letmutmanager=trzcina::ServiceManager::default();"));
+        assert!(source.contains("manager.register_service(Pump{inner:container.pump().await,});"));
+        assert!(!source.contains("serve_application"));
     }
 
     #[test]
@@ -380,12 +382,15 @@ mod tests {
             )
         );
         assert!(source.contains(
-            "matchmargaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
+            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(source.contains(
-            "margaret::framework::service::serve_application::serve_application(matches,servers,margaret::framework::service::resolved_services::ResolvedServices{services:bundle_services,},)"
+            "letserver_services=matchmargaret::framework::service::serve_application::serve_application(matches,servers,){Ok(server_services)=>server_services,Err(outcome)=>returnoutcome,};"
         ));
-        assert!(source.contains("letmutbundle_services"));
+        assert!(source.contains(
+            "forserver_serviceinserver_services{manager.register_service(server_service);}"
+        ));
+        assert!(!source.contains("bundle_services"));
     }
 
     #[test]
@@ -395,16 +400,22 @@ mod tests {
         assert!(source.contains(
             "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
-        assert!(source.contains("letmutspiffe_client_readiness=spiffe_bundle.client_readiness();"));
+        assert!(source.contains("letspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(source.contains(
             "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
         assert!(source.contains(
-            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
+            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(source.contains(
-            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:container.worker(console_argument_0.clone()).await,},),);"
         ));
+        assert!(source.contains(
+            "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(!source.contains("run_all"));
+        assert!(!source.contains("spiffe_identity_manager"));
+        assert!(!source.contains("wait_until_ready"));
         assert!(!source.contains("serve_application"));
         assert!(!source.contains("spiffe_server_config"));
     }
@@ -428,6 +439,16 @@ mod tests {
         assert!(source.contains(
             "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
+        assert!(source.contains(
+            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
+        ));
+        assert!(source.contains(
+            "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"
+        ));
+        assert!(source.contains(
+            "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(!source.contains("run_all"));
     }
 
     #[test]

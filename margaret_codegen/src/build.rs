@@ -554,23 +554,23 @@ impl Worker {
         assert!(serve.contains(
             "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
-        assert!(serve.contains("letmutspiffe_client_readiness=spiffe_bundle.client_readiness();"));
+        assert!(serve.contains("letspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(serve.contains(
             "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
         assert!(serve.contains(
-            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
-        ));
-        assert!(serve.contains(
-            "letspiffe_identity_running=spiffe_identity_manager.start(cancellation_token.clone());"
-        ));
-        assert!(serve.contains(
-            "matchspiffe_client_readiness.wait_until_ready(&cancellation_token).await{margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Present=>{}margaret::framework::sync_holder::sync_holder_presence::SyncHolderPresence::Cancelled=>{returnmargaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running],trzcina::ServiceShutdownOptions::default(),).await;}}"
+            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(serve.contains("letconsole_argument_0=spiffe_http_client.clone();"));
         assert!(serve.contains(
-            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:container.worker(console_argument_0.clone()).await,},),);"
         ));
+        assert!(serve.contains(
+            "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(!serve.contains("run_all"));
+        assert!(!serve.contains("spiffe_identity_manager"));
+        assert!(!serve.contains("wait_until_ready"));
         assert!(!serve.contains("bundle_services"));
         assert!(!serve.contains("spiffe_server_config"));
 
@@ -620,15 +620,19 @@ impl CallRoute {
             "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
         assert!(serve.contains(
-            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
+            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(serve.contains(
-            "margaret::framework::service::serve_application::serve_application(matches,servers,margaret::framework::service::resolved_services::ResolvedServices{services:bundle_services,},)"
+            "letserver_services=matchmargaret::framework::service::serve_application::serve_application(matches,servers,){Ok(server_services)=>server_services,Err(outcome)=>returnoutcome,};"
         ));
         assert!(serve.contains(
-            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+            "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"
         ));
-        assert!(!serve.contains("bundle_services.extend"));
+        assert!(serve.contains(
+            "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
+        ));
+        assert!(!serve.contains("run_all"));
+        assert!(!serve.contains("bundle_services"));
         assert!(!serve.contains("spiffe_server_config"));
     }
 
@@ -673,21 +677,25 @@ impl GetIdentity {
         assert!(serve.contains(
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
         ));
-        assert!(serve.contains("letmutspiffe_client_readiness=spiffe_bundle.client_readiness();"));
+        assert!(serve.contains("letspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(serve.contains(
             "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
         assert!(serve.contains(
-            "ifletErr(error)=spiffe_identity_manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
+            "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(serve.contains(
             "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
         ));
         assert!(serve.contains(
-            "margaret::framework::service::run_all::run_all(::std::vec![spiffe_identity_running,spiffe_application_running],trzcina::ServiceShutdownOptions::default(),).await"
+            "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"
+        ));
+        assert!(serve.contains(
+            "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
         ));
         assert!(serve.matches("SvidBundle::new").count() == 1);
-        assert!(!serve.contains("bundle_services.extend"));
+        assert!(!serve.contains("run_all"));
+        assert!(!serve.contains("bundle_services"));
     }
 
     #[test]
