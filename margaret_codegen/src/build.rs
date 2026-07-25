@@ -475,15 +475,15 @@ impl ProvidesEndpoint for PartnerJwksEndpoint {}
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
 struct GetVerify {
-    auth: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>,
-    partner: std::sync::Arc<crate::margaret::jwks::partner::PublicJwksVerifier>,
+    auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
+    partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
 }
 
 impl GetVerify {
     #[constructor]
     fn create(
-        #[jwks_secret_store(client = auth)] auth: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>,
-        #[jwks_secret_store(client = partner)] partner: std::sync::Arc<crate::margaret::jwks::partner::PublicJwksVerifier>,
+        #[jwks_secret_store(client = auth)] auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
+        #[jwks_secret_store(client = partner)] partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
     ) -> Self {}
 
     #[process]
@@ -543,24 +543,26 @@ impl PostMint {
         let code = generate(JWKS_MULTI_CLIENT_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod jwks;"));
-        assert!(module(&code, "jwks").contains("pub mod auth;"));
-        assert!(module(&code, "jwks").contains("pub mod partner;"));
-        assert!(module(&code, "jwks/auth")
+        assert!(module(&code, "jwks").contains("pub mod auth_jwks_endpoint;"));
+        assert!(module(&code, "jwks").contains("pub mod partner_jwks_endpoint;"));
+        assert!(module(&code, "jwks/auth_jwks_endpoint")
             .contains("pub use margaret_jwks_client::jwks_client::JwksClient;"));
-        assert!(module(&code, "jwks/auth").contains(
+        assert!(module(&code, "jwks/auth_jwks_endpoint").contains(
             "pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
-        assert!(module(&code, "jwks/partner").contains(
+        assert!(module(&code, "jwks/partner_jwks_endpoint").contains(
             "pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains("crate::margaret::jwks::auth::JwksClient::create("));
-        assert!(container.contains("crate::margaret::jwks::partner::JwksClient::create("));
+        assert!(container.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create("));
+        assert!(container.contains("crate::margaret::jwks::partner_jwks_endpoint::JwksClient::create("));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains("impltrzcina::ServiceforMargaretJwksAuthJwksClient"));
-        assert!(serve.contains("impltrzcina::ServiceforMargaretJwksPartnerJwksClient"));
+        assert!(serve.contains("impltrzcina::ServiceforMargaretJwksAuthJwksEndpointJwksClient"));
+        assert!(
+            serve.contains("impltrzcina::ServiceforMargaretJwksPartnerJwksEndpointJwksClient")
+        );
         assert!(!concatenated(&code).contains("PublicJwksHandler"));
     }
 
@@ -602,12 +604,12 @@ impl ProvidesEndpoint for AuthJwksEndpoint {}
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
 struct GetVerify {
-    verifier: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>,
+    verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
 }
 
 impl GetVerify {
     #[constructor]
-    fn create(#[jwks_secret_store(client = auth)] verifier: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>) -> Self {}
+    fn create(#[jwks_secret_store(client = auth)] verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>) -> Self {}
 
     #[process]
     fn respond(&self) -> Response {}
@@ -620,7 +622,7 @@ impl GetVerify {
 
         let container: String = module(&code, "container").split_whitespace().collect();
         assert!(container.contains(".await.verifier()"));
-        assert!(container.contains("crate::margaret::jwks::auth::JwksClient::create("));
+        assert!(container.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create("));
 
         let run = module(&code, "run");
         assert!(run.contains(r#"clap::Arg::new("issuer-url")"#));

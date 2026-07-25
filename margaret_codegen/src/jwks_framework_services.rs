@@ -44,7 +44,7 @@ pub(crate) fn jwks_framework_services(
     for binding in client_bindings {
         services.extend(framework_service(
             bindings,
-            jwks_client_canonical_path(&binding.tag),
+            jwks_client_canonical_path(&binding.module_segment),
             FrameworkServiceKind::Service,
             true,
         ));

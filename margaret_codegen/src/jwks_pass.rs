@@ -1,6 +1,5 @@
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_jwks_codegen::jwks_client_module::JwksClientModule;
-use margaret_jwks_codegen::jwks_client_module_segment::jwks_client_module_segment;
 use margaret_jwks_codegen::jwks_server_module::JwksServerModule;
 use margaret_jwks_codegen::render_jwks::render_jwks;
 use margaret_tag_codegen::jwks_client_binding::JwksClientBinding;
@@ -29,9 +28,10 @@ pub(crate) fn jwks_pass(
     let clients: Vec<JwksClientModule> = client_bindings
         .iter()
         .map(|binding| JwksClientModule {
-            has_client: bindings.provides(&jwks_client_canonical_path(&binding.tag)),
-            has_verifier: bindings.provides(&public_jwks_verifier_canonical_path(&binding.tag)),
-            segment: jwks_client_module_segment(&binding.tag),
+            has_client: bindings.provides(&jwks_client_canonical_path(&binding.module_segment)),
+            has_verifier: bindings
+                .provides(&public_jwks_verifier_canonical_path(&binding.module_segment)),
+            segment: binding.module_segment.clone(),
         })
         .collect();
 

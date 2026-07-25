@@ -6,7 +6,8 @@ use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_attributes::field_base::field_base;
+use margaret_attributes::name_allocator::NameAllocator;
 use margaret_attributes::tag::Tag;
 
 use crate::jwks_client_binding::JwksClientBinding;
@@ -36,14 +37,6 @@ fn collect_kind(
             concrete: concrete.to_string(),
             kind,
         })?;
-
-        if kind == TagKind::JwksClient && !is_snake_case_identifier(&tag.to_string()) {
-            return Err(TagError::TagNotSnakeCase {
-                concrete: concrete.to_string(),
-                kind,
-                tag: tag.to_string(),
-            });
-        }
 
         if let Some(existing) = entries.get(&tag) {
             return Err(TagError::DuplicateTag {
@@ -102,19 +95,27 @@ impl TagPool {
 
     #[must_use]
     pub fn jwks_client_bindings(&self) -> Vec<JwksClientBinding> {
-        let mut bindings: Vec<JwksClientBinding> = self
+        let mut entries: Vec<(&Tag, &TagEntry)> = self
             .entries
             .iter()
             .filter(|(_, entry)| entry.kind == TagKind::JwksClient)
-            .map(|(tag, entry)| JwksClientBinding {
-                endpoint: entry.concrete.clone(),
-                tag: tag.clone(),
-            })
             .collect();
 
-        bindings.sort_by_key(|binding| binding.tag.to_string());
+        entries.sort_by_key(|(tag, _)| tag.to_string());
 
-        bindings
+        let mut allocator = NameAllocator::new();
+
+        entries
+            .into_iter()
+            .map(|(tag, entry)| JwksClientBinding {
+                endpoint: entry.concrete.clone(),
+                module_segment: allocator
+                    .allocate(&field_base(&entry.concrete))
+                    .field()
+                    .to_string(),
+                tag: tag.clone(),
+            })
+            .collect()
     }
 
     pub fn resolve(
@@ -196,6 +197,40 @@ mod tests {
         assert_eq!(bindings.len(), 1);
         assert_eq!(bindings[0].tag.to_string(), "jwks");
         assert_eq!(bindings[0].endpoint.to_string(), "crate::JwksEndpoint");
+        assert_eq!(bindings[0].module_segment, "jwks_endpoint");
+    }
+
+    #[test]
+    fn takes_a_raw_identifier_tag_verbatim_and_derives_the_segment_from_the_endpoint() {
+        let pool = pool_for("#[provides_jwks_endpoint(r#async)]\nstruct AsyncEndpoint;\n")
+            .expect("the pool collects");
+        let bindings = pool.jwks_client_bindings();
+
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[0].tag.to_string(), "r#async");
+        assert_eq!(bindings[0].module_segment, "async_endpoint");
+    }
+
+    #[test]
+    fn disambiguates_client_module_segments_that_collide() {
+        let pool = pool_for(
+            "mod outer {\n    pub mod inner {\n        #[provides_jwks_endpoint(first)]\n        pub struct AuthEndpoint;\n    }\n}\n\nmod outer_inner {\n    #[provides_jwks_endpoint(second)]\n    pub struct AuthEndpoint;\n}\n",
+        )
+        .expect("the pool collects");
+
+        let segments: Vec<String> = pool
+            .jwks_client_bindings()
+            .iter()
+            .map(|binding| binding.module_segment.clone())
+            .collect();
+
+        assert_eq!(
+            segments,
+            vec![
+                "outer_inner_auth_endpoint".to_string(),
+                "outer_inner_auth_endpoint_2".to_string(),
+            ]
+        );
     }
 
     #[test]
@@ -294,14 +329,6 @@ mod tests {
         assert!(
             error_for("#[provides_jwks_endpoint(endpoints::jwks)]\nstruct JwksEndpoint;\n")
                 .contains("not a single plain name")
-        );
-    }
-
-    #[test]
-    fn rejects_a_non_snake_case_jwks_endpoint_tag() {
-        assert!(
-            error_for("#[provides_jwks_endpoint(myClient)]\nstruct Endpoint;\n")
-                .contains("is not a snake_case identifier")
         );
     }
 
