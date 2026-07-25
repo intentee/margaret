@@ -24,22 +24,25 @@ pub enum ContainerError {
         source: TagError,
     },
 
-    #[error("#[provides_endpoint] is only supported on structs, but '{path}' is not a struct")]
+    #[error("#[provides_jwks_endpoint] is only supported on structs, but '{path}' is not a struct")]
     NotAnEndpointStruct { path: String },
 
-    #[error("the endpoint provider '{path}' must not also carry a role attribute")]
+    #[error("the jwks endpoint provider '{path}' must not also carry a role attribute")]
     ConflictingEndpointRole { path: String },
 
     #[error("#[singleton] does not take any arguments, but '{path}' declares some")]
     SingletonHasArguments { path: String },
 
-    #[error("the endpoint provider '{path}' must also be declared as a #[singleton]")]
+    #[error("the jwks endpoint provider '{path}' must also be declared as a #[singleton]")]
     EndpointProviderRequiresSingleton { path: String },
 
     #[error(
-        "the endpoint provider '{path}' does not implement margaret_endpoint::provides_endpoint::ProvidesEndpoint"
+        "the jwks endpoint provider '{path}' does not implement margaret_endpoint::provides_endpoint::ProvidesEndpoint"
     )]
     EndpointProviderMissingTrait { path: String },
+
+    #[error("{site} references a jwks secret store that is not available: {target}")]
+    UnknownJwksSecretStore { site: String, target: String },
 
     #[error("#[singleton] is only supported on structs, but '{path}' is not a struct")]
     NotASingletonStruct { path: String },

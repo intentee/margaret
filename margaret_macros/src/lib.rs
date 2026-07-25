@@ -16,7 +16,7 @@ pub fn singleton(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn constructor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, &["console_argument", "endpoint_provider"])
+    strip_parameter_markers(item, &["console_argument", "jwks_secret_store"])
 }
 
 #[proc_macro_attribute]
@@ -50,7 +50,7 @@ pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn provides_endpoint(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+pub fn provides_jwks_endpoint(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
@@ -182,23 +182,25 @@ mod tests {
     }
 
     #[test]
-    fn removes_endpoint_provider_markers_from_parameters() {
+    fn removes_jwks_secret_store_markers_from_parameters() {
         let stripped = strip_or_compile_error(
             quote! {
                 pub fn create(
-                    #[endpoint_provider(jwks)] issuer: Arc<dyn ProvidesEndpoint>,
+                    #[jwks_secret_store(server)] minter: Arc<JwksSecretStore>,
+                    #[jwks_secret_store(client = auth)] verifier: Arc<PublicJwksVerifier>,
                     #[console_argument(from = "label")] label: String,
                 ) -> Self {
-                    Self { issuer, label }
+                    Self { minter, verifier, label }
                 }
             },
-            &["console_argument", "endpoint_provider"],
+            &["console_argument", "jwks_secret_store"],
         )
         .to_string();
 
-        assert!(!stripped.contains("endpoint_provider"));
+        assert!(!stripped.contains("jwks_secret_store"));
         assert!(!stripped.contains("console_argument"));
-        assert!(stripped.contains("issuer"));
+        assert!(stripped.contains("minter"));
+        assert!(stripped.contains("verifier"));
         assert!(stripped.contains("label"));
     }
 

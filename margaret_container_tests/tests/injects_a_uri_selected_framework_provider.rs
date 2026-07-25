@@ -6,6 +6,7 @@ use margaret_attributes::crate_root::CrateRoot;
 use margaret_console_argument_codegen::scan::scan;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_enablement::FrameworkEnablement;
+use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container_tests::container_module_source::container_module_source;
@@ -21,6 +22,7 @@ fn uri_selected_provider() -> FrameworkProvider {
             value_type: CanonicalPath::new(vec!["crate".to_string(), "TestStorageUri".to_string()]),
         },
         enablement: FrameworkEnablement::WhenReferenced,
+        injection: FrameworkInjectionRole::Unmarked,
         provided: CanonicalPath::new(vec!["crate".to_string(), "TestStorage".to_string()]),
     }
 }

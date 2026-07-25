@@ -11,7 +11,7 @@ use margaret_macros::constructor;
 use margaret_macros::process;
 use margaret_macros::service;
 
-use crate::margaret::jwks::PublicJwksVerifier;
+use crate::margaret::jwks::auth::PublicJwksVerifier;
 use crate::system_clock::SystemClock;
 
 #[derive(Deserialize)]
@@ -34,7 +34,10 @@ pub struct JwksVerifier {
 impl JwksVerifier {
     #[constructor]
     #[must_use]
-    pub fn create(clock: Arc<SystemClock>, verifier: Arc<PublicJwksVerifier>) -> Self {
+    pub fn create(
+        clock: Arc<SystemClock>,
+        #[jwks_secret_store(client = auth)] verifier: Arc<PublicJwksVerifier>,
+    ) -> Self {
         Self { clock, verifier }
     }
 

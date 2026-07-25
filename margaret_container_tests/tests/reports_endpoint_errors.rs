@@ -13,7 +13,7 @@ fn error(fixture: &str) -> ContainerError {
 }
 
 #[test]
-fn rejects_a_provides_endpoint_on_a_non_struct() {
+fn rejects_a_provides_jwks_endpoint_on_a_non_struct() {
     assert!(matches!(
         error("endpoint_not_a_struct"),
         ContainerError::NotAnEndpointStruct { .. }
@@ -21,7 +21,7 @@ fn rejects_a_provides_endpoint_on_a_non_struct() {
 }
 
 #[test]
-fn rejects_an_endpoint_provider_that_is_also_a_service() {
+fn rejects_a_jwks_endpoint_provider_that_is_also_a_service() {
     assert!(matches!(
         error("endpoint_conflicting_role"),
         ContainerError::ConflictingEndpointRole { .. }
@@ -29,7 +29,7 @@ fn rejects_an_endpoint_provider_that_is_also_a_service() {
 }
 
 #[test]
-fn rejects_an_endpoint_provider_without_a_singleton() {
+fn rejects_a_jwks_endpoint_provider_without_a_singleton() {
     assert!(matches!(
         error("endpoint_without_singleton"),
         ContainerError::EndpointProviderRequiresSingleton { .. }
@@ -37,7 +37,7 @@ fn rejects_an_endpoint_provider_without_a_singleton() {
 }
 
 #[test]
-fn rejects_an_endpoint_provider_that_carries_singleton_arguments() {
+fn rejects_a_jwks_endpoint_provider_that_carries_singleton_arguments() {
     assert!(matches!(
         error("endpoint_singleton_with_arguments"),
         ContainerError::SingletonHasArguments { .. }
@@ -45,7 +45,7 @@ fn rejects_an_endpoint_provider_that_carries_singleton_arguments() {
 }
 
 #[test]
-fn rejects_an_endpoint_provider_with_malformed_singleton_arguments() {
+fn rejects_a_jwks_endpoint_provider_with_malformed_singleton_arguments() {
     assert!(matches!(
         error("endpoint_malformed_singleton_arguments"),
         ContainerError::Index {
@@ -55,7 +55,7 @@ fn rejects_an_endpoint_provider_with_malformed_singleton_arguments() {
 }
 
 #[test]
-fn rejects_an_endpoint_provider_without_the_trait() {
+fn rejects_a_jwks_endpoint_provider_without_the_trait() {
     assert!(matches!(
         error("endpoint_missing_trait"),
         ContainerError::EndpointProviderMissingTrait { .. }
@@ -63,53 +63,9 @@ fn rejects_an_endpoint_provider_without_the_trait() {
 }
 
 #[test]
-fn rejects_an_endpoint_provider_with_fields_but_no_constructor() {
+fn rejects_a_jwks_endpoint_provider_with_fields_but_no_constructor() {
     assert!(matches!(
         error("endpoint_requires_constructor"),
         ContainerError::SingletonRequiresConstructor { .. }
     ));
-}
-
-#[test]
-fn rejects_an_endpoint_provider_reference_to_an_unknown_tag() {
-    assert!(
-        error("endpoint_unknown_tag")
-            .to_string()
-            .contains("no endpoint provider declares")
-    );
-}
-
-#[test]
-fn rejects_an_endpoint_provider_reference_to_a_middleware_tag() {
-    assert!(
-        error("endpoint_wrong_kind")
-            .to_string()
-            .contains("is a middleware handler, not a endpoint provider")
-    );
-}
-
-#[test]
-fn rejects_a_malformed_endpoint_provider_reference() {
-    assert!(
-        error("endpoint_malformed_reference")
-            .to_string()
-            .contains("must reference exactly one tag")
-    );
-}
-
-#[test]
-fn rejects_an_unparseable_endpoint_provider_argument() {
-    assert!(matches!(
-        error("endpoint_unparseable_argument"),
-        ContainerError::Index { .. }
-    ));
-}
-
-#[test]
-fn rejects_a_tag_declared_by_two_endpoint_providers() {
-    assert!(
-        error("endpoint_duplicate_tag")
-            .to_string()
-            .contains("declared more than once")
-    );
 }

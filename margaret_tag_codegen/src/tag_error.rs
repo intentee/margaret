@@ -42,4 +42,7 @@ pub enum TagError {
 
     #[error("{site} must reference exactly one tag by its plain name")]
     MalformedReference { site: String },
+
+    #[error("{site} must be either `server` or `client = <tag>`")]
+    MalformedJwksSecretStore { site: String },
 }

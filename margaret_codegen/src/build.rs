@@ -2,6 +2,8 @@ use std::path::Path;
 
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_container::container_error::ContainerError;
+use margaret_tag_codegen::tag_pool::TagPool;
 
 use crate::asset_bag_pass::asset_bag_pass;
 use crate::binding_pass::binding_pass;
@@ -34,9 +36,12 @@ pub fn build(
     let mut context = BuildContext::new(&index, metafile_contents);
 
     let registry = console_arguments_pass(&index)?;
-    let bindings = container_pass(&mut context, &registry)?;
+    let client_bindings = TagPool::collect(&index)
+        .map_err(ContainerError::from)?
+        .jwks_client_bindings();
+    let bindings = container_pass(&mut context, &registry, &client_bindings)?;
     asset_bag_pass(&mut context, &bindings, assets_directory, embed_relative)?;
-    jwks_pass(&mut context, &bindings);
+    jwks_pass(&mut context, &bindings, &client_bindings);
     let registries = binding_pass(&mut context)?;
     middleware_pass(&mut context, &registries)?;
     websocket_pass(&mut context, &bindings, &registries)?;
@@ -66,6 +71,7 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_generated_module::generated_module::GeneratedModule;
+    use margaret_tag_codegen::tag_pool::TagPool;
 
     use super::build;
     use crate::asset_bag_pass::asset_bag_pass;
@@ -218,8 +224,11 @@ struct Room;
         let mut context = BuildContext::new(&index, None);
 
         let registry = console_arguments_pass(&index).expect("the console arguments pass succeeds");
-        let bindings =
-            container_pass(&mut context, &registry).expect("the container pass succeeds");
+        let client_bindings = TagPool::collect(&index)
+            .expect("the tag pool collects")
+            .jwks_client_bindings();
+        let bindings = container_pass(&mut context, &registry, &client_bindings)
+            .expect("the container pass succeeds");
         asset_bag_pass(
             &mut context,
             &bindings,
@@ -227,7 +236,7 @@ struct Room;
             EMBED_RELATIVE,
         )
         .expect("the asset bag pass succeeds");
-        jwks_pass(&mut context, &bindings);
+        jwks_pass(&mut context, &bindings, &client_bindings);
         let registries = binding_pass(&mut context).expect("the binding pass succeeds");
         middleware_pass(&mut context, &registries).expect("the middleware pass succeeds");
         websocket_pass(&mut context, &bindings, &registries).expect("the websocket pass succeeds");
@@ -445,27 +454,60 @@ impl GetJwks {
 }
 ";
 
-    const JWKS_CLIENT_CRATE: &str = "\
+    const JWKS_MULTI_CLIENT_CRATE: &str = "\
 #[rustfmt::skip]
 pub mod margaret;
 
 use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
-#[provides_endpoint(jwks)]
-struct JwksEndpoint;
+#[provides_jwks_endpoint(auth)]
+struct AuthJwksEndpoint;
 
-impl ProvidesEndpoint for JwksEndpoint {}
+impl ProvidesEndpoint for AuthJwksEndpoint {}
+
+#[singleton]
+#[provides_jwks_endpoint(partner)]
+struct PartnerJwksEndpoint;
+
+impl ProvidesEndpoint for PartnerJwksEndpoint {}
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
 struct GetVerify {
-    verifier: std::sync::Arc<crate::margaret::jwks::PublicJwksVerifier>,
+    auth: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>,
+    partner: std::sync::Arc<crate::margaret::jwks::partner::PublicJwksVerifier>,
 }
 
 impl GetVerify {
     #[constructor]
-    fn create(verifier: std::sync::Arc<crate::margaret::jwks::PublicJwksVerifier>) -> Self {}
+    fn create(
+        #[jwks_secret_store(client = auth)] auth: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>,
+        #[jwks_secret_store(client = partner)] partner: std::sync::Arc<crate::margaret::jwks::partner::PublicJwksVerifier>,
+    ) -> Self {}
+
+    #[process]
+    fn respond(&self) -> Response {}
+}
+";
+
+    const JWKS_SERVER_STORE_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+#[responds_to_http(method = \"post\", path = \"/mint\", server = \"internal\")]
+struct PostMint {
+    minter: std::sync::Arc<crate::margaret::jwks::MintAccessTokenHandler>,
+    store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>,
+}
+
+impl PostMint {
+    #[constructor]
+    fn create(
+        minter: std::sync::Arc<crate::margaret::jwks::MintAccessTokenHandler>,
+        #[jwks_secret_store(server)] store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>,
+    ) -> Self {}
 
     #[process]
     fn respond(&self) -> Response {}
@@ -497,23 +539,47 @@ impl GetVerify {
     }
 
     #[test]
-    fn generates_the_jwks_client_when_a_jwks_endpoint_is_provided() {
-        let code = generate(JWKS_CLIENT_CRATE).expect("the build succeeds");
+    fn generates_a_jwks_client_per_provides_jwks_endpoint() {
+        let code = generate(JWKS_MULTI_CLIENT_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod jwks;"));
-        assert!(module(&code, "jwks")
+        assert!(module(&code, "jwks").contains("pub mod auth;"));
+        assert!(module(&code, "jwks").contains("pub mod partner;"));
+        assert!(module(&code, "jwks/auth")
             .contains("pub use margaret_jwks_client::jwks_client::JwksClient;"));
-        assert!(module(&code, "jwks").contains(
+        assert!(module(&code, "jwks/auth").contains(
+            "pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;"
+        ));
+        assert!(module(&code, "jwks/partner").contains(
             "pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains("crate::margaret::jwks::JwksClient::create("));
-        assert!(container.contains(".verifier()"));
+        assert!(container.contains("crate::margaret::jwks::auth::JwksClient::create("));
+        assert!(container.contains("crate::margaret::jwks::partner::JwksClient::create("));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains("impltrzcina::ServiceforCrateMargaretJwksJwksClient"));
+        assert!(serve.contains("impltrzcina::ServiceforCrateMargaretJwksAuthJwksClient"));
+        assert!(serve.contains("impltrzcina::ServiceforCrateMargaretJwksPartnerJwksClient"));
         assert!(!concatenated(&code).contains("PublicJwksHandler"));
+    }
+
+    #[test]
+    fn generates_the_server_secret_store_and_mint_handler_when_injected() {
+        let code = generate(JWKS_SERVER_STORE_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "jwks")
+            .contains("pub use margaret_jwks_roller_server::jwks_roller::JwksRoller;"));
+        assert!(module(&code, "jwks")
+            .contains("pub use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;"));
+        assert!(module(&code, "jwks").contains(
+            "pub use margaret_access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
+        ));
+
+        let container: String = module(&code, "container").split_whitespace().collect();
+        assert!(container.contains(".server_secret_store()"));
+        assert!(container.contains("crate::margaret::jwks::MintAccessTokenHandler::create("));
+        assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
 
     const JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE: &str = "\
@@ -523,25 +589,25 @@ pub mod margaret;
 use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
-#[provides_endpoint(jwks)]
-struct JwksEndpoint;
+#[provides_jwks_endpoint(auth)]
+struct AuthJwksEndpoint;
 
-impl JwksEndpoint {
+impl AuthJwksEndpoint {
     #[constructor]
     fn create(#[console_argument(from = \"issuer-url\")] issuer_url: String) -> Self {}
 }
 
-impl ProvidesEndpoint for JwksEndpoint {}
+impl ProvidesEndpoint for AuthJwksEndpoint {}
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
 struct GetVerify {
-    verifier: std::sync::Arc<crate::margaret::jwks::PublicJwksVerifier>,
+    verifier: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>,
 }
 
 impl GetVerify {
     #[constructor]
-    fn create(verifier: std::sync::Arc<crate::margaret::jwks::PublicJwksVerifier>) -> Self {}
+    fn create(#[jwks_secret_store(client = auth)] verifier: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>) -> Self {}
 
     #[process]
     fn respond(&self) -> Response {}
@@ -554,7 +620,7 @@ impl GetVerify {
 
         let container: String = module(&code, "container").split_whitespace().collect();
         assert!(container.contains(".await.verifier()"));
-        assert!(container.contains("crate::margaret::jwks::JwksClient::create("));
+        assert!(container.contains("crate::margaret::jwks::auth::JwksClient::create("));
 
         let run = module(&code, "run");
         assert!(run.contains(r#"clap::Arg::new("issuer-url")"#));
@@ -603,15 +669,42 @@ impl GetJwks {
     }
 
     #[test]
-    fn rejects_a_jwks_verifier_injection_without_a_jwks_endpoint() {
+    fn rejects_a_client_store_referencing_an_unknown_tag() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]\nstruct GetVerify {\n    verifier: std::sync::Arc<crate::margaret::jwks::PublicJwksVerifier>,\n}\n\nimpl GetVerify {\n    #[constructor]\n    fn create(verifier: std::sync::Arc<crate::margaret::jwks::PublicJwksVerifier>) -> Self {}\n\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]\nstruct GetVerify {\n    verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>,\n}\n\nimpl GetVerify {\n    #[constructor]\n    fn create(#[jwks_secret_store(client = missing)] verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>) -> Self {}\n\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         )
-        .expect_err("a verifier injection without a jwks endpoint is rejected")
+        .expect_err("a client store without a matching jwks endpoint is rejected")
         .to_string();
 
-        assert!(message.contains("PublicJwksVerifier"));
-        assert!(message.contains("no singleton provides"));
+        assert!(message.contains("client 'missing'"));
+    }
+
+    const JWKS_DUPLICATE_ENDPOINT_TAG_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+
+#[singleton]
+#[provides_jwks_endpoint(auth)]
+struct FirstEndpoint;
+
+impl ProvidesEndpoint for FirstEndpoint {}
+
+#[singleton]
+#[provides_jwks_endpoint(auth)]
+struct SecondEndpoint;
+
+impl ProvidesEndpoint for SecondEndpoint {}
+";
+
+    #[test]
+    fn propagates_a_duplicate_jwks_endpoint_tag() {
+        let message = generate(JWKS_DUPLICATE_ENDPOINT_TAG_CRATE)
+            .expect_err("a duplicate jwks endpoint tag is rejected")
+            .to_string();
+
+        assert!(message.contains("declared more than once"));
     }
 
     #[test]

@@ -2,8 +2,10 @@ use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumen
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_enablement::FrameworkEnablement;
+use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::rendered_container::RenderedContainer;
+use margaret_tag_codegen::jwks_client_binding::JwksClientBinding;
 
 use crate::asset_responder_path::asset_responder_canonical_path;
 use crate::build_context::BuildContext;
@@ -14,17 +16,19 @@ use crate::jwks_secret_storage_provider::jwks_secret_storage_provider;
 pub(crate) fn container_pass(
     context: &mut BuildContext,
     registry: &ConsoleArgumentRegistry,
+    client_bindings: &[JwksClientBinding],
 ) -> Result<ContainerBindings, CodegenError> {
     let mut framework_providers = vec![
         FrameworkProvider {
             construction: FrameworkConstruction::Unit,
             enablement: FrameworkEnablement::WhenReferenced,
+            injection: FrameworkInjectionRole::Unmarked,
             provided: asset_responder_canonical_path(),
         },
         jwks_secret_storage_provider(),
     ];
 
-    framework_providers.extend(jwks_framework_providers());
+    framework_providers.extend(jwks_framework_providers(client_bindings));
 
     let RenderedContainer { bindings, modules } =
         margaret_container::render_container::render_container(

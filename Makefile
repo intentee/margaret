@@ -1,4 +1,5 @@
 COVERAGE_PACKAGES := \
+	-p margaret_access_token_minter \
 	-p margaret_asset_bag \
 	-p margaret_asset_bag_codegen \
 	-p margaret_attributes \
@@ -31,6 +32,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_jwks_roller_tests \
 	-p margaret_jwks_secret_storage_selection \
 	-p margaret_jwks_secret_storage_selection_tests \
+	-p margaret_jwks_secret_store \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
@@ -93,6 +95,7 @@ coverage: node_modules postgres-image
 	cargo llvm-cov report
 	npx rust-coverage-check target/llvm-cov.json \
 		--workspace-root $(CURDIR) \
+		--gated margaret_access_token_minter=100 \
 		--gated margaret_asset_bag=100 \
 		--gated margaret_asset_bag_codegen=100 \
 		--gated margaret_attributes=100 \
@@ -125,6 +128,7 @@ coverage: node_modules postgres-image
 		--gated margaret_jwks_roller_tests=100 \
 		--gated margaret_jwks_secret_storage_selection=100 \
 		--gated margaret_jwks_secret_storage_selection_tests=100 \
+		--gated margaret_jwks_secret_store=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_middleware_codegen=100 \
 		--gated margaret_model=100 \

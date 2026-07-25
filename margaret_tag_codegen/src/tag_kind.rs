@@ -4,14 +4,14 @@ use std::fmt::Result as FormatResult;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TagKind {
-    Endpoint,
+    JwksClient,
     Middleware,
 }
 
 impl Display for TagKind {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> FormatResult {
         let label = match self {
-            TagKind::Endpoint => "endpoint provider",
+            TagKind::JwksClient => "jwks endpoint provider",
             TagKind::Middleware => "middleware handler",
         };
 

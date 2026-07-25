@@ -10,7 +10,7 @@ impl DnsResolver {
     fn new() -> Self {}
 }
 
-#[provides_endpoint(jwks)]
+#[provides_jwks_endpoint(jwks)]
 #[singleton]
 struct JwksEndpoint;
 
@@ -23,11 +23,3 @@ impl JwksEndpoint {
 }
 
 impl ProvidesEndpoint for JwksEndpoint {}
-
-#[singleton]
-struct JwksClient;
-
-impl JwksClient {
-    #[constructor]
-    fn new(#[endpoint_provider(jwks)] issuer: Arc<dyn ProvidesEndpoint>) -> Self {}
-}

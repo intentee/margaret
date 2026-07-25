@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
+use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 
 use crate::jwks_roller_server_bundle::JwksRollerServerBundle;
 use crate::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
@@ -10,6 +11,7 @@ use crate::public_jwks_handler::PublicJwksHandler;
 pub struct JwksRoller {
     bundle: JwksRollerServerBundle,
     public_jwks_handler: Arc<PublicJwksHandler>,
+    server_secret_store: Arc<JwksSecretStore>,
 }
 
 impl JwksRoller {
@@ -17,10 +19,12 @@ impl JwksRoller {
     pub fn create(storage: Arc<dyn JwksSecretStorage>) -> Self {
         let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams { storage });
         let public_jwks_handler = bundle.public_jwks_handler();
+        let server_secret_store = Arc::new(JwksSecretStore::new(bundle.jwks_secret_holder()));
 
         Self {
             bundle,
             public_jwks_handler,
+            server_secret_store,
         }
     }
 
@@ -31,6 +35,11 @@ impl JwksRoller {
 
     pub async fn run(&self) -> Result<(), JwksRollerServerError> {
         self.bundle.roll_and_publish()
+    }
+
+    #[must_use]
+    pub fn server_secret_store(&self) -> Arc<JwksSecretStore> {
+        self.server_secret_store.clone()
     }
 }
 
@@ -58,5 +67,18 @@ mod tests {
         roller.run().await.expect("the first roll publishes a document");
 
         assert_eq!(roller.public_jwks_handler().respond().status(), 200);
+    }
+
+    #[tokio::test]
+    async fn exposes_a_secret_store_backed_by_the_live_secret() {
+        let roller = roller();
+        let store = roller.server_secret_store();
+        let claims = serde_json::json!({ "sub": "subject" });
+
+        assert!(store.sign(&claims).await.is_err());
+
+        roller.run().await.expect("the first roll seeds the secret");
+
+        assert!(store.sign(&claims).await.is_ok());
     }
 }
