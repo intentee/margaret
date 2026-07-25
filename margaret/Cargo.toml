@@ -23,6 +23,7 @@ margaret_jwks_secret_store = { path = "../margaret_jwks_secret_store", optional 
 margaret_macros = { path = "../margaret_macros", optional = true }
 margaret_model = { path = "../margaret_model", optional = true }
 margaret_peer_identity = { path = "../margaret_peer_identity", optional = true }
+margaret_postgres_pool = { path = "../margaret_postgres_pool", optional = true }
 margaret_service = { path = "../margaret_service", optional = true }
 margaret_spiffe_svid = { path = "../margaret_spiffe_svid", optional = true }
 margaret_spiffe_svid_client = { path = "../margaret_spiffe_svid_client", optional = true }
@@ -55,6 +56,7 @@ runtime = [
     "dep:margaret_macros",
     "dep:margaret_model",
     "dep:margaret_peer_identity",
+    "dep:margaret_postgres_pool",
     "dep:margaret_service",
     "dep:margaret_spiffe_svid",
     "dep:margaret_spiffe_svid_client",

@@ -7,6 +7,7 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 
 use crate::codegen_error::CodegenError;
+use crate::postgres_pool_path::postgres_pool_canonical_path;
 
 fn serve_roots(index: &AttributeIndex) -> Vec<CanonicalPath> {
     let markers = ["service", "scheduled_with_tick_timer"];
@@ -37,5 +38,12 @@ pub(crate) fn serve_arguments(
 
     woven.extend_from_slice(views_console_arguments);
 
-    Ok(bindings.serve_arguments(&serve_roots(index), &woven)?)
+    let mut roots = serve_roots(index);
+    let postgres_pool_path = postgres_pool_canonical_path();
+
+    if bindings.provides(&postgres_pool_path) {
+        roots.push(postgres_pool_path);
+    }
+
+    Ok(bindings.serve_arguments(&roots, &woven)?)
 }

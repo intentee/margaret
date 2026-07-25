@@ -1801,6 +1801,7 @@ dependencies = [
  "margaret_macros",
  "margaret_model",
  "margaret_peer_identity",
+ "margaret_postgres_pool",
  "margaret_service",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_client",
@@ -1876,6 +1877,7 @@ dependencies = [
  "margaret_jwks_codegen",
  "margaret_middleware_codegen",
  "margaret_model_codegen",
+ "margaret_postgres_pool_codegen",
  "margaret_request_binding_codegen",
  "margaret_schema_codegen",
  "margaret_service_codegen",
@@ -2404,6 +2406,33 @@ dependencies = [
  "margaret_peer_identity",
  "rcgen",
  "spiffe",
+]
+
+[[package]]
+name = "margaret_postgres_pool"
+version = "0.1.0"
+dependencies = [
+ "sqlx",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "margaret_postgres_pool_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_generated_module",
+ "quote",
+]
+
+[[package]]
+name = "margaret_postgres_pool_tests"
+version = "0.1.0"
+dependencies = [
+ "ephemeral-postgres",
+ "margaret_postgres_pool",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]

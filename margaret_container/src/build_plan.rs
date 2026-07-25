@@ -550,12 +550,19 @@ fn resolve_framework_construction(construction: &FrameworkConstruction) -> Direc
             let mut resolved = Vec::new();
 
             for dependency in dependencies {
-                let provider_key = match dependency {
-                    FrameworkDependency::Endpoint(endpoint_path) => endpoint_path.clone(),
-                    FrameworkDependency::Provider(provider_key) => provider_key.clone(),
-                };
-
-                resolved.push(DependencyKind::Single { provider_key });
+                resolved.push(match dependency {
+                    FrameworkDependency::ConsoleArgument(argument) => {
+                        DependencyKind::ConsoleArgument {
+                            argument: argument.clone(),
+                        }
+                    }
+                    FrameworkDependency::Endpoint(endpoint_path) => DependencyKind::Single {
+                        provider_key: endpoint_path.clone(),
+                    },
+                    FrameworkDependency::Provider(provider_key) => DependencyKind::Single {
+                        provider_key: provider_key.clone(),
+                    },
+                });
             }
 
             DirectConstruction::Constructor {
@@ -592,7 +599,7 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
             .iter()
             .filter_map(|dependency| match dependency {
                 FrameworkDependency::Provider(provider_key) => Some(provider_key),
-                FrameworkDependency::Endpoint(_) => None,
+                FrameworkDependency::ConsoleArgument(_) | FrameworkDependency::Endpoint(_) => None,
             })
             .collect(),
         FrameworkConstruction::UriSelected { .. } | FrameworkConstruction::Unit => Vec::new(),

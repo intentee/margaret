@@ -37,6 +37,8 @@ pub use margaret_model as model;
 #[cfg(feature = "runtime")]
 pub use margaret_peer_identity as peer_identity;
 #[cfg(feature = "runtime")]
+pub use margaret_postgres_pool as postgres_pool;
+#[cfg(feature = "runtime")]
 pub use margaret_service as service;
 #[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid as spiffe_svid;

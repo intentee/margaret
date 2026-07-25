@@ -1,0 +1,11 @@
+[package]
+name = "margaret_postgres_pool_codegen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+margaret_generated_module = { path = "../margaret_generated_module" }
+quote = { workspace = true }
+
+[lints]
+workspace = true

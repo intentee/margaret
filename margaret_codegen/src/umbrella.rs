@@ -11,6 +11,7 @@ pub(crate) fn umbrella(
         has_jwks,
         has_middleware,
         has_models,
+        has_postgres_pool,
         has_views,
         has_websockets,
         serves,
@@ -51,6 +52,10 @@ pub(crate) fn umbrella(
         source.push_str("#[rustfmt::skip]\npub mod schema;\n");
     }
 
+    if has_postgres_pool {
+        source.push_str("#[rustfmt::skip]\npub mod postgres_pool;\n");
+    }
+
     if has_views {
         source.push_str("#[rustfmt::skip]\npub mod views;\n");
     }
@@ -81,6 +86,7 @@ mod tests {
             has_jwks: false,
             has_middleware: false,
             has_models: false,
+            has_postgres_pool: false,
             has_views: false,
             has_websockets: false,
             serves: false,

@@ -97,6 +97,7 @@ mod tests {
                 views_console_arguments: &[],
             },
             &[],
+            &[],
         )
         .expect("the services source is generated")
         .format()
@@ -127,6 +128,7 @@ mod tests {
                 server_console_arguments: &BTreeMap::new(),
                 views_console_arguments: &[],
             },
+            &[],
             &[],
         )
         .expect_err("the services source fails to generate")
@@ -234,6 +236,7 @@ mod tests {
                 views_console_arguments: &[],
             },
             &framework_services,
+            &[],
         )
         .expect("the services source is generated")
         .format()

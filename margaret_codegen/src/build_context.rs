@@ -52,6 +52,10 @@ impl<'index> BuildContext<'index> {
         self.capabilities.has_jwks = true;
     }
 
+    pub(crate) fn enable_postgres_pool(&mut self) {
+        self.capabilities.has_postgres_pool = true;
+    }
+
     pub(crate) fn extend_modules(&mut self, modules: Vec<GeneratedModuleTokens>) {
         self.module_tokens.extend(modules);
     }

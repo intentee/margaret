@@ -40,6 +40,9 @@ COVERAGE_PACKAGES := \
 	-p margaret_model_codegen \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
+	-p margaret_postgres_pool \
+	-p margaret_postgres_pool_codegen \
+	-p margaret_postgres_pool_tests \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_codegen \
 	-p margaret_schema_codegen \
@@ -67,7 +70,9 @@ COVERAGE_PACKAGES := \
 	-p margaret_websocket_codegen \
 	-p margaret_websocket_tests
 
-POSTGRES_FEATURES := --features margaret_schema_postgres_tests/tests_that_use_postgres
+POSTGRES_FEATURES := \
+	--features margaret_postgres_pool_tests/tests_that_use_postgres \
+	--features margaret_schema_postgres_tests/tests_that_use_postgres
 
 POSTGRES_IMAGE_NAME := postgres
 POSTGRES_IMAGE_TAG := 18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
@@ -137,6 +142,9 @@ coverage: node_modules postgres-image
 		--gated margaret_model_codegen=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
+		--gated margaret_postgres_pool=100 \
+		--gated margaret_postgres_pool_codegen=100 \
+		--gated margaret_postgres_pool_tests=100 \
 		--gated margaret_request_binding_codegen=100 \
 		--gated margaret_route_parameter_codegen=100 \
 		--gated margaret_schema_codegen=100 \

@@ -7,6 +7,7 @@ use quote::quote;
 use syn::Path;
 
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
@@ -304,6 +305,22 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
     format_ident!("{}", unit.type_name)
 }
 
+fn startup_constructions(
+    startup_singletons: &[CanonicalPath],
+    bindings: &ContainerBindings,
+) -> TokenStream {
+    let constructions = startup_singletons.iter().map(|provided| {
+        let accessor = format_ident!("{}", provided.field_name());
+        let woven = bindings.console_weaves_owned(bindings.console_arguments(provided));
+
+        quote! {
+            let _ = container.#accessor(#(#woven),*).await;
+        }
+    });
+
+    quote! { #(#constructions)* }
+}
+
 fn serve_prelude(serve_arguments: &[ConsoleArgument], bindings: &ContainerBindings) -> TokenStream {
     let resolutions = serve_arguments.iter().map(|argument| {
         let ident = console_argument_ident(bindings.console_slot(argument.name()));
@@ -326,12 +343,14 @@ pub fn render_services(
         views_console_arguments,
     }: ServeConsoleArguments,
     framework_services: &[FrameworkService],
+    startup_singletons: &[CanonicalPath],
 ) -> Result<GeneratedModuleTokens, ServiceCodegenError> {
     let mut units = service_units(index)?;
 
     units.extend(framework_services.iter().map(ServiceUnit::from_framework));
 
     let adapters = units.iter().map(adapter);
+    let startup = startup_constructions(startup_singletons, bindings);
     let registrations = units.iter().map(|unit| registration(unit, bindings));
     let manager_setup = server_manager_setup(
         servers,
@@ -357,6 +376,7 @@ pub fn render_services(
             cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret::framework::console::command_outcome::CommandOutcome {
             #prelude
+            #startup
             #manager_setup
 
             #(#registrations)*

@@ -12,6 +12,7 @@ use crate::build_context::BuildContext;
 use crate::codegen_error::CodegenError;
 use crate::jwks_framework_providers::jwks_framework_providers;
 use crate::jwks_secret_storage_provider::jwks_secret_storage_provider;
+use crate::postgres_pool_provider::postgres_pool_provider;
 
 pub(crate) fn container_pass(
     context: &mut BuildContext,
@@ -29,6 +30,14 @@ pub(crate) fn container_pass(
     ];
 
     framework_providers.extend(jwks_framework_providers(client_bindings));
+
+    let postgres_pool_enablement = if context.capabilities().has_models {
+        FrameworkEnablement::Always
+    } else {
+        FrameworkEnablement::WhenReferenced
+    };
+
+    framework_providers.push(postgres_pool_provider(postgres_pool_enablement));
 
     let RenderedContainer { bindings, modules } =
         margaret_container::render_container::render_container(

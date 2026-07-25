@@ -17,6 +17,7 @@ use crate::http_pass::http_pass;
 use crate::jwks_pass::jwks_pass;
 use crate::middleware_pass::middleware_pass;
 use crate::model_pass::model_pass;
+use crate::postgres_pool_pass::postgres_pool_pass;
 use crate::serve_arguments::serve_arguments;
 use crate::services_pass::services_pass;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
@@ -42,6 +43,7 @@ pub fn build(
     let bindings = container_pass(&mut context, &registry, &client_bindings)?;
     asset_bag_pass(&mut context, &bindings, assets_directory, embed_relative)?;
     jwks_pass(&mut context, &bindings, &client_bindings);
+    postgres_pool_pass(&mut context, &bindings);
     let registries = binding_pass(&mut context)?;
     middleware_pass(&mut context, &registries)?;
     websocket_pass(&mut context, &bindings, &registries)?;
@@ -86,6 +88,7 @@ mod tests {
     use crate::jwks_pass::jwks_pass;
     use crate::middleware_pass::middleware_pass;
     use crate::model_pass::model_pass;
+    use crate::postgres_pool_pass::postgres_pool_pass;
     use crate::serve_arguments::serve_arguments;
     use crate::services_pass::services_pass;
     use crate::umbrella::umbrella;
@@ -237,6 +240,7 @@ struct Room;
         )
         .expect("the asset bag pass succeeds");
         jwks_pass(&mut context, &bindings, &client_bindings);
+        postgres_pool_pass(&mut context, &bindings);
         let registries = binding_pass(&mut context).expect("the binding pass succeeds");
         middleware_pass(&mut context, &registries).expect("the middleware pass succeeds");
         websocket_pass(&mut context, &bindings, &registries).expect("the websocket pass succeeds");
@@ -1363,6 +1367,89 @@ impl New {
         .to_string();
 
         assert!(message.contains("failed to generate the models"));
+    }
+
+    const MODELS_WITH_SERVER_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[model(table = \"widgets\")]
+struct Widget {
+    #[column(primary_key, name = \"id\")]
+    id: uuid::Uuid,
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+struct Page;
+
+impl Page {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+";
+
+    #[test]
+    fn starts_the_postgres_pool_at_serve_when_models_are_used() {
+        let code = generate(MODELS_WITH_SERVER_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod postgres_pool;"));
+        assert!(
+            module(&code, "postgres_pool")
+                .contains("pub use margaret::framework::postgres_pool::pg_pool::PgPool;")
+        );
+
+        let run: String = module(&code, "run").split_whitespace().collect();
+        assert!(run.contains(r#"clap::Arg::new("postgres-url").long("postgres-url").required(true)"#));
+        assert!(run.contains(
+            r#"clap::Arg::new("postgres-max-connections").long("postgres-max-connections").required(true)"#
+        ));
+
+        let container: String = module(&code, "container").split_whitespace().collect();
+        assert!(container.contains("crate::margaret::postgres_pool::PgPool::connect("));
+
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+        assert!(serve.contains(".margaret_postgres_pool_pg_pool("));
+    }
+
+    const POOL_INJECTION_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+struct Page {
+    pool: std::sync::Arc<crate::margaret::postgres_pool::PgPool>,
+}
+
+impl Page {
+    #[constructor]
+    fn create(pool: std::sync::Arc<crate::margaret::postgres_pool::PgPool>) -> Self {}
+
+    #[process]
+    fn respond(&self) -> Response {}
+}
+";
+
+    #[test]
+    fn enables_the_postgres_pool_when_a_component_injects_it() {
+        let code = generate(POOL_INJECTION_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod postgres_pool;"));
+        assert!(module(&code, "run").contains(r#"clap::Arg::new("postgres-url")"#));
+
+        let container: String = module(&code, "container").split_whitespace().collect();
+        assert!(container.contains("crate::Page::create(self.margaret_postgres_pool_pg_pool("));
+    }
+
+    #[test]
+    fn omits_the_postgres_pool_without_models_or_injection() {
+        let code = generate(WEB_CRATE).expect("the build succeeds");
+
+        assert!(!module(&code, "mod").contains("pub mod postgres_pool;"));
+        assert!(!has_module(&code, "postgres_pool"));
+        assert!(!module(&code, "run").contains("postgres-url"));
+        assert!(!concatenated(&code).contains("PgPool"));
     }
 
     const CONSOLE_ARGUMENT_RESPONDER_CRATE: &str = "\

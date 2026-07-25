@@ -15,6 +15,7 @@ margaret_http_codegen = { path = "../margaret_http_codegen" }
 margaret_jwks_codegen = { path = "../margaret_jwks_codegen" }
 margaret_middleware_codegen = { path = "../margaret_middleware_codegen" }
 margaret_model_codegen = { path = "../margaret_model_codegen" }
+margaret_postgres_pool_codegen = { path = "../margaret_postgres_pool_codegen" }
 margaret_request_binding_codegen = { path = "../margaret_request_binding_codegen" }
 margaret_schema_codegen = { path = "../margaret_schema_codegen" }
 margaret_service_codegen = { path = "../margaret_service_codegen" }

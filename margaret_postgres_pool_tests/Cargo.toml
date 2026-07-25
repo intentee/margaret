@@ -1,0 +1,21 @@
+[package]
+name = "margaret_postgres_pool_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dev-dependencies]
+ephemeral-postgres = { workspace = true }
+margaret_postgres_pool = { path = "../margaret_postgres_pool" }
+sqlx = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+tests_that_use_postgres = []
+
+[lints]
+workspace = true
+
+[[test]]
+name = "integration"
+path = "tests/main.rs"
