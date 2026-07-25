@@ -1,4 +1,4 @@
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[provides_jwks_endpoint(jwks)]
 struct JwksEndpoint;

@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use margaret_macros::constructor;
-use margaret_macros::process;
-use margaret_macros::service;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::service;
 
 use crate::identity_client::IdentityClient;
 use crate::margaret::asset_bag::asset;

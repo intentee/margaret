@@ -1,4 +1,4 @@
-use margaret_console::command_outcome::CommandOutcome;
+use margaret::framework::console::command_outcome::CommandOutcome;
 
 #[tokio::main]
 async fn main() -> CommandOutcome {
@@ -9,7 +9,7 @@ async fn main() -> CommandOutcome {
 
 #[cfg(test)]
 mod tests {
-    use margaret_console::command_outcome::CommandOutcome;
+    use margaret::framework::console::command_outcome::CommandOutcome;
 
     #[test]
     fn returns_failed_without_a_recognized_command() {

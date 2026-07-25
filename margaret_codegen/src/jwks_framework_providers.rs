@@ -14,7 +14,7 @@ use crate::jwks_verifier_path::public_jwks_verifier_canonical_path;
 use crate::mint_access_token_handler_path::mint_access_token_handler_canonical_path;
 
 fn client_providers(binding: &JwksClientBinding) -> [FrameworkProvider; 2] {
-    let client = jwks_client_canonical_path(&binding.tag);
+    let client = jwks_client_canonical_path(&binding.module_segment);
 
     [
         FrameworkProvider {
@@ -34,7 +34,7 @@ fn client_providers(binding: &JwksClientBinding) -> [FrameworkProvider; 2] {
             },
             enablement: FrameworkEnablement::WhenReferenced,
             injection: FrameworkInjectionRole::JwksClientStore(binding.tag.clone()),
-            provided: public_jwks_verifier_canonical_path(&binding.tag),
+            provided: public_jwks_verifier_canonical_path(&binding.module_segment),
         },
     ]
 }

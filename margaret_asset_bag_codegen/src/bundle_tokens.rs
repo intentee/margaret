@@ -38,7 +38,7 @@ pub(crate) fn bundle_tokens(
                 let stylesheet_href = href_tokens(css_bundle);
 
                 Ok(quote! {
-                    ::margaret_asset_bag::script_stylesheet_bundle::ScriptStylesheetBundle::new(
+                    ::margaret::framework::asset_bag::script_stylesheet_bundle::ScriptStylesheetBundle::new(
                         #main_href,
                         #stylesheet_href,
                         &[#(#preload_list),*],
@@ -46,14 +46,14 @@ pub(crate) fn bundle_tokens(
                 })
             }
             None => Ok(quote! {
-                ::margaret_asset_bag::script_bundle::ScriptBundle::new(
+                ::margaret::framework::asset_bag::script_bundle::ScriptBundle::new(
                     #main_href,
                     &[#(#preload_list),*],
                 )
             }),
         },
         Asset::Stylesheet(_) => Ok(quote! {
-            ::margaret_asset_bag::stylesheet_bundle::StylesheetBundle::new(
+            ::margaret::framework::asset_bag::stylesheet_bundle::StylesheetBundle::new(
                 #main_href,
                 &[#(#preload_list),*],
             )
@@ -110,15 +110,15 @@ mod tests {
         assert_eq!(
             handle.to_string(),
             quote! {
-                ::margaret_asset_bag::script_stylesheet_bundle::ScriptStylesheetBundle::new(
-                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/app_ABC.js"),
-                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/app_ABC.css"),
+                ::margaret::framework::asset_bag::script_stylesheet_bundle::ScriptStylesheetBundle::new(
+                    ::margaret::framework::asset_bag::asset_href::AssetHref::Local("assets/app_ABC.js"),
+                    ::margaret::framework::asset_bag::asset_href::AssetHref::Local("assets/app_ABC.css"),
                     &[
-                        ::margaret_asset_bag::preload::Preload::Module(
-                            ::margaret_asset_bag::asset_href::AssetHref::Local("assets/chunk_ABC.js")
+                        ::margaret::framework::asset_bag::preload::Preload::Module(
+                            ::margaret::framework::asset_bag::asset_href::AssetHref::Local("assets/chunk_ABC.js")
                         ),
-                        ::margaret_asset_bag::preload::Preload::Font(
-                            ::margaret_asset_bag::asset_href::AssetHref::Absolute("https://fonts.example/font.woff2")
+                        ::margaret::framework::asset_bag::preload::Preload::Font(
+                            ::margaret::framework::asset_bag::asset_href::AssetHref::Absolute("https://fonts.example/font.woff2")
                         )
                     ],
                 )
@@ -152,8 +152,8 @@ mod tests {
         assert_eq!(
             handle.to_string(),
             quote! {
-                ::margaret_asset_bag::script_bundle::ScriptBundle::new(
-                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/solo_ABC.js"),
+                ::margaret::framework::asset_bag::script_bundle::ScriptBundle::new(
+                    ::margaret::framework::asset_bag::asset_href::AssetHref::Local("assets/solo_ABC.js"),
                     &[],
                 )
             }
@@ -186,8 +186,8 @@ mod tests {
         assert_eq!(
             handle.to_string(),
             quote! {
-                ::margaret_asset_bag::stylesheet_bundle::StylesheetBundle::new(
-                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/theme_ABC.css"),
+                ::margaret::framework::asset_bag::stylesheet_bundle::StylesheetBundle::new(
+                    ::margaret::framework::asset_bag::asset_href::AssetHref::Local("assets/theme_ABC.css"),
                     &[],
                 )
             }

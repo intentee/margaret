@@ -3,8 +3,8 @@ pub mod responders;
 
 use std::sync::Arc;
 
-use margaret_macros::build_for_session;
-use margaret_macros::websocket_session;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::websocket_session;
 use tokio::sync::Mutex;
 
 use crate::english_greeter::EnglishGreeter;

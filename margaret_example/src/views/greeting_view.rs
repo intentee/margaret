@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use margaret_macros::constructor;
-use margaret_macros::renders_view;
-use margaret_macros::singleton;
-use margaret_views::maud::Markup;
-use margaret_views::maud::html;
-use margaret_views::renders_view::RendersView;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::renders_view;
+use margaret::framework::macros::singleton;
+use margaret::framework::views::maud::Markup;
+use margaret::framework::views::maud::html;
+use margaret::framework::views::renders_view::RendersView;
 
 use crate::margaret::routes::Routes;
 use crate::views::card_layout::CardLayout;
@@ -45,7 +45,7 @@ impl RendersView for GreetingView {
 mod tests {
     use std::sync::Arc;
 
-    use margaret_views::renders_view::RendersView;
+    use margaret::framework::views::renders_view::RendersView;
 
     use super::GreetingView;
     use super::GreetingViewProps;

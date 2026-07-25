@@ -1,4 +1,4 @@
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[renders_view(name = "configured")]
 #[responds_to_http(method = "get", path = "/configured", server = "public")]

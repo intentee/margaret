@@ -149,7 +149,7 @@ struct Widget {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
 struct SystemClock;
@@ -458,7 +458,7 @@ impl GetJwks {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -475,15 +475,15 @@ impl ProvidesEndpoint for PartnerJwksEndpoint {}
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
 struct GetVerify {
-    auth: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>,
-    partner: std::sync::Arc<crate::margaret::jwks::partner::PublicJwksVerifier>,
+    auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
+    partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
 }
 
 impl GetVerify {
     #[constructor]
     fn create(
-        #[jwks_secret_store(client = auth)] auth: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>,
-        #[jwks_secret_store(client = partner)] partner: std::sync::Arc<crate::margaret::jwks::partner::PublicJwksVerifier>,
+        #[jwks_secret_store(client = auth)] auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
+        #[jwks_secret_store(client = partner)] partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
     ) -> Self {}
 
     #[process]
@@ -549,20 +549,20 @@ impl Worker {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains(
-            "margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
+            "margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
         ));
         assert!(serve.contains(
-            "letspiffe_bundle=margaret_spiffe_svid_client::SvidClientBundle::new(margaret_spiffe_svid::SvidServiceBundleParams{"
+            "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
         assert!(serve.contains(
-            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>returnmargaret_console::report_failure::report_failure(error),};"
+            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
         assert!(serve.contains("letconsole_argument_0=spiffe_http_client.clone();"));
         assert!(serve.contains(
-            "matchmargaret_service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
+            "matchmargaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
         ));
         assert!(serve.contains(
-            "margaret_service::serve_application::serve_application(matches,::std::vec::Vec::new(),margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
+            "margaret::framework::service::serve_application::serve_application(matches,::std::vec::Vec::new(),margaret::framework::service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
         assert!(!serve.contains("spiffe_server_config"));
 
@@ -609,14 +609,14 @@ impl CallRoute {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains(
-            "letspiffe_bundle=margaret_spiffe_svid_client::SvidClientBundle::new(margaret_spiffe_svid::SvidServiceBundleParams{"
+            "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
         assert!(serve.contains(
-            "matchmargaret_service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
+            "matchmargaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
         ));
         assert!(serve.contains("letmutbundle_services"));
         assert!(serve.contains(
-            "margaret_service::serve_application::serve_application(matches,servers,"
+            "margaret::framework::service::serve_application::serve_application(matches,servers,"
         ));
         assert!(!serve.contains("spiffe_server_config"));
     }
@@ -657,16 +657,16 @@ impl GetIdentity {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains(
-            "letspiffe_bundle=margaret_spiffe_svid_bundle::SvidBundle::new(margaret_spiffe_svid::SvidServiceBundleParams{"
+            "letspiffe_bundle=margaret::framework::spiffe_svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
         assert!(serve.contains(
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
         ));
         assert!(serve.contains(
-            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>returnmargaret_console::report_failure::report_failure(error),};"
+            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}};"
         ));
         assert!(serve.contains(
-            "matchmargaret_service::bundle_services::bundle_services(spiffe_bundle).await"
+            "matchmargaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await"
         ));
     }
 
@@ -693,26 +693,42 @@ impl GetIdentity {
     }
 
     #[test]
+    fn rejects_a_console_argument_named_after_the_spiffe_http_client() {
+        let error = generate(
+            "use reqwest::Client;\nuse std::sync::Arc;\nuse tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct IdentityClient {\n    client: Client,\n}\n\nimpl IdentityClient {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> Self {}\n}\n\n#[singleton]\nstruct Labeled {\n    label: String,\n}\n\nimpl Labeled {\n    #[constructor]\n    fn create(#[console_argument(from = \"spiffe_http_client\")] label: String) -> Self {}\n}\n\n#[service]\nstruct Worker {\n    client: Arc<IdentityClient>,\n    labeled: Arc<Labeled>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(client: Arc<IdentityClient>, labeled: Arc<Labeled>) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(error.contains("collides with the framework-provided #[spiffe_http_client]"));
+    }
+
+    #[test]
     fn generates_the_jwks_roller_when_the_handler_is_injected() {
         let code = generate(JWKS_ROLLER_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod jwks;"));
-        assert!(module(&code, "jwks")
-            .contains("pub use margaret_jwks_roller_server::jwks_roller::JwksRoller;"));
+        assert!(
+            module(&code, "jwks").contains(
+                "pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;"
+            )
+        );
         assert!(module(&code, "jwks").contains(
-            "pub use margaret_jwks_roller_server::public_jwks_handler::PublicJwksHandler;"
+            "pub use margaret::framework::jwks_roller_server::public_jwks_handler::PublicJwksHandler;"
         ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
         assert!(container.contains("crate::margaret::jwks::JwksRoller::create("));
         assert!(container.contains(".public_jwks_handler()"));
         assert!(container.contains(
-            "margaret_jwks_secret_storage_selection::resolve_jwks_secret_storage::resolve_jwks_secret_storage"
+            "margaret::framework::jwks_secret_storage_selection::resolve_jwks_secret_storage::resolve_jwks_secret_storage"
         ));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains("impltrzcina::TickerforCrateMargaretJwksJwksRoller"));
-        assert!(serve.contains("margaret_jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"));
+        assert!(serve.contains("impltrzcina::TickerforMargaretJwksJwksRoller"));
+        assert!(serve.contains(
+            "margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"
+        ));
         assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
 
@@ -721,24 +737,30 @@ impl GetIdentity {
         let code = generate(JWKS_MULTI_CLIENT_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod jwks;"));
-        assert!(module(&code, "jwks").contains("pub mod auth;"));
-        assert!(module(&code, "jwks").contains("pub mod partner;"));
-        assert!(module(&code, "jwks/auth")
-            .contains("pub use margaret_jwks_client::jwks_client::JwksClient;"));
-        assert!(module(&code, "jwks/auth").contains(
-            "pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;"
+        assert!(module(&code, "jwks").contains("pub mod auth_jwks_endpoint;"));
+        assert!(module(&code, "jwks").contains("pub mod partner_jwks_endpoint;"));
+        assert!(
+            module(&code, "jwks/auth_jwks_endpoint")
+                .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;")
+        );
+        assert!(module(&code, "jwks/auth_jwks_endpoint").contains(
+            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
-        assert!(module(&code, "jwks/partner").contains(
-            "pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;"
+        assert!(module(&code, "jwks/partner_jwks_endpoint").contains(
+            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains("crate::margaret::jwks::auth::JwksClient::create("));
-        assert!(container.contains("crate::margaret::jwks::partner::JwksClient::create("));
+        assert!(
+            container.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
+        );
+        assert!(
+            container.contains("crate::margaret::jwks::partner_jwks_endpoint::JwksClient::create(")
+        );
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
-        assert!(serve.contains("impltrzcina::ServiceforCrateMargaretJwksAuthJwksClient"));
-        assert!(serve.contains("impltrzcina::ServiceforCrateMargaretJwksPartnerJwksClient"));
+        assert!(serve.contains("impltrzcina::ServiceforMargaretJwksAuthJwksEndpointJwksClient"));
+        assert!(serve.contains("impltrzcina::ServiceforMargaretJwksPartnerJwksEndpointJwksClient"));
         assert!(!concatenated(&code).contains("PublicJwksHandler"));
     }
 
@@ -746,12 +768,16 @@ impl GetIdentity {
     fn generates_the_server_secret_store_and_mint_handler_when_injected() {
         let code = generate(JWKS_SERVER_STORE_CRATE).expect("the build succeeds");
 
-        assert!(module(&code, "jwks")
-            .contains("pub use margaret_jwks_roller_server::jwks_roller::JwksRoller;"));
-        assert!(module(&code, "jwks")
-            .contains("pub use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;"));
+        assert!(
+            module(&code, "jwks").contains(
+                "pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;"
+            )
+        );
         assert!(module(&code, "jwks").contains(
-            "pub use margaret_access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
+            "pub use margaret::framework::jwks_secret_store::jwks_secret_store::JwksSecretStore;"
+        ));
+        assert!(module(&code, "jwks").contains(
+            "pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
         ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
@@ -764,7 +790,7 @@ impl GetIdentity {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -780,12 +806,12 @@ impl ProvidesEndpoint for AuthJwksEndpoint {}
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
 struct GetVerify {
-    verifier: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>,
+    verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
 }
 
 impl GetVerify {
     #[constructor]
-    fn create(#[jwks_secret_store(client = auth)] verifier: std::sync::Arc<crate::margaret::jwks::auth::PublicJwksVerifier>) -> Self {}
+    fn create(#[jwks_secret_store(client = auth)] verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>) -> Self {}
 
     #[process]
     fn respond(&self) -> Response {}
@@ -798,7 +824,9 @@ impl GetVerify {
 
         let container: String = module(&code, "container").split_whitespace().collect();
         assert!(container.contains(".await.verifier()"));
-        assert!(container.contains("crate::margaret::jwks::auth::JwksClient::create("));
+        assert!(
+            container.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
+        );
 
         let run = module(&code, "run");
         assert!(run.contains(r#"clap::Arg::new("issuer-url")"#));
@@ -828,12 +856,47 @@ impl GetJwks {
 
     #[test]
     fn framework_jwks_names_do_not_collide_with_a_user_component_of_the_same_name() {
-        let code =
-            generate(JWKS_NAME_COLLISION_CRATE).expect("a user component named JwksRoller coexists");
+        let code = generate(JWKS_NAME_COLLISION_CRATE)
+            .expect("a user component named JwksRoller coexists");
 
         let container: String = module(&code, "container").split_whitespace().collect();
         assert!(container.contains("std::sync::Arc<crate::JwksRoller>"));
         assert!(container.contains("std::sync::Arc<crate::margaret::jwks::JwksRoller>"));
+    }
+
+    const JWKS_FIELD_COLLISION_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+pub mod margaret_jwks {
+    #[singleton]
+    pub struct JwksRoller;
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/.well-known/jwks.json\", server = \"internal\")]
+struct GetJwks {
+    handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>,
+}
+
+impl GetJwks {
+    #[constructor]
+    fn create(handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>) -> Self {}
+
+    #[process]
+    fn respond(&self) -> Response {}
+}
+";
+
+    #[test]
+    fn framework_jwks_field_is_disambiguated_from_a_colliding_user_component() {
+        let code = generate(JWKS_FIELD_COLLISION_CRATE)
+            .expect("a user component flattening to a framework field coexists");
+
+        let container: String = module(&code, "container").split_whitespace().collect();
+
+        assert!(container.contains("std::sync::Arc<crate::margaret_jwks::JwksRoller>"));
+        assert!(container.contains("margaret_jwks_jwks_roller_2"));
     }
 
     #[test]
@@ -861,7 +924,7 @@ impl GetJwks {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -925,8 +988,8 @@ impl ProvidesEndpoint for SecondEndpoint {}
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_http::next::Next;
-use margaret_http::request::Request;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
@@ -964,7 +1027,7 @@ impl RequestLog {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
 
@@ -1009,7 +1072,7 @@ impl GetProfile {
     #[test]
     fn omits_the_authenticated_users_module_without_a_served_request() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n",
         )
         .expect("the build succeeds");
 
@@ -1040,9 +1103,9 @@ impl GetProfile {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_http::next::Next;
-use margaret_http::request::Request;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[websocket_session(path = \"/room\", server = \"public\")]
 #[middleware(logged)]
@@ -1303,7 +1366,7 @@ impl GetCard {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
 #[renders_view(name = \"banner\")]
@@ -1597,7 +1660,7 @@ impl Page {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[websocket_session(path = \"/room\", server = \"public\")]
 struct Room;
@@ -1638,7 +1701,7 @@ impl RespondsToWebSocketMessage for Chatter {
 pub mod margaret;
 
 use std::sync::Arc;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
 struct SystemClock;

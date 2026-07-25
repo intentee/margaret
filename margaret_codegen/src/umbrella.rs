@@ -17,7 +17,9 @@ pub(crate) fn umbrella(
     }: Capabilities,
 ) -> GeneratedModule {
     let serves_http = has_http || has_websockets;
-    let mut source = String::from("#[rustfmt::skip]\npub mod container;\n");
+    let mut source = String::from("#[rustfmt::skip]\npub use ::margaret::framework;\n");
+
+    source.push_str("#[rustfmt::skip]\npub mod container;\n");
 
     if has_asset_bag {
         source.push_str("#[rustfmt::skip]\npub mod asset_bag;\n");
@@ -62,4 +64,35 @@ pub(crate) fn umbrella(
     }
 
     GeneratedModule::new("mod", source)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::capabilities::Capabilities;
+
+    use super::umbrella;
+
+    fn minimal_capabilities() -> Capabilities {
+        Capabilities {
+            has_asset_bag: false,
+            has_authenticated_users: false,
+            has_console: false,
+            has_http: false,
+            has_jwks: false,
+            has_middleware: false,
+            has_models: false,
+            has_views: false,
+            has_websockets: false,
+            serves: false,
+        }
+    }
+
+    #[test]
+    fn forwards_the_framework_re_exports_into_the_generated_module() {
+        assert!(
+            umbrella(minimal_capabilities())
+                .source()
+                .contains("pub use ::margaret::framework;")
+        );
+    }
 }

@@ -10,7 +10,6 @@ margaret_console_argument_codegen = { path = "../margaret_console_argument_codeg
 margaret_console_codegen = { path = "../margaret_console_codegen" }
 margaret_container = { path = "../margaret_container" }
 margaret_generated_module = { path = "../margaret_generated_module" }
-heck = { workspace = true }
 margaret_http_codegen = { path = "../margaret_http_codegen" }
 margaret_jwks_codegen = { path = "../margaret_jwks_codegen" }
 margaret_middleware_codegen = { path = "../margaret_middleware_codegen" }

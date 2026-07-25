@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::mem::take;
 
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::name_allocator::NameAllocator;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
@@ -98,6 +99,7 @@ pub(crate) fn websocket_plan(
         sessions.iter().map(|_| Vec::new()).collect();
     let mut message_handler: HashMap<String, String> = HashMap::new();
     let mut session_methods: HashMap<usize, HashMap<String, String>> = HashMap::new();
+    let mut dispatch_idents: HashMap<usize, NameAllocator> = HashMap::new();
 
     for handler in &handlers {
         let handler_name = handler.handler_path.to_string();
@@ -146,7 +148,18 @@ pub(crate) fn websocket_plan(
         methods.insert(method.clone(), handler_name.clone());
         message_handler.insert(message_name, handler_name);
 
+        let dispatch_ident = format!(
+            "{}Dispatch",
+            dispatch_idents
+                .entry(session_index)
+                .or_default()
+                .allocate(&method)
+                .type_name()
+        );
+
         let binding = HandlerBinding {
+            dispatch_ident,
+            handler_field: handler.handler_field.clone(),
             handler_path: handler.handler_path.clone(),
             method,
         };

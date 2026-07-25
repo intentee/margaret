@@ -19,7 +19,7 @@ pub fn fold_layers(
         let instance = middleware_instance_tokens(application, module_path, bindings);
 
         handler = quote! {
-            margaret_http::layer::layer(#instance, #handler)
+            margaret::framework::http::layer::layer(#instance, #handler)
         };
     }
 

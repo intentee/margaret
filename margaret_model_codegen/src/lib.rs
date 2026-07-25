@@ -391,6 +391,26 @@ struct S {
     }
 
     #[test]
+    fn rejects_a_primary_key_index_name_that_is_too_long() {
+        let table = "a".repeat(60);
+        let source = format!(
+            "#[model(table = \"{table}\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}}\n"
+        );
+
+        assert!(error_message(&source).contains("primary key index name that is too long"));
+    }
+
+    #[test]
+    fn rejects_a_unique_index_name_that_is_too_long() {
+        let column = "a".repeat(60);
+        let source = format!(
+            "#[model(table = \"t\")]\nstruct S {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    {column}: String,\n}}\n"
+        );
+
+        assert!(error_message(&source).contains("unique index name that is too long"));
+    }
+
+    #[test]
     fn rejects_a_foreign_key_whose_derived_name_is_too_long() {
         let field = "a".repeat(62);
         let source = with_author(&format!(
@@ -764,7 +784,7 @@ struct Book {
 
         assert_eq!(
             inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
         );
         assert!(!inferred.nullable);
     }
@@ -776,7 +796,7 @@ struct Book {
 
         assert_eq!(
             inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
         );
         assert!(inferred.nullable);
     }
@@ -789,7 +809,7 @@ struct Book {
             inferred_column(source, "articles", "previous_status")
                 .column_type
                 .to_string(),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
         );
     }
 

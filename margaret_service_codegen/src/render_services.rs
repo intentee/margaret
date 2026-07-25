@@ -31,12 +31,12 @@ use crate::spiffe_activation::SpiffeActivation;
 
 fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
     if !spiffe_secured {
-        return quote! { margaret_http::transport_config::TransportConfig::Plain };
+        return quote! { margaret::framework::http::transport_config::TransportConfig::Plain };
     }
 
     match server.transport_policy() {
         ServerTransportPolicy::PinnedSpiffeMtls => quote! {
-            margaret_http::transport_config::TransportConfig::MutualTls {
+            margaret::framework::http::transport_config::TransportConfig::MutualTls {
                 server_config: spiffe_server_config.clone(),
             }
         },
@@ -45,10 +45,10 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
 
             quote! {
                 match matches.get_one::<String>(#transport_argument).map(String::as_str) {
-                    Some("spiffe_mtls") => margaret_http::transport_config::TransportConfig::MutualTls {
+                    Some("spiffe_mtls") => margaret::framework::http::transport_config::TransportConfig::MutualTls {
                         server_config: spiffe_server_config.clone(),
                     },
-                    _ => margaret_http::transport_config::TransportConfig::Plain,
+                    _ => margaret::framework::http::transport_config::TransportConfig::Plain,
                 }
             }
         }
@@ -71,11 +71,11 @@ fn svid_identity_prelude(
         required_flag_read(&quote! { String }, "spire-agent-addr", &quote! { value.clone() });
 
     let bundle_constructor = if server_active && client_active {
-        quote! { margaret_spiffe_svid_bundle::SvidBundle }
+        quote! { margaret::framework::spiffe_svid_bundle::SvidBundle }
     } else if server_active {
-        quote! { margaret_spiffe_svid_server::SvidServerBundle }
+        quote! { margaret::framework::spiffe_svid_server::SvidServerBundle }
     } else {
-        quote! { margaret_spiffe_svid_client::SvidClientBundle }
+        quote! { margaret::framework::spiffe_svid_client::SvidClientBundle }
     };
 
     let server_config = server_active.then(|| {
@@ -90,16 +90,16 @@ fn svid_identity_prelude(
         quote! {
             let #spiffe_http_client = match spiffe_bundle.reqwest_client() {
                 Ok(client) => client,
-                Err(error) => return margaret_console::report_failure::report_failure(error),
+                Err(error) => return margaret::framework::console::report_failure::report_failure(error),
             };
         }
     });
 
     quote! {
-        margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
+        margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
 
         let spiffe_bundle = #bundle_constructor::new(
-            margaret_spiffe_svid::SvidServiceBundleParams {
+            margaret::framework::spiffe_svid::SvidServiceBundleParams {
                 spiffe_trust_domain: #spiffe_trust_domain,
                 spire_agent_addr: #spire_agent_addr,
             },
@@ -128,7 +128,7 @@ fn server_manager_setup(
 
     let bundle_services_registration = svid_active.then(|| {
         quote! {
-            match margaret_service::bundle_services::bundle_services(spiffe_bundle).await {
+            match margaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await {
                 Ok(services) => bundle_services.extend(services),
                 Err(outcome) => return outcome,
             }
@@ -149,10 +149,10 @@ fn server_manager_setup(
 
             #bundle_services_registration
 
-            let #manager_binding = match margaret_service::serve_application::serve_application(
+            let #manager_binding = match margaret::framework::service::serve_application::serve_application(
                 matches,
                 ::std::vec::Vec::new(),
-                margaret_service::resolved_services::ResolvedServices {
+                margaret::framework::service::resolved_services::ResolvedServices {
                     services: bundle_services,
                 },
             )
@@ -199,7 +199,7 @@ fn server_manager_setup(
         );
 
         quote! {
-            margaret_service::server_assembly::ServerAssembly {
+            margaret::framework::service::server_assembly::ServerAssembly {
                 address_argument: #address_argument,
                 name: #name,
                 routes: super::http::#function_name::#function_name(container, #(#server_borrows)* &routes #views_argument).await,
@@ -239,10 +239,10 @@ fn server_manager_setup(
 
         #bundle_services_registration
 
-        let #manager_binding = match margaret_service::serve_application::serve_application(
+        let #manager_binding = match margaret::framework::service::serve_application::serve_application(
             matches,
             servers,
-            margaret_service::resolved_services::ResolvedServices {
+            margaret::framework::service::resolved_services::ResolvedServices {
                 services: bundle_services,
             },
         )
@@ -424,14 +424,14 @@ pub fn render_services(
             container: &super::container::Container,
             #matches_binding: &clap::ArgMatches,
             cancellation_token: tokio_util::sync::CancellationToken,
-        ) -> margaret_console::command_outcome::CommandOutcome {
+        ) -> margaret::framework::console::command_outcome::CommandOutcome {
             #identity_prelude
             #prelude
             #manager_setup
 
             #(#registrations)*
 
-            margaret_service::run::run(
+            margaret::framework::service::run::run(
                 manager,
                 cancellation_token,
                 trzcina::ServiceShutdownOptions::default(),

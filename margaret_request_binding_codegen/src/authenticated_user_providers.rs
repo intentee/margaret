@@ -28,7 +28,9 @@ use crate::request_binding_error::RequestBindingError;
 
 fn authenticated_user_outcome_path() -> CanonicalPath {
     CanonicalPath::new(vec![
-        "margaret_identity".to_string(),
+        "margaret".to_string(),
+        "framework".to_string(),
+        "identity".to_string(),
         "authenticated_user_outcome".to_string(),
         "AuthenticatedUserOutcome".to_string(),
     ])

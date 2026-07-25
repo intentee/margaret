@@ -156,7 +156,7 @@ pub enum RequestBindingError {
     AmbiguousInferFromRequest { provider: String, methods: String },
 
     #[error(
-        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>"
+        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>"
     )]
     InferenceReturnTypeMismatch { provider: String, written: String },
 

@@ -18,18 +18,18 @@ impl ForeignKeyArguments {
     ) -> Result<Self, ModelCodegenError> {
         arguments.interpret(|reader| {
             let on_delete = match reader.take_path("on_delete")? {
-                None => quote!(margaret_model::on_delete::OnDelete::NoAction),
+                None => quote!(margaret::framework::model::on_delete::OnDelete::NoAction),
                 Some(path) if path.is_ident("cascade") => {
-                    quote!(margaret_model::on_delete::OnDelete::Cascade)
+                    quote!(margaret::framework::model::on_delete::OnDelete::Cascade)
                 }
                 Some(path) if path.is_ident("restrict") => {
-                    quote!(margaret_model::on_delete::OnDelete::Restrict)
+                    quote!(margaret::framework::model::on_delete::OnDelete::Restrict)
                 }
                 Some(path) if path.is_ident("set_null") => {
-                    quote!(margaret_model::on_delete::OnDelete::SetNull)
+                    quote!(margaret::framework::model::on_delete::OnDelete::SetNull)
                 }
                 Some(path) if path.is_ident("set_default") => {
-                    quote!(margaret_model::on_delete::OnDelete::SetDefault)
+                    quote!(margaret::framework::model::on_delete::OnDelete::SetDefault)
                 }
                 Some(path) => {
                     return Err(ModelCodegenError::UnknownOnDeleteAction {
@@ -73,7 +73,7 @@ mod tests {
     fn defaults_to_no_action_when_absent() {
         assert_eq!(
             on_delete(parse_quote!(#[foreign_key])),
-            quote!(margaret_model::on_delete::OnDelete::NoAction).to_string()
+            quote!(margaret::framework::model::on_delete::OnDelete::NoAction).to_string()
         );
     }
 
@@ -81,7 +81,7 @@ mod tests {
     fn maps_cascade() {
         assert_eq!(
             on_delete(parse_quote!(#[foreign_key(on_delete = cascade)])),
-            quote!(margaret_model::on_delete::OnDelete::Cascade).to_string()
+            quote!(margaret::framework::model::on_delete::OnDelete::Cascade).to_string()
         );
     }
 
@@ -89,7 +89,7 @@ mod tests {
     fn maps_restrict() {
         assert_eq!(
             on_delete(parse_quote!(#[foreign_key(on_delete = restrict)])),
-            quote!(margaret_model::on_delete::OnDelete::Restrict).to_string()
+            quote!(margaret::framework::model::on_delete::OnDelete::Restrict).to_string()
         );
     }
 
@@ -97,7 +97,7 @@ mod tests {
     fn maps_set_null() {
         assert_eq!(
             on_delete(parse_quote!(#[foreign_key(on_delete = set_null)])),
-            quote!(margaret_model::on_delete::OnDelete::SetNull).to_string()
+            quote!(margaret::framework::model::on_delete::OnDelete::SetNull).to_string()
         );
     }
 
@@ -105,7 +105,7 @@ mod tests {
     fn maps_set_default() {
         assert_eq!(
             on_delete(parse_quote!(#[foreign_key(on_delete = set_default)])),
-            quote!(margaret_model::on_delete::OnDelete::SetDefault).to_string()
+            quote!(margaret::framework::model::on_delete::OnDelete::SetDefault).to_string()
         );
     }
 

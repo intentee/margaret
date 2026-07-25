@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use url::Url;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
-use margaret_endpoint::static_endpoint::StaticEndpoint;
+use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 
 #[must_use]
 pub fn unreachable_endpoint() -> Arc<dyn ProvidesEndpoint> {

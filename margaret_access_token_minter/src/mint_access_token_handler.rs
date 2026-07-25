@@ -138,7 +138,10 @@ mod tests {
         let handler = handler_from(Some(fresh_p256_secret()));
 
         let response = handler
-            .respond(&request_with_body(json!({ "wrong": "field" })), unix_time(500))
+            .respond(
+                &request_with_body(json!({ "wrong": "field" })),
+                unix_time(500),
+            )
             .await;
 
         assert_eq!(response.status(), 400);

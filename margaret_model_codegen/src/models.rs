@@ -370,10 +370,12 @@ fn defer_foreign_key(
         })?;
 
     if &target_path == item.canonical_path() && !indirected {
-        return Err(ModelCodegenError::SelfReferentialForeignKeyRequiresIndirection {
-            field: field_name,
-            model: model.to_string(),
-        });
+        return Err(
+            ModelCodegenError::SelfReferentialForeignKeyRequiresIndirection {
+                field: field_name,
+                model: model.to_string(),
+            },
+        );
     }
 
     Ok(DeferredForeignKey {
@@ -667,7 +669,7 @@ fn resolve_model(
             indexes,
             inferred: InferredColumn {
                 column_type: referenced.column_type.clone(),
-                default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+                default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
                 nullable,
             },
             name: column_name.clone(),
@@ -747,7 +749,12 @@ fn validate_relation_namespace(
             register_constraint_index_name(
                 seen_table_names,
                 &mut constraint_index_names,
-                primary_key_index_name(&model.table),
+                primary_key_index_name(&model.table).map_err(|source| {
+                    ModelCodegenError::PrimaryKeyIndexNameTooLong {
+                        model: model.table.clone(),
+                        source,
+                    }
+                })?,
                 &model.table,
             )?;
         }
@@ -756,7 +763,12 @@ fn validate_relation_namespace(
             register_constraint_index_name(
                 seen_table_names,
                 &mut constraint_index_names,
-                unique_index_name(&model.table, &unique_constraint.columns),
+                unique_index_name(&model.table, &unique_constraint.columns).map_err(|source| {
+                    ModelCodegenError::UniqueIndexNameTooLong {
+                        model: model.table.clone(),
+                        source,
+                    }
+                })?,
                 &model.table,
             )?;
         }

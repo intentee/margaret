@@ -10,10 +10,10 @@ use crate::request_binding::RequestBinding;
 fn authenticated_user_resolver(requirement: AuthenticatedUserRequirement) -> TokenStream {
     match requirement {
         AuthenticatedUserRequirement::Optional => quote! {
-            margaret_identity::optional_authenticated_user::optional_authenticated_user
+            margaret::framework::identity::optional_authenticated_user::optional_authenticated_user
         },
         AuthenticatedUserRequirement::Required => quote! {
-            margaret_identity::require_authenticated_user::require_authenticated_user
+            margaret::framework::identity::require_authenticated_user::require_authenticated_user
         },
     }
 }
@@ -35,7 +35,7 @@ pub fn render_request_extraction(
 
             quote! {
                 let #holder = match #resolver(
-                    margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(
+                    margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(
                         #provider_access.as_ref(),
                         #request_local,
                     ).await,
@@ -46,7 +46,7 @@ pub fn render_request_extraction(
             }
         }
         RequestBinding::Raw { path_key } => quote! {
-            let #holder = match margaret_http::require_route_parameter::require_route_parameter(
+            let #holder = match margaret::framework::http::require_route_parameter::require_route_parameter(
                 #request_local,
                 #path_key,
             ) {
@@ -55,7 +55,7 @@ pub fn render_request_extraction(
             };
         },
         RequestBinding::Bound { path_key, .. } => quote! {
-            let #holder = match margaret_http::require_bound_route_parameter::require_bound_route_parameter(
+            let #holder = match margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(
                 #request_local,
                 #path_key,
                 #provider_access.as_ref(),
@@ -69,15 +69,15 @@ pub fn render_request_extraction(
 
             match extraction {
                 FormRequestExtraction::Result => quote! {
-                    let #holder = margaret_http_validation::validate_input::validate_input(
+                    let #holder = margaret::framework::http_validation::validate_input::validate_input(
                         #request_local,
-                        margaret_http_validation::request_input::RequestInput::#variant,
+                        margaret::framework::http_validation::request_input::RequestInput::#variant,
                     );
                 },
                 FormRequestExtraction::Model => quote! {
-                    let #holder = match margaret_http_validation::require_input::require_input(
+                    let #holder = match margaret::framework::http_validation::require_input::require_input(
                         #request_local,
-                        margaret_http_validation::request_input::RequestInput::#variant,
+                        margaret::framework::http_validation::request_input::RequestInput::#variant,
                     ) {
                         Ok(model) => model,
                         Err(response) => #error_return,
@@ -86,7 +86,7 @@ pub fn render_request_extraction(
             }
         }
         RequestBinding::PeerSpiffeId => quote! {
-            let #holder = match margaret_http::require_peer_spiffe_id::require_peer_spiffe_id(
+            let #holder = match margaret::framework::http::require_peer_spiffe_id::require_peer_spiffe_id(
                 #request_local,
             ) {
                 Ok(value) => value,
@@ -103,7 +103,7 @@ pub fn render_request_extraction(
             }
         }
         RequestBinding::AssetBag => quote! {
-            let #holder = ::margaret_asset_bag::asset_bag::AssetBag::new();
+            let #holder = ::margaret::framework::asset_bag::asset_bag::AssetBag::new();
         },
         RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }

@@ -8,10 +8,10 @@ use chrono::Utc;
 use dashmap::DashMap;
 use uuid::Uuid;
 
-use margaret_http::http_route_parameter_binder::HttpRouteParameterBinder;
-use margaret_macros::constructor;
-use margaret_macros::provides_route_parameter;
-use margaret_macros::singleton;
+use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::provides_route_parameter;
+use margaret::framework::macros::singleton;
 
 use crate::models::article::Article;
 use crate::models::article_status::ArticleStatus;
@@ -187,7 +187,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use margaret_http::http_route_parameter_binder::HttpRouteParameterBinder;
+    use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
 
     use super::ArticleStore;
     use super::FEATURED_ARTICLE_ID;

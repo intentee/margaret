@@ -1779,6 +1779,41 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
+name = "margaret"
+version = "0.1.0"
+dependencies = [
+ "margaret_access_token_minter",
+ "margaret_asset_bag",
+ "margaret_codegen",
+ "margaret_console",
+ "margaret_http",
+ "margaret_http_validation",
+ "margaret_identity",
+ "margaret_identity_session",
+ "margaret_jwks_client",
+ "margaret_jwks_endpoint",
+ "margaret_jwks_file_secret_storage",
+ "margaret_jwks_keygen",
+ "margaret_jwks_roller",
+ "margaret_jwks_roller_server",
+ "margaret_jwks_secret_storage_selection",
+ "margaret_jwks_secret_store",
+ "margaret_macros",
+ "margaret_model",
+ "margaret_peer_identity",
+ "margaret_service",
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_bundle",
+ "margaret_spiffe_svid_client",
+ "margaret_spiffe_svid_server",
+ "margaret_sync_holder",
+ "margaret_token_signer",
+ "margaret_validation",
+ "margaret_views",
+ "margaret_websocket",
+]
+
+[[package]]
 name = "margaret_access_token_minter"
 version = "0.1.0"
 dependencies = [
@@ -1831,7 +1866,6 @@ dependencies = [
 name = "margaret_codegen"
 version = "0.1.0"
 dependencies = [
- "heck",
  "margaret_asset_bag_codegen",
  "margaret_attributes",
  "margaret_console_argument_codegen",
@@ -1861,15 +1895,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
- "margaret_asset_bag",
- "margaret_codegen",
- "margaret_console",
- "margaret_http",
- "margaret_identity",
- "margaret_macros",
- "margaret_service",
- "margaret_spiffe_svid",
- "margaret_spiffe_svid_server",
+ "margaret",
  "tokio",
  "tokio-util",
  "trzcina",
@@ -1900,18 +1926,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "clap",
- "margaret_asset_bag",
- "margaret_codegen",
- "margaret_console",
- "margaret_http",
- "margaret_http_validation",
- "margaret_identity",
- "margaret_macros",
- "margaret_service",
- "margaret_spiffe_svid",
- "margaret_spiffe_svid_server",
- "margaret_views",
- "margaret_websocket",
+ "margaret",
  "maud",
  "serde",
  "serde_json",
@@ -1988,16 +2003,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_endpoint"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "thiserror",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "margaret_example"
 version = "0.1.0"
 dependencies = [
@@ -2006,28 +2011,7 @@ dependencies = [
  "chrono",
  "clap",
  "dashmap",
- "margaret_access_token_minter",
- "margaret_asset_bag",
- "margaret_codegen",
- "margaret_console",
- "margaret_endpoint",
- "margaret_http",
- "margaret_http_validation",
- "margaret_identity",
- "margaret_identity_session",
- "margaret_jwks_client",
- "margaret_jwks_roller",
- "margaret_jwks_roller_server",
- "margaret_jwks_secret_storage_selection",
- "margaret_jwks_secret_store",
- "margaret_macros",
- "margaret_model",
- "margaret_service",
- "margaret_spiffe_svid",
- "margaret_spiffe_svid_server",
- "margaret_validation",
- "margaret_views",
- "margaret_websocket",
+ "margaret",
  "maud",
  "serde",
  "serde_json",
@@ -2170,8 +2154,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "log",
- "margaret_endpoint",
  "margaret_identity_session",
+ "margaret_jwks_endpoint",
  "margaret_jwks_keygen",
  "margaret_sync_holder",
  "reqwest",
@@ -2190,11 +2174,11 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "margaret_endpoint",
  "margaret_http",
  "margaret_http_tests",
  "margaret_identity_session",
  "margaret_jwks_client",
+ "margaret_jwks_endpoint",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
@@ -2211,11 +2195,20 @@ dependencies = [
 name = "margaret_jwks_codegen"
 version = "0.1.0"
 dependencies = [
- "heck",
  "margaret_attributes",
  "margaret_generated_module",
  "proc-macro2",
  "quote",
+]
+
+[[package]]
+name = "margaret_jwks_endpoint"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "thiserror",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -2469,7 +2462,7 @@ dependencies = [
 name = "margaret_self_referential_model_fixture"
 version = "0.1.0"
 dependencies = [
- "margaret_macros",
+ "margaret",
  "uuid",
 ]
 
@@ -2529,14 +2522,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
- "margaret_asset_bag",
- "margaret_codegen",
- "margaret_console",
- "margaret_http",
- "margaret_macros",
- "margaret_service",
- "margaret_spiffe_svid",
- "margaret_spiffe_svid_client",
+ "margaret",
  "reqwest",
  "tokio",
  "tokio-util",
@@ -2782,7 +2768,6 @@ dependencies = [
 name = "margaret_websocket_codegen"
 version = "0.1.0"
 dependencies = [
- "heck",
  "margaret_attributes",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",

@@ -13,6 +13,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::field_base::field_base;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
@@ -58,7 +59,10 @@ fn build_drafts<'index>(
     let mut provider_drafts: Vec<Draft> = Vec::new();
 
     for matched in index.select(&singleton_selector()) {
-        if matched.item().has_attribute(&provides_jwks_endpoint_selector()) {
+        if matched
+            .item()
+            .has_attribute(&provides_jwks_endpoint_selector())
+        {
             continue;
         }
 
@@ -142,6 +146,7 @@ fn build_provider_draft<'index>(
         field_name,
         item,
         provided: ProvidedType::Concrete(concrete_path),
+        type_name: identifier.type_name().to_string(),
     })
 }
 
@@ -190,6 +195,7 @@ fn build_endpoint_draft<'index>(
         field_name: identifier.field().to_string(),
         item,
         provided: ProvidedType::Endpoint(concrete_path),
+        type_name: identifier.type_name().to_string(),
     })
 }
 
@@ -215,6 +221,7 @@ fn build_construction_draft<'index>(
         field_name: identifier.field().to_string(),
         item,
         provided: ProvidedType::Concrete(concrete_path),
+        type_name: identifier.type_name().to_string(),
     })
 }
 
@@ -363,10 +370,7 @@ fn resolve_jwks_secret_store(
         })
 }
 
-fn injection_matches_target(
-    role: &FrameworkInjectionRole,
-    target: &JwksSecretStoreTarget,
-) -> bool {
+fn injection_matches_target(role: &FrameworkInjectionRole, target: &JwksSecretStoreTarget) -> bool {
     match (role, target) {
         (FrameworkInjectionRole::JwksServerStore, JwksSecretStoreTarget::Server) => true,
         (
@@ -457,6 +461,7 @@ struct Draft<'index> {
     field_name: String,
     item: &'index IndexedItem,
     provided: ProvidedType,
+    type_name: String,
 }
 
 struct DraftedContainer<'index> {
@@ -480,7 +485,11 @@ fn resolve_framework_providers(
         framework_providers,
         &buildable,
     );
+    let mut allocator = index.reserved_allocator();
     let mut providers = Vec::new();
+
+    let mut buildable: Vec<(CanonicalPath, DirectConstruction)> = buildable.into_iter().collect();
+    buildable.sort_by(|left, right| left.0.cmp(&right.0));
 
     for (path, construction) in buildable {
         if !included.contains(&path) {
@@ -493,7 +502,9 @@ fn resolve_framework_providers(
             });
         }
 
-        let field_name = path.field_name();
+        let identifier = allocator.allocate(&field_base(&path));
+        let field_name = identifier.field().to_string();
+        let type_name = identifier.type_name().to_string();
         let provided = framework_provided_type(&construction, path.clone());
 
         providers.push(Provider {
@@ -501,6 +512,7 @@ fn resolve_framework_providers(
             construction,
             field_name,
             provided,
+            type_name,
         });
     }
 
@@ -605,9 +617,7 @@ fn resolve_framework_construction(construction: &FrameworkConstruction) -> Direc
     }
 }
 
-fn framework_provider_dependencies(
-    construction: &FrameworkConstruction,
-) -> Vec<&CanonicalPath> {
+fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<&CanonicalPath> {
     match construction {
         FrameworkConstruction::Accessor { source, .. } => vec![source],
         FrameworkConstruction::Constructor { dependencies, .. } => dependencies
@@ -772,6 +782,7 @@ pub(crate) fn build_plan(
             field_name,
             item,
             provided,
+            type_name,
         } = draft;
 
         let provider_key = provided.key().clone();
@@ -793,6 +804,7 @@ pub(crate) fn build_plan(
                 construction,
                 field_name,
                 provided,
+                type_name,
             },
         );
     }
@@ -804,6 +816,7 @@ pub(crate) fn build_plan(
             field_name,
             item,
             provided,
+            type_name,
         } = draft;
 
         let construction = resolve_direct(
@@ -823,6 +836,7 @@ pub(crate) fn build_plan(
                 construction,
                 field_name,
                 provided,
+                type_name,
             },
         );
     }

@@ -101,12 +101,12 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
         }
 
         #[async_trait::async_trait]
-        impl margaret_http::http_middleware::HttpMiddleware for #wrapper {
+        impl margaret::framework::http::http_middleware::HttpMiddleware for #wrapper {
             async fn process(
                 &self,
-                #request_binding: &margaret_http::request::Request,
-                #next_binding: margaret_http::next::Next,
-            ) -> margaret_http::response_continuation::ResponseContinuation {
+                #request_binding: &margaret::framework::http::request::Request,
+                #next_binding: margaret::framework::http::next::Next,
+            ) -> margaret::framework::http::response_continuation::ResponseContinuation {
                 #(#extractions)*
                 self.inner.process(#(#call_arguments),*).await
             }

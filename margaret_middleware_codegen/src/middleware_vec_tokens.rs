@@ -21,7 +21,7 @@ pub fn middleware_vec_tokens(
     quote! {
         {
             let mut middleware: ::std::vec::Vec<
-                ::std::sync::Arc<dyn margaret_http::http_middleware::HttpMiddleware>,
+                ::std::sync::Arc<dyn margaret::framework::http::http_middleware::HttpMiddleware>,
             > = ::std::vec::Vec::new();
 
             #(#pushes)*
