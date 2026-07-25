@@ -14,7 +14,7 @@ tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
 [build-dependencies]
-margaret = { path = "../../../../margaret", features = ["codegen"] }
+margaret = { path = "../../../../margaret", default-features = false, features = ["codegen"] }
 
 [lints]
 workspace = true
