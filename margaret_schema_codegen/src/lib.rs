@@ -174,7 +174,7 @@ struct Second {
     #[test]
     fn resolves_a_self_referential_foreign_key() {
         let source = schema_source(
-            "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Node>,\n}\n",
+            "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Box<Node>>,\n}\n",
         );
 
         assert!(source.contains("name:\"parent_id\".to_string(),nullable:true,"));
@@ -198,6 +198,17 @@ struct Second {
         );
 
         assert!(source.contains("margaret_model::column_type::ColumnType::Bytea"));
+    }
+
+    #[test]
+    fn generates_a_text_column_from_an_enum_field() {
+        let source = schema_source(
+            "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n}\n",
+        );
+
+        assert!(source.contains(
+            "column_type:margaret_model::column_type::ColumnType::Text,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"status\".to_string(),nullable:false,"
+        ));
     }
 
     #[test]

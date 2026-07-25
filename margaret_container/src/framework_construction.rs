@@ -1,5 +1,6 @@
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::tag::Tag;
+
+use crate::framework_dependency::FrameworkDependency;
 
 pub enum FrameworkConstruction {
     Accessor {
@@ -7,9 +8,14 @@ pub enum FrameworkConstruction {
         source: CanonicalPath,
     },
     Constructor {
-        endpoints: Vec<Tag>,
+        dependencies: Vec<FrameworkDependency>,
         is_async: bool,
         method: String,
+    },
+    UriSelected {
+        argument_name: String,
+        resolver: CanonicalPath,
+        value_type: CanonicalPath,
     },
     Unit,
 }

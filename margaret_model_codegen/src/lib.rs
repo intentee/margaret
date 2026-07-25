@@ -11,11 +11,16 @@ pub mod resolved_unique_constraint;
 
 mod collected_model;
 mod column_arguments;
+mod column_type_context;
 mod deferred_foreign_key;
+mod enum_column;
 mod foreign_key_arguments;
 mod foreign_key_target;
 mod foreign_key_target_column;
 mod index_arguments;
+mod index_column_member;
+mod index_redundancy;
+mod indirection_inner;
 mod infer_column_type;
 mod model_arguments;
 mod option_inner;
@@ -27,6 +32,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
+    use quote::quote;
     use tempfile::TempDir;
     use tempfile::tempdir;
 
@@ -35,6 +41,7 @@ mod tests {
     use margaret_attributes::crate_root::CrateRoot;
 
     use crate::has_models::has_models;
+    use crate::inferred_column::InferredColumn;
     use crate::models::models;
 
     const ARTICLE: &str = "\
@@ -459,7 +466,27 @@ struct S {
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    #[index]\n    id: uuid::Uuid,\n}\n",
             )
-            .contains("a primary key is already indexed")
+            .contains("leading column of the primary key")
+        );
+    }
+
+    #[test]
+    fn rejects_an_index_on_the_leading_primary_key_column_of_a_composite_key() {
+        assert!(
+            error_message(
+                "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    #[index]\n    repository: String,\n    #[column(primary_key)]\n    branch: String,\n    #[column(primary_key)]\n    hash: String,\n}\n",
+            )
+            .contains("leading column of the primary key")
+        );
+    }
+
+    #[test]
+    fn accepts_an_index_on_a_non_leading_primary_key_column() {
+        let source = "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    repository: String,\n    #[column(primary_key)]\n    branch: String,\n    #[column(primary_key)]\n    #[index]\n    hash: String,\n}\n";
+
+        assert_eq!(
+            resolved_index_columns(source),
+            vec![vec!["hash".to_string()]]
         );
     }
 
@@ -674,6 +701,17 @@ struct Book {
             .collect()
     }
 
+    fn resolved_index_columns(lib_source: &str) -> Vec<Vec<String>> {
+        let directory = crate_with(lib_source);
+
+        models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .flat_map(|model| model.indexes)
+            .map(|index| index.columns)
+            .collect()
+    }
+
     #[test]
     fn orders_referenced_tables_before_referencing_tables() {
         let source = with_author(
@@ -685,9 +723,16 @@ struct Book {
 
     #[test]
     fn orders_a_self_referential_foreign_key_without_a_cycle() {
-        let source = "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Node,\n}\n";
+        let source = "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Box<Node>>,\n}\n";
 
         assert_eq!(table_order(source), ["nodes"]);
+    }
+
+    #[test]
+    fn rejects_an_unboxed_self_referential_foreign_key() {
+        let source = "#[model(table = \"nodes\")]\nstruct Node {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    parent: Option<Node>,\n}\n";
+
+        assert!(error_message(source).contains("heap indirection"));
     }
 
     #[test]
@@ -695,5 +740,77 @@ struct Book {
         let source = "#[model(table = \"alpha\")]\nstruct Alpha {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    beta: Beta,\n}\n\n#[model(table = \"beta\")]\nstruct Beta {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    alpha: Alpha,\n}\n";
 
         assert!(error_message(source).contains("foreign key dependency cycle"));
+    }
+
+    fn inferred_column(lib_source: &str, table: &str, column: &str) -> InferredColumn {
+        let directory = crate_with(lib_source);
+
+        models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .find(|model| model.table == table)
+            .expect("the model resolves")
+            .columns
+            .into_iter()
+            .find(|resolved| resolved.name == column)
+            .expect("the column resolves")
+            .inferred
+    }
+
+    #[test]
+    fn infers_a_text_column_from_a_unit_enum() {
+        let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n    #[column]\n    cover: Vec<u8>,\n}\n";
+        let inferred = inferred_column(source, "articles", "status");
+
+        assert_eq!(
+            inferred.column_type.to_string(),
+            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+        );
+        assert!(!inferred.nullable);
+    }
+
+    #[test]
+    fn treats_an_optional_enum_as_a_nullable_text_column() {
+        let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: Option<ArticleStatus>,\n}\n";
+        let inferred = inferred_column(source, "articles", "status");
+
+        assert_eq!(
+            inferred.column_type.to_string(),
+            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+        );
+        assert!(inferred.nullable);
+    }
+
+    #[test]
+    fn validates_an_enum_shared_by_two_columns_only_once() {
+        let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n    #[column]\n    previous_status: ArticleStatus,\n}\n";
+
+        assert_eq!(
+            inferred_column(source, "articles", "previous_status")
+                .column_type
+                .to_string(),
+            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+        );
+    }
+
+    #[test]
+    fn rejects_an_enum_column_with_a_data_carrying_variant() {
+        let source = "enum ArticleStatus {\n    Draft,\n    Rejected(String),\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column]\n    status: ArticleStatus,\n}\n";
+
+        assert!(error_message(source).contains("variant 'Rejected' carries data"));
+    }
+
+    #[test]
+    fn rejects_an_empty_enum_column() {
+        let source = "enum ArticleStatus {}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column]\n    status: ArticleStatus,\n}\n";
+
+        assert!(error_message(source).contains("which has no variants"));
+    }
+
+    #[test]
+    fn rejects_a_struct_column_that_is_not_a_foreign_key() {
+        let source = "struct Author {}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column]\n    author: Author,\n}\n";
+
+        assert!(error_message(source).contains("cannot be mapped to an SQL type"));
     }
 }

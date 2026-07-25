@@ -1,0 +1,22 @@
+[package]
+name = "margaret_jwks_file_secret_storage_tests"
+version = "0.1.0"
+edition = "2024"
+autotests = false
+
+[dependencies]
+margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+margaret_jwks_file_secret_storage = { path = "../margaret_jwks_file_secret_storage" }
+margaret_jwks_roller = { path = "../margaret_jwks_roller" }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

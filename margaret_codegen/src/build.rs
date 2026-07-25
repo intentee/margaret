@@ -484,8 +484,11 @@ impl GetVerify {
         ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains("crate::margaret::jwks::JwksRoller::create()"));
+        assert!(container.contains("crate::margaret::jwks::JwksRoller::create("));
         assert!(container.contains(".public_jwks_handler()"));
+        assert!(container.contains(
+            "margaret_jwks_secret_storage_selection::resolve_jwks_secret_storage::resolve_jwks_secret_storage"
+        ));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains("impltrzcina::TickerforCrateMargaretJwksJwksRoller"));
@@ -1241,6 +1244,8 @@ impl New {
 
         let run: String = module(&code, "run").split_whitespace().collect();
 
+        assert!(run.contains("pubfnrun"));
+        assert!(!run.contains("pubasyncfnrun"));
         assert!(run.contains("\"schema\""));
         assert!(run.contains("super::schema::schema()"));
     }

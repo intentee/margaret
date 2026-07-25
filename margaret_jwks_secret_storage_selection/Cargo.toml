@@ -1,0 +1,12 @@
+[package]
+name = "margaret_jwks_secret_storage_selection"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+margaret_jwks_file_secret_storage = { path = "../margaret_jwks_file_secret_storage" }
+margaret_jwks_roller = { path = "../margaret_jwks_roller" }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

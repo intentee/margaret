@@ -18,7 +18,9 @@ use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::marker::marker;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 use margaret_attributes::struct_shape::StructShape;
+use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
+use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 use margaret_tag_codegen::read_reference_tag::read_reference_tag;
 use margaret_tag_codegen::tag_kind::TagKind;
 use margaret_tag_codegen::tag_pool::TagPool;
@@ -29,6 +31,7 @@ use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
 use crate::framework_construction::FrameworkConstruction;
+use crate::framework_dependency::FrameworkDependency;
 use crate::framework_enablement::FrameworkEnablement;
 use crate::framework_provider::FrameworkProvider;
 use crate::path_text::path_text;
@@ -444,16 +447,26 @@ fn resolve_framework_providers(
         }
 
         let field_name = path.field_name();
+        let provided = framework_provided_type(&construction, path.clone());
 
         providers.push(Provider {
-            concrete_path: path.clone(),
+            concrete_path: path,
             construction,
             field_name,
-            provided: ProvidedType::Concrete(path),
+            provided,
         });
     }
 
     Ok(providers)
+}
+
+fn framework_provided_type(construction: &DirectConstruction, path: CanonicalPath) -> ProvidedType {
+    match construction {
+        DirectConstruction::Resolved { .. } => ProvidedType::UriSelected(path),
+        DirectConstruction::Constructor { .. }
+        | DirectConstruction::Fieldless { .. }
+        | DirectConstruction::FrameworkAccessor { .. } => ProvidedType::Concrete(path),
+    }
 }
 
 fn buildable_constructions(
@@ -508,16 +521,19 @@ fn resolve_framework_construction(
             })
         }
         FrameworkConstruction::Constructor {
-            endpoints,
+            dependencies,
             is_async,
             method,
         } => {
             let mut resolved = Vec::new();
 
-            for tag in endpoints {
-                resolved.push(DependencyKind::Single {
-                    provider_key: pool.endpoint(tag)?.clone(),
-                });
+            for dependency in dependencies {
+                let provider_key = match dependency {
+                    FrameworkDependency::Endpoint(tag) => pool.endpoint(tag)?.clone(),
+                    FrameworkDependency::Provider(provider_key) => provider_key.clone(),
+                };
+
+                resolved.push(DependencyKind::Single { provider_key });
             }
 
             Some(DirectConstruction::Constructor {
@@ -526,6 +542,21 @@ fn resolve_framework_construction(
                 method: method.clone(),
             })
         }
+        FrameworkConstruction::UriSelected {
+            argument_name,
+            resolver,
+            value_type,
+        } => Some(DirectConstruction::Resolved {
+            dependencies: vec![DependencyKind::ConsoleArgument {
+                argument: Box::new(ConsoleArgument::Named {
+                    name: argument_name.clone(),
+                    required: true,
+                    weaving: WeavingKind::from_canonical(value_type, true),
+                    value_type: value_type.clone(),
+                }),
+            }],
+            resolver: resolver.clone(),
+        }),
         FrameworkConstruction::Unit => Some(DirectConstruction::Fieldless {
             shape: StructShape::Unit,
         }),
@@ -537,7 +568,14 @@ fn framework_provider_dependencies(
 ) -> Vec<&CanonicalPath> {
     match construction {
         FrameworkConstruction::Accessor { source, .. } => vec![source],
-        FrameworkConstruction::Constructor { .. } | FrameworkConstruction::Unit => Vec::new(),
+        FrameworkConstruction::Constructor { dependencies, .. } => dependencies
+            .iter()
+            .filter_map(|dependency| match dependency {
+                FrameworkDependency::Provider(provider_key) => Some(provider_key),
+                FrameworkDependency::Endpoint(_) => None,
+            })
+            .collect(),
+        FrameworkConstruction::UriSelected { .. } | FrameworkConstruction::Unit => Vec::new(),
     }
 }
 

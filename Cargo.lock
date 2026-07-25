@@ -1997,7 +1997,9 @@ dependencies = [
  "margaret_identity",
  "margaret_identity_session",
  "margaret_jwks_client",
+ "margaret_jwks_roller",
  "margaret_jwks_roller_server",
+ "margaret_jwks_secret_storage_selection",
  "margaret_macros",
  "margaret_model",
  "margaret_service",
@@ -2196,6 +2198,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_jwks_file_secret_storage"
+version = "0.1.0"
+dependencies = [
+ "margaret_jwks_keygen",
+ "margaret_jwks_roller",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "margaret_jwks_file_secret_storage_tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "margaret_jwks_file_secret_storage",
+ "margaret_jwks_keygen",
+ "margaret_jwks_roller",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "margaret_jwks_keygen"
 version = "0.1.0"
 dependencies = [
@@ -2244,11 +2268,13 @@ dependencies = [
  "http",
  "margaret_http",
  "margaret_identity_session",
+ "margaret_jwks_file_secret_storage",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_roller_tests",
  "margaret_sync_holder",
  "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -2263,6 +2289,27 @@ dependencies = [
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "thiserror",
+]
+
+[[package]]
+name = "margaret_jwks_secret_storage_selection"
+version = "0.1.0"
+dependencies = [
+ "margaret_jwks_file_secret_storage",
+ "margaret_jwks_roller",
+ "thiserror",
+]
+
+[[package]]
+name = "margaret_jwks_secret_storage_selection_tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "margaret_jwks_keygen",
+ "margaret_jwks_roller",
+ "margaret_jwks_secret_storage_selection",
+ "tempfile",
 ]
 
 [[package]]
@@ -2379,6 +2426,14 @@ dependencies = [
  "margaret_model",
  "sqlx",
  "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "margaret_self_referential_model_fixture"
+version = "0.1.0"
+dependencies = [
+ "margaret_macros",
  "uuid",
 ]
 

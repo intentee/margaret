@@ -31,6 +31,7 @@ impl PatchArticle {
             body: current_body,
             cover,
             published,
+            status,
             created_at,
             author,
         }: Article,
@@ -45,6 +46,7 @@ impl PatchArticle {
             body,
             cover,
             published,
+            status,
             created_at,
             author,
         });

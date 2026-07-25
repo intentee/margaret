@@ -18,6 +18,8 @@ mod jwks_framework_services;
 mod jwks_handler_path;
 mod jwks_pass;
 mod jwks_roller_path;
+mod jwks_secret_storage_path;
+mod jwks_secret_storage_provider;
 mod jwks_verifier_path;
 mod middleware_pass;
 mod model_pass;

@@ -1,3 +1,4 @@
 pub mod bindings_for_fixture;
+pub mod container_module_source;
 pub mod generate_container_source;
 pub mod resolve_full_fixture;

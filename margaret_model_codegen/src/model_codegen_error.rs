@@ -58,6 +58,25 @@ pub enum ModelCodegenError {
     },
 
     #[error(
+        "column '{column}' of model '{model}' maps to enum '{enum_type}', which has no variants; an enum column requires at least one variant"
+    )]
+    EmptyEnumColumn {
+        column: String,
+        enum_type: String,
+        model: String,
+    },
+
+    #[error(
+        "column '{column}' of model '{model}' maps to enum '{enum_type}', whose variant '{variant}' carries data; only fieldless (unit) variants are supported"
+    )]
+    EnumColumnVariantNotUnit {
+        column: String,
+        enum_type: String,
+        model: String,
+        variant: String,
+    },
+
+    #[error(
         "foreign key field '{field}' of model '{model}' must also carry a #[column] attribute; #[foreign_key] layers on top of #[column]"
     )]
     ForeignKeyRequiresColumn { field: String, model: String },
@@ -106,6 +125,11 @@ pub enum ModelCodegenError {
         "foreign key dependency cycle detected between tables: {path}; inline foreign keys require an acyclic table order"
     )]
     ForeignKeyCycle { path: String },
+
+    #[error(
+        "self-referential foreign key field '{field}' of model '{model}' must be placed behind heap indirection to break its infinite type size; wrap it in Box, Rc, or Arc, e.g. `Option<Box<...>>`"
+    )]
+    SelfReferentialForeignKeyRequiresIndirection { field: String, model: String },
 
     #[error("model '{model}' has a table name that is too long: {source}")]
     TableNameTooLong {
@@ -219,7 +243,7 @@ pub enum ModelCodegenError {
     RedundantIndexOnUniqueColumn { column: String, model: String },
 
     #[error(
-        "the single-column index on column '{column}' of model '{model}' is redundant; a primary key is already indexed"
+        "the single-column index on column '{column}' of model '{model}' is redundant; it is the leading column of the primary key, which is already indexed"
     )]
     RedundantIndexOnPrimaryKeyColumn { column: String, model: String },
 }

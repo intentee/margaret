@@ -11,6 +11,11 @@ pub enum ItemKind {
 
 impl ItemKind {
     #[must_use]
+    pub fn is_enum(&self) -> bool {
+        matches!(self, ItemKind::Enum)
+    }
+
+    #[must_use]
     pub fn is_struct(&self) -> bool {
         matches!(self, ItemKind::Struct(_))
     }
@@ -25,5 +30,11 @@ mod tests {
     fn is_struct_is_true_only_for_structs() {
         assert!(ItemKind::Struct(StructShape::Unit).is_struct());
         assert!(!ItemKind::Trait.is_struct());
+    }
+
+    #[test]
+    fn is_enum_is_true_only_for_enums() {
+        assert!(ItemKind::Enum.is_enum());
+        assert!(!ItemKind::Struct(StructShape::Unit).is_enum());
     }
 }

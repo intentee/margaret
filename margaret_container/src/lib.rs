@@ -9,6 +9,7 @@ mod dependency_kind;
 mod direct_construction;
 mod field_ident;
 pub mod framework_construction;
+pub mod framework_dependency;
 pub mod framework_enablement;
 pub mod framework_provider;
 pub mod injectable_resolution;

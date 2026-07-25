@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
+use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 
 use crate::jwks_roller_server_bundle::JwksRollerServerBundle;
 use crate::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
@@ -14,10 +14,8 @@ pub struct JwksRoller {
 
 impl JwksRoller {
     #[must_use]
-    pub fn create() -> Self {
-        let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
-            storage: Arc::new(MemoryJwksSecretStorage),
-        });
+    pub fn create(storage: Arc<dyn JwksSecretStorage>) -> Self {
+        let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams { storage });
         let public_jwks_handler = bundle.public_jwks_handler();
 
         Self {
@@ -38,18 +36,24 @@ impl JwksRoller {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
+
     use super::JwksRoller;
+
+    fn roller() -> JwksRoller {
+        JwksRoller::create(Arc::new(MemoryJwksSecretStorage))
+    }
 
     #[test]
     fn serves_no_document_before_the_first_roll() {
-        let roller = JwksRoller::create();
-
-        assert_eq!(roller.public_jwks_handler().respond().status(), 503);
+        assert_eq!(roller().public_jwks_handler().respond().status(), 503);
     }
 
     #[tokio::test]
     async fn serves_the_rolled_document_after_a_run() {
-        let roller = JwksRoller::create();
+        let roller = roller();
 
         roller.run().await.expect("the first roll publishes a document");
 

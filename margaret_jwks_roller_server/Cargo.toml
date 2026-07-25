@@ -20,7 +20,9 @@ trzcina = { workspace = true }
 [dev-dependencies]
 http = { workspace = true }
 margaret_identity_session = { path = "../margaret_identity_session" }
+margaret_jwks_file_secret_storage = { path = "../margaret_jwks_file_secret_storage" }
 margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
+tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
 
 [[test]]

@@ -37,6 +37,11 @@ fn field_type(provider: &Provider) -> TokenStream {
 
             quote! { std::sync::Arc<dyn #interface> }
         }
+        ProvidedType::UriSelected(trait_path) => {
+            let interface = path_tokens(trait_path);
+
+            quote! { std::sync::Arc<dyn #interface> }
+        }
     }
 }
 
@@ -83,7 +88,7 @@ fn construction(
     );
 
     match &provider.construction {
-        DirectConstruction::FrameworkAccessor { .. } => value,
+        DirectConstruction::FrameworkAccessor { .. } | DirectConstruction::Resolved { .. } => value,
         DirectConstruction::Constructor { .. } | DirectConstruction::Fieldless { .. } => {
             quote! { std::sync::Arc::new(#value) }
         }
@@ -96,11 +101,7 @@ fn framework_accessor_value(
     plan: &ContainerPlan,
     closures: &ConsoleClosures,
 ) -> TokenStream {
-    let mut ledger = ConsoleWeaveLedger::new(&body_slot_uses(dependencies, closures));
-    let source_expressions: Vec<TokenStream> = dependencies
-        .iter()
-        .map(|dependency| dependency_expression(dependency, plan, closures, &mut ledger))
-        .collect();
+    let source_expressions = woven_dependency_expressions(dependencies, plan, closures);
     let accessor_method = format_ident!("{accessor}");
 
     quote! { #(#source_expressions)*.#accessor_method() }
@@ -121,11 +122,7 @@ fn direct_value(
             method,
         } => {
             let constructor = format_ident!("{}", method);
-            let mut ledger = ConsoleWeaveLedger::new(&body_slot_uses(dependencies, closures));
-            let arguments: Vec<TokenStream> = dependencies
-                .iter()
-                .map(|dependency| dependency_expression(dependency, plan, closures, &mut ledger))
-                .collect();
+            let arguments = woven_dependency_expressions(dependencies, plan, closures);
 
             if *constructor_is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
@@ -138,7 +135,29 @@ fn direct_value(
             accessor,
             dependencies,
         } => framework_accessor_value(accessor, dependencies, plan, closures),
+        DirectConstruction::Resolved {
+            dependencies,
+            resolver,
+        } => {
+            let resolver = path_tokens(resolver);
+            let arguments = woven_dependency_expressions(dependencies, plan, closures);
+
+            quote! { #resolver(#(#arguments),*) }
+        }
     }
+}
+
+fn woven_dependency_expressions(
+    dependencies: &[DependencyKind],
+    plan: &ContainerPlan,
+    closures: &ConsoleClosures,
+) -> Vec<TokenStream> {
+    let mut ledger = ConsoleWeaveLedger::new(&body_slot_uses(dependencies, closures));
+
+    dependencies
+        .iter()
+        .map(|dependency| dependency_expression(dependency, plan, closures, &mut ledger))
+        .collect()
 }
 
 fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {

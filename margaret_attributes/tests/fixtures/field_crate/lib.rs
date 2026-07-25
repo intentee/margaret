@@ -7,3 +7,9 @@ struct NamedFields {
 struct TupleFields(String, u32);
 
 struct UnitStruct;
+
+enum Variants {
+    Unit,
+    Tuple(String, u32),
+    Named { first: String },
+}
