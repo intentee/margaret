@@ -20,6 +20,7 @@ use crate::model_pass::model_pass;
 use crate::serve_arguments::serve_arguments;
 use crate::services_pass::services_pass;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
+use crate::validate_jwks_client_bindings::validate_jwks_client_bindings;
 use crate::views_pass::views_pass;
 use crate::websocket_pass::websocket_pass;
 
@@ -39,6 +40,7 @@ pub fn build(
     let client_bindings = TagPool::collect(&index)
         .map_err(ContainerError::from)?
         .jwks_client_bindings();
+    validate_jwks_client_bindings(&client_bindings)?;
     let bindings = container_pass(&mut context, &registry, &client_bindings)?;
     asset_bag_pass(&mut context, &bindings, assets_directory, embed_relative)?;
     jwks_pass(&mut context, &bindings, &client_bindings);
@@ -705,6 +707,34 @@ impl ProvidesEndpoint for SecondEndpoint {}
             .to_string();
 
         assert!(message.contains("declared more than once"));
+    }
+
+    const JWKS_COLLIDING_ENDPOINT_TAGS_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+
+#[singleton]
+#[provides_jwks_endpoint(myClient)]
+struct FirstEndpoint;
+
+impl ProvidesEndpoint for FirstEndpoint {}
+
+#[singleton]
+#[provides_jwks_endpoint(my_client)]
+struct SecondEndpoint;
+
+impl ProvidesEndpoint for SecondEndpoint {}
+";
+
+    #[test]
+    fn rejects_jwks_endpoint_tags_that_canonicalize_to_the_same_module() {
+        let message = generate(JWKS_COLLIDING_ENDPOINT_TAGS_CRATE)
+            .expect_err("jwks endpoint tags that share a canonical module are rejected")
+            .to_string();
+
+        assert!(message.contains("canonicalize to the module"));
     }
 
     #[test]

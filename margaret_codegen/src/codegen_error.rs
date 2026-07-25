@@ -41,6 +41,15 @@ pub enum CodegenError {
     )]
     AssetResponderWithoutMetafile,
 
+    #[error(
+        "the jwks endpoint tags '{first}' and '{second}' both canonicalize to the module '{module}'"
+    )]
+    CollidingJwksClientModules {
+        first: String,
+        module: String,
+        second: String,
+    },
+
     #[error("failed to generate the dependency container: {source}")]
     Container {
         #[from]
