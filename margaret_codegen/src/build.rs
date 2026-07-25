@@ -149,7 +149,7 @@ struct Widget {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
 struct SystemClock;
@@ -458,7 +458,7 @@ impl GetJwks {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -520,21 +520,21 @@ impl PostMint {
 
         assert!(module(&code, "mod").contains("pub mod jwks;"));
         assert!(module(&code, "jwks")
-            .contains("pub use margaret_jwks_roller_server::jwks_roller::JwksRoller;"));
+            .contains("pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;"));
         assert!(module(&code, "jwks").contains(
-            "pub use margaret_jwks_roller_server::public_jwks_handler::PublicJwksHandler;"
+            "pub use margaret::framework::jwks_roller_server::public_jwks_handler::PublicJwksHandler;"
         ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
         assert!(container.contains("crate::margaret::jwks::JwksRoller::create("));
         assert!(container.contains(".public_jwks_handler()"));
         assert!(container.contains(
-            "margaret_jwks_secret_storage_selection::resolve_jwks_secret_storage::resolve_jwks_secret_storage"
+            "margaret::framework::jwks_secret_storage_selection::resolve_jwks_secret_storage::resolve_jwks_secret_storage"
         ));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains("impltrzcina::TickerforCrateMargaretJwksJwksRoller"));
-        assert!(serve.contains("margaret_jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"));
+        assert!(serve.contains("margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"));
         assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
 
@@ -546,12 +546,12 @@ impl PostMint {
         assert!(module(&code, "jwks").contains("pub mod auth;"));
         assert!(module(&code, "jwks").contains("pub mod partner;"));
         assert!(module(&code, "jwks/auth")
-            .contains("pub use margaret_jwks_client::jwks_client::JwksClient;"));
+            .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;"));
         assert!(module(&code, "jwks/auth").contains(
-            "pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;"
+            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
         assert!(module(&code, "jwks/partner").contains(
-            "pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;"
+            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
@@ -569,11 +569,11 @@ impl PostMint {
         let code = generate(JWKS_SERVER_STORE_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "jwks")
-            .contains("pub use margaret_jwks_roller_server::jwks_roller::JwksRoller;"));
+            .contains("pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;"));
         assert!(module(&code, "jwks")
-            .contains("pub use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;"));
+            .contains("pub use margaret::framework::jwks_secret_store::jwks_secret_store::JwksSecretStore;"));
         assert!(module(&code, "jwks").contains(
-            "pub use margaret_access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
+            "pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
         ));
 
         let container: String = module(&code, "container").split_whitespace().collect();
@@ -586,7 +586,7 @@ impl PostMint {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -683,7 +683,7 @@ impl GetJwks {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -747,8 +747,8 @@ impl ProvidesEndpoint for SecondEndpoint {}
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_http::next::Next;
-use margaret_http::request::Request;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
@@ -786,7 +786,7 @@ impl RequestLog {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
 
@@ -831,7 +831,7 @@ impl GetProfile {
     #[test]
     fn omits_the_authenticated_users_module_without_a_served_request() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n",
         )
         .expect("the build succeeds");
 
@@ -862,9 +862,9 @@ impl GetProfile {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_http::next::Next;
-use margaret_http::request::Request;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[websocket_session(path = \"/room\", server = \"public\")]
 #[middleware(logged)]
@@ -1125,7 +1125,7 @@ impl GetCard {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
 #[renders_view(name = \"banner\")]
@@ -1419,7 +1419,7 @@ impl Page {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[websocket_session(path = \"/room\", server = \"public\")]
 struct Room;
@@ -1460,7 +1460,7 @@ impl RespondsToWebSocketMessage for Chatter {
 pub mod margaret;
 
 use std::sync::Arc;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
 struct SystemClock;

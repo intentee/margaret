@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use margaret_asset_bag::asset_bag::AssetBag;
-use margaret_macros::constructor;
-use margaret_macros::singleton;
-use margaret_views::maud::DOCTYPE;
-use margaret_views::maud::Markup;
-use margaret_views::maud::html;
-use margaret_views::renders_view::RendersView;
+use margaret::framework::asset_bag::asset_bag::AssetBag;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+use margaret::framework::views::maud::DOCTYPE;
+use margaret::framework::views::maud::Markup;
+use margaret::framework::views::maud::html;
+use margaret::framework::views::renders_view::RendersView;
 
 use crate::views::asset_showcase::AssetShowcase;
 use crate::views::asset_showcase::AssetShowcaseProps;
@@ -54,8 +54,8 @@ impl RendersView for AssetPage {
 mod tests {
     use std::sync::Arc;
 
-    use margaret_asset_bag::asset_bag::AssetBag;
-    use margaret_views::renders_view::RendersView;
+    use margaret::framework::asset_bag::asset_bag::AssetBag;
+    use margaret::framework::views::renders_view::RendersView;
 
     use super::AssetPage;
     use super::AssetPageProps;

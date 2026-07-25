@@ -2,8 +2,8 @@ use std::convert::Infallible;
 
 use tokio_util::sync::CancellationToken;
 
-use margaret_macros::process;
-use margaret_macros::service;
+use margaret::framework::macros::process;
+use margaret::framework::macros::service;
 
 #[service]
 pub struct Pulse;

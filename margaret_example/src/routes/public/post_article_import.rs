@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use margaret_http::response::Response;
-use margaret_macros::constructor;
-use margaret_macros::process;
-use margaret_macros::responds_to_http;
-use margaret_macros::singleton;
-use margaret_validation::validation_result::ValidationResult;
+use margaret::framework::http::response::Response;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
+use margaret::framework::validation::validation_result::ValidationResult;
 
 use crate::forms::post_article_form::PostArticleForm;
 use crate::stores::article_store::ArticleStore;
@@ -52,7 +52,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use margaret_validation::validation_result::ValidationResult;
+    use margaret::framework::validation::validation_result::ValidationResult;
 
     use super::PostArticleImport;
     use crate::forms::post_article_form::PostArticleForm;

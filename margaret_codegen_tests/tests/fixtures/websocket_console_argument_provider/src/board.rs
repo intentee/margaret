@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use margaret_macros::build_for_session;
-use margaret_macros::constructor;
-use margaret_macros::singleton;
-use margaret_macros::websocket_message;
-use margaret_macros::websocket_session;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
-use margaret_websocket::streaming_request_envelope::StreamingRequestEnvelope;
-use margaret_websocket::web_socket::WebSocket;
-use margaret_websocket::web_socket_error::WebSocketError;
+use margaret::framework::macros::build_for_session;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+use margaret::framework::macros::websocket_message;
+use margaret::framework::macros::websocket_session;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope;
+use margaret::framework::websocket::web_socket::WebSocket;
+use margaret::framework::websocket::web_socket_error::WebSocketError;
 use serde::Deserialize;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;

@@ -56,10 +56,10 @@ fn command_arm(command: &ConsoleCommand, container: &Ident) -> TokenStream {
     if command.takes_token {
         quote! {
             Some((#name, #matches_binding)) => {
-                let cancellation_token = match margaret_service::install::install() {
+                let cancellation_token = match margaret::framework::service::install::install() {
                     Ok(cancellation_token) => cancellation_token,
                     Err(error) => {
-                        return margaret_console::report_failure::report_failure(error);
+                        return margaret::framework::console::report_failure::report_failure(error);
                     }
                 };
 
@@ -109,10 +109,10 @@ pub(crate) fn render(
             Some(("schema", _matches)) => {
                 println!(
                     "{}",
-                    margaret_model::render_postgres::render_postgres(&super::schema::schema())
+                    margaret::framework::model::render_postgres::render_postgres(&super::schema::schema())
                 );
 
-                margaret_console::command_outcome::CommandOutcome::Succeeded
+                margaret::framework::console::command_outcome::CommandOutcome::Succeeded
             }
         }
     } else {
@@ -155,8 +155,8 @@ pub(crate) fn render(
     let serve_arm = if serves {
         quote! {
             Some(("serve", matches)) => {
-                margaret_service::dispatch_serve::dispatch_serve(
-                    margaret_service::install::install,
+                margaret::framework::service::dispatch_serve::dispatch_serve(
+                    margaret::framework::service::install::install,
                     |cancellation_token| super::serve::serve(#container, matches, cancellation_token),
                 )
                 .await
@@ -170,7 +170,7 @@ pub(crate) fn render(
         pub #run_asyncness fn run<Arguments, Argument>(
             #container: &super::container::Container,
             args: Arguments,
-        ) -> margaret_console::command_outcome::CommandOutcome
+        ) -> margaret::framework::console::command_outcome::CommandOutcome
         where
             Arguments: IntoIterator<Item = Argument>,
             Argument: Into<std::ffi::OsString> + Clone,
@@ -185,10 +185,10 @@ pub(crate) fn render(
                     #(#arms)*
                     #serve_arm
                     #schema_arm
-                    _ => margaret_console::print_help::print_help(&mut command),
+                    _ => margaret::framework::console::print_help::print_help(&mut command),
                 },
                 Err(error) => {
-                    margaret_console::outcome_for_clap_error::outcome_for_clap_error(error)
+                    margaret::framework::console::outcome_for_clap_error::outcome_for_clap_error(error)
                 }
             }
         }

@@ -1,4 +1,4 @@
-use margaret_macros::websocket_message;
+use margaret::framework::macros::websocket_message;
 use serde::Deserialize;
 use validator::Validate;
 

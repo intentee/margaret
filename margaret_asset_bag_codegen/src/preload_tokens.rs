@@ -9,19 +9,19 @@ pub(crate) fn preload_tokens(output_path: &str) -> TokenStream {
 
     match PreloadableAsset::from_path(output_path.to_string()) {
         PreloadableAsset::Fetch(_) => quote! {
-            ::margaret_asset_bag::preload::Preload::Fetch(#href)
+            ::margaret::framework::asset_bag::preload::Preload::Fetch(#href)
         },
         PreloadableAsset::Font(_) => quote! {
-            ::margaret_asset_bag::preload::Preload::Font(#href)
+            ::margaret::framework::asset_bag::preload::Preload::Font(#href)
         },
         PreloadableAsset::Image(_) => quote! {
-            ::margaret_asset_bag::preload::Preload::Image(#href)
+            ::margaret::framework::asset_bag::preload::Preload::Image(#href)
         },
         PreloadableAsset::Module(_) => quote! {
-            ::margaret_asset_bag::preload::Preload::Module(#href)
+            ::margaret::framework::asset_bag::preload::Preload::Module(#href)
         },
         PreloadableAsset::Stylesheet(_) => quote! {
-            ::margaret_asset_bag::preload::Preload::Style(#href)
+            ::margaret::framework::asset_bag::preload::Preload::Style(#href)
         },
     }
 }
@@ -36,8 +36,8 @@ mod tests {
         let variant = quote::format_ident!("{variant}");
 
         quote! {
-            ::margaret_asset_bag::preload::Preload::#variant(
-                ::margaret_asset_bag::asset_href::AssetHref::Local(#href)
+            ::margaret::framework::asset_bag::preload::Preload::#variant(
+                ::margaret::framework::asset_bag::asset_href::AssetHref::Local(#href)
             )
         }
         .to_string()

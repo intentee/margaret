@@ -47,10 +47,10 @@ pub(crate) fn resolve_static_outputs(
     }
 
     let image = static_slot(input, &images, |href| {
-        quote! { ::margaret_asset_bag::image_output::ImageOutput::new(#href) }
+        quote! { ::margaret::framework::asset_bag::image_output::ImageOutput::new(#href) }
     })?;
     let file = static_slot(input, &files, |href| {
-        quote! { ::margaret_asset_bag::file_output::FileOutput::new(#href) }
+        quote! { ::margaret::framework::asset_bag::file_output::FileOutput::new(#href) }
     })?;
 
     Ok(StaticOutputSlots { image, file })
@@ -93,8 +93,8 @@ mod tests {
         assert_eq!(
             slots.image.into_tokens().to_string(),
             quote! {
-                ::margaret_asset_bag::image_output::ImageOutput::new(
-                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/logo_HASH.png")
+                ::margaret::framework::asset_bag::image_output::ImageOutput::new(
+                    ::margaret::framework::asset_bag::asset_href::AssetHref::Local("assets/logo_HASH.png")
                 )
             }
             .to_string()
@@ -122,8 +122,8 @@ mod tests {
         assert_eq!(
             slots.file.into_tokens().to_string(),
             quote! {
-                ::margaret_asset_bag::file_output::FileOutput::new(
-                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/inter_HASH.woff2")
+                ::margaret::framework::asset_bag::file_output::FileOutput::new(
+                    ::margaret::framework::asset_bag::asset_href::AssetHref::Local("assets/inter_HASH.woff2")
                 )
             }
             .to_string()
@@ -149,8 +149,8 @@ mod tests {
         assert_eq!(
             slots.file.into_tokens().to_string(),
             quote! {
-                ::margaret_asset_bag::file_output::FileOutput::new(
-                    ::margaret_asset_bag::asset_href::AssetHref::Local("assets/model_HASH.glb")
+                ::margaret::framework::asset_bag::file_output::FileOutput::new(
+                    ::margaret::framework::asset_bag::asset_href::AssetHref::Local("assets/model_HASH.glb")
                 )
             }
             .to_string()

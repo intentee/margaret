@@ -24,7 +24,7 @@ fn render_column(column: &ResolvedColumn) -> TokenStream {
     let name = Literal::string(&column.name);
 
     quote! {
-        margaret_model::column::Column {
+        margaret::framework::model::column::Column {
             column_type: #column_type,
             default: #default,
             name: #name.to_string(),
@@ -40,7 +40,7 @@ fn render_foreign_key(foreign_key: &ResolvedForeignKey) -> TokenStream {
     let references_table = Literal::string(&foreign_key.references_table);
 
     quote! {
-        margaret_model::foreign_key::ForeignKey {
+        margaret::framework::model::foreign_key::ForeignKey {
             column: #column.to_string(),
             on_delete: #on_delete,
             references_column: #references_column.to_string(),
@@ -54,7 +54,7 @@ fn render_index(index: &ResolvedIndex) -> TokenStream {
     let name = Literal::string(&index.name);
 
     quote! {
-        margaret_model::index::Index {
+        margaret::framework::model::index::Index {
             columns: #columns,
             name: #name.to_string(),
         }
@@ -65,7 +65,7 @@ fn render_unique_constraint(columns: &[String]) -> TokenStream {
     let columns = string_vec(columns);
 
     quote! {
-        margaret_model::unique_constraint::UniqueConstraint {
+        margaret::framework::model::unique_constraint::UniqueConstraint {
             columns: #columns,
         }
     }
@@ -83,7 +83,7 @@ fn render_table(model: &Model) -> TokenStream {
         .map(|unique_constraint| render_unique_constraint(&unique_constraint.columns));
 
     quote! {
-        margaret_model::table::Table {
+        margaret::framework::model::table::Table {
             columns: vec![#(#columns),*],
             foreign_keys: vec![#(#foreign_keys),*],
             indexes: vec![#(#indexes),*],
@@ -99,8 +99,8 @@ pub(crate) fn render(models: &[Model]) -> TokenStream {
 
     quote! {
         #[must_use]
-        pub fn schema() -> margaret_model::schema::Schema {
-            margaret_model::schema::Schema {
+        pub fn schema() -> margaret::framework::model::schema::Schema {
+            margaret::framework::model::schema::Schema {
                 tables: vec![#(#tables),*],
             }
         }

@@ -42,13 +42,13 @@ mod tests {
     use crate::websocket_codegen_error::WebSocketCodegenError;
 
     const REQUEST_TRAIT: &str =
-        "use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
-    const NOTIFICATION_TRAIT: &str = "use margaret_websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;\n";
+        "use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
+    const NOTIFICATION_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;\n";
 
     const FULL_SESSION: &str = r#"
 use std::sync::Arc;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
-use margaret_websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;
 
 #[singleton]
 struct SystemClock;
@@ -187,7 +187,7 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     const CONSOLE_ARGUMENT_HANDLER: &str = r#"
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[websocket_session(path = "/room", server = "public")]
 struct Room;
@@ -228,8 +228,8 @@ impl RespondsToWebSocketMessage for Chatter {
     }
 
     const SESSION_WITH_MIDDLEWARE: &str = r#"
-use margaret_http::next::Next;
-use margaret_http::request::Request;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
 
 #[websocket_session(path = "/room", server = "public")]
 #[middleware(guard)]
@@ -251,8 +251,8 @@ impl Guard {
 
     const SESSION_WITH_ROUTES_MIDDLEWARE: &str = r#"
 use crate::margaret::routes::Routes;
-use margaret_http::next::Next;
-use margaret_http::request::Request;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
 
 #[websocket_session(path = "/room", server = "public")]
 #[middleware(traced)]
@@ -296,14 +296,14 @@ impl Room {
     fn names_the_factory_handshake_unused_when_no_binding_reads_the_request() {
         let source = generated(INJECTED_ONLY_SESSION);
 
-        assert!(source.contains("&self,_handshake:&margaret_http::request::Request"));
+        assert!(source.contains("&self,_handshake:&margaret::framework::http::request::Request"));
     }
 
     #[test]
     fn names_the_factory_handshake_when_a_binding_reads_the_request() {
         let source = generated(FULL_SESSION);
 
-        assert!(source.contains("&self,handshake:&margaret_http::request::Request"));
+        assert!(source.contains("&self,handshake:&margaret::framework::http::request::Request"));
     }
 
     #[test]
@@ -324,7 +324,7 @@ impl Room {
     fn carries_its_middleware_on_the_route_entry() {
         let source = generated(SESSION_WITH_MIDDLEWARE);
 
-        assert!(source.contains("margaret_http::route_entry::RouteEntry::web_socket("));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::web_socket("));
         assert!(source.contains(
             "middleware.push(std::sync::Arc::new(super::middleware::Guard{inner:container.guard().await"
         ));
@@ -332,8 +332,8 @@ impl Room {
     }
 
     const SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
-use margaret_http::next::Next;
-use margaret_http::request::Request;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
 
 #[websocket_session(path = "/room", server = "public")]
 #[middleware(guard)]
@@ -738,9 +738,9 @@ impl Bad {
     }
 
     const AUTHENTICATED_HANDSHAKE: &str = r#"
-use margaret_http::request::Request;
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::http::request::Request;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 struct User;
 
@@ -792,7 +792,7 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(AUTHENTICATED_HANDSHAKE);
 
         assert!(source.contains(
-            "margaret_identity::optional_authenticated_user::optional_authenticated_user(margaret_identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await,)"
+            "margaret::framework::identity::optional_authenticated_user::optional_authenticated_user(margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await,)"
         ));
         assert!(source.contains("Err(response)=>return::std::result::Result::Err(response)"));
     }
@@ -807,7 +807,7 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(AUTHENTICATED_HANDSHAKE);
 
         assert!(source.contains(
-            "->::std::result::Result<::std::sync::Arc<Self::Session>,margaret_http::response_continuation::ResponseContinuation,>"
+            "->::std::result::Result<::std::sync::Arc<Self::Session>,margaret::framework::http::response_continuation::ResponseContinuation,>"
         ));
     }
 
@@ -815,8 +815,8 @@ impl RespondsToWebSocketMessage for Chatter {
     fn hands_the_routes_to_a_handshake_authenticated_user_provider() {
         let source = generated(
             r#"
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 struct User;
 
@@ -857,8 +857,8 @@ impl RespondsToWebSocketMessage for Chatter {
     fn keeps_a_captured_provider_clear_of_a_session_parameter_that_takes_its_name() {
         let source = generated(
             r#"
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
 struct SystemClock;
@@ -910,8 +910,8 @@ impl RespondsToWebSocketMessage for Chatter {
     }
 
     const CONSOLE_ARGUMENT_PROVIDER: &str = r#"
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 struct User;
 
@@ -966,7 +966,7 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(
             error(
                 r#"
-use margaret_http::next::Next;
+use margaret::framework::http::next::Next;
 
 #[singleton]
 #[handles_middleware_attribute(attribute = decorated)]
@@ -997,7 +997,7 @@ impl Room {
         assert!(
             error(
                 r#"
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
 
@@ -1048,7 +1048,7 @@ impl Bad {
         assert!(
             error(
                 r#"
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
 
@@ -1079,7 +1079,7 @@ impl Room {
 
     const PARITY_SESSION: &str = r#"
 use std::sync::Arc;
-use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
 struct Greeter;
@@ -1100,7 +1100,7 @@ impl ArticleStore {
     fn new() -> Self {}
 }
 
-impl margaret_http::http_route_parameter_binder::HttpRouteParameterBinder for ArticleStore {
+impl margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder for ArticleStore {
     type Model = Article;
 }
 
@@ -1119,10 +1119,10 @@ impl BoardSession {
         #[route_parameter(from = "article")] article: Article,
         #[form_request(from = Query)] filters: Filters,
         #[form_request(from = Cookie)] preferences: Preferences,
-        request: &margaret_http::request::Request,
+        request: &margaret::framework::http::request::Request,
         peer: &spiffe::spiffe_id::SpiffeId,
         routes: &crate::margaret::routes::Routes,
-        assets: margaret_asset_bag::asset_bag::AssetBag,
+        assets: margaret::framework::asset_bag::asset_bag::AssetBag,
     ) -> Self {}
 }
 
@@ -1151,7 +1151,7 @@ impl RespondsToWebSocketMessage for Poster {
         assert!(source.contains("RequestInput::Query"));
         assert!(source.contains("RequestInput::Cookie"));
         assert!(source.contains("require_peer_spiffe_id::require_peer_spiffe_id"));
-        assert!(source.contains("::margaret_asset_bag::asset_bag::AssetBag::new()"));
+        assert!(source.contains("::margaret::framework::asset_bag::asset_bag::AssetBag::new()"));
         assert!(source.contains("self.routes.as_ref()"));
         assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
         assert!(source.contains("upgrade_entry(container,routes)"));

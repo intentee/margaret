@@ -37,7 +37,7 @@ pub enum ContainerError {
     EndpointProviderRequiresSingleton { path: String },
 
     #[error(
-        "the jwks endpoint provider '{path}' does not implement margaret_endpoint::provides_endpoint::ProvidesEndpoint"
+        "the jwks endpoint provider '{path}' does not implement margaret::framework::endpoint::provides_endpoint::ProvidesEndpoint"
     )]
     EndpointProviderMissingTrait { path: String },
 

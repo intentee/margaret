@@ -1,4 +1,5 @@
 COVERAGE_PACKAGES := \
+	-p margaret \
 	-p margaret_access_token_minter \
 	-p margaret_asset_bag \
 	-p margaret_asset_bag_codegen \
@@ -95,6 +96,7 @@ coverage: node_modules postgres-image
 	cargo llvm-cov report
 	npx rust-coverage-check target/llvm-cov.json \
 		--workspace-root $(CURDIR) \
+		--gated margaret=100 \
 		--gated margaret_access_token_minter=100 \
 		--gated margaret_asset_bag=100 \
 		--gated margaret_asset_bag_codegen=100 \

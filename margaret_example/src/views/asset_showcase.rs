@@ -1,8 +1,8 @@
-use margaret_asset_bag::asset_bag::AssetBag;
-use margaret_macros::singleton;
-use margaret_views::maud::Markup;
-use margaret_views::maud::html;
-use margaret_views::renders_view::RendersView;
+use margaret::framework::asset_bag::asset_bag::AssetBag;
+use margaret::framework::macros::singleton;
+use margaret::framework::views::maud::Markup;
+use margaret::framework::views::maud::html;
+use margaret::framework::views::renders_view::RendersView;
 
 use crate::margaret::asset_bag::asset;
 
@@ -36,9 +36,9 @@ impl RendersView for AssetShowcase {
 
 #[cfg(test)]
 mod tests {
-    use margaret_asset_bag::asset_bag::AssetBag;
-    use margaret_views::maud::Render;
-    use margaret_views::renders_view::RendersView;
+    use margaret::framework::asset_bag::asset_bag::AssetBag;
+    use margaret::framework::views::maud::Render;
+    use margaret::framework::views::renders_view::RendersView;
 
     use super::AssetShowcase;
     use super::AssetShowcaseProps;

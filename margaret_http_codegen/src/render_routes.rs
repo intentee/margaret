@@ -80,14 +80,14 @@ fn server_layouts<'server>(
 fn segments_tokens(named: &NamedRoute<'_>) -> TokenStream {
     let segments = named.path.segments().iter().map(|segment| match segment {
         UrlSegment::Literal(text) => {
-            quote! { margaret_http::url_segment::UrlSegment::Literal(#text) }
+            quote! { margaret::framework::http::url_segment::UrlSegment::Literal(#text) }
         }
         UrlSegment::Parameter(name) => {
             let value = format_ident!("{}", name);
 
             quote! {
-                margaret_http::url_segment::UrlSegment::Parameter(
-                    margaret_http::url_parameter::UrlParameter {
+                margaret::framework::http::url_segment::UrlSegment::Parameter(
+                    margaret::framework::http::url_parameter::UrlParameter {
                         name: #name,
                         value: #value,
                     },
@@ -101,9 +101,9 @@ fn segments_tokens(named: &NamedRoute<'_>) -> TokenStream {
 
 fn route_type_tokens(named: &NamedRoute<'_>) -> TokenStream {
     if is_get(named) {
-        quote! { margaret_http::forwardable_route::ForwardableRoute }
+        quote! { margaret::framework::http::forwardable_route::ForwardableRoute }
     } else {
-        quote! { margaret_http::route_reference::RouteReference }
+        quote! { margaret::framework::http::route_reference::RouteReference }
     }
 }
 
@@ -112,11 +112,11 @@ fn route_constructor(named: &NamedRoute<'_>, origin: TokenStream) -> TokenStream
 
     if is_get(named) {
         quote! {
-            margaret_http::forwardable_route::ForwardableRoute::new(#origin, #segments)
+            margaret::framework::http::forwardable_route::ForwardableRoute::new(#origin, #segments)
         }
     } else {
         quote! {
-            margaret_http::route_reference::RouteReference::new(#origin, #segments)
+            margaret::framework::http::route_reference::RouteReference::new(#origin, #segments)
         }
     }
 }

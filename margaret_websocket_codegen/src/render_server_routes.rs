@@ -63,7 +63,7 @@ pub(crate) fn render_server_routes(
         };
 
         quote! {
-            margaret_http::route_entry::RouteEntry::web_socket(
+            margaret::framework::http::route_entry::RouteEntry::web_socket(
                 #path,
                 #module::upgrade_entry(container, #(#console_forward)* #routes_argument).await,
                 #middleware,
@@ -80,7 +80,7 @@ pub(crate) fn render_server_routes(
             container: &super::container::Container,
             #(#console_parameters)*
             #routes_name: &::std::sync::Arc<super::routes::Routes>,
-        ) -> ::std::vec::Vec<margaret_http::route_entry::RouteEntry> {
+        ) -> ::std::vec::Vec<margaret::framework::http::route_entry::RouteEntry> {
             ::std::vec::Vec::from([#(#entries)*])
         }
     }

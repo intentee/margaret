@@ -57,9 +57,9 @@ mod tests {
     use crate::views_availability::ViewsAvailability;
 
     const PRELUDE: &str = "\
-use margaret_http::next::Next;
-use margaret_http::request::Request;
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
 ";
@@ -231,7 +231,7 @@ impl SessionUserProvider {
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> User {}\n}\n"
             )
             .contains(
-                "it must return margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
             )
         );
     }
@@ -243,7 +243,7 @@ impl SessionUserProvider {
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) {}\n}\n"
             )
             .contains(
-                "it must return margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
             )
         );
     }
@@ -255,7 +255,7 @@ impl SessionUserProvider {
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> (u8, u8) {}\n}\n"
             )
             .contains(
-                "it must return margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
             )
         );
     }
@@ -596,7 +596,7 @@ impl SessionUserProvider {
             .collect();
 
         assert!(source.contains(
-            "returnmargaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response.into(),)"
+            "returnmargaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response.into(),)"
         ));
     }
 }

@@ -3,11 +3,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tokio_util::sync::CancellationToken;
 
-use margaret_macros::constructor;
-use margaret_macros::singleton;
-use margaret_websocket::notification_envelope::NotificationEnvelope;
-use margaret_websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;
-use margaret_websocket::web_socket::WebSocket;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
+use margaret::framework::websocket::notification_envelope::NotificationEnvelope;
+use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;
+use margaret::framework::websocket::web_socket::WebSocket;
 
 use crate::routes::public::sessions::storyboard::StoryboardSession;
 use crate::routes::public::sessions::storyboard::messages::typing::Typing;

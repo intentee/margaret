@@ -1,8 +1,8 @@
 use dashmap::DashMap;
 use uuid::Uuid;
 
-use margaret_macros::constructor;
-use margaret_macros::singleton;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
 
 use crate::models::user::User;
 
