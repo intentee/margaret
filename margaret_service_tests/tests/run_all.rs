@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use anyhow::anyhow;
 use async_trait::async_trait;
+use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 use trzcina::ServiceManager;
@@ -24,6 +27,17 @@ struct Fails;
 impl Service for Fails {
     async fn run(self: Box<Self>, _cancellation_token: CancellationToken) -> Result<()> {
         Err(anyhow!("the service failed"))
+    }
+}
+
+struct IgnoresCancellation;
+
+#[async_trait]
+impl Service for IgnoresCancellation {
+    async fn run(self: Box<Self>, _cancellation_token: CancellationToken) -> Result<()> {
+        std::future::pending::<()>().await;
+
+        Ok(())
     }
 }
 
@@ -69,4 +83,37 @@ async fn drives_multiple_managers_and_succeeds_when_every_manager_completes() {
     .await;
 
     assert_eq!(outcome, CommandOutcome::Succeeded);
+}
+
+#[tokio::test(start_paused = true)]
+async fn enforces_shutdown_deadlines_across_managers_within_a_single_window() {
+    let deadline = Duration::from_secs(5);
+    let cancellation_token = CancellationToken::new();
+
+    let mut first_manager = ServiceManager::default();
+    first_manager.register_service(IgnoresCancellation);
+
+    let mut second_manager = ServiceManager::default();
+    second_manager.register_service(IgnoresCancellation);
+
+    let collections = vec![
+        first_manager.start(cancellation_token.clone()),
+        second_manager.start(cancellation_token.clone()),
+    ];
+
+    cancellation_token.cancel();
+
+    let started_at = Instant::now();
+    run_all(
+        collections,
+        ServiceShutdownOptions {
+            cooperative_deadline: deadline,
+            abort_deadline: deadline,
+        },
+    )
+    .await;
+    let elapsed = started_at.elapsed();
+
+    assert!(elapsed >= deadline);
+    assert!(elapsed < deadline * 2);
 }
