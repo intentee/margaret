@@ -4,21 +4,25 @@ use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
 use margaret_console_argument_codegen::scan::scan;
+use margaret_container::framework_construction::FrameworkConstruction;
+use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
-use margaret_container::uri_selected_provider::UriSelectedProvider;
 use margaret_container_tests::container_module_source::container_module_source;
 
 fn uri_selected_provider() -> FrameworkProvider {
-    FrameworkProvider::UriSelected(UriSelectedProvider {
-        argument_name: "test-storage".to_string(),
-        resolver: CanonicalPath::new(vec![
-            "crate".to_string(),
-            "resolve_test_storage".to_string(),
-        ]),
-        trait_path: CanonicalPath::new(vec!["crate".to_string(), "TestStorage".to_string()]),
-        value_type: CanonicalPath::new(vec!["crate".to_string(), "TestStorageUri".to_string()]),
-    })
+    FrameworkProvider {
+        construction: FrameworkConstruction::UriSelected {
+            argument_name: "test-storage".to_string(),
+            resolver: CanonicalPath::new(vec![
+                "crate".to_string(),
+                "resolve_test_storage".to_string(),
+            ]),
+            value_type: CanonicalPath::new(vec!["crate".to_string(), "TestStorageUri".to_string()]),
+        },
+        enablement: FrameworkEnablement::WhenReferenced,
+        provided: CanonicalPath::new(vec!["crate".to_string(), "TestStorage".to_string()]),
+    }
 }
 
 fn render_with_provider(fixture: &str) -> String {

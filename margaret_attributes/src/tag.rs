@@ -13,6 +13,11 @@ pub struct Tag {
 
 impl Tag {
     #[must_use]
+    pub fn from_ident(name: Ident) -> Self {
+        Self { name }
+    }
+
+    #[must_use]
     pub fn from_path(path: &Path) -> Option<Self> {
         if path.leading_colon.is_some() {
             return None;
@@ -41,6 +46,8 @@ impl Display for Tag {
 
 #[cfg(test)]
 mod tests {
+    use proc_macro2::Ident;
+    use proc_macro2::Span;
     use syn::parse_quote;
 
     use crate::tag::Tag;
@@ -50,6 +57,13 @@ mod tests {
         let tag = Tag::from_path(&parse_quote!(jwks)).expect("a single-segment tag");
 
         assert_eq!(tag.to_string(), "jwks");
+    }
+
+    #[test]
+    fn builds_a_tag_from_an_identifier() {
+        let tag = Tag::from_ident(Ident::new("jwks", Span::call_site()));
+
+        assert_eq!(tag, Tag::from_path(&parse_quote!(jwks)).expect("a tag"));
     }
 
     #[test]

@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use syn::Attribute;
 use syn::FnArg;
@@ -29,6 +30,9 @@ use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
+use crate::framework_construction::FrameworkConstruction;
+use crate::framework_dependency::FrameworkDependency;
+use crate::framework_enablement::FrameworkEnablement;
 use crate::framework_provider::FrameworkProvider;
 use crate::path_text::path_text;
 use crate::peel_target::peel_target;
@@ -413,67 +417,231 @@ struct DraftedContainer<'index> {
     provider_drafts: Vec<Draft<'index>>,
 }
 
-fn framework_provider_definition(framework_provider: &FrameworkProvider) -> Provider {
-    match framework_provider {
-        FrameworkProvider::Unit(path) => Provider {
-            concrete_path: path.clone(),
-            construction: DirectConstruction::Fieldless {
-                shape: StructShape::Unit,
-            },
-            field_name: path.field_name(),
-            provided: ProvidedType::Concrete(path.clone()),
-        },
-        FrameworkProvider::UriSelected(provider) => {
-            let argument = ConsoleArgument::Named {
-                name: provider.argument_name.clone(),
-                required: true,
-                weaving: WeavingKind::from_canonical(&provider.value_type, true),
-                value_type: provider.value_type.clone(),
-            };
-
-            Provider {
-                concrete_path: provider.trait_path.clone(),
-                construction: DirectConstruction::Resolved {
-                    dependencies: vec![DependencyKind::ConsoleArgument {
-                        argument: Box::new(argument),
-                    }],
-                    resolver: provider.resolver.clone(),
-                },
-                field_name: provider.trait_path.field_name(),
-                provided: ProvidedType::UriSelected(provider.trait_path.clone()),
-            }
-        }
-    }
-}
-
 fn resolve_framework_providers(
     index: &AttributeIndex,
     provider_drafts: &[Draft],
     construction_drafts: &[Draft],
     provided_keys: &mut HashMap<CanonicalPath, CanonicalPath>,
-    framework_provided: &[FrameworkProvider],
+    framework_providers: &[FrameworkProvider],
+    pool: &TagPool,
 ) -> Result<Vec<Provider>, ContainerError> {
+    let buildable = buildable_constructions(framework_providers, pool);
+    let included = included_framework_providers(
+        index,
+        provider_drafts,
+        construction_drafts,
+        framework_providers,
+        &buildable,
+    );
     let mut providers = Vec::new();
 
-    for framework_provider in framework_provided {
-        let key = framework_provider.key();
-
-        if !is_framework_path_referenced(index, provider_drafts, key)
-            && !is_framework_path_referenced(index, construction_drafts, key)
-        {
+    for (path, construction) in buildable {
+        if !included.contains(&path) {
             continue;
         }
 
-        if provided_keys.insert(key.clone(), key.clone()).is_some() {
+        if provided_keys.insert(path.clone(), path.clone()).is_some() {
             return Err(ContainerError::AmbiguousFrameworkProvider {
-                path: key.to_string(),
+                path: path.to_string(),
             });
         }
 
-        providers.push(framework_provider_definition(framework_provider));
+        let field_name = path.field_name();
+        let provided = framework_provided_type(&construction, path.clone());
+
+        providers.push(Provider {
+            concrete_path: path,
+            construction,
+            field_name,
+            provided,
+        });
     }
 
     Ok(providers)
+}
+
+fn framework_provided_type(construction: &DirectConstruction, path: CanonicalPath) -> ProvidedType {
+    match construction {
+        DirectConstruction::Resolved { .. } => ProvidedType::UriSelected(path),
+        DirectConstruction::Constructor { .. }
+        | DirectConstruction::Fieldless { .. }
+        | DirectConstruction::FrameworkAccessor { .. } => ProvidedType::Concrete(path),
+    }
+}
+
+fn buildable_constructions(
+    framework_providers: &[FrameworkProvider],
+    pool: &TagPool,
+) -> HashMap<CanonicalPath, DirectConstruction> {
+    let mut resolved: HashMap<CanonicalPath, DirectConstruction> = HashMap::new();
+
+    for framework_provider in framework_providers {
+        if let Some(construction) =
+            resolve_framework_construction(&framework_provider.construction, pool)
+        {
+            resolved.insert(framework_provider.provided.clone(), construction);
+        }
+    }
+
+    loop {
+        let removable: Vec<CanonicalPath> = framework_providers
+            .iter()
+            .filter(|framework_provider| resolved.contains_key(&framework_provider.provided))
+            .filter(|framework_provider| {
+                framework_provider_dependencies(&framework_provider.construction)
+                    .iter()
+                    .any(|dependency| !resolved.contains_key(*dependency))
+            })
+            .map(|framework_provider| framework_provider.provided.clone())
+            .collect();
+
+        if removable.is_empty() {
+            break;
+        }
+
+        for path in removable {
+            resolved.remove(&path);
+        }
+    }
+
+    resolved
+}
+
+fn resolve_framework_construction(
+    construction: &FrameworkConstruction,
+    pool: &TagPool,
+) -> Option<DirectConstruction> {
+    match construction {
+        FrameworkConstruction::Accessor { accessor, source } => {
+            Some(DirectConstruction::FrameworkAccessor {
+                accessor: accessor.clone(),
+                dependencies: vec![DependencyKind::Single {
+                    provider_key: source.clone(),
+                }],
+            })
+        }
+        FrameworkConstruction::Constructor {
+            dependencies,
+            is_async,
+            method,
+        } => {
+            let mut resolved = Vec::new();
+
+            for dependency in dependencies {
+                let provider_key = match dependency {
+                    FrameworkDependency::Endpoint(tag) => pool.endpoint(tag)?.clone(),
+                    FrameworkDependency::Provider(provider_key) => provider_key.clone(),
+                };
+
+                resolved.push(DependencyKind::Single { provider_key });
+            }
+
+            Some(DirectConstruction::Constructor {
+                dependencies: resolved,
+                is_async: *is_async,
+                method: method.clone(),
+            })
+        }
+        FrameworkConstruction::UriSelected {
+            argument_name,
+            resolver,
+            value_type,
+        } => Some(DirectConstruction::Resolved {
+            dependencies: vec![DependencyKind::ConsoleArgument {
+                argument: Box::new(ConsoleArgument::Named {
+                    name: argument_name.clone(),
+                    required: true,
+                    weaving: WeavingKind::from_canonical(value_type, true),
+                    value_type: value_type.clone(),
+                }),
+            }],
+            resolver: resolver.clone(),
+        }),
+        FrameworkConstruction::Unit => Some(DirectConstruction::Fieldless {
+            shape: StructShape::Unit,
+        }),
+    }
+}
+
+fn framework_provider_dependencies(
+    construction: &FrameworkConstruction,
+) -> Vec<&CanonicalPath> {
+    match construction {
+        FrameworkConstruction::Accessor { source, .. } => vec![source],
+        FrameworkConstruction::Constructor { dependencies, .. } => dependencies
+            .iter()
+            .filter_map(|dependency| match dependency {
+                FrameworkDependency::Provider(provider_key) => Some(provider_key),
+                FrameworkDependency::Endpoint(_) => None,
+            })
+            .collect(),
+        FrameworkConstruction::UriSelected { .. } | FrameworkConstruction::Unit => Vec::new(),
+    }
+}
+
+fn included_framework_providers(
+    index: &AttributeIndex,
+    provider_drafts: &[Draft],
+    construction_drafts: &[Draft],
+    framework_providers: &[FrameworkProvider],
+    buildable: &HashMap<CanonicalPath, DirectConstruction>,
+) -> HashSet<CanonicalPath> {
+    let mut triggered: HashSet<CanonicalPath> = HashSet::new();
+
+    for framework_provider in framework_providers {
+        if buildable.contains_key(&framework_provider.provided)
+            && is_directly_triggered(
+                index,
+                provider_drafts,
+                construction_drafts,
+                framework_provider,
+            )
+        {
+            triggered.insert(framework_provider.provided.clone());
+        }
+    }
+
+    loop {
+        let mut added = false;
+
+        for framework_provider in framework_providers {
+            if !triggered.contains(&framework_provider.provided) {
+                continue;
+            }
+
+            for dependency in framework_provider_dependencies(&framework_provider.construction) {
+                if buildable.contains_key(dependency) && triggered.insert(dependency.clone()) {
+                    added = true;
+                }
+            }
+        }
+
+        if !added {
+            break;
+        }
+    }
+
+    triggered
+}
+
+fn is_directly_triggered(
+    index: &AttributeIndex,
+    provider_drafts: &[Draft],
+    construction_drafts: &[Draft],
+    framework_provider: &FrameworkProvider,
+) -> bool {
+    match framework_provider.enablement {
+        FrameworkEnablement::Always => true,
+        FrameworkEnablement::Dependency => false,
+        FrameworkEnablement::WhenReferenced => {
+            is_framework_path_referenced(index, provider_drafts, &framework_provider.provided)
+                || is_framework_path_referenced(
+                    index,
+                    construction_drafts,
+                    &framework_provider.provided,
+                )
+        }
+    }
 }
 
 fn is_framework_path_referenced(
@@ -506,7 +674,7 @@ fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &Canonical
 pub(crate) fn build_plan(
     index: &AttributeIndex,
     registry: &ConsoleArgumentRegistry,
-    framework_provided: &[FrameworkProvider],
+    framework_providers: &[FrameworkProvider],
     pool: &TagPool,
 ) -> Result<ContainerPlan, ContainerError> {
     let DraftedContainer {
@@ -515,12 +683,13 @@ pub(crate) fn build_plan(
         provider_drafts,
     } = build_drafts(index)?;
 
-    let framework_providers = resolve_framework_providers(
+    let resolved_framework_providers = resolve_framework_providers(
         index,
         &provider_drafts,
         &construction_drafts,
         &mut provided_keys,
-        framework_provided,
+        framework_providers,
+        pool,
     )?;
 
     let mut providers = BTreeMap::new();
@@ -588,7 +757,7 @@ pub(crate) fn build_plan(
         );
     }
 
-    for provider in framework_providers {
+    for provider in resolved_framework_providers {
         providers.insert(provider.provided.key().clone(), provider);
     }
 

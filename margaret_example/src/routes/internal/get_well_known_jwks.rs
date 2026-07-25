@@ -6,23 +6,25 @@ use margaret_macros::process;
 use margaret_macros::responds_to_http;
 use margaret_macros::singleton;
 
-use crate::tickers::jwks_roller::JwksRoller;
+use crate::margaret::jwks::PublicJwksHandler;
 
 #[singleton]
 #[responds_to_http(method = "get", path = "/.well-known/jwks.json", server = "internal")]
 pub struct GetWellKnownJwks {
-    jwks_roller: Arc<JwksRoller>,
+    public_jwks_handler: Arc<PublicJwksHandler>,
 }
 
 impl GetWellKnownJwks {
     #[constructor]
     #[must_use]
-    pub fn create(jwks_roller: Arc<JwksRoller>) -> Self {
-        Self { jwks_roller }
+    pub fn create(public_jwks_handler: Arc<PublicJwksHandler>) -> Self {
+        Self {
+            public_jwks_handler,
+        }
     }
 
     #[process]
     pub async fn respond(&self) -> Response {
-        self.jwks_roller.public_jwks_handler().respond()
+        self.public_jwks_handler.respond()
     }
 }

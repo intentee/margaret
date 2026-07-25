@@ -19,6 +19,8 @@ use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
+use crate::framework_service::FrameworkService;
+use crate::serve_console_arguments::ServeConsoleArguments;
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
@@ -318,11 +320,17 @@ pub fn render_services(
     servers: &[HttpServer],
     has_views: bool,
     bindings: &ContainerBindings,
-    serve_arguments: &[ConsoleArgument],
-    server_console_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
-    views_console_arguments: &[ConsoleArgument],
+    ServeConsoleArguments {
+        serve_arguments,
+        server_console_arguments,
+        views_console_arguments,
+    }: ServeConsoleArguments,
+    framework_services: &[FrameworkService],
 ) -> Result<GeneratedModuleTokens, ServiceCodegenError> {
-    let units = service_units(index)?;
+    let mut units = service_units(index)?;
+
+    units.extend(framework_services.iter().map(ServiceUnit::from_framework));
+
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(|unit| registration(unit, bindings));
     let manager_setup = server_manager_setup(

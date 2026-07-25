@@ -16,10 +16,10 @@ use crate::topological_order::topological_order;
 pub fn render_container(
     index: &AttributeIndex,
     registry: &ConsoleArgumentRegistry,
-    framework_provided: &[FrameworkProvider],
+    framework_providers: &[FrameworkProvider],
 ) -> Result<RenderedContainer, ContainerError> {
     let tag_pool = TagPool::collect(index)?;
-    let plan = build_plan(index, registry, framework_provided, &tag_pool)?;
+    let plan = build_plan(index, registry, framework_providers, &tag_pool)?;
 
     topological_order(&plan.providers)?;
 

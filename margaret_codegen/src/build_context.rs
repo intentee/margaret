@@ -5,6 +5,7 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_service_codegen::framework_service::FrameworkService;
 
 use crate::capabilities::Capabilities;
 use crate::codegen_error::CodegenError;
@@ -14,6 +15,7 @@ use crate::umbrella::umbrella;
 
 pub(crate) struct BuildContext<'index> {
     capabilities: Capabilities,
+    framework_services: Vec<FrameworkService>,
     index: &'index AttributeIndex,
     metafile_contents: Option<String>,
     middleware_plans: Vec<MiddlewarePlan>,
@@ -29,6 +31,7 @@ impl<'index> BuildContext<'index> {
     pub(crate) fn new(index: &'index AttributeIndex, metafile_contents: Option<String>) -> Self {
         Self {
             capabilities: Capabilities::detect(index, metafile_contents.is_some()),
+            framework_services: Vec::new(),
             index,
             metafile_contents,
             middleware_plans: Vec::new(),
@@ -45,8 +48,16 @@ impl<'index> BuildContext<'index> {
         self.capabilities
     }
 
+    pub(crate) fn enable_jwks(&mut self) {
+        self.capabilities.has_jwks = true;
+    }
+
     pub(crate) fn extend_modules(&mut self, modules: Vec<GeneratedModuleTokens>) {
         self.module_tokens.extend(modules);
+    }
+
+    pub(crate) fn framework_services(&self) -> &[FrameworkService] {
+        &self.framework_services
     }
 
     pub(crate) fn index(&self) -> &'index AttributeIndex {
@@ -80,6 +91,10 @@ impl<'index> BuildContext<'index> {
 
     pub(crate) fn servers(&self) -> &[HttpServer] {
         &self.servers
+    }
+
+    pub(crate) fn set_framework_services(&mut self, framework_services: Vec<FrameworkService>) {
+        self.framework_services = framework_services;
     }
 
     pub(crate) fn set_middleware_plans(&mut self, middleware_plans: Vec<MiddlewarePlan>) {

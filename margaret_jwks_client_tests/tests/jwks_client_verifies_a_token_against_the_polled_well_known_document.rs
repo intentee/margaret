@@ -11,8 +11,7 @@ use url::Url;
 
 use margaret_endpoint::static_endpoint::StaticEndpoint;
 use margaret_http_tests::mtls_fixture::MtlsFixture;
-use margaret_jwks_client::JwksClientBundle;
-use margaret_jwks_client::JwksClientBundleParams;
+use margaret_jwks_client::JwksClient;
 use margaret_jwks_client_tests::running_jwks_server::RunningJwksServer;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
@@ -64,13 +63,11 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
     let jwks_server =
         RunningJwksServer::start(fixture.server_config.clone(), public_jwks_handler).await;
 
-    let http_client = Client::builder()
+    let client_builder = Client::builder()
         .use_preconfigured_tls(ClientConfig::clone(&fixture.client_config))
         .https_only(true)
         .redirect(Policy::none())
-        .timeout(Duration::from_secs(60))
-        .build()
-        .expect("the test jwks http client builds");
+        .timeout(Duration::from_secs(60));
     let jwks_url = Url::parse(&format!(
         "https://{}:{}{}",
         fixture.server_name,
@@ -78,21 +75,15 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
         WELL_KNOWN_JWKS_PATH,
     ))
     .expect("the jwks url parses");
-    let client_bundle = JwksClientBundle::new(JwksClientBundleParams {
-        endpoint_provider: Arc::new(StaticEndpoint::new(jwks_url)),
-        http_client,
-    });
-    let verifier = client_bundle.verifier();
-    let mut poll_services = client_bundle
-        .services()
-        .await
-        .expect("the client bundle exposes services");
-    let poll_service = poll_services
-        .pop()
-        .expect("the client bundle exposes the poll service");
+    let jwks_client = JwksClient::create(Arc::new(StaticEndpoint::new(jwks_url)));
+    let verifier = jwks_client.verifier();
 
     let poll_token = cancellation_token.clone();
-    let poll_task = tokio::spawn(async move { poll_service.run(poll_token).await });
+    let poll_task = tokio::spawn(async move {
+        jwks_client
+            .run_with_client_builder(client_builder, poll_token)
+            .await
+    });
 
     let verified = loop {
         if let Ok(verified) = verifier.verify::<TestClaims>(&token, test_instant(1_700_000_000)) {
