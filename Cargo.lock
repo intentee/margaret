@@ -2473,7 +2473,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
- "futures-util",
  "libc",
  "margaret_console",
  "margaret_http",
@@ -2598,6 +2597,8 @@ dependencies = [
 name = "margaret_spiffe_svid_client_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_client",
  "margaret_spiffe_svid_tests",

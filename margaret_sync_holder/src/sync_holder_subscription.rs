@@ -40,6 +40,14 @@ impl<TItem: Clone + Send + Sync + 'static> SyncHolderSubscription<TItem> {
     }
 }
 
+impl<TItem> Clone for SyncHolderSubscription<TItem> {
+    fn clone(&self) -> Self {
+        Self {
+            receiver: self.receiver.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::pin::pin;
@@ -103,6 +111,20 @@ mod tests {
                 holder.set(Some(3));
             },
         );
+
+        assert_eq!(presence, SyncHolderPresence::Present);
+    }
+
+    #[tokio::test]
+    async fn a_clone_observes_a_later_set_independently() {
+        let holder: SyncHolder<i32> = SyncHolder::default();
+        let mut clone = holder.subscribe().clone();
+        let cancellation_token = CancellationToken::new();
+
+        let (presence, ()) = tokio::join!(clone.wait_until_present(&cancellation_token), async {
+            tokio::task::yield_now().await;
+            holder.set(Some(9));
+        });
 
         assert_eq!(presence, SyncHolderPresence::Present);
     }

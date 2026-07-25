@@ -7,6 +7,7 @@ use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 
 use crate::svid_server_cert_verifier::SvidServerCertVerifier;
 
+#[derive(Clone)]
 pub struct SvidClientReadiness {
     server_cert_verifier_subscription: SyncHolderSubscription<Arc<SvidServerCertVerifier>>,
 }
@@ -51,6 +52,21 @@ mod tests {
 
         assert_eq!(
             readiness.wait_until_ready(&cancellation_token).await,
+            SyncHolderPresence::Cancelled
+        );
+    }
+
+    #[tokio::test]
+    async fn a_clone_reports_cancellation_like_the_original() {
+        let facade = SvidServerCertVerifierFacade::default();
+        let readiness = SvidClientReadiness::new(facade.subscribe());
+        let mut clone = readiness.clone();
+        let cancellation_token = CancellationToken::new();
+
+        cancellation_token.cancel();
+
+        assert_eq!(
+            clone.wait_until_ready(&cancellation_token).await,
             SyncHolderPresence::Cancelled
         );
     }
