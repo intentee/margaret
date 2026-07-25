@@ -44,5 +44,6 @@ pub fn argument_registration(argument: &ConsoleArgument) -> TokenStream {
                 )
             }
         }
+        ConsoleArgument::SpiffeHttpClient => quote! {},
     }
 }

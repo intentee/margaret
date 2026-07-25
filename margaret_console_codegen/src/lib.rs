@@ -351,6 +351,15 @@ impl Farewell {
     }
 
     #[test]
+    fn rejects_a_console_command_that_injects_the_spiffe_http_client() {
+        let message = error_for(
+            "use reqwest::Client;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> Self {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+        );
+
+        assert!(message.contains("injects the #[spiffe_http_client]"));
+    }
+
+    #[test]
     fn propagates_malformed_command_arguments() {
         let message = error_for("#[console_command(= 5)]\nstruct Bad;\n");
 

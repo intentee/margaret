@@ -9,9 +9,11 @@ use syn::Path;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
@@ -25,6 +27,7 @@ use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
 use crate::service_units::service_units;
+use crate::spiffe_activation::SpiffeActivation;
 
 fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
     if !spiffe_secured {
@@ -52,45 +55,114 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
     }
 }
 
+fn svid_identity_prelude(
+    SpiffeActivation {
+        client_active,
+        server_active,
+    }: SpiffeActivation,
+) -> TokenStream {
+    if !server_active && !client_active {
+        return quote! {};
+    }
+
+    let spiffe_trust_domain =
+        required_flag_read(&quote! { String }, "spiffe-trust-domain", &quote! { value.clone() });
+    let spire_agent_addr =
+        required_flag_read(&quote! { String }, "spire-agent-addr", &quote! { value.clone() });
+
+    let bundle_constructor = if server_active && client_active {
+        quote! { margaret_spiffe_svid_bundle::SvidBundle }
+    } else if server_active {
+        quote! { margaret_spiffe_svid_server::SvidServerBundle }
+    } else {
+        quote! { margaret_spiffe_svid_client::SvidClientBundle }
+    };
+
+    let server_config = server_active.then(|| {
+        quote! {
+            let spiffe_server_config = ::std::sync::Arc::new(spiffe_bundle.server_config());
+        }
+    });
+
+    let http_client = client_active.then(|| {
+        let spiffe_http_client = spiffe_http_client_ident();
+
+        quote! {
+            let #spiffe_http_client = match spiffe_bundle.reqwest_client() {
+                Ok(client) => client,
+                Err(error) => return margaret_console::report_failure::report_failure(error),
+            };
+        }
+    });
+
+    quote! {
+        margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
+
+        let spiffe_bundle = #bundle_constructor::new(
+            margaret_spiffe_svid::SvidServiceBundleParams {
+                spiffe_trust_domain: #spiffe_trust_domain,
+                spire_agent_addr: #spire_agent_addr,
+            },
+        );
+
+        #server_config
+        #http_client
+    }
+}
+
 fn server_manager_setup(
     servers: &[HttpServer],
     has_views: bool,
     registers_services: bool,
+    activation: SpiffeActivation,
     bindings: &ContainerBindings,
     server_console_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
     views_console_arguments: &[ConsoleArgument],
 ) -> TokenStream {
+    let svid_active = activation.svid_active();
     let manager_binding = if registers_services {
         quote! { mut manager }
     } else {
         quote! { manager }
     };
 
-    if servers.is_empty() {
-        return quote! {
-            let #manager_binding = trzcina::ServiceManager::default();
-        };
-    }
-
-    let spiffe_secured = serves_spiffe(servers);
-    let spiffe_prelude = spiffe_secured.then(|| {
-        let spiffe_trust_domain =
-            required_flag_read(&quote! { String }, "spiffe-trust-domain", &quote! { value.clone() });
-        let spire_agent_addr =
-            required_flag_read(&quote! { String }, "spire-agent-addr", &quote! { value.clone() });
-
+    let bundle_services_registration = svid_active.then(|| {
         quote! {
-            margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
-
-            let spiffe_bundle = margaret_spiffe_svid_server::SvidServerBundle::new(
-                margaret_spiffe_svid::SvidServiceBundleParams {
-                    spiffe_trust_domain: #spiffe_trust_domain,
-                    spire_agent_addr: #spire_agent_addr,
-                },
-            );
-            let spiffe_server_config = ::std::sync::Arc::new(spiffe_bundle.server_config());
+            match margaret_service::bundle_services::bundle_services(spiffe_bundle).await {
+                Ok(services) => bundle_services.extend(services),
+                Err(outcome) => return outcome,
+            }
         }
     });
+
+    if servers.is_empty() {
+        if !svid_active {
+            return quote! {
+                let #manager_binding = trzcina::ServiceManager::default();
+            };
+        }
+
+        return quote! {
+            let mut bundle_services: ::std::vec::Vec<
+                ::std::boxed::Box<dyn trzcina::Service>,
+            > = ::std::vec::Vec::new();
+
+            #bundle_services_registration
+
+            let #manager_binding = match margaret_service::serve_application::serve_application(
+                matches,
+                ::std::vec::Vec::new(),
+                margaret_service::resolved_services::ResolvedServices {
+                    services: bundle_services,
+                },
+            )
+            .await
+            {
+                Ok(manager) => manager,
+                Err(outcome) => return outcome,
+            };
+        };
+    }
 
     let origins = servers.iter().map(|server| {
         let origin_variable = format_ident!("origin_{}", server.name());
@@ -119,7 +191,7 @@ fn server_manager_setup(
         let address_argument = server.address_argument();
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
-        let transport = transport_expression(server, spiffe_secured);
+        let transport = transport_expression(server, activation.server_active);
         let server_borrows = bindings.console_borrows(
             server_console_arguments
                 .get(server.name())
@@ -139,19 +211,11 @@ fn server_manager_setup(
     });
     let assemblies = vec_literal_tokens(assemblies);
 
-    let bundle_services_binding = if spiffe_secured {
+    let bundle_services_binding = if svid_active {
         quote! { mut bundle_services }
     } else {
         quote! { bundle_services }
     };
-    let bundle_services = spiffe_secured.then(|| {
-        quote! {
-            match margaret_service::bundle_services::bundle_services(spiffe_bundle).await {
-                Ok(services) => bundle_services.extend(services),
-                Err(outcome) => return outcome,
-            }
-        }
-    });
     let views_setup = has_views.then(|| {
         let views_borrows = bindings.console_borrows(views_console_arguments);
 
@@ -161,8 +225,6 @@ fn server_manager_setup(
     });
 
     quote! {
-        #spiffe_prelude
-
         #(#origins)*
 
         let routes = ::std::sync::Arc::new(
@@ -175,7 +237,7 @@ fn server_manager_setup(
             ::std::boxed::Box<dyn trzcina::Service>,
         > = ::std::vec::Vec::new();
 
-        #bundle_services
+        #bundle_services_registration
 
         let #manager_binding = match margaret_service::serve_application::serve_application(
             matches,
@@ -331,12 +393,19 @@ pub fn render_services(
 
     units.extend(framework_services.iter().map(ServiceUnit::from_framework));
 
+    let activation = SpiffeActivation {
+        client_active: has_spiffe_http_client(serve_arguments),
+        server_active: serves_spiffe(servers),
+    };
+
     let adapters = units.iter().map(adapter);
     let registrations = units.iter().map(|unit| registration(unit, bindings));
+    let identity_prelude = svid_identity_prelude(activation);
     let manager_setup = server_manager_setup(
         servers,
         has_views,
         !units.is_empty(),
+        activation,
         bindings,
         server_console_arguments,
         views_console_arguments,
@@ -356,6 +425,7 @@ pub fn render_services(
             #matches_binding: &clap::ArgMatches,
             cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret_console::command_outcome::CommandOutcome {
+            #identity_prelude
             #prelude
             #manager_setup
 

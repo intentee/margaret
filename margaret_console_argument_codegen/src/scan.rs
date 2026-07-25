@@ -162,6 +162,7 @@ mod tests {
                 value_type,
                 ..
             } => format!("positional:{id}:{}:{value_type}", requiredness(*required)),
+            ConsoleArgument::SpiffeHttpClient => "spiffe_http_client".to_string(),
         }
     }
 
@@ -177,6 +178,14 @@ mod tests {
                 .argument(&owner(name), position)
                 .expect("the argument is scanned"),
         )
+    }
+
+    #[test]
+    fn describes_the_spiffe_http_client_input() {
+        assert_eq!(
+            describe(&ConsoleArgument::SpiffeHttpClient),
+            "spiffe_http_client"
+        );
     }
 
     #[test]

@@ -23,6 +23,7 @@ pub enum ConsoleArgument {
         weaving: WeavingKind,
         value_type: CanonicalPath,
     },
+    SpiffeHttpClient,
 }
 
 impl ConsoleArgument {
@@ -48,6 +49,7 @@ impl ConsoleArgument {
                     quote! { ::std::option::Option<#type_tokens> }
                 }
             }
+            ConsoleArgument::SpiffeHttpClient => quote! { reqwest::Client },
         }
     }
 
@@ -57,6 +59,7 @@ impl ConsoleArgument {
             ConsoleArgument::Flag { name } => name,
             ConsoleArgument::Named { name, .. } => name,
             ConsoleArgument::Positional { id, .. } => id,
+            ConsoleArgument::SpiffeHttpClient => "spiffe_http_client",
         }
     }
 
@@ -75,6 +78,7 @@ impl ConsoleArgument {
             ConsoleArgument::Flag { .. } => WeavingKind::Copy,
             ConsoleArgument::Named { weaving, .. }
             | ConsoleArgument::Positional { weaving, .. } => weaving.clone(),
+            ConsoleArgument::SpiffeHttpClient => WeavingKind::Cloned,
         }
     }
 }
@@ -190,5 +194,21 @@ mod tests {
         };
 
         assert_eq!(collapsed(named.parameter_referent()), "::std::path::Path");
+    }
+
+    #[test]
+    fn a_spiffe_http_client_field_is_a_reqwest_client() {
+        let client = ConsoleArgument::SpiffeHttpClient;
+
+        assert_eq!(collapsed(client.field_type()), "reqwest::Client");
+        assert_eq!(client.name(), "spiffe_http_client");
+    }
+
+    #[test]
+    fn a_spiffe_http_client_weaves_by_cloning_its_value_type() {
+        let client = ConsoleArgument::SpiffeHttpClient;
+
+        assert_eq!(client.weaving(), WeavingKind::Cloned);
+        assert_eq!(collapsed(client.parameter_referent()), "reqwest::Client");
     }
 }

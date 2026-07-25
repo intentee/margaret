@@ -44,6 +44,11 @@ pub enum ContainerError {
     #[error("{site} references a jwks secret store that is not available: {target}")]
     UnknownJwksSecretStore { site: String, target: String },
 
+    #[error(
+        "#[spiffe_http_client] does not take any arguments, but parameter '{parameter}' of singleton '{singleton}' declares some"
+    )]
+    SpiffeHttpClientTakesNoArguments { parameter: String, singleton: String },
+
     #[error("#[singleton] is only supported on structs, but '{path}' is not a struct")]
     NotASingletonStruct { path: String },
 

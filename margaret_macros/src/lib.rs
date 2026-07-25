@@ -16,7 +16,10 @@ pub fn singleton(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn constructor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_parameter_markers(item, &["console_argument", "jwks_secret_store"])
+    strip_parameter_markers(
+        item,
+        &["console_argument", "jwks_secret_store", "spiffe_http_client"],
+    )
 }
 
 #[proc_macro_attribute]
@@ -201,6 +204,27 @@ mod tests {
         assert!(!stripped.contains("console_argument"));
         assert!(stripped.contains("minter"));
         assert!(stripped.contains("verifier"));
+        assert!(stripped.contains("label"));
+    }
+
+    #[test]
+    fn removes_spiffe_http_client_markers_from_parameters() {
+        let stripped = strip_or_compile_error(
+            quote! {
+                pub fn create(
+                    #[spiffe_http_client] reqwest: Client,
+                    #[console_argument(from = "label")] label: String,
+                ) -> Self {
+                    Self { reqwest, label }
+                }
+            },
+            &["console_argument", "spiffe_http_client"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("spiffe_http_client"));
+        assert!(!stripped.contains("console_argument"));
+        assert!(stripped.contains("reqwest"));
         assert!(stripped.contains("label"));
     }
 

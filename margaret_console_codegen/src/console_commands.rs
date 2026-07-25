@@ -6,6 +6,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
+use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameters::parameters;
@@ -75,11 +76,20 @@ pub(crate) fn console_commands(
 
         validate_runner(index, item, runner, &command)?;
 
+        let arguments = bindings.console_arguments(item.canonical_path()).to_vec();
+
+        if arguments
+            .iter()
+            .any(|argument| matches!(argument, ConsoleArgument::SpiffeHttpClient))
+        {
+            return Err(ConsoleCodegenError::ConsoleCommandInjectsSpiffeHttpClient { command });
+        }
+
         let existing = commands.insert(
             name.clone(),
             ConsoleCommand {
                 accessor,
-                arguments: bindings.console_arguments(item.canonical_path()).to_vec(),
+                arguments,
                 command_path: command.clone(),
                 description,
                 name: name.clone(),

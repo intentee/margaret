@@ -8,6 +8,7 @@ pub mod service_codegen_error;
 mod service_kind;
 mod service_unit;
 mod service_units;
+mod spiffe_activation;
 mod tick_timer_arguments;
 
 #[cfg(test)]
@@ -142,6 +143,7 @@ mod tests {
 
     const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
     const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n";
+    const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> Self {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
 
     #[test]
     fn reports_units_present() {
@@ -361,6 +363,43 @@ mod tests {
             "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
         assert!(source.contains("letmutbundle_services"));
+    }
+
+    #[test]
+    fn wires_the_client_bundle_when_a_spiffe_http_client_is_injected() {
+        let source = rendered(SPIFFE_CLIENT, &[]);
+
+        assert!(source.contains(
+            "letspiffe_bundle=margaret_spiffe_svid_client::SvidClientBundle::new(margaret_spiffe_svid::SvidServiceBundleParams{"
+        ));
+        assert!(source.contains(
+            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>returnmargaret_console::report_failure::report_failure(error),};"
+        ));
+        assert!(source.contains(
+            "margaret_service::serve_application::serve_application(matches,::std::vec::Vec::new(),"
+        ));
+        assert!(!source.contains("spiffe_server_config"));
+    }
+
+    #[test]
+    fn shares_the_svid_bundle_when_a_pinned_server_and_a_client_are_active() {
+        let source = rendered(
+            SPIFFE_CLIENT,
+            &[HttpServer::new(
+                "internal".to_string(),
+                ServerTransportPolicy::PinnedSpiffeMtls,
+            )],
+        );
+
+        assert!(source.contains(
+            "letspiffe_bundle=margaret_spiffe_svid_bundle::SvidBundle::new(margaret_spiffe_svid::SvidServiceBundleParams{"
+        ));
+        assert!(source.contains(
+            "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
+        ));
+        assert!(source.contains(
+            "letspiffe_http_client=matchspiffe_bundle.reqwest_client(){Ok(client)=>client,Err(error)=>returnmargaret_console::report_failure::report_failure(error),};"
+        ));
     }
 
     #[test]

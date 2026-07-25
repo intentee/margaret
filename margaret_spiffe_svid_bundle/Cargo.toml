@@ -1,0 +1,17 @@
+[package]
+name = "margaret_spiffe_svid_bundle"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
+margaret_spiffe_svid_client = { path = "../margaret_spiffe_svid_client" }
+margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server" }
+reqwest = { workspace = true }
+rustls = { workspace = true }
+trzcina = { workspace = true }
+
+[lints]
+workspace = true

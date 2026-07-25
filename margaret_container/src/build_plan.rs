@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use syn::Attribute;
 use syn::FnArg;
+use syn::Meta;
 use syn::Pat;
 use syn::Path;
 
@@ -306,6 +307,21 @@ fn resolve_dependencies(
             continue;
         }
 
+        if let Some(attribute) = marker(&pattern_type.attrs, &spiffe_http_client_selector()) {
+            if !matches!(attribute.meta, Meta::Path(_)) {
+                return Err(ContainerError::SpiffeHttpClientTakesNoArguments {
+                    parameter,
+                    singleton: concrete_path.to_string(),
+                });
+            }
+
+            dependencies.push(DependencyKind::ConsoleArgument {
+                argument: Box::new(ConsoleArgument::SpiffeHttpClient),
+            });
+
+            continue;
+        }
+
         let Some(written) = peel_target(&pattern_type.ty) else {
             return Err(ContainerError::UnsupportedParameterShape {
                 singleton: concrete_path.to_string(),
@@ -429,6 +445,10 @@ fn provides_jwks_endpoint_selector() -> AttributeSelector {
 
 fn jwks_secret_store_selector() -> AttributeSelector {
     AttributeSelector::from_marker("jwks_secret_store")
+}
+
+fn spiffe_http_client_selector() -> AttributeSelector {
+    AttributeSelector::from_marker("spiffe_http_client")
 }
 
 struct Draft<'index> {
