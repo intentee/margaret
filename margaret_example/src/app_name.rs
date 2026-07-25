@@ -1,5 +1,5 @@
-use margaret_macros::constructor;
-use margaret_macros::singleton;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::singleton;
 
 #[singleton]
 pub struct AppName {

@@ -6,10 +6,10 @@ use chrono::Utc;
 use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 
-use margaret_identity_session::is_expired::IsExpired;
-use margaret_macros::constructor;
-use margaret_macros::process;
-use margaret_macros::service;
+use margaret::framework::identity_session::is_expired::IsExpired;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::service;
 
 use crate::margaret::jwks::auth::PublicJwksVerifier;
 use crate::system_clock::SystemClock;

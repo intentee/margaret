@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-margaret_macros = { path = "../../../../margaret_macros" }
+margaret = { path = "../../../../margaret" }
 uuid = { workspace = true }
 
 [lints]

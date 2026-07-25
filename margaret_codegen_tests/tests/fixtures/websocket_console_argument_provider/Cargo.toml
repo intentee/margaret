@@ -7,17 +7,7 @@ publish = false
 [dependencies]
 async-trait = { workspace = true }
 clap = { workspace = true }
-margaret_asset_bag = { path = "../../../../margaret_asset_bag" }
-margaret_console = { path = "../../../../margaret_console" }
-margaret_http = { path = "../../../../margaret_http" }
-margaret_http_validation = { path = "../../../../margaret_http_validation" }
-margaret_identity = { path = "../../../../margaret_identity" }
-margaret_macros = { path = "../../../../margaret_macros" }
-margaret_service = { path = "../../../../margaret_service" }
-margaret_spiffe_svid = { path = "../../../../margaret_spiffe_svid" }
-margaret_spiffe_svid_server = { path = "../../../../margaret_spiffe_svid_server" }
-margaret_views = { path = "../../../../margaret_views" }
-margaret_websocket = { path = "../../../../margaret_websocket" }
+margaret = { path = "../../../../margaret" }
 maud = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -28,7 +18,7 @@ trzcina = { workspace = true }
 validator = { workspace = true, features = ["derive"] }
 
 [build-dependencies]
-margaret_codegen = { path = "../../../../margaret_codegen" }
+margaret = { path = "../../../../margaret", features = ["codegen"] }
 
 [lints]
 workspace = true

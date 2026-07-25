@@ -184,10 +184,10 @@ mod tests {
         let index = index_for("#[singleton]\nstruct Placeholder;\n");
         let framework_services = vec![
             FrameworkService {
-                concrete_path: canonical(&["margaret_jwks_roller_server", "jwks_roller", "JwksRoller"]),
+                concrete_path: canonical(&["margaret", "framework", "jwks_roller_server", "jwks_roller", "JwksRoller"]),
                 kind: FrameworkServiceKind::Ticker {
                     interval: canonical(&[
-                        "margaret_jwks_roller_server",
+                        "margaret", "framework", "jwks_roller_server",
                         "jwks_roll_interval",
                         "JWKS_ROLL_INTERVAL",
                     ]),
@@ -197,7 +197,7 @@ mod tests {
                 type_name: "JwksRoller".to_string(),
             },
             FrameworkService {
-                concrete_path: canonical(&["margaret_jwks_client", "jwks_client", "JwksClient"]),
+                concrete_path: canonical(&["margaret", "framework", "jwks_client", "jwks_client", "JwksClient"]),
                 kind: FrameworkServiceKind::Service,
                 runner: "run".to_string(),
                 takes_token: true,
@@ -225,15 +225,15 @@ mod tests {
 
         assert!(source.contains("impltrzcina::TickerforJwksRoller"));
         assert!(source.contains(
-            "fntick_interval(&self)->std::time::Duration{margaret_jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL}"
+            "fntick_interval(&self)->std::time::Duration{margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL}"
         ));
         assert!(source.contains(
-            "manager.register_service(JwksRoller{inner:container.jwks_roller_jwks_roller().await"
+            "manager.register_service(JwksRoller{inner:container.framework_jwks_roller_server_jwks_roller_jwks_roller().await"
         ));
         assert!(source.contains("impltrzcina::ServiceforJwksClient"));
         assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
         assert!(source.contains(
-            "manager.register_service(JwksClient{inner:container.jwks_client_jwks_client().await"
+            "manager.register_service(JwksClient{inner:container.framework_jwks_client_jwks_client_jwks_client().await"
         ));
     }
 
@@ -280,15 +280,15 @@ mod tests {
 
         assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
         assert!(source.contains(
-            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
-            r#"transport:margaret_http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
+            r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
+            "margaret::framework::service::serve_application::serve_application(matches,servers,margaret::framework::service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
-        assert!(!source.contains("margaret_service::bundle_services::bundle_services"));
+        assert!(!source.contains("margaret::framework::service::bundle_services::bundle_services"));
         assert!(!source.contains("letmutbundle_services"));
         assert!(source.contains("letbundle_services:"));
         assert!(source.contains("letmutmanager"));
@@ -300,7 +300,7 @@ mod tests {
 
         assert!(
             source.contains(
-                "letmanager=matchmargaret_service::serve_application::serve_application("
+                "letmanager=matchmargaret::framework::service::serve_application::serve_application("
             )
         );
         assert!(!source.contains("letmutmanager"));
@@ -334,10 +334,10 @@ mod tests {
         );
 
         assert!(source.contains(
-            "margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
+            "margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
         ));
         assert!(source.contains(
-            "margaret_spiffe_svid_server::SvidServerBundle::new(margaret_spiffe_svid::SvidServiceBundleParams{"
+            "margaret::framework::spiffe_svid_server::SvidServerBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
         ));
         assert!(source.contains(r#"matches.get_one::<String>("spiffe-trust-domain")"#));
         assert!(source.contains(r#"matches.get_one::<String>("spire-agent-addr")"#));
@@ -345,20 +345,20 @@ mod tests {
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
         ));
         assert!(source.contains(
-            "transport:margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
+            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
         ));
         assert!(source.contains(
             r#"transport:matchmatches.get_one::<String>("public-transport").map(String::as_str)"#
         ));
         assert!(source.contains(
-            r#"Some("spiffe_mtls")=>{margaret_http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
+            r#"Some("spiffe_mtls")=>{margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
         ));
-        assert!(source.contains("_=>margaret_http::transport_config::TransportConfig::Plain,"));
+        assert!(source.contains("_=>margaret::framework::http::transport_config::TransportConfig::Plain,"));
         assert!(source.contains(
-            "matchmargaret_service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
+            "matchmargaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
         ));
         assert!(source.contains(
-            "margaret_service::serve_application::serve_application(matches,servers,margaret_service::resolved_services::ResolvedServices{services:bundle_services,},)"
+            "margaret::framework::service::serve_application::serve_application(matches,servers,margaret::framework::service::resolved_services::ResolvedServices{services:bundle_services,},)"
         ));
         assert!(source.contains("letmutbundle_services"));
     }
@@ -374,7 +374,7 @@ mod tests {
         );
 
         assert!(source.contains(
-            r#"letorigin_public:::std::sync::Arc<str>=matchmatches.get_one::<String>("public-url"){Some(value)=>value.clone().into(),None=>returnmargaret_console::command_outcome::CommandOutcome::Failed,};"#
+            r#"letorigin_public:::std::sync::Arc<str>=matchmatches.get_one::<String>("public-url"){Some(value)=>value.clone().into(),None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}};"#
         ));
         assert!(source.contains(
             "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(origin_internal.clone(),origin_public.clone(),),);"
@@ -394,20 +394,20 @@ mod tests {
         );
 
         assert!(source.contains(
-            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            r#"margaret_service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#
         ));
         assert!(
             source.contains(
-                "margaret_service::serve_application::serve_application(matches,servers,"
+                "margaret::framework::service::serve_application::serve_application(matches,servers,"
             )
         );
     }

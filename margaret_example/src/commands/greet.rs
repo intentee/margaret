@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use margaret_console::command_outcome::CommandOutcome;
-use margaret_macros::console_command;
-use margaret_macros::constructor;
-use margaret_macros::process;
-use margaret_macros::singleton;
+use margaret::framework::console::command_outcome::CommandOutcome;
+use margaret::framework::macros::console_command;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::process;
+use margaret::framework::macros::singleton;
 
 use crate::english_greeter::EnglishGreeter;
 

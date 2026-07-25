@@ -1,4 +1,4 @@
-use margaret_macros::model;
+use margaret::framework::macros::model;
 
 #[model(table = "screen_sections")]
 #[derive(Clone)]

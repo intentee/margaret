@@ -114,8 +114,8 @@ mod tests {
     }
 
     const GUARD: &str = r#"
-use margaret_http::next::Next;
-use margaret_http::request::Request;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
 
 #[handles_middleware_attribute(attribute = guard)]
 struct Guard;
@@ -131,14 +131,14 @@ impl Guard {
         let source = wrappers_for(GUARD);
 
         assert!(source.contains("pubstructGuard{pubinner:std::sync::Arc<crate::Guard>,}"));
-        assert!(source.contains("implmargaret_http::http_middleware::HttpMiddlewareforGuard"));
+        assert!(source.contains("implmargaret::framework::http::http_middleware::HttpMiddlewareforGuard"));
         assert!(source.contains("self.inner.process(request,next).await"));
     }
 
     #[test]
     fn injects_the_routes_reference_into_the_wrapper() {
         let source = wrappers_for(
-            "use crate::margaret::routes::Routes;\nuse margaret_http::next::Next;\nuse margaret_http::request::Request;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, request: &Request, next: Next, routes: &Routes) -> ResponseContinuation {}\n}\n",
+            "use crate::margaret::routes::Routes;\nuse margaret::framework::http::next::Next;\nuse margaret::framework::http::request::Request;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, request: &Request, next: Next, routes: &Routes) -> ResponseContinuation {}\n}\n",
         );
 
         assert!(source.contains(
@@ -150,11 +150,11 @@ impl Guard {
     #[test]
     fn omits_the_request_from_a_wrapper_that_only_delegates() {
         let source = wrappers_for(
-            "use margaret_http::next::Next;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
+            "use margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
         );
 
         assert!(source.contains(
-            "asyncfnprocess(&self,_request:&margaret_http::request::Request,next:margaret_http::next::Next,)"
+            "asyncfnprocess(&self,_request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
         assert!(source.contains("self.inner.process(next).await"));
     }
@@ -162,11 +162,11 @@ impl Guard {
     #[test]
     fn omits_the_next_handler_from_a_short_circuiting_wrapper() {
         let source = wrappers_for(
-            "use margaret_http::request::Request;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, request: &Request) -> ResponseContinuation {}\n}\n",
+            "use margaret::framework::http::request::Request;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, request: &Request) -> ResponseContinuation {}\n}\n",
         );
 
         assert!(source.contains(
-            "asyncfnprocess(&self,request:&margaret_http::request::Request,_next:margaret_http::next::Next,)"
+            "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
         assert!(source.contains("self.inner.process(request).await"));
     }
@@ -174,7 +174,7 @@ impl Guard {
     #[test]
     fn disambiguates_wrappers_that_derive_the_same_name() {
         let source = wrappers_for(
-            "use margaret_http::next::Next;\n\n#[handles_middleware_attribute(attribute = one)]\nstruct V2;\nimpl V2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n\n#[handles_middleware_attribute(attribute = two)]\nstruct V_2;\nimpl V_2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
+            "use margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = one)]\nstruct V2;\nimpl V2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n\n#[handles_middleware_attribute(attribute = two)]\nstruct V_2;\nimpl V_2 {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
         );
 
         assert!(source.contains("pubstructV2{pubinner:std::sync::Arc<crate::V2>,}"));
@@ -234,7 +234,7 @@ impl Guard {
     #[test]
     fn resolves_the_layers_in_declaration_order() {
         let layers = layers_for(
-            "use margaret_http::next::Next;\n\n#[middleware(first)]\n#[middleware(second)]\nstruct Site;\n\n#[handles_middleware_attribute(attribute = first)]\nstruct First;\nimpl First {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n\n#[handles_middleware_attribute(attribute = second)]\nstruct Second;\nimpl Second {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
+            "use margaret::framework::http::next::Next;\n\n#[middleware(first)]\n#[middleware(second)]\nstruct Site;\n\n#[handles_middleware_attribute(attribute = first)]\nstruct First;\nimpl First {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n\n#[handles_middleware_attribute(attribute = second)]\nstruct Second;\nimpl Second {\n    #[process]\n    fn process(&self, next: Next) -> ResponseContinuation {}\n}\n",
         )
         .expect("the layers resolve");
 
@@ -312,7 +312,7 @@ impl Guard {
 
         assert_eq!(
             folded,
-            "margaret_http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await}),margaret_http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await}),BASE))"
+            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await}),margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await}),BASE))"
         );
     }
 
@@ -351,7 +351,7 @@ impl Guard {
         .collect::<String>();
 
         assert!(vector.contains(
-            "letmutmiddleware:::std::vec::Vec<::std::sync::Arc<dynmargaret_http::http_middleware::HttpMiddleware>,>=::std::vec::Vec::new();"
+            "letmutmiddleware:::std::vec::Vec<::std::sync::Arc<dynmargaret::framework::http::http_middleware::HttpMiddleware>,>=::std::vec::Vec::new();"
         ));
         assert!(vector.contains(
             "middleware.push(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()}));"
@@ -371,7 +371,7 @@ impl Guard {
     }
 
     const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
-use margaret_http::next::Next;
+use margaret::framework::http::next::Next;
 
 #[singleton]
 #[handles_middleware_attribute(attribute = guard)]
@@ -425,8 +425,8 @@ struct Site;
     fn extracts_a_validation_result_form_request_in_a_middleware() {
         let source = wrappers_for(
             r#"
-use margaret_http::next::Next;
-use margaret_validation::validation_result::ValidationResult;
+use margaret::framework::http::next::Next;
+use margaret::framework::validation::validation_result::ValidationResult;
 
 #[handles_middleware_attribute(attribute = guard)]
 struct Guard;
@@ -439,11 +439,11 @@ impl Guard {
         );
 
         assert!(
-            source.contains("margaret_http_validation::validate_input::validate_input(request,")
+            source.contains("margaret::framework::http_validation::validate_input::validate_input(request,")
         );
-        assert!(source.contains("margaret_http_validation::request_input::RequestInput::Json"));
+        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Json"));
         assert!(source.contains(
-            "asyncfnprocess(&self,request:&margaret_http::request::Request,next:margaret_http::next::Next,)"
+            "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
         assert!(source.contains("self.inner.process(data,next).await"));
     }
@@ -462,12 +462,12 @@ impl Guard {
 "#,
         );
 
-        assert!(source.contains("margaret_http_validation::require_input::require_input(request,"));
-        assert!(source.contains("margaret_http_validation::request_input::RequestInput::Form"));
+        assert!(source.contains("margaret::framework::http_validation::require_input::require_input(request,"));
+        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Form"));
         assert!(source.contains("Ok(model)=>model"));
         assert!(source.contains("Err(response)=>returnresponse.into()"));
         assert!(source.contains(
-            "asyncfnprocess(&self,request:&margaret_http::request::Request,_next:margaret_http::next::Next,)"
+            "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
         assert!(source.contains("self.inner.process(data).await"));
     }
@@ -476,8 +476,8 @@ impl Guard {
     fn extracts_a_form_request_alongside_the_request_and_next_in_a_middleware() {
         let source = wrappers_for(
             r#"
-use margaret_http::next::Next;
-use margaret_http::request::Request;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
 
 #[handles_middleware_attribute(attribute = guard)]
 struct Guard;
@@ -489,9 +489,9 @@ impl Guard {
 "#,
         );
 
-        assert!(source.contains("margaret_http_validation::request_input::RequestInput::Query"));
+        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Query"));
         assert!(source.contains(
-            "asyncfnprocess(&self,request:&margaret_http::request::Request,next:margaret_http::next::Next,)"
+            "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
         assert!(source.contains("self.inner.process(request,filters,next).await"));
     }
@@ -500,7 +500,7 @@ impl Guard {
     fn injects_the_views_reference_into_the_wrapper() {
         let source = wrappers_for(
             r#"
-use margaret_http::next::Next;
+use margaret::framework::http::next::Next;
 
 #[handles_middleware_attribute(attribute = traced)]
 struct Tracer;
@@ -522,8 +522,8 @@ impl Tracer {
     fn disambiguates_wrapper_parameters_named_request_and_next() {
         let source = wrappers_for(
             r#"
-use margaret_http::next::Next;
-use margaret_http::request::Request;
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
 
 #[handles_middleware_attribute(attribute = guard)]
 struct Guard;
@@ -536,11 +536,11 @@ impl Guard {
         );
 
         assert!(source.contains(
-            "asyncfnprocess(&self,request_2:&margaret_http::request::Request,next_2:margaret_http::next::Next,)"
+            "asyncfnprocess(&self,request_2:&margaret::framework::http::request::Request,next_2:margaret::framework::http::next::Next,)"
         ));
         assert!(source.contains("letnext=request_2;"));
         assert!(
-            source.contains("margaret_http_validation::require_input::require_input(request_2,")
+            source.contains("margaret::framework::http_validation::require_input::require_input(request_2,")
         );
         assert!(source.contains("self.inner.process(next,request,next_2).await"));
     }
@@ -549,7 +549,7 @@ impl Guard {
     fn rejects_a_middleware_with_multiple_next_handlers() {
         assert!(
             plans_error_for(
-                "use margaret_http::next::Next;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, first: Next, second: Next) -> ResponseContinuation {}\n}\n"
+                "use margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, first: Next, second: Next) -> ResponseContinuation {}\n}\n"
             )
             .contains("declares more than one next handler")
         );

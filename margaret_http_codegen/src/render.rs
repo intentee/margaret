@@ -130,7 +130,7 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let respond_call = quote! { #responder_binding.#method_name(#(#argument_values),*).await };
     let body = quote! {
         #(#bindings_tokens)*
-        margaret_http::response_continuation::ResponseContinuation::from(#respond_call)
+        margaret::framework::http::response_continuation::ResponseContinuation::from(#respond_call)
     };
 
     let captures_routes = responder_injects_routes(route);
@@ -139,7 +139,7 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         std::pin::Pin<
             std::boxed::Box<
                 dyn std::future::Future<
-                    Output = margaret_http::response_continuation::ResponseContinuation,
+                    Output = margaret::framework::http::response_continuation::ResponseContinuation,
                 > + Send
                 + '_,
             >,
@@ -148,10 +148,10 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
 
     let handler = if captured.is_empty() && !captures_routes && !captures_views {
         quote! {
-            margaret_http::responder_handler::responder_handler(
+            margaret::framework::http::responder_handler::responder_handler(
                 #responder_access,
                 |#responder_binding: std::sync::Arc<#responder_type>,
-                 #request_binding: &margaret_http::request::Request|
+                 #request_binding: &margaret::framework::http::request::Request|
                  -> #outcome_future {
                     std::boxed::Box::pin(async move {
                         #body
@@ -178,10 +178,10 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
                 #(#capture_bindings)*
                 #routes_setup
                 #views_setup
-                margaret_http::responder_handler::responder_handler(
+                margaret::framework::http::responder_handler::responder_handler(
                     #responder_access,
                     move |#responder_binding: std::sync::Arc<#responder_type>,
-                          #request_binding: &margaret_http::request::Request|
+                          #request_binding: &margaret::framework::http::request::Request|
                           -> #outcome_future {
                         #(#capture_clones)*
                         #routes_reclone
@@ -386,13 +386,13 @@ fn server_module(
             };
 
             quote! {
-                margaret_http::method_handler::MethodHandler::new(#method, #handler)
+                margaret::framework::http::method_handler::MethodHandler::new(#method, #handler)
             }
         });
         let method_handlers = vec_literal_tokens(method_handlers);
 
         quote! {
-            margaret_http::route_entry::RouteEntry::new(#path, #method_handlers)
+            margaret::framework::http::route_entry::RouteEntry::new(#path, #method_handlers)
         }
     });
     let route_entries = vec_literal_tokens(route_entries);
@@ -401,7 +401,7 @@ fn server_module(
         route.name.as_ref().map(|name| {
             let binding = handler_binding(route);
 
-            quote! { margaret_http::named_handler::NamedHandler::new(#name, #binding) }
+            quote! { margaret::framework::http::named_handler::NamedHandler::new(#name, #binding) }
         })
     });
     let named_handlers = vec_literal_tokens(named_handlers);
@@ -417,11 +417,11 @@ fn server_module(
                     super::super::websocket::#websocket_routes(container, #(#websocket_forward)* #routes_param).await,
                 );
 
-                margaret_http::router::Router::build(route_entries)
+                margaret::framework::http::router::Router::build(route_entries)
             }
         }
     } else {
-        quote! { margaret_http::router::Router::build(#route_entries) }
+        quote! { margaret::framework::http::router::Router::build(#route_entries) }
     };
 
     let parameter_count = 2 + console_parameters.len() + usize::from(views_parameter.is_some());
@@ -435,13 +435,13 @@ fn server_module(
             #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
             #views_parameter
         ) -> ::std::result::Result<
-            margaret_http::server_routes::ServerRoutes,
-            margaret_http::matchit::InsertError,
+            margaret::framework::http::server_routes::ServerRoutes,
+            margaret::framework::http::matchit::InsertError,
         > {
             #(#handler_bindings)*
 
             #router.map(|router| {
-                margaret_http::server_routes::ServerRoutes::new(router, #named_handlers)
+                margaret::framework::http::server_routes::ServerRoutes::new(router, #named_handlers)
             })
         }
     }

@@ -667,7 +667,7 @@ fn resolve_model(
             indexes,
             inferred: InferredColumn {
                 column_type: referenced.column_type.clone(),
-                default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+                default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
                 nullable,
             },
             name: column_name.clone(),

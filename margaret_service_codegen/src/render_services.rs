@@ -28,12 +28,12 @@ use crate::service_units::service_units;
 
 fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
     if !spiffe_secured {
-        return quote! { margaret_http::transport_config::TransportConfig::Plain };
+        return quote! { margaret::framework::http::transport_config::TransportConfig::Plain };
     }
 
     match server.transport_policy() {
         ServerTransportPolicy::PinnedSpiffeMtls => quote! {
-            margaret_http::transport_config::TransportConfig::MutualTls {
+            margaret::framework::http::transport_config::TransportConfig::MutualTls {
                 server_config: spiffe_server_config.clone(),
             }
         },
@@ -42,10 +42,10 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
 
             quote! {
                 match matches.get_one::<String>(#transport_argument).map(String::as_str) {
-                    Some("spiffe_mtls") => margaret_http::transport_config::TransportConfig::MutualTls {
+                    Some("spiffe_mtls") => margaret::framework::http::transport_config::TransportConfig::MutualTls {
                         server_config: spiffe_server_config.clone(),
                     },
-                    _ => margaret_http::transport_config::TransportConfig::Plain,
+                    _ => margaret::framework::http::transport_config::TransportConfig::Plain,
                 }
             }
         }
@@ -80,10 +80,10 @@ fn server_manager_setup(
             required_flag_read(&quote! { String }, "spire-agent-addr", &quote! { value.clone() });
 
         quote! {
-            margaret_spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
+            margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
 
-            let spiffe_bundle = margaret_spiffe_svid_server::SvidServerBundle::new(
-                margaret_spiffe_svid::SvidServiceBundleParams {
+            let spiffe_bundle = margaret::framework::spiffe_svid_server::SvidServerBundle::new(
+                margaret::framework::spiffe_svid::SvidServiceBundleParams {
                     spiffe_trust_domain: #spiffe_trust_domain,
                     spire_agent_addr: #spire_agent_addr,
                 },
@@ -127,7 +127,7 @@ fn server_manager_setup(
         );
 
         quote! {
-            margaret_service::server_assembly::ServerAssembly {
+            margaret::framework::service::server_assembly::ServerAssembly {
                 address_argument: #address_argument,
                 name: #name,
                 routes: super::http::#function_name::#function_name(container, #(#server_borrows)* &routes #views_argument).await,
@@ -146,7 +146,7 @@ fn server_manager_setup(
     };
     let bundle_services = spiffe_secured.then(|| {
         quote! {
-            match margaret_service::bundle_services::bundle_services(spiffe_bundle).await {
+            match margaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await {
                 Ok(services) => bundle_services.extend(services),
                 Err(outcome) => return outcome,
             }
@@ -177,10 +177,10 @@ fn server_manager_setup(
 
         #bundle_services
 
-        let #manager_binding = match margaret_service::serve_application::serve_application(
+        let #manager_binding = match margaret::framework::service::serve_application::serve_application(
             matches,
             servers,
-            margaret_service::resolved_services::ResolvedServices {
+            margaret::framework::service::resolved_services::ResolvedServices {
                 services: bundle_services,
             },
         )
@@ -355,13 +355,13 @@ pub fn render_services(
             container: &super::container::Container,
             #matches_binding: &clap::ArgMatches,
             cancellation_token: tokio_util::sync::CancellationToken,
-        ) -> margaret_console::command_outcome::CommandOutcome {
+        ) -> margaret::framework::console::command_outcome::CommandOutcome {
             #prelude
             #manager_setup
 
             #(#registrations)*
 
-            margaret_service::run::run(
+            margaret::framework::service::run::run(
                 manager,
                 cancellation_token,
                 trzcina::ServiceShutdownOptions::default(),
