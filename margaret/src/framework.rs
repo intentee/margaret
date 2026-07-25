@@ -41,6 +41,8 @@ pub use margaret_service as service;
 #[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid as spiffe_svid;
 #[cfg(feature = "runtime")]
+pub use margaret_spiffe_svid_bundle as spiffe_svid_bundle;
+#[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid_client as spiffe_svid_client;
 #[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid_server as spiffe_svid_server;

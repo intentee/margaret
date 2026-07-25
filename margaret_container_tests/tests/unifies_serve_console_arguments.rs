@@ -1,10 +1,17 @@
 use std::path::Path;
 
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
 use margaret_container_tests::bindings_for_fixture::bindings_for_fixture;
 
 fn path(name: &str) -> CanonicalPath {
     CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
+}
+
+fn console_key(name: &str) -> ServeInputKey {
+    ServeInputKey::ConsoleArgument {
+        name: name.to_string(),
+    }
 }
 
 #[test]
@@ -25,8 +32,8 @@ fn unifies_serve_console_arguments_across_roots() {
     assert_eq!(bindings.console_arguments(&path("Config")).len(), 1);
     assert!(bindings.console_arguments(&path("Absent")).is_empty());
 
-    let path_slot = bindings.console_slot("path");
-    let alpha_slot = bindings.console_slot("alpha");
+    let path_slot = bindings.console_slot(&console_key("path"));
+    let alpha_slot = bindings.console_slot(&console_key("alpha"));
 
     assert_ne!(path_slot, alpha_slot);
 }

@@ -49,6 +49,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
 	-p margaret_spiffe_svid \
+	-p margaret_spiffe_svid_bundle \
+	-p margaret_spiffe_svid_bundle_tests \
 	-p margaret_spiffe_svid_client \
 	-p margaret_spiffe_svid_client_tests \
 	-p margaret_spiffe_svid_integration_tests \
@@ -146,6 +148,8 @@ coverage: node_modules postgres-image
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
 		--gated margaret_spiffe_svid=100 \
+		--gated margaret_spiffe_svid_bundle=100 \
+		--gated margaret_spiffe_svid_bundle_tests=100 \
 		--gated margaret_spiffe_svid_client=100 \
 		--gated margaret_spiffe_svid_client_tests=100 \
 		--gated margaret_spiffe_svid_integration_tests=100 \

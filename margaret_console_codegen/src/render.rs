@@ -6,6 +6,7 @@ use quote::quote;
 use margaret_console_argument_codegen::argument_registration::argument_registration;
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
@@ -121,6 +122,7 @@ pub(crate) fn render(
 
     let serve_registration = if serves {
         let spiffe_secured = serves_spiffe(servers);
+        let svid_active = spiffe_secured || has_spiffe_http_client(serve_arguments);
         let service_arguments = serve_arguments.iter().map(argument_registration);
         let server_arguments = servers.iter().map(|server| {
             let address_argument = server.address_argument();
@@ -138,7 +140,7 @@ pub(crate) fn render(
                 #transport_argument
             }
         });
-        let spiffe_arguments = spiffe_secured.then(|| {
+        let spiffe_arguments = svid_active.then(|| {
             quote! {
                 .arg(clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true))
                 .arg(clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true))

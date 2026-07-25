@@ -16,6 +16,8 @@ pub mod svid_rotate_loop;
 pub mod svid_rotate_service;
 pub mod svid_service;
 pub mod svid_service_bundle_params;
+pub mod svid_side_params;
 
 pub use crate::svid_service::SvidService;
 pub use crate::svid_service_bundle_params::SvidServiceBundleParams;
+pub use crate::svid_side_params::SvidSideParams;

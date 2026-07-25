@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
 use margaret_console_argument_codegen::unify_by_key::unify_by_key;
 
 use crate::container_error::ContainerError;
@@ -43,7 +44,7 @@ fn collect(
 
 pub(crate) struct ConsoleClosures {
     closures: BTreeMap<CanonicalPath, Vec<ConsoleArgument>>,
-    slots: BTreeMap<String, usize>,
+    slots: BTreeMap<ServeInputKey, usize>,
 }
 
 impl ConsoleClosures {
@@ -54,12 +55,12 @@ impl ConsoleClosures {
             collect(key, plan, &mut closures)?;
         }
 
-        let mut slots: BTreeMap<String, usize> = BTreeMap::new();
+        let mut slots: BTreeMap<ServeInputKey, usize> = BTreeMap::new();
         let mut next = 0;
 
         for closure in closures.values() {
             for argument in closure {
-                slots.entry(argument.name().to_string()).or_insert_with(|| {
+                slots.entry(argument.slot_key()).or_insert_with(|| {
                     let assigned = next;
                     next += 1;
                     assigned
@@ -74,11 +75,11 @@ impl ConsoleClosures {
         &self.closures[key]
     }
 
-    pub(crate) fn slot(&self, name: &str) -> usize {
-        self.slots[name]
+    pub(crate) fn slot(&self, key: &ServeInputKey) -> usize {
+        self.slots[key]
     }
 
-    pub(crate) fn slots(&self) -> &BTreeMap<String, usize> {
+    pub(crate) fn slots(&self) -> &BTreeMap<ServeInputKey, usize> {
         &self.slots
     }
 }

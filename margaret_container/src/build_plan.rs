@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use syn::Attribute;
 use syn::FnArg;
+use syn::Meta;
 use syn::Pat;
 use syn::Path;
 
@@ -290,7 +291,33 @@ fn resolve_dependencies(
             });
         };
 
-        if let Some(argument) = registry.argument(concrete_path, position) {
+        let parameter = parameter_name(&pattern_type.pat, position);
+        let console_argument = registry.argument(concrete_path, position);
+        let jwks_marker = marker(&pattern_type.attrs, &jwks_secret_store_selector());
+
+        if let Some(attribute) = marker(&pattern_type.attrs, &spiffe_http_client_selector()) {
+            if console_argument.is_some() || jwks_marker.is_some() {
+                return Err(ContainerError::AmbiguousSpiffeHttpClientInjection {
+                    parameter,
+                    singleton: concrete_path.to_string(),
+                });
+            }
+
+            if !matches!(attribute.meta, Meta::Path(_)) {
+                return Err(ContainerError::SpiffeHttpClientTakesNoArguments {
+                    parameter,
+                    singleton: concrete_path.to_string(),
+                });
+            }
+
+            dependencies.push(DependencyKind::ConsoleArgument {
+                argument: Box::new(ConsoleArgument::SpiffeHttpClient),
+            });
+
+            continue;
+        }
+
+        if let Some(argument) = console_argument {
             dependencies.push(DependencyKind::ConsoleArgument {
                 argument: Box::new(argument.clone()),
             });
@@ -298,9 +325,7 @@ fn resolve_dependencies(
             continue;
         }
 
-        let parameter = parameter_name(&pattern_type.pat, position);
-
-        if let Some(attribute) = marker(&pattern_type.attrs, &jwks_secret_store_selector()) {
+        if let Some(attribute) = jwks_marker {
             dependencies.push(DependencyKind::Single {
                 provider_key: resolve_jwks_secret_store(
                     concrete_path,
@@ -433,6 +458,10 @@ fn provides_jwks_endpoint_selector() -> AttributeSelector {
 
 fn jwks_secret_store_selector() -> AttributeSelector {
     AttributeSelector::from_marker("jwks_secret_store")
+}
+
+fn spiffe_http_client_selector() -> AttributeSelector {
+    AttributeSelector::from_marker("spiffe_http_client")
 }
 
 struct Draft<'index> {

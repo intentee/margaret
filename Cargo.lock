@@ -1803,6 +1803,7 @@ dependencies = [
  "margaret_peer_identity",
  "margaret_service",
  "margaret_spiffe_svid",
+ "margaret_spiffe_svid_bundle",
  "margaret_spiffe_svid_client",
  "margaret_spiffe_svid_server",
  "margaret_sync_holder",
@@ -2472,6 +2473,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
+ "futures-util",
  "libc",
  "margaret_console",
  "margaret_http",
@@ -2515,6 +2517,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_spiffe_http_client_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "margaret",
+ "reqwest",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+]
+
+[[package]]
 name = "margaret_spiffe_svid"
 version = "0.1.0"
 dependencies = [
@@ -2531,6 +2547,33 @@ dependencies = [
  "trzcina",
  "url",
  "x509-parser 0.17.0",
+]
+
+[[package]]
+name = "margaret_spiffe_svid_bundle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_client",
+ "margaret_spiffe_svid_server",
+ "reqwest",
+ "rustls",
+ "trzcina",
+]
+
+[[package]]
+name = "margaret_spiffe_svid_bundle_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_spiffe_svid",
+ "margaret_spiffe_svid_bundle",
+ "margaret_spiffe_svid_tests",
+ "margaret_sync_holder",
+ "tokio",
+ "tokio-util",
+ "trzcina",
 ]
 
 [[package]]
@@ -2558,6 +2601,7 @@ dependencies = [
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_client",
  "margaret_spiffe_svid_tests",
+ "margaret_sync_holder",
  "rustls",
  "spiffe",
  "tokio",
@@ -2570,8 +2614,7 @@ name = "margaret_spiffe_svid_integration_tests"
 version = "0.1.0"
 dependencies = [
  "margaret_spiffe_svid",
- "margaret_spiffe_svid_client",
- "margaret_spiffe_svid_server",
+ "margaret_spiffe_svid_bundle",
  "margaret_spiffe_svid_tests",
  "rustls",
  "tempfile",
@@ -2633,6 +2676,7 @@ name = "margaret_sync_holder"
 version = "0.1.0"
 dependencies = [
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
