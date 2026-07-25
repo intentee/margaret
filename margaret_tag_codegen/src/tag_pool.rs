@@ -8,6 +8,7 @@ use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
 
+use crate::jwks_client_binding::JwksClientBinding;
 use crate::read_middleware_attribute::read_middleware_attribute;
 use crate::tag_error::TagError;
 use crate::tag_kind::TagKind;
@@ -51,15 +52,15 @@ fn collect_kind(
 
 fn declared_tag_path(args: &AttributeArgs, kind: TagKind) -> Result<Option<Path>, TagError> {
     match kind {
-        TagKind::Endpoint => {
+        TagKind::JwksClient => {
             args.interpret(|reader| Ok::<_, TagError>(reader.take_positional_path()))
         }
         TagKind::Middleware => Ok(read_middleware_attribute(args)?),
     }
 }
 
-fn endpoint_selector() -> AttributeSelector {
-    AttributeSelector::from_marker("provides_endpoint")
+fn jwks_endpoint_selector() -> AttributeSelector {
+    AttributeSelector::from_marker("provides_jwks_endpoint")
 }
 
 fn middleware_selector() -> AttributeSelector {
@@ -74,7 +75,12 @@ impl TagPool {
     pub fn collect(index: &AttributeIndex) -> Result<Self, TagError> {
         let mut entries: HashMap<Tag, TagEntry> = HashMap::new();
 
-        collect_kind(index, &endpoint_selector(), TagKind::Endpoint, &mut entries)?;
+        collect_kind(
+            index,
+            &jwks_endpoint_selector(),
+            TagKind::JwksClient,
+            &mut entries,
+        )?;
         collect_kind(
             index,
             &middleware_selector(),
@@ -86,14 +92,20 @@ impl TagPool {
     }
 
     #[must_use]
-    pub fn endpoint(&self, tag: &Tag) -> Option<&CanonicalPath> {
-        match self.entries.get(tag) {
-            Some(TagEntry {
-                concrete,
-                kind: TagKind::Endpoint,
-            }) => Some(concrete),
-            _ => None,
-        }
+    pub fn jwks_client_bindings(&self) -> Vec<JwksClientBinding> {
+        let mut bindings: Vec<JwksClientBinding> = self
+            .entries
+            .iter()
+            .filter(|(_, entry)| entry.kind == TagKind::JwksClient)
+            .map(|(tag, entry)| JwksClientBinding {
+                endpoint: entry.concrete.clone(),
+                tag: tag.clone(),
+            })
+            .collect();
+
+        bindings.sort_by_key(|binding| binding.tag.to_string());
+
+        bindings
     }
 
     pub fn resolve(
@@ -167,46 +179,39 @@ mod tests {
     }
 
     #[test]
-    fn resolves_an_endpoint_tag_to_its_provider() {
-        let pool = pool_for("#[provides_endpoint(jwks)]\nstruct JwksEndpoint;\n")
+    fn binds_a_jwks_client_tag_to_its_endpoint() {
+        let pool = pool_for("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n")
             .expect("the pool collects");
+        let bindings = pool.jwks_client_bindings();
 
-        assert_eq!(
-            pool.resolve(&tag("jwks"), TagKind::Endpoint, "the site")
-                .expect("the tag resolves")
-                .to_string(),
-            "crate::JwksEndpoint"
-        );
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[0].tag.to_string(), "jwks");
+        assert_eq!(bindings[0].endpoint.to_string(), "crate::JwksEndpoint");
     }
 
     #[test]
-    fn finds_an_endpoint_tag_by_name() {
-        let pool = pool_for("#[provides_endpoint(jwks)]\nstruct JwksEndpoint;\n")
-            .expect("the pool collects");
+    fn lists_jwks_client_bindings_in_a_stable_order() {
+        let pool = pool_for(
+            "#[provides_jwks_endpoint(partner)]\nstruct PartnerEndpoint;\n\n#[provides_jwks_endpoint(auth)]\nstruct AuthEndpoint;\n",
+        )
+        .expect("the pool collects");
 
-        assert_eq!(
-            pool.endpoint(&tag("jwks"))
-                .expect("the endpoint tag is present")
-                .to_string(),
-            "crate::JwksEndpoint"
-        );
+        let tags: Vec<String> = pool
+            .jwks_client_bindings()
+            .iter()
+            .map(|binding| binding.tag.to_string())
+            .collect();
+
+        assert_eq!(tags, vec!["auth".to_string(), "partner".to_string()]);
     }
 
     #[test]
-    fn does_not_find_a_middleware_tag_as_an_endpoint() {
+    fn excludes_a_middleware_tag_from_jwks_client_bindings() {
         let pool =
-            pool_for("#[handles_middleware_attribute(attribute = jwks)]\nstruct RequestLog;\n")
+            pool_for("#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n")
                 .expect("the pool collects");
 
-        assert!(pool.endpoint(&tag("jwks")).is_none());
-    }
-
-    #[test]
-    fn does_not_find_an_absent_endpoint_tag() {
-        let pool = pool_for("#[provides_endpoint(issuer)]\nstruct IssuerEndpoint;\n")
-            .expect("the pool collects");
-
-        assert!(pool.endpoint(&tag("jwks")).is_none());
+        assert!(pool.jwks_client_bindings().is_empty());
     }
 
     #[test]
@@ -225,44 +230,44 @@ mod tests {
 
     #[test]
     fn reports_an_unknown_tag() {
-        let pool = pool_for("#[provides_endpoint(jwks)]\nstruct JwksEndpoint;\n")
+        let pool = pool_for("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n")
             .expect("the pool collects");
 
         assert!(
-            pool.resolve(&tag("missing"), TagKind::Endpoint, "the site")
+            pool.resolve(&tag("missing"), TagKind::JwksClient, "the site")
                 .expect_err("the tag is unknown")
                 .to_string()
-                .contains("no endpoint provider declares")
+                .contains("no jwks endpoint provider declares")
         );
     }
 
     #[test]
     fn reports_a_tag_of_the_wrong_kind() {
-        let pool = pool_for("#[provides_endpoint(jwks)]\nstruct JwksEndpoint;\n")
+        let pool = pool_for("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n")
             .expect("the pool collects");
 
         assert!(
             pool.resolve(&tag("jwks"), TagKind::Middleware, "the site")
                 .expect_err("the tag is the wrong kind")
                 .to_string()
-                .contains("is a endpoint provider, not a middleware handler")
+                .contains("is a jwks endpoint provider, not a middleware handler")
         );
     }
 
     #[test]
-    fn rejects_a_tag_declared_by_both_an_endpoint_and_a_middleware() {
+    fn rejects_a_tag_declared_by_both_a_jwks_endpoint_and_a_middleware() {
         assert!(
             error_for(
-                "#[provides_endpoint(shared)]\nstruct Endpoint;\n\n#[handles_middleware_attribute(attribute = shared)]\nstruct Handler;\n",
+                "#[provides_jwks_endpoint(shared)]\nstruct Endpoint;\n\n#[handles_middleware_attribute(attribute = shared)]\nstruct Handler;\n",
             )
             .contains("declared more than once")
         );
     }
 
     #[test]
-    fn rejects_an_endpoint_provider_without_a_tag() {
+    fn rejects_a_jwks_endpoint_without_a_tag() {
         assert!(
-            error_for("#[provides_endpoint]\nstruct JwksEndpoint;\n")
+            error_for("#[provides_jwks_endpoint]\nstruct JwksEndpoint;\n")
                 .contains("does not name a tag")
         );
     }
@@ -278,7 +283,7 @@ mod tests {
     #[test]
     fn rejects_a_tag_that_is_not_a_plain_name() {
         assert!(
-            error_for("#[provides_endpoint(endpoints::jwks)]\nstruct JwksEndpoint;\n")
+            error_for("#[provides_jwks_endpoint(endpoints::jwks)]\nstruct JwksEndpoint;\n")
                 .contains("not a single plain name")
         );
     }
@@ -296,7 +301,7 @@ mod tests {
     #[test]
     fn reports_unparseable_attribute_arguments() {
         assert!(
-            error_for("#[provides_endpoint(= 5)]\nstruct JwksEndpoint;\n")
+            error_for("#[provides_jwks_endpoint(= 5)]\nstruct JwksEndpoint;\n")
                 .contains("failed to index")
         );
     }

@@ -3,11 +3,11 @@ use url::Url;
 
 use margaret_endpoint::endpoint_error::EndpointError;
 use margaret_endpoint::provides_endpoint::ProvidesEndpoint;
-use margaret_macros::provides_endpoint;
+use margaret_macros::provides_jwks_endpoint;
 use margaret_macros::singleton;
 
 #[singleton]
-#[provides_endpoint(jwks)]
+#[provides_jwks_endpoint(auth)]
 pub struct JwksEndpoint;
 
 #[async_trait]

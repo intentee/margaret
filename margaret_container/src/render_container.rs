@@ -1,7 +1,6 @@
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-use margaret_tag_codegen::tag_pool::TagPool;
 
 use crate::build_plan::build_plan;
 use crate::console_closures::ConsoleClosures;
@@ -18,8 +17,7 @@ pub fn render_container(
     registry: &ConsoleArgumentRegistry,
     framework_providers: &[FrameworkProvider],
 ) -> Result<RenderedContainer, ContainerError> {
-    let tag_pool = TagPool::collect(index)?;
-    let plan = build_plan(index, registry, framework_providers, &tag_pool)?;
+    let plan = build_plan(index, registry, framework_providers)?;
 
     topological_order(&plan.providers)?;
 

@@ -11,6 +11,7 @@ mod field_ident;
 pub mod framework_construction;
 pub mod framework_dependency;
 pub mod framework_enablement;
+pub mod framework_injection_role;
 pub mod framework_provider;
 pub mod injectable_resolution;
 pub mod injected_dependency;

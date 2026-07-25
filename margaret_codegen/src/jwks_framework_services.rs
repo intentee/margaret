@@ -5,6 +5,7 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_jwks_codegen::jwks_roll_interval_path::jwks_roll_interval_path;
 use margaret_service_codegen::framework_service::FrameworkService;
 use margaret_service_codegen::framework_service_kind::FrameworkServiceKind;
+use margaret_tag_codegen::jwks_client_binding::JwksClientBinding;
 
 use crate::jwks_client_path::jwks_client_canonical_path;
 use crate::jwks_roller_path::jwks_roller_canonical_path;
@@ -16,9 +17,11 @@ fn framework_adapter_name(path: &CanonicalPath) -> String {
         .collect()
 }
 
-pub(crate) fn jwks_framework_services(bindings: &ContainerBindings) -> Vec<FrameworkService> {
+pub(crate) fn jwks_framework_services(
+    bindings: &ContainerBindings,
+    client_bindings: &[JwksClientBinding],
+) -> Vec<FrameworkService> {
     let roller = jwks_roller_canonical_path();
-    let client = jwks_client_canonical_path();
     let mut services = Vec::new();
 
     if bindings.provides(&roller) {
@@ -35,7 +38,8 @@ pub(crate) fn jwks_framework_services(bindings: &ContainerBindings) -> Vec<Frame
         });
     }
 
-    if bindings.provides(&client) {
+    for binding in client_bindings {
+        let client = jwks_client_canonical_path(&binding.tag);
         let type_name = framework_adapter_name(&client);
 
         services.push(FrameworkService {

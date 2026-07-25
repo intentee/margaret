@@ -1,0 +1,19 @@
+[package]
+name = "margaret_jwks_secret_store"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = { workspace = true }
+margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
+margaret_token_signer = { path = "../margaret_token_signer" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+margaret_identity_session = { path = "../margaret_identity_session" }
+margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

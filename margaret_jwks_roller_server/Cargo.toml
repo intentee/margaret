@@ -11,6 +11,7 @@ bytes = { workspace = true }
 margaret_http = { path = "../margaret_http" }
 margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
+margaret_jwks_secret_store = { path = "../margaret_jwks_secret_store" }
 margaret_sync_holder = { path = "../margaret_sync_holder" }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

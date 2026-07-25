@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "margaret_access_token_minter",
     "margaret_asset_bag",
     "margaret_asset_bag_codegen",
     "margaret_attributes",
@@ -37,6 +38,7 @@ members = [
     "margaret_jwks_roller_tests",
     "margaret_jwks_secret_storage_selection",
     "margaret_jwks_secret_storage_selection_tests",
+    "margaret_jwks_secret_store",
     "margaret_macros",
     "margaret_middleware_codegen",
     "margaret_model",

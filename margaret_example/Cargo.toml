@@ -9,6 +9,7 @@ async-trait = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 clap = { workspace = true }
 dashmap = { workspace = true }
+margaret_access_token_minter = { path = "../margaret_access_token_minter" }
 margaret_asset_bag = { path = "../margaret_asset_bag" }
 margaret_console = { path = "../margaret_console" }
 margaret_endpoint = { path = "../margaret_endpoint" }
@@ -20,6 +21,7 @@ margaret_jwks_client = { path = "../margaret_jwks_client" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
 margaret_jwks_roller_server = { path = "../margaret_jwks_roller_server" }
 margaret_jwks_secret_storage_selection = { path = "../margaret_jwks_secret_storage_selection" }
+margaret_jwks_secret_store = { path = "../margaret_jwks_secret_store" }
 margaret_macros = { path = "../margaret_macros" }
 margaret_model = { path = "../margaret_model" }
 margaret_service = { path = "../margaret_service" }

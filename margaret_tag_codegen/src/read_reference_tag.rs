@@ -30,30 +30,24 @@ mod tests {
 
     #[test]
     fn reads_a_single_plain_tag() {
-        let tag = read_reference_tag(&args(parse_quote!(#[endpoint_provider(jwks)])), "the site")
+        let tag = read_reference_tag(&args(parse_quote!(#[middleware(logged)])), "the site")
             .expect("the tag is read");
 
-        assert_eq!(tag.to_string(), "jwks");
+        assert_eq!(tag.to_string(), "logged");
     }
 
     #[test]
     fn rejects_a_reference_without_a_tag() {
-        assert!(read_reference_tag(&args(parse_quote!(#[endpoint_provider])), "the site").is_err());
+        assert!(read_reference_tag(&args(parse_quote!(#[middleware])), "the site").is_err());
     }
 
     #[test]
     fn rejects_a_reference_with_more_than_one_tag() {
-        assert!(
-            read_reference_tag(&args(parse_quote!(#[endpoint_provider(a, b)])), "the site")
-                .is_err()
-        );
+        assert!(read_reference_tag(&args(parse_quote!(#[middleware(a, b)])), "the site").is_err());
     }
 
     #[test]
     fn rejects_a_reference_that_is_not_a_plain_name() {
-        assert!(
-            read_reference_tag(&args(parse_quote!(#[endpoint_provider(a::b)])), "the site")
-                .is_err()
-        );
+        assert!(read_reference_tag(&args(parse_quote!(#[middleware(a::b)])), "the site").is_err());
     }
 }

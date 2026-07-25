@@ -1,4 +1,4 @@
-#[provides_endpoint(jwks)]
+#[provides_jwks_endpoint(jwks)]
 #[singleton]
 struct JwksEndpoint;
 

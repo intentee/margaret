@@ -1,6 +1,7 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_enablement::FrameworkEnablement;
+use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 
 use crate::jwks_secret_storage_path::jwks_secret_storage_canonical_path;
@@ -30,6 +31,7 @@ pub(crate) fn jwks_secret_storage_provider() -> FrameworkProvider {
             ]),
         },
         enablement: FrameworkEnablement::WhenReferenced,
+        injection: FrameworkInjectionRole::Unmarked,
         provided: jwks_secret_storage_canonical_path(),
     }
 }
