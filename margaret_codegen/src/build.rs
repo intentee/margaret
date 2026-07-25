@@ -519,8 +519,11 @@ impl PostMint {
         let code = generate(JWKS_ROLLER_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod jwks;"));
-        assert!(module(&code, "jwks")
-            .contains("pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;"));
+        assert!(
+            module(&code, "jwks").contains(
+                "pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;"
+            )
+        );
         assert!(module(&code, "jwks").contains(
             "pub use margaret::framework::jwks_roller_server::public_jwks_handler::PublicJwksHandler;"
         ));
@@ -534,7 +537,9 @@ impl PostMint {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains("impltrzcina::TickerforCrateMargaretJwksJwksRoller"));
-        assert!(serve.contains("margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"));
+        assert!(serve.contains(
+            "margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"
+        ));
         assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
 
@@ -545,8 +550,10 @@ impl PostMint {
         assert!(module(&code, "mod").contains("pub mod jwks;"));
         assert!(module(&code, "jwks").contains("pub mod auth;"));
         assert!(module(&code, "jwks").contains("pub mod partner;"));
-        assert!(module(&code, "jwks/auth")
-            .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;"));
+        assert!(
+            module(&code, "jwks/auth")
+                .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;")
+        );
         assert!(module(&code, "jwks/auth").contains(
             "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
@@ -568,10 +575,14 @@ impl PostMint {
     fn generates_the_server_secret_store_and_mint_handler_when_injected() {
         let code = generate(JWKS_SERVER_STORE_CRATE).expect("the build succeeds");
 
-        assert!(module(&code, "jwks")
-            .contains("pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;"));
-        assert!(module(&code, "jwks")
-            .contains("pub use margaret::framework::jwks_secret_store::jwks_secret_store::JwksSecretStore;"));
+        assert!(
+            module(&code, "jwks").contains(
+                "pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;"
+            )
+        );
+        assert!(module(&code, "jwks").contains(
+            "pub use margaret::framework::jwks_secret_store::jwks_secret_store::JwksSecretStore;"
+        ));
         assert!(module(&code, "jwks").contains(
             "pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
         ));
@@ -650,8 +661,8 @@ impl GetJwks {
 
     #[test]
     fn framework_jwks_names_do_not_collide_with_a_user_component_of_the_same_name() {
-        let code =
-            generate(JWKS_NAME_COLLISION_CRATE).expect("a user component named JwksRoller coexists");
+        let code = generate(JWKS_NAME_COLLISION_CRATE)
+            .expect("a user component named JwksRoller coexists");
 
         let container: String = module(&code, "container").split_whitespace().collect();
         assert!(container.contains("std::sync::Arc<crate::JwksRoller>"));

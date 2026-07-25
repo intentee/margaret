@@ -64,7 +64,10 @@ mod tests {
     async fn serves_the_rolled_document_after_a_run() {
         let roller = roller();
 
-        roller.run().await.expect("the first roll publishes a document");
+        roller
+            .run()
+            .await
+            .expect("the first roll publishes a document");
 
         assert_eq!(roller.public_jwks_handler().respond().status(), 200);
     }

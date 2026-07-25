@@ -9,7 +9,9 @@ use crate::websocket_codegen_error::WebSocketCodegenError;
 
 fn responds_to_message_path() -> CanonicalPath {
     CanonicalPath::new(vec![
-        "margaret".to_string(), "framework".to_string(), "websocket".to_string(),
+        "margaret".to_string(),
+        "framework".to_string(),
+        "websocket".to_string(),
         "responds_to_web_socket_message".to_string(),
         "RespondsToWebSocketMessage".to_string(),
     ])
@@ -17,7 +19,9 @@ fn responds_to_message_path() -> CanonicalPath {
 
 fn responds_to_notification_path() -> CanonicalPath {
     CanonicalPath::new(vec![
-        "margaret".to_string(), "framework".to_string(), "websocket".to_string(),
+        "margaret".to_string(),
+        "framework".to_string(),
+        "websocket".to_string(),
         "responds_to_web_socket_notification".to_string(),
         "RespondsToWebSocketNotification".to_string(),
     ])

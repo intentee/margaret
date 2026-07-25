@@ -41,8 +41,7 @@ mod tests {
     use crate::render_websocket::render_websocket;
     use crate::websocket_codegen_error::WebSocketCodegenError;
 
-    const REQUEST_TRAIT: &str =
-        "use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
+    const REQUEST_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
     const NOTIFICATION_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;\n";
 
     const FULL_SESSION: &str = r#"

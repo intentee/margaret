@@ -14,17 +14,23 @@ impl RequestInjectable {
     pub(crate) fn canonical_path(&self) -> CanonicalPath {
         match self {
             Self::AssetBag => CanonicalPath::new(vec![
-                "margaret".to_string(), "framework".to_string(), "asset_bag".to_string(),
+                "margaret".to_string(),
+                "framework".to_string(),
+                "asset_bag".to_string(),
                 "asset_bag".to_string(),
                 "AssetBag".to_string(),
             ]),
             Self::CurrentRequest => CanonicalPath::new(vec![
-                "margaret".to_string(), "framework".to_string(), "http".to_string(),
+                "margaret".to_string(),
+                "framework".to_string(),
+                "http".to_string(),
                 "request".to_string(),
                 "Request".to_string(),
             ]),
             Self::Next => CanonicalPath::new(vec![
-                "margaret".to_string(), "framework".to_string(), "http".to_string(),
+                "margaret".to_string(),
+                "framework".to_string(),
+                "http".to_string(),
                 "next".to_string(),
                 "Next".to_string(),
             ]),
@@ -40,7 +46,9 @@ impl RequestInjectable {
                 "Routes".to_string(),
             ]),
             Self::ValidationResult => CanonicalPath::new(vec![
-                "margaret".to_string(), "framework".to_string(), "validation".to_string(),
+                "margaret".to_string(),
+                "framework".to_string(),
+                "validation".to_string(),
                 "validation_result".to_string(),
                 "ValidationResult".to_string(),
             ]),
@@ -94,7 +102,13 @@ mod tests {
 
     #[test]
     fn matches_the_asset_bag_injectable_only_when_written_by_value() {
-        let asset_bag = path(&["margaret", "framework", "asset_bag", "asset_bag", "AssetBag"]);
+        let asset_bag = path(&[
+            "margaret",
+            "framework",
+            "asset_bag",
+            "asset_bag",
+            "AssetBag",
+        ]);
 
         assert!(RequestInjectable::AssetBag.matches(Some(&asset_bag), false));
         assert!(!RequestInjectable::AssetBag.matches(Some(&asset_bag), true));
@@ -111,7 +125,9 @@ mod tests {
     #[test]
     fn matches_the_validation_result_injectable_only_when_written_by_value() {
         let validation_result = path(&[
-            "margaret", "framework", "validation",
+            "margaret",
+            "framework",
+            "validation",
             "validation_result",
             "ValidationResult",
         ]);

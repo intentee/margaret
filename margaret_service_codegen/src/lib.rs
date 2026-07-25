@@ -176,7 +176,12 @@ mod tests {
     }
 
     fn canonical(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(segments.iter().map(|segment| (*segment).to_string()).collect())
+        CanonicalPath::new(
+            segments
+                .iter()
+                .map(|segment| (*segment).to_string())
+                .collect(),
+        )
     }
 
     #[test]
@@ -184,10 +189,18 @@ mod tests {
         let index = index_for("#[singleton]\nstruct Placeholder;\n");
         let framework_services = vec![
             FrameworkService {
-                concrete_path: canonical(&["margaret", "framework", "jwks_roller_server", "jwks_roller", "JwksRoller"]),
+                concrete_path: canonical(&[
+                    "margaret",
+                    "framework",
+                    "jwks_roller_server",
+                    "jwks_roller",
+                    "JwksRoller",
+                ]),
                 kind: FrameworkServiceKind::Ticker {
                     interval: canonical(&[
-                        "margaret", "framework", "jwks_roller_server",
+                        "margaret",
+                        "framework",
+                        "jwks_roller_server",
                         "jwks_roll_interval",
                         "JWKS_ROLL_INTERVAL",
                     ]),
@@ -197,7 +210,13 @@ mod tests {
                 type_name: "JwksRoller".to_string(),
             },
             FrameworkService {
-                concrete_path: canonical(&["margaret", "framework", "jwks_client", "jwks_client", "JwksClient"]),
+                concrete_path: canonical(&[
+                    "margaret",
+                    "framework",
+                    "jwks_client",
+                    "jwks_client",
+                    "JwksClient",
+                ]),
                 kind: FrameworkServiceKind::Service,
                 runner: "run".to_string(),
                 takes_token: true,
@@ -298,11 +317,9 @@ mod tests {
     fn binds_the_manager_immutably_when_no_services_are_registered() {
         let source = rendered("#[singleton]\nstruct Store;\n", &public());
 
-        assert!(
-            source.contains(
-                "letmanager=matchmargaret::framework::service::serve_application::serve_application("
-            )
-        );
+        assert!(source.contains(
+            "letmanager=matchmargaret::framework::service::serve_application::serve_application("
+        ));
         assert!(!source.contains("letmutmanager"));
     }
 
@@ -353,7 +370,11 @@ mod tests {
         assert!(source.contains(
             r#"Some("spiffe_mtls")=>{margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
         ));
-        assert!(source.contains("_=>margaret::framework::http::transport_config::TransportConfig::Plain,"));
+        assert!(
+            source.contains(
+                "_=>margaret::framework::http::transport_config::TransportConfig::Plain,"
+            )
+        );
         assert!(source.contains(
             "matchmargaret::framework::service::bundle_services::bundle_services(spiffe_bundle).await{Ok(services)=>bundle_services.extend(services),Err(outcome)=>returnoutcome,}"
         ));
@@ -405,11 +426,9 @@ mod tests {
         assert!(source.contains(
             r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#
         ));
-        assert!(
-            source.contains(
-                "margaret::framework::service::serve_application::serve_application(matches,servers,"
-            )
-        );
+        assert!(source.contains(
+            "margaret::framework::service::serve_application::serve_application(matches,servers,"
+        ));
     }
 
     #[test]

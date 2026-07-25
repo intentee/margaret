@@ -100,7 +100,10 @@ mod tests {
         }
     }
 
-    fn store_with_secret() -> (JwksSecretStore, margaret_jwks_keygen::jwks_secret::JwksSecret) {
+    fn store_with_secret() -> (
+        JwksSecretStore,
+        margaret_jwks_keygen::jwks_secret::JwksSecret,
+    ) {
         let secret = fresh_p256_secret();
         let holder = JwksSecretHolder::default();
 

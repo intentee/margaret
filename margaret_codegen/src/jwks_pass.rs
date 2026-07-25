@@ -37,10 +37,8 @@ pub(crate) fn jwks_pass(
 
     context.set_framework_services(jwks_framework_services(bindings, client_bindings));
 
-    let any_server = server.has_handler
-        || server.has_minter
-        || server.has_roller
-        || server.has_secret_store;
+    let any_server =
+        server.has_handler || server.has_minter || server.has_roller || server.has_secret_store;
     let any_client = !clients.is_empty();
 
     if any_server || any_client {

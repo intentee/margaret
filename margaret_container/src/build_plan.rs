@@ -57,7 +57,10 @@ fn build_drafts<'index>(
     let mut provider_drafts: Vec<Draft> = Vec::new();
 
     for matched in index.select(&singleton_selector()) {
-        if matched.item().has_attribute(&provides_jwks_endpoint_selector()) {
+        if matched
+            .item()
+            .has_attribute(&provides_jwks_endpoint_selector())
+        {
             continue;
         }
 
@@ -347,10 +350,7 @@ fn resolve_jwks_secret_store(
         })
 }
 
-fn injection_matches_target(
-    role: &FrameworkInjectionRole,
-    target: &JwksSecretStoreTarget,
-) -> bool {
+fn injection_matches_target(role: &FrameworkInjectionRole, target: &JwksSecretStoreTarget) -> bool {
     match (role, target) {
         (FrameworkInjectionRole::JwksServerStore, JwksSecretStoreTarget::Server) => true,
         (
@@ -585,9 +585,7 @@ fn resolve_framework_construction(construction: &FrameworkConstruction) -> Direc
     }
 }
 
-fn framework_provider_dependencies(
-    construction: &FrameworkConstruction,
-) -> Vec<&CanonicalPath> {
+fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<&CanonicalPath> {
     match construction {
         FrameworkConstruction::Accessor { source, .. } => vec![source],
         FrameworkConstruction::Constructor { dependencies, .. } => dependencies

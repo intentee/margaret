@@ -79,10 +79,14 @@ struct Author {
         assert!(source.contains("margaret::framework::model::table::Table"));
         assert!(source.contains("\"articles\""));
         assert!(source.contains("margaret::framework::model::column_type::ColumnType::Uuid"));
-        assert!(source.contains("margaret::framework::model::column_default::ColumnDefault::UuidV7"));
+        assert!(
+            source.contains("margaret::framework::model::column_default::ColumnDefault::UuidV7")
+        );
         assert!(source.contains("margaret::framework::model::column_type::ColumnType::Text"));
         assert!(source.contains("margaret::framework::model::column_type::ColumnType::Boolean"));
-        assert!(source.contains("margaret::framework::model::column_default::ColumnDefault::NotSet"));
+        assert!(
+            source.contains("margaret::framework::model::column_default::ColumnDefault::NotSet")
+        );
         assert!(source.contains("\"is_published\""));
         assert!(source.contains("\"note\""));
         assert!(source.contains("nullable:true"));
@@ -133,7 +137,9 @@ struct Second {
 
         assert!(source.contains("margaret::framework::model::foreign_key::ForeignKey"));
         assert!(source.contains("column:\"author_id\".to_string()"));
-        assert!(source.contains("on_delete:margaret::framework::model::on_delete::OnDelete::NoAction"));
+        assert!(
+            source.contains("on_delete:margaret::framework::model::on_delete::OnDelete::NoAction")
+        );
         assert!(source.contains("references_column:\"id\".to_string()"));
         assert!(source.contains("references_table:\"authors\".to_string()"));
         assert!(source.contains(
@@ -239,7 +245,9 @@ struct Second {
             "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = cascade)]\n    author: Author,\n}\n",
         ));
 
-        assert!(source.contains("on_delete:margaret::framework::model::on_delete::OnDelete::Cascade"));
+        assert!(
+            source.contains("on_delete:margaret::framework::model::on_delete::OnDelete::Cascade")
+        );
     }
 
     #[test]

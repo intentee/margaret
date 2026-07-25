@@ -349,7 +349,11 @@ impl GetAsset {
             .collect();
 
         assert!(source.contains("request_2:&margaret::framework::http::request::Request"));
-        assert!(source.contains("letrequest=::margaret::framework::asset_bag::asset_bag::AssetBag::new();"));
+        assert!(
+            source.contains(
+                "letrequest=::margaret::framework::asset_bag::asset_bag::AssetBag::new();"
+            )
+        );
         assert!(source.contains(
             "margaret::framework::http::require_route_parameter::require_route_parameter(request_2,\"id\",)"
         ));
@@ -732,9 +736,9 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     fn generates_a_forwardable_route_field_for_a_named_paramless_get() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
-        assert!(
-            source.contains("pubget_greeting:margaret::framework::http::forwardable_route::ForwardableRoute,")
-        );
+        assert!(source.contains(
+            "pubget_greeting:margaret::framework::http::forwardable_route::ForwardableRoute,"
+        ));
         assert!(source.contains(
             "get_greeting:margaret::framework::http::forwardable_route::ForwardableRoute::new(origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/greeting\",),]),)"
         ));
@@ -757,7 +761,11 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
     fn renders_a_named_non_get_route_as_a_plain_route_reference() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
-        assert!(source.contains("pubpost_ping:margaret::framework::http::route_reference::RouteReference,"));
+        assert!(
+            source.contains(
+                "pubpost_ping:margaret::framework::http::route_reference::RouteReference,"
+            )
+        );
         assert!(source.contains(
             "pubfnpatch_article(&self,article:String,)->margaret::framework::http::route_reference::RouteReference"
         ));
@@ -806,7 +814,9 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         assert!(source.contains(
             "|responder:std::sync::Arc<crate::GetPage>,_request:&margaret::framework::http::request::Request"
         ));
-        assert!(source.contains("letasset_bag=::margaret::framework::asset_bag::asset_bag::AssetBag::new();"));
+        assert!(source.contains(
+            "letasset_bag=::margaret::framework::asset_bag::asset_bag::AssetBag::new();"
+        ));
         assert!(source.contains("responder.respond(asset_bag).await"));
     }
 
@@ -816,7 +826,9 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "use spiffe::spiffe_id::SpiffeId;\n\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, peer: &SpiffeId) -> Response {}\n}\n",
         );
 
-        assert!(source.contains("margaret::framework::http::require_peer_spiffe_id::require_peer_spiffe_id("));
+        assert!(source.contains(
+            "margaret::framework::http::require_peer_spiffe_id::require_peer_spiffe_id("
+        ));
     }
 
     #[test]
@@ -1370,9 +1382,9 @@ impl GetGreeting {
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
         assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","));
-        assert!(
-            source.contains("margaret::framework::http::named_handler::NamedHandler::new(\"get_greeting\",")
-        );
+        assert!(source.contains(
+            "margaret::framework::http::named_handler::NamedHandler::new(\"get_greeting\","
+        ));
     }
 
     #[test]
@@ -1410,7 +1422,11 @@ impl GetGreeting {
         );
 
         assert!(source.contains("origin_2:::std::sync::Arc<str>,"));
-        assert!(source.contains("puborigin:margaret::framework::http::forwardable_route::ForwardableRoute,"));
+        assert!(
+            source.contains(
+                "puborigin:margaret::framework::http::forwardable_route::ForwardableRoute,"
+            )
+        );
         assert!(source.contains("self.origin_2.clone()"));
     }
 
@@ -1510,10 +1526,14 @@ impl GetMetrics {
             "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Form)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
+        assert!(source.contains(
+            "margaret::framework::http_validation::validate_input::validate_input(request,"
+        ));
         assert!(
-            source.contains("margaret::framework::http_validation::validate_input::validate_input(request,")
+            source.contains(
+                "margaret::framework::http_validation::request_input::RequestInput::Form"
+            )
         );
-        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Form"));
         assert!(source.contains("responder.respond(data).await"));
     }
 
@@ -1523,7 +1543,11 @@ impl GetMetrics {
             "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = Query)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
-        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Query"));
+        assert!(
+            source.contains(
+                "margaret::framework::http_validation::request_input::RequestInput::Query"
+            )
+        );
     }
 
     #[test]
@@ -1532,7 +1556,11 @@ impl GetMetrics {
             "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = Json)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
-        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Json"));
+        assert!(
+            source.contains(
+                "margaret::framework::http_validation::request_input::RequestInput::Json"
+            )
+        );
     }
 
     #[test]
@@ -1541,7 +1569,11 @@ impl GetMetrics {
             "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] data: ValidationResult<Data>) -> Response {}\n}\n",
         );
 
-        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Cookie"));
+        assert!(
+            source.contains(
+                "margaret::framework::http_validation::request_input::RequestInput::Cookie"
+            )
+        );
     }
 
     #[test]
@@ -1595,8 +1627,14 @@ impl GetMetrics {
             "#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Form)] data: Data) -> Response {}\n}\n",
         );
 
-        assert!(source.contains("margaret::framework::http_validation::require_input::require_input(request,"));
-        assert!(source.contains("margaret::framework::http_validation::request_input::RequestInput::Form"));
+        assert!(source.contains(
+            "margaret::framework::http_validation::require_input::require_input(request,"
+        ));
+        assert!(
+            source.contains(
+                "margaret::framework::http_validation::request_input::RequestInput::Form"
+            )
+        );
         assert!(source.contains("Ok(model)=>model"));
         assert!(source.contains("Err(response)=>returnresponse.into()"));
         assert!(source.contains("responder.respond(data).await"));
