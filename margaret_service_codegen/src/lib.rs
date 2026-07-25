@@ -4,6 +4,7 @@ pub mod has_services;
 pub mod render_services;
 pub mod serve_console_arguments;
 pub mod service_codegen_error;
+pub mod startup_singleton;
 
 mod service_kind;
 mod service_unit;

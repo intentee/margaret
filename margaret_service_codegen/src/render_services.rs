@@ -7,7 +7,6 @@ use quote::quote;
 use syn::Path;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
@@ -26,6 +25,7 @@ use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
 use crate::service_units::service_units;
+use crate::startup_singleton::StartupSingleton;
 
 fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
     if !spiffe_secured {
@@ -306,12 +306,13 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
 }
 
 fn startup_constructions(
-    startup_singletons: &[CanonicalPath],
+    startup_singletons: &[StartupSingleton],
     bindings: &ContainerBindings,
 ) -> TokenStream {
-    let constructions = startup_singletons.iter().map(|provided| {
-        let accessor = format_ident!("{}", provided.field_name());
-        let woven = bindings.console_weaves_owned(bindings.console_arguments(provided));
+    let constructions = startup_singletons.iter().map(|singleton| {
+        let accessor = format_ident!("{}", singleton.field_name);
+        let woven =
+            bindings.console_weaves_owned(bindings.console_arguments(&singleton.concrete_path));
 
         quote! {
             let _ = container.#accessor(#(#woven),*).await;
@@ -343,7 +344,7 @@ pub fn render_services(
         views_console_arguments,
     }: ServeConsoleArguments,
     framework_services: &[FrameworkService],
-    startup_singletons: &[CanonicalPath],
+    startup_singletons: &[StartupSingleton],
 ) -> Result<GeneratedModuleTokens, ServiceCodegenError> {
     let mut units = service_units(index)?;
 

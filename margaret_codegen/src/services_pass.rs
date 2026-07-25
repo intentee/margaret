@@ -1,7 +1,7 @@
-use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_service_codegen::serve_console_arguments::ServeConsoleArguments;
+use margaret_service_codegen::startup_singleton::StartupSingleton;
 
 use crate::build_context::BuildContext;
 use crate::codegen_error::CodegenError;
@@ -17,11 +17,14 @@ pub(crate) fn services_pass(
     }
 
     let postgres_pool_path = postgres_pool_canonical_path();
-    let startup_singletons: Vec<CanonicalPath> = if bindings.provides(&postgres_pool_path) {
-        vec![postgres_pool_path]
-    } else {
-        Vec::new()
-    };
+    let startup_singletons: Vec<StartupSingleton> = bindings
+        .provider(&postgres_pool_path)
+        .map(|binding| StartupSingleton {
+            concrete_path: postgres_pool_path.clone(),
+            field_name: binding.field_name.clone(),
+        })
+        .into_iter()
+        .collect();
 
     let module = margaret_service_codegen::render_services::render_services(
         context.index(),
