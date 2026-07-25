@@ -82,7 +82,28 @@ fn construction(
         closures,
     );
 
-    quote! { std::sync::Arc::new(#value) }
+    match &provider.construction {
+        DirectConstruction::FrameworkAccessor { .. } => value,
+        DirectConstruction::Constructor { .. } | DirectConstruction::Fieldless { .. } => {
+            quote! { std::sync::Arc::new(#value) }
+        }
+    }
+}
+
+fn framework_accessor_value(
+    accessor: &str,
+    dependencies: &[DependencyKind],
+    plan: &ContainerPlan,
+    closures: &ConsoleClosures,
+) -> TokenStream {
+    let mut ledger = ConsoleWeaveLedger::new(&body_slot_uses(dependencies, closures));
+    let source_expressions: Vec<TokenStream> = dependencies
+        .iter()
+        .map(|dependency| dependency_expression(dependency, plan, closures, &mut ledger))
+        .collect();
+    let accessor_method = format_ident!("{accessor}");
+
+    quote! { #(#source_expressions)*.#accessor_method() }
 }
 
 fn direct_value(
@@ -113,6 +134,10 @@ fn direct_value(
             }
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
+        DirectConstruction::FrameworkAccessor {
+            accessor,
+            dependencies,
+        } => framework_accessor_value(accessor, dependencies, plan, closures),
     }
 }
 

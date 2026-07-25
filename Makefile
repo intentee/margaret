@@ -21,6 +21,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_injection_codegen \
 	-p margaret_jwks_client \
 	-p margaret_jwks_client_tests \
+	-p margaret_jwks_codegen \
 	-p margaret_jwks_keygen \
 	-p margaret_jwks_keygen_tests \
 	-p margaret_jwks_roller \
@@ -110,6 +111,7 @@ coverage: node_modules postgres-image
 		--gated margaret_injection_codegen=100 \
 		--gated margaret_jwks_client=100 \
 		--gated margaret_jwks_client_tests=100 \
+		--gated margaret_jwks_codegen=100 \
 		--gated margaret_jwks_keygen=100 \
 		--gated margaret_jwks_keygen_tests=100 \
 		--gated margaret_jwks_roller=100 \

@@ -8,6 +8,7 @@ pub(crate) fn umbrella(
         has_authenticated_users,
         has_console,
         has_http,
+        has_jwks,
         has_middleware,
         has_models,
         has_views,
@@ -20,6 +21,10 @@ pub(crate) fn umbrella(
 
     if has_asset_bag {
         source.push_str("#[rustfmt::skip]\npub mod asset_bag;\n");
+    }
+
+    if has_jwks {
+        source.push_str("#[rustfmt::skip]\npub mod jwks;\n");
     }
 
     if has_authenticated_users && serves_http {

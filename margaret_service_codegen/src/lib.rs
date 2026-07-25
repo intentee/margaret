@@ -1,5 +1,8 @@
+pub mod framework_service;
+pub mod framework_service_kind;
 pub mod has_services;
 pub mod render_services;
+pub mod serve_console_arguments;
 pub mod service_codegen_error;
 
 mod service_kind;
@@ -26,8 +29,11 @@ mod tests {
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 
+    use crate::framework_service::FrameworkService;
+    use crate::framework_service_kind::FrameworkServiceKind;
     use crate::has_services::has_services;
     use crate::render_services::render_services;
+    use crate::serve_console_arguments::ServeConsoleArguments;
 
     fn crate_with(lib_source: &str) -> TempDir {
         let directory = tempdir().expect("a temporary crate directory is created");
@@ -85,8 +91,11 @@ mod tests {
             servers,
             has_views,
             &bindings,
-            &serve_arguments,
-            &BTreeMap::new(),
+            ServeConsoleArguments {
+                serve_arguments: &serve_arguments,
+                server_console_arguments: &BTreeMap::new(),
+                views_console_arguments: &[],
+            },
             &[],
         )
         .expect("the services source is generated")
@@ -113,8 +122,11 @@ mod tests {
             &[],
             false,
             &placeholder,
-            &[],
-            &BTreeMap::new(),
+            ServeConsoleArguments {
+                serve_arguments: &[],
+                server_console_arguments: &BTreeMap::new(),
+                views_console_arguments: &[],
+            },
             &[],
         )
         .expect_err("the services source fails to generate")
@@ -161,6 +173,68 @@ mod tests {
         ));
         assert!(source.contains("_tick_context:trzcina::TickContext"));
         assert!(source.contains("self.inner.run().await.map_err(anyhow::Error::from)"));
+    }
+
+    fn canonical(segments: &[&str]) -> CanonicalPath {
+        CanonicalPath::new(segments.iter().map(|segment| (*segment).to_string()).collect())
+    }
+
+    #[test]
+    fn renders_framework_ticker_and_service_adapters_beside_user_units() {
+        let index = index_for("#[singleton]\nstruct Placeholder;\n");
+        let framework_services = vec![
+            FrameworkService {
+                concrete_path: canonical(&["margaret_jwks_roller_server", "jwks_roller", "JwksRoller"]),
+                kind: FrameworkServiceKind::Ticker {
+                    interval: canonical(&[
+                        "margaret_jwks_roller_server",
+                        "jwks_roll_interval",
+                        "JWKS_ROLL_INTERVAL",
+                    ]),
+                },
+                runner: "run".to_string(),
+                takes_token: false,
+                type_name: "JwksRoller".to_string(),
+            },
+            FrameworkService {
+                concrete_path: canonical(&["margaret_jwks_client", "jwks_client", "JwksClient"]),
+                kind: FrameworkServiceKind::Service,
+                runner: "run".to_string(),
+                takes_token: true,
+                type_name: "JwksClient".to_string(),
+            },
+        ];
+        let source: String = render_services(
+            &index,
+            &public(),
+            false,
+            &bindings(&index),
+            ServeConsoleArguments {
+                serve_arguments: &[],
+                server_console_arguments: &BTreeMap::new(),
+                views_console_arguments: &[],
+            },
+            &framework_services,
+        )
+        .expect("the services source is generated")
+        .format()
+        .expect("the module formats")
+        .source()
+        .split_whitespace()
+        .collect();
+
+        assert!(source.contains("impltrzcina::TickerforJwksRoller"));
+        assert!(source.contains(
+            "fntick_interval(&self)->std::time::Duration{margaret_jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL}"
+        ));
+        assert!(source.contains(
+            "manager.register_service(JwksRoller{inner:container.jwks_roller_jwks_roller().await"
+        ));
+        assert!(source.contains("impltrzcina::ServiceforJwksClient"));
+        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
+        assert!(source.contains(
+            "manager.register_service(JwksClient{inner:container.jwks_client_jwks_client().await"
+        ));
     }
 
     #[test]

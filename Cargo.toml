@@ -26,6 +26,7 @@ members = [
     "margaret_injection_codegen",
     "margaret_jwks_client",
     "margaret_jwks_client_tests",
+    "margaret_jwks_codegen",
     "margaret_jwks_keygen",
     "margaret_jwks_keygen_tests",
     "margaret_jwks_roller",

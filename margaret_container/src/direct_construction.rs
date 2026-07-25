@@ -11,12 +11,17 @@ pub(crate) enum DirectConstruction {
     Fieldless {
         shape: StructShape,
     },
+    FrameworkAccessor {
+        accessor: String,
+        dependencies: Vec<DependencyKind>,
+    },
 }
 
 impl DirectConstruction {
     pub(crate) fn dependencies(&self) -> &[DependencyKind] {
         match self {
-            DirectConstruction::Constructor { dependencies, .. } => dependencies,
+            DirectConstruction::Constructor { dependencies, .. }
+            | DirectConstruction::FrameworkAccessor { dependencies, .. } => dependencies,
             DirectConstruction::Fieldless { .. } => &[],
         }
     }

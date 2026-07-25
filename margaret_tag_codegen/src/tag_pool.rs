@@ -85,6 +85,17 @@ impl TagPool {
         Ok(Self { entries })
     }
 
+    #[must_use]
+    pub fn endpoint(&self, tag: &Tag) -> Option<&CanonicalPath> {
+        match self.entries.get(tag) {
+            Some(TagEntry {
+                concrete,
+                kind: TagKind::Endpoint,
+            }) => Some(concrete),
+            _ => None,
+        }
+    }
+
     pub fn resolve(
         &self,
         tag: &Tag,
@@ -166,6 +177,36 @@ mod tests {
                 .to_string(),
             "crate::JwksEndpoint"
         );
+    }
+
+    #[test]
+    fn finds_an_endpoint_tag_by_name() {
+        let pool = pool_for("#[provides_endpoint(jwks)]\nstruct JwksEndpoint;\n")
+            .expect("the pool collects");
+
+        assert_eq!(
+            pool.endpoint(&tag("jwks"))
+                .expect("the endpoint tag is present")
+                .to_string(),
+            "crate::JwksEndpoint"
+        );
+    }
+
+    #[test]
+    fn does_not_find_a_middleware_tag_as_an_endpoint() {
+        let pool =
+            pool_for("#[handles_middleware_attribute(attribute = jwks)]\nstruct RequestLog;\n")
+                .expect("the pool collects");
+
+        assert!(pool.endpoint(&tag("jwks")).is_none());
+    }
+
+    #[test]
+    fn does_not_find_an_absent_endpoint_tag() {
+        let pool = pool_for("#[provides_endpoint(issuer)]\nstruct IssuerEndpoint;\n")
+            .expect("the pool collects");
+
+        assert!(pool.endpoint(&tag("jwks")).is_none());
     }
 
     #[test]
