@@ -1,0 +1,70 @@
+[package]
+name = "margaret"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+margaret_access_token_minter = { path = "../margaret_access_token_minter", optional = true }
+margaret_asset_bag = { path = "../margaret_asset_bag", optional = true }
+margaret_codegen = { path = "../margaret_codegen", optional = true }
+margaret_console = { path = "../margaret_console", optional = true }
+margaret_http = { path = "../margaret_http", optional = true }
+margaret_http_validation = { path = "../margaret_http_validation", optional = true }
+margaret_identity = { path = "../margaret_identity", optional = true }
+margaret_identity_session = { path = "../margaret_identity_session", optional = true }
+margaret_jwks_client = { path = "../margaret_jwks_client", optional = true }
+margaret_jwks_endpoint = { path = "../margaret_jwks_endpoint", optional = true }
+margaret_jwks_file_secret_storage = { path = "../margaret_jwks_file_secret_storage", optional = true }
+margaret_jwks_keygen = { path = "../margaret_jwks_keygen", optional = true }
+margaret_jwks_roller = { path = "../margaret_jwks_roller", optional = true }
+margaret_jwks_roller_server = { path = "../margaret_jwks_roller_server", optional = true }
+margaret_jwks_secret_storage_selection = { path = "../margaret_jwks_secret_storage_selection", optional = true }
+margaret_jwks_secret_store = { path = "../margaret_jwks_secret_store", optional = true }
+margaret_macros = { path = "../margaret_macros", optional = true }
+margaret_model = { path = "../margaret_model", optional = true }
+margaret_peer_identity = { path = "../margaret_peer_identity", optional = true }
+margaret_service = { path = "../margaret_service", optional = true }
+margaret_spiffe_svid = { path = "../margaret_spiffe_svid", optional = true }
+margaret_spiffe_svid_client = { path = "../margaret_spiffe_svid_client", optional = true }
+margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server", optional = true }
+margaret_sync_holder = { path = "../margaret_sync_holder", optional = true }
+margaret_token_signer = { path = "../margaret_token_signer", optional = true }
+margaret_validation = { path = "../margaret_validation", optional = true }
+margaret_views = { path = "../margaret_views", optional = true }
+margaret_websocket = { path = "../margaret_websocket", optional = true }
+
+[features]
+default = ["runtime"]
+codegen = ["dep:margaret_codegen"]
+runtime = [
+    "dep:margaret_access_token_minter",
+    "dep:margaret_asset_bag",
+    "dep:margaret_console",
+    "dep:margaret_http",
+    "dep:margaret_http_validation",
+    "dep:margaret_identity",
+    "dep:margaret_identity_session",
+    "dep:margaret_jwks_client",
+    "dep:margaret_jwks_endpoint",
+    "dep:margaret_jwks_file_secret_storage",
+    "dep:margaret_jwks_keygen",
+    "dep:margaret_jwks_roller",
+    "dep:margaret_jwks_roller_server",
+    "dep:margaret_jwks_secret_storage_selection",
+    "dep:margaret_jwks_secret_store",
+    "dep:margaret_macros",
+    "dep:margaret_model",
+    "dep:margaret_peer_identity",
+    "dep:margaret_service",
+    "dep:margaret_spiffe_svid",
+    "dep:margaret_spiffe_svid_client",
+    "dep:margaret_spiffe_svid_server",
+    "dep:margaret_sync_holder",
+    "dep:margaret_token_signer",
+    "dep:margaret_validation",
+    "dep:margaret_views",
+    "dep:margaret_websocket",
+]
+
+[lints]
+workspace = true

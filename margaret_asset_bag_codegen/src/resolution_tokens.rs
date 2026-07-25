@@ -13,7 +13,7 @@ pub(crate) fn resolution_tokens(
     let file = file.into_tokens();
 
     quote! {
-        ::margaret_asset_bag::asset_resolution::AssetResolution::new(#bundle, #image, #file)
+        ::margaret::framework::asset_bag::asset_resolution::AssetResolution::new(#bundle, #image, #file)
     }
 }
 
@@ -38,10 +38,10 @@ mod tests {
         assert_eq!(
             tokens.to_string(),
             quote! {
-                ::margaret_asset_bag::asset_resolution::AssetResolution::new(
+                ::margaret::framework::asset_bag::asset_resolution::AssetResolution::new(
                     BUNDLE,
                     IMAGE,
-                    ::margaret_asset_bag::absent::Absent
+                    ::margaret::framework::asset_bag::absent::Absent
                 )
             }
             .to_string()

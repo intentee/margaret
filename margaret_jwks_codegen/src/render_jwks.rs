@@ -11,12 +11,12 @@ use crate::jwks_server_module::JwksServerModule;
 fn client_submodule_tokens(client: &JwksClientModule) -> TokenStream {
     let client_use = client.has_client.then(|| {
         quote! {
-            pub use margaret_jwks_client::jwks_client::JwksClient;
+            pub use margaret::framework::jwks_client::jwks_client::JwksClient;
         }
     });
     let verifier_use = client.has_verifier.then(|| {
         quote! {
-            pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
+            pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;
         }
     });
 
@@ -26,22 +26,22 @@ fn client_submodule_tokens(client: &JwksClientModule) -> TokenStream {
 fn server_root_tokens(server: &JwksServerModule) -> TokenStream {
     let roller = server.has_roller.then(|| {
         quote! {
-            pub use margaret_jwks_roller_server::jwks_roller::JwksRoller;
+            pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;
         }
     });
     let handler = server.has_handler.then(|| {
         quote! {
-            pub use margaret_jwks_roller_server::public_jwks_handler::PublicJwksHandler;
+            pub use margaret::framework::jwks_roller_server::public_jwks_handler::PublicJwksHandler;
         }
     });
     let secret_store = server.has_secret_store.then(|| {
         quote! {
-            pub use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
+            pub use margaret::framework::jwks_secret_store::jwks_secret_store::JwksSecretStore;
         }
     });
     let minter = server.has_minter.then(|| {
         quote! {
-            pub use margaret_access_token_minter::mint_access_token_handler::MintAccessTokenHandler;
+            pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;
         }
     });
 
@@ -137,15 +137,15 @@ mod tests {
         };
         let source = module_source(render_jwks(&server, &[]), "jwks");
 
-        assert!(source.contains("pub use margaret_jwks_roller_server::jwks_roller::JwksRoller;"));
+        assert!(source.contains("pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;"));
         assert!(source.contains(
-            "pub use margaret_jwks_roller_server::public_jwks_handler::PublicJwksHandler;"
+            "pub use margaret::framework::jwks_roller_server::public_jwks_handler::PublicJwksHandler;"
         ));
         assert!(
-            source.contains("pub use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;")
+            source.contains("pub use margaret::framework::jwks_secret_store::jwks_secret_store::JwksSecretStore;")
         );
         assert!(source.contains(
-            "pub use margaret_access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
+            "pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
         ));
     }
 
@@ -169,9 +169,9 @@ mod tests {
         let submodule = module_source(modules, "jwks/auth");
 
         assert!(root.contains("pub mod auth;"));
-        assert!(submodule.contains("pub use margaret_jwks_client::jwks_client::JwksClient;"));
+        assert!(submodule.contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;"));
         assert!(submodule.contains(
-            "pub use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;"
+            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
     }
 
@@ -199,7 +199,7 @@ mod tests {
             "jwks/auth",
         );
 
-        assert!(submodule.contains("pub use margaret_jwks_client::jwks_client::JwksClient;"));
+        assert!(submodule.contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;"));
         assert!(!submodule.contains("PublicJwksVerifier"));
     }
 

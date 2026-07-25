@@ -9,7 +9,7 @@ pub(crate) enum AssetSlot {
 impl AssetSlot {
     pub(crate) fn into_tokens(self) -> TokenStream {
         match self {
-            AssetSlot::Absent => quote! { ::margaret_asset_bag::absent::Absent },
+            AssetSlot::Absent => quote! { ::margaret::framework::asset_bag::absent::Absent },
             AssetSlot::Present(tokens) => tokens,
         }
     }

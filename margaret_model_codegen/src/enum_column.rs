@@ -63,8 +63,8 @@ pub(crate) fn enum_column(
     }
 
     Ok(Some(InferredColumn {
-        column_type: quote!(margaret_model::column_type::ColumnType::Text),
-        default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+        column_type: quote!(margaret::framework::model::column_type::ColumnType::Text),
+        default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
         nullable,
     }))
 }

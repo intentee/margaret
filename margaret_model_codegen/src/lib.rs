@@ -784,7 +784,7 @@ struct Book {
 
         assert_eq!(
             inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
         );
         assert!(!inferred.nullable);
     }
@@ -796,7 +796,7 @@ struct Book {
 
         assert_eq!(
             inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
         );
         assert!(inferred.nullable);
     }
@@ -809,7 +809,7 @@ struct Book {
             inferred_column(source, "articles", "previous_status")
                 .column_type
                 .to_string(),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
         );
     }
 

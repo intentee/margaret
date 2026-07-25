@@ -1,7 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 
-use margaret_macros::model;
+use margaret::framework::macros::model;
 
 #[model(table = "authors")]
 #[derive(Clone)]

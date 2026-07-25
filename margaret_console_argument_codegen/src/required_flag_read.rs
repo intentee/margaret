@@ -10,7 +10,7 @@ pub fn required_flag_read(
     quote! {
         match matches.get_one::<#value_type>(#id) {
             Some(value) => #present,
-            None => return margaret_console::command_outcome::CommandOutcome::Failed,
+            None => return margaret::framework::console::command_outcome::CommandOutcome::Failed,
         }
     }
 }

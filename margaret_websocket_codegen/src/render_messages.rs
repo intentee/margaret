@@ -12,27 +12,27 @@ fn render_request_message(path: &CanonicalPath, cardinality: &MessageCardinality
     let message = path_tokens(path);
     let envelope = match cardinality {
         MessageCardinality::Single => {
-            quote! { margaret_websocket::request_envelope::RequestEnvelope<Self> }
+            quote! { margaret::framework::websocket::request_envelope::RequestEnvelope<Self> }
         }
         MessageCardinality::Stream => {
-            quote! { margaret_websocket::streaming_request_envelope::StreamingRequestEnvelope<Self> }
+            quote! { margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope<Self> }
         }
     };
     let construction = match cardinality {
         MessageCardinality::Single => {
-            quote! { margaret_websocket::request_envelope::RequestEnvelope::new(id, message) }
+            quote! { margaret::framework::websocket::request_envelope::RequestEnvelope::new(id, message) }
         }
         MessageCardinality::Stream => {
-            quote! { margaret_websocket::streaming_request_envelope::StreamingRequestEnvelope::new(id, message) }
+            quote! { margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope::new(id, message) }
         }
     };
 
     quote! {
-        impl margaret_websocket::web_socket_request_message::WebSocketRequestMessage for #message {
+        impl margaret::framework::websocket::web_socket_request_message::WebSocketRequestMessage for #message {
             type Envelope = #envelope;
 
             fn envelope(
-                id: margaret_websocket::request_id::RequestId,
+                id: margaret::framework::websocket::request_id::RequestId,
                 message: Self,
             ) -> Self::Envelope {
                 #construction
@@ -45,7 +45,7 @@ fn render_response_message(path: &CanonicalPath, method: &str) -> TokenStream {
     let message = path_tokens(path);
 
     quote! {
-        impl margaret_websocket::web_socket_response_message::WebSocketResponseMessage for #message {
+        impl margaret::framework::websocket::web_socket_response_message::WebSocketResponseMessage for #message {
             const METHOD: &'static str = #method;
         }
     }

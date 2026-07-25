@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 
 #[singleton]
 struct DnsResolver;

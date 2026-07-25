@@ -203,15 +203,15 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
         }
 
         #[async_trait::async_trait]
-        impl margaret_websocket::web_socket_session_factory::WebSocketSessionFactory for Factory {
+        impl margaret::framework::websocket::web_socket_session_factory::WebSocketSessionFactory for Factory {
             type Session = #session_path;
 
             async fn create(
                 &self,
-                #handshake: &margaret_http::request::Request,
+                #handshake: &margaret::framework::http::request::Request,
             ) -> ::std::result::Result<
                 ::std::sync::Arc<Self::Session>,
-                margaret_http::response_continuation::ResponseContinuation,
+                margaret::framework::http::response_continuation::ResponseContinuation,
             > {
                 #extractions
 
@@ -237,18 +237,18 @@ fn render_request_dispatch(binding: &HandlerBinding, session_path: &TokenStream)
         }
 
         #[async_trait::async_trait]
-        impl margaret_websocket::web_socket_message_dispatch::WebSocketMessageDispatch<#session_path>
+        impl margaret::framework::websocket::web_socket_message_dispatch::WebSocketMessageDispatch<#session_path>
             for #dispatch
         {
             async fn dispatch(
                 &self,
                 cancellation_token: tokio_util::sync::CancellationToken,
                 session: ::std::sync::Arc<#session_path>,
-                id: margaret_websocket::request_id::RequestId,
+                id: margaret::framework::websocket::request_id::RequestId,
                 params: serde_json::Value,
-                socket: margaret_websocket::web_socket::WebSocket,
+                socket: margaret::framework::websocket::web_socket::WebSocket,
             ) {
-                margaret_websocket::dispatch_request::dispatch_request(
+                margaret::framework::websocket::dispatch_request::dispatch_request(
                     &*self.handler,
                     cancellation_token,
                     session,
@@ -275,7 +275,7 @@ fn render_notification_dispatch(
         }
 
         #[async_trait::async_trait]
-        impl margaret_websocket::web_socket_notification_dispatch::WebSocketNotificationDispatch<#session_path>
+        impl margaret::framework::websocket::web_socket_notification_dispatch::WebSocketNotificationDispatch<#session_path>
             for #dispatch
         {
             async fn dispatch(
@@ -283,9 +283,9 @@ fn render_notification_dispatch(
                 cancellation_token: tokio_util::sync::CancellationToken,
                 session: ::std::sync::Arc<#session_path>,
                 params: serde_json::Value,
-                socket: margaret_websocket::web_socket::WebSocket,
+                socket: margaret::framework::websocket::web_socket::WebSocket,
             ) {
-                margaret_websocket::dispatch_notification::dispatch_notification(
+                margaret::framework::websocket::dispatch_notification::dispatch_notification(
                     &*self.handler,
                     cancellation_token,
                     session,
@@ -361,12 +361,12 @@ fn render_dispatch_table(
             #container: &super::super::container::Container,
             #(#parameters)*
         ) -> ::std::sync::Arc<
-            margaret_websocket::web_socket_dispatch_table::WebSocketDispatchTable<#session_path>,
+            margaret::framework::websocket::web_socket_dispatch_table::WebSocketDispatchTable<#session_path>,
         > {
             let #requests_mutability #requests: ::std::collections::HashMap<
                 ::std::string::String,
                 ::std::sync::Arc<
-                    dyn margaret_websocket::web_socket_message_dispatch::WebSocketMessageDispatch<
+                    dyn margaret::framework::websocket::web_socket_message_dispatch::WebSocketMessageDispatch<
                         #session_path,
                     >,
                 >,
@@ -376,7 +376,7 @@ fn render_dispatch_table(
             let #notifications_mutability #notifications: ::std::collections::HashMap<
                 ::std::string::String,
                 ::std::sync::Arc<
-                    dyn margaret_websocket::web_socket_notification_dispatch::WebSocketNotificationDispatch<
+                    dyn margaret::framework::websocket::web_socket_notification_dispatch::WebSocketNotificationDispatch<
                         #session_path,
                     >,
                 >,
@@ -384,7 +384,7 @@ fn render_dispatch_table(
             #(#notification_inserts)*
 
             ::std::sync::Arc::new(
-                margaret_websocket::web_socket_dispatch_table::WebSocketDispatchTable::new(
+                margaret::framework::websocket::web_socket_dispatch_table::WebSocketDispatchTable::new(
                     #requests,
                     #notifications,
                 ),
@@ -430,9 +430,9 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
             container: &super::super::container::Container,
             #(#upgrade_parameters)*
             #routes_parameter
-        ) -> ::std::sync::Arc<dyn margaret_http::web_socket_upgrade::WebSocketUpgrade> {
+        ) -> ::std::sync::Arc<dyn margaret::framework::http::web_socket_upgrade::WebSocketUpgrade> {
             ::std::sync::Arc::new(
-                margaret_websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry::new(
+                margaret::framework::websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry::new(
                     Factory {
                         #initializers
                     },

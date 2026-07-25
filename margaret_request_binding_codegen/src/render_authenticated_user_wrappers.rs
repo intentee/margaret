@@ -65,12 +65,12 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     };
 
     let continuation_return = quote! {
-        return margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
+        return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
             response,
         )
     };
     let response_return = quote! {
-        return margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
+        return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
             response.into(),
         )
     };
@@ -97,13 +97,13 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
         }
 
         #[async_trait::async_trait]
-        impl margaret_identity::infers_authenticated_user::InfersAuthenticatedUser for #wrapper {
+        impl margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser for #wrapper {
             type User = #model;
 
             async fn infer(
                 &self,
-                #request_binding: &margaret_http::request::Request,
-            ) -> margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User> {
+                #request_binding: &margaret::framework::http::request::Request,
+            ) -> margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User> {
                 #(#extractions)*
                 self.inner.#method_name(#(#call_arguments),*).await
             }

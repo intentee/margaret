@@ -1,8 +1,8 @@
-use margaret_macros::renders_view;
-use margaret_macros::singleton;
-use margaret_views::maud::Markup;
-use margaret_views::maud::html;
-use margaret_views::renders_view::RendersView;
+use margaret::framework::macros::renders_view;
+use margaret::framework::macros::singleton;
+use margaret::framework::views::maud::Markup;
+use margaret::framework::views::maud::html;
+use margaret::framework::views::renders_view::RendersView;
 
 use crate::margaret::asset_bag::asset;
 

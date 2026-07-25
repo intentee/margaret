@@ -75,14 +75,14 @@ struct Author {
         let source = schema_source(ARTICLE);
 
         assert!(source.contains("pubfnschema()"));
-        assert!(source.contains("margaret_model::schema::Schema"));
-        assert!(source.contains("margaret_model::table::Table"));
+        assert!(source.contains("margaret::framework::model::schema::Schema"));
+        assert!(source.contains("margaret::framework::model::table::Table"));
         assert!(source.contains("\"articles\""));
-        assert!(source.contains("margaret_model::column_type::ColumnType::Uuid"));
-        assert!(source.contains("margaret_model::column_default::ColumnDefault::UuidV7"));
-        assert!(source.contains("margaret_model::column_type::ColumnType::Text"));
-        assert!(source.contains("margaret_model::column_type::ColumnType::Boolean"));
-        assert!(source.contains("margaret_model::column_default::ColumnDefault::NotSet"));
+        assert!(source.contains("margaret::framework::model::column_type::ColumnType::Uuid"));
+        assert!(source.contains("margaret::framework::model::column_default::ColumnDefault::UuidV7"));
+        assert!(source.contains("margaret::framework::model::column_type::ColumnType::Text"));
+        assert!(source.contains("margaret::framework::model::column_type::ColumnType::Boolean"));
+        assert!(source.contains("margaret::framework::model::column_default::ColumnDefault::NotSet"));
         assert!(source.contains("\"is_published\""));
         assert!(source.contains("\"note\""));
         assert!(source.contains("nullable:true"));
@@ -96,7 +96,7 @@ struct Author {
             schema_source("#[model(table = \"t\")]\nstruct S(#[column(name = \"value\")] i64);\n");
 
         assert!(source.contains("\"value\""));
-        assert!(source.contains("margaret_model::column_type::ColumnType::BigInt"));
+        assert!(source.contains("margaret::framework::model::column_type::ColumnType::BigInt"));
     }
 
     #[test]
@@ -131,13 +131,13 @@ struct Second {
             "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n",
         ));
 
-        assert!(source.contains("margaret_model::foreign_key::ForeignKey"));
+        assert!(source.contains("margaret::framework::model::foreign_key::ForeignKey"));
         assert!(source.contains("column:\"author_id\".to_string()"));
-        assert!(source.contains("on_delete:margaret_model::on_delete::OnDelete::NoAction"));
+        assert!(source.contains("on_delete:margaret::framework::model::on_delete::OnDelete::NoAction"));
         assert!(source.contains("references_column:\"id\".to_string()"));
         assert!(source.contains("references_table:\"authors\".to_string()"));
         assert!(source.contains(
-            "column_type:margaret_model::column_type::ColumnType::Uuid,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"author_id\".to_string(),nullable:false,"
+            "column_type:margaret::framework::model::column_type::ColumnType::Uuid,default:margaret::framework::model::column_default::ColumnDefault::NotSet,name:\"author_id\".to_string(),nullable:false,"
         ));
     }
 
@@ -157,7 +157,7 @@ struct Second {
         );
 
         assert!(source.contains(
-            "column_type:margaret_model::column_type::ColumnType::Text,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"tag_slug\".to_string(),nullable:false,"
+            "column_type:margaret::framework::model::column_type::ColumnType::Text,default:margaret::framework::model::column_default::ColumnDefault::NotSet,name:\"tag_slug\".to_string(),nullable:false,"
         ));
     }
 
@@ -197,7 +197,7 @@ struct Second {
             "#[model(table = \"files\")]\nstruct File {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    data: Vec<u8>,\n}\n",
         );
 
-        assert!(source.contains("margaret_model::column_type::ColumnType::Bytea"));
+        assert!(source.contains("margaret::framework::model::column_type::ColumnType::Bytea"));
     }
 
     #[test]
@@ -207,7 +207,7 @@ struct Second {
         );
 
         assert!(source.contains(
-            "column_type:margaret_model::column_type::ColumnType::Text,default:margaret_model::column_default::ColumnDefault::NotSet,name:\"status\".to_string(),nullable:false,"
+            "column_type:margaret::framework::model::column_type::ColumnType::Text,default:margaret::framework::model::column_default::ColumnDefault::NotSet,name:\"status\".to_string(),nullable:false,"
         ));
     }
 
@@ -218,7 +218,7 @@ struct Second {
         );
 
         assert!(source.contains(
-            "unique_constraints:vec![margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"email\".to_string()],}]"
+            "unique_constraints:vec![margaret::framework::model::unique_constraint::UniqueConstraint{columns:vec![\"email\".to_string()],}]"
         ));
     }
 
@@ -229,7 +229,7 @@ struct Second {
         ));
 
         assert!(source.contains(
-            "unique_constraints:vec![margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"author_id\".to_string()],}]"
+            "unique_constraints:vec![margaret::framework::model::unique_constraint::UniqueConstraint{columns:vec![\"author_id\".to_string()],}]"
         ));
     }
 
@@ -239,7 +239,7 @@ struct Second {
             "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = cascade)]\n    author: Author,\n}\n",
         ));
 
-        assert!(source.contains("on_delete:margaret_model::on_delete::OnDelete::Cascade"));
+        assert!(source.contains("on_delete:margaret::framework::model::on_delete::OnDelete::Cascade"));
     }
 
     #[test]
@@ -249,7 +249,7 @@ struct Second {
         ));
 
         assert!(source.contains(
-            "unique_constraints:vec![margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"slug\".to_string()],},margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"author_id\".to_string()],}]"
+            "unique_constraints:vec![margaret::framework::model::unique_constraint::UniqueConstraint{columns:vec![\"slug\".to_string()],},margaret::framework::model::unique_constraint::UniqueConstraint{columns:vec![\"author_id\".to_string()],}]"
         ));
     }
 
@@ -260,7 +260,7 @@ struct Second {
         );
 
         assert!(source.contains(
-            "indexes:vec![margaret_model::index::Index{columns:vec![\"slug\".to_string()],name:\"posts_slug_index\".to_string(),}]"
+            "indexes:vec![margaret::framework::model::index::Index{columns:vec![\"slug\".to_string()],name:\"posts_slug_index\".to_string(),}]"
         ));
     }
 
@@ -271,7 +271,7 @@ struct Second {
         ));
 
         assert!(source.contains(
-            "indexes:vec![margaret_model::index::Index{columns:vec![\"author_id\".to_string()],name:\"articles_author_id_index\".to_string(),}]"
+            "indexes:vec![margaret::framework::model::index::Index{columns:vec![\"author_id\".to_string()],name:\"articles_author_id_index\".to_string(),}]"
         ));
     }
 
@@ -282,7 +282,7 @@ struct Second {
         );
 
         assert!(source.contains(
-            "indexes:vec![margaret_model::index::Index{columns:vec![\"kind\".to_string(),\"label\".to_string()],name:\"events_kind_label\".to_string(),}]"
+            "indexes:vec![margaret::framework::model::index::Index{columns:vec![\"kind\".to_string(),\"label\".to_string()],name:\"events_kind_label\".to_string(),}]"
         ));
     }
 
@@ -293,7 +293,7 @@ struct Second {
         ));
 
         assert!(source.contains(
-            "indexes:vec![margaret_model::index::Index{columns:vec![\"author_id\".to_string(),\"title\".to_string()],name:\"articles_author_title\".to_string(),}]"
+            "indexes:vec![margaret::framework::model::index::Index{columns:vec![\"author_id\".to_string(),\"title\".to_string()],name:\"articles_author_title\".to_string(),}]"
         ));
     }
 
@@ -304,10 +304,10 @@ struct Second {
         );
 
         assert!(source.contains(
-            "indexes:vec![margaret_model::index::Index{columns:vec![\"email\".to_string(),\"label\".to_string()],name:\"members_email_label\".to_string(),}]"
+            "indexes:vec![margaret::framework::model::index::Index{columns:vec![\"email\".to_string(),\"label\".to_string()],name:\"members_email_label\".to_string(),}]"
         ));
         assert!(source.contains(
-            "unique_constraints:vec![margaret_model::unique_constraint::UniqueConstraint{columns:vec![\"email\".to_string()],}]"
+            "unique_constraints:vec![margaret::framework::model::unique_constraint::UniqueConstraint{columns:vec![\"email\".to_string()],}]"
         ));
     }
 
@@ -318,7 +318,7 @@ struct Second {
         );
 
         assert!(source.contains(
-            "indexes:vec![margaret_model::index::Index{columns:vec![\"created_at\".to_string()],name:\"articles_created_at_index\".to_string(),},margaret_model::index::Index{columns:vec![\"slug\".to_string()],name:\"articles_slug_index\".to_string(),}]"
+            "indexes:vec![margaret::framework::model::index::Index{columns:vec![\"created_at\".to_string()],name:\"articles_created_at_index\".to_string(),},margaret::framework::model::index::Index{columns:vec![\"slug\".to_string()],name:\"articles_slug_index\".to_string(),}]"
         ));
     }
 }

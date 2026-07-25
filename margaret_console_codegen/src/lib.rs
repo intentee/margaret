@@ -172,7 +172,7 @@ impl Farewell {
             r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(false).requires("public-uploads")"#
         ));
         assert!(source.contains(
-            "margaret_service::dispatch_serve::dispatch_serve(margaret_service::install::install,|cancellation_token|super::serve::serve(container,matches,cancellation_token,),)"
+            "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|super::serve::serve(container,matches,cancellation_token,),)"
         ));
     }
 
@@ -311,7 +311,7 @@ impl Farewell {
             false,
         );
 
-        assert!(source.contains("letcancellation_token=matchmargaret_service::install::install()"));
+        assert!(source.contains("letcancellation_token=matchmargaret::framework::service::install::install()"));
         assert!(source.contains(".run(cancellation_token).await"));
     }
 

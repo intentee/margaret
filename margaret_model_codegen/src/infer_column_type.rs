@@ -22,41 +22,41 @@ fn base_column_type(ty: &Type) -> Option<InferredColumn> {
 
     match type_path.path.segments.last() {
         Some(segment) if segment.ident == "Uuid" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Uuid),
-            default: quote!(margaret_model::column_default::ColumnDefault::UuidV7),
+            column_type: quote!(margaret::framework::model::column_type::ColumnType::Uuid),
+            default: quote!(margaret::framework::model::column_default::ColumnDefault::UuidV7),
             nullable: false,
         }),
         Some(segment) if segment.ident == "String" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Text),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: quote!(margaret::framework::model::column_type::ColumnType::Text),
+            default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
             nullable: false,
         }),
         Some(segment) if segment.ident == "bool" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Boolean),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: quote!(margaret::framework::model::column_type::ColumnType::Boolean),
+            default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
             nullable: false,
         }),
         Some(segment) if segment.ident == "i32" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Integer),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: quote!(margaret::framework::model::column_type::ColumnType::Integer),
+            default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
             nullable: false,
         }),
         Some(segment) if segment.ident == "i64" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::BigInt),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: quote!(margaret::framework::model::column_type::ColumnType::BigInt),
+            default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
             nullable: false,
         }),
         Some(segment) if segment.ident == "DateTime" => Some(InferredColumn {
-            column_type: quote!(margaret_model::column_type::ColumnType::Timestamptz),
-            default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+            column_type: quote!(margaret::framework::model::column_type::ColumnType::Timestamptz),
+            default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
             nullable: false,
         }),
         Some(segment)
             if segment.ident == "Vec" && single_generic_argument(segment).is_some_and(is_u8) =>
         {
             Some(InferredColumn {
-                column_type: quote!(margaret_model::column_type::ColumnType::Bytea),
-                default: quote!(margaret_model::column_default::ColumnDefault::NotSet),
+                column_type: quote!(margaret::framework::model::column_type::ColumnType::Bytea),
+                default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
                 nullable: false,
             })
         }
@@ -115,11 +115,11 @@ mod tests {
 
         assert_eq!(
             inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Uuid).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Uuid).to_string()
         );
         assert_eq!(
             inferred.default.to_string(),
-            quote!(margaret_model::column_default::ColumnDefault::UuidV7).to_string()
+            quote!(margaret::framework::model::column_default::ColumnDefault::UuidV7).to_string()
         );
         assert!(!inferred.nullable);
     }
@@ -128,7 +128,7 @@ mod tests {
     fn infers_text_from_string() {
         assert_eq!(
             column_type("String"),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
         );
     }
 
@@ -136,7 +136,7 @@ mod tests {
     fn infers_boolean_from_bool() {
         assert_eq!(
             column_type("bool"),
-            quote!(margaret_model::column_type::ColumnType::Boolean).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Boolean).to_string()
         );
     }
 
@@ -144,7 +144,7 @@ mod tests {
     fn infers_integer_from_i32() {
         assert_eq!(
             column_type("i32"),
-            quote!(margaret_model::column_type::ColumnType::Integer).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Integer).to_string()
         );
     }
 
@@ -152,7 +152,7 @@ mod tests {
     fn infers_big_int_from_i64() {
         assert_eq!(
             column_type("i64"),
-            quote!(margaret_model::column_type::ColumnType::BigInt).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::BigInt).to_string()
         );
     }
 
@@ -162,11 +162,11 @@ mod tests {
 
         assert_eq!(
             inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Timestamptz).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Timestamptz).to_string()
         );
         assert_eq!(
             inferred.default.to_string(),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet).to_string()
+            quote!(margaret::framework::model::column_default::ColumnDefault::NotSet).to_string()
         );
         assert!(!inferred.nullable);
     }
@@ -178,11 +178,11 @@ mod tests {
         assert!(inferred.nullable);
         assert_eq!(
             inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Text).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
         );
         assert_eq!(
             inferred.default.to_string(),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet).to_string()
+            quote!(margaret::framework::model::column_default::ColumnDefault::NotSet).to_string()
         );
     }
 
@@ -192,11 +192,11 @@ mod tests {
 
         assert_eq!(
             inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Bytea).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Bytea).to_string()
         );
         assert_eq!(
             inferred.default.to_string(),
-            quote!(margaret_model::column_default::ColumnDefault::NotSet).to_string()
+            quote!(margaret::framework::model::column_default::ColumnDefault::NotSet).to_string()
         );
         assert!(!inferred.nullable);
     }
@@ -208,7 +208,7 @@ mod tests {
         assert!(inferred.nullable);
         assert_eq!(
             inferred.column_type.to_string(),
-            quote!(margaret_model::column_type::ColumnType::Bytea).to_string()
+            quote!(margaret::framework::model::column_type::ColumnType::Bytea).to_string()
         );
     }
 

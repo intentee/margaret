@@ -20,7 +20,7 @@ fn responder_arm(
     let output_path = format!("{assets_directory_name}/{tail}");
 
     quote! {
-        #tail => ::margaret_http::response::Response::static_bytes(
+        #tail => ::margaret::framework::http::response::Response::static_bytes(
             200,
             #resolved_content_type,
             ::core::include_bytes!(::core::concat!(
@@ -62,10 +62,10 @@ pub(crate) fn render_asset_responder(
 
         impl #type_identifier {
             #[must_use]
-            pub fn respond(&self, asset_path: &str) -> ::margaret_http::response::Response {
+            pub fn respond(&self, asset_path: &str) -> ::margaret::framework::http::response::Response {
                 match asset_path {
                     #(#arms)*
-                    _ => ::margaret_http::response::Response::not_found(),
+                    _ => ::margaret::framework::http::response::Response::not_found(),
                 }
             }
         }

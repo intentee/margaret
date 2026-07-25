@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
-use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret_macros::constructor;
-use margaret_macros::infer_from_request;
-use margaret_macros::infers_authenticated_user;
-use margaret_macros::singleton;
+use margaret::framework::http::response::Response;
+use margaret::framework::http::response_continuation::ResponseContinuation;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::macros::constructor;
+use margaret::framework::macros::infer_from_request;
+use margaret::framework::macros::infers_authenticated_user;
+use margaret::framework::macros::singleton;
 
 use crate::forms::session_cookie::SessionCookie;
 use crate::models::user::User;

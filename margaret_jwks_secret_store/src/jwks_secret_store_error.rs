@@ -14,6 +14,12 @@ pub enum JwksSecretStoreError {
         source: JwksKeyError,
     },
 
+    #[error("failed to verify a token against the signing secret: {source}")]
+    Verify {
+        #[source]
+        source: JwksKeyError,
+    },
+
     #[error("failed to mint an access token: {source}")]
     Mint {
         #[source]

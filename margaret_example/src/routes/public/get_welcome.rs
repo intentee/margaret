@@ -1,7 +1,7 @@
-use margaret_http::forward::Forward;
-use margaret_macros::process;
-use margaret_macros::responds_to_http;
-use margaret_macros::singleton;
+use margaret::framework::http::forward::Forward;
+use margaret::framework::macros::process;
+use margaret::framework::macros::responds_to_http;
+use margaret::framework::macros::singleton;
 
 use crate::margaret::forwarders::public::Forwarder;
 

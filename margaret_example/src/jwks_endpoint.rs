@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use url::Url;
 
-use margaret_jwks_endpoint::endpoint_error::EndpointError;
-use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
-use margaret_macros::provides_jwks_endpoint;
-use margaret_macros::singleton;
+use margaret::framework::jwks_endpoint::endpoint_error::EndpointError;
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::macros::provides_jwks_endpoint;
+use margaret::framework::macros::singleton;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]

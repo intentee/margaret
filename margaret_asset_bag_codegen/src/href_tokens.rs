@@ -5,10 +5,10 @@ use url::Url;
 pub(crate) fn href_tokens(path: &str) -> TokenStream {
     match Url::parse(path) {
         Ok(_absolute) => quote! {
-            ::margaret_asset_bag::asset_href::AssetHref::Absolute(#path)
+            ::margaret::framework::asset_bag::asset_href::AssetHref::Absolute(#path)
         },
         Err(_relative) => quote! {
-            ::margaret_asset_bag::asset_href::AssetHref::Local(#path)
+            ::margaret::framework::asset_bag::asset_href::AssetHref::Local(#path)
         },
     }
 }
@@ -23,7 +23,7 @@ mod tests {
     fn treats_a_relative_output_path_as_a_local_href() {
         assert_eq!(
             href_tokens("assets/app_ABC12345.js").to_string(),
-            quote! { ::margaret_asset_bag::asset_href::AssetHref::Local("assets/app_ABC12345.js") }
+            quote! { ::margaret::framework::asset_bag::asset_href::AssetHref::Local("assets/app_ABC12345.js") }
                 .to_string()
         );
     }
@@ -33,7 +33,7 @@ mod tests {
         assert_eq!(
             href_tokens("https://fonts.example/font.woff2").to_string(),
             quote! {
-                ::margaret_asset_bag::asset_href::AssetHref::Absolute("https://fonts.example/font.woff2")
+                ::margaret::framework::asset_bag::asset_href::AssetHref::Absolute("https://fonts.example/font.woff2")
             }
             .to_string()
         );
