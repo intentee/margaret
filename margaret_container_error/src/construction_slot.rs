@@ -201,4 +201,37 @@ mod tests {
 
         assert!(error.to_string().contains("interrupted"));
     }
+
+    #[tokio::test]
+    async fn a_cancelled_construction_poisons_a_concurrent_waiter() {
+        let slot: ConstructionSlot<u8> = ConstructionSlot::default();
+
+        let mut cancelled =
+            Box::pin(slot.construct_once("crate::keys::KeyLoader", boxed(pending::<Outcome>())));
+        let mut waiter = Box::pin(
+            slot.construct_once("crate::keys::KeyLoader", boxed(ready(Ok(Arc::new(1u8))))),
+        );
+
+        poll_fn(|context| {
+            let _ = cancelled.as_mut().poll(context);
+
+            Poll::Ready(())
+        })
+        .await;
+
+        poll_fn(|context| {
+            assert!(waiter.as_mut().poll(context).is_pending());
+
+            Poll::Ready(())
+        })
+        .await;
+
+        drop(cancelled);
+
+        let error = waiter
+            .await
+            .expect_err("the waiter refuses to re-run the cancelled construction");
+
+        assert!(error.to_string().contains("interrupted"));
+    }
 }
