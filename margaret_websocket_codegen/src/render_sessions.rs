@@ -389,7 +389,7 @@ fn render_dispatch_table(
             ),
         )
     };
-    let (return_type, table) = if bindings.has_fallible_accessors() {
+    let (return_type, table) = if bindings.has_accessors() {
         let error = accessor_error_path();
 
         (
@@ -454,7 +454,7 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
     let dispatch_table = render_dispatch_table(plan, &session_path, &dispatch_arguments, bindings);
     let parameter_count = 1 + upgrade_parameters.len() + usize::from(routes_parameter.is_some());
     let too_many_arguments = too_many_arguments_expect(parameter_count);
-    let has_fallible = bindings.has_fallible_accessors();
+    let has_fallible = bindings.has_accessors();
     let dispatch_call = quote! { dispatch_table(container, #(#dispatch_forward)*).await };
     let dispatch_value = if has_fallible {
         quote! { #dispatch_call? }

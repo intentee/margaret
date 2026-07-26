@@ -70,11 +70,11 @@ impl<Constructed: ?Sized> Default for ConstructionSlot<Constructed> {
 #[cfg(test)]
 mod tests {
     use std::future::Future;
-    use std::future::pending;
     use std::future::poll_fn;
     use std::future::ready;
     use std::pin::Pin;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
     use std::task::Poll;
@@ -177,22 +177,50 @@ mod tests {
         assert!(Arc::ptr_eq(&second, &third));
     }
 
+    fn signals_entry_then_never_completes(entered: Arc<AtomicBool>) -> Build<'static> {
+        let mut warmed = false;
+
+        boxed(poll_fn(move |context| {
+            if warmed {
+                entered.store(true, Ordering::SeqCst);
+            } else {
+                warmed = true;
+                context.waker().wake_by_ref();
+            }
+
+            Poll::Pending
+        }))
+    }
+
+    async fn drive_until_construction_entered<Building>(building: &mut Building, entered: &AtomicBool)
+    where
+        Building: Future<Output = Outcome> + Unpin,
+    {
+        poll_fn(|context| {
+            let _ = Pin::new(&mut *building).poll(context);
+
+            if entered.load(Ordering::SeqCst) {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        })
+        .await;
+    }
+
     #[tokio::test]
     async fn a_cancelled_construction_poisons_the_slot_against_reruns() {
         let slot: ConstructionSlot<u8> = ConstructionSlot::default();
+        let entered = Arc::new(AtomicBool::new(false));
 
-        {
-            let building =
-                slot.construct_once("crate::keys::KeyLoader", boxed(pending::<Outcome>()));
-            tokio::pin!(building);
+        let mut building = Box::pin(slot.construct_once(
+            "crate::keys::KeyLoader",
+            signals_entry_then_never_completes(entered.clone()),
+        ));
 
-            poll_fn(|context| {
-                let _ = building.as_mut().poll(context);
+        drive_until_construction_entered(&mut building, &entered).await;
 
-                Poll::Ready(())
-            })
-            .await;
-        }
+        drop(building);
 
         let error = slot
             .construct_once("crate::keys::KeyLoader", boxed(ready(Ok(Arc::new(42u8)))))
@@ -205,19 +233,17 @@ mod tests {
     #[tokio::test]
     async fn a_cancelled_construction_poisons_a_concurrent_waiter() {
         let slot: ConstructionSlot<u8> = ConstructionSlot::default();
+        let entered = Arc::new(AtomicBool::new(false));
 
-        let mut cancelled =
-            Box::pin(slot.construct_once("crate::keys::KeyLoader", boxed(pending::<Outcome>())));
+        let mut cancelled = Box::pin(slot.construct_once(
+            "crate::keys::KeyLoader",
+            signals_entry_then_never_completes(entered.clone()),
+        ));
         let mut waiter = Box::pin(
             slot.construct_once("crate::keys::KeyLoader", boxed(ready(Ok(Arc::new(1u8))))),
         );
 
-        poll_fn(|context| {
-            let _ = cancelled.as_mut().poll(context);
-
-            Poll::Ready(())
-        })
-        .await;
+        drive_until_construction_entered(&mut cancelled, &entered).await;
 
         poll_fn(|context| {
             assert!(waiter.as_mut().poll(context).is_pending());

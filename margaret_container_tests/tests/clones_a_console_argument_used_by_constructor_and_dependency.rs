@@ -13,6 +13,6 @@ fn clones_a_console_argument_used_by_constructor_and_dependency() {
         .collect();
 
     assert!(source.contains(
-        "crate::Parent::create(console_argument_0.clone(),self.child(console_argument_0).await,)"
+        "crate::Parent::create(console_argument_0.clone(),self.child(console_argument_0).await?,)"
     ));
 }

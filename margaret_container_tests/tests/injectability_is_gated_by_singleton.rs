@@ -52,5 +52,5 @@ fn rejects_a_construction_with_fields_but_no_constructor() {
 fn injects_a_singleton_that_also_carries_a_role() {
     let source = fixture("singleton_ticker");
 
-    assert!(source.contains("crate::Reader::new(self.roller().await)"));
+    assert!(source.contains("crate::Reader::new(self.roller().await?)"));
 }

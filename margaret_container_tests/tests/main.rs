@@ -1,5 +1,5 @@
 mod accepts_singletons_named_after_framework_identifiers;
-mod binds_fallible_accessor_invocations;
+mod binds_accessor_invocations;
 mod clones_a_console_argument_shared_by_sibling_singles;
 mod clones_a_console_argument_used_by_constructor_and_dependency;
 mod constructs_services_and_tickers_lazily;
@@ -37,3 +37,4 @@ mod resolves_injectable_dependencies;
 mod unifies_serve_console_arguments;
 mod weaves_console_arguments_through_dependencies;
 mod wires_dependencies_through_lazy_accessors;
+

@@ -150,7 +150,9 @@ impl Farewell {
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 
         assert!(source.contains(r#"("farewell",_matches)"#));
-        assert!(source.contains("container.farewell().await.run().await"));
+        assert!(source.contains(
+            "(matchcontainer.farewell().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}).run().await"
+        ));
     }
 
     #[test]
@@ -325,7 +327,7 @@ impl Farewell {
         );
 
         assert!(
-            source.contains(r#"container.flagged(matches.get_flag("loud")).await.run().await"#)
+            source.contains(r#"(matchcontainer.flagged(matches.get_flag("loud")).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}).run().await"#)
         );
     }
 
@@ -390,7 +392,9 @@ impl Farewell {
         );
 
         assert!(source.contains(r#"("bare",_matches)"#));
-        assert!(source.contains("container.bare().await.run().await"));
+        assert!(source.contains(
+            "(matchcontainer.bare().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}).run().await"
+        ));
     }
 
     #[test]

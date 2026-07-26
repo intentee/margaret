@@ -21,23 +21,12 @@ fn collapsed(tokens: TokenStream) -> String {
 }
 
 #[test]
-fn reports_a_fallible_container() {
-    let bindings = bindings("fallible_constructor");
-
-    assert!(bindings.has_fallible_accessors());
-    assert!(bindings.accessor_fallible("loader"));
+fn reports_a_container_that_constructs_singletons() {
+    assert!(bindings("services").has_accessors());
 }
 
 #[test]
-fn reports_an_infallible_container() {
-    let bindings = bindings("services");
-
-    assert!(!bindings.has_fallible_accessors());
-    assert!(!bindings.accessor_fallible("pulse"));
-}
-
-#[test]
-fn propagates_a_fallible_accessor_with_the_question_mark_operator() {
+fn propagates_an_accessor_with_the_question_mark_operator() {
     let bindings = bindings("fallible_constructor");
     let invocation = bindings.accessor_invocation(
         &format_ident!("container"),
@@ -50,7 +39,7 @@ fn propagates_a_fallible_accessor_with_the_question_mark_operator() {
 }
 
 #[test]
-fn reports_a_fallible_accessor_into_a_caller_supplied_outcome() {
+fn reports_an_accessor_into_a_caller_supplied_outcome() {
     let bindings = bindings("fallible_constructor");
     let invocation = bindings.accessor_invocation(
         &format_ident!("container"),
@@ -66,7 +55,7 @@ fn reports_a_fallible_accessor_into_a_caller_supplied_outcome() {
 }
 
 #[test]
-fn leaves_an_infallible_accessor_invocation_unwrapped() {
+fn propagates_even_an_infallible_constructor_accessor() {
     let bindings = bindings("services");
     let invocation = bindings.accessor_invocation(
         &format_ident!("container"),
@@ -75,5 +64,5 @@ fn leaves_an_infallible_accessor_invocation_unwrapped() {
         &AccessorFailure::Propagate,
     );
 
-    assert_eq!(collapsed(invocation), "container.pulse().await");
+    assert_eq!(collapsed(invocation), "container.pulse().await?");
 }

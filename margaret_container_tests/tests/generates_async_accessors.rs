@@ -9,10 +9,14 @@ fn generates_async_accessors() {
         .expect("the async fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("pool:tokio::sync::OnceCell<std::sync::Arc<crate::Pool>>"));
-    assert!(source.contains("config:tokio::sync::OnceCell<std::sync::Arc<crate::Config>>"));
+    assert!(source.contains(
+        "pool:margaret::framework::container_error::construction_slot::ConstructionSlot<crate::Pool,>"
+    ));
+    assert!(source.contains(
+        "config:margaret::framework::container_error::construction_slot::ConstructionSlot<crate::Config,>"
+    ));
     assert!(source.contains("pubasyncfnpool"));
-    assert!(source.contains("crate::Pool::new(self.config().await).await"));
+    assert!(source.contains("crate::Pool::new(self.config().await?).await"));
     assert!(source.contains("crate::Config::new()"));
     assert!(!source.contains("crate::Config::new().await"));
 }

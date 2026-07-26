@@ -44,7 +44,7 @@ pub(crate) fn render_server_routes(
     };
     let console_parameters =
         bindings.console_parameters(&server_console_arguments(sessions, bindings));
-    let has_fallible = bindings.has_fallible_accessors();
+    let has_fallible = bindings.has_accessors();
     let entries = sessions.iter().map(|session_plan| {
         let path = &session_plan.session.path;
         let module = format_ident!("{}", session_plan.session.module_name);

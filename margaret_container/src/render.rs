@@ -22,26 +22,19 @@ use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provides_endpoint_path::provides_endpoint_path;
 
-fn field_declaration(provider: &Provider, fallible: bool) -> TokenStream {
+fn field_declaration(provider: &Provider) -> TokenStream {
     let name = field_ident(provider);
+    let slot = construction_slot_path();
+    let constructed = constructed_type(provider);
 
-    if fallible {
-        let slot = construction_slot_path();
-        let constructed = constructed_type(provider);
-
-        quote! { #name: #slot<#constructed> }
-    } else {
-        let field_type = field_type(provider);
-
-        quote! { #name: tokio::sync::OnceCell<#field_type> }
-    }
+    quote! { #name: #slot<#constructed> }
 }
 
 fn accessor_return_type(provider: &Provider) -> TokenStream {
     let field_type = field_type(provider);
     let error = accessor_error_path();
 
-    quote! { Result<#field_type, #error> }
+    quote! { ::std::result::Result<#field_type, #error> }
 }
 
 fn field_type(provider: &Provider) -> TokenStream {
@@ -85,34 +78,18 @@ fn accessor(
         })
         .collect();
     let construction = construction(provider, plan, closures);
+    let accessor_return_type = accessor_return_type(provider);
+    let singleton = provider.concrete_path.to_string();
 
-    if plan.fallibility.of(key) {
-        let accessor_return_type = accessor_return_type(provider);
-        let singleton = provider.concrete_path.to_string();
+    quote! {
+        pub async fn #name(&self #(, #parameters)*) -> #accessor_return_type {
+            self.#name
+                .construct_once(#singleton, async move {
+                    let provided: #field_type = #construction;
 
-        quote! {
-            pub async fn #name(&self #(, #parameters)*) -> #accessor_return_type {
-                self.#name
-                    .construct_once(#singleton, async move {
-                        let provided: #field_type = #construction;
-
-                        Ok(provided)
-                    })
-                    .await
-            }
-        }
-    } else {
-        quote! {
-            pub async fn #name(&self #(, #parameters)*) -> #field_type {
-                self.#name
-                    .get_or_init(|| async move {
-                        let provided: #field_type = #construction;
-
-                        provided
-                    })
-                    .await
-                    .clone()
-            }
+                    Ok(provided)
+                })
+                .await
         }
     }
 }
@@ -262,11 +239,7 @@ fn dependency_expression(
             let accessor = field_ident(&plan.providers[provider_key]);
             let woven = woven_arguments(closures.of(provider_key), closures, ledger);
 
-            if plan.fallibility.of(provider_key) {
-                quote! { self.#accessor(#(#woven),*).await? }
-            } else {
-                quote! { self.#accessor(#(#woven),*).await }
-            }
+            quote! { self.#accessor(#(#woven),*).await? }
         }
     }
 }
@@ -274,9 +247,7 @@ fn dependency_expression(
 pub(crate) fn render(plan: &ContainerPlan, closures: &ConsoleClosures) -> TokenStream {
     let ordered = ordered_providers(plan);
 
-    let fields = ordered
-        .iter()
-        .map(|(key, provider)| field_declaration(provider, plan.fallibility.of(key)));
+    let fields = ordered.iter().map(|(_, provider)| field_declaration(provider));
     let accessors = ordered
         .iter()
         .map(|(key, provider)| accessor(key, provider, plan, closures));

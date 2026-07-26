@@ -7,23 +7,18 @@ use crate::field_ident::field_ident;
 use crate::ordered_providers::ordered_providers;
 use crate::provider::Provider;
 
-fn field_initializer(provider: &Provider, fallible: bool) -> TokenStream {
+fn field_initializer(provider: &Provider) -> TokenStream {
     let name = field_ident(provider);
+    let slot = construction_slot_path();
 
-    if fallible {
-        let slot = construction_slot_path();
-
-        quote! { #name: #slot::default() }
-    } else {
-        quote! { #name: tokio::sync::OnceCell::new() }
-    }
+    quote! { #name: #slot::default() }
 }
 
 pub(crate) fn render_build(plan: &ContainerPlan) -> TokenStream {
     let ordered = ordered_providers(plan);
     let initializers = ordered
         .iter()
-        .map(|(key, provider)| field_initializer(provider, plan.fallibility.of(key)));
+        .map(|(_, provider)| field_initializer(provider));
 
     quote! {
         #[must_use]

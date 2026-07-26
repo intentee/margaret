@@ -28,9 +28,9 @@ use crate::provider_binding::ProviderBinding;
 
 pub struct ContainerBindings {
     accessor_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
-    accessor_fallibility: BTreeMap<String, bool>,
     console_arguments: BTreeMap<CanonicalPath, Vec<ConsoleArgument>>,
     console_slots: BTreeMap<ServeInputKey, usize>,
+    has_accessors: bool,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
 }
 
@@ -49,12 +49,7 @@ impl ContainerBindings {
                 )
             })
             .collect();
-        let accessor_fallibility = plan
-            .providers
-            .iter()
-            .chain(plan.constructions.iter())
-            .map(|(entry_key, entry)| (entry.field_name.clone(), plan.fallibility.of(entry_key)))
-            .collect();
+        let has_accessors = plan.providers.len() + plan.constructions.len() > 0;
         let console_arguments = plan
             .providers
             .iter()
@@ -73,19 +68,11 @@ impl ContainerBindings {
 
         Self {
             accessor_console_arguments,
-            accessor_fallibility,
             console_arguments,
             console_slots,
+            has_accessors,
             providers,
         }
-    }
-
-    #[must_use]
-    pub fn accessor_fallible(&self, field_name: &str) -> bool {
-        self.accessor_fallibility
-            .get(field_name)
-            .copied()
-            .unwrap_or(false)
     }
 
     #[must_use]
@@ -98,10 +85,6 @@ impl ContainerBindings {
     ) -> TokenStream {
         let accessor = format_ident!("{field_name}");
         let call = quote! { #container.#accessor(#(#woven),*).await };
-
-        if !self.accessor_fallible(field_name) {
-            return call;
-        }
 
         match failure {
             AccessorFailure::Propagate => quote! { #call? },
@@ -189,8 +172,8 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn has_fallible_accessors(&self) -> bool {
-        self.accessor_fallibility.values().any(|fallible| *fallible)
+    pub fn has_accessors(&self) -> bool {
+        self.has_accessors
     }
 
     #[must_use]

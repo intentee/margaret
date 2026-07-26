@@ -44,7 +44,7 @@ fn reports_a_fallible_console_command_into_the_command_outcome() {
 #[test]
 fn threads_construction_errors_through_the_views_builder() {
     assert!(module(&generated(), "views/build").contains(
-        "->Result<super::Views,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
+        "->::std::result::Result<super::Views,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
     ));
 }
 

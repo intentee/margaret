@@ -26,7 +26,6 @@ use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 use margaret_tag_codegen::jwks_secret_store_target::JwksSecretStoreTarget;
 use margaret_tag_codegen::read_jwks_secret_store_target::read_jwks_secret_store_target;
 
-use crate::accessor_fallibility::AccessorFallibility;
 use crate::construction_source::ConstructionSource;
 use crate::constructor_return::ConstructorReturnShape;
 use crate::container_error::ContainerError;
@@ -869,11 +868,8 @@ pub(crate) fn build_plan(
         providers.insert(provider.provided.key().clone(), provider);
     }
 
-    let fallibility = AccessorFallibility::from_plan(&providers, &constructions);
-
     Ok(ContainerPlan {
         constructions,
-        fallibility,
         providers,
     })
 }

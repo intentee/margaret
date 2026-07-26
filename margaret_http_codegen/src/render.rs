@@ -417,7 +417,7 @@ fn server_module(
         })
     });
     let named_handlers = vec_literal_tokens(named_handlers);
-    let has_fallible = bindings.has_fallible_accessors();
+    let has_fallible = bindings.has_accessors();
     let router = if has_websocket_routes {
         let websocket_routes = format_ident!("{}_routes", server.name());
         let websocket_forward = bindings.console_forwards(websocket_arguments);

@@ -38,11 +38,11 @@ pub(crate) fn render_build(
         }
     };
 
-    let (return_type, body) = if bindings.has_fallible_accessors() {
+    let (return_type, body) = if bindings.has_accessors() {
         let error = accessor_error_path();
 
         (
-            quote! { Result<super::Views, #error> },
+            quote! { ::std::result::Result<super::Views, #error> },
             quote! { Ok(#views_value) },
         )
     } else {

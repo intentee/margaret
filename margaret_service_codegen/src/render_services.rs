@@ -204,7 +204,7 @@ fn server_registration(
                 .unwrap_or(&empty_arguments),
         );
         let routes_call = quote! { super::http::#function_name::#function_name(container, #(#server_borrows)* &routes #views_argument).await };
-        let routes = if bindings.has_fallible_accessors() {
+        let routes = if bindings.has_accessors() {
             quote! {
                 match #routes_call {
                     Ok(routes) => routes,
@@ -233,7 +233,7 @@ fn server_registration(
     let views_setup = has_views.then(|| {
         let views_borrows = bindings.console_borrows(views_console_arguments);
         let build = quote! { super::views::build::build(container, #(#views_borrows)*).await };
-        let built = if bindings.has_fallible_accessors() {
+        let built = if bindings.has_accessors() {
             quote! {
                 match #build {
                     Ok(views) => views,
