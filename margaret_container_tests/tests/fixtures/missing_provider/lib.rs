@@ -3,5 +3,5 @@ struct Service;
 
 impl Service {
     #[constructor]
-    fn new(missing: Arc<Unprovided>) -> Self {}
+    fn new(missing: Arc<Unprovided>) -> anyhow::Result<Self> {}
 }

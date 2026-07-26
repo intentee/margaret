@@ -34,7 +34,10 @@ impl PublicJwksVerifier {
             .and_then(TokenVerification::must)
             .map_err(JwksClientError::TokenVerification)?;
 
-        if claims.is_expired(now) {
+        if claims
+            .is_expired(now)
+            .map_err(|source| JwksClientError::TokenExpiry { source })?
+        {
             return Err(JwksClientError::TokenExpired);
         }
 

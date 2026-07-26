@@ -108,7 +108,10 @@ fn construction(
 
     match &provider.construction {
         DirectConstruction::FrameworkAccessor { .. } | DirectConstruction::Resolved { .. } => value,
-        DirectConstruction::Constructor { .. } | DirectConstruction::Fieldless { .. } => {
+        DirectConstruction::Constructor { .. }
+        | DirectConstruction::Fieldless { .. }
+        | DirectConstruction::FrameworkConstructor { .. }
+        | DirectConstruction::FrameworkUnit => {
             quote! { std::sync::Arc::new(#value) }
         }
     }
@@ -137,28 +140,42 @@ fn direct_value(
     match direct {
         DirectConstruction::Constructor {
             dependencies,
-            fallible,
-            is_async: constructor_is_async,
+            is_async,
             method,
         } => {
             let constructor = format_ident!("{}", method);
             let arguments = woven_dependency_expressions(dependencies, plan, closures);
-            let call = if *constructor_is_async {
+            let error = construction_error_path();
+            let singleton = concrete_path.to_string();
+            let call = if *is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
             } else {
                 quote! { #concrete::#constructor(#(#arguments),*) }
             };
 
-            if *fallible {
-                let error = construction_error_path();
-                let singleton = concrete_path.to_string();
-
-                quote! { #error::wrap(#singleton, #call)? }
-            } else {
-                call
+            quote! {
+                #error::wrap(
+                    #singleton,
+                    #call,
+                )?
             }
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
+        DirectConstruction::FrameworkConstructor {
+            dependencies,
+            is_async,
+            method,
+        } => {
+            let constructor = format_ident!("{}", method);
+            let arguments = woven_dependency_expressions(dependencies, plan, closures);
+
+            if *is_async {
+                quote! { #concrete::#constructor(#(#arguments),*).await }
+            } else {
+                quote! { #concrete::#constructor(#(#arguments),*) }
+            }
+        }
+        DirectConstruction::FrameworkUnit => quote! { #concrete },
         DirectConstruction::FrameworkAccessor {
             accessor,
             dependencies,
@@ -175,6 +192,14 @@ fn direct_value(
     }
 }
 
+fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {
+    match shape {
+        StructShape::Named { .. } => quote! { #concrete {} },
+        StructShape::Unit => quote! { #concrete },
+        StructShape::Unnamed { .. } => quote! { #concrete() },
+    }
+}
+
 fn woven_dependency_expressions(
     dependencies: &[DependencyKind],
     plan: &ContainerPlan,
@@ -186,14 +211,6 @@ fn woven_dependency_expressions(
         .iter()
         .map(|dependency| dependency_expression(dependency, plan, closures, &mut ledger))
         .collect()
-}
-
-fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {
-    match shape {
-        StructShape::Named { .. } => quote! { #concrete {} },
-        StructShape::Unit => quote! { #concrete },
-        StructShape::Unnamed { .. } => quote! { #concrete() },
-    }
 }
 
 fn dependency_arguments<'plan>(
@@ -247,7 +264,9 @@ fn dependency_expression(
 pub(crate) fn render(plan: &ContainerPlan, closures: &ConsoleClosures) -> TokenStream {
     let ordered = ordered_providers(plan);
 
-    let fields = ordered.iter().map(|(_, provider)| field_declaration(provider));
+    let fields = ordered
+        .iter()
+        .map(|(_, provider)| field_declaration(provider));
     let accessors = ordered
         .iter()
         .map(|(key, provider)| accessor(key, provider, plan, closures));

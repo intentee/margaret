@@ -18,8 +18,8 @@ pub struct PatchArticle {
 
 impl PatchArticle {
     #[constructor]
-    pub fn create(articles: Arc<ArticleStore>) -> Self {
-        Self { articles }
+    pub fn create(articles: Arc<ArticleStore>) -> anyhow::Result<Self> {
+        Ok(Self { articles })
     }
 
     #[process]
@@ -36,21 +36,23 @@ impl PatchArticle {
             author,
         }: Article,
         #[form_request(from = Form)] PatchArticleForm { title, body }: PatchArticleForm,
-    ) -> Response {
-        let title = title.unwrap_or(current_title);
-        let body = body.unwrap_or(current_body);
+    ) -> anyhow::Result<Response> {
+        Ok({
+            let title = title.unwrap_or(current_title);
+            let body = body.unwrap_or(current_body);
 
-        self.articles.save(Article {
-            id,
-            title: title.clone(),
-            body,
-            cover,
-            published,
-            status,
-            created_at,
-            author,
-        });
+            self.articles.save(Article {
+                id,
+                title: title.clone(),
+                body,
+                cover,
+                published,
+                status,
+                created_at,
+                author,
+            });
 
-        Response::text(200, format!("updated \"{title}\""))
+            Response::text(200, format!("updated \"{title}\""))
+        })
     }
 }

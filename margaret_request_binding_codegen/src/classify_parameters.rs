@@ -277,32 +277,47 @@ fn classify_form_request(
 }
 
 fn classify_route_parameter(
-    index: &AttributeIndex,
-    item: &IndexedItem,
     context: &BindingContext,
     attribute: &Attribute,
     declared: &Type,
+    resolved: Option<&CanonicalPath>,
     position: usize,
     binders: &HashMap<CanonicalPath, RouteParameterBinder>,
+    bound_route_parameters: &mut HashSet<String>,
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
 
-    match context {
+    let route_path = match context {
         BindingContext::AuthenticatedUserProvider { .. } | BindingContext::Middleware { .. } => {
             return Err(RequestBindingError::RouteParameterUnavailable {
                 subject: subject.to_string(),
                 parameter: position.to_string(),
             });
         }
-        BindingContext::Handshake { .. } | BindingContext::Responder { .. } => {}
-    }
+        BindingContext::Handshake { route_path, .. }
+        | BindingContext::Responder { route_path, .. } => route_path,
+    };
 
     let arguments = AttributeArgs::from_attribute(attribute)?;
     let RouteParameterArguments { from } =
         RouteParameterArguments::parse(&arguments, subject, position)?;
-    let resolved = index.resolve_item_type(item, declared);
 
-    if resolved.as_ref() == Some(&string_path()) {
+    if !route_path.parameters().any(|name| name == from) {
+        return Err(RequestBindingError::RouteParameterNotInPath {
+            subject: subject.to_string(),
+            parameter: from,
+            path: route_path.pattern().to_string(),
+        });
+    }
+
+    if !bound_route_parameters.insert(from.clone()) {
+        return Err(RequestBindingError::MultipleRouteParameterBindings {
+            subject: subject.to_string(),
+            parameter: from,
+        });
+    }
+
+    if resolved == Some(&string_path()) {
         return Ok(RequestBinding::Raw { path_key: from });
     }
 
@@ -314,7 +329,7 @@ fn classify_route_parameter(
     })?;
     let binder =
         binders
-            .get(&model)
+            .get(model)
             .ok_or_else(|| RequestBindingError::MissingRouteParameterBinder {
                 subject: subject.to_string(),
                 parameter: from.clone(),
@@ -360,6 +375,7 @@ pub fn classify_parameters(
     let route_parameter_selector = AttributeSelector::from_marker("route_parameter");
     let form_request_selector = AttributeSelector::from_marker("form_request");
     let mut bound = Vec::new();
+    let mut bound_route_parameters = HashSet::new();
 
     for ParameterView {
         attributes,
@@ -418,13 +434,13 @@ pub fn classify_parameters(
             classify_form_request(index, item, attribute, declared, context, position)?
         } else if let Some(attribute) = route_parameter {
             classify_route_parameter(
-                index,
-                item,
                 context,
                 attribute,
                 declared,
+                resolved.as_ref(),
                 position,
                 &registries.route_parameters,
+                &mut bound_route_parameters,
             )?
         } else if is_next {
             match context {
@@ -486,24 +502,6 @@ pub fn classify_parameters(
     }
 
     verify_single_inference(&bound, subject)?;
-
-    match context {
-        BindingContext::Handshake { route_path, .. }
-        | BindingContext::Responder { route_path, .. } => {
-            for parameter in &bound {
-                if let Some(path_key) = parameter.binding.path_key()
-                    && !route_path.parameters().any(|name| name == path_key)
-                {
-                    return Err(RequestBindingError::RouteParameterNotInPath {
-                        subject: subject.to_string(),
-                        parameter: path_key.to_string(),
-                        path: route_path.pattern().to_string(),
-                    });
-                }
-            }
-        }
-        BindingContext::AuthenticatedUserProvider { .. } | BindingContext::Middleware { .. } => {}
-    }
 
     Ok(bound)
 }

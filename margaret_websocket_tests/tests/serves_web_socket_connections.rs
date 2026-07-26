@@ -205,6 +205,20 @@ async fn continues_when_a_handler_fails_to_serialize_a_response() {
     harness
         .send(r#"{"id":6,"method":"failing","params":{"prompt":"boom"}}"#)
         .await;
+    let response: serde_json::Value =
+        serde_json::from_str(&harness.recv().await).expect("the error response is valid JSON");
+
+    assert_eq!(
+        response,
+        serde_json::json!({
+            "error": {
+                "code": "internal_error",
+                "details": null,
+                "message": "Internal error"
+            },
+            "id": 6
+        })
+    );
     harness.send_raw(Message::Close(None)).await;
     harness.driver.await.expect("the driver finishes");
 }

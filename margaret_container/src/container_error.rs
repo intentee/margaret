@@ -77,9 +77,7 @@ pub enum ContainerError {
     #[error("singleton '{singleton}' has more than one #[constructor] method: {methods}")]
     AmbiguousConstructor { singleton: String, methods: String },
 
-    #[error(
-        "the #[constructor] of singleton '{singleton}' must return Self or anyhow::Result<Self>"
-    )]
+    #[error("the #[constructor] of singleton '{singleton}' must return anyhow::Result<Self>")]
     ConstructorReturnTypeMismatch { singleton: String },
 
     #[error(

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::handler::Handler;
+use crate::handler_error::HandlerError;
 use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;
 
@@ -20,13 +21,13 @@ where
     Extract: for<'request> Fn(
             Arc<Responder>,
             &'request Request,
-        )
-            -> Pin<Box<dyn Future<Output = ResponseContinuation> + Send + 'request>>
-        + Send
+        ) -> Pin<
+            Box<dyn Future<Output = Result<ResponseContinuation, HandlerError>> + Send + 'request>,
+        > + Send
         + Sync
         + 'static,
 {
-    async fn handle(&self, request: &Request) -> ResponseContinuation {
+    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
         (self.extract)(self.responder.clone(), request).await
     }
 }
@@ -40,9 +41,9 @@ where
     Extract: for<'request> Fn(
             Arc<Responder>,
             &'request Request,
-        )
-            -> Pin<Box<dyn Future<Output = ResponseContinuation> + Send + 'request>>
-        + Send
+        ) -> Pin<
+            Box<dyn Future<Output = Result<ResponseContinuation, HandlerError>> + Send + 'request>,
+        > + Send
         + Sync
         + 'static,
 {
@@ -61,6 +62,7 @@ mod tests {
 
     use super::responder_handler;
     use crate::forward_targets::ForwardTargets;
+    use crate::handler_error::HandlerError;
     use crate::request::Request;
     use crate::respond_recursively::respond_recursively;
     use crate::response::Response;
@@ -80,9 +82,11 @@ mod tests {
             Arc::new(Echo),
             |responder: Arc<Echo>,
              request: &Request|
-             -> Pin<Box<dyn Future<Output = ResponseContinuation> + Send + '_>> {
+             -> Pin<
+                Box<dyn Future<Output = Result<ResponseContinuation, HandlerError>> + Send + '_>,
+            > {
                 Box::pin(async move {
-                    ResponseContinuation::from(
+                    Ok(ResponseContinuation::from(
                         responder
                             .respond(
                                 request
@@ -91,7 +95,7 @@ mod tests {
                                     .to_string(),
                             )
                             .await,
-                    )
+                    ))
                 })
             },
         );

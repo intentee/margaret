@@ -10,10 +10,11 @@ pub struct AlphaSession;
 
 impl AlphaSession {
     #[build_for_session]
-    #[must_use]
-    pub fn new() -> Self {
-        let _ = asset!("resources/ts/app.ts");
+    pub fn new() -> anyhow::Result<Self> {
+        Ok({
+            let _ = asset!("resources/ts/app.ts");
 
-        Self
+            Self
+        })
     }
 }

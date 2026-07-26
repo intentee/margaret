@@ -5,6 +5,7 @@ edition = "2024"
 autotests = false
 
 [dependencies]
+anyhow = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 margaret_jwks_endpoint = { path = "../margaret_jwks_endpoint" }

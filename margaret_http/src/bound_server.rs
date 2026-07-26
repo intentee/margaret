@@ -415,6 +415,7 @@ mod tests {
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
+    use crate::handler_error::HandlerError;
     use crate::http_middleware::HttpMiddleware;
     use crate::method_handler::MethodHandler;
     use crate::named_handler::NamedHandler;
@@ -436,8 +437,8 @@ mod tests {
 
     #[async_trait]
     impl Handler for PlainOk {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::Done(Response::text(200, "ok"))
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::Done(Response::text(200, "ok")))
         }
     }
 
@@ -646,7 +647,11 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for PassThrough {
-        async fn process(&self, request: &Request, next: Next) -> ResponseContinuation {
+        async fn process(
+            &self,
+            request: &Request,
+            next: Next,
+        ) -> Result<ResponseContinuation, HandlerError> {
             next.run(request).await
         }
     }
@@ -657,8 +662,15 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for RespondsWith {
-        async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
-            ResponseContinuation::Done(Response::text(self.status, "short circuit"))
+        async fn process(
+            &self,
+            _request: &Request,
+            _next: Next,
+        ) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::Done(Response::text(
+                self.status,
+                "short circuit",
+            )))
         }
     }
 
@@ -666,8 +678,14 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for RedirectsAway {
-        async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
-            ResponseContinuation::from(Redirect::see_other("http://localhost/login".to_string()))
+        async fn process(
+            &self,
+            _request: &Request,
+            _next: Next,
+        ) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::from(Redirect::see_other(
+                "http://localhost/login".to_string(),
+            )))
         }
     }
 
@@ -675,12 +693,18 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for OverridesAfterDelegating {
-        async fn process(&self, request: &Request, next: Next) -> ResponseContinuation {
-            let _delegated = next.run(request).await;
+        async fn process(
+            &self,
+            request: &Request,
+            next: Next,
+        ) -> Result<ResponseContinuation, HandlerError> {
+            next.run(request)
+                .await
+                .expect("the delegated test handler succeeds");
 
-            ResponseContinuation::Done(
+            Ok(ResponseContinuation::Done(
                 Response::forbidden().set_cookie(Cookie::new("session", "rotated")),
-            )
+            ))
         }
     }
 
@@ -688,8 +712,15 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for ForwardsToTarget {
-        async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
-            ResponseContinuation::from(Forward::new("target", HashMap::new()))
+        async fn process(
+            &self,
+            _request: &Request,
+            _next: Next,
+        ) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::from(Forward::new(
+                "target",
+                HashMap::new(),
+            )))
         }
     }
 

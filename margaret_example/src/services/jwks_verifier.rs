@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::sync::Arc;
 
 use chrono::DateTime;
@@ -20,8 +19,8 @@ struct AccessClaims {
 }
 
 impl IsExpired for AccessClaims {
-    fn is_expired(&self, now: DateTime<Utc>) -> bool {
-        self.exp < now.timestamp()
+    fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
+        Ok(self.exp < now.timestamp())
     }
 }
 
@@ -33,16 +32,15 @@ pub struct JwksVerifier {
 
 impl JwksVerifier {
     #[constructor]
-    #[must_use]
     pub fn create(
         clock: Arc<SystemClock>,
         #[jwks_secret_store(client = auth)] verifier: Arc<PublicJwksVerifier>,
-    ) -> Self {
-        Self { clock, verifier }
+    ) -> anyhow::Result<Self> {
+        Ok(Self { clock, verifier })
     }
 
     #[process]
-    pub async fn run(&self, cancellation_token: CancellationToken) -> Result<(), Infallible> {
+    pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         match self
             .verifier
             .verify::<AccessClaims>("sample.access.token", self.clock.now())

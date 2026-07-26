@@ -25,6 +25,7 @@ pub fn render_request_extraction(
     context: &ExtractionContext,
 ) -> TokenStream {
     let continuation_return = context.continuation_return;
+    let system_error_return = context.error_return;
     let provider_access = context.provider_access;
     let request_local = context.request_local;
     let error_return = context.response_return;
@@ -34,14 +35,15 @@ pub fn render_request_extraction(
             let resolver = authenticated_user_resolver(*requirement);
 
             quote! {
-                let #holder = match #resolver(
-                    margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(
+                let #holder = match margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(
                         #provider_access.as_ref(),
                         #request_local,
-                    ).await,
-                ) {
-                    Ok(value) => value,
-                    Err(response) => #continuation_return,
+                    ).await {
+                    ::std::result::Result::Ok(outcome) => match #resolver(outcome) {
+                        ::std::result::Result::Ok(value) => value,
+                        ::std::result::Result::Err(response) => #continuation_return,
+                    },
+                    ::std::result::Result::Err(error) => #system_error_return,
                 };
             }
         }
@@ -54,16 +56,7 @@ pub fn render_request_extraction(
                 Err(response) => #error_return,
             };
         },
-        RequestBinding::Bound { path_key, .. } => quote! {
-            let #holder = match margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(
-                #request_local,
-                #path_key,
-                #provider_access.as_ref(),
-            ).await {
-                Ok(value) => value,
-                Err(response) => #error_return,
-            };
-        },
+        RequestBinding::Bound { .. } => TokenStream::new(),
         RequestBinding::FormRequest { source, extraction } => {
             let variant = source.variant();
 

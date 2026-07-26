@@ -1,6 +1,5 @@
 use thiserror::Error;
 
-use margaret_jwks_endpoint::endpoint_error::EndpointError;
 use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 
 #[derive(Debug, Error)]
@@ -9,7 +8,13 @@ pub enum JwksClientError {
     DocumentFetch(#[source] reqwest::Error),
 
     #[error("the jwks endpoint could not be resolved: {0}")]
-    EndpointResolution(#[source] EndpointError),
+    EndpointResolution(#[source] anyhow::Error),
+
+    #[error("the token expiry could not be determined: {source:#}")]
+    TokenExpiry {
+        #[source]
+        source: anyhow::Error,
+    },
 
     #[error("the jwks document has not been fetched from the issuer yet")]
     NotReady,

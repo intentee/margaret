@@ -36,8 +36,13 @@ fn reports_a_fallible_service_registration_into_the_command_outcome() {
 
 #[test]
 fn reports_a_fallible_console_command_into_the_command_outcome() {
-    assert!(module(&generated(), "run").contains(
-        "Some((\"boot\",_matches))=>{(matchcontainer.boot_boot().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}})"
+    let source = module(&generated(), "run");
+
+    assert!(source.contains(
+        "matchcontainer.boot_boot().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}"
+    ));
+    assert!(source.contains(
+        "::std::result::Result::Err(error)=>{margaret::framework::console::report_failure::report_failure(error,)}"
     ));
 }
 

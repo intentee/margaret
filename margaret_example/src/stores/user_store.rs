@@ -22,13 +22,14 @@ pub struct UserStore {
 
 impl UserStore {
     #[constructor]
-    #[must_use]
-    pub fn create() -> Self {
-        let sessions = DashMap::new();
+    pub fn create() -> anyhow::Result<Self> {
+        Ok({
+            let sessions = DashMap::new();
 
-        sessions.insert(MILO_SESSION, milo());
+            sessions.insert(MILO_SESSION, milo());
 
-        Self { sessions }
+            Self { sessions }
+        })
     }
 
     #[must_use]
@@ -48,6 +49,7 @@ mod tests {
     fn finds_the_seeded_user_by_their_session() {
         assert_eq!(
             UserStore::create()
+                .expect("the user store is constructed")
                 .find_user_by_session(MILO_SESSION)
                 .map(|user| user.name),
             Some("Milo".to_string())
@@ -58,6 +60,7 @@ mod tests {
     fn finds_no_user_for_an_unknown_session() {
         assert!(
             UserStore::create()
+                .expect("the user store is constructed")
                 .find_user_by_session(Uuid::from_u128(1))
                 .is_none()
         );

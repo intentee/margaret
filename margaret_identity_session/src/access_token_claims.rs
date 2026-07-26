@@ -14,8 +14,8 @@ pub struct AccessTokenClaims {
 }
 
 impl IsExpired for AccessTokenClaims {
-    fn is_expired(&self, now: DateTime<Utc>) -> bool {
-        self.exp < now.timestamp()
+    fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
+        Ok(self.exp < now.timestamp())
     }
 }
 
@@ -42,8 +42,8 @@ mod tests {
 
     #[test]
     fn reports_expiry_relative_to_now() {
-        assert!(!claims(101).is_expired(at(100)));
-        assert!(claims(99).is_expired(at(100)));
-        assert!(!claims(100).is_expired(at(100)));
+        assert_eq!(claims(101).is_expired(at(100)).ok(), Some(false));
+        assert_eq!(claims(99).is_expired(at(100)).ok(), Some(true));
+        assert_eq!(claims(100).is_expired(at(100)).ok(), Some(false));
     }
 }

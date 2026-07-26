@@ -8,11 +8,12 @@ pub struct AppName {
 
 impl AppName {
     #[constructor]
-    #[must_use]
-    pub fn create() -> Self {
-        Self {
-            value: "margaret".to_string(),
-        }
+    pub fn create() -> anyhow::Result<Self> {
+        Ok({
+            Self {
+                value: "margaret".to_string(),
+            }
+        })
     }
 
     #[must_use]

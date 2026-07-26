@@ -1930,6 +1930,7 @@ dependencies = [
 name = "margaret_codegen_reusable_websocket_protocol_fixture"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "clap",
  "margaret",
@@ -1965,6 +1966,7 @@ dependencies = [
 name = "margaret_codegen_websocket_fixture"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "clap",
  "margaret",
@@ -1982,6 +1984,7 @@ dependencies = [
 name = "margaret_console"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap",
 ]
 
@@ -2094,6 +2097,7 @@ dependencies = [
 name = "margaret_http"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "bytes",
  "cookie",
@@ -2172,6 +2176,7 @@ dependencies = [
 name = "margaret_identity"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "margaret_http",
 ]
@@ -2180,6 +2185,7 @@ dependencies = [
 name = "margaret_identity_session"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "cookie",
  "serde",
@@ -2225,6 +2231,7 @@ dependencies = [
 name = "margaret_jwks_client_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "margaret_http",
@@ -2258,6 +2265,7 @@ dependencies = [
 name = "margaret_jwks_endpoint"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "thiserror",
  "tokio",
@@ -2268,6 +2276,7 @@ dependencies = [
 name = "margaret_jwks_file_secret_storage"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "serde_json",
@@ -2321,6 +2330,7 @@ dependencies = [
 name = "margaret_jwks_roller"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "margaret_jwks_keygen",
  "thiserror",
 ]
@@ -2747,6 +2757,7 @@ dependencies = [
 name = "margaret_token_signer"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "futures-util",
  "margaret_identity_session",
@@ -2786,6 +2797,7 @@ dependencies = [
 name = "margaret_views"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "maud",
 ]
 
@@ -2808,6 +2820,7 @@ dependencies = [
 name = "margaret_websocket"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "futures-util",
  "hyper",
@@ -2847,6 +2860,7 @@ dependencies = [
 name = "margaret_websocket_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "futures-util",
  "margaret_http",

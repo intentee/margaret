@@ -192,8 +192,10 @@ mod tests {
         }))
     }
 
-    async fn drive_until_construction_entered<Building>(building: &mut Building, entered: &AtomicBool)
-    where
+    async fn drive_until_construction_entered<Building>(
+        building: &mut Building,
+        entered: &AtomicBool,
+    ) where
         Building: Future<Output = Outcome> + Unpin,
     {
         poll_fn(|context| {

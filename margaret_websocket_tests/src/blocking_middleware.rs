@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+use margaret_http::handler_error::HandlerError;
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::next::Next;
 use margaret_http::request::Request;
@@ -10,7 +11,11 @@ pub struct BlockingMiddleware;
 
 #[async_trait]
 impl HttpMiddleware for BlockingMiddleware {
-    async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
-        ResponseContinuation::Done(Response::forbidden())
+    async fn process(
+        &self,
+        _request: &Request,
+        _next: Next,
+    ) -> Result<ResponseContinuation, HandlerError> {
+        Ok(ResponseContinuation::Done(Response::forbidden()))
     }
 }

@@ -141,10 +141,10 @@ mod tests {
         )]
     }
 
-    const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
-    const STATELESS_RESPONDER: &str = "#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n";
-    const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n";
-    const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> Self {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
+    const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
+    const STATELESS_RESPONDER: &str = "#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
+    const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n";
+    const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
 
     #[test]
     fn invokes_server_and_views_helpers_directly_when_the_container_has_no_accessors() {
@@ -172,7 +172,9 @@ mod tests {
 
         assert!(source.contains("structPump{"));
         assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
-        assert!(source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await"));
+        assert!(
+            source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await")
+        );
     }
 
     #[test]
@@ -188,7 +190,7 @@ mod tests {
             "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
         ));
         assert!(source.contains("_tick_context:trzcina::TickContext"));
-        assert!(source.contains("self.inner.run().await.map_err(anyhow::Error::from)"));
+        assert!(source.contains("self.inner.run().await?;Ok(())"));
     }
 
     fn canonical(segments: &[&str]) -> CanonicalPath {
@@ -277,21 +279,18 @@ mod tests {
     #[test]
     fn renders_a_ticker_that_passes_the_token() {
         let source = rendered(
-            "use tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
-        assert!(
-            source
-                .contains("self.inner.run(cancellation_token).await.map_err(anyhow::Error::from)")
-        );
+        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
         assert!(!source.contains("_cancellation_token"));
     }
 
     #[test]
     fn renders_a_ticker_without_a_behavior() {
         let source = rendered(
-            "#[scheduled_with_tick_timer(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
@@ -303,7 +302,7 @@ mod tests {
     #[test]
     fn renders_a_service_without_a_token() {
         let source = rendered(
-            "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
@@ -350,11 +349,9 @@ mod tests {
         assert!(source.contains(
             "letviews=::std::sync::Arc::new(matchsuper::views::build::build(container).await{Ok(views)=>views,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}},);"
         ));
-        assert!(
-            source.contains(
-                "super::http::server_public::server_public(container,&routes,&views,).await"
-            )
-        );
+        assert!(source.contains(
+            "super::http::server_public::server_public(container,&routes,&views,).await"
+        ));
     }
 
     #[test]
@@ -524,7 +521,7 @@ mod tests {
     #[test]
     fn rejects_a_non_path_interval() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -533,7 +530,7 @@ mod tests {
     #[test]
     fn rejects_a_non_path_behavior() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -555,7 +552,7 @@ mod tests {
     #[test]
     fn rejects_conflicting_roles() {
         let message = error_for(
-            "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("mutually exclusive"));
@@ -569,16 +566,43 @@ mod tests {
     #[test]
     fn rejects_an_ambiguous_runner() {
         let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> Result<(), Infallible> {}\n    #[process]\n    fn b(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> anyhow::Result<()> {}\n    #[process]\n    fn b(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("more than one #[process]"));
     }
 
     #[test]
+    fn rejects_a_runner_without_a_return_type() {
+        let message = error_for(
+            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) {}\n}\n",
+        );
+
+        assert!(message.contains("must return anyhow::Result<()>"));
+    }
+
+    #[test]
+    fn rejects_a_runner_returning_another_result_type() {
+        let message = error_for(
+            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Failure> {}\n}\n",
+        );
+
+        assert!(message.contains("must return anyhow::Result<()>"));
+    }
+
+    #[test]
+    fn rejects_a_runner_returning_a_non_unit_outcome() {
+        let message = error_for(
+            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<bool> {}\n}\n",
+        );
+
+        assert!(message.contains("must return anyhow::Result<()>"));
+    }
+
+    #[test]
     fn rejects_a_ticker_without_an_interval() {
         let message = error_for(
-            "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("missing the 'interval'"));
@@ -587,7 +611,7 @@ mod tests {
     #[test]
     fn rejects_an_unmarked_runner_parameter() {
         let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> Result<(), Infallible> {}\n}\n",
+            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("takes parameter 'value'"));
@@ -597,7 +621,7 @@ mod tests {
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
         let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("carries #[authenticated_user]"));
@@ -607,7 +631,7 @@ mod tests {
     #[test]
     fn rejects_a_cancellation_token_passed_by_reference() {
         let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("takes parameter 'token'"));
@@ -626,10 +650,10 @@ struct Roller {
 
 impl Roller {
     #[constructor]
-    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> Self {}
+    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 "#,
             &[],
@@ -637,7 +661,7 @@ impl Roller {
 
         assert!(source.contains("structRoller{inner:std::sync::Arc<crate::Roller>,}"));
         assert!(source.contains("impltrzcina::TickerforRoller"));
-        assert!(source.contains("self.inner.run().await.map_err(anyhow::Error::from)"));
+        assert!(source.contains("self.inner.run().await?;Ok(())"));
         assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains(
             "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
@@ -660,19 +684,16 @@ struct Roller {
 
 impl Roller {
     #[constructor]
-    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> Self {}
+    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}
+    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}
 }
 "#,
             &[],
         );
 
-        assert!(
-            source
-                .contains("self.inner.run(cancellation_token).await.map_err(anyhow::Error::from)")
-        );
+        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
         assert!(!source.contains("_cancellation_token"));
         assert!(source.contains(
             "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
@@ -691,10 +712,10 @@ struct Worker {
 
 impl Worker {
     #[constructor]
-    fn create(#[console_argument(from = "label")] label: String) -> Self {}
+    fn create(#[console_argument(from = "label")] label: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}
+    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}
 }
 "#,
             &[],
@@ -716,10 +737,10 @@ struct Worker {
 
 impl Worker {
     #[constructor]
-    fn create(#[console_argument(from = "label")] label: String) -> Self {}
+    fn create(#[console_argument(from = "label")] label: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 "#,
             &[],
@@ -745,10 +766,10 @@ struct Watcher {
 
 impl Watcher {
     #[constructor]
-    fn create(#[console_argument(from = "verbose")] verbose: bool) -> Self {}
+    fn create(#[console_argument(from = "verbose")] verbose: bool) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 "#,
             &[],
@@ -770,10 +791,10 @@ struct First {
 
 impl First {
     #[constructor]
-    fn create(#[console_argument(from = "shared")] a: String) -> Self {}
+    fn create(#[console_argument(from = "shared")] a: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 
 #[service]
@@ -783,10 +804,10 @@ struct Second {
 
 impl Second {
     #[constructor]
-    fn create(#[console_argument(from = "shared")] b: String) -> Self {}
+    fn create(#[console_argument(from = "shared")] b: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 "#,
             &[],
@@ -804,7 +825,7 @@ impl Second {
     #[test]
     fn propagates_malformed_ticker_arguments() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));

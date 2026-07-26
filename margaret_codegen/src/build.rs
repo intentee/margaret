@@ -103,7 +103,7 @@ struct Page;
 
 impl Page {
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -116,7 +116,7 @@ struct Config;
 
 impl Config {
     #[constructor]
-    fn create() -> Self {}
+    fn create() -> anyhow::Result<Self> {}
 }
 ";
 
@@ -130,7 +130,7 @@ struct Greet;
 
 impl Greet {
     #[process]
-    fn run(&self) -> CommandOutcome {}
+    fn run(&self) -> anyhow::Result<CommandOutcome> {}
 }
 ";
 
@@ -156,7 +156,7 @@ struct SystemClock;
 
 impl SystemClock {
     #[constructor]
-    fn create() -> Self {}
+    fn create() -> anyhow::Result<Self> {}
 }
 
 #[websocket_session(path = \"/room/{name}\", server = \"public\")]
@@ -164,7 +164,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(clock: std::sync::Arc<SystemClock>, #[route_parameter(from = \"name\")] name: String) -> Self {}
+    fn build(clock: std::sync::Arc<SystemClock>, #[route_parameter(from = \"name\")] name: String) -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = \"chat\", response = single)]
@@ -344,7 +344,7 @@ impl AssetRoute {
     #[constructor]
     fn create(
         responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
-    ) -> Self {}
+    ) -> anyhow::Result<Self> {}
 }
 ";
 
@@ -447,10 +447,10 @@ struct GetJwks {
 
 impl GetJwks {
     #[constructor]
-    fn create(handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>) -> Self {}
+    fn create(handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -484,10 +484,10 @@ impl GetVerify {
     fn create(
         #[jwks_secret_store(client = auth)] auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
         #[jwks_secret_store(client = partner)] partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
-    ) -> Self {}
+    ) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -507,10 +507,10 @@ impl PostMint {
     fn create(
         minter: std::sync::Arc<crate::margaret::jwks::MintAccessTokenHandler>,
         #[jwks_secret_store(server)] store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>,
-    ) -> Self {}
+    ) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -526,7 +526,7 @@ struct OutboundCaller {
 
 impl OutboundCaller {
     #[constructor]
-    fn create(#[spiffe_http_client] client: Client) -> Self {}
+    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}
 }
 
 #[service]
@@ -536,10 +536,10 @@ struct Worker {
 
 impl Worker {
     #[constructor]
-    fn create(caller: Arc<OutboundCaller>) -> Self {}
+    fn create(caller: Arc<OutboundCaller>) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}
+    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}
 }
 ";
 
@@ -578,8 +578,12 @@ impl Worker {
         assert!(container.contains("console_argument_0:reqwest::Client"));
 
         let run: String = module(&code, "run").split_whitespace().collect();
-        assert!(run.contains(r#"clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true)"#));
-        assert!(run.contains(r#"clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true)"#));
+        assert!(run.contains(
+            r#"clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true)"#
+        ));
+        assert!(run.contains(
+            r#"clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true)"#
+        ));
     }
 
     const SPIFFE_HTTP_SERVER_CLIENT_CRATE: &str = "\
@@ -593,7 +597,7 @@ struct OutboundCaller {
 
 impl OutboundCaller {
     #[constructor]
-    fn create(#[spiffe_http_client] client: Client) -> Self {}
+    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -604,10 +608,10 @@ struct CallRoute {
 
 impl CallRoute {
     #[constructor]
-    fn create(caller: Arc<OutboundCaller>) -> Self {}
+    fn create(caller: Arc<OutboundCaller>) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -648,7 +652,7 @@ struct OutboundCaller {
 
 impl OutboundCaller {
     #[constructor]
-    fn create(#[spiffe_http_client] client: Client) -> Self {}
+    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -659,10 +663,10 @@ struct GetIdentity {
 
 impl GetIdentity {
     #[constructor]
-    fn create(caller: Arc<OutboundCaller>) -> Self {}
+    fn create(caller: Arc<OutboundCaller>) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self, peer: &SpiffeId) -> Response {}
+    fn respond(&self, peer: &SpiffeId) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -701,7 +705,7 @@ impl GetIdentity {
     #[test]
     fn rejects_a_spiffe_http_client_marker_with_arguments() {
         let error = generate(
-            "use reqwest::Client;\n\n#[singleton]\nstruct Bad {\n    client: Client,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client(extra)] client: Client) -> Self {}\n}\n",
+            "use reqwest::Client;\n\n#[singleton]\nstruct Bad {\n    client: Client,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client(extra)] client: Client) -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -712,7 +716,7 @@ impl GetIdentity {
     #[test]
     fn rejects_a_parameter_that_is_both_a_spiffe_http_client_and_a_console_argument() {
         let error = generate(
-            "#[singleton]\nstruct Bad {\n    endpoint: String,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client] #[console_argument(from = \"endpoint\")] endpoint: String) -> Self {}\n}\n",
+            "#[singleton]\nstruct Bad {\n    endpoint: String,\n}\n\nimpl Bad {\n    #[constructor]\n    fn create(#[spiffe_http_client] #[console_argument(from = \"endpoint\")] endpoint: String) -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -723,7 +727,7 @@ impl GetIdentity {
     #[test]
     fn rejects_a_console_command_that_injects_the_spiffe_http_client() {
         let error = generate(
-            "use reqwest::Client;\nuse std::sync::Arc;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> Self {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: Arc<OutboundCaller>) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            "use reqwest::Client;\nuse std::sync::Arc;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -734,7 +738,7 @@ impl GetIdentity {
     #[test]
     fn allows_a_console_argument_named_after_the_spiffe_http_client() {
         let code = generate(
-            "use reqwest::Client;\nuse std::sync::Arc;\nuse tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct IdentityClient {\n    client: Client,\n}\n\nimpl IdentityClient {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> Self {}\n}\n\n#[singleton]\nstruct Labeled {\n    label: String,\n}\n\nimpl Labeled {\n    #[constructor]\n    fn create(#[console_argument(from = \"spiffe_http_client\")] label: String) -> Self {}\n}\n\n#[service]\nstruct Worker {\n    client: Arc<IdentityClient>,\n    labeled: Arc<Labeled>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(client: Arc<IdentityClient>, labeled: Arc<Labeled>) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            "use reqwest::Client;\nuse std::sync::Arc;\nuse tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct IdentityClient {\n    client: Client,\n}\n\nimpl IdentityClient {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct Labeled {\n    label: String,\n}\n\nimpl Labeled {\n    #[constructor]\n    fn create(#[console_argument(from = \"spiffe_http_client\")] label: String) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    client: Arc<IdentityClient>,\n    labeled: Arc<Labeled>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(client: Arc<IdentityClient>, labeled: Arc<Labeled>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
         )
         .expect("the framework binding and a console argument of the same name coexist");
 
@@ -837,7 +841,7 @@ struct AuthJwksEndpoint;
 
 impl AuthJwksEndpoint {
     #[constructor]
-    fn create(#[console_argument(from = \"issuer-url\")] issuer_url: String) -> Self {}
+    fn create(#[console_argument(from = \"issuer-url\")] issuer_url: String) -> anyhow::Result<Self> {}
 }
 
 impl ProvidesEndpoint for AuthJwksEndpoint {}
@@ -850,10 +854,10 @@ struct GetVerify {
 
 impl GetVerify {
     #[constructor]
-    fn create(#[jwks_secret_store(client = auth)] verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>) -> Self {}
+    fn create(#[jwks_secret_store(client = auth)] verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -886,10 +890,10 @@ struct GetJwks {
 
 impl GetJwks {
     #[constructor]
-    fn create(handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>) -> Self {}
+    fn create(handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -920,10 +924,10 @@ struct GetJwks {
 
 impl GetJwks {
     #[constructor]
-    fn create(handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>) -> Self {}
+    fn create(handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -951,7 +955,7 @@ impl GetJwks {
     #[test]
     fn rejects_a_client_store_referencing_an_unknown_tag() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]\nstruct GetVerify {\n    verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>,\n}\n\nimpl GetVerify {\n    #[constructor]\n    fn create(#[jwks_secret_store(client = missing)] verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>) -> Self {}\n\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]\nstruct GetVerify {\n    verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>,\n}\n\nimpl GetVerify {\n    #[constructor]\n    fn create(#[jwks_secret_store(client = missing)] verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect_err("a client store without a matching jwks endpoint is rejected")
         .to_string();
@@ -1037,7 +1041,7 @@ struct Page;
 
 impl Page {
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 
 #[singleton]
@@ -1046,10 +1050,10 @@ struct RequestLog;
 
 impl RequestLog {
     #[constructor]
-    fn create() -> Self {}
+    fn create() -> anyhow::Result<Self> {}
 
     #[process]
-    fn process(&self, request: &Request, next: Next) -> ResponseContinuation {}
+    fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 ";
 
@@ -1076,7 +1080,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[singleton]
@@ -1085,7 +1089,7 @@ struct GetProfile;
 
 impl GetProfile {
     #[process]
-    fn respond(&self, #[authenticated_user] user: User) -> Response {}
+    fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -1111,7 +1115,7 @@ impl GetProfile {
     #[test]
     fn omits_the_authenticated_users_module_without_a_served_request() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         )
         .expect("the build succeeds");
 
@@ -1152,7 +1156,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = \"chat\", response = single)]
@@ -1172,10 +1176,10 @@ struct RequestLog;
 
 impl RequestLog {
     #[constructor]
-    fn create() -> Self {}
+    fn create() -> anyhow::Result<Self> {}
 
     #[process]
-    fn process(&self, request: &Request, next: Next) -> ResponseContinuation {}
+    fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 ";
 
@@ -1193,7 +1197,7 @@ impl RequestLog {
     #[test]
     fn propagates_a_middleware_codegen_error() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> ResponseContinuation {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         )
         .expect_err("the invalid middleware handler is rejected")
         .to_string();
@@ -1272,7 +1276,7 @@ struct Config;
 
 impl Config {
     #[constructor]
-    fn create(&self) -> Self {}
+    fn create(&self) -> anyhow::Result<Self> {}
 }
 ";
 
@@ -1288,7 +1292,7 @@ impl Config {
     #[test]
     fn propagates_an_http_failure() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(path = \"/x\")]\nstruct Bad;\n\nimpl Bad {\n    #[constructor]\n    fn create() -> Self {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(path = \"/x\")]\nstruct Bad;\n\nimpl Bad {\n    #[constructor]\n    fn create() -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1324,7 +1328,7 @@ struct Bad;
 
 impl Bad {
     #[constructor]
-    fn create(#[console_argument(positional)] label: String) -> Self {}
+    fn create(#[console_argument(positional)] label: String) -> anyhow::Result<Self> {}
 }
 ";
 
@@ -1347,7 +1351,7 @@ struct Worker;
 
 impl Worker {
     #[constructor]
-    fn create(#[console_argument(positional)] label: String) -> Self {}
+    fn create(#[console_argument(positional)] label: String) -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -1356,10 +1360,10 @@ struct Page;
 
 impl Page {
     #[constructor]
-    fn create(#[console_argument(from = \"label\")] label: String) -> Self {}
+    fn create(#[console_argument(from = \"label\")] label: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -1386,7 +1390,7 @@ struct GetCard;
 
 impl GetCard {
     #[process]
-    fn respond(&self, views: &crate::margaret::views::Views) -> Response {}
+    fn respond(&self, views: &crate::margaret::views::Views) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -1416,7 +1420,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = \"chat\", response = single)]
@@ -1444,7 +1448,7 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn propagates_a_views_failure() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[renders_view(name = \"CardLayout\")]\nstruct Card;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[renders_view(name = \"CardLayout\")]\nstruct Card;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1455,7 +1459,7 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn propagates_a_dependency_cycle_failure() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct A;\n\nimpl A {\n    #[constructor]\n    fn create(b: Arc<B>) -> Self {}\n}\n\n#[singleton]\nstruct B;\n\nimpl B {\n    #[constructor]\n    fn create(a: Arc<A>) -> Self {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct A;\n\nimpl A {\n    #[constructor]\n    fn create(b: Arc<B>) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct B;\n\nimpl B {\n    #[constructor]\n    fn create(a: Arc<A>) -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1466,7 +1470,7 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn awaits_an_async_constructor_in_the_container() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> Self {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect("the async build succeeds");
 
@@ -1487,7 +1491,7 @@ struct Index;
 
 impl Index {
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 
 #[singleton]
@@ -1496,7 +1500,7 @@ struct Metrics;
 
 impl Metrics {
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -1522,7 +1526,7 @@ impl Metrics {
     #[test]
     fn rejects_a_non_string_server() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1533,7 +1537,7 @@ impl Metrics {
     #[test]
     fn supports_same_struct_name_route_handlers_in_different_modules() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n",
         )
         .expect("two `Page` handlers in different modules coexist");
 
@@ -1565,7 +1569,7 @@ struct Origin;
 
 impl Origin {
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 
 #[singleton]
@@ -1574,7 +1578,7 @@ struct New;
 
 impl New {
     #[process]
-    fn respond(&self, #[route_parameter(from = \"id\")] id: String) -> Response {}
+    fn respond(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -1644,10 +1648,10 @@ struct Page;
 
 impl Page {
     #[constructor]
-    fn create(#[console_argument(from = \"greeting\")] greeting: String) -> Self {}
+    fn create(#[console_argument(from = \"greeting\")] greeting: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -1673,7 +1677,7 @@ struct Banner;
 
 impl Banner {
     #[constructor]
-    fn create(#[console_argument(from = \"title\")] title: String) -> Self {}
+    fn create(#[console_argument(from = \"title\")] title: String) -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -1682,7 +1686,7 @@ struct Page;
 
 impl Page {
     #[process]
-    fn respond(&self, views: &crate::margaret::views::Views) -> Response {}
+    fn respond(&self, views: &crate::margaret::views::Views) -> anyhow::Result<Response> {}
 }
 ";
 
@@ -1706,7 +1710,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = \"chat\", response = single)]
@@ -1717,7 +1721,7 @@ struct Chatter;
 
 impl Chatter {
     #[constructor]
-    fn create(#[console_argument(from = \"greeting\")] greeting: String) -> Self {}
+    fn create(#[console_argument(from = \"greeting\")] greeting: String) -> anyhow::Result<Self> {}
 }
 
 impl RespondsToWebSocketMessage for Chatter {
@@ -1747,7 +1751,7 @@ struct SystemClock;
 
 impl SystemClock {
     #[constructor]
-    fn create(#[console_argument(from = \"timezone\")] timezone: String) -> Self {}
+    fn create(#[console_argument(from = \"timezone\")] timezone: String) -> anyhow::Result<Self> {}
 }
 
 #[websocket_session(path = \"/room\", server = \"public\")]
@@ -1755,7 +1759,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(clock: Arc<SystemClock>) -> Self {}
+    fn build(clock: Arc<SystemClock>) -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = \"chat\", response = single)]
@@ -1766,7 +1770,7 @@ struct Chatter;
 
 impl Chatter {
     #[constructor]
-    fn create() -> Self {}
+    fn create() -> anyhow::Result<Self> {}
 }
 
 impl RespondsToWebSocketMessage for Chatter {

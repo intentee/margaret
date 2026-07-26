@@ -9,9 +9,8 @@ pub struct SystemClock;
 
 impl SystemClock {
     #[constructor]
-    #[must_use]
-    pub fn create() -> Self {
-        Self
+    pub fn create() -> anyhow::Result<Self> {
+        Ok(Self)
     }
 
     #[must_use]

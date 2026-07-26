@@ -3,7 +3,7 @@ struct Child;
 
 impl Child {
     #[constructor]
-    fn create(#[console_argument(from = "retries")] retries: u16) -> Self {}
+    fn create(#[console_argument(from = "retries")] retries: u16) -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -14,6 +14,6 @@ impl Parent {
     fn create(
         #[console_argument(from = "retries")] retries: u16,
         child: std::sync::Arc<Child>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
     }
 }

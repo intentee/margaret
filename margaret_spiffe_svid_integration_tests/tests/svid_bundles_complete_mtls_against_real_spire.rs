@@ -36,10 +36,7 @@ async fn completes_mtls_with_a_real_spire_issued_svid() {
     let client_config = Arc::new(svid_bundle.client_config());
 
     let mut service_manager = ServiceManager::default();
-    service_manager
-        .register_bundle(svid_bundle)
-        .await
-        .unwrap();
+    service_manager.register_bundle(svid_bundle).await.unwrap();
 
     let cancellation_token = CancellationToken::new();
     let cancellation_token_for_manager = cancellation_token.clone();

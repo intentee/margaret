@@ -3,8 +3,8 @@ use chrono::Utc;
 use futures_util::future::try_join;
 use serde::Serialize;
 
-use margaret_identity_session::is_expired::IsExpired;
 use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
+use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
@@ -16,13 +16,8 @@ use crate::token_signer_error::TokenSignerError;
 async fn sign_with_current<TClaims: Send + Serialize + Sync>(
     secret: &JwksSecret,
     claims: &TClaims,
-) -> Result<String, TokenSignerError> {
-    secret
-        .current
-        .signing
-        .sign(claims)
-        .await
-        .map_err(|source| TokenSignerError::Signing { source })
+) -> Result<String, JwksKeyError> {
+    secret.current.signing.sign(claims).await
 }
 
 pub async fn mint_access_token(
@@ -42,7 +37,7 @@ pub async fn mint_access_token(
         | JwksSecretVerificationResult::SignedWithPrevious(claims) => claims,
     };
 
-    if refresh_claims.is_expired(now) {
+    if refresh_claims.is_expired_at(now) {
         return Err(TokenSignerError::ExpiredRefreshToken);
     }
 
@@ -51,7 +46,8 @@ pub async fn mint_access_token(
         sign_with_current(secret, &access_claims),
         sign_with_current(secret, &refresh_claims),
     )
-    .await?;
+    .await
+    .map_err(|source| TokenSignerError::Signing { source })?;
 
     Ok(MintedTokens {
         access_token,

@@ -15,11 +15,11 @@ impl Configured {
         #[console_argument(from = "echo")] echo: String,
         #[console_argument(from = "foxtrot")] foxtrot: String,
         #[console_argument(from = "golf")] golf: String,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
     }
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -27,7 +27,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "ping", response = single)]

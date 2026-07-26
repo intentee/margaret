@@ -9,6 +9,7 @@ use dashmap::DashMap;
 use uuid::Uuid;
 
 use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
+use margaret::framework::http::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::provides_route_parameter;
 use margaret::framework::macros::singleton;
@@ -97,20 +98,21 @@ pub struct ArticleStore {
 
 impl ArticleStore {
     #[constructor]
-    #[must_use]
-    pub fn create(clock: Arc<SystemClock>) -> Self {
-        let articles = DashMap::new();
+    pub fn create(clock: Arc<SystemClock>) -> anyhow::Result<Self> {
+        Ok({
+            let articles = DashMap::new();
 
-        for article in seed() {
-            articles.insert(article.id, article);
-        }
+            for article in seed() {
+                articles.insert(article.id, article);
+            }
 
-        Self {
-            articles,
-            authors: known_authors(),
-            clock,
-            next_id: AtomicU64::new(FIRST_AUTHORED_ID),
-        }
+            Self {
+                articles,
+                authors: known_authors(),
+                clock,
+                next_id: AtomicU64::new(FIRST_AUTHORED_ID),
+            }
+        })
     }
 
     pub fn all(&self) -> Vec<Article> {
@@ -174,10 +176,16 @@ impl ArticleStore {
 impl HttpRouteParameterBinder for ArticleStore {
     type Model = Article;
 
-    async fn bind(&self, value: String) -> Option<Article> {
-        Uuid::parse_str(&value)
-            .ok()
-            .and_then(|id| self.find_article_by_id(id))
+    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {
+        Ok(
+            match Uuid::parse_str(&value)
+                .ok()
+                .and_then(|id| self.find_article_by_id(id))
+            {
+                Some(article) => RouteParameterBindingOutcome::Bound(article),
+                None => RouteParameterBindingOutcome::NotFound,
+            },
+        )
     }
 }
 
@@ -188,13 +196,16 @@ mod tests {
     use uuid::Uuid;
 
     use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
+    use margaret::framework::http::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 
     use super::ArticleStore;
     use super::FEATURED_ARTICLE_ID;
     use crate::system_clock::SystemClock;
 
     fn store() -> ArticleStore {
-        ArticleStore::create(Arc::new(SystemClock::create()))
+        let clock = SystemClock::create().expect("the clock is constructed");
+
+        ArticleStore::create(Arc::new(clock)).expect("the article store is constructed")
     }
 
     #[test]
@@ -251,7 +262,13 @@ mod tests {
     async fn binds_an_article_by_its_uuid() {
         let store = store();
 
-        assert!(store.bind(FEATURED_ARTICLE_ID.to_string()).await.is_some());
-        assert!(store.bind("not-a-uuid".to_string()).await.is_none());
+        assert!(matches!(
+            store.bind(FEATURED_ARTICLE_ID.to_string()).await,
+            Ok(RouteParameterBindingOutcome::Bound(_))
+        ));
+        assert!(matches!(
+            store.bind("not-a-uuid".to_string()).await,
+            Ok(RouteParameterBindingOutcome::NotFound)
+        ));
     }
 }

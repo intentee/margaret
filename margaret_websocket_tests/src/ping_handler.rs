@@ -6,7 +6,6 @@ use tokio_util::sync::CancellationToken;
 use margaret_websocket::request_envelope::RequestEnvelope;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret_websocket::web_socket::WebSocket;
-use margaret_websocket::web_socket_error::WebSocketError;
 
 use crate::ping_message::PingMessage;
 use crate::response_chunk::ResponseChunk;
@@ -25,7 +24,7 @@ impl RespondsToWebSocketMessage for PingHandler {
         _session: Arc<TestSession>,
         message: RequestEnvelope<PingMessage>,
         socket: WebSocket,
-    ) -> Result<(), WebSocketError> {
+    ) -> anyhow::Result<()> {
         socket
             .send(message.response(ResponseChunk {
                 text: format!("pong {}", message.message().label),

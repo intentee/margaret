@@ -20,20 +20,21 @@ pub struct GetGreetingCard {
 
 impl GetGreetingCard {
     #[constructor]
-    #[must_use]
-    pub fn create(greeter: Arc<EnglishGreeter>) -> Self {
-        Self { greeter }
+    pub fn create(greeter: Arc<EnglishGreeter>) -> anyhow::Result<Self> {
+        Ok(Self { greeter })
     }
 
     #[process]
-    pub async fn respond(&self, routes: &Routes, views: &Views) -> Response {
-        Response::html(
-            200,
-            views.greeting_view.render(GreetingViewProps {
-                greeting: self.greeter.greet(),
-                routes,
-            }),
-        )
+    pub async fn respond(&self, routes: &Routes, views: &Views) -> anyhow::Result<Response> {
+        Ok({
+            Response::html(
+                200,
+                views.greeting_view.render(GreetingViewProps {
+                    greeting: self.greeter.greet(),
+                    routes,
+                })?,
+            )
+        })
     }
 }
 
@@ -55,14 +56,28 @@ mod tests {
         let card_layout = Arc::new(CardLayout);
         let views = Views {
             card_layout: card_layout.clone(),
-            farewell_view: Arc::new(FarewellView::create(card_layout.clone())),
-            greeting_view: Arc::new(GreetingView::create(card_layout)),
+            farewell_view: Arc::new(
+                FarewellView::create(card_layout.clone())
+                    .expect("the farewell view is constructed"),
+            ),
+            greeting_view: Arc::new(
+                GreetingView::create(card_layout).expect("the greeting view is constructed"),
+            ),
         };
         let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
-        let responder = GetGreetingCard::create(Arc::new(EnglishGreeter::create(Arc::new(
-            AppName::create(),
-        ))));
+        let app_name = AppName::create().expect("the app name is constructed");
+        let greeter =
+            EnglishGreeter::create(Arc::new(app_name)).expect("the English greeter is constructed");
+        let responder =
+            GetGreetingCard::create(Arc::new(greeter)).expect("the responder is constructed");
 
-        assert_eq!(responder.respond(&routes, &views).await.status(), 200);
+        assert_eq!(
+            responder
+                .respond(&routes, &views)
+                .await
+                .expect("the responder succeeds")
+                .status(),
+            200
+        );
     }
 }

@@ -16,13 +16,12 @@ pub struct GetHealth {
 
 impl GetHealth {
     #[constructor]
-    #[must_use]
-    pub fn create(app_name: Arc<AppName>) -> Self {
-        Self { app_name }
+    pub fn create(app_name: Arc<AppName>) -> anyhow::Result<Self> {
+        Ok(Self { app_name })
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
-        Response::text(200, self.app_name.as_str())
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok(Response::text(200, self.app_name.as_str()))
     }
 }

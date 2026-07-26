@@ -8,7 +8,6 @@ use margaret::framework::macros::singleton;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret::framework::websocket::web_socket::WebSocket;
-use margaret::framework::websocket::web_socket_error::WebSocketError;
 
 use crate::routes::public::sessions::storyboard::StoryboardSession;
 use crate::routes::public::sessions::storyboard::messages::conversation_message::ConversationMessage;
@@ -19,9 +18,8 @@ pub struct Storyboard;
 
 impl Storyboard {
     #[constructor]
-    #[must_use]
-    pub fn create() -> Self {
-        Self
+    pub fn create() -> anyhow::Result<Self> {
+        Ok(Self)
     }
 }
 
@@ -36,7 +34,7 @@ impl RespondsToWebSocketMessage for Storyboard {
         session: Arc<StoryboardSession>,
         message: StreamingRequestEnvelope<ConversationMessage>,
         socket: WebSocket,
-    ) -> Result<(), WebSocketError> {
+    ) -> anyhow::Result<()> {
         let prompt = message.message().prompt.clone();
 
         session.record(prompt.clone()).await;

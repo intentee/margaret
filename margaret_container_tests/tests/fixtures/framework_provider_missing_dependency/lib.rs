@@ -5,5 +5,5 @@ struct Consumer;
 
 impl Consumer {
     #[constructor]
-    fn new(dropped: Arc<crate::Dropped>) -> Self {}
+    fn new(dropped: Arc<crate::Dropped>) -> anyhow::Result<Self> {}
 }

@@ -9,7 +9,9 @@ use crate::loaded_secret::LoadedSecret;
 use crate::roller_error::RollerError;
 
 fn load_or_fresh(storage: &dyn JwksSecretStorage, curve: Curve) -> Result<JwksSecret, RollerError> {
-    match storage.load()? {
+    match storage.load().map_err(|source| RollerError::SecretLoad {
+        source: source.into(),
+    })? {
         LoadedSecret::Present(loaded) => Ok(*loaded),
         LoadedSecret::Absent => JwksSecret::fresh(curve).map_err(RollerError::KeyGeneration),
     }
@@ -33,7 +35,11 @@ pub fn roll(
 ) -> Result<Arc<JwksSecret>, RollerError> {
     let next = Arc::new(next_secret(storage, holder, curve)?);
 
-    storage.persist(&next)?;
+    storage
+        .persist(&next)
+        .map_err(|source| RollerError::SecretPersist {
+            source: source.into(),
+        })?;
     holder.set(Some(next.clone()));
 
     Ok(next)

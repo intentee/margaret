@@ -4,5 +4,5 @@ struct JwksEndpoint;
 
 impl JwksEndpoint {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }

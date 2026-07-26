@@ -15,6 +15,7 @@ use margaret_http::web_socket_upgrade::WebSocketUpgrade;
 
 use crate::serve_web_socket_connection::serve_web_socket_connection;
 use crate::web_socket_dispatch_table::WebSocketDispatchTable;
+use crate::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome;
 use crate::web_socket_session_factory::WebSocketSessionFactory;
 
 async fn drive_web_socket_upgrade<Session>(
@@ -25,8 +26,13 @@ async fn drive_web_socket_upgrade<Session>(
 ) where
     Session: Send + Sync + 'static,
 {
-    let Ok(upgraded) = on_upgrade.await else {
-        return;
+    let upgraded = match on_upgrade.await {
+        Ok(upgraded) => upgraded,
+        Err(error) => {
+            eprintln!("margaret_websocket: protocol upgrade failed: {error}");
+
+            return;
+        }
     };
     let stream = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
 
@@ -82,8 +88,13 @@ where
 
         let accept = derive_accept_key(key.as_bytes());
         let session = match self.factory.create(handshake).await {
-            Ok(session) => session,
-            Err(continuation) => return continuation,
+            Ok(WebSocketSessionCreationOutcome::Created(session)) => session,
+            Ok(WebSocketSessionCreationOutcome::Interrupted(continuation)) => return continuation,
+            Err(error) => {
+                eprintln!("margaret_websocket: session creation failed: {error:#}");
+
+                return ResponseContinuation::from(Response::text(500, "Internal Server Error"));
+            }
         };
 
         tokio::spawn(drive_web_socket_upgrade(

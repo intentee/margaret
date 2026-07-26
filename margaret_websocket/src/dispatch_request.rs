@@ -15,6 +15,22 @@ use crate::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use crate::web_socket::WebSocket;
 use crate::web_socket_request_message::WebSocketRequestMessage;
 
+async fn report_request_result(result: anyhow::Result<()>, socket: WebSocket, id: RequestId) {
+    if let Err(error) = result {
+        eprintln!("margaret_websocket: request handler failed: {error:#}");
+        report_send_failure(
+            socket
+                .send_error(
+                    id,
+                    EnvelopeErrorCode::InternalError,
+                    "Internal error".to_string(),
+                    Value::Null,
+                )
+                .await,
+        );
+    }
+}
+
 pub async fn dispatch_request<Handler>(
     handler: &Handler,
     cancellation_token: CancellationToken,
@@ -28,13 +44,17 @@ pub async fn dispatch_request<Handler>(
 {
     match validate_json::<Handler::Message>(Some(&params)) {
         ValidationResult::Valid(message) => {
-            let envelope = Handler::Message::envelope(id, message);
+            let envelope = Handler::Message::envelope(id.clone(), message);
+            let error_socket = socket.clone();
 
-            report_send_failure(
+            report_request_result(
                 handler
                     .process(cancellation_token, session, envelope, socket)
                     .await,
-            );
+                error_socket,
+                id,
+            )
+            .await;
         }
         ValidationResult::Invalid(_) => {
             report_send_failure(

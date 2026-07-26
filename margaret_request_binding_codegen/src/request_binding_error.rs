@@ -53,6 +53,11 @@ pub enum RequestBindingError {
     },
 
     #[error(
+        "{subject} requests route parameter '{parameter}' more than once; a route parameter is bound exactly once"
+    )]
+    MultipleRouteParameterBindings { subject: String, parameter: String },
+
+    #[error(
         "argument #{parameter} of {subject} carries #[route_parameter], but {subject} has no route path to bind from"
     )]
     RouteParameterUnavailable { subject: String, parameter: String },
@@ -156,7 +161,7 @@ pub enum RequestBindingError {
     AmbiguousInferFromRequest { provider: String, methods: String },
 
     #[error(
-        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>"
+        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>>"
     )]
     InferenceReturnTypeMismatch { provider: String, written: String },
 

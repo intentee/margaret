@@ -16,15 +16,16 @@ pub struct CallRoute {
 
 impl CallRoute {
     #[constructor]
-    #[must_use]
-    pub fn create(identity_client: Arc<IdentityClient>) -> Self {
-        Self { identity_client }
+    pub fn create(identity_client: Arc<IdentityClient>) -> anyhow::Result<Self> {
+        Ok(Self { identity_client })
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
-        let _http_client = self.identity_client.http_client();
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok({
+            let _http_client = self.identity_client.http_client();
 
-        Response::text(200, "called")
+            Response::text(200, "called")
+        })
     }
 }

@@ -11,10 +11,15 @@ pub struct GetFeed;
 
 impl GetFeed {
     #[process]
-    pub async fn respond(&self, #[authenticated_user] reader: Option<User>) -> Response {
-        match reader {
-            Some(reader) => Response::text(200, format!("your feed, {}", reader.name)),
-            None => Response::text(200, "the public feed".to_string()),
-        }
+    pub async fn respond(
+        &self,
+        #[authenticated_user] reader: Option<User>,
+    ) -> anyhow::Result<Response> {
+        Ok({
+            match reader {
+                Some(reader) => Response::text(200, format!("your feed, {}", reader.name)),
+                None => Response::text(200, "the public feed".to_string()),
+            }
+        })
     }
 }

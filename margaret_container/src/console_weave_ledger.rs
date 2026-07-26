@@ -21,14 +21,21 @@ impl ConsoleWeaveLedger {
     }
 
     pub(crate) fn weave(&mut self, argument: &ConsoleArgument, slot: usize) -> TokenStream {
-        let remaining = self
-            .remaining
-            .get_mut(&slot)
-            .expect("the ledger counts every slot it weaves");
+        let Some(remaining) = self.remaining.get_mut(&slot) else {
+            return quote::quote! {
+                ::core::compile_error!("margaret generated an inconsistent console argument weave");
+            };
+        };
 
-        *remaining -= 1;
+        let is_last = *remaining == 1;
 
-        owned_weave(argument, slot, *remaining == 0)
+        if is_last {
+            self.remaining.remove(&slot);
+        } else {
+            *remaining -= 1;
+        }
+
+        owned_weave(argument, slot, is_last)
     }
 }
 
@@ -116,5 +123,15 @@ mod tests {
         );
         assert_eq!(collapsed(ledger.weave(&cloned(), 1)), "console_argument_1");
         assert_eq!(collapsed(ledger.weave(&cloned(), 0)), "console_argument_0");
+    }
+
+    #[test]
+    fn reports_a_slot_that_was_not_planned() {
+        let mut ledger = ConsoleWeaveLedger::new(&[]);
+
+        assert_eq!(
+            collapsed(ledger.weave(&cloned(), 7)),
+            "::core::compile_error!(\"margaretgeneratedaninconsistentconsoleargumentweave\");"
+        );
     }
 }

@@ -3,7 +3,7 @@ struct Config;
 
 impl Config {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 #[service]
@@ -13,7 +13,7 @@ struct Pulse {
 
 impl Pulse {
     #[constructor]
-    fn new(config: Arc<Config>) -> Self {}
+    fn new(config: Arc<Config>) -> anyhow::Result<Self> {}
 }
 
 #[scheduled_with_tick_timer(interval = crate::schedule::PERIOD)]

@@ -24,7 +24,10 @@ impl GetArticle {
             created_at,
             ..
         }: Article,
-    ) -> Response {
-        Response::text(200, format!("\"{title}\" (posted at {created_at}): {body}"))
+    ) -> anyhow::Result<Response> {
+        Ok(Response::text(
+            200,
+            format!("\"{title}\" (posted at {created_at}): {body}"),
+        ))
     }
 }

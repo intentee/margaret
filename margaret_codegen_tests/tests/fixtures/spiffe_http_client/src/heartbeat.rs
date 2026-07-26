@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
@@ -17,13 +16,12 @@ pub struct Heartbeat {
 
 impl Heartbeat {
     #[constructor]
-    #[must_use]
-    pub fn create(identity_client: Arc<IdentityClient>) -> Self {
-        Self { identity_client }
+    pub fn create(identity_client: Arc<IdentityClient>) -> anyhow::Result<Self> {
+        Ok(Self { identity_client })
     }
 
     #[process]
-    pub async fn run(&self, cancellation_token: CancellationToken) -> Result<(), Infallible> {
+    pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         let _asset = asset!("resources/ts/app.ts");
         let _http_client = self.identity_client.http_client();
 

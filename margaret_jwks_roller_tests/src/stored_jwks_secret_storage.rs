@@ -4,7 +4,6 @@ use std::sync::PoisonError;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::loaded_secret::LoadedSecret;
-use margaret_jwks_roller::roller_error::RollerError;
 
 pub struct StoredJwksSecretStorage {
     stored: Mutex<LoadedSecret>,
@@ -27,7 +26,7 @@ impl StoredJwksSecretStorage {
 }
 
 impl JwksSecretStorage for StoredJwksSecretStorage {
-    fn load(&self) -> Result<LoadedSecret, RollerError> {
+    fn load(&self) -> anyhow::Result<LoadedSecret> {
         let stored = self.stored.lock().unwrap_or_else(PoisonError::into_inner);
 
         Ok(match &*stored {
@@ -36,7 +35,7 @@ impl JwksSecretStorage for StoredJwksSecretStorage {
         })
     }
 
-    fn persist(&self, secret: &JwksSecret) -> Result<(), RollerError> {
+    fn persist(&self, secret: &JwksSecret) -> anyhow::Result<()> {
         let mut stored = self.stored.lock().unwrap_or_else(PoisonError::into_inner);
 
         *stored = LoadedSecret::Present(Box::new(secret.clone()));

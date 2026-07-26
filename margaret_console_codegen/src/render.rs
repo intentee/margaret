@@ -76,12 +76,22 @@ fn command_arm(
                     }
                 };
 
-                #accessor_access.run(cancellation_token).await
+                match #accessor_access.run(cancellation_token).await {
+                    ::std::result::Result::Ok(outcome) => outcome,
+                    ::std::result::Result::Err(error) => {
+                        margaret::framework::console::report_failure::report_failure(error)
+                    }
+                }
             }
         }
     } else {
         quote! {
-            Some((#name, #matches_binding)) => #accessor_access.run().await,
+            Some((#name, #matches_binding)) => match #accessor_access.run().await {
+                ::std::result::Result::Ok(outcome) => outcome,
+                ::std::result::Result::Err(error) => {
+                    margaret::framework::console::report_failure::report_failure(error)
+                }
+            },
         }
     }
 }

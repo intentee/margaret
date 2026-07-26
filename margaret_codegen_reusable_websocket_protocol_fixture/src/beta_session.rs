@@ -8,8 +8,7 @@ pub struct BetaSession;
 
 impl BetaSession {
     #[build_for_session]
-    #[must_use]
-    pub fn new() -> Self {
-        Self
+    pub fn new() -> anyhow::Result<Self> {
+        Ok(Self)
     }
 }

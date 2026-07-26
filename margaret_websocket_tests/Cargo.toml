@@ -5,6 +5,7 @@ edition = "2024"
 autotests = false
 
 [dependencies]
+anyhow = { workspace = true }
 async-trait = { workspace = true }
 futures-util = { workspace = true }
 margaret_http = { path = "../margaret_http" }

@@ -23,11 +23,13 @@ impl RespondsToWebSocketNotification for TypingHandler {
         session: Arc<TestSession>,
         message: NotificationEnvelope<TypingNotification>,
         _socket: WebSocket,
-    ) {
+    ) -> anyhow::Result<()> {
         session
             .notifications
             .lock()
             .expect("the notification log is not poisoned")
             .push(message.message().who.clone());
+
+        Ok(())
     }
 }

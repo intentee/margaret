@@ -22,8 +22,8 @@ pub struct PostArticle {
 
 impl PostArticle {
     #[constructor]
-    pub fn create(articles: Arc<ArticleStore>) -> Self {
-        Self { articles }
+    pub fn create(articles: Arc<ArticleStore>) -> anyhow::Result<Self> {
+        Ok(Self { articles })
     }
 
     #[process]
@@ -34,11 +34,13 @@ impl PostArticle {
             body,
             author_id,
         }: PostArticleForm,
-    ) -> Response {
-        match self.articles.insert(title, body, author_id) {
-            Ok(article) => Response::text(201, format!("created \"{}\"", article.title)),
-            Err(error) => Response::text(500, error.to_string()),
-        }
+    ) -> anyhow::Result<Response> {
+        Ok({
+            match self.articles.insert(title, body, author_id) {
+                Ok(article) => Response::text(201, format!("created \"{}\"", article.title)),
+                Err(error) => Response::text(500, error.to_string()),
+            }
+        })
     }
 }
 
@@ -55,15 +57,23 @@ mod tests {
 
     #[tokio::test]
     async fn responds_with_500_when_the_author_is_unknown() {
-        let responder = PostArticle::create(Arc::new(ArticleStore::create(Arc::new(
-            SystemClock::create(),
-        ))));
+        let clock = SystemClock::create().expect("the clock is constructed");
+        let store =
+            ArticleStore::create(Arc::new(clock)).expect("the article store is constructed");
+        let responder = PostArticle::create(Arc::new(store)).expect("the responder is constructed");
         let form = PostArticleForm {
             title: "Title".to_string(),
             body: "Body".to_string(),
             author_id: Uuid::from_u128(999),
         };
 
-        assert_eq!(responder.respond(form).await.status(), 500);
+        assert_eq!(
+            responder
+                .respond(form)
+                .await
+                .expect("the responder succeeds")
+                .status(),
+            500
+        );
     }
 }

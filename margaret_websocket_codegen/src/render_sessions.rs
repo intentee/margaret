@@ -17,6 +17,7 @@ use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
 use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::render_bound_request_extractions::render_bound_request_extractions;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
@@ -163,9 +164,44 @@ fn create_extractions(
     handshake: &Ident,
     captured: &CapturedProviders,
 ) -> TokenStream {
-    let continuation_return = quote! { return ::std::result::Result::Err(response) };
-    let response_return = quote! { return ::std::result::Result::Err(response.into()) };
+    let continuation_return = quote! {
+        return ::std::result::Result::Ok(
+            margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
+                response,
+            ),
+        )
+    };
+    let response_return = quote! {
+        return ::std::result::Result::Ok(
+            margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
+                response.into(),
+            ),
+        )
+    };
+    let error_return = quote! {
+        return ::std::result::Result::Err(
+            margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError::consumer(
+                error,
+            ),
+        )
+    };
     let owner = quote! { self. };
+    let bound = render_bound_request_extractions(
+        &session.parameters,
+        captured,
+        &owner,
+        handshake,
+        &quote! { return ::std::result::Result::Err(error.into()) },
+        &quote! {
+            return ::std::result::Result::Ok(
+                margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
+                    margaret::framework::http::response_continuation::ResponseContinuation::from(
+                        margaret::framework::http::response::Response::not_found(),
+                    ),
+                ),
+            )
+        },
+    );
     let extractions = session.parameters.iter().map(|parameter| {
         let provider_access = captured.access(&parameter.binding, &owner);
 
@@ -174,6 +210,7 @@ fn create_extractions(
             &parameter.holder,
             &ExtractionContext {
                 continuation_return: &continuation_return,
+                error_return: &error_return,
                 provider_access: &provider_access,
                 request_local: handshake,
                 response_return: &response_return,
@@ -181,7 +218,10 @@ fn create_extractions(
         )
     });
 
-    quote! { #(#extractions)* }
+    quote! {
+        #bound
+        #(#extractions)*
+    }
 }
 
 fn build_arguments(session: &WebSocketSession) -> TokenStream {
@@ -227,14 +267,17 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
                 &self,
                 #handshake: &margaret::framework::http::request::Request,
             ) -> ::std::result::Result<
-                ::std::sync::Arc<Self::Session>,
-                margaret::framework::http::response_continuation::ResponseContinuation,
+                margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome<Self::Session>,
+                margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError,
             > {
                 #extractions
 
-                ::std::result::Result::Ok(::std::sync::Arc::new(
-                    #session_path::#method_name(#arguments),
-                ))
+                #session_path::#method_name(#arguments)
+                    .map(::std::sync::Arc::new)
+                    .map(margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created)
+                    .map_err(
+                        margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
+                    )
             }
         }
     }

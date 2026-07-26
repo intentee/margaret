@@ -17,12 +17,17 @@ pub struct RefreshTokenClaims {
 }
 
 impl IsExpired for RefreshTokenClaims {
-    fn is_expired(&self, now: DateTime<Utc>) -> bool {
-        self.exp < now.timestamp()
+    fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
+        Ok(self.is_expired_at(now))
     }
 }
 
 impl RefreshTokenClaims {
+    #[must_use]
+    pub fn is_expired_at(&self, now: DateTime<Utc>) -> bool {
+        self.exp < now.timestamp()
+    }
+
     #[must_use]
     pub fn mint_access_token_claims(&self, now: DateTime<Utc>) -> AccessTokenClaims {
         let timestamp = now.timestamp();
@@ -60,9 +65,9 @@ mod tests {
 
     #[test]
     fn reports_expiry_relative_to_now() {
-        assert!(!claims(101).is_expired(at(100)));
-        assert!(claims(99).is_expired(at(100)));
-        assert!(!claims(100).is_expired(at(100)));
+        assert_eq!(claims(101).is_expired(at(100)).ok(), Some(false));
+        assert_eq!(claims(99).is_expired(at(100)).ok(), Some(true));
+        assert_eq!(claims(100).is_expired(at(100)).ok(), Some(false));
     }
 
     #[test]

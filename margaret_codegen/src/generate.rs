@@ -84,7 +84,7 @@ struct Config;
 
 impl Config {
     #[constructor]
-    fn create() -> Self {}
+    fn create() -> anyhow::Result<Self> {}
 }
 ";
 
@@ -152,7 +152,7 @@ impl AssetRoute {
     #[constructor]
     fn create(
         responder: std::sync::Arc<crate::margaret::asset_bag::asset_responder::AssetResponder>,
-    ) -> Self {}
+    ) -> anyhow::Result<Self> {}
 }
 ";
 

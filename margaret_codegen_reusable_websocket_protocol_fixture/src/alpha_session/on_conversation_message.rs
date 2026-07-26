@@ -6,7 +6,6 @@ use margaret::framework::macros::singleton;
 use margaret::framework::websocket::request_envelope::RequestEnvelope;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret::framework::websocket::web_socket::WebSocket;
-use margaret::framework::websocket::web_socket_error::WebSocketError;
 use tokio_util::sync::CancellationToken;
 
 use crate::alpha_session::AlphaSession;
@@ -17,9 +16,8 @@ pub struct OnConversationMessage;
 
 impl OnConversationMessage {
     #[constructor]
-    #[must_use]
-    pub fn new() -> Self {
-        Self
+    pub fn new() -> anyhow::Result<Self> {
+        Ok(Self)
     }
 }
 
@@ -34,7 +32,7 @@ impl RespondsToWebSocketMessage for OnConversationMessage {
         _session: Arc<AlphaSession>,
         _message: RequestEnvelope<ConversationMessage>,
         _socket: WebSocket,
-    ) -> Result<(), WebSocketError> {
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 }

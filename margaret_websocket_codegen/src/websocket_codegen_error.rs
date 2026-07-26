@@ -66,7 +66,7 @@ pub enum WebSocketCodegenError {
     #[error("session '{session}' has more than one #[build_for_session] method: {methods}")]
     AmbiguousBuildForSession { session: String, methods: String },
 
-    #[error("the #[build_for_session] method of '{session}' must return Self")]
+    #[error("the #[build_for_session] method of '{session}' must return anyhow::Result<Self>")]
     BuildForSessionReturnTypeMismatch { session: String },
 
     #[error(

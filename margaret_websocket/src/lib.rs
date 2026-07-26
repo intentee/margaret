@@ -20,5 +20,7 @@ pub mod web_socket_message_dispatch;
 pub mod web_socket_notification_dispatch;
 pub mod web_socket_request_message;
 pub mod web_socket_response_message;
+pub mod web_socket_session_creation_error;
+pub mod web_socket_session_creation_outcome;
 pub mod web_socket_session_factory;
 pub mod web_socket_upgrade_entry;

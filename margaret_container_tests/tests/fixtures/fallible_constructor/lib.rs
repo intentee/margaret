@@ -13,5 +13,5 @@ struct Consumer;
 
 impl Consumer {
     #[constructor]
-    fn new(loader: Arc<Loader>) -> Self {}
+    fn new(loader: Arc<Loader>) -> anyhow::Result<Self> {}
 }

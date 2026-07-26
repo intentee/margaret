@@ -16,13 +16,15 @@ pub struct GetMetrics {
 
 impl GetMetrics {
     #[constructor]
-    #[must_use]
-    pub fn create(metrics: Arc<Metrics>) -> Self {
-        Self { metrics }
+    pub fn create(metrics: Arc<Metrics>) -> anyhow::Result<Self> {
+        Ok(Self { metrics })
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
-        Response::text(200, format!("sweeps={}", self.metrics.sweeps()))
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok(Response::text(
+            200,
+            format!("sweeps={}", self.metrics.sweeps()),
+        ))
     }
 }

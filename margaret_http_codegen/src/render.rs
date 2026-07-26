@@ -27,6 +27,7 @@ use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::injects_routes::injects_routes;
 use margaret_request_binding_codegen::injects_views::injects_views;
+use margaret_request_binding_codegen::render_bound_request_extractions::render_bound_request_extractions;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
@@ -119,6 +120,20 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let views_local = format_ident!("{}", allocator.allocate("views").field());
     let captured = CapturedProviders::capture(&route.arguments, &mut allocator);
 
+    let bound_bindings = render_bound_request_extractions(
+        &route.arguments,
+        &captured,
+        &TokenStream::new(),
+        &request_binding,
+        &quote! { return ::std::result::Result::Err(error.into()) },
+        &quote! {
+            return ::std::result::Result::Ok(
+                margaret::framework::http::response_continuation::ResponseContinuation::from(
+                    margaret::framework::http::response::Response::not_found(),
+                ),
+            )
+        },
+    );
     let bindings_tokens = route
         .arguments
         .iter()
@@ -131,8 +146,11 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let method_name = &route.method_name;
     let respond_call = quote! { #responder_binding.#method_name(#(#argument_values),*).await };
     let body = quote! {
+        #bound_bindings
         #(#bindings_tokens)*
-        margaret::framework::http::response_continuation::ResponseContinuation::from(#respond_call)
+        #respond_call
+            .map(margaret::framework::http::response_continuation::ResponseContinuation::from)
+            .map_err(margaret::framework::http::handler_error::HandlerError::consumer)
     };
 
     let captures_routes = responder_injects_routes(route);
@@ -141,7 +159,10 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         std::pin::Pin<
             std::boxed::Box<
                 dyn std::future::Future<
-                    Output = margaret::framework::http::response_continuation::ResponseContinuation,
+                    Output = ::std::result::Result<
+                        margaret::framework::http::response_continuation::ResponseContinuation,
+                        margaret::framework::http::handler_error::HandlerError,
+                    >,
                 > + Send
                 + '_,
             >,
@@ -283,10 +304,19 @@ fn argument_binding(
         &argument.binding,
         &argument.holder,
         &ExtractionContext {
-            continuation_return: &quote! { return response },
+            continuation_return: &quote! {
+                return ::std::result::Result::Ok(response)
+            },
+            error_return: &quote! {
+                return ::std::result::Result::Err(
+                    margaret::framework::http::handler_error::HandlerError::consumer(error),
+                )
+            },
             provider_access: &provider_access,
             request_local: request,
-            response_return: &quote! { return response.into() },
+            response_return: &quote! {
+                return ::std::result::Result::Ok(response.into())
+            },
         },
     )
 }

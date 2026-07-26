@@ -5,7 +5,7 @@ struct Helper;
 
 impl Helper {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 #[service]
@@ -13,5 +13,5 @@ struct Worker;
 
 impl Worker {
     #[constructor]
-    fn new(helper: Arc<Helper>) -> Self {}
+    fn new(helper: Arc<Helper>) -> anyhow::Result<Self> {}
 }

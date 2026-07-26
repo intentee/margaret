@@ -10,6 +10,7 @@ use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::handler::Handler;
+use margaret_http::handler_error::HandlerError;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
@@ -25,8 +26,8 @@ struct Accepts;
 
 #[async_trait]
 impl Handler for Accepts {
-    async fn handle(&self, _request: &Request) -> ResponseContinuation {
-        ResponseContinuation::Done(Response::text(200, "accepted"))
+    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        Ok(ResponseContinuation::Done(Response::text(200, "accepted")))
     }
 }
 

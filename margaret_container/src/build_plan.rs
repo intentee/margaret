@@ -8,6 +8,7 @@ use syn::Meta;
 use syn::Pat;
 use syn::Path;
 
+use margaret_attributes::anyhow_result_ok_type::anyhow_result_ok_type;
 use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
@@ -19,7 +20,6 @@ use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::marker::marker;
 use margaret_attributes::matched_attribute::MatchedAttribute;
-use margaret_attributes::struct_shape::StructShape;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
 use margaret_console_argument_codegen::weaving_kind::WeavingKind;
@@ -27,7 +27,6 @@ use margaret_tag_codegen::jwks_secret_store_target::JwksSecretStoreTarget;
 use margaret_tag_codegen::read_jwks_secret_store_target::read_jwks_secret_store_target;
 
 use crate::construction_source::ConstructionSource;
-use crate::constructor_return::ConstructorReturnShape;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
@@ -252,15 +251,20 @@ fn resolve_direct(
 ) -> Result<DirectConstruction, ContainerError> {
     match source {
         ConstructionSource::Constructor(constructor) => {
-            let fallible = match ConstructorReturnShape::of(constructor.signature()) {
-                ConstructorReturnShape::SelfValue => false,
-                ConstructorReturnShape::GenericOverSelf => true,
-                ConstructorReturnShape::Unsupported => {
-                    return Err(ContainerError::ConstructorReturnTypeMismatch {
-                        singleton: concrete_path.to_string(),
-                    });
-                }
+            let syn::ReturnType::Type(_, return_type) = &constructor.signature().output else {
+                return Err(ContainerError::ConstructorReturnTypeMismatch {
+                    singleton: concrete_path.to_string(),
+                });
             };
+
+            if !anyhow_result_ok_type(return_type).is_some_and(
+                |ok_type| matches!(ok_type, syn::Type::Path(path) if path.path.is_ident("Self")),
+            ) {
+                return Err(ContainerError::ConstructorReturnTypeMismatch {
+                    singleton: concrete_path.to_string(),
+                });
+            }
+
             let dependencies = resolve_dependencies(
                 index,
                 item,
@@ -273,7 +277,6 @@ fn resolve_direct(
 
             Ok(DirectConstruction::Constructor {
                 dependencies,
-                fallible,
                 is_async: constructor.signature().asyncness.is_some(),
                 method: constructor.identifier().to_string(),
             })
@@ -544,6 +547,8 @@ fn framework_provided_type(construction: &DirectConstruction, path: CanonicalPat
         DirectConstruction::Resolved { .. } => ProvidedType::UriSelected(path),
         DirectConstruction::Constructor { .. }
         | DirectConstruction::Fieldless { .. }
+        | DirectConstruction::FrameworkConstructor { .. }
+        | DirectConstruction::FrameworkUnit
         | DirectConstruction::FrameworkAccessor { .. } => ProvidedType::Concrete(path),
     }
 }
@@ -610,9 +615,8 @@ fn resolve_framework_construction(construction: &FrameworkConstruction) -> Direc
                 resolved.push(DependencyKind::Single { provider_key });
             }
 
-            DirectConstruction::Constructor {
+            DirectConstruction::FrameworkConstructor {
                 dependencies: resolved,
-                fallible: false,
                 is_async: *is_async,
                 method: method.clone(),
             }
@@ -632,9 +636,7 @@ fn resolve_framework_construction(construction: &FrameworkConstruction) -> Direc
             }],
             resolver: resolver.clone(),
         },
-        FrameworkConstruction::Unit => DirectConstruction::Fieldless {
-            shape: StructShape::Unit,
-        },
+        FrameworkConstruction::Unit => DirectConstruction::FrameworkUnit,
     }
 }
 
@@ -741,8 +743,7 @@ fn is_framework_role_referenced(drafts: &[Draft], role: &FrameworkInjectionRole)
 }
 
 fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &CanonicalPath) -> bool {
-    let ConstructionSource::Constructor(constructor) = &draft.construction
-    else {
+    let ConstructionSource::Constructor(constructor) = &draft.construction else {
         return false;
     };
 
@@ -759,8 +760,7 @@ fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &Canonical
 }
 
 fn draft_references_role(draft: &Draft, role: &FrameworkInjectionRole) -> bool {
-    let ConstructionSource::Constructor(constructor) = &draft.construction
-    else {
+    let ConstructionSource::Constructor(constructor) = &draft.construction else {
         return false;
     };
 

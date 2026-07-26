@@ -6,7 +6,7 @@ struct Roller;
 
 impl Roller {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -14,5 +14,5 @@ struct Reader;
 
 impl Reader {
     #[constructor]
-    fn new(roller: Arc<Roller>) -> Self {}
+    fn new(roller: Arc<Roller>) -> anyhow::Result<Self> {}
 }

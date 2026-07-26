@@ -1,7 +1,7 @@
 use quote::format_ident;
 use syn::ReturnType;
-use syn::Type;
 
+use margaret_attributes::anyhow_result_ok_type::anyhow_result_ok_type;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_method::IndexedMethod;
@@ -18,12 +18,14 @@ use crate::session_arguments::SessionArguments;
 use crate::websocket_codegen_error::WebSocketCodegenError;
 use crate::websocket_session::WebSocketSession;
 
-fn returns_self(method: &IndexedMethod) -> bool {
+fn returns_anyhow_result_self(method: &IndexedMethod) -> bool {
     let ReturnType::Type(_, return_type) = &method.signature().output else {
         return false;
     };
 
-    matches!(return_type.as_ref(), Type::Path(type_path) if type_path.path.is_ident("Self"))
+    anyhow_result_ok_type(return_type).is_some_and(
+        |ok_type| matches!(ok_type, syn::Type::Path(type_path) if type_path.path.is_ident("Self")),
+    )
 }
 
 pub(crate) fn websocket_sessions(
@@ -46,7 +48,7 @@ pub(crate) fn websocket_sessions(
         let SessionArguments { path, server } = SessionArguments::parse(matched.args()?, &session)?;
         let method = build_for_session_method(item, &session)?;
 
-        if !returns_self(method) {
+        if !returns_anyhow_result_self(method) {
             return Err(WebSocketCodegenError::BuildForSessionReturnTypeMismatch { session });
         }
 

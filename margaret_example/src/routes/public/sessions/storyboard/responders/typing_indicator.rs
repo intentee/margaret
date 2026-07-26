@@ -17,9 +17,8 @@ pub struct TypingIndicator;
 
 impl TypingIndicator {
     #[constructor]
-    #[must_use]
-    pub fn create() -> Self {
-        Self
+    pub fn create() -> anyhow::Result<Self> {
+        Ok(Self)
     }
 }
 
@@ -34,9 +33,11 @@ impl RespondsToWebSocketNotification for TypingIndicator {
         session: Arc<StoryboardSession>,
         message: NotificationEnvelope<Typing>,
         _socket: WebSocket,
-    ) {
+    ) -> anyhow::Result<()> {
         session
             .record(format!("{} is typing", message.message().who))
             .await;
+
+        Ok(())
     }
 }

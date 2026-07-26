@@ -7,10 +7,10 @@ struct Configured;
 
 impl Configured {
     #[constructor]
-    fn create(#[console_argument(from = "label")] label: String) -> Self {}
+    fn create(#[console_argument(from = "label")] label: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -18,7 +18,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "ping", response = single)]

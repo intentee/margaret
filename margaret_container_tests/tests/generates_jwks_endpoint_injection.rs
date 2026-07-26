@@ -18,7 +18,7 @@ fn jwks_client_provider() -> FrameworkProvider {
     FrameworkProvider {
         construction: FrameworkConstruction::Constructor {
             dependencies: vec![FrameworkDependency::Endpoint(endpoint)],
-            is_async: false,
+            is_async: true,
             method: "new".to_string(),
         },
         enablement: FrameworkEnablement::Always,
@@ -62,14 +62,17 @@ fn injects_the_endpoints_own_dependencies_and_console_argument() {
 
 #[test]
 fn injects_the_endpoint_into_the_framework_client_by_tag() {
-    assert!(
-        endpoints_container().contains(
-            "crate::JwksClientRuntime::new(self.jwks_endpoint(console_argument_0).await?,)"
-        )
-    );
+    assert!(endpoints_container().contains(
+        "crate::JwksClientRuntime::new(self.jwks_endpoint(console_argument_0).await?,).await"
+    ));
 }
 
 #[test]
 fn constructs_the_endpoint_wrapped_in_an_arc() {
-    assert!(endpoints_container().contains("=std::sync::Arc::new(crate::JwksEndpoint::new"));
+    let source = endpoints_container();
+
+    assert!(source.contains("=std::sync::Arc::new("));
+    assert!(
+        source.contains("ConstructionError::wrap(\"crate::JwksEndpoint\",crate::JwksEndpoint::new")
+    );
 }

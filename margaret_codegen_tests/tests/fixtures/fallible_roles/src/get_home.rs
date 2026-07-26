@@ -19,20 +19,21 @@ pub struct GetHome {
 
 impl GetHome {
     #[constructor]
-    #[must_use]
-    pub fn create(secrets: Arc<Secrets>) -> Self {
-        Self { secrets }
+    pub fn create(secrets: Arc<Secrets>) -> anyhow::Result<Self> {
+        Ok(Self { secrets })
     }
 
     #[process]
-    pub async fn respond(&self, views: &Views) -> Response {
-        let _ = self.secrets.token();
+    pub async fn respond(&self, views: &Views) -> anyhow::Result<Response> {
+        Ok({
+            let _ = self.secrets.token();
 
-        Response::html(
-            200,
-            views.home_view.render(HomeViewProps {
-                heading: "home".to_string(),
-            }),
-        )
+            Response::html(
+                200,
+                views.home_view.render(HomeViewProps {
+                    heading: "home".to_string(),
+                })?,
+            )
+        })
     }
 }

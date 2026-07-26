@@ -41,6 +41,11 @@ pub enum ConsoleCodegenError {
         parameter: String,
     },
 
+    #[error(
+        "the #[process] runner of console command '{command}' must return anyhow::Result<margaret::framework::console::command_outcome::CommandOutcome>"
+    )]
+    ConsoleCommandRunnerReturnType { command: String },
+
     #[error("console command '{command}' is missing the 'name' argument")]
     MissingCommandName { command: String },
 

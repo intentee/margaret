@@ -49,7 +49,7 @@ fn wraps_a_fallible_constructor_through_the_framework_error_adapter() {
 }
 
 #[test]
-fn propagates_fallibility_to_an_infallible_dependent() {
+fn propagates_fallibility_to_an_explicitly_constructed_dependent() {
     let source = fixture("fallible_constructor");
 
     assert!(source.contains("pubasyncfnconsumer("));
@@ -57,7 +57,7 @@ fn propagates_fallibility_to_an_infallible_dependent() {
         "->::std::result::Result<std::sync::Arc<crate::Consumer>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
     ));
     assert!(source.contains("crate::Consumer::new(self.loader().await?)"));
-    assert!(!source.contains("wrap(\"crate::Consumer\""));
+    assert!(source.contains("wrap(\"crate::Consumer\""));
 }
 
 #[test]
@@ -74,8 +74,8 @@ fn renders_a_fallible_service_construction_that_depends_on_a_fallible_singleton(
 }
 
 #[test]
-fn constructs_an_infallible_singleton_through_the_slot_without_wrapping() {
-    let source = fixture("services");
+fn constructs_a_fieldless_singleton_through_the_slot_without_wrapping() {
+    let source = fixture("fieldless");
 
     assert!(source.contains("construct_once"));
     assert!(!source.contains("get_or_try_init"));

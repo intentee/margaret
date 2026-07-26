@@ -18,8 +18,8 @@ pub struct GetArticles {
 
 impl GetArticles {
     #[constructor]
-    pub fn create(articles: Arc<ArticleStore>) -> Self {
-        Self { articles }
+    pub fn create(articles: Arc<ArticleStore>) -> anyhow::Result<Self> {
+        Ok(Self { articles })
     }
 
     #[process]
@@ -27,27 +27,29 @@ impl GetArticles {
         &self,
         routes: &Routes,
         #[form_request(from = Query)] GetArticlesForm { author }: GetArticlesForm,
-    ) -> Response {
-        let author = author.as_deref();
-        let links = self
-            .articles
-            .all()
-            .into_iter()
-            .filter(|article| match author {
-                Some(author) => article.author.name == author,
-                None => true,
-            })
-            .map(|article| {
-                let url = routes.public.get_article(article.id.to_string()).url();
+    ) -> anyhow::Result<Response> {
+        Ok({
+            let author = author.as_deref();
+            let links = self
+                .articles
+                .all()
+                .into_iter()
+                .filter(|article| match author {
+                    Some(author) => article.author.name == author,
+                    None => true,
+                })
+                .map(|article| {
+                    let url = routes.public.get_article(article.id.to_string()).url();
 
-                format!("{}: {url}", article.title)
-            })
-            .collect::<Vec<String>>()
-            .join("\n");
+                    format!("{}: {url}", article.title)
+                })
+                .collect::<Vec<String>>()
+                .join("\n");
 
-        Response::text(
-            200,
-            format!("{links}\ncreate: {}", routes.public.post_article.url()),
-        )
+            Response::text(
+                200,
+                format!("{links}\ncreate: {}", routes.public.post_article.url()),
+            )
+        })
     }
 }

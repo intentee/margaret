@@ -12,7 +12,7 @@ pub struct TestClaims {
 }
 
 impl IsExpired for TestClaims {
-    fn is_expired(&self, now: DateTime<Utc>) -> bool {
-        self.exp < now.timestamp()
+    fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
+        Ok(self.exp < now.timestamp())
     }
 }

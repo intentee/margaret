@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -22,13 +21,14 @@ pub struct TokenIssuer {
 
 impl TokenIssuer {
     #[constructor]
-    #[must_use]
-    pub fn create(#[jwks_secret_store(server)] secret_store: Arc<JwksSecretStore>) -> Self {
-        Self { secret_store }
+    pub fn create(
+        #[jwks_secret_store(server)] secret_store: Arc<JwksSecretStore>,
+    ) -> anyhow::Result<Self> {
+        Ok(Self { secret_store })
     }
 
     #[process]
-    pub async fn run(&self, cancellation_token: CancellationToken) -> Result<(), Infallible> {
+    pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         match self
             .secret_store
             .sign(&DemoClaims {

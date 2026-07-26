@@ -7,6 +7,7 @@ use syn::PathArguments;
 use syn::ReturnType;
 use syn::Type;
 
+use margaret_attributes::anyhow_result_ok_type::anyhow_result_ok_type;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
@@ -161,6 +162,13 @@ pub fn authenticated_user_providers(
         let method = infer_from_request_method(item, &provider)?;
         let signature = method.signature();
         let ReturnType::Type(_, outcome) = &signature.output else {
+            return Err(RequestBindingError::InferenceReturnTypeMismatch {
+                provider,
+                written: signature.output.to_token_stream().to_string(),
+            });
+        };
+
+        let Some(outcome) = anyhow_result_ok_type(outcome) else {
             return Err(RequestBindingError::InferenceReturnTypeMismatch {
                 provider,
                 written: signature.output.to_token_stream().to_string(),

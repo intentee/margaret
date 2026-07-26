@@ -16,13 +16,18 @@ pub struct CardLayout;
 impl RendersView for CardLayout {
     type Props<'props> = CardLayoutProps;
 
-    fn render(&self, CardLayoutProps { body, home_url }: Self::Props<'_>) -> Markup {
-        html! {
-            main { (body) }
-            nav {
-                a href=(home_url) { "home" }
+    fn render(
+        &self,
+        CardLayoutProps { body, home_url }: Self::Props<'_>,
+    ) -> anyhow::Result<Markup> {
+        Ok({
+            html! {
+                main { (body) }
+                nav {
+                    a href=(home_url) { "home" }
+                }
             }
-        }
+        })
     }
 }
 
@@ -36,10 +41,12 @@ mod tests {
 
     #[test]
     fn wraps_the_body_and_links_home() {
-        let markup = CardLayout.render(CardLayoutProps {
-            body: html! { "hello" },
-            home_url: "/greeting".to_string(),
-        });
+        let markup = CardLayout
+            .render(CardLayoutProps {
+                body: html! { "hello" },
+                home_url: "/greeting".to_string(),
+            })
+            .expect("the card layout renders");
 
         assert_eq!(
             markup.into_string(),

@@ -11,9 +11,19 @@ pub(crate) async fn respond_recursively(
     request: Request,
     first: Arc<dyn Handler>,
 ) -> Response {
-    let outcome = first.handle(&request).await;
+    let outcome = match first.handle(&request).await {
+        Ok(outcome) => resolve_continuation(forward_targets, request, outcome).await,
+        Err(error) => Err(error),
+    };
 
-    resolve_continuation(forward_targets, request, outcome).await
+    match outcome {
+        Ok(response) => response,
+        Err(error) => {
+            eprintln!("margaret_http: request handling failed: {error:#}");
+
+            Response::text(500, "Internal Server Error")
+        }
+    }
 }
 
 #[cfg(test)]
@@ -29,6 +39,7 @@ mod tests {
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
+    use crate::handler_error::HandlerError;
     use crate::named_handler::NamedHandler;
     use crate::redirect::Redirect;
     use crate::request::Request;
@@ -39,8 +50,23 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardToTarget {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::from(Forward::new("target", HashMap::new()))
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::from(Forward::new(
+                "target",
+                HashMap::new(),
+            )))
+        }
+    }
+
+    struct ForwardToFailingTarget;
+
+    #[async_trait]
+    impl Handler for ForwardToFailingTarget {
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::from(Forward::new(
+                "failing_target",
+                HashMap::new(),
+            )))
         }
     }
 
@@ -48,8 +74,11 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardToSelf {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::from(Forward::new("origin", HashMap::new()))
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::from(Forward::new(
+                "origin",
+                HashMap::new(),
+            )))
         }
     }
 
@@ -57,8 +86,11 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardToUnknown {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::from(Forward::new("unknown", HashMap::new()))
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::from(Forward::new(
+                "unknown",
+                HashMap::new(),
+            )))
         }
     }
 
@@ -66,8 +98,8 @@ mod tests {
 
     #[async_trait]
     impl Handler for Target {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::Done(Response::text(222, "target"))
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::Done(Response::text(222, "target")))
         }
     }
 
@@ -75,11 +107,11 @@ mod tests {
 
     #[async_trait]
     impl Handler for ForwardToArticle {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::from(Forward::new(
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::from(Forward::new(
                 "article",
                 HashMap::from([("article".to_string(), "7".to_string())]),
-            ))
+            )))
         }
     }
 
@@ -87,14 +119,14 @@ mod tests {
 
     #[async_trait]
     impl Handler for EchoArticle {
-        async fn handle(&self, request: &Request) -> ResponseContinuation {
-            ResponseContinuation::Done(Response::text(
+        async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::Done(Response::text(
                 200,
                 request
                     .path_param("article")
                     .expect("the forward supplies the article path parameter")
                     .to_string(),
-            ))
+            )))
         }
     }
 
@@ -102,8 +134,21 @@ mod tests {
 
     #[async_trait]
     impl Handler for RedirectingResponder {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::from(Redirect::see_other("http://localhost/greeting".to_string()))
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::from(Redirect::see_other(
+                "http://localhost/greeting".to_string(),
+            )))
+        }
+    }
+
+    struct FailingResponder;
+
+    #[async_trait]
+    impl Handler for FailingResponder {
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Err(HandlerError::consumer(anyhow::anyhow!(
+                "secret database endpoint"
+            )))
         }
     }
 
@@ -149,6 +194,40 @@ mod tests {
     async fn returns_a_server_error_when_forwarding_to_an_unregistered_name() {
         assert_eq!(
             status_of(forward_targets_with(Vec::new()), Arc::new(ForwardToUnknown)).await,
+            500
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_a_consumer_failure_as_a_generic_server_error() {
+        let response = respond_recursively(
+            &forward_targets_with(Vec::new()),
+            Request::new(Method::GET, "/".to_string()),
+            Arc::new(FailingResponder),
+        )
+        .await
+        .into_http();
+        let status = response.status().as_u16();
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("the response body collects")
+            .to_bytes();
+
+        assert_eq!(status, 500);
+        assert_eq!(body, "Internal Server Error");
+    }
+
+    #[tokio::test]
+    async fn reports_a_forward_target_failure_as_a_generic_server_error() {
+        let forward_targets = forward_targets_with(vec![NamedHandler::new(
+            "failing_target",
+            Arc::new(FailingResponder),
+        )]);
+
+        assert_eq!(
+            status_of(forward_targets, Arc::new(ForwardToFailingTarget)).await,
             500
         );
     }

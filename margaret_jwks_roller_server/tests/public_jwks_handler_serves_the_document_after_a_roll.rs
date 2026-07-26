@@ -23,7 +23,7 @@ async fn public_jwks_handler_serves_the_document_after_a_roll() {
     let handler = bundle.public_jwks_handler();
     let request = Request::new(Method::GET, WELL_KNOWN_JWKS_PATH.to_string());
 
-    let ResponseContinuation::Done(response) = handler.handle(&request).await else {
+    let Ok(ResponseContinuation::Done(response)) = handler.handle(&request).await else {
         panic!("the jwks handler always responds directly");
     };
 

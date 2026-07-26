@@ -5,7 +5,7 @@ struct Worker;
 
 impl Worker {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -13,5 +13,5 @@ struct Consumer;
 
 impl Consumer {
     #[constructor]
-    fn new(worker: Arc<Worker>) -> Self {}
+    fn new(worker: Arc<Worker>) -> anyhow::Result<Self> {}
 }

@@ -329,7 +329,9 @@ fn ticker_adapter(unit: &ServiceUnit, behavior: &Option<Path>, interval: &Path) 
                 #token_binding: tokio_util::sync::CancellationToken,
                 _tick_context: trzcina::TickContext,
             ) -> anyhow::Result<()> {
-                #call.map_err(anyhow::Error::from)
+                #call?;
+
+                Ok(())
             }
         }
     }
@@ -374,7 +376,11 @@ fn woven_arguments(unit: &ServiceUnit, bindings: &ContainerBindings) -> Vec<Toke
     bindings.console_weaves_owned(bindings.console_arguments(&unit.concrete_path))
 }
 
-fn registration(unit: &ServiceUnit, bindings: &ContainerBindings, client_active: bool) -> TokenStream {
+fn registration(
+    unit: &ServiceUnit,
+    bindings: &ContainerBindings,
+    client_active: bool,
+) -> TokenStream {
     let name = adapter_ident(unit);
     let container = format_ident!("container");
     let woven = woven_arguments(unit, bindings);

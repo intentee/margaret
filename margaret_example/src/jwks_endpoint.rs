@@ -12,11 +12,12 @@ pub struct JwksEndpoint;
 
 #[async_trait]
 impl ProvidesEndpoint for JwksEndpoint {
-    async fn provide(&self) -> Result<Url, EndpointError> {
+    async fn provide(&self) -> anyhow::Result<Url> {
         Url::parse("https://issuer.internal/.well-known/jwks.json").map_err(|source| {
             EndpointError::Resolution {
                 source: Box::new(source),
             }
+            .into()
         })
     }
 }

@@ -12,9 +12,8 @@ pub struct EnglishGreeter {
 
 impl EnglishGreeter {
     #[constructor]
-    #[must_use]
-    pub fn create(app_name: Arc<AppName>) -> Self {
-        Self { app_name }
+    pub fn create(app_name: Arc<AppName>) -> anyhow::Result<Self> {
+        Ok(Self { app_name })
     }
 
     #[must_use]

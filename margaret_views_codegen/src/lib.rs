@@ -116,7 +116,7 @@ struct Banner;
 
 impl Banner {
     #[constructor]
-    fn create(#[console_argument(from = \"title\")] title: String) -> Self {}
+    fn create(#[console_argument(from = \"title\")] title: String) -> anyhow::Result<Self> {}
 }
 ";
 

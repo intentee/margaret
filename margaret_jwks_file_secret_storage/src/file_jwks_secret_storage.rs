@@ -67,20 +67,21 @@ impl FileJwksSecretStorage {
 }
 
 impl JwksSecretStorage for FileJwksSecretStorage {
-    fn load(&self) -> Result<LoadedSecret, RollerError> {
+    fn load(&self) -> anyhow::Result<LoadedSecret> {
         match std::fs::read(&self.path) {
-            Ok(bytes) => self.deserialize(&bytes),
+            Ok(bytes) => self.deserialize(&bytes).map_err(Into::into),
             Err(source) if source.kind() == ErrorKind::NotFound => Ok(LoadedSecret::Absent),
-            Err(source) => Err(RollerError::SecretLoad {
-                source: Box::new(FileJwksSecretStorageError::Read {
-                    path: self.path.clone(),
-                    source,
-                }),
-            }),
+            Err(source) => Err(FileJwksSecretStorageError::Read {
+                path: self.path.clone(),
+                source,
+            }
+            .into()),
         }
     }
 
-    fn persist(&self, secret: &JwksSecret) -> Result<(), RollerError> {
-        self.persist_document(secret).map_err(secret_persist_error)
+    fn persist(&self, secret: &JwksSecret) -> anyhow::Result<()> {
+        self.persist_document(secret)
+            .map_err(secret_persist_error)
+            .map_err(Into::into)
     }
 }

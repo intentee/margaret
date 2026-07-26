@@ -15,7 +15,7 @@ impl Boot {
     }
 
     #[process]
-    pub async fn run(&self) -> CommandOutcome {
-        CommandOutcome::Succeeded
+    pub async fn run(&self) -> anyhow::Result<CommandOutcome> {
+        Ok(CommandOutcome::Succeeded)
     }
 }

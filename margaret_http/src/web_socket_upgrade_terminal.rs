@@ -6,8 +6,8 @@ use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
 use crate::handler::Handler;
+use crate::handler_error::HandlerError;
 use crate::request::Request;
-use crate::response::Response;
 use crate::response_continuation::ResponseContinuation;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
@@ -33,23 +33,16 @@ impl WebSocketUpgradeTerminal {
 
 #[async_trait]
 impl Handler for WebSocketUpgradeTerminal {
-    async fn handle(&self, request: &Request) -> ResponseContinuation {
+    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
         let on_upgrade = self.on_upgrade.lock().await.take();
 
         match on_upgrade {
-            Some(on_upgrade) => {
-                self.upgrade
-                    .clone()
-                    .upgrade(request, on_upgrade, self.cancellation_token.clone())
-                    .await
-            }
-            None => {
-                eprintln!(
-                    "margaret_http: the websocket upgrade terminal was entered more than once for a single handshake"
-                );
-
-                ResponseContinuation::Done(Response::text(500, "Internal Server Error"))
-            }
+            Some(on_upgrade) => Ok(self
+                .upgrade
+                .clone()
+                .upgrade(request, on_upgrade, self.cancellation_token.clone())
+                .await),
+            None => Err(HandlerError::RepeatedWebSocketUpgrade),
         }
     }
 }
@@ -95,6 +88,7 @@ mod tests {
             outcome,
         )
         .await
+        .expect("the continuation resolves")
         .into_http()
         .status()
         .as_u16()
@@ -111,7 +105,16 @@ mod tests {
         );
         let handshake = Request::new(Method::GET, "/chat".to_string());
 
-        assert_eq!(status_of(terminal.handle(&handshake).await).await, 101);
-        assert_eq!(status_of(terminal.handle(&handshake).await).await, 500);
+        assert_eq!(
+            status_of(
+                terminal
+                    .handle(&handshake)
+                    .await
+                    .expect("the first upgrade is accepted")
+            )
+            .await,
+            101
+        );
+        assert!(terminal.handle(&handshake).await.is_err());
     }
 }

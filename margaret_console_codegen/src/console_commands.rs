@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use quote::format_ident;
 
+use margaret_attributes::anyhow_result_ok_type::anyhow_result_ok_type;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
@@ -21,6 +22,22 @@ fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, runner: &Index
     parameters(runner.signature())
         .iter()
         .any(|view| is_cancellation_token(index, item, view.declared))
+}
+
+fn require_anyhow_result(runner: &IndexedMethod, command: &str) -> Result<(), ConsoleCodegenError> {
+    let syn::ReturnType::Type(_, return_type) = &runner.signature().output else {
+        return Err(ConsoleCodegenError::ConsoleCommandRunnerReturnType {
+            command: command.to_string(),
+        });
+    };
+
+    if anyhow_result_ok_type(return_type).is_none() {
+        return Err(ConsoleCodegenError::ConsoleCommandRunnerReturnType {
+            command: command.to_string(),
+        });
+    }
+
+    Ok(())
 }
 
 fn validate_runner(
@@ -74,6 +91,7 @@ pub(crate) fn console_commands(
         let accessor = format_ident!("{}", identifier.field());
         let runner = process_method(item)?;
 
+        require_anyhow_result(runner, &command)?;
         validate_runner(index, item, runner, &command)?;
 
         let arguments = bindings.console_arguments(item.canonical_path()).to_vec();

@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::sync::Arc;
 
 use margaret::framework::macros::constructor;
@@ -20,7 +19,7 @@ impl Worker {
     }
 
     #[process]
-    pub async fn run(&self, cancellation_token: CancellationToken) -> Result<(), Infallible> {
+    pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         let _ = self.secrets.token();
 
         cancellation_token.cancelled().await;
