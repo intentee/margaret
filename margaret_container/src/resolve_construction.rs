@@ -3,7 +3,6 @@ use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::struct_shape::StructShape;
 
 use crate::construction_source::ConstructionSource;
-use crate::constructor_return::ConstructorReturn;
 use crate::container_error::ContainerError;
 
 fn has_constructor_attribute(method: &IndexedMethod) -> bool {
@@ -38,12 +37,7 @@ pub(crate) fn resolve_construction<'index>(
     }
 
     match found.pop() {
-        Some(method) => match ConstructorReturn::classify(method.signature()) {
-            Some(returns) => Ok(ConstructionSource::Constructor { method, returns }),
-            None => Err(ContainerError::ConstructorReturnTypeMismatch {
-                singleton: concrete_path.to_string(),
-            }),
-        },
+        Some(method) => Ok(ConstructionSource::Constructor(method)),
         None => {
             let field_count = match shape {
                 StructShape::Unit => 0,

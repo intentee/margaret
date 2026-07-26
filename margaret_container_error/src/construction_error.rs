@@ -2,29 +2,39 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ConstructionError {
-    #[error("failed to construct '{singleton}': {cause:#}")]
+    #[error("failed to construct '{singleton}': {source:#}")]
     UserError {
         singleton: &'static str,
-        cause: anyhow::Error,
+        #[source]
+        source: anyhow::Error,
     },
 }
 
 impl ConstructionError {
     #[must_use]
-    pub fn user_error(singleton: &'static str, cause: impl Into<anyhow::Error>) -> Self {
+    pub fn user_error(singleton: &'static str, source: impl Into<anyhow::Error>) -> Self {
         Self::UserError {
             singleton,
-            cause: cause.into(),
+            source: source.into(),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
     use std::io::Error as IoError;
     use std::io::ErrorKind;
 
     use super::ConstructionError;
+
+    #[test]
+    fn exposes_the_cause_through_the_error_source_chain() {
+        let cause = anyhow::anyhow!("socket refused").context("opening the ledger");
+        let error = ConstructionError::user_error("crate::worker::Worker", cause);
+
+        assert!(error.source().is_some());
+    }
 
     #[test]
     fn renders_the_singleton_path_and_the_full_cause_chain() {

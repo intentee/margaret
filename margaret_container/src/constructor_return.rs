@@ -1,6 +1,5 @@
 use syn::GenericArgument;
 use syn::PathArguments;
-use syn::PathSegment;
 use syn::ReturnType;
 use syn::Signature;
 use syn::Type;
@@ -9,51 +8,42 @@ fn is_self_type(candidate: &Type) -> bool {
     matches!(candidate, Type::Path(type_path) if type_path.path.is_ident("Self"))
 }
 
-fn result_ok_is_self(segment: &PathSegment) -> bool {
-    let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
-        return false;
-    };
-
-    matches!(
-        arguments.args.first(),
-        Some(GenericArgument::Type(ok_type)) if is_self_type(ok_type)
-    )
-}
-
-fn returns_result_of_self(return_type: &Type) -> bool {
+fn generic_over_self(return_type: &Type) -> Option<&Type> {
     let Type::Path(type_path) = return_type else {
-        return false;
+        return None;
     };
 
-    type_path
-        .path
-        .segments
-        .last()
-        .is_some_and(|segment| segment.ident == "Result" && result_ok_is_self(segment))
-}
-
-pub(crate) enum ConstructorReturn {
-    Fallible,
-    Infallible,
-}
-
-impl ConstructorReturn {
-    pub(crate) fn classify(signature: &Signature) -> Option<Self> {
-        let ReturnType::Type(_, return_type) = &signature.output else {
+    type_path.path.segments.last().and_then(|segment| {
+        let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
             return None;
         };
 
-        if is_self_type(return_type) {
-            Some(Self::Infallible)
-        } else if returns_result_of_self(return_type) {
-            Some(Self::Fallible)
-        } else {
-            None
+        match arguments.args.first() {
+            Some(GenericArgument::Type(ok_type)) if is_self_type(ok_type) => Some(return_type),
+            _ => None,
         }
-    }
+    })
+}
 
-    pub(crate) fn is_fallible(&self) -> bool {
-        matches!(self, ConstructorReturn::Fallible)
+pub(crate) enum ConstructorReturnShape<'signature> {
+    GenericOverSelf(&'signature Type),
+    SelfValue,
+    Unsupported,
+}
+
+impl<'signature> ConstructorReturnShape<'signature> {
+    pub(crate) fn of(signature: &'signature Signature) -> Self {
+        let ReturnType::Type(_, return_type) = &signature.output else {
+            return ConstructorReturnShape::Unsupported;
+        };
+
+        if is_self_type(return_type) {
+            ConstructorReturnShape::SelfValue
+        } else if let Some(generic) = generic_over_self(return_type) {
+            ConstructorReturnShape::GenericOverSelf(generic)
+        } else {
+            ConstructorReturnShape::Unsupported
+        }
     }
 }
 
@@ -62,67 +52,65 @@ mod tests {
     use syn::ImplItemFn;
     use syn::Signature;
 
-    use super::ConstructorReturn;
+    use super::ConstructorReturnShape;
 
-    fn signature(source: &str) -> Signature {
+    fn shape_label(source: &str) -> &'static str {
         let method: ImplItemFn = syn::parse_str(source).expect("a method fixture parses");
+        let signature: Signature = method.sig;
 
-        method.sig
-    }
-
-    fn classify(source: &str) -> Option<ConstructorReturn> {
-        ConstructorReturn::classify(&signature(source))
+        match ConstructorReturnShape::of(&signature) {
+            ConstructorReturnShape::GenericOverSelf(_) => "generic_over_self",
+            ConstructorReturnShape::SelfValue => "self",
+            ConstructorReturnShape::Unsupported => "unsupported",
+        }
     }
 
     #[test]
-    fn classifies_a_self_return_as_infallible() {
-        assert!(
-            !classify("fn new() -> Self {}")
-                .expect("the return type classifies")
-                .is_fallible()
+    fn detects_a_self_return() {
+        assert_eq!(shape_label("fn new() -> Self {}"), "self");
+    }
+
+    #[test]
+    fn detects_a_generic_whose_first_argument_is_self() {
+        assert_eq!(
+            shape_label("fn new() -> anyhow::Result<Self> {}"),
+            "generic_over_self"
         );
     }
 
     #[test]
-    fn classifies_an_anyhow_result_of_self_as_fallible() {
-        assert!(
-            classify("fn new() -> anyhow::Result<Self> {}")
-                .expect("the return type classifies")
-                .is_fallible()
-        );
-    }
-
-    #[test]
-    fn classifies_a_two_argument_result_of_self_as_fallible() {
-        assert!(
-            classify("fn new() -> Result<Self, std::io::Error> {}")
-                .expect("the return type classifies")
-                .is_fallible()
+    fn detects_a_two_argument_generic_over_self() {
+        assert_eq!(
+            shape_label("fn new() -> Result<Self, std::io::Error> {}"),
+            "generic_over_self"
         );
     }
 
     #[test]
     fn rejects_a_concrete_return() {
-        assert!(classify("fn new() -> Config {}").is_none());
+        assert_eq!(shape_label("fn new() -> Config {}"), "unsupported");
     }
 
     #[test]
-    fn rejects_a_result_whose_success_type_is_not_self() {
-        assert!(classify("fn new() -> Result<Config, Self> {}").is_none());
+    fn rejects_a_generic_whose_first_argument_is_not_self() {
+        assert_eq!(
+            shape_label("fn new() -> Result<Config, Self> {}"),
+            "unsupported"
+        );
     }
 
     #[test]
-    fn rejects_a_result_without_type_arguments() {
-        assert!(classify("fn new() -> Result {}").is_none());
+    fn rejects_a_generic_without_type_arguments() {
+        assert_eq!(shape_label("fn new() -> Result {}"), "unsupported");
     }
 
     #[test]
     fn rejects_a_non_path_return() {
-        assert!(classify("fn new() -> () {}").is_none());
+        assert_eq!(shape_label("fn new() -> () {}"), "unsupported");
     }
 
     #[test]
     fn rejects_a_missing_return() {
-        assert!(classify("fn new() {}").is_none());
+        assert_eq!(shape_label("fn new() {}"), "unsupported");
     }
 }

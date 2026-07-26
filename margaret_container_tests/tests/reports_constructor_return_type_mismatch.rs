@@ -14,3 +14,16 @@ fn reports_constructor_return_type_mismatch() {
         ContainerError::ConstructorReturnTypeMismatch { .. }
     ));
 }
+
+#[test]
+fn rejects_a_constructor_returning_a_non_anyhow_result() {
+    let directory =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/non_anyhow_result_return");
+    let error = generate_container_source("non_anyhow_result_return", &directory)
+        .expect_err("a #[constructor] returning a non-anyhow Result must be rejected");
+
+    assert!(matches!(
+        error,
+        ContainerError::ConstructorReturnTypeMismatch { .. }
+    ));
+}
