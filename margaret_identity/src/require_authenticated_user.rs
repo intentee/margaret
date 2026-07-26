@@ -1,4 +1,3 @@
-use margaret_http::redirect::Redirect;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 
@@ -13,8 +12,8 @@ pub fn require_authenticated_user<User>(
             Err(ResponseContinuation::from(Response::unauthorized()))
         }
         Ok(AuthenticatedUserOutcome::Authenticated(user)) => Ok(user),
-        Ok(AuthenticatedUserOutcome::LoginPageRedirect { url }) => {
-            Err(ResponseContinuation::from(Redirect::see_other(url)))
+        Ok(AuthenticatedUserOutcome::LoginPageRedirect(redirect)) => {
+            Err(ResponseContinuation::from(redirect))
         }
         Err(error) => Err(respond_with_identity_error(error)),
     }
@@ -22,7 +21,11 @@ pub fn require_authenticated_user<User>(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use margaret_http::forwardable_route::ForwardableRoute;
     use margaret_http::response_continuation::ResponseContinuation;
+    use margaret_http::url_segment::UrlSegment;
 
     use super::require_authenticated_user;
     use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
@@ -55,10 +58,14 @@ mod tests {
 
     #[test]
     fn redirects_a_login_page_outcome() {
+        let sign_in_redirect = ForwardableRoute::new(
+            Arc::from("http://localhost"),
+            vec![UrlSegment::Literal("/sign-in")],
+        )
+        .see_other();
+
         assert_eq!(
-            rejection_status(Ok(AuthenticatedUserOutcome::LoginPageRedirect {
-                url: "http://localhost/sign-in".to_string(),
-            })),
+            rejection_status(Ok(AuthenticatedUserOutcome::LoginPageRedirect(sign_in_redirect))),
             None
         );
     }

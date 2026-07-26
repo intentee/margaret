@@ -36,7 +36,6 @@ use crate::route_group::RouteGroup;
 struct ConcurrentBinder {
     future: TokenStream,
     holder: Ident,
-    resolution: Ident,
 }
 
 fn access(call: TokenStream) -> TokenStream {
@@ -157,7 +156,6 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
             continue;
         };
         let provider_access = captured.access(&argument.binding, &TokenStream::new());
-        let resolution = format_ident!("{}", allocator.allocate("binder_resolution").field());
 
         concurrent_binders.push(ConcurrentBinder {
             future: quote! {
@@ -168,7 +166,6 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
                 )
             },
             holder: argument.holder.clone(),
-            resolution,
         });
     }
 
@@ -178,31 +175,25 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
             #respond_continuation
         }
     } else {
-        let resolutions: Vec<&Ident> = concurrent_binders
-            .iter()
-            .map(|binder| &binder.resolution)
-            .collect();
-        let errors: Vec<TokenStream> = resolutions
-            .iter()
-            .map(|resolution| quote! { #resolution.err() })
-            .collect();
         let holders: Vec<&Ident> = concurrent_binders.iter().map(|binder| &binder.holder).collect();
         let futures: Vec<&TokenStream> =
             concurrent_binders.iter().map(|binder| &binder.future).collect();
-        let resolution_tuple = quote! { (#(#resolutions,)*) };
 
         quote! {
             #(#non_binder_bindings)*
 
-            let #resolution_tuple = margaret::framework::http::join!(#(#futures),*);
-
-            match #resolution_tuple {
-                (#(::std::result::Result::Ok(#holders),)*) => {
+            match margaret::framework::http::try_join!(#(#futures),*) {
+                ::std::result::Result::Ok((
+                    #(margaret::framework::http::route_parameter_outcome::RouteParameterOutcome::Found(#holders),)*
+                )) => {
                     #respond_continuation
                 }
-                #resolution_tuple => margaret::framework::http::route_parameter_rejection_response::route_parameter_rejection_response(
-                    [#(#errors,)*],
-                ).into(),
+                ::std::result::Result::Ok(_) => {
+                    margaret::framework::http::response::Response::not_found().into()
+                }
+                ::std::result::Result::Err(source) => {
+                    margaret::framework::http::respond_with_user_error::respond_with_user_error(source).into()
+                }
             }
         }
     };

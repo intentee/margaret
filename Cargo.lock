@@ -2049,6 +2049,7 @@ dependencies = [
  "bytes",
  "cookie",
  "form_urlencoded",
+ "futures-util",
  "http",
  "http-body",
  "http-body-util",

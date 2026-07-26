@@ -60,11 +60,14 @@ pub fn render_request_extraction(
                 #path_key,
                 #provider_access.as_ref(),
             ).await {
-                Ok(value) => value,
-                Err(rejection) => {
-                    let response = margaret::framework::http::route_parameter_rejection_response::route_parameter_rejection_response(
-                        [::std::option::Option::Some(rejection)],
-                    );
+                Ok(margaret::framework::http::route_parameter_outcome::RouteParameterOutcome::Found(value)) => value,
+                Ok(margaret::framework::http::route_parameter_outcome::RouteParameterOutcome::NotFound) => {
+                    let response = margaret::framework::http::response::Response::not_found();
+
+                    #error_return
+                }
+                Err(source) => {
+                    let response = margaret::framework::http::respond_with_user_error::respond_with_user_error(source);
 
                     #error_return
                 }

@@ -1,30 +1,26 @@
 use crate::http_route_parameter_binder::HttpRouteParameterBinder;
 use crate::request::Request;
 use crate::route_parameter_outcome::RouteParameterOutcome;
-use crate::route_parameter_rejection::RouteParameterRejection;
 
 pub async fn require_bound_route_parameter<Binder>(
     request: &Request,
     name: &str,
     binder: &Binder,
-) -> Result<Binder::Model, RouteParameterRejection>
+) -> anyhow::Result<RouteParameterOutcome<Binder::Model>>
 where
     Binder: HttpRouteParameterBinder,
 {
     let Some(value) = request.path_param(name) else {
-        return Err(RouteParameterRejection::NotFound);
+        return Ok(RouteParameterOutcome::NotFound);
     };
 
-    match binder.bind(value.to_string()).await {
-        Ok(RouteParameterOutcome::Found(model)) => Ok(model),
-        Ok(RouteParameterOutcome::NotFound) => Err(RouteParameterRejection::NotFound),
-        Err(error) => Err(RouteParameterRejection::SystemError(error)),
-    }
+    binder.bind(value.to_string()).await
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::future::pending;
 
     use async_trait::async_trait;
     use http::Method;
@@ -33,7 +29,6 @@ mod tests {
     use crate::http_route_parameter_binder::HttpRouteParameterBinder;
     use crate::request::Request;
     use crate::route_parameter_outcome::RouteParameterOutcome;
-    use crate::route_parameter_rejection_response::route_parameter_rejection_response;
 
     struct EvenNumberBinder;
 
@@ -69,51 +64,44 @@ mod tests {
     async fn binds_a_present_and_acceptable_route_parameter() {
         let request = request_with_parameter("42");
 
-        assert_eq!(
-            require_bound_route_parameter(&request, "number", &EvenNumberBinder)
-                .await
-                .ok(),
-            Some(42)
-        );
+        let outcome = require_bound_route_parameter(&request, "number", &EvenNumberBinder)
+            .await
+            .expect("the acceptable value binds without a system error");
+
+        assert_eq!(outcome, RouteParameterOutcome::Found(42));
     }
 
     #[tokio::test]
-    async fn rejects_as_not_found_when_binding_rejects_the_value() {
+    async fn resolves_to_not_found_when_binding_rejects_the_value() {
         let request = request_with_parameter("7");
-        let rejection = require_bound_route_parameter(&request, "number", &EvenNumberBinder)
-            .await
-            .expect_err("the odd value is rejected");
 
-        assert_eq!(
-            route_parameter_rejection_response([Some(rejection)]).status(),
-            404
-        );
+        let outcome = require_bound_route_parameter(&request, "number", &EvenNumberBinder)
+            .await
+            .expect("the rejected value is a not-found outcome, not a system error");
+
+        assert_eq!(outcome, RouteParameterOutcome::NotFound);
     }
 
     #[tokio::test]
-    async fn rejects_as_not_found_when_the_route_parameter_is_absent() {
+    async fn resolves_to_not_found_when_the_route_parameter_is_absent() {
         let request = Request::new(Method::GET, "/numbers".to_string());
-        let rejection = require_bound_route_parameter(&request, "number", &EvenNumberBinder)
-            .await
-            .expect_err("the absent parameter is rejected");
 
-        assert_eq!(
-            route_parameter_rejection_response([Some(rejection)]).status(),
-            404
-        );
+        let outcome = require_bound_route_parameter(&request, "number", &EvenNumberBinder)
+            .await
+            .expect("the absent parameter is a not-found outcome, not a system error");
+
+        assert_eq!(outcome, RouteParameterOutcome::NotFound);
     }
 
     #[tokio::test]
-    async fn rejects_as_a_system_error_when_the_binder_fails() {
+    async fn propagates_a_system_error_when_the_binder_fails() {
         let request = request_with_parameter("42");
-        let rejection = require_bound_route_parameter(&request, "number", &FailingBinder)
-            .await
-            .expect_err("the failing binder is rejected");
 
-        assert_eq!(
-            route_parameter_rejection_response([Some(rejection)]).status(),
-            500
-        );
+        let error = require_bound_route_parameter(&request, "number", &FailingBinder)
+            .await
+            .expect_err("a binder failure surfaces as a system error, never a not-found");
+
+        assert_eq!(error.to_string(), "the datastore is unavailable");
     }
 
     struct BarrierBinder {
@@ -145,12 +133,27 @@ mod tests {
             ]),
         );
 
-        let (first_outcome, second_outcome) = crate::join!(
+        let (first_outcome, second_outcome) = crate::try_join!(
             require_bound_route_parameter(&request, "first", &first),
             require_bound_route_parameter(&request, "second", &second),
+        )
+        .expect("both barrier binders resolve without a system error");
+
+        assert_eq!(first_outcome, RouteParameterOutcome::Found("alpha".to_string()));
+        assert_eq!(second_outcome, RouteParameterOutcome::Found("beta".to_string()));
+    }
+
+    #[tokio::test]
+    async fn a_system_error_short_circuits_a_pending_binder() {
+        let request = request_with_parameter("42");
+
+        let outcome = crate::try_join!(
+            require_bound_route_parameter(&request, "number", &FailingBinder),
+            pending::<anyhow::Result<RouteParameterOutcome<u32>>>(),
         );
 
-        assert_eq!(first_outcome.ok(), Some("alpha".to_string()));
-        assert_eq!(second_outcome.ok(), Some("beta".to_string()));
+        let error = outcome.expect_err("the failing binder short-circuits the pending future");
+
+        assert_eq!(error.to_string(), "the datastore is unavailable");
     }
 }

@@ -466,15 +466,20 @@ impl GetPair {
     fn resolves_multiple_route_parameter_binders_concurrently() {
         let source: String = source_for(TWICE_BOUND_MODEL).split_whitespace().collect();
 
+        assert!(source.contains("matchmargaret::framework::http::try_join!("));
+        assert_eq!(
+            source
+                .matches(
+                    "margaret::framework::http::route_parameter_outcome::RouteParameterOutcome::Found("
+                )
+                .count(),
+            2
+        );
         assert!(source.contains(
-            "let(binder_resolution,binder_resolution_2)=margaret::framework::http::join!("
+            "::std::result::Result::Ok(_)=>{margaret::framework::http::response::Response::not_found().into()}"
         ));
-        assert!(source.contains("match(binder_resolution,binder_resolution_2){"));
         assert!(source.contains(
-            "(::std::result::Result::Ok(author),::std::result::Result::Ok(editor),)=>{"
-        ));
-        assert!(source.contains(
-            "(binder_resolution,binder_resolution_2)=>{margaret::framework::http::route_parameter_rejection_response::route_parameter_rejection_response([binder_resolution.err(),binder_resolution_2.err(),]).into()}"
+            "::std::result::Result::Err(source)=>{margaret::framework::http::respond_with_user_error::respond_with_user_error("
         ));
     }
 
@@ -482,11 +487,15 @@ impl GetPair {
     fn resolves_a_single_route_parameter_binder_through_the_concurrent_join() {
         let source: String = source_for(BOUND_MODEL).split_whitespace().collect();
 
-        assert!(source.contains("let(binder_resolution,)=margaret::framework::http::join!("));
-        assert!(source.contains("match(binder_resolution,){(::std::result::Result::Ok(user),)=>{"));
-        assert!(source.contains(
-            "(binder_resolution,)=>{margaret::framework::http::route_parameter_rejection_response::route_parameter_rejection_response([binder_resolution.err(),]).into()}"
-        ));
+        assert!(source.contains("matchmargaret::framework::http::try_join!("));
+        assert_eq!(
+            source
+                .matches(
+                    "margaret::framework::http::route_parameter_outcome::RouteParameterOutcome::Found("
+                )
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -497,8 +506,7 @@ impl GetPair {
         .split_whitespace()
         .collect();
 
-        assert!(!source.contains("margaret::framework::http::join!"));
-        assert!(!source.contains("route_parameter_rejection_response"));
+        assert!(!source.contains("margaret::framework::http::try_join!"));
     }
 
     const BOUND_MODEL: &str = r#"

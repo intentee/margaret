@@ -1,6 +1,5 @@
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
-use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Debug, Error)]
 pub enum WebSocketError {
@@ -9,7 +8,7 @@ pub enum WebSocketError {
     )]
     Send {
         #[source]
-        source: SendError<Message>,
+        source: SendError<()>,
     },
 
     #[error("failed to serialize a websocket response payload: {source}")]

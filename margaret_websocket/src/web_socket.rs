@@ -77,25 +77,40 @@ impl WebSocket {
         let text = serde_json::to_string(frame)
             .map_err(|source| WebSocketError::SerializeResponse { source })?;
 
+        let permit = self
+            .sender
+            .reserve()
+            .await
+            .map_err(|source| WebSocketError::Send { source })?;
+
         if terminates_request && !self.claim_answer() {
             return Ok(());
         }
 
-        self.sender
-            .send(Message::text(text))
-            .await
-            .map_err(|source| WebSocketError::Send { source })
+        permit.send(Message::text(text));
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use futures_util::FutureExt;
     use serde_json::Value;
     use tokio::sync::mpsc;
 
     use super::WebSocket;
     use crate::outbound_response::OutboundResponse;
     use crate::request_id::RequestId;
+
+    fn chunk_response() -> OutboundResponse<Value> {
+        OutboundResponse {
+            id: RequestId::Number(1),
+            is_done: false,
+            method: "test",
+            payload: Value::Null,
+        }
+    }
 
     fn terminal_response() -> OutboundResponse<Value> {
         OutboundResponse {
@@ -122,5 +137,51 @@ mod tests {
 
         assert!(receiver.try_recv().is_ok());
         assert!(receiver.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_terminal_send_does_not_consume_the_answer_slot() {
+        let (sender, mut receiver) = mpsc::channel(1);
+        let socket = WebSocket::new(sender);
+
+        socket
+            .send(chunk_response())
+            .await
+            .expect("the chunk fills the single channel slot");
+
+        assert!(
+            socket.send(terminal_response()).now_or_never().is_none(),
+            "the terminal send parks on a full channel, then is dropped",
+        );
+
+        receiver
+            .recv()
+            .await
+            .expect("the chunk is drained, freeing the slot");
+
+        socket
+            .send(terminal_response())
+            .await
+            .expect("a fresh terminal is delivered after the cancelled send");
+
+        assert!(receiver.try_recv().is_ok());
+    }
+
+    #[tokio::test]
+    async fn reports_a_send_error_when_the_connection_is_closed() {
+        let (sender, receiver) = mpsc::channel(1);
+        let socket = WebSocket::new(sender);
+
+        drop(receiver);
+
+        let error = socket
+            .send(terminal_response())
+            .await
+            .expect_err("the send fails once the connection is closed");
+
+        assert_eq!(
+            error.to_string(),
+            "the websocket connection is closed and can no longer accept outbound frames: channel closed",
+        );
     }
 }

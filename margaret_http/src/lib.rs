@@ -1,5 +1,5 @@
+pub use futures_util::try_join;
 pub use matchit;
-pub use tokio::join;
 
 pub(crate) mod body_class;
 pub mod body_limit;
@@ -36,8 +36,6 @@ pub mod response;
 pub mod response_continuation;
 pub mod route_entry;
 pub mod route_parameter_outcome;
-pub mod route_parameter_rejection;
-pub mod route_parameter_rejection_response;
 pub mod route_reference;
 pub mod router;
 pub mod server;

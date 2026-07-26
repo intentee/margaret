@@ -26,6 +26,10 @@ use crate::injects_routes::injects_routes;
 use crate::injects_views::injects_views;
 use crate::request_binding_error::RequestBindingError;
 
+fn anyhow_result_path() -> CanonicalPath {
+    CanonicalPath::new(vec!["anyhow".to_string(), "Result".to_string()])
+}
+
 fn authenticated_user_outcome_path() -> CanonicalPath {
     CanonicalPath::new(vec![
         "margaret".to_string(),
@@ -100,6 +104,13 @@ fn verify_outcome(
     model: &CanonicalPath,
     outcome: &Type,
 ) -> Result<(), RequestBindingError> {
+    if index.resolve_item_type(item, outcome).as_ref() != Some(&anyhow_result_path()) {
+        return Err(RequestBindingError::InferenceReturnTypeMismatch {
+            provider: provider.to_string(),
+            written: written(outcome),
+        });
+    }
+
     let Some(inner_outcome) = generic_type(outcome, 0) else {
         return Err(RequestBindingError::InferenceReturnTypeMismatch {
             provider: provider.to_string(),

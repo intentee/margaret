@@ -67,9 +67,7 @@ impl SessionReaderProvider {
                 name: reader,
             }))
         } else {
-            Ok(AuthenticatedUserOutcome::LoginPageRedirect {
-                url: "http://localhost/sign-in".to_string(),
-            })
+            Ok(AuthenticatedUserOutcome::Anonymous)
         }
     }
 }

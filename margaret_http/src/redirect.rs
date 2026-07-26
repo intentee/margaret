@@ -15,8 +15,7 @@ impl Redirect {
         }
     }
 
-    #[must_use]
-    pub fn see_other(location: String) -> Self {
+    pub(crate) fn see_other(location: String) -> Self {
         Self {
             location,
             status: StatusCode::SEE_OTHER,

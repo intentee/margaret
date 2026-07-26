@@ -9,6 +9,7 @@ use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
 use crate::forms::session_cookie::SessionCookie;
+use crate::margaret::routes::Routes;
 use crate::models::user::User;
 use crate::stores::user_store::UserStore;
 
@@ -28,15 +29,16 @@ impl SessionUserProvider {
     #[infer_from_request]
     pub async fn infer_session_user(
         &self,
+        routes: &Routes,
         #[form_request(from = Cookie)] cookie: SessionCookie,
     ) -> anyhow::Result<AuthenticatedUserOutcome<User>> {
         let Some(session) = cookie.session else {
             return Ok(AuthenticatedUserOutcome::Anonymous);
         };
         let Ok(session) = Uuid::parse_str(&session) else {
-            return Ok(AuthenticatedUserOutcome::LoginPageRedirect {
-                url: "/sign-in".to_string(),
-            });
+            return Ok(AuthenticatedUserOutcome::LoginPageRedirect(
+                routes.public.get_sign_in.see_other(),
+            ));
         };
 
         Ok(match self.users.find_user_by_session(session) {

@@ -303,6 +303,66 @@ impl SessionUserProvider {
     }
 
     #[test]
+    fn rejects_an_inference_method_that_wraps_the_outcome_in_option() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Option<AuthenticatedUserOutcome<User>> {}\n}\n"
+            )
+            .contains(
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_that_wraps_the_outcome_in_a_collection() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Vec<AuthenticatedUserOutcome<User>> {}\n}\n"
+            )
+            .contains(
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_that_uses_a_non_anyhow_result() {
+        assert!(
+            rejection_for(
+                "struct CustomError;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, CustomError> {}\n}\n"
+            )
+            .contains(
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_that_returns_a_bare_result() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result {}\n}\n"
+            )
+            .contains(
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_an_inference_method_whose_outcome_is_not_the_authenticated_user_outcome() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<User> {}\n}\n"
+            )
+            .contains(
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+            )
+        );
+    }
+
+    #[test]
     fn orders_the_providers_by_the_struct_that_declares_them() {
         let registries = registries_for(
             "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct SecondProvider;\n\nimpl SecondProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct FirstProvider;\n\nimpl FirstProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
