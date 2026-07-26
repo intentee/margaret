@@ -36,19 +36,16 @@ pub async fn dispatch_request<Handler>(
                 .await
             {
                 report_web_socket_error(Err(WebSocketError::UserError(error)));
-
-                if !socket.has_answered_request() {
-                    report_web_socket_error(
-                        socket
-                            .send_error(
-                                id,
-                                EnvelopeErrorCode::InternalError,
-                                "the request handler failed".to_string(),
-                                Value::Null,
-                            )
-                            .await,
-                    );
-                }
+                report_web_socket_error(
+                    socket
+                        .send_error(
+                            id,
+                            EnvelopeErrorCode::InternalError,
+                            "the request handler failed".to_string(),
+                            Value::Null,
+                        )
+                        .await,
+                );
             }
         }
         ValidationResult::Invalid(_) => {
