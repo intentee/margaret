@@ -26,13 +26,13 @@ fn renders_a_fallible_constructor_accessor_returning_a_result() {
 }
 
 #[test]
-fn maps_a_failed_constructor_into_the_user_error_variant() {
+fn wraps_a_fallible_constructor_through_the_framework_error_adapter() {
     let source = fixture("fallible_constructor");
 
-    assert!(source.contains("letoutcome:::anyhow::Result<crate::Loader>=crate::Loader::new();"));
     assert!(source.contains(
-        "outcome.map_err(|source|margaret::framework::container_error::construction_error::ConstructionError::user_error(\"crate::Loader\",source,))?"
+        "margaret::framework::container_error::construction_error::ConstructionError::wrap(\"crate::Loader\",crate::Loader::new(),)?"
     ));
+    assert!(!source.contains("anyhow"));
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn propagates_fallibility_to_an_infallible_dependent() {
         "->Result<std::sync::Arc<crate::Consumer>,margaret::framework::container_error::construction_error::ConstructionError,>"
     ));
     assert!(source.contains("crate::Consumer::new(self.loader().await?)"));
-    assert!(!source.contains("user_error(\"crate::Consumer\""));
+    assert!(!source.contains("wrap(\"crate::Consumer\""));
 }
 
 #[test]
@@ -56,10 +56,7 @@ fn renders_a_fallible_service_construction_that_depends_on_a_fallible_singleton(
         "->Result<std::sync::Arc<crate::Worker>,margaret::framework::container_error::construction_error::ConstructionError,>"
     ));
     assert!(source.contains(
-        "letoutcome:::anyhow::Result<crate::Worker>=crate::Worker::new(self.loader().await?,);"
-    ));
-    assert!(source.contains(
-        "outcome.map_err(|source|margaret::framework::container_error::construction_error::ConstructionError::user_error(\"crate::Worker\",source,))?"
+        "margaret::framework::container_error::construction_error::ConstructionError::wrap(\"crate::Worker\",crate::Worker::new(self.loader().await?),)?"
     ));
 }
 
