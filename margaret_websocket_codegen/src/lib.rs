@@ -4,6 +4,7 @@ pub mod websocket_artifacts;
 pub mod websocket_codegen_error;
 
 mod build_for_session_method;
+mod build_websocket_plan;
 mod discovered_handler;
 mod handler_binding;
 mod handler_kind;
@@ -14,6 +15,7 @@ mod render_server_routes;
 mod render_sessions;
 mod session_arguments;
 mod session_console_arguments;
+mod session_handler_plan;
 mod session_plan;
 mod websocket_handlers;
 mod websocket_message;
@@ -1453,6 +1455,93 @@ impl Room {
             error(&source)
                 .to_string()
                 .contains("is not a notification message")
+        );
+    }
+
+    const REUSABLE_MESSAGES: &str = r#"
+#[websocket_session(path = "/first", server = "public")]
+struct FirstSession;
+
+impl FirstSession {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[websocket_session(path = "/second", server = "public")]
+struct SecondSession;
+
+impl SecondSession {
+    #[build_for_session]
+    fn build() -> Self {}
+}
+
+#[websocket_message(request, method = "shared_request", response = single)]
+struct SharedRequest;
+
+#[websocket_message(notification, method = "shared_notification")]
+struct SharedNotification;
+
+mod first_request {
+    #[singleton]
+    pub struct Handler;
+
+    impl margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage for Handler {
+        type Session = crate::FirstSession;
+        type Message = crate::SharedRequest;
+    }
+}
+
+mod second_request {
+    #[singleton]
+    pub struct Handler;
+
+    impl margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage for Handler {
+        type Session = crate::SecondSession;
+        type Message = crate::SharedRequest;
+    }
+}
+
+mod first_notification {
+    #[singleton]
+    pub struct Handler;
+
+    impl margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification for Handler {
+        type Session = crate::FirstSession;
+        type Message = crate::SharedNotification;
+    }
+}
+
+mod second_notification {
+    #[singleton]
+    pub struct Handler;
+
+    impl margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification for Handler {
+        type Session = crate::SecondSession;
+        type Message = crate::SharedNotification;
+    }
+}
+"#;
+
+    #[test]
+    fn reuses_request_and_notification_messages_across_sessions() {
+        let source = generated(REUSABLE_MESSAGES);
+
+        assert!(source.contains("crate::first_request::Handler"));
+        assert!(source.contains("crate::second_request::Handler"));
+        assert!(source.contains("crate::first_notification::Handler"));
+        assert!(source.contains("crate::second_notification::Handler"));
+        assert_eq!(source.matches("\"shared_request\".to_string()").count(), 2);
+        assert_eq!(
+            source
+                .matches("\"shared_notification\".to_string()")
+                .count(),
+            2
+        );
+        assert_eq!(
+            source
+                .matches("WebSocketRequestMessageforcrate::SharedRequest")
+                .count(),
+            1
         );
     }
 

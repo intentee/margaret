@@ -2,4 +2,5 @@ mod canonicalizes_console_argument_types;
 mod emits_conditional_too_many_arguments_expectations;
 mod generates_fallible_role_assembly;
 mod rejects_invalid_console_argument_types;
+mod reuses_websocket_messages_across_sessions;
 mod weaves_console_arguments_by_type;
