@@ -29,14 +29,24 @@ pub async fn dispatch_request<Handler>(
 {
     match validate_json::<Handler::Message>(Some(&params)) {
         ValidationResult::Valid(message) => {
-            let envelope = Handler::Message::envelope(id, message);
+            let envelope = Handler::Message::envelope(id.clone(), message);
 
-            report_web_socket_error(
-                handler
-                    .process(cancellation_token, session, envelope, socket)
-                    .await
-                    .map_err(WebSocketError::UserError),
-            );
+            if let Err(error) = handler
+                .process(cancellation_token, session, envelope, socket.clone())
+                .await
+            {
+                report_web_socket_error(Err(WebSocketError::UserError(error)));
+                report_web_socket_error(
+                    socket
+                        .send_error(
+                            id,
+                            EnvelopeErrorCode::InternalError,
+                            "the request handler failed".to_string(),
+                            Value::Null,
+                        )
+                        .await,
+                );
+            }
         }
         ValidationResult::Invalid(_) => {
             report_web_socket_error(

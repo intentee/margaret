@@ -218,12 +218,18 @@ async fn closes_on_cancellation() {
 }
 
 #[tokio::test]
-async fn continues_when_a_handler_fails_to_serialize_a_response() {
+async fn sends_an_error_frame_when_a_request_handler_fails() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
         .send(r#"{"id":6,"method":"failing","params":{"prompt":"boom"}}"#)
         .await;
+
+    let error = harness.recv().await;
+
+    assert!(error.contains("\"id\":6"));
+    assert!(error.contains("internal_error"));
+
     harness.send_raw(Message::Close(None)).await;
     harness.driver.await.expect("the driver finishes");
 }
