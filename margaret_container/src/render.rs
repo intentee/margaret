@@ -10,6 +10,7 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 
 use crate::console_closures::ConsoleClosures;
 use crate::console_weave_ledger::ConsoleWeaveLedger;
+use crate::construction_error_path::construction_error_path;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
@@ -53,24 +54,45 @@ fn accessor(
 ) -> TokenStream {
     let name = field_ident(provider);
     let field_type = field_type(provider);
-    let parameters = closures.of(key).iter().map(|argument| {
-        let ident = console_argument_ident(closures.slot(&argument.slot_key()));
-        let value_type = argument.field_type();
+    let parameters: Vec<TokenStream> = closures
+        .of(key)
+        .iter()
+        .map(|argument| {
+            let ident = console_argument_ident(closures.slot(&argument.slot_key()));
+            let value_type = argument.field_type();
 
-        quote! { #ident: #value_type }
-    });
+            quote! { #ident: #value_type }
+        })
+        .collect();
     let construction = construction(provider, plan, closures);
 
-    quote! {
-        pub async fn #name(&self #(, #parameters)*) -> #field_type {
-            self.#name
-                .get_or_init(|| async move {
-                    let provided: #field_type = #construction;
+    if plan.fallibility.of(key) {
+        let error = construction_error_path();
 
-                    provided
-                })
-                .await
-                .clone()
+        quote! {
+            pub async fn #name(&self #(, #parameters)*) -> Result<#field_type, #error> {
+                Ok(self.#name
+                    .get_or_try_init(|| async move {
+                        let provided: #field_type = #construction;
+
+                        Ok(provided)
+                    })
+                    .await?
+                    .clone())
+            }
+        }
+    } else {
+        quote! {
+            pub async fn #name(&self #(, #parameters)*) -> #field_type {
+                self.#name
+                    .get_or_init(|| async move {
+                        let provided: #field_type = #construction;
+
+                        provided
+                    })
+                    .await
+                    .clone()
+            }
         }
     }
 }
@@ -118,16 +140,25 @@ fn direct_value(
     match direct {
         DirectConstruction::Constructor {
             dependencies,
+            fallible,
             is_async: constructor_is_async,
             method,
         } => {
             let constructor = format_ident!("{}", method);
             let arguments = woven_dependency_expressions(dependencies, plan, closures);
-
-            if *constructor_is_async {
+            let call = if *constructor_is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
             } else {
                 quote! { #concrete::#constructor(#(#arguments),*) }
+            };
+
+            if *fallible {
+                let error = construction_error_path();
+                let singleton = concrete_path.to_string();
+
+                quote! { #call.map_err(|cause| #error::user_error(#singleton, cause))? }
+            } else {
+                call
             }
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
@@ -211,7 +242,11 @@ fn dependency_expression(
             let accessor = field_ident(&plan.providers[provider_key]);
             let woven = woven_arguments(closures.of(provider_key), closures, ledger);
 
-            quote! { self.#accessor(#(#woven),*).await }
+            if plan.fallibility.of(provider_key) {
+                quote! { self.#accessor(#(#woven),*).await? }
+            } else {
+                quote! { self.#accessor(#(#woven),*).await }
+            }
         }
     }
 }

@@ -1,12 +1,9 @@
-use syn::ReturnType;
-use syn::Signature;
-use syn::Type;
-
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::struct_shape::StructShape;
 
 use crate::construction_source::ConstructionSource;
+use crate::constructor_return::ConstructorReturn;
 use crate::container_error::ContainerError;
 
 fn has_constructor_attribute(method: &IndexedMethod) -> bool {
@@ -17,20 +14,6 @@ fn has_constructor_attribute(method: &IndexedMethod) -> bool {
             .last()
             .is_some_and(|segment| segment.ident == "constructor")
     })
-}
-
-fn constructor_returns_self(signature: &Signature) -> bool {
-    match &signature.output {
-        ReturnType::Type(_, return_type) => is_self_type(return_type),
-        ReturnType::Default => false,
-    }
-}
-
-fn is_self_type(return_type: &Type) -> bool {
-    match return_type {
-        Type::Path(type_path) => type_path.path.is_ident("Self"),
-        _ => false,
-    }
 }
 
 pub(crate) fn resolve_construction<'index>(
@@ -55,12 +38,12 @@ pub(crate) fn resolve_construction<'index>(
     }
 
     match found.pop() {
-        Some(method) if constructor_returns_self(method.signature()) => {
-            Ok(ConstructionSource::Constructor(method))
-        }
-        Some(_) => Err(ContainerError::ConstructorReturnTypeMismatch {
-            singleton: concrete_path.to_string(),
-        }),
+        Some(method) => match ConstructorReturn::classify(method.signature()) {
+            Some(returns) => Ok(ConstructionSource::Constructor { method, returns }),
+            None => Err(ContainerError::ConstructorReturnTypeMismatch {
+                singleton: concrete_path.to_string(),
+            }),
+        },
         None => {
             let field_count = match shape {
                 StructShape::Unit => 0,
@@ -78,41 +61,5 @@ pub(crate) fn resolve_construction<'index>(
                 Ok(ConstructionSource::Fieldless(shape))
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use syn::ImplItemFn;
-    use syn::Signature;
-
-    use super::constructor_returns_self;
-
-    fn signature(source: &str) -> Signature {
-        let method: ImplItemFn = syn::parse_str(source).expect("a method fixture parses");
-
-        method.sig
-    }
-
-    #[test]
-    fn accepts_self_return() {
-        assert!(constructor_returns_self(&signature("fn new() -> Self {}")));
-    }
-
-    #[test]
-    fn rejects_concrete_return() {
-        assert!(!constructor_returns_self(&signature(
-            "fn new() -> Config {}"
-        )));
-    }
-
-    #[test]
-    fn rejects_non_path_return() {
-        assert!(!constructor_returns_self(&signature("fn new() -> () {}")));
-    }
-
-    #[test]
-    fn rejects_missing_return() {
-        assert!(!constructor_returns_self(&signature("fn new() {}")));
     }
 }

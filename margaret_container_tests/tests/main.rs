@@ -1,4 +1,5 @@
 mod accepts_singletons_named_after_framework_identifiers;
+mod binds_fallible_accessor_invocations;
 mod clones_a_console_argument_shared_by_sibling_singles;
 mod clones_a_console_argument_used_by_constructor_and_dependency;
 mod constructs_services_and_tickers_lazily;
@@ -8,6 +9,7 @@ mod exposes_console_argument_weaving_tokens;
 mod generates_async_accessors;
 mod generates_concrete_fields;
 mod generates_container_struct;
+mod generates_fallible_accessors;
 mod generates_fieldless_singletons;
 mod generates_jwks_endpoint_injection;
 mod generates_parameterized_accessor_for_console_arguments;

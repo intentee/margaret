@@ -1,7 +1,11 @@
+pub mod accessor_failure;
+mod accessor_fallibility;
 mod build_plan;
 mod console_closures;
 mod console_weave_ledger;
+pub mod construction_error_path;
 mod construction_source;
+mod constructor_return;
 pub mod container_bindings;
 pub mod container_error;
 mod container_plan;

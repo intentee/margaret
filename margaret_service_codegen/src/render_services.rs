@@ -15,6 +15,7 @@ use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
+use margaret_container::accessor_failure::AccessorFailure;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
@@ -65,10 +66,16 @@ fn svid_identity_prelude(
         return quote! {};
     }
 
-    let spiffe_trust_domain =
-        required_flag_read(&quote! { String }, "spiffe-trust-domain", &quote! { value.clone() });
-    let spire_agent_addr =
-        required_flag_read(&quote! { String }, "spire-agent-addr", &quote! { value.clone() });
+    let spiffe_trust_domain = required_flag_read(
+        &quote! { String },
+        "spiffe-trust-domain",
+        &quote! { value.clone() },
+    );
+    let spire_agent_addr = required_flag_read(
+        &quote! { String },
+        "spire-agent-addr",
+        &quote! { value.clone() },
+    );
 
     let bundle_constructor = if server_active && client_active {
         quote! { margaret::framework::spiffe_svid_bundle::SvidBundle }
@@ -196,12 +203,25 @@ fn server_registration(
                 .get(server.name())
                 .unwrap_or(&empty_arguments),
         );
+        let routes_call = quote! { super::http::#function_name::#function_name(container, #(#server_borrows)* &routes #views_argument).await };
+        let routes = if bindings.has_fallible_accessors() {
+            quote! {
+                match #routes_call {
+                    Ok(routes) => routes,
+                    Err(error) => {
+                        return margaret::framework::console::report_failure::report_failure(error);
+                    }
+                }
+            }
+        } else {
+            routes_call
+        };
 
         quote! {
             margaret::framework::service::server_assembly::ServerAssembly {
                 address_argument: #address_argument,
                 name: #name,
-                routes: super::http::#function_name::#function_name(container, #(#server_borrows)* &routes #views_argument).await,
+                routes: #routes,
                 transport: #transport,
                 upload_dir_argument: #upload_dir_argument,
                 uploads_argument: #uploads_argument,
@@ -212,9 +232,22 @@ fn server_registration(
 
     let views_setup = has_views.then(|| {
         let views_borrows = bindings.console_borrows(views_console_arguments);
+        let build = quote! { super::views::build::build(container, #(#views_borrows)*).await };
+        let built = if bindings.has_fallible_accessors() {
+            quote! {
+                match #build {
+                    Ok(views) => views,
+                    Err(error) => {
+                        return margaret::framework::console::report_failure::report_failure(error);
+                    }
+                }
+            }
+        } else {
+            build
+        };
 
         quote! {
-            let views = ::std::sync::Arc::new(super::views::build::build(container, #(#views_borrows)*).await);
+            let views = ::std::sync::Arc::new(#built);
         }
     });
 
@@ -343,9 +376,17 @@ fn woven_arguments(unit: &ServiceUnit, bindings: &ContainerBindings) -> Vec<Toke
 
 fn registration(unit: &ServiceUnit, bindings: &ContainerBindings, client_active: bool) -> TokenStream {
     let name = adapter_ident(unit);
-    let accessor = format_ident!("{}", unit.field_name);
+    let container = format_ident!("container");
     let woven = woven_arguments(unit, bindings);
-    let inner = quote! { #name { inner: container.#accessor(#(#woven),*).await } };
+    let access = bindings.accessor_invocation(
+        &container,
+        &unit.field_name,
+        &woven,
+        &AccessorFailure::Report(quote! {
+            return margaret::framework::console::report_failure::report_failure(error)
+        }),
+    );
+    let inner = quote! { #name { inner: #access } };
 
     gated_registration(&inner, client_active)
 }

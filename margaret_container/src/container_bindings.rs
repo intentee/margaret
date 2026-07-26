@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use proc_macro2::Ident;
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -17,6 +19,7 @@ use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
 use margaret_console_argument_codegen::unify_by_key::unify_by_key;
 use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 
+use crate::accessor_failure::AccessorFailure;
 use crate::console_closures::ConsoleClosures;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
@@ -25,6 +28,7 @@ use crate::provider_binding::ProviderBinding;
 
 pub struct ContainerBindings {
     accessor_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
+    accessor_fallibility: BTreeMap<String, bool>,
     console_arguments: BTreeMap<CanonicalPath, Vec<ConsoleArgument>>,
     console_slots: BTreeMap<ServeInputKey, usize>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
@@ -45,6 +49,12 @@ impl ContainerBindings {
                 )
             })
             .collect();
+        let accessor_fallibility = plan
+            .providers
+            .iter()
+            .chain(plan.constructions.iter())
+            .map(|(entry_key, entry)| (entry.field_name.clone(), plan.fallibility.of(entry_key)))
+            .collect();
         let console_arguments = plan
             .providers
             .iter()
@@ -63,9 +73,44 @@ impl ContainerBindings {
 
         Self {
             accessor_console_arguments,
+            accessor_fallibility,
             console_arguments,
             console_slots,
             providers,
+        }
+    }
+
+    #[must_use]
+    pub fn accessor_fallible(&self, field_name: &str) -> bool {
+        self.accessor_fallibility
+            .get(field_name)
+            .copied()
+            .unwrap_or(false)
+    }
+
+    #[must_use]
+    pub fn accessor_invocation(
+        &self,
+        container: &Ident,
+        field_name: &str,
+        woven: &[TokenStream],
+        failure: &AccessorFailure,
+    ) -> TokenStream {
+        let accessor = format_ident!("{field_name}");
+        let call = quote! { #container.#accessor(#(#woven),*).await };
+
+        if !self.accessor_fallible(field_name) {
+            return call;
+        }
+
+        match failure {
+            AccessorFailure::Propagate => quote! { #call? },
+            AccessorFailure::Report(on_failure) => quote! {
+                (match #call {
+                    Ok(value) => value,
+                    Err(error) => #on_failure,
+                })
+            },
         }
     }
 
@@ -141,6 +186,11 @@ impl ContainerBindings {
             .iter()
             .map(|argument| self.materialize(argument, true))
             .collect()
+    }
+
+    #[must_use]
+    pub fn has_fallible_accessors(&self) -> bool {
+        self.accessor_fallibility.values().any(|fallible| *fallible)
     }
 
     #[must_use]

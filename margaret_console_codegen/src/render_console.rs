@@ -20,6 +20,13 @@ pub fn render_console(
 
     Ok(GeneratedModuleTokens::new(
         "run",
-        render(&commands, serves, has_models, servers, serve_arguments),
+        render(
+            &commands,
+            serves,
+            has_models,
+            servers,
+            serve_arguments,
+            bindings,
+        ),
     ))
 }

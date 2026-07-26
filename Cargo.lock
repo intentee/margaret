@@ -1786,6 +1786,7 @@ dependencies = [
  "margaret_asset_bag",
  "margaret_codegen",
  "margaret_console",
+ "margaret_container_error",
  "margaret_http",
  "margaret_http_validation",
  "margaret_identity",
@@ -1902,6 +1903,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_codegen_fallible_roles_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "margaret",
+ "maud",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "validator",
+]
+
+[[package]]
 name = "margaret_codegen_tests"
 version = "0.1.0"
 dependencies = [
@@ -1992,6 +2011,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_container_error"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "thiserror",
+]
+
+[[package]]
 name = "margaret_container_tests"
 version = "0.1.0"
 dependencies = [
@@ -1999,6 +2026,8 @@ dependencies = [
  "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
+ "proc-macro2",
+ "quote",
  "syn 2.0.119",
 ]
 

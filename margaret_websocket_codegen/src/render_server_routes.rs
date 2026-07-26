@@ -4,6 +4,7 @@ use quote::quote;
 
 use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_container::construction_error_path::construction_error_path;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_vec_tokens::middleware_vec_tokens;
 
@@ -43,6 +44,7 @@ pub(crate) fn render_server_routes(
     };
     let console_parameters =
         bindings.console_parameters(&server_console_arguments(sessions, bindings));
+    let has_fallible = bindings.has_fallible_accessors();
     let entries = sessions.iter().map(|session_plan| {
         let path = &session_plan.session.path;
         let module = format_ident!("{}", session_plan.session.module_name);
@@ -61,11 +63,19 @@ pub(crate) fn render_server_routes(
                 bindings,
             )
         };
+        let upgrade_call = quote! {
+            #module::upgrade_entry(container, #(#console_forward)* #routes_argument).await
+        };
+        let upgrade = if has_fallible {
+            quote! { #upgrade_call? }
+        } else {
+            upgrade_call
+        };
 
         quote! {
             margaret::framework::http::route_entry::RouteEntry::web_socket(
                 #path,
-                #module::upgrade_entry(container, #(#console_forward)* #routes_argument).await,
+                #upgrade,
                 #middleware,
             ),
         }
@@ -73,6 +83,25 @@ pub(crate) fn render_server_routes(
 
     let parameter_count = 2 + console_parameters.len();
     let too_many_arguments = too_many_arguments_expect(parameter_count);
+    let list = quote! { ::std::vec::Vec::from([#(#entries)*]) };
+    let (return_type, body) = if has_fallible {
+        let error = construction_error_path();
+
+        (
+            quote! {
+                ::std::result::Result<
+                    ::std::vec::Vec<margaret::framework::http::route_entry::RouteEntry>,
+                    #error,
+                >
+            },
+            quote! { Ok(#list) },
+        )
+    } else {
+        (
+            quote! { ::std::vec::Vec<margaret::framework::http::route_entry::RouteEntry> },
+            list,
+        )
+    };
 
     quote! {
         #too_many_arguments
@@ -80,8 +109,8 @@ pub(crate) fn render_server_routes(
             container: &super::container::Container,
             #(#console_parameters)*
             #routes_name: &::std::sync::Arc<super::routes::Routes>,
-        ) -> ::std::vec::Vec<margaret::framework::http::route_entry::RouteEntry> {
-            ::std::vec::Vec::from([#(#entries)*])
+        ) -> #return_type {
+            #body
         }
     }
 }

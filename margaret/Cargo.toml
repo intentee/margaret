@@ -8,6 +8,7 @@ margaret_access_token_minter = { path = "../margaret_access_token_minter", optio
 margaret_asset_bag = { path = "../margaret_asset_bag", optional = true }
 margaret_codegen = { path = "../margaret_codegen", optional = true }
 margaret_console = { path = "../margaret_console", optional = true }
+margaret_container_error = { path = "../margaret_container_error", optional = true }
 margaret_http = { path = "../margaret_http", optional = true }
 margaret_http_validation = { path = "../margaret_http_validation", optional = true }
 margaret_identity = { path = "../margaret_identity", optional = true }
@@ -41,6 +42,7 @@ runtime = [
     "dep:margaret_access_token_minter",
     "dep:margaret_asset_bag",
     "dep:margaret_console",
+    "dep:margaret_container_error",
     "dep:margaret_http",
     "dep:margaret_http_validation",
     "dep:margaret_identity",
