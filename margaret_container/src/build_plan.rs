@@ -27,7 +27,6 @@ use margaret_tag_codegen::jwks_secret_store_target::JwksSecretStoreTarget;
 use margaret_tag_codegen::read_jwks_secret_store_target::read_jwks_secret_store_target;
 
 use crate::accessor_fallibility::AccessorFallibility;
-use crate::anyhow_result_path::anyhow_result_path;
 use crate::construction_source::ConstructionSource;
 use crate::constructor_return::ConstructorReturnShape;
 use crate::container_error::ContainerError;
@@ -256,12 +255,8 @@ fn resolve_direct(
         ConstructionSource::Constructor(constructor) => {
             let fallible = match ConstructorReturnShape::of(constructor.signature()) {
                 ConstructorReturnShape::SelfValue => false,
-                ConstructorReturnShape::GenericOverSelf(return_type)
-                    if index.resolve_item_type(item, return_type) == Some(anyhow_result_path()) =>
-                {
-                    true
-                }
-                ConstructorReturnShape::GenericOverSelf(_) | ConstructorReturnShape::Unsupported => {
+                ConstructorReturnShape::GenericOverSelf => true,
+                ConstructorReturnShape::Unsupported => {
                     return Err(ContainerError::ConstructorReturnTypeMismatch {
                         singleton: concrete_path.to_string(),
                     });

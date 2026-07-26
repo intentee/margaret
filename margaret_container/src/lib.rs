@@ -1,6 +1,5 @@
 pub mod accessor_failure;
 mod accessor_fallibility;
-mod anyhow_result_path;
 mod build_plan;
 mod console_closures;
 mod console_weave_ledger;

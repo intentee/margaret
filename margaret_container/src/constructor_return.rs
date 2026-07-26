@@ -8,39 +8,39 @@ fn is_self_type(candidate: &Type) -> bool {
     matches!(candidate, Type::Path(type_path) if type_path.path.is_ident("Self"))
 }
 
-fn generic_over_self(return_type: &Type) -> Option<&Type> {
+fn is_generic_over_self(return_type: &Type) -> bool {
     let Type::Path(type_path) = return_type else {
-        return None;
+        return false;
     };
 
-    type_path.path.segments.last().and_then(|segment| {
+    type_path.path.segments.last().is_some_and(|segment| {
         let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
-            return None;
+            return false;
         };
 
-        match arguments.args.first() {
-            Some(GenericArgument::Type(ok_type)) if is_self_type(ok_type) => Some(return_type),
-            _ => None,
-        }
+        matches!(
+            arguments.args.first(),
+            Some(GenericArgument::Type(ok_type)) if is_self_type(ok_type)
+        )
     })
 }
 
-pub(crate) enum ConstructorReturnShape<'signature> {
-    GenericOverSelf(&'signature Type),
+pub(crate) enum ConstructorReturnShape {
+    GenericOverSelf,
     SelfValue,
     Unsupported,
 }
 
-impl<'signature> ConstructorReturnShape<'signature> {
-    pub(crate) fn of(signature: &'signature Signature) -> Self {
+impl ConstructorReturnShape {
+    pub(crate) fn of(signature: &Signature) -> Self {
         let ReturnType::Type(_, return_type) = &signature.output else {
             return ConstructorReturnShape::Unsupported;
         };
 
         if is_self_type(return_type) {
             ConstructorReturnShape::SelfValue
-        } else if let Some(generic) = generic_over_self(return_type) {
-            ConstructorReturnShape::GenericOverSelf(generic)
+        } else if is_generic_over_self(return_type) {
+            ConstructorReturnShape::GenericOverSelf
         } else {
             ConstructorReturnShape::Unsupported
         }
@@ -59,7 +59,7 @@ mod tests {
         let signature: Signature = method.sig;
 
         match ConstructorReturnShape::of(&signature) {
-            ConstructorReturnShape::GenericOverSelf(_) => "generic_over_self",
+            ConstructorReturnShape::GenericOverSelf => "generic_over_self",
             ConstructorReturnShape::SelfValue => "self",
             ConstructorReturnShape::Unsupported => "unsupported",
         }
