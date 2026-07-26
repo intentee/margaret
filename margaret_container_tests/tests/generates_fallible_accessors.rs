@@ -29,7 +29,7 @@ fn caches_a_fallible_construction_through_construct_once_not_get_or_try_init() {
     let source = fixture("fallible_constructor");
 
     assert!(source.contains(
-        "margaret::framework::container_error::construct_once::construct_once(&self.loader,asyncmove"
+        "margaret::framework::container_error::construct_once::construct_once(&self.loader,\"crate::Loader\",asyncmove"
     ));
     assert!(!source.contains("get_or_try_init"));
 }

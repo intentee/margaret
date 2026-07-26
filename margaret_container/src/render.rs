@@ -81,11 +81,13 @@ fn accessor(
 
     if plan.fallibility.of(key) {
         let cell_type = cell_type(provider, true);
+        let singleton = provider.concrete_path.to_string();
 
         quote! {
             pub async fn #name(&self #(, #parameters)*) -> #cell_type {
                 margaret::framework::container_error::construct_once::construct_once(
                     &self.#name,
+                    #singleton,
                     async move {
                         let provided: #field_type = #construction;
 

@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ConstructionError {
+    #[error("construction of '{singleton}' was interrupted before it completed")]
+    Interrupted { singleton: &'static str },
     #[error("failed to construct '{singleton}': {source:#}")]
     UserError {
         singleton: &'static str,
