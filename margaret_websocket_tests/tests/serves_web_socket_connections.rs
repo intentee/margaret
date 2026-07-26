@@ -235,6 +235,33 @@ async fn sends_an_error_frame_when_a_request_handler_fails() {
 }
 
 #[tokio::test]
+async fn does_not_send_a_second_terminal_after_the_handler_answered() {
+    let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
+
+    harness
+        .send(r#"{"id":8,"method":"respond_then_fail","params":{"prompt":"question"}}"#)
+        .await;
+
+    let answered = harness.recv().await;
+
+    assert!(answered.contains("\"id\":8"));
+    assert!(answered.contains("\"done\":true"));
+    assert!(!answered.contains("internal_error"));
+
+    harness
+        .send(r#"{"id":9,"method":"ping","params":{"label":"after"}}"#)
+        .await;
+
+    let next = harness.recv().await;
+
+    assert!(next.contains("\"id\":9"));
+    assert!(!next.contains("internal_error"));
+
+    harness.send_raw(Message::Close(None)).await;
+    harness.driver.await.expect("the driver finishes");
+}
+
+#[tokio::test]
 async fn stops_when_the_client_disconnects_mid_stream() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 

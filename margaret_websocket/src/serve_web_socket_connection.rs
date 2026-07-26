@@ -51,7 +51,7 @@ async fn dispatch_frame<Session>(
                 let dispatch = dispatch.clone();
                 let cancellation_token = cancellation_token.child_token();
                 let session = session.clone();
-                let socket = socket.clone();
+                let socket = socket.request_scope();
 
                 tokio::spawn(async move {
                     dispatch

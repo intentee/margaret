@@ -15,6 +15,8 @@ pub mod ping_message;
 pub mod raw_http_exchange;
 pub mod redirecting_session_factory;
 pub mod rejecting_session_factory;
+pub mod respond_then_fail_dispatch;
+pub mod respond_then_fail_handler;
 pub mod response_chunk;
 pub mod running_websocket_server;
 pub mod storyboard_complete;

@@ -1,3 +1,7 @@
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+
 use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc::Sender;
@@ -12,19 +16,42 @@ use crate::web_socket_error::WebSocketError;
 
 #[derive(Clone)]
 pub struct WebSocket {
+    answered: Arc<AtomicBool>,
     sender: Sender<Message>,
 }
 
 impl WebSocket {
     pub(crate) fn new(sender: Sender<Message>) -> Self {
-        Self { sender }
+        Self {
+            answered: Arc::new(AtomicBool::new(false)),
+            sender,
+        }
     }
 
     pub async fn send<Payload: Serialize>(
         &self,
         response: OutboundResponse<Payload>,
     ) -> Result<(), WebSocketError> {
-        self.send_serializable(&response).await
+        let terminates_request = response.is_done;
+
+        self.send_serializable(&response).await?;
+
+        if terminates_request {
+            self.answered.store(true, Ordering::SeqCst);
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn has_answered_request(&self) -> bool {
+        self.answered.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn request_scope(&self) -> Self {
+        Self {
+            answered: Arc::new(AtomicBool::new(false)),
+            sender: self.sender.clone(),
+        }
     }
 
     pub(crate) async fn send_error(
@@ -42,7 +69,11 @@ impl WebSocket {
             },
             id,
         })
-        .await
+        .await?;
+
+        self.answered.store(true, Ordering::SeqCst);
+
+        Ok(())
     }
 
     async fn send_serializable<WireFrame: Serialize>(

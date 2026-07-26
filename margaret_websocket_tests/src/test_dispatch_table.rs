@@ -13,6 +13,8 @@ use crate::flood_dispatch::FloodDispatch;
 use crate::flood_handler::FloodHandler;
 use crate::ping_dispatch::PingDispatch;
 use crate::ping_handler::PingHandler;
+use crate::respond_then_fail_dispatch::RespondThenFailDispatch;
+use crate::respond_then_fail_handler::RespondThenFailHandler;
 use crate::storyboard_dispatch::StoryboardDispatch;
 use crate::storyboard_handler::StoryboardHandler;
 use crate::test_session::TestSession;
@@ -46,6 +48,12 @@ pub fn test_dispatch_table() -> Arc<WebSocketDispatchTable<TestSession>> {
         "flood".to_string(),
         Arc::new(FloodDispatch {
             handler: Arc::new(FloodHandler),
+        }),
+    );
+    requests.insert(
+        "respond_then_fail".to_string(),
+        Arc::new(RespondThenFailDispatch {
+            handler: Arc::new(RespondThenFailHandler),
         }),
     );
 
