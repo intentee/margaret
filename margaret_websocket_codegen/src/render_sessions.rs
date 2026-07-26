@@ -7,6 +7,8 @@ use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_container::accessor_error_path::accessor_error_path;
+use margaret_container::accessor_failure::AccessorFailure;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
@@ -34,10 +36,14 @@ fn injected_field_value(
     dependency: &InjectedDependency,
     bindings: &ContainerBindings,
 ) -> TokenStream {
-    let accessor = format_ident!("{}", dependency.field);
     let arguments = bindings.console_weaves(&bindings.injected_console_arguments(dependency));
 
-    quote! { container.#accessor(#(#arguments),*).await }
+    bindings.accessor_invocation(
+        &format_ident!("container"),
+        &dependency.field,
+        &arguments,
+        &AccessorFailure::Propagate,
+    )
 }
 
 fn captured_providers(session: &WebSocketSession) -> CapturedProviders {
@@ -109,14 +115,20 @@ fn factory_initializers(
             _ => None,
         }
     });
-    let initializers = captured.entries().map(|CapturedProvider { kind, local }| {
-        let accessor = format_ident!("{}", kind.accessor());
-
-        match kind {
+    let container = format_ident!("container");
+    let initializers = captured
+        .entries()
+        .map(|CapturedProvider { kind, local }| match kind {
             CapturedProviderKind::AuthenticatedUser { application } => {
                 let wrapper = &application.wrapper;
                 let arguments =
                     bindings.console_weaves(bindings.console_arguments(&application.concrete));
+                let inner = bindings.accessor_invocation(
+                    &container,
+                    kind.accessor(),
+                    &arguments,
+                    &AccessorFailure::Propagate,
+                );
                 let routes_init = application
                     .injects_routes
                     .then(|| quote! { routes: routes.clone(), });
@@ -124,7 +136,7 @@ fn factory_initializers(
                 quote! {
                     #local: ::std::sync::Arc::new(
                         super::super::authenticated_users::#wrapper {
-                            inner: container.#accessor(#(#arguments),*).await,
+                            inner: #inner,
                             #routes_init
                         },
                     ),
@@ -132,11 +144,16 @@ fn factory_initializers(
             }
             CapturedProviderKind::Binder { provider, .. } => {
                 let arguments = bindings.console_weaves(bindings.console_arguments(provider));
+                let access = bindings.accessor_invocation(
+                    &container,
+                    kind.accessor(),
+                    &arguments,
+                    &AccessorFailure::Propagate,
+                );
 
-                quote! { #local: container.#accessor(#(#arguments),*).await, }
+                quote! { #local: #access, }
             }
-        }
-    });
+        });
 
     quote! { #(#holders)* #(#initializers)* }
 }
@@ -306,14 +323,19 @@ fn dispatch_insert(
 ) -> TokenStream {
     let dispatch = dispatch_struct_ident(binding);
     let method = &binding.method;
-    let accessor = format_ident!("{}", binding.handler_field);
     let arguments = bindings.console_weaves(bindings.console_arguments(&binding.handler_path));
+    let handler = bindings.accessor_invocation(
+        container,
+        &binding.handler_field,
+        &arguments,
+        &AccessorFailure::Propagate,
+    );
 
     quote! {
         #map.insert(
             #method.to_string(),
             ::std::sync::Arc::new(#dispatch {
-                handler: #container.#accessor(#(#arguments),*).await,
+                handler: #handler,
             }),
         );
     }
@@ -354,15 +376,36 @@ fn render_dispatch_table(
     let notifications_mutability = mutability(!plan.notification_handlers.is_empty());
     let parameter_count = 1 + parameters.len();
     let too_many_arguments = too_many_arguments_expect(parameter_count);
+    let table_type = quote! {
+        ::std::sync::Arc<
+            margaret::framework::websocket::web_socket_dispatch_table::WebSocketDispatchTable<#session_path>,
+        >
+    };
+    let table_value = quote! {
+        ::std::sync::Arc::new(
+            margaret::framework::websocket::web_socket_dispatch_table::WebSocketDispatchTable::new(
+                #requests,
+                #notifications,
+            ),
+        )
+    };
+    let (return_type, table) = if bindings.has_accessors() {
+        let error = accessor_error_path();
+
+        (
+            quote! { ::std::result::Result<#table_type, #error> },
+            quote! { Ok(#table_value) },
+        )
+    } else {
+        (table_type, table_value)
+    };
 
     quote! {
         #too_many_arguments
         async fn dispatch_table(
             #container: &super::super::container::Container,
             #(#parameters)*
-        ) -> ::std::sync::Arc<
-            margaret::framework::websocket::web_socket_dispatch_table::WebSocketDispatchTable<#session_path>,
-        > {
+        ) -> #return_type {
             let #requests_mutability #requests: ::std::collections::HashMap<
                 ::std::string::String,
                 ::std::sync::Arc<
@@ -383,12 +426,7 @@ fn render_dispatch_table(
             > = ::std::collections::HashMap::new();
             #(#notification_inserts)*
 
-            ::std::sync::Arc::new(
-                margaret::framework::websocket::web_socket_dispatch_table::WebSocketDispatchTable::new(
-                    #requests,
-                    #notifications,
-                ),
-            )
+            #table
         }
     }
 }
@@ -416,6 +454,36 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
     let dispatch_table = render_dispatch_table(plan, &session_path, &dispatch_arguments, bindings);
     let parameter_count = 1 + upgrade_parameters.len() + usize::from(routes_parameter.is_some());
     let too_many_arguments = too_many_arguments_expect(parameter_count);
+    let has_fallible = bindings.has_accessors();
+    let dispatch_call = quote! { dispatch_table(container, #(#dispatch_forward)*).await };
+    let dispatch_value = if has_fallible {
+        quote! { #dispatch_call? }
+    } else {
+        dispatch_call
+    };
+    let upgrade_type = quote! {
+        ::std::sync::Arc<dyn margaret::framework::http::web_socket_upgrade::WebSocketUpgrade>
+    };
+    let upgrade_value = quote! {
+        ::std::sync::Arc::new(
+            margaret::framework::websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry::new(
+                Factory {
+                    #initializers
+                },
+                #dispatch_value,
+            ),
+        )
+    };
+    let (upgrade_return, upgrade_body) = if has_fallible {
+        let error = accessor_error_path();
+
+        (
+            quote! { ::std::result::Result<#upgrade_type, #error> },
+            quote! { Ok(#upgrade_value) },
+        )
+    } else {
+        (upgrade_type, upgrade_value)
+    };
 
     quote! {
         #factory
@@ -430,15 +498,8 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
             container: &super::super::container::Container,
             #(#upgrade_parameters)*
             #routes_parameter
-        ) -> ::std::sync::Arc<dyn margaret::framework::http::web_socket_upgrade::WebSocketUpgrade> {
-            ::std::sync::Arc::new(
-                margaret::framework::websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry::new(
-                    Factory {
-                        #initializers
-                    },
-                    dispatch_table(container, #(#dispatch_forward)*).await,
-                ),
-            )
+        ) -> #upgrade_return {
+            #upgrade_body
         }
     }
 }

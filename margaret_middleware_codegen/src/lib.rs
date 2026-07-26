@@ -315,7 +315,7 @@ impl Guard {
 
         assert_eq!(
             folded,
-            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await}),margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await}),BASE))"
+            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await?}),margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await?}),BASE))"
         );
     }
 
@@ -357,10 +357,10 @@ impl Guard {
             "letmutmiddleware:::std::vec::Vec<::std::sync::Arc<dynmargaret::framework::http::http_middleware::HttpMiddleware>,>=::std::vec::Vec::new();"
         ));
         assert!(vector.contains(
-            "middleware.push(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()}));"
+            "middleware.push(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await?,routes:routes.clone()}));"
         ));
         assert!(vector.contains(
-            "middleware.push(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await}));"
+            "middleware.push(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await?}));"
         ));
 
         let tracer = vector

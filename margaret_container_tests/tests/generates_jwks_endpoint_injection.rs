@@ -56,7 +56,7 @@ fn drafts_a_jwks_endpoint_as_the_provides_endpoint_interface() {
 fn injects_the_endpoints_own_dependencies_and_console_argument() {
     assert!(
         endpoints_container()
-            .contains("crate::JwksEndpoint::new(self.dns_resolver().await,console_argument_0,)")
+            .contains("crate::JwksEndpoint::new(self.dns_resolver().await?,console_argument_0,)")
     );
 }
 
@@ -64,7 +64,7 @@ fn injects_the_endpoints_own_dependencies_and_console_argument() {
 fn injects_the_endpoint_into_the_framework_client_by_tag() {
     assert!(
         endpoints_container().contains(
-            "crate::JwksClientRuntime::new(self.jwks_endpoint(console_argument_0).await,)"
+            "crate::JwksClientRuntime::new(self.jwks_endpoint(console_argument_0).await?,)"
         )
     );
 }

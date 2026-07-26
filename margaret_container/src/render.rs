@@ -8,39 +8,53 @@ use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 
+use crate::accessor_error_path::accessor_error_path;
 use crate::console_closures::ConsoleClosures;
 use crate::console_weave_ledger::ConsoleWeaveLedger;
+use crate::construction_error_path::construction_error_path;
+use crate::construction_slot_path::construction_slot_path;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
 use crate::field_ident::field_ident;
+use crate::ordered_providers::ordered_providers;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provides_endpoint_path::provides_endpoint_path;
 
 fn field_declaration(provider: &Provider) -> TokenStream {
     let name = field_ident(provider);
-    let field_type = field_type(provider);
+    let slot = construction_slot_path();
+    let constructed = constructed_type(provider);
 
-    quote! { #name: tokio::sync::OnceCell<#field_type> }
+    quote! { #name: #slot<#constructed> }
+}
+
+fn accessor_return_type(provider: &Provider) -> TokenStream {
+    let field_type = field_type(provider);
+    let error = accessor_error_path();
+
+    quote! { ::std::result::Result<#field_type, #error> }
 }
 
 fn field_type(provider: &Provider) -> TokenStream {
-    match &provider.provided {
-        ProvidedType::Concrete(path) => {
-            let concrete = path_tokens(path);
+    let constructed = constructed_type(provider);
 
-            quote! { std::sync::Arc<#concrete> }
-        }
+    quote! { std::sync::Arc<#constructed> }
+}
+
+fn constructed_type(provider: &Provider) -> TokenStream {
+    match &provider.provided {
+        ProvidedType::Concrete(path) => path_tokens(path),
         ProvidedType::Endpoint(_) => {
             let interface = path_tokens(&provides_endpoint_path());
 
-            quote! { std::sync::Arc<dyn #interface> }
+            quote! { dyn #interface }
         }
         ProvidedType::UriSelected(trait_path) => {
             let interface = path_tokens(trait_path);
 
-            quote! { std::sync::Arc<dyn #interface> }
+            quote! { dyn #interface }
         }
     }
 }
@@ -53,24 +67,29 @@ fn accessor(
 ) -> TokenStream {
     let name = field_ident(provider);
     let field_type = field_type(provider);
-    let parameters = closures.of(key).iter().map(|argument| {
-        let ident = console_argument_ident(closures.slot(&argument.slot_key()));
-        let value_type = argument.field_type();
+    let parameters: Vec<TokenStream> = closures
+        .of(key)
+        .iter()
+        .map(|argument| {
+            let ident = console_argument_ident(closures.slot(&argument.slot_key()));
+            let value_type = argument.field_type();
 
-        quote! { #ident: #value_type }
-    });
+            quote! { #ident: #value_type }
+        })
+        .collect();
     let construction = construction(provider, plan, closures);
+    let accessor_return_type = accessor_return_type(provider);
+    let singleton = provider.concrete_path.to_string();
 
     quote! {
-        pub async fn #name(&self #(, #parameters)*) -> #field_type {
+        pub async fn #name(&self #(, #parameters)*) -> #accessor_return_type {
             self.#name
-                .get_or_init(|| async move {
+                .construct_once(#singleton, async move {
                     let provided: #field_type = #construction;
 
-                    provided
+                    Ok(provided)
                 })
                 .await
-                .clone()
         }
     }
 }
@@ -118,16 +137,25 @@ fn direct_value(
     match direct {
         DirectConstruction::Constructor {
             dependencies,
+            fallible,
             is_async: constructor_is_async,
             method,
         } => {
             let constructor = format_ident!("{}", method);
             let arguments = woven_dependency_expressions(dependencies, plan, closures);
-
-            if *constructor_is_async {
+            let call = if *constructor_is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
             } else {
                 quote! { #concrete::#constructor(#(#arguments),*) }
+            };
+
+            if *fallible {
+                let error = construction_error_path();
+                let singleton = concrete_path.to_string();
+
+                quote! { #error::wrap(#singleton, #call)? }
+            } else {
+                call
             }
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
@@ -211,23 +239,15 @@ fn dependency_expression(
             let accessor = field_ident(&plan.providers[provider_key]);
             let woven = woven_arguments(closures.of(provider_key), closures, ledger);
 
-            quote! { self.#accessor(#(#woven),*).await }
+            quote! { self.#accessor(#(#woven),*).await? }
         }
     }
 }
 
 pub(crate) fn render(plan: &ContainerPlan, closures: &ConsoleClosures) -> TokenStream {
-    let mut ordered: Vec<(&CanonicalPath, &Provider)> = plan
-        .providers
-        .iter()
-        .chain(plan.constructions.iter())
-        .collect();
+    let ordered = ordered_providers(plan);
 
-    ordered.sort_by(|(_, first), (_, second)| first.field_name.cmp(&second.field_name));
-
-    let fields = ordered
-        .iter()
-        .map(|(_, provider)| field_declaration(provider));
+    let fields = ordered.iter().map(|(_, provider)| field_declaration(provider));
     let accessors = ordered
         .iter()
         .map(|(key, provider)| accessor(key, provider, plan, closures));

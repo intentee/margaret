@@ -6,6 +6,7 @@ use crate::dependency_kind::DependencyKind;
 pub(crate) enum DirectConstruction {
     Constructor {
         dependencies: Vec<DependencyKind>,
+        fallible: bool,
         is_async: bool,
         method: String,
     },

@@ -7,6 +7,8 @@ use margaret_console_argument_codegen::argument_registration::argument_registrat
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
+use margaret_container::accessor_failure::AccessorFailure;
+use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
@@ -43,16 +45,26 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
     }
 }
 
-fn command_arm(command: &ConsoleCommand, container: &Ident) -> TokenStream {
+fn command_arm(
+    command: &ConsoleCommand,
+    container: &Ident,
+    bindings: &ContainerBindings,
+) -> TokenStream {
     let name = &command.name;
-    let accessor = &command.accessor;
     let matches_binding = if command.arguments.is_empty() {
         quote! { _matches }
     } else {
         quote! { matches }
     };
-    let values = command.arguments.iter().map(argument_value);
-    let accessor_access = quote! { #container.#accessor(#(#values),*).await };
+    let values: Vec<TokenStream> = command.arguments.iter().map(argument_value).collect();
+    let accessor_access = bindings.accessor_invocation(
+        container,
+        &command.accessor.to_string(),
+        &values,
+        &AccessorFailure::Report(quote! {
+            return margaret::framework::console::report_failure::report_failure(error)
+        }),
+    );
 
     if command.takes_token {
         quote! {
@@ -80,6 +92,7 @@ pub(crate) fn render(
     has_models: bool,
     servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
+    bindings: &ContainerBindings,
 ) -> TokenStream {
     let dispatches_asynchronously = !commands.is_empty() || serves;
     let container = if dispatches_asynchronously {
@@ -95,7 +108,7 @@ pub(crate) fn render(
     let subcommands = commands.iter().map(subcommand_registration);
     let arms = commands
         .iter()
-        .map(|command| command_arm(command, &container));
+        .map(|command| command_arm(command, &container, bindings));
 
     let schema_registration = if has_models {
         quote! {

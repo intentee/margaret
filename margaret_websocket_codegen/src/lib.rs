@@ -494,7 +494,7 @@ impl Guard {
 
         assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
         assert!(source.contains(
-            "super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"
+            "super::middleware::Tracer{inner:container.tracer().await?,routes:routes.clone()"
         ));
         assert!(source.contains("upgrade_entry(container)"));
     }
@@ -893,7 +893,7 @@ impl RespondsToWebSocketMessage for Chatter {
             "structFactory{session_user_provider:::std::sync::Arc<super::super::authenticated_users::SessionUserProvider,>,}"
         ));
         assert!(source.contains(
-            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider().await,}),}"
+            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider().await?,}),}"
         ));
     }
 
@@ -1063,7 +1063,7 @@ impl RespondsToWebSocketMessage for Chatter {
 
         assert!(source.contains("pubasyncfnupgrade_entry(container:&super::super::container::Container,console_argument_0:&str,)"));
         assert!(source.contains(
-            "inner:container.session_user_provider(console_argument_0.to_owned()).await,"
+            "inner:container.session_user_provider(console_argument_0.to_owned()).await?,"
         ));
         assert!(source.contains(
             "pubasyncfnpublic_routes(container:&super::container::Container,console_argument_0:&str,_routes:"

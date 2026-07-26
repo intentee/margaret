@@ -1,0 +1,25 @@
+[package]
+name = "margaret_codegen_fallible_roles_fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+margaret = { path = "../../../../margaret" }
+maud = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+validator = { workspace = true, features = ["derive"] }
+
+[build-dependencies]
+margaret = { path = "../../../../margaret", default-features = false, features = ["codegen"] }
+
+[lints]
+workspace = true

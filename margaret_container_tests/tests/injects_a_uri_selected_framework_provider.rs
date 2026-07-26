@@ -50,7 +50,7 @@ fn render_with_provider(fixture: &str) -> String {
 fn materializes_the_provider_as_a_trait_object_field() {
     assert!(
         render_with_provider("uri_selected_provider")
-            .contains("test_storage:tokio::sync::OnceCell<std::sync::Arc<dyncrate::TestStorage>>")
+            .contains("test_storage:margaret::framework::container_error::construction_slot::ConstructionSlot<dyncrate::TestStorage,>")
     );
 }
 

@@ -47,12 +47,18 @@ pub enum ContainerError {
     #[error(
         "#[spiffe_http_client] does not take any arguments, but parameter '{parameter}' of singleton '{singleton}' declares some"
     )]
-    SpiffeHttpClientTakesNoArguments { parameter: String, singleton: String },
+    SpiffeHttpClientTakesNoArguments {
+        parameter: String,
+        singleton: String,
+    },
 
     #[error(
         "parameter '{parameter}' of singleton '{singleton}' carries #[spiffe_http_client] together with another injection source; a parameter must resolve to exactly one source"
     )]
-    AmbiguousSpiffeHttpClientInjection { parameter: String, singleton: String },
+    AmbiguousSpiffeHttpClientInjection {
+        parameter: String,
+        singleton: String,
+    },
 
     #[error("#[singleton] is only supported on structs, but '{path}' is not a struct")]
     NotASingletonStruct { path: String },
@@ -71,7 +77,9 @@ pub enum ContainerError {
     #[error("singleton '{singleton}' has more than one #[constructor] method: {methods}")]
     AmbiguousConstructor { singleton: String, methods: String },
 
-    #[error("the #[constructor] of singleton '{singleton}' must return Self")]
+    #[error(
+        "the #[constructor] of singleton '{singleton}' must return Self or anyhow::Result<Self>"
+    )]
     ConstructorReturnTypeMismatch { singleton: String },
 
     #[error(

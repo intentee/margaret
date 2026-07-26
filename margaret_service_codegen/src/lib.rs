@@ -142,8 +142,22 @@ mod tests {
     }
 
     const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
+    const STATELESS_RESPONDER: &str = "#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n";
     const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n";
     const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> Self {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
+
+    #[test]
+    fn invokes_server_and_views_helpers_directly_when_the_container_has_no_accessors() {
+        let source = rendered_with_views(STATELESS_RESPONDER, &public());
+
+        assert!(source.contains(
+            "routes:super::http::server_public::server_public(container,&routes,&views).await,"
+        ));
+        assert!(source.contains(
+            "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
+        ));
+        assert!(!source.contains("report_failure"));
+    }
 
     #[test]
     fn reports_units_present() {
@@ -158,7 +172,7 @@ mod tests {
 
         assert!(source.contains("structPump{"));
         assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
-        assert!(source.contains("manager.register_service(Pump{inner:container.pump().await"));
+        assert!(source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await"));
     }
 
     #[test]
@@ -251,12 +265,12 @@ mod tests {
             "fntick_interval(&self)->std::time::Duration{margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL}"
         ));
         assert!(source.contains(
-            "manager.register_service(JwksRoller{inner:container.framework_jwks_roller_server_jwks_roller_jwks_roller().await"
+            "manager.register_service(JwksRoller{inner:(matchcontainer.framework_jwks_roller_server_jwks_roller_jwks_roller().await"
         ));
         assert!(source.contains("impltrzcina::ServiceforJwksClient"));
         assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
         assert!(source.contains(
-            "manager.register_service(JwksClient{inner:container.framework_jwks_client_jwks_client_jwks_client().await"
+            "manager.register_service(JwksClient{inner:(matchcontainer.framework_jwks_client_jwks_client_jwks_client().await"
         ));
     }
 
@@ -303,7 +317,7 @@ mod tests {
 
         assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:matchsuper::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
@@ -314,7 +328,7 @@ mod tests {
         assert!(source.contains(
             "forserver_serviceinserver_services{manager.register_service(server_service);}"
         ));
-        assert!(source.contains("manager.register_service(Pump{inner:container.pump().await,});"));
+        assert!(source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"));
         assert!(!source.contains("bundle_services"));
         assert!(!source.contains("resolved_services"));
         assert!(source.contains("letmutmanager=trzcina::ServiceManager::default();"));
@@ -325,7 +339,7 @@ mod tests {
         let source = rendered(SERVICE, &[]);
 
         assert!(source.contains("letmutmanager=trzcina::ServiceManager::default();"));
-        assert!(source.contains("manager.register_service(Pump{inner:container.pump().await,});"));
+        assert!(source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"));
         assert!(!source.contains("serve_application"));
     }
 
@@ -334,11 +348,11 @@ mod tests {
         let source = rendered_with_views("#[singleton]\nstruct Store;\n", &public());
 
         assert!(source.contains(
-            "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
+            "letviews=::std::sync::Arc::new(matchsuper::views::build::build(container).await{Ok(views)=>views,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}},);"
         ));
         assert!(
             source.contains(
-                "super::http::server_public::server_public(container,&routes,&views).await"
+                "super::http::server_public::server_public(container,&routes,&views,).await"
             )
         );
     }
@@ -408,7 +422,7 @@ mod tests {
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(source.contains(
-            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:container.worker(console_argument_0.clone()).await,},),);"
+            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:(matchcontainer.worker(console_argument_0.clone()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),},),);"
         ));
         assert!(source.contains(
             "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
@@ -482,13 +496,13 @@ mod tests {
         );
 
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:matchsuper::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:matchsuper::http::server_internal::server_internal(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#
@@ -626,7 +640,7 @@ impl Roller {
         assert!(source.contains("self.inner.run().await.map_err(anyhow::Error::from)"));
         assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains(
-            "manager.register_service(Roller{inner:container.roller(console_argument_0.to_owned()).await,});"
+            "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
         ));
         assert!(source.contains(
             r#"letconsole_argument_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
@@ -661,7 +675,7 @@ impl Roller {
         );
         assert!(!source.contains("_cancellation_token"));
         assert!(source.contains(
-            "manager.register_service(Roller{inner:container.roller(console_argument_0.to_owned()).await,});"
+            "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
         ));
     }
 
@@ -688,7 +702,7 @@ impl Worker {
 
         assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
         assert!(source.contains(
-            "manager.register_service(Worker{inner:container.worker(console_argument_0.to_owned()).await,});"
+            "manager.register_service(Worker{inner:(matchcontainer.worker(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
         ));
     }
 
@@ -714,7 +728,7 @@ impl Worker {
         assert!(source.contains("structWorker{inner:std::sync::Arc<crate::Worker>,}"));
         assert!(source.contains("self.inner.run().await?;Ok(())"));
         assert!(source.contains(
-            "manager.register_service(Worker{inner:container.worker(console_argument_0.to_owned()).await,});"
+            "manager.register_service(Worker{inner:(matchcontainer.worker(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
         ));
         assert!(source.contains(
             r#"letconsole_argument_0=matchmatches.get_one::<std::string::String>("label")"#
@@ -741,7 +755,7 @@ impl Watcher {
         );
 
         assert!(source.contains(
-            "manager.register_service(Watcher{inner:container.watcher(console_argument_0).await,});"
+            "manager.register_service(Watcher{inner:(matchcontainer.watcher(console_argument_0).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
         ));
         assert!(source.contains(r#"letconsole_argument_0=matches.get_flag("verbose")"#));
     }
@@ -779,10 +793,10 @@ impl Second {
         );
 
         assert!(source.contains(
-            "manager.register_service(First{inner:container.first(console_argument_0.to_owned()).await,});"
+            "manager.register_service(First{inner:(matchcontainer.first(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
         ));
         assert!(source.contains(
-            "manager.register_service(Second{inner:container.second(console_argument_0.to_owned()).await,});"
+            "manager.register_service(Second{inner:(matchcontainer.second(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
         ));
         assert_eq!(source.matches("letconsole_argument_0=").count(), 1);
     }

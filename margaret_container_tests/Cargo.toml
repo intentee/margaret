@@ -11,6 +11,10 @@ margaret_container = { path = "../margaret_container" }
 margaret_generated_module = { path = "../margaret_generated_module" }
 syn = { workspace = true }
 
+[dev-dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+
 [[test]]
 name = "main"
 path = "tests/main.rs"

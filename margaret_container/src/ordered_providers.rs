@@ -1,14 +1,16 @@
+use margaret_attributes::canonical_path::CanonicalPath;
+
 use crate::container_plan::ContainerPlan;
 use crate::provider::Provider;
 
-pub(crate) fn ordered_providers(plan: &ContainerPlan) -> Vec<&Provider> {
-    let mut ordered: Vec<&Provider> = plan
+pub(crate) fn ordered_providers(plan: &ContainerPlan) -> Vec<(&CanonicalPath, &Provider)> {
+    let mut ordered: Vec<(&CanonicalPath, &Provider)> = plan
         .providers
-        .values()
-        .chain(plan.constructions.values())
+        .iter()
+        .chain(plan.constructions.iter())
         .collect();
 
-    ordered.sort_by(|first, second| first.field_name.cmp(&second.field_name));
+    ordered.sort_by(|(_, first), (_, second)| first.field_name.cmp(&second.field_name));
 
     ordered
 }

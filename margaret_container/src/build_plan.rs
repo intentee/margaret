@@ -27,6 +27,7 @@ use margaret_tag_codegen::jwks_secret_store_target::JwksSecretStoreTarget;
 use margaret_tag_codegen::read_jwks_secret_store_target::read_jwks_secret_store_target;
 
 use crate::construction_source::ConstructionSource;
+use crate::constructor_return::ConstructorReturnShape;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
@@ -251,6 +252,15 @@ fn resolve_direct(
 ) -> Result<DirectConstruction, ContainerError> {
     match source {
         ConstructionSource::Constructor(constructor) => {
+            let fallible = match ConstructorReturnShape::of(constructor.signature()) {
+                ConstructorReturnShape::SelfValue => false,
+                ConstructorReturnShape::GenericOverSelf => true,
+                ConstructorReturnShape::Unsupported => {
+                    return Err(ContainerError::ConstructorReturnTypeMismatch {
+                        singleton: concrete_path.to_string(),
+                    });
+                }
+            };
             let dependencies = resolve_dependencies(
                 index,
                 item,
@@ -263,6 +273,7 @@ fn resolve_direct(
 
             Ok(DirectConstruction::Constructor {
                 dependencies,
+                fallible,
                 is_async: constructor.signature().asyncness.is_some(),
                 method: constructor.identifier().to_string(),
             })
@@ -601,6 +612,7 @@ fn resolve_framework_construction(construction: &FrameworkConstruction) -> Direc
 
             DirectConstruction::Constructor {
                 dependencies: resolved,
+                fallible: false,
                 is_async: *is_async,
                 method: method.clone(),
             }
@@ -729,7 +741,8 @@ fn is_framework_role_referenced(drafts: &[Draft], role: &FrameworkInjectionRole)
 }
 
 fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &CanonicalPath) -> bool {
-    let ConstructionSource::Constructor(constructor) = &draft.construction else {
+    let ConstructionSource::Constructor(constructor) = &draft.construction
+    else {
         return false;
     };
 
@@ -746,7 +759,8 @@ fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &Canonical
 }
 
 fn draft_references_role(draft: &Draft, role: &FrameworkInjectionRole) -> bool {
-    let ConstructionSource::Constructor(constructor) = &draft.construction else {
+    let ConstructionSource::Constructor(constructor) = &draft.construction
+    else {
         return false;
     };
 
