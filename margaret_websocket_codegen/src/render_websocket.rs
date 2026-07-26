@@ -9,6 +9,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 
+use crate::build_websocket_plan::build_websocket_plan;
 use crate::render_messages::render_messages;
 use crate::render_server_routes::render_server_routes;
 use crate::render_server_routes::server_console_arguments;
@@ -16,7 +17,6 @@ use crate::render_sessions::render_sessions;
 use crate::session_plan::SessionPlan;
 use crate::websocket_artifacts::WebSocketArtifacts;
 use crate::websocket_codegen_error::WebSocketCodegenError;
-use crate::websocket_plan::websocket_plan;
 
 pub fn render_websocket(
     index: &AttributeIndex,
@@ -24,7 +24,7 @@ pub fn render_websocket(
     middleware_plans: &[MiddlewarePlan],
     registries: &BindingRegistries,
 ) -> Result<WebSocketArtifacts, WebSocketCodegenError> {
-    let plan = websocket_plan(index, bindings, middleware_plans, registries)?;
+    let plan = build_websocket_plan(index, bindings, middleware_plans, registries)?;
 
     let mut sessions_by_server: BTreeMap<String, Vec<&SessionPlan>> = BTreeMap::new();
 
