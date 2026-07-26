@@ -4,7 +4,7 @@ use quote::quote;
 
 use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_container::construction_error_path::construction_error_path;
+use margaret_container::accessor_error_path::accessor_error_path;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_vec_tokens::middleware_vec_tokens;
 
@@ -85,7 +85,7 @@ pub(crate) fn render_server_routes(
     let too_many_arguments = too_many_arguments_expect(parameter_count);
     let list = quote! { ::std::vec::Vec::from([#(#entries)*]) };
     let (return_type, body) = if has_fallible {
-        let error = construction_error_path();
+        let error = accessor_error_path();
 
         (
             quote! {

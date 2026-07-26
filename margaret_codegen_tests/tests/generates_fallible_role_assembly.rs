@@ -44,7 +44,7 @@ fn reports_a_fallible_console_command_into_the_command_outcome() {
 #[test]
 fn threads_construction_errors_through_the_views_builder() {
     assert!(module(&generated(), "views/build").contains(
-        "->Result<super::Views,margaret::framework::container_error::construction_error::ConstructionError,>"
+        "->Result<super::Views,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
     ));
 }
 
@@ -55,7 +55,7 @@ fn threads_construction_errors_through_the_http_server_assembly() {
     assert!(source.contains("container.get_home_get_home().await?"));
     assert!(source.contains("super::super::websocket::public_routes(container,routes).await?"));
     assert!(source.contains(
-        "->::std::result::Result<::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>,margaret::framework::container_error::construction_error::ConstructionError,>"
+        "->::std::result::Result<::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
     ));
 }
 

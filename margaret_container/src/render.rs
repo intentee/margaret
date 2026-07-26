@@ -8,6 +8,7 @@ use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 
+use crate::accessor_error_path::accessor_error_path;
 use crate::console_closures::ConsoleClosures;
 use crate::console_weave_ledger::ConsoleWeaveLedger;
 use crate::construction_error_path::construction_error_path;
@@ -19,11 +20,23 @@ use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provides_endpoint_path::provides_endpoint_path;
 
-fn field_declaration(provider: &Provider) -> TokenStream {
+fn field_declaration(provider: &Provider, fallible: bool) -> TokenStream {
     let name = field_ident(provider);
+    let cell_type = cell_type(provider, fallible);
+
+    quote! { #name: tokio::sync::OnceCell<#cell_type> }
+}
+
+fn cell_type(provider: &Provider, fallible: bool) -> TokenStream {
     let field_type = field_type(provider);
 
-    quote! { #name: tokio::sync::OnceCell<#field_type> }
+    if fallible {
+        let error = accessor_error_path();
+
+        quote! { Result<#field_type, #error> }
+    } else {
+        field_type
+    }
 }
 
 fn field_type(provider: &Provider) -> TokenStream {
@@ -67,18 +80,19 @@ fn accessor(
     let construction = construction(provider, plan, closures);
 
     if plan.fallibility.of(key) {
-        let error = construction_error_path();
+        let cell_type = cell_type(provider, true);
 
         quote! {
-            pub async fn #name(&self #(, #parameters)*) -> Result<#field_type, #error> {
-                Ok(self.#name
-                    .get_or_try_init(|| async move {
+            pub async fn #name(&self #(, #parameters)*) -> #cell_type {
+                margaret::framework::container_error::construct_once::construct_once(
+                    &self.#name,
+                    async move {
                         let provided: #field_type = #construction;
 
                         Ok(provided)
-                    })
-                    .await?
-                    .clone())
+                    },
+                )
+                .await
             }
         }
     } else {
@@ -262,7 +276,7 @@ pub(crate) fn render(plan: &ContainerPlan, closures: &ConsoleClosures) -> TokenS
 
     let fields = ordered
         .iter()
-        .map(|(_, provider)| field_declaration(provider));
+        .map(|(key, provider)| field_declaration(provider, plan.fallibility.of(key)));
     let accessors = ordered
         .iter()
         .map(|(key, provider)| accessor(key, provider, plan, closures));

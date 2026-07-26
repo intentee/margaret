@@ -1,3 +1,4 @@
+pub mod accessor_error_path;
 pub mod accessor_failure;
 mod accessor_fallibility;
 mod build_plan;

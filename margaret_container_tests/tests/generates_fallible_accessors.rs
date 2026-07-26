@@ -20,9 +20,18 @@ fn renders_a_fallible_constructor_accessor_returning_a_result() {
 
     assert!(source.contains("pubasyncfnloader("));
     assert!(source.contains(
-        "->Result<std::sync::Arc<crate::Loader>,margaret::framework::container_error::construction_error::ConstructionError,>"
+        "->Result<std::sync::Arc<crate::Loader>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
     ));
-    assert!(source.contains(".get_or_try_init(||asyncmove"));
+}
+
+#[test]
+fn caches_a_fallible_construction_through_construct_once_not_get_or_try_init() {
+    let source = fixture("fallible_constructor");
+
+    assert!(source.contains(
+        "margaret::framework::container_error::construct_once::construct_once(&self.loader,asyncmove"
+    ));
+    assert!(!source.contains("get_or_try_init"));
 }
 
 #[test]
@@ -41,7 +50,7 @@ fn propagates_fallibility_to_an_infallible_dependent() {
 
     assert!(source.contains("pubasyncfnconsumer("));
     assert!(source.contains(
-        "->Result<std::sync::Arc<crate::Consumer>,margaret::framework::container_error::construction_error::ConstructionError,>"
+        "->Result<std::sync::Arc<crate::Consumer>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
     ));
     assert!(source.contains("crate::Consumer::new(self.loader().await?)"));
     assert!(!source.contains("wrap(\"crate::Consumer\""));
@@ -53,7 +62,7 @@ fn renders_a_fallible_service_construction_that_depends_on_a_fallible_singleton(
 
     assert!(source.contains("pubasyncfnworker("));
     assert!(source.contains(
-        "->Result<std::sync::Arc<crate::Worker>,margaret::framework::container_error::construction_error::ConstructionError,>"
+        "->Result<std::sync::Arc<crate::Worker>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
     ));
     assert!(source.contains(
         "margaret::framework::container_error::construction_error::ConstructionError::wrap(\"crate::Worker\",crate::Worker::new(self.loader().await?),)?"
@@ -65,5 +74,6 @@ fn leaves_infallible_accessors_unchanged() {
     let source = fixture("services");
 
     assert!(!source.contains("get_or_try_init"));
+    assert!(!source.contains("construct_once"));
     assert!(!source.contains("ConstructionError"));
 }

@@ -125,6 +125,7 @@ tokio-rustls = "0.26"
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 tokio-util = "0.7"
 toml = "0.8"
+trybuild = "1.0"
 tower = "0.5"
 trzcina = "0.4"
 url = "2.5"

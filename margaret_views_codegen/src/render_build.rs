@@ -4,8 +4,8 @@ use quote::quote;
 
 use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_container::accessor_error_path::accessor_error_path;
 use margaret_container::accessor_failure::AccessorFailure;
-use margaret_container::construction_error_path::construction_error_path;
 use margaret_container::container_bindings::ContainerBindings;
 
 use crate::view::View;
@@ -39,7 +39,7 @@ pub(crate) fn render_build(
     };
 
     let (return_type, body) = if bindings.has_fallible_accessors() {
-        let error = construction_error_path();
+        let error = accessor_error_path();
 
         (
             quote! { Result<super::Views, #error> },
