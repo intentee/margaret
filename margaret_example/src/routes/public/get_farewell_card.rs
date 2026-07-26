@@ -32,7 +32,7 @@ impl GetFarewellCard {
             views.farewell_view.render(FarewellViewProps {
                 name: self.app_name.as_str().to_string(),
                 routes,
-            }),
+            })?,
         ))
     }
 }

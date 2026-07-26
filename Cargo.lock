@@ -1808,6 +1808,7 @@ dependencies = [
  "margaret_spiffe_svid_server",
  "margaret_sync_holder",
  "margaret_token_signer",
+ "margaret_url_path",
  "margaret_validation",
  "margaret_views",
  "margaret_websocket",
@@ -2056,11 +2057,11 @@ dependencies = [
  "hyper",
  "hyper-util",
  "margaret_peer_identity",
+ "margaret_url_path",
  "matchit",
  "maud",
  "mime",
  "multer",
- "percent-encoding",
  "rustls",
  "serde",
  "serde_json",
@@ -2731,6 +2732,14 @@ name = "margaret_toposort"
 version = "0.1.0"
 
 [[package]]
+name = "margaret_url_path"
+version = "0.1.0"
+dependencies = [
+ "percent-encoding",
+ "thiserror",
+]
+
+[[package]]
 name = "margaret_validation"
 version = "0.1.0"
 dependencies = [
@@ -2743,6 +2752,7 @@ dependencies = [
 name = "margaret_views"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "maud",
 ]
 

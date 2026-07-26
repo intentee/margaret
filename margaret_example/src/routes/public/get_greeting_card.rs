@@ -32,7 +32,7 @@ impl GetGreetingCard {
             views.greeting_view.render(GreetingViewProps {
                 greeting: self.greeter.greet(),
                 routes,
-            }),
+            })?,
         ))
     }
 }

@@ -30,6 +30,7 @@ margaret_spiffe_svid_client = { path = "../margaret_spiffe_svid_client", optiona
 margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server", optional = true }
 margaret_sync_holder = { path = "../margaret_sync_holder", optional = true }
 margaret_token_signer = { path = "../margaret_token_signer", optional = true }
+margaret_url_path = { path = "../margaret_url_path", optional = true }
 margaret_validation = { path = "../margaret_validation", optional = true }
 margaret_views = { path = "../margaret_views", optional = true }
 margaret_websocket = { path = "../margaret_websocket", optional = true }
@@ -63,6 +64,7 @@ runtime = [
     "dep:margaret_spiffe_svid_server",
     "dep:margaret_sync_holder",
     "dep:margaret_token_signer",
+    "dep:margaret_url_path",
     "dep:margaret_validation",
     "dep:margaret_views",
     "dep:margaret_websocket",

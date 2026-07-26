@@ -857,10 +857,13 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "pubfnget_article(&self,article:String,)->margaret::framework::http::forwardable_route::ForwardableRoute"
+            "pubfnget_article(&self,article:String,)->::std::result::Result<margaret::framework::http::forwardable_route::ForwardableRoute,margaret::framework::url_path::route_url_error::RouteUrlError,>"
         ));
         assert!(source.contains(
-            "margaret::framework::http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/articles/\",),margaret::framework::http::url_segment::UrlSegment::Parameter(margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
+            "margaret::framework::url_path::reject_route_path_segment::reject_route_path_segment(\"article\",&article,)?;"
+        ));
+        assert!(source.contains(
+            "::std::result::Result::Ok(margaret::framework::http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/articles/\",),margaret::framework::http::url_segment::UrlSegment::Parameter(margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
         ));
         assert!(!source.contains("Params"));
     }
@@ -870,7 +873,10 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "pubfnget_asset(&self,asset_path:String,)->margaret::framework::http::forwardable_route::ForwardableRoute"
+            "pubfnget_asset(&self,asset_path:String,)->::std::result::Result<margaret::framework::http::forwardable_route::ForwardableRoute,margaret::framework::url_path::route_url_error::RouteUrlError,>"
+        ));
+        assert!(source.contains(
+            "margaret::framework::url_path::reject_route_path_tail::reject_route_path_tail(\"asset_path\",&asset_path,)?;"
         ));
         assert!(source.contains(
             "margaret::framework::http::url_segment::UrlSegment::CatchAll(margaret::framework::http::url_parameter::UrlParameter{name:\"asset_path\",value:asset_path,})"
@@ -887,7 +893,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             )
         );
         assert!(source.contains(
-            "pubfnpatch_article(&self,article:String,)->margaret::framework::http::route_reference::RouteReference"
+            "pubfnpatch_article(&self,article:String,)->::std::result::Result<margaret::framework::http::route_reference::RouteReference,margaret::framework::url_path::route_url_error::RouteUrlError,>"
         ));
         assert!(!source.contains("forward_to"));
     }
@@ -1558,7 +1564,7 @@ impl GetGreeting {
 
         assert!(source.contains("pub(crate)fnnew_2(origin:::std::sync::Arc<str>)"));
         assert!(source.contains(
-            "pubfnnew(&self,id:String,)->margaret::framework::http::forwardable_route::ForwardableRoute"
+            "pubfnnew(&self,id:String,)->::std::result::Result<margaret::framework::http::forwardable_route::ForwardableRoute,margaret::framework::url_path::route_url_error::RouteUrlError,>"
         ));
         assert!(source.contains("servers::public::Public::new_2(origin_public)"));
     }

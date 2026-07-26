@@ -69,6 +69,7 @@ members = [
     "margaret_token_signer",
     "margaret_token_signer_tests",
     "margaret_toposort",
+    "margaret_url_path",
     "margaret_validation",
     "margaret_views",
     "margaret_views_codegen",

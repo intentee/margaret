@@ -6,7 +6,6 @@ pub mod body_limit;
 pub mod bound_server;
 pub mod build_url;
 pub(crate) mod collect_limited;
-pub mod encode_path_segment;
 pub(crate) mod form_field;
 pub(crate) mod form_fields;
 pub mod forward;

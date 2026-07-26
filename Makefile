@@ -62,6 +62,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_token_signer \
 	-p margaret_token_signer_tests \
 	-p margaret_toposort \
+	-p margaret_url_path \
 	-p margaret_validation \
 	-p margaret_views \
 	-p margaret_views_codegen \
@@ -161,6 +162,7 @@ coverage: node_modules postgres-image
 		--gated margaret_token_signer=100 \
 		--gated margaret_token_signer_tests=100 \
 		--gated margaret_toposort=100 \
+		--gated margaret_url_path=100 \
 		--gated margaret_validation=100 \
 		--gated margaret_views=100 \
 		--gated margaret_views_codegen=100 \

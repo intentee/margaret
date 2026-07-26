@@ -28,7 +28,7 @@ impl GetAssetsDemo {
     pub async fn respond(&self, asset_bag: AssetBag) -> anyhow::Result<Response> {
         Ok(Response::html(
             200,
-            self.asset_page.render(AssetPageProps { asset_bag }),
+            self.asset_page.render(AssetPageProps { asset_bag })?,
         ))
     }
 }

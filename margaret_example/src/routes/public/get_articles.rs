@@ -37,12 +37,12 @@ impl GetArticles {
                 Some(author) => article.author.name == author,
                 None => true,
             })
-            .map(|article| {
-                let url = routes.public.get_article(article.id.to_string()).url();
+            .map(|article| -> anyhow::Result<String> {
+                let url = routes.public.get_article(article.id.to_string())?.url();
 
-                format!("{}: {url}", article.title)
+                Ok(format!("{}: {url}", article.title))
             })
-            .collect::<Vec<String>>()
+            .collect::<anyhow::Result<Vec<String>>>()?
             .join("\n");
 
         Ok(Response::text(

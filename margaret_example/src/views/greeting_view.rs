@@ -33,7 +33,7 @@ impl GreetingView {
 impl RendersView for GreetingView {
     type Props<'props> = GreetingViewProps<'props>;
 
-    fn render(&self, GreetingViewProps { greeting, routes }: Self::Props<'_>) -> Markup {
+    fn render(&self, GreetingViewProps { greeting, routes }: Self::Props<'_>) -> anyhow::Result<Markup> {
         self.card_layout.render(CardLayoutProps {
             body: html! { (greeting) },
             home_url: routes.public.get_greeting.url(),
@@ -59,10 +59,12 @@ mod tests {
         };
         let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
 
-        let markup = view.render(GreetingViewProps {
-            greeting: "Hello, World".to_string(),
-            routes: &routes,
-        });
+        let markup = view
+            .render(GreetingViewProps {
+                greeting: "Hello, World".to_string(),
+                routes: &routes,
+            })
+            .expect("the view renders");
 
         assert_eq!(
             markup.into_string(),

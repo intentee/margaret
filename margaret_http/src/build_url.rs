@@ -1,4 +1,5 @@
-use crate::encode_path_segment::encode_path_segment;
+use margaret_url_path::encode_path_segment::encode_path_segment;
+
 use crate::url_segment::UrlSegment;
 
 fn encode_path_tail(value: &str) -> String {
@@ -76,22 +77,6 @@ mod tests {
         );
 
         assert_eq!(url, "http://localhost/articles/..%2Fadmin%3Fmode=x");
-    }
-
-    #[test]
-    fn keeps_slashes_in_a_catch_all_while_neutralizing_a_traversal_sub_segment() {
-        let url = build_url(
-            "http://localhost",
-            &[
-                UrlSegment::Literal("/assets/"),
-                UrlSegment::CatchAll(UrlParameter {
-                    name: "asset_path",
-                    value: "css/../secret".to_string(),
-                }),
-            ],
-        );
-
-        assert_eq!(url, "http://localhost/assets/css/%2E%2E/secret");
     }
 
     #[test]

@@ -133,6 +133,26 @@ fn route_constructor(named: &NamedRoute<'_>, origin: TokenStream) -> TokenStream
     }
 }
 
+fn segment_rejection(segment: &UrlSegment) -> Option<TokenStream> {
+    match segment {
+        UrlSegment::Literal(_) => None,
+        UrlSegment::Parameter(name) => {
+            let parameter = format_ident!("{}", name);
+
+            Some(quote! {
+                margaret::framework::url_path::reject_route_path_segment::reject_route_path_segment(#name, &#parameter)?;
+            })
+        }
+        UrlSegment::CatchAll(name) => {
+            let parameter = format_ident!("{}", name);
+
+            Some(quote! {
+                margaret::framework::url_path::reject_route_path_tail::reject_route_path_tail(#name, &#parameter)?;
+            })
+        }
+    }
+}
+
 fn route_method(named: &NamedRoute<'_>, origin: &Ident) -> TokenStream {
     let method = route_field_ident(named);
     let return_type = route_type_tokens(named);
@@ -142,12 +162,20 @@ fn route_method(named: &NamedRoute<'_>, origin: &Ident) -> TokenStream {
 
         quote! { #parameter: String }
     });
+    let rejections = named.path.segments().iter().filter_map(segment_rejection);
     let constructor = route_constructor(named, quote! { self.#origin.clone() });
 
     quote! {
-        #[must_use]
-        pub fn #method(&self, #(#parameters),*) -> #return_type {
-            #constructor
+        pub fn #method(
+            &self,
+            #(#parameters),*
+        ) -> ::std::result::Result<
+            #return_type,
+            margaret::framework::url_path::route_url_error::RouteUrlError,
+        > {
+            #(#rejections)*
+
+            ::std::result::Result::Ok(#constructor)
         }
     }
 }

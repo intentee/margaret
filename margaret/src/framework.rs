@@ -51,6 +51,8 @@ pub use margaret_sync_holder as sync_holder;
 #[cfg(feature = "runtime")]
 pub use margaret_token_signer as token_signer;
 #[cfg(feature = "runtime")]
+pub use margaret_url_path as url_path;
+#[cfg(feature = "runtime")]
 pub use margaret_validation as validation;
 #[cfg(feature = "runtime")]
 pub use margaret_views as views;
