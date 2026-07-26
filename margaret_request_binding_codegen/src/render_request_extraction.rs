@@ -61,7 +61,13 @@ pub fn render_request_extraction(
                 #provider_access.as_ref(),
             ).await {
                 Ok(value) => value,
-                Err(response) => #error_return,
+                Err(rejection) => {
+                    let response = margaret::framework::http::route_parameter_rejection_response::route_parameter_rejection_response(
+                        [::std::option::Option::Some(rejection)],
+                    );
+
+                    #error_return
+                }
             };
         },
         RequestBinding::FormRequest { source, extraction } => {

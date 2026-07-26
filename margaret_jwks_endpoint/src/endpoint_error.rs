@@ -2,35 +2,18 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum EndpointError {
-    #[error("the endpoint could not be resolved: {source}")]
-    Resolution {
-        #[source]
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
+    #[error("a user-implemented jwks endpoint provider returned an error: {0:#}")]
+    UserError(anyhow::Error),
 }
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use super::EndpointError;
 
     #[test]
-    fn resolution_reports_its_source() {
-        let error = EndpointError::Resolution {
-            source: "the srv record has no targets".into(),
-        };
+    fn renders_the_wrapped_source() {
+        let error = EndpointError::UserError(anyhow::anyhow!("the srv record has no targets"));
 
-        assert_eq!(
-            error.to_string(),
-            "the endpoint could not be resolved: the srv record has no targets"
-        );
-        assert_eq!(
-            error
-                .source()
-                .expect("the underlying error is preserved")
-                .to_string(),
-            "the srv record has no targets"
-        );
+        assert!(error.to_string().contains("the srv record has no targets"));
     }
 }

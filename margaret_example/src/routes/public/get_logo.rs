@@ -9,11 +9,11 @@ pub struct GetLogo;
 
 impl GetLogo {
     #[process]
-    pub async fn respond(&self) -> Response {
-        Response::bytes(
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok(Response::bytes(
             200,
             "image/png",
             include_bytes!("../../../../assets/logo.png").as_slice(),
-        )
+        ))
     }
 }

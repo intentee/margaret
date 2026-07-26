@@ -172,7 +172,7 @@ impl SessionUserProvider {
     fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
 
     #[infer_from_request]
-    fn infer(&self, routes: &crate::margaret::routes::Routes) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[singleton]
@@ -221,7 +221,7 @@ impl GetProfile {
     #[test]
     fn hands_the_views_to_an_authenticated_user_provider_that_renders_them() {
         let source: String = source_for_with_views(
-            "use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> AuthenticatedUserOutcome<User> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n",
+            "use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n",
         )
         .split_whitespace()
         .collect();
@@ -243,7 +243,7 @@ impl GetProfile {
     fn rejects_an_authenticated_user_in_a_middleware() {
         assert!(
             error_for(
-                "use margaret::framework::http::next::Next;\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> ResponseContinuation {}\n}\n"
+                "use margaret::framework::http::next::Next;\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> ResponseContinuation {}\n}\n"
             )
             .contains("only available in an HTTP responder")
         );
@@ -261,7 +261,7 @@ struct Session;
 
 impl Session {
     #[infer_from_request]
-    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[singleton]
@@ -374,7 +374,7 @@ struct Store;
 
 impl Store {
     #[infer_from_request]
-    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 impl HttpRouteParameterBinder for Store {
@@ -460,6 +460,45 @@ impl GetPair {
         );
         assert!(source.contains("\"author\",user_binder.as_ref(),"));
         assert!(source.contains("\"editor\",user_binder.as_ref(),"));
+    }
+
+    #[test]
+    fn resolves_multiple_route_parameter_binders_concurrently() {
+        let source: String = source_for(TWICE_BOUND_MODEL).split_whitespace().collect();
+
+        assert!(source.contains(
+            "let(binder_resolution,binder_resolution_2)=margaret::framework::http::join!("
+        ));
+        assert!(source.contains("match(binder_resolution,binder_resolution_2){"));
+        assert!(source.contains(
+            "(::std::result::Result::Ok(author),::std::result::Result::Ok(editor),)=>{"
+        ));
+        assert!(source.contains(
+            "(binder_resolution,binder_resolution_2)=>{margaret::framework::http::route_parameter_rejection_response::route_parameter_rejection_response([binder_resolution.err(),binder_resolution_2.err(),]).into()}"
+        ));
+    }
+
+    #[test]
+    fn resolves_a_single_route_parameter_binder_through_the_concurrent_join() {
+        let source: String = source_for(BOUND_MODEL).split_whitespace().collect();
+
+        assert!(source.contains("let(binder_resolution,)=margaret::framework::http::join!("));
+        assert!(source.contains("match(binder_resolution,){(::std::result::Result::Ok(user),)=>{"));
+        assert!(source.contains(
+            "(binder_resolution,)=>{margaret::framework::http::route_parameter_rejection_response::route_parameter_rejection_response([binder_resolution.err(),]).into()}"
+        ));
+    }
+
+    #[test]
+    fn a_responder_without_route_parameters_skips_the_concurrent_join() {
+        let source: String = source_for(
+            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
+        )
+        .split_whitespace()
+        .collect();
+
+        assert!(!source.contains("margaret::framework::http::join!"));
+        assert!(!source.contains("route_parameter_rejection_response"));
     }
 
     const BOUND_MODEL: &str = r#"
@@ -1467,9 +1506,13 @@ impl GetGreeting {
             "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n",
         );
 
-        assert!(
-            source.contains("margaret::framework::http::response_continuation::ResponseContinuation::from(responder.respond().await,)")
-        );
+        assert!(source.contains("matchresponder.respond().await{"));
+        assert!(source.contains(
+            "Ok(value)=>{margaret::framework::http::response_continuation::ResponseContinuation::from(value,)}"
+        ));
+        assert!(source.contains(
+            "Err(source)=>{margaret::framework::http::response_continuation::ResponseContinuation::from(margaret::framework::http::respond_with_user_error::respond_with_user_error(source,),)}"
+        ));
     }
 
     const MULTIPLE_SERVERS: &str = r#"

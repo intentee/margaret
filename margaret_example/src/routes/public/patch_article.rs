@@ -36,7 +36,7 @@ impl PatchArticle {
             author,
         }: Article,
         #[form_request(from = Form)] PatchArticleForm { title, body }: PatchArticleForm,
-    ) -> Response {
+    ) -> anyhow::Result<Response> {
         let title = title.unwrap_or(current_title);
         let body = body.unwrap_or(current_body);
 
@@ -51,6 +51,6 @@ impl PatchArticle {
             author,
         });
 
-        Response::text(200, format!("updated \"{title}\""))
+        Ok(Response::text(200, format!("updated \"{title}\"")))
     }
 }

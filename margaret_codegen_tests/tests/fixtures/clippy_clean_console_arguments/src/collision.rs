@@ -24,10 +24,10 @@ impl Session {
     }
 
     #[infer_from_request]
-    pub async fn infer_reader(&self) -> AuthenticatedUserOutcome<Reader> {
-        AuthenticatedUserOutcome::Authenticated(Reader {
+    pub async fn infer_reader(&self) -> anyhow::Result<AuthenticatedUserOutcome<Reader>> {
+        Ok(AuthenticatedUserOutcome::Authenticated(Reader {
             name: "milo".to_string(),
-        })
+        }))
     }
 }
 
@@ -41,10 +41,10 @@ impl GetCollision {
         &self,
         collision_session: &Request,
         #[authenticated_user] reader: Reader,
-    ) -> Response {
-        Response::text(
+    ) -> anyhow::Result<Response> {
+        Ok(Response::text(
             200,
             format!("{} {}", reader.name, collision_session.inputs.server.path()),
-        )
+        ))
     }
 }

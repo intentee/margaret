@@ -9,8 +9,10 @@ use margaret_validation::validate_json::validate_json;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::notification_envelope::NotificationEnvelope;
+use crate::report_web_socket_error::report_web_socket_error;
 use crate::responds_to_web_socket_notification::RespondsToWebSocketNotification;
 use crate::web_socket::WebSocket;
+use crate::web_socket_error::WebSocketError;
 
 pub async fn dispatch_notification<Handler>(
     handler: &Handler,
@@ -23,13 +25,16 @@ pub async fn dispatch_notification<Handler>(
     Handler::Message: DeserializeOwned + Validate,
 {
     if let ValidationResult::Valid(message) = validate_json::<Handler::Message>(Some(&params)) {
-        handler
-            .process(
-                cancellation_token,
-                session,
-                NotificationEnvelope::new(message),
-                socket,
-            )
-            .await;
+        report_web_socket_error(
+            handler
+                .process(
+                    cancellation_token,
+                    session,
+                    NotificationEnvelope::new(message),
+                    socket,
+                )
+                .await
+                .map_err(WebSocketError::UserError),
+        );
     }
 }

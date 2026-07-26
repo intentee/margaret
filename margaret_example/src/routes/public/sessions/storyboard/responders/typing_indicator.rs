@@ -34,9 +34,11 @@ impl RespondsToWebSocketNotification for TypingIndicator {
         session: Arc<StoryboardSession>,
         message: NotificationEnvelope<Typing>,
         _socket: WebSocket,
-    ) {
+    ) -> anyhow::Result<()> {
         session
             .record(format!("{} is typing", message.message().who))
             .await;
+
+        Ok(())
     }
 }

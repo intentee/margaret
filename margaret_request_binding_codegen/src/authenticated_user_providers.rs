@@ -100,14 +100,24 @@ fn verify_outcome(
     model: &CanonicalPath,
     outcome: &Type,
 ) -> Result<(), RequestBindingError> {
-    if index.resolve_item_type(item, outcome).as_ref() != Some(&authenticated_user_outcome_path()) {
+    let Some(inner_outcome) = generic_type(outcome, 0) else {
+        return Err(RequestBindingError::InferenceReturnTypeMismatch {
+            provider: provider.to_string(),
+            written: written(outcome),
+        });
+    };
+
+    if index.resolve_item_type(item, inner_outcome).as_ref()
+        != Some(&authenticated_user_outcome_path())
+    {
         return Err(RequestBindingError::InferenceReturnTypeMismatch {
             provider: provider.to_string(),
             written: written(outcome),
         });
     }
 
-    let inferred = generic_type(outcome, 0).and_then(|inner| index.resolve_item_type(item, inner));
+    let inferred =
+        generic_type(inner_outcome, 0).and_then(|inner| index.resolve_item_type(item, inner));
 
     if inferred.as_ref() == Some(model) {
         Ok(())

@@ -6,6 +6,7 @@ use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
 use crate::next::Next;
 use crate::request::Request;
+use crate::respond_with_user_error::respond_with_user_error;
 use crate::response_continuation::ResponseContinuation;
 
 struct LayeredHandler<Middleware: HttpMiddleware + ?Sized> {
@@ -19,9 +20,14 @@ where
     Middleware: HttpMiddleware + Send + Sync + ?Sized + 'static,
 {
     async fn handle(&self, request: &Request) -> ResponseContinuation {
-        self.middleware
+        match self
+            .middleware
             .process(request, Next::new(self.inner.clone()))
             .await
+        {
+            Ok(continuation) => continuation,
+            Err(error) => ResponseContinuation::Done(respond_with_user_error(error)),
+        }
     }
 }
 
@@ -62,8 +68,8 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for PassThrough {
-        async fn process(&self, request: &Request, next: Next) -> ResponseContinuation {
-            next.run(request).await
+        async fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {
+            Ok(next.run(request).await)
         }
     }
 
@@ -71,8 +77,17 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for ShortCircuit {
-        async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
-            ResponseContinuation::Done(Response::text(403, "blocked"))
+        async fn process(&self, _request: &Request, _next: Next) -> anyhow::Result<ResponseContinuation> {
+            Ok(ResponseContinuation::Done(Response::text(403, "blocked")))
+        }
+    }
+
+    struct Failing;
+
+    #[async_trait]
+    impl HttpMiddleware for Failing {
+        async fn process(&self, _request: &Request, _next: Next) -> anyhow::Result<ResponseContinuation> {
+            Err(anyhow::anyhow!("the middleware could not reach its dependency"))
         }
     }
 
@@ -101,5 +116,10 @@ mod tests {
     #[tokio::test]
     async fn lets_the_middleware_short_circuit_without_the_inner_handler() {
         assert_eq!(status_through(ShortCircuit).await, 403);
+    }
+
+    #[tokio::test]
+    async fn maps_a_failing_middleware_to_an_internal_server_error() {
+        assert_eq!(status_through(Failing).await, 500);
     }
 }

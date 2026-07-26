@@ -64,15 +64,14 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
         format_ident!("_request")
     };
 
-    let continuation_return = quote! {
-        return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
-            response,
-        )
-    };
-    let response_return = quote! {
-        return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
-            response.into(),
-        )
+    let extraction_return = quote! {
+        {
+            let _ = response;
+
+            return ::std::result::Result::Ok(
+                margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Anonymous,
+            );
+        }
     };
     let provider_access = TokenStream::new();
     let extractions = parameters.iter().map(|parameter| {
@@ -80,10 +79,10 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
             &parameter.binding,
             &parameter.holder,
             &ExtractionContext {
-                continuation_return: &continuation_return,
+                continuation_return: &extraction_return,
                 provider_access: &provider_access,
                 request_local: &request_binding,
-                response_return: &response_return,
+                response_return: &extraction_return,
             },
         )
     });
@@ -103,7 +102,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
             async fn infer(
                 &self,
                 #request_binding: &margaret::framework::http::request::Request,
-            ) -> margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User> {
+            ) -> ::anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>> {
                 #(#extractions)*
                 self.inner.#method_name(#(#call_arguments),*).await
             }

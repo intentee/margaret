@@ -43,6 +43,17 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
     }
 }
 
+fn command_outcome(run_call: TokenStream) -> TokenStream {
+    quote! {
+        match #run_call {
+            Ok(()) => margaret::framework::console::command_outcome::CommandOutcome::Succeeded,
+            Err(error) => margaret::framework::console::report_failure::report_failure(
+                margaret::framework::console::console_error::ConsoleError::UserError(error),
+            ),
+        }
+    }
+}
+
 fn command_arm(command: &ConsoleCommand, container: &Ident) -> TokenStream {
     let name = &command.name;
     let accessor = &command.accessor;
@@ -55,6 +66,8 @@ fn command_arm(command: &ConsoleCommand, container: &Ident) -> TokenStream {
     let accessor_access = quote! { #container.#accessor(#(#values),*).await };
 
     if command.takes_token {
+        let outcome = command_outcome(quote! { #accessor_access.run(cancellation_token).await });
+
         quote! {
             Some((#name, #matches_binding)) => {
                 let cancellation_token = match margaret::framework::service::install::install() {
@@ -64,12 +77,14 @@ fn command_arm(command: &ConsoleCommand, container: &Ident) -> TokenStream {
                     }
                 };
 
-                #accessor_access.run(cancellation_token).await
+                #outcome
             }
         }
     } else {
+        let outcome = command_outcome(quote! { #accessor_access.run().await });
+
         quote! {
-            Some((#name, #matches_binding)) => #accessor_access.run().await,
+            Some((#name, #matches_binding)) => #outcome,
         }
     }
 }

@@ -1,4 +1,5 @@
 pub use matchit;
+pub use tokio::join;
 
 pub(crate) mod body_class;
 pub mod body_limit;
@@ -29,10 +30,14 @@ pub mod require_peer_spiffe_id;
 pub mod require_route_parameter;
 pub(crate) mod resolve_continuation;
 pub mod respond_recursively;
+pub mod respond_with_user_error;
 pub mod responder_handler;
 pub mod response;
 pub mod response_continuation;
 pub mod route_entry;
+pub mod route_parameter_outcome;
+pub mod route_parameter_rejection;
+pub mod route_parameter_rejection_response;
 pub mod route_reference;
 pub mod router;
 pub mod server;

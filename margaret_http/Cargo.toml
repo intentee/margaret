@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
 cookie = { workspace = true }
@@ -30,7 +31,7 @@ tokio-util = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
 
 [lints]
 workspace = true

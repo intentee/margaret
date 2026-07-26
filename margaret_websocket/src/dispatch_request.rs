@@ -9,10 +9,11 @@ use margaret_validation::validate_json::validate_json;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::envelope_error_code::EnvelopeErrorCode;
-use crate::report_send_failure::report_send_failure;
+use crate::report_web_socket_error::report_web_socket_error;
 use crate::request_id::RequestId;
 use crate::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use crate::web_socket::WebSocket;
+use crate::web_socket_error::WebSocketError;
 use crate::web_socket_request_message::WebSocketRequestMessage;
 
 pub async fn dispatch_request<Handler>(
@@ -30,14 +31,15 @@ pub async fn dispatch_request<Handler>(
         ValidationResult::Valid(message) => {
             let envelope = Handler::Message::envelope(id, message);
 
-            report_send_failure(
+            report_web_socket_error(
                 handler
                     .process(cancellation_token, session, envelope, socket)
-                    .await,
+                    .await
+                    .map_err(WebSocketError::UserError),
             );
         }
         ValidationResult::Invalid(_) => {
-            report_send_failure(
+            report_web_socket_error(
                 socket
                     .send_error(
                         id,
@@ -49,7 +51,7 @@ pub async fn dispatch_request<Handler>(
             );
         }
         ValidationResult::Malformed(malformation) => {
-            report_send_failure(
+            report_web_socket_error(
                 socket
                     .send_error(
                         id,

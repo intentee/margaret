@@ -7,6 +7,8 @@ use margaret_websocket::web_socket_notification_dispatch::WebSocketNotificationD
 
 use crate::failing_dispatch::FailingDispatch;
 use crate::failing_handler::FailingHandler;
+use crate::failing_notification_dispatch::FailingNotificationDispatch;
+use crate::failing_notification_handler::FailingNotificationHandler;
 use crate::flood_dispatch::FloodDispatch;
 use crate::flood_handler::FloodHandler;
 use crate::ping_dispatch::PingDispatch;
@@ -54,6 +56,12 @@ pub fn test_dispatch_table() -> Arc<WebSocketDispatchTable<TestSession>> {
         "typing".to_string(),
         Arc::new(TypingDispatch {
             handler: Arc::new(TypingHandler),
+        }),
+    );
+    notifications.insert(
+        "failing_notification".to_string(),
+        Arc::new(FailingNotificationDispatch {
+            handler: Arc::new(FailingNotificationHandler),
         }),
     );
 

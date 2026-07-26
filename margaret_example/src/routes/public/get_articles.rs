@@ -27,7 +27,7 @@ impl GetArticles {
         &self,
         routes: &Routes,
         #[form_request(from = Query)] GetArticlesForm { author }: GetArticlesForm,
-    ) -> Response {
+    ) -> anyhow::Result<Response> {
         let author = author.as_deref();
         let links = self
             .articles
@@ -45,9 +45,9 @@ impl GetArticles {
             .collect::<Vec<String>>()
             .join("\n");
 
-        Response::text(
+        Ok(Response::text(
             200,
             format!("{links}\ncreate: {}", routes.public.post_article.url()),
-        )
+        ))
     }
 }

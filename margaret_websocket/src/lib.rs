@@ -6,7 +6,7 @@ pub mod inbound_frame;
 pub mod notification_envelope;
 pub mod outbound_error;
 pub mod outbound_response;
-pub mod report_send_failure;
+pub mod report_web_socket_error;
 pub mod request_envelope;
 pub mod request_id;
 pub mod responds_to_web_socket_message;

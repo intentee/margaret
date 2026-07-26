@@ -11,6 +11,7 @@ use tokio_util::sync::CancellationToken;
 use trzcina::TickContext;
 use trzcina::Ticker;
 
+use margaret_jwks_endpoint::endpoint_error::EndpointError;
 use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 
@@ -31,7 +32,7 @@ impl PublicJwksPollService {
             .endpoint_provider
             .provide()
             .await
-            .map_err(JwksClientError::EndpointResolution)?;
+            .map_err(|error| JwksClientError::EndpointResolution(EndpointError::UserError(error)))?;
 
         self.http_client
             .get(jwks_url)

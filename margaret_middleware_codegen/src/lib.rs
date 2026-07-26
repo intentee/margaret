@@ -478,9 +478,9 @@ impl Guard {
             )
         );
         assert!(source.contains("Ok(model)=>model"));
-        assert!(source.contains("Err(response)=>returnresponse.into()"));
+        assert!(source.contains("Err(response)=>return::std::result::Result::Ok(response.into())"));
         assert!(source.contains(
-            "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
+            "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)->::anyhow::Result<margaret::framework::http::response_continuation::ResponseContinuation>"
         ));
         assert!(source.contains("self.inner.process(data).await"));
     }

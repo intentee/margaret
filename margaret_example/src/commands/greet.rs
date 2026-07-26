@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use margaret::framework::console::command_outcome::CommandOutcome;
 use margaret::framework::macros::console_command;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
@@ -35,7 +34,7 @@ impl Greet {
     }
 
     #[process]
-    pub async fn run(&self) -> CommandOutcome {
+    pub async fn run(&self) -> anyhow::Result<()> {
         println!(
             "{}, {} (salutation: {:?}, loud: {})",
             self.greeter.greet(),
@@ -44,6 +43,6 @@ impl Greet {
             self.loud
         );
 
-        CommandOutcome::Succeeded
+        Ok(())
     }
 }

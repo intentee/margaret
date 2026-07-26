@@ -33,6 +33,12 @@ use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::route_group::RouteGroup;
 
+struct ConcurrentBinder {
+    future: TokenStream,
+    holder: Ident,
+    resolution: Ident,
+}
+
 fn access(call: TokenStream) -> TokenStream {
     quote! { #call.await }
 }
@@ -117,10 +123,6 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let views_local = format_ident!("{}", allocator.allocate("views").field());
     let captured = CapturedProviders::capture(&route.arguments, &mut allocator);
 
-    let bindings_tokens = route
-        .arguments
-        .iter()
-        .map(|argument| argument_binding(argument, &request_binding, &captured));
     let server = format_ident!("{}", route.server);
     let argument_values = route
         .arguments
@@ -128,9 +130,81 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         .map(|argument| argument_value(argument, &routes_local, &views_local, &server));
     let method_name = &route.method_name;
     let respond_call = quote! { #responder_binding.#method_name(#(#argument_values),*).await };
-    let body = quote! {
-        #(#bindings_tokens)*
-        margaret::framework::http::response_continuation::ResponseContinuation::from(#respond_call)
+    let respond_continuation = quote! {
+        match #respond_call {
+            Ok(value) => margaret::framework::http::response_continuation::ResponseContinuation::from(value),
+            Err(source) => margaret::framework::http::response_continuation::ResponseContinuation::from(
+                margaret::framework::http::respond_with_user_error::respond_with_user_error(source),
+            ),
+        }
+    };
+
+    let non_binder_bindings: Vec<TokenStream> = route
+        .arguments
+        .iter()
+        .filter(|argument| !matches!(argument.binding, RequestBinding::Bound { .. }))
+        .map(|argument| argument_binding(argument, &request_binding, &captured))
+        .collect();
+
+    for argument in &route.arguments {
+        allocator.reserve(&argument.holder.to_string());
+    }
+
+    let mut concurrent_binders: Vec<ConcurrentBinder> = Vec::new();
+
+    for argument in &route.arguments {
+        let RequestBinding::Bound { path_key, .. } = &argument.binding else {
+            continue;
+        };
+        let provider_access = captured.access(&argument.binding, &TokenStream::new());
+        let resolution = format_ident!("{}", allocator.allocate("binder_resolution").field());
+
+        concurrent_binders.push(ConcurrentBinder {
+            future: quote! {
+                margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(
+                    #request_binding,
+                    #path_key,
+                    #provider_access.as_ref(),
+                )
+            },
+            holder: argument.holder.clone(),
+            resolution,
+        });
+    }
+
+    let body = if concurrent_binders.is_empty() {
+        quote! {
+            #(#non_binder_bindings)*
+            #respond_continuation
+        }
+    } else {
+        let resolutions: Vec<&Ident> = concurrent_binders
+            .iter()
+            .map(|binder| &binder.resolution)
+            .collect();
+        let errors: Vec<TokenStream> = resolutions
+            .iter()
+            .map(|resolution| quote! { #resolution.err() })
+            .collect();
+        let holders: Vec<&Ident> = concurrent_binders.iter().map(|binder| &binder.holder).collect();
+        let futures: Vec<&TokenStream> =
+            concurrent_binders.iter().map(|binder| &binder.future).collect();
+        let resolution_tuple = quote! { (#(#resolutions,)*) };
+
+        quote! {
+            #(#non_binder_bindings)*
+
+            let #resolution_tuple = margaret::framework::http::join!(#(#futures),*);
+
+            match #resolution_tuple {
+                (#(::std::result::Result::Ok(#holders),)*) => {
+                    #respond_continuation
+                }
+                #resolution_tuple => margaret::framework::http::route_parameter_rejection_response::route_parameter_rejection_response(
+                    [#(#errors,)*],
+                ).into(),
+            }
+        }
     };
 
     let captures_routes = responder_injects_routes(route);

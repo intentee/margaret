@@ -22,9 +22,9 @@ impl CallRoute {
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
+    pub async fn respond(&self) -> anyhow::Result<Response> {
         let _http_client = self.identity_client.http_client();
 
-        Response::text(200, "called")
+        Ok(Response::text(200, "called"))
     }
 }

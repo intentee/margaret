@@ -156,7 +156,7 @@ pub enum RequestBindingError {
     AmbiguousInferFromRequest { provider: String, methods: String },
 
     #[error(
-        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>"
+        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>>"
     )]
     InferenceReturnTypeMismatch { provider: String, written: String },
 
@@ -212,7 +212,7 @@ pub enum RequestBindingError {
     MultipleAuthenticatedUserParameters { subject: String, model: String },
 
     #[error(
-        "argument #{parameter} of {subject} carries #[authenticated_user], which is only available in an HTTP responder or a WebSocket session builder; let the provider return AuthenticatedUserOutcome::Interrupted to gate a request elsewhere"
+        "argument #{parameter} of {subject} carries #[authenticated_user], which is only available in an HTTP responder or a WebSocket session builder; let the provider return AuthenticatedUserOutcome::LoginPageRedirect to gate a request elsewhere"
     )]
     AuthenticatedUserUnavailable { subject: String, parameter: String },
 

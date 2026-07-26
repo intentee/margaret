@@ -34,11 +34,10 @@ impl PostArticle {
             body,
             author_id,
         }: PostArticleForm,
-    ) -> Response {
-        match self.articles.insert(title, body, author_id) {
-            Ok(article) => Response::text(201, format!("created \"{}\"", article.title)),
-            Err(error) => Response::text(500, error.to_string()),
-        }
+    ) -> anyhow::Result<Response> {
+        let article = self.articles.insert(title, body, author_id)?;
+
+        Ok(Response::text(201, format!("created \"{}\"", article.title)))
     }
 }
 
@@ -54,7 +53,7 @@ mod tests {
     use crate::system_clock::SystemClock;
 
     #[tokio::test]
-    async fn responds_with_500_when_the_author_is_unknown() {
+    async fn reports_an_error_when_the_author_is_unknown() {
         let responder = PostArticle::create(Arc::new(ArticleStore::create(Arc::new(
             SystemClock::create(),
         ))));
@@ -64,6 +63,6 @@ mod tests {
             author_id: Uuid::from_u128(999),
         };
 
-        assert_eq!(responder.respond(form).await.status(), 500);
+        assert!(responder.respond(form).await.is_err());
     }
 }

@@ -9,7 +9,6 @@ use margaret::framework::macros::websocket_session;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret::framework::websocket::web_socket::WebSocket;
-use margaret::framework::websocket::web_socket_error::WebSocketError;
 use serde::Deserialize;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
@@ -79,7 +78,7 @@ impl RespondsToWebSocketMessage for BoardResponder {
         session: Arc<BoardSession>,
         message: StreamingRequestEnvelope<BoardPrompt>,
         socket: WebSocket,
-    ) -> Result<(), WebSocketError> {
+    ) -> anyhow::Result<()> {
         socket
             .send(message.fin(BoardChunk {
                 text: format!(
@@ -89,6 +88,8 @@ impl RespondsToWebSocketMessage for BoardResponder {
                     message.message().prompt,
                 ),
             }))
-            .await
+            .await?;
+
+        Ok(())
     }
 }

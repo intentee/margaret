@@ -26,23 +26,22 @@ impl PostArticleImport {
     pub async fn respond(
         &self,
         #[form_request(from = Json)] form: ValidationResult<PostArticleForm>,
-    ) -> Response {
+    ) -> anyhow::Result<Response> {
         let PostArticleForm {
             title,
             body,
             author_id,
         } = match form {
             ValidationResult::Valid(form) => form,
-            ValidationResult::Invalid(errors) => return Response::text(422, errors.to_string()),
+            ValidationResult::Invalid(errors) => return Ok(Response::text(422, errors.to_string())),
             ValidationResult::Malformed(malformation) => {
-                return Response::text(400, malformation.to_string());
+                return Ok(Response::text(400, malformation.to_string()));
             }
         };
 
-        match self.articles.insert(title, body, author_id) {
-            Ok(article) => Response::text(201, format!("imported \"{}\"", article.title)),
-            Err(error) => Response::text(500, error.to_string()),
-        }
+        let article = self.articles.insert(title, body, author_id)?;
+
+        Ok(Response::text(201, format!("imported \"{}\"", article.title)))
     }
 }
 
@@ -60,7 +59,7 @@ mod tests {
     use crate::system_clock::SystemClock;
 
     #[tokio::test]
-    async fn responds_with_500_when_the_author_is_unknown() {
+    async fn reports_an_error_when_the_author_is_unknown() {
         let responder = PostArticleImport::create(Arc::new(ArticleStore::create(Arc::new(
             SystemClock::create(),
         ))));
@@ -70,6 +69,6 @@ mod tests {
             author_id: Uuid::from_u128(999),
         });
 
-        assert_eq!(responder.respond(form).await.status(), 500);
+        assert!(responder.respond(form).await.is_err());
     }
 }

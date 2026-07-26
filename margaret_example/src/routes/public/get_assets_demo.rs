@@ -25,8 +25,11 @@ impl GetAssetsDemo {
     }
 
     #[process]
-    pub async fn respond(&self, asset_bag: AssetBag) -> Response {
-        Response::html(200, self.asset_page.render(AssetPageProps { asset_bag }))
+    pub async fn respond(&self, asset_bag: AssetBag) -> anyhow::Result<Response> {
+        Ok(Response::html(
+            200,
+            self.asset_page.render(AssetPageProps { asset_bag }),
+        ))
     }
 }
 
@@ -44,6 +47,13 @@ mod tests {
     async fn responds_with_the_rendered_asset_page() {
         let responder = GetAssetsDemo::create(Arc::new(AssetPage::create(Arc::new(AssetShowcase))));
 
-        assert_eq!(responder.respond(AssetBag::new()).await.status(), 200);
+        assert_eq!(
+            responder
+                .respond(AssetBag::new())
+                .await
+                .expect("the responder responds")
+                .status(),
+            200
+        );
     }
 }

@@ -862,7 +862,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -936,7 +936,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, routes: &crate::margaret::routes::Routes) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -986,7 +986,7 @@ struct Session;
 
 impl Session {
     #[infer_from_request]
-    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1034,7 +1034,7 @@ impl SessionUserProvider {
     fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
 
     #[infer_from_request]
-    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1117,7 +1117,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, views: &crate::margaret::views::Views) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1170,7 +1170,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]

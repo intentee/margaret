@@ -1924,6 +1924,7 @@ dependencies = [
 name = "margaret_codegen_websocket_fixture"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "clap",
  "margaret",
@@ -1941,7 +1942,9 @@ dependencies = [
 name = "margaret_console"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap",
+ "thiserror",
 ]
 
 [[package]]
@@ -2041,6 +2044,7 @@ dependencies = [
 name = "margaret_http"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "bytes",
  "cookie",
@@ -2119,8 +2123,10 @@ dependencies = [
 name = "margaret_identity"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "margaret_http",
+ "thiserror",
 ]
 
 [[package]]
@@ -2172,6 +2178,7 @@ dependencies = [
 name = "margaret_jwks_client_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "margaret_http",
@@ -2205,6 +2212,7 @@ dependencies = [
 name = "margaret_jwks_endpoint"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "thiserror",
  "tokio",
@@ -2755,6 +2763,7 @@ dependencies = [
 name = "margaret_websocket"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "futures-util",
  "hyper",
@@ -2794,6 +2803,7 @@ dependencies = [
 name = "margaret_websocket_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "futures-util",
  "margaret_http",

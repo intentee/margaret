@@ -9,6 +9,7 @@ use dashmap::DashMap;
 use uuid::Uuid;
 
 use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
+use margaret::framework::http::route_parameter_outcome::RouteParameterOutcome;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::provides_route_parameter;
 use margaret::framework::macros::singleton;
@@ -174,10 +175,15 @@ impl ArticleStore {
 impl HttpRouteParameterBinder for ArticleStore {
     type Model = Article;
 
-    async fn bind(&self, value: String) -> Option<Article> {
-        Uuid::parse_str(&value)
-            .ok()
-            .and_then(|id| self.find_article_by_id(id))
+    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterOutcome<Article>> {
+        let Ok(id) = Uuid::parse_str(&value) else {
+            return Ok(RouteParameterOutcome::NotFound);
+        };
+
+        Ok(match self.find_article_by_id(id) {
+            Some(article) => RouteParameterOutcome::Found(article),
+            None => RouteParameterOutcome::NotFound,
+        })
     }
 }
 
@@ -188,6 +194,7 @@ mod tests {
     use uuid::Uuid;
 
     use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
+    use margaret::framework::http::route_parameter_outcome::RouteParameterOutcome;
 
     use super::ArticleStore;
     use super::FEATURED_ARTICLE_ID;
@@ -251,7 +258,13 @@ mod tests {
     async fn binds_an_article_by_its_uuid() {
         let store = store();
 
-        assert!(store.bind(FEATURED_ARTICLE_ID.to_string()).await.is_some());
-        assert!(store.bind("not-a-uuid".to_string()).await.is_none());
+        assert!(matches!(
+            store.bind(FEATURED_ARTICLE_ID.to_string()).await,
+            Ok(RouteParameterOutcome::Found(_))
+        ));
+        assert!(matches!(
+            store.bind("not-a-uuid".to_string()).await,
+            Ok(RouteParameterOutcome::NotFound)
+        ));
     }
 }

@@ -9,7 +9,7 @@ pub struct PassingMiddleware;
 
 #[async_trait]
 impl HttpMiddleware for PassingMiddleware {
-    async fn process(&self, request: &Request, next: Next) -> ResponseContinuation {
-        next.run(request).await
+    async fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {
+        Ok(next.run(request).await)
     }
 }

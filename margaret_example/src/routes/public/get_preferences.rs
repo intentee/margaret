@@ -14,10 +14,10 @@ impl GetPreferences {
     pub async fn respond(
         &self,
         #[form_request(from = Cookie)] ReaderPreferencesCookie { theme }: ReaderPreferencesCookie,
-    ) -> Response {
-        match theme {
+    ) -> anyhow::Result<Response> {
+        Ok(match theme {
             Some(theme) => Response::text(200, format!("theme: {theme}")),
             None => Response::text(200, "no theme preference set".to_string()),
-        }
+        })
     }
 }

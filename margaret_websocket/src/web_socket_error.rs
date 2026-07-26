@@ -17,4 +17,7 @@ pub enum WebSocketError {
         #[source]
         source: serde_json::Error,
     },
+
+    #[error("a user-implemented websocket handler returned an error: {0:#}")]
+    UserError(anyhow::Error),
 }

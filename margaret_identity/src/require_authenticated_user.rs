@@ -1,33 +1,33 @@
+use margaret_http::redirect::Redirect;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 
 use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
+use crate::respond_with_identity_error::respond_with_identity_error;
 
 pub fn require_authenticated_user<User>(
-    outcome: AuthenticatedUserOutcome<User>,
+    outcome: anyhow::Result<AuthenticatedUserOutcome<User>>,
 ) -> Result<User, ResponseContinuation> {
     match outcome {
-        AuthenticatedUserOutcome::Anonymous => {
+        Ok(AuthenticatedUserOutcome::Anonymous) => {
             Err(ResponseContinuation::from(Response::unauthorized()))
         }
-        AuthenticatedUserOutcome::Authenticated(user) => Ok(user),
-        AuthenticatedUserOutcome::Interrupted(continuation) => Err(continuation),
+        Ok(AuthenticatedUserOutcome::Authenticated(user)) => Ok(user),
+        Ok(AuthenticatedUserOutcome::LoginPageRedirect { url }) => {
+            Err(ResponseContinuation::from(Redirect::see_other(url)))
+        }
+        Err(error) => Err(respond_with_identity_error(error)),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use margaret_http::forwardable_route::ForwardableRoute;
-    use margaret_http::response::Response;
     use margaret_http::response_continuation::ResponseContinuation;
-    use margaret_http::url_segment::UrlSegment;
 
     use super::require_authenticated_user;
     use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
 
-    fn rejection_status(outcome: AuthenticatedUserOutcome<&str>) -> Option<u16> {
+    fn rejection_status(outcome: anyhow::Result<AuthenticatedUserOutcome<&str>>) -> Option<u16> {
         let rejection =
             require_authenticated_user(outcome).expect_err("the outcome carries no user");
 
@@ -37,20 +37,10 @@ mod tests {
         }
     }
 
-    fn sign_in_redirect() -> ResponseContinuation {
-        ResponseContinuation::from(
-            ForwardableRoute::new(
-                Arc::from("http://localhost"),
-                vec![UrlSegment::Literal("/sign-in")],
-            )
-            .see_other(),
-        )
-    }
-
     #[test]
     fn hands_over_the_authenticated_user() {
         assert_eq!(
-            require_authenticated_user(AuthenticatedUserOutcome::Authenticated("milo")).ok(),
+            require_authenticated_user(Ok(AuthenticatedUserOutcome::Authenticated("milo"))).ok(),
             Some("milo")
         );
     }
@@ -58,26 +48,26 @@ mod tests {
     #[test]
     fn rejects_an_anonymous_visitor_as_unauthorized() {
         assert_eq!(
-            rejection_status(AuthenticatedUserOutcome::Anonymous),
+            rejection_status(Ok(AuthenticatedUserOutcome::Anonymous)),
             Some(401)
         );
     }
 
     #[test]
-    fn propagates_a_terminal_interruption_instead_of_rejecting() {
+    fn redirects_a_login_page_outcome() {
         assert_eq!(
-            rejection_status(AuthenticatedUserOutcome::Interrupted(
-                ResponseContinuation::from(Response::text(410, "the session expired"))
-            )),
-            Some(410)
+            rejection_status(Ok(AuthenticatedUserOutcome::LoginPageRedirect {
+                url: "http://localhost/sign-in".to_string(),
+            })),
+            None
         );
     }
 
     #[test]
-    fn keeps_a_redirecting_interruption_intact() {
+    fn maps_a_provider_error_to_an_internal_server_error() {
         assert_eq!(
-            rejection_status(AuthenticatedUserOutcome::Interrupted(sign_in_redirect())),
-            None
+            rejection_status(Err(anyhow::anyhow!("the session store is unavailable"))),
+            Some(500)
         );
     }
 }

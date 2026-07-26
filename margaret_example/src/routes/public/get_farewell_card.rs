@@ -26,14 +26,14 @@ impl GetFarewellCard {
     }
 
     #[process]
-    pub async fn respond(&self, routes: &Routes, views: &Views) -> Response {
-        Response::html(
+    pub async fn respond(&self, routes: &Routes, views: &Views) -> anyhow::Result<Response> {
+        Ok(Response::html(
             200,
             views.farewell_view.render(FarewellViewProps {
                 name: self.app_name.as_str().to_string(),
                 routes,
             }),
-        )
+        ))
     }
 }
 
@@ -60,6 +60,13 @@ mod tests {
         let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
         let responder = GetFarewellCard::create(Arc::new(AppName::create()));
 
-        assert_eq!(responder.respond(&routes, &views).await.status(), 200);
+        assert_eq!(
+            responder
+                .respond(&routes, &views)
+                .await
+                .expect("the responder responds")
+                .status(),
+            200
+        );
     }
 }

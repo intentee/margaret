@@ -65,6 +65,25 @@ async fn applies_a_notification_to_the_session() {
 }
 
 #[tokio::test]
+async fn continues_after_a_notification_handler_fails() {
+    let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
+
+    harness
+        .send(r#"{"method":"failing_notification","params":{"who":"alice"}}"#)
+        .await;
+    harness.send_raw(Message::Close(None)).await;
+    harness.driver.await.expect("the driver finishes");
+
+    let notifications = harness
+        .session
+        .notifications
+        .lock()
+        .expect("the notification log is not poisoned");
+
+    assert!(notifications.is_empty());
+}
+
+#[tokio::test]
 async fn reports_invalid_request_parameters() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 

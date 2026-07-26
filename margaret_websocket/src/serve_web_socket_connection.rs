@@ -15,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::envelope_error_code::EnvelopeErrorCode;
 use crate::inbound_frame::InboundFrame;
-use crate::report_send_failure::report_send_failure;
+use crate::report_web_socket_error::report_web_socket_error;
 use crate::web_socket::WebSocket;
 use crate::web_socket_dispatch_table::WebSocketDispatchTable;
 
@@ -60,7 +60,7 @@ async fn dispatch_frame<Session>(
                 });
             }
             None => {
-                report_send_failure(
+                report_web_socket_error(
                     socket
                         .send_error(
                             id,

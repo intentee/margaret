@@ -17,5 +17,5 @@ pub trait RespondsToWebSocketNotification: Send + Sync {
         session: Arc<Self::Session>,
         message: NotificationEnvelope<Self::Message>,
         socket: WebSocket,
-    );
+    ) -> anyhow::Result<()>;
 }

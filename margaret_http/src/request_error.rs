@@ -63,4 +63,7 @@ pub enum RequestError {
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
+
+    #[error("a user-implemented handler returned an error: {0:#}")]
+    UserError(anyhow::Error),
 }

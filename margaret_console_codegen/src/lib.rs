@@ -305,6 +305,22 @@ impl Farewell {
     }
 
     #[test]
+    fn wraps_a_command_run_in_a_console_outcome() {
+        let source = source_for(
+            "#[singleton]\n#[console_command(name = \"seed\")]\nstruct Seed;\n\nimpl Seed {\n    #[constructor]\n    fn create() -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains("matchcontainer.seed().await.run().await{"));
+        assert!(source.contains(
+            "Ok(())=>{margaret::framework::console::command_outcome::CommandOutcome::Succeeded}"
+        ));
+        assert!(source.contains(
+            "Err(error)=>{margaret::framework::console::report_failure::report_failure(margaret::framework::console::console_error::ConsoleError::UserError(error,),)}"
+        ));
+    }
+
+    #[test]
     fn injects_the_cancellation_token_into_a_command_runner() {
         let source = source_for(
             "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch {\n    target: String,\n}\n\nimpl Watch {\n    #[constructor]\n    fn create(#[console_argument(positional)] target: String) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> CommandOutcome {}\n}\n",

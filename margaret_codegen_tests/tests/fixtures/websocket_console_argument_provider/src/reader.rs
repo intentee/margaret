@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
 use margaret::framework::http::request::Request;
-use margaret::framework::http::response::Response;
-use margaret::framework::http::response_continuation::ResponseContinuation;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::infer_from_request;
@@ -57,17 +55,21 @@ impl SessionReaderProvider {
         &self,
         request: &Request,
         #[form_request(from = Cookie)] cookie: ReaderCookie,
-    ) -> AuthenticatedUserOutcome<Reader> {
+    ) -> anyhow::Result<AuthenticatedUserOutcome<Reader>> {
         let _ = request.inputs.server.path();
 
         let Some(reader) = cookie.reader else {
-            return AuthenticatedUserOutcome::Anonymous;
+            return Ok(AuthenticatedUserOutcome::Anonymous);
         };
 
         if self.realm.admits(&reader) {
-            AuthenticatedUserOutcome::Authenticated(Reader { name: reader })
+            Ok(AuthenticatedUserOutcome::Authenticated(Reader {
+                name: reader,
+            }))
         } else {
-            AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(Response::forbidden()))
+            Ok(AuthenticatedUserOutcome::LoginPageRedirect {
+                url: "http://localhost/sign-in".to_string(),
+            })
         }
     }
 }

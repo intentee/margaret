@@ -31,9 +31,10 @@ impl PostMintAccessToken {
     }
 
     #[process]
-    pub async fn respond(&self, request: &Request) -> Response {
-        self.mint_access_token_handler
+    pub async fn respond(&self, request: &Request) -> anyhow::Result<Response> {
+        Ok(self
+            .mint_access_token_handler
             .respond(request, self.clock.now())
-            .await
+            .await)
     }
 }

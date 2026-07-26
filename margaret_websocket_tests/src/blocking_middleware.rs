@@ -10,7 +10,7 @@ pub struct BlockingMiddleware;
 
 #[async_trait]
 impl HttpMiddleware for BlockingMiddleware {
-    async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
-        ResponseContinuation::Done(Response::forbidden())
+    async fn process(&self, _request: &Request, _next: Next) -> anyhow::Result<ResponseContinuation> {
+        Ok(ResponseContinuation::Done(Response::forbidden()))
     }
 }

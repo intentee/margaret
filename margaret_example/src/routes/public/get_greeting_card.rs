@@ -26,14 +26,14 @@ impl GetGreetingCard {
     }
 
     #[process]
-    pub async fn respond(&self, routes: &Routes, views: &Views) -> Response {
-        Response::html(
+    pub async fn respond(&self, routes: &Routes, views: &Views) -> anyhow::Result<Response> {
+        Ok(Response::html(
             200,
             views.greeting_view.render(GreetingViewProps {
                 greeting: self.greeter.greet(),
                 routes,
             }),
-        )
+        ))
     }
 }
 
@@ -63,6 +63,13 @@ mod tests {
             AppName::create(),
         ))));
 
-        assert_eq!(responder.respond(&routes, &views).await.status(), 200);
+        assert_eq!(
+            responder
+                .respond(&routes, &views)
+                .await
+                .expect("the responder responds")
+                .status(),
+            200
+        );
     }
 }

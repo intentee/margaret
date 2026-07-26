@@ -44,6 +44,11 @@ impl Response {
         Self::bytes(status, "text/html; charset=utf-8", body.into())
     }
 
+    #[must_use]
+    pub fn internal_server_error() -> Self {
+        Self::text(500, "Internal Server Error")
+    }
+
     pub fn json<Value: Serialize>(status: u16, value: &Value) -> Self {
         match serde_json::to_string(value) {
             Ok(body) => Self::bytes(status, "application/json", body),

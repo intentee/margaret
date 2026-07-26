@@ -11,10 +11,10 @@ pub struct GetIdentity;
 
 impl GetIdentity {
     #[process]
-    pub async fn respond(&self, peer: &SpiffeId) -> Response {
-        Response::text(
+    pub async fn respond(&self, peer: &SpiffeId) -> anyhow::Result<Response> {
+        Ok(Response::text(
             200,
             format!("trust_domain={} path={}", peer.trust_domain(), peer.path()),
-        )
+        ))
     }
 }

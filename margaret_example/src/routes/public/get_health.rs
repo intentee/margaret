@@ -22,7 +22,7 @@ impl GetHealth {
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
-        Response::text(200, self.app_name.as_str())
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok(Response::text(200, self.app_name.as_str()))
     }
 }

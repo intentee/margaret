@@ -10,26 +10,22 @@ use margaret_websocket::web_socket::WebSocket;
 use crate::test_session::TestSession;
 use crate::typing_notification::TypingNotification;
 
-pub struct TypingHandler;
+pub struct FailingNotificationHandler;
 
 #[async_trait]
-impl RespondsToWebSocketNotification for TypingHandler {
+impl RespondsToWebSocketNotification for FailingNotificationHandler {
     type Message = TypingNotification;
     type Session = TestSession;
 
     async fn process(
         &self,
         _cancellation_token: CancellationToken,
-        session: Arc<TestSession>,
-        message: NotificationEnvelope<TypingNotification>,
+        _session: Arc<TestSession>,
+        _message: NotificationEnvelope<TypingNotification>,
         _socket: WebSocket,
     ) -> anyhow::Result<()> {
-        session
-            .notifications
-            .lock()
-            .expect("the notification log is not poisoned")
-            .push(message.message().who.clone());
-
-        Ok(())
+        Err(anyhow::anyhow!(
+            "the notification handler could not reach its dependency"
+        ))
     }
 }

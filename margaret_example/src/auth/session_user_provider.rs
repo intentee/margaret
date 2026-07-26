@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use margaret::framework::http::response::Response;
-use margaret::framework::http::response_continuation::ResponseContinuation;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::infer_from_request;
@@ -31,19 +29,19 @@ impl SessionUserProvider {
     pub async fn infer_session_user(
         &self,
         #[form_request(from = Cookie)] cookie: SessionCookie,
-    ) -> AuthenticatedUserOutcome<User> {
+    ) -> anyhow::Result<AuthenticatedUserOutcome<User>> {
         let Some(session) = cookie.session else {
-            return AuthenticatedUserOutcome::Anonymous;
+            return Ok(AuthenticatedUserOutcome::Anonymous);
         };
         let Ok(session) = Uuid::parse_str(&session) else {
-            return AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(
-                Response::text(400, "Malformed session cookie"),
-            ));
+            return Ok(AuthenticatedUserOutcome::LoginPageRedirect {
+                url: "/sign-in".to_string(),
+            });
         };
 
-        match self.users.find_user_by_session(session) {
+        Ok(match self.users.find_user_by_session(session) {
             Some(user) => AuthenticatedUserOutcome::Authenticated(user),
             None => AuthenticatedUserOutcome::Anonymous,
-        }
+        })
     }
 }

@@ -74,8 +74,8 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
         format_ident!("_next")
     };
 
-    let continuation_return = quote! { return response };
-    let response_return = quote! { return response.into() };
+    let continuation_return = quote! { return ::std::result::Result::Ok(response) };
+    let response_return = quote! { return ::std::result::Result::Ok(response.into()) };
     let provider_access = TokenStream::new();
     let extractions = parameters.iter().map(|parameter| {
         render_request_extraction(
@@ -106,7 +106,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
                 &self,
                 #request_binding: &margaret::framework::http::request::Request,
                 #next_binding: margaret::framework::http::next::Next,
-            ) -> margaret::framework::http::response_continuation::ResponseContinuation {
+            ) -> ::anyhow::Result<margaret::framework::http::response_continuation::ResponseContinuation> {
                 #(#extractions)*
                 self.inner.process(#(#call_arguments),*).await
             }

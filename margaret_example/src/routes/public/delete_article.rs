@@ -25,9 +25,9 @@ impl DeleteArticle {
     pub async fn respond(
         &self,
         #[route_parameter(from = "article")] Article { id, title, .. }: Article,
-    ) -> Response {
+    ) -> anyhow::Result<Response> {
         self.articles.remove(id);
 
-        Response::text(200, format!("deleted \"{title}\""))
+        Ok(Response::text(200, format!("deleted \"{title}\"")))
     }
 }

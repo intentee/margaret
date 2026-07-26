@@ -28,9 +28,9 @@ impl Configured {
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
+    pub async fn respond(&self) -> anyhow::Result<Response> {
         let _ = asset!("resources/ts/app.ts");
 
-        Response::text(200, "configured")
+        Ok(Response::text(200, "configured"))
     }
 }

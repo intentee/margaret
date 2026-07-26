@@ -24,7 +24,7 @@ impl GetWellKnownJwks {
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
-        self.public_jwks_handler.respond()
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok(self.public_jwks_handler.respond())
     }
 }

@@ -16,12 +16,12 @@ impl PostArticleCover {
         &self,
         request: &Request,
         #[route_parameter(from = "article")] Article { title, .. }: Article,
-    ) -> Response {
+    ) -> anyhow::Result<Response> {
         let Some(cover) = request.inputs.files.get("cover") else {
-            return Response::text(422, "a \"cover\" file upload is required");
+            return Ok(Response::text(422, "a \"cover\" file upload is required"));
         };
 
-        Response::text(
+        Ok(Response::text(
             201,
             format!(
                 "stored {} byte {} cover for \"{title}\" from {}",
@@ -29,6 +29,6 @@ impl PostArticleCover {
                 cover.content_type(),
                 request.inputs.server.remote_addr(),
             ),
-        )
+        ))
     }
 }

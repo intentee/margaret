@@ -27,7 +27,7 @@ impl GetGreeting {
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
-        Response::text(200, self.greeter.greet())
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok(Response::text(200, self.greeter.greet()))
     }
 }
