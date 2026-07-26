@@ -9,6 +9,10 @@ fn constructs_services_and_tickers_lazily() {
         .expect("the services fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("pubasyncfnpulse(&self)->std::sync::Arc<crate::Pulse>"));
-    assert!(source.contains("pubasyncfnsweeper(&self)->std::sync::Arc<crate::Sweeper>"));
+    assert!(source.contains(
+        "pubasyncfnpulse(&self,)->::std::result::Result<std::sync::Arc<crate::Pulse>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
+    ));
+    assert!(source.contains(
+        "pubasyncfnsweeper(&self,)->::std::result::Result<std::sync::Arc<crate::Sweeper>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
+    ));
 }

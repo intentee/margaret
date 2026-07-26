@@ -12,18 +12,15 @@ fn accepts_singletons_named_after_framework_identifiers() {
         .split_whitespace()
         .collect();
 
-    assert!(
-        source
-            .contains("pubasyncfnbuild(&self)->std::sync::Arc<framework_named_singletons::Build>")
-    );
     assert!(source.contains(
-        "pubasyncfncontainer(&self,)->std::sync::Arc<framework_named_singletons::Container>"
+        "pubasyncfnbuild(&self,)->::std::result::Result<std::sync::Arc<framework_named_singletons::Build>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
     ));
-    assert!(
-        source.contains(
-            "pubasyncfnroutes(&self)->std::sync::Arc<framework_named_singletons::Routes>"
-        )
-    );
+    assert!(source.contains(
+        "pubasyncfncontainer(&self,)->::std::result::Result<std::sync::Arc<framework_named_singletons::Container>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
+    ));
+    assert!(source.contains(
+        "pubasyncfnroutes(&self,)->::std::result::Result<std::sync::Arc<framework_named_singletons::Routes>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
+    ));
     assert!(source.contains("pubfnbuild()->super::Container"));
     assert!(!source.contains("build_2"));
     assert!(!source.contains("container_2"));

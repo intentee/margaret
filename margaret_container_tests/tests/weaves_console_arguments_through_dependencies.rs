@@ -23,6 +23,6 @@ fn weaves_console_arguments_through_dependencies() {
         )
     );
     assert!(source.contains(
-        "crate::Service::create(self.config(console_argument_1).await,self.alpha_plugin(console_argument_0).await,)"
+        "crate::Service::create(self.config(console_argument_1).await?,self.alpha_plugin(console_argument_0).await?,)"
     ));
 }

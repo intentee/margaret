@@ -7,6 +7,8 @@ pub use margaret_codegen as codegen;
 #[cfg(feature = "runtime")]
 pub use margaret_console as console;
 #[cfg(feature = "runtime")]
+pub use margaret_container_error as container_error;
+#[cfg(feature = "runtime")]
 pub use margaret_http as http;
 #[cfg(feature = "runtime")]
 pub use margaret_http_validation as http_validation;

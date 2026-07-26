@@ -62,7 +62,7 @@ fn resolves_the_server_store_and_client_verifier_by_marker() {
 
     assert!(
         source.contains(
-            "crate::Consumer::new(self.server_store().await,self.auth_verifier().await,)"
+            "crate::Consumer::new(self.server_store().await?,self.auth_verifier().await?,)"
         )
     );
 }

@@ -13,7 +13,7 @@ fn moves_a_copy_console_argument_shared_by_dependencies() {
         .collect();
 
     assert!(source.contains(
-        "crate::Parent::create(console_argument_0,self.child(console_argument_0).await,)"
+        "crate::Parent::create(console_argument_0,self.child(console_argument_0).await?,)"
     ));
     assert!(!source.contains("console_argument_0.clone()"));
 }

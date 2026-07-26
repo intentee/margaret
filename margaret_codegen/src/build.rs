@@ -563,7 +563,7 @@ impl Worker {
         ));
         assert!(serve.contains("letconsole_argument_0=spiffe_http_client.clone();"));
         assert!(serve.contains(
-            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:container.worker(console_argument_0.clone()).await,},),);"
+            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:(matchcontainer.worker(console_argument_0.clone()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),},),);"
         ));
         assert!(serve.contains(
             "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
@@ -862,7 +862,7 @@ impl GetVerify {
         let code = generate(JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE).expect("the build succeeds");
 
         let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains(".await.verifier()"));
+        assert!(container.contains(".await?.verifier()"));
         assert!(
             container.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
         );
@@ -1588,9 +1588,9 @@ impl New {
         let http: String = concatenated(&code).split_whitespace().collect();
 
         assert!(build.contains("pubfnbuild()->super::Container"));
-        assert!(container.contains("pubasyncfnbuild(&self)"));
-        assert!(container.contains("pubasyncfncontainer(&self)"));
-        assert!(container.contains("pubasyncfnroutes(&self)"));
+        assert!(container.contains("pubasyncfnbuild(&self,)"));
+        assert!(container.contains("pubasyncfncontainer(&self,)"));
+        assert!(container.contains("pubasyncfnroutes(&self,)"));
         assert!(!container.contains("build_2"));
         assert!(!container.contains("container_2"));
         assert!(!container.contains("routes_2"));

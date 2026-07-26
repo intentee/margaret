@@ -202,6 +202,16 @@ impl Banner {
     }
 
     #[test]
+    fn renders_a_non_fallible_empty_builder_when_the_container_has_no_accessors() {
+        let source = formatted(generated("struct Plain;\n").modules);
+
+        assert!(source.contains("pub struct Views {}"));
+        assert!(source.contains(
+            "pub async fn build(container: &super::super::container::Container) -> super::Views {"
+        ));
+    }
+
+    #[test]
     fn supports_same_struct_name_views_in_different_modules() {
         let source = formatted(
             generated(

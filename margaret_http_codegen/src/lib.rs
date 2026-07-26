@@ -203,7 +203,7 @@ impl GetProfile {
             .collect();
 
         assert!(source.contains(
-            "letsession_user_provider=std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(console_argument_0.to_owned()).await,routes:routes.clone(),});"
+            "letsession_user_provider=std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(console_argument_0.to_owned()).await?,routes:routes.clone(),});"
         ));
         assert!(source.contains("letsession_user_provider=session_user_provider.clone();"));
         assert!(source.contains(
@@ -299,7 +299,7 @@ impl GetProfile {
         let source: String = source_for(COLLIDING_PROVIDER).split_whitespace().collect();
 
         assert!(source.contains(
-            "letsession_2=std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session().await,routes:routes.clone(),});"
+            "letsession_2=std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session().await?,routes:routes.clone(),});"
         ));
         assert!(source.contains("letsession_2=session_2.clone();"));
         assert!(source.contains("letsession=request;"));
@@ -340,7 +340,7 @@ impl GetUser {
     fn keeps_a_captured_binder_clear_of_a_parameter_that_takes_its_name() {
         let source: String = source_for(COLLIDING_BINDER).split_whitespace().collect();
 
-        assert!(source.contains("letstore_2=container.store().await;"));
+        assert!(source.contains("letstore_2=container.store().await?;"));
         assert!(source.contains("letstore_2=store_2.clone();"));
         assert!(source.contains(
             "margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,\"user\",store_2.as_ref(),)"
@@ -432,9 +432,9 @@ impl GetArticle {
             .collect();
 
         assert!(source.contains(
-            "letstore=std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store().await,routes:routes.clone(),});"
+            "letstore=std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store().await?,routes:routes.clone(),});"
         ));
-        assert!(source.contains("letstore_2=container.store().await;"));
+        assert!(source.contains("letstore_2=container.store().await?;"));
         assert!(source.contains(
             "margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(store.as_ref(),request,)"
         ));
@@ -475,7 +475,7 @@ impl GetPair {
 
         assert_eq!(
             source
-                .matches("letuser_binder=container.user_binder().await;")
+                .matches("letuser_binder=container.user_binder().await?;")
                 .count(),
             1
         );
@@ -1064,10 +1064,10 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         ));
         assert!(source.contains("responder.respond().await"));
         assert!(source.contains(
-            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await,}),margaret::framework::http::responder_handler::responder_handler(container.resource().await"
+            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await?,}),margaret::framework::http::responder_handler::responder_handler(container.resource().await?"
         ));
         assert!(source.contains(
-            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await,}),margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{"
+            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await?,}),margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{"
         ));
 
         let guard = source.find("container.guard").expect("the guard is wired");
@@ -1085,7 +1085,7 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
         );
 
         assert!(source.contains(
-            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await,routes:routes.clone()"
+            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await?,routes:routes.clone()"
         ));
     }
 
@@ -1796,7 +1796,7 @@ impl Tracer {
         );
 
         assert!(source.contains(
-            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await,views:views.clone()"
+            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await?,views:views.clone()"
         ));
         assert!(source.contains("views:&::std::sync::Arc<super::super::views::Views>"));
     }

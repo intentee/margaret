@@ -4,7 +4,11 @@ use margaret::framework::console::command_outcome::CommandOutcome;
 async fn main() -> CommandOutcome {
     let container = margaret_example::margaret::container::build::build();
 
-    margaret_example::margaret::run::run(&container, std::env::args_os()).await
+    Box::pin(margaret_example::margaret::run::run(
+        &container,
+        std::env::args_os(),
+    ))
+    .await
 }
 
 #[cfg(test)]

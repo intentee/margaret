@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use proc_macro2::Ident;
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -17,6 +19,7 @@ use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
 use margaret_console_argument_codegen::unify_by_key::unify_by_key;
 use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 
+use crate::accessor_failure::AccessorFailure;
 use crate::console_closures::ConsoleClosures;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
@@ -27,6 +30,7 @@ pub struct ContainerBindings {
     accessor_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
     console_arguments: BTreeMap<CanonicalPath, Vec<ConsoleArgument>>,
     console_slots: BTreeMap<ServeInputKey, usize>,
+    has_accessors: bool,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
 }
 
@@ -45,6 +49,7 @@ impl ContainerBindings {
                 )
             })
             .collect();
+        let has_accessors = plan.providers.len() + plan.constructions.len() > 0;
         let console_arguments = plan
             .providers
             .iter()
@@ -65,7 +70,30 @@ impl ContainerBindings {
             accessor_console_arguments,
             console_arguments,
             console_slots,
+            has_accessors,
             providers,
+        }
+    }
+
+    #[must_use]
+    pub fn accessor_invocation(
+        &self,
+        container: &Ident,
+        field_name: &str,
+        woven: &[TokenStream],
+        failure: &AccessorFailure,
+    ) -> TokenStream {
+        let accessor = format_ident!("{field_name}");
+        let call = quote! { #container.#accessor(#(#woven),*).await };
+
+        match failure {
+            AccessorFailure::Propagate => quote! { #call? },
+            AccessorFailure::Report(on_failure) => quote! {
+                (match #call {
+                    Ok(value) => value,
+                    Err(error) => #on_failure,
+                })
+            },
         }
     }
 
@@ -141,6 +169,11 @@ impl ContainerBindings {
             .iter()
             .map(|argument| self.materialize(argument, true))
             .collect()
+    }
+
+    #[must_use]
+    pub fn has_accessors(&self) -> bool {
+        self.has_accessors
     }
 
     #[must_use]
