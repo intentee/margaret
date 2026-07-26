@@ -156,7 +156,13 @@ fn direct_value(
                 let error = construction_error_path();
                 let singleton = concrete_path.to_string();
 
-                quote! { #call.map_err(|cause| #error::user_error(#singleton, cause))? }
+                quote! {
+                    {
+                        let outcome: ::anyhow::Result<#concrete> = #call;
+
+                        outcome.map_err(|source| #error::user_error(#singleton, source))?
+                    }
+                }
             } else {
                 call
             }

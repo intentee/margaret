@@ -29,8 +29,9 @@ fn renders_a_fallible_constructor_accessor_returning_a_result() {
 fn maps_a_failed_constructor_into_the_user_error_variant() {
     let source = fixture("fallible_constructor");
 
+    assert!(source.contains("letoutcome:::anyhow::Result<crate::Loader>=crate::Loader::new();"));
     assert!(source.contains(
-        "crate::Loader::new().map_err(|cause|margaret::framework::container_error::construction_error::ConstructionError::user_error(\"crate::Loader\",cause,))?"
+        "outcome.map_err(|source|margaret::framework::container_error::construction_error::ConstructionError::user_error(\"crate::Loader\",source,))?"
     ));
 }
 
@@ -55,7 +56,10 @@ fn renders_a_fallible_service_construction_that_depends_on_a_fallible_singleton(
         "->Result<std::sync::Arc<crate::Worker>,margaret::framework::container_error::construction_error::ConstructionError,>"
     ));
     assert!(source.contains(
-        "crate::Worker::new(self.loader().await?).map_err(|cause|margaret::framework::container_error::construction_error::ConstructionError::user_error(\"crate::Worker\",cause,))?"
+        "letoutcome:::anyhow::Result<crate::Worker>=crate::Worker::new(self.loader().await?,);"
+    ));
+    assert!(source.contains(
+        "outcome.map_err(|source|margaret::framework::container_error::construction_error::ConstructionError::user_error(\"crate::Worker\",source,))?"
     ));
 }
 
