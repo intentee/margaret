@@ -118,17 +118,26 @@ async fn reports_malformed_request_parameters() {
 }
 
 #[tokio::test]
-async fn reports_an_unknown_request_method() {
+async fn reports_each_unknown_request_method() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
         .send(r#"{"id":4,"method":"nonexistent","params":{}}"#)
         .await;
 
-    let error = harness.recv().await;
+    let first = harness.recv().await;
 
-    assert!(error.contains("\"id\":4"));
-    assert!(error.contains("unknown_method"));
+    assert!(first.contains("\"id\":4"));
+    assert!(first.contains("unknown_method"));
+
+    harness
+        .send(r#"{"id":5,"method":"still_nonexistent","params":{}}"#)
+        .await;
+
+    let second = harness.recv().await;
+
+    assert!(second.contains("\"id\":5"));
+    assert!(second.contains("unknown_method"));
 
     harness.cancellation_token.cancel();
     harness.driver.await.expect("the driver finishes");

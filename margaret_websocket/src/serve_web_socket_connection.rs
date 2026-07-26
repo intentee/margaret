@@ -62,6 +62,7 @@ async fn dispatch_frame<Session>(
             None => {
                 report_web_socket_error(
                     socket
+                        .request_scope()
                         .send_error(
                             id,
                             EnvelopeErrorCode::UnknownMethod,
