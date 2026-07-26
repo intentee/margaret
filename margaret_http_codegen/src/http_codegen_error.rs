@@ -98,4 +98,29 @@ pub enum HttpCodegenError {
         "responder '{responder}' names the server '{server}', which must be a snake_case identifier usable as a `routes` accessor"
     )]
     InvalidServerName { responder: String, server: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' names the login route '{login_route}', which is not a #[responds_to_http] responder"
+    )]
+    AuthenticatedUserLoginRouteNotARoute { provider: String, login_route: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' names the login route '{login_route}', which is not a GET route"
+    )]
+    AuthenticatedUserLoginRouteNotGet { provider: String, login_route: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' names the login route '{login_route}', which has no `name = \"...\"`; a login route must be a named route"
+    )]
+    AuthenticatedUserLoginRouteUnnamed { provider: String, login_route: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' names the login route '{login_route}', which takes path parameters; a login route must have a parameter-free path"
+    )]
+    AuthenticatedUserLoginRouteParameterized { provider: String, login_route: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' names the login route '{login_route}', which itself requires an authenticated user; unauthenticated visitors are redirected there, so it must be reachable without authentication"
+    )]
+    AuthenticatedUserLoginRouteRequiresAuthentication { provider: String, login_route: String },
 }

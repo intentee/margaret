@@ -65,7 +65,7 @@ fn route_applications(route: &HttpRoute) -> impl Iterator<Item = &AuthenticatedU
 }
 
 fn providers_inject_routes(route: &HttpRoute) -> bool {
-    route_applications(route).any(|application| application.injects_routes)
+    route_applications(route).next().is_some()
 }
 
 fn providers_inject_views(route: &HttpRoute) -> bool {
@@ -299,9 +299,7 @@ fn capture_binding(
             let wrapper = &application.wrapper;
             let woven = console_weave(&application.concrete, bindings);
             let inner_access = access(quote! { container.#accessor(#(#woven),*) });
-            let routes_init = application
-                .injects_routes
-                .then(|| quote! { routes: routes.clone(), });
+            let routes_init = quote! { routes: routes.clone(), };
             let views_init = application
                 .injects_views
                 .then(|| quote! { views: views.clone(), });

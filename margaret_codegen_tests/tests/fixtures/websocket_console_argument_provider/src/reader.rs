@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use margaret::framework::http::request::Request;
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
@@ -38,7 +38,10 @@ impl ReaderRealm {
 }
 
 #[singleton]
-#[infers_authenticated_user(user_model = crate::reader::Reader)]
+#[infers_authenticated_user(
+    login_route = crate::sign_in::SignIn,
+    user_model = crate::reader::Reader
+)]
 pub struct SessionReaderProvider {
     realm: Arc<ReaderRealm>,
 }
@@ -55,19 +58,19 @@ impl SessionReaderProvider {
         &self,
         request: &Request,
         #[form_request(from = Cookie)] cookie: ReaderCookie,
-    ) -> anyhow::Result<AuthenticatedUserOutcome<Reader>> {
+    ) -> anyhow::Result<AuthenticatedUserInference<Reader>> {
         let _ = request.inputs.server.path();
 
         let Some(reader) = cookie.reader else {
-            return Ok(AuthenticatedUserOutcome::Anonymous);
+            return Ok(AuthenticatedUserInference::Anonymous);
         };
 
         if self.realm.admits(&reader) {
-            Ok(AuthenticatedUserOutcome::Authenticated(Reader {
+            Ok(AuthenticatedUserInference::Authenticated(Reader {
                 name: reader,
             }))
         } else {
-            Ok(AuthenticatedUserOutcome::Anonymous)
+            Ok(AuthenticatedUserInference::Anonymous)
         }
     }
 }

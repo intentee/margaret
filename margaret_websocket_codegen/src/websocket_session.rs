@@ -33,11 +33,7 @@ impl WebSocketSession {
     }
 
     pub(crate) fn injects_routes(&self) -> bool {
-        injects_routes(&self.parameters)
-            || self
-                .authenticated_user_providers()
-                .iter()
-                .any(|application| application.injects_routes)
+        injects_routes(&self.parameters) || !self.authenticated_user_providers().is_empty()
     }
 
     pub(crate) fn references_routes(&self) -> bool {

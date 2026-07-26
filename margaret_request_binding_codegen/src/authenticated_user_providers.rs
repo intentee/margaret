@@ -22,7 +22,6 @@ use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
 use crate::classify_parameters::classify_parameters;
 use crate::infers_authenticated_user_arguments::InfersAuthenticatedUserArguments;
-use crate::injects_routes::injects_routes;
 use crate::injects_views::injects_views;
 use crate::request_binding_error::RequestBindingError;
 
@@ -30,13 +29,13 @@ fn anyhow_result_path() -> CanonicalPath {
     CanonicalPath::new(vec!["anyhow".to_string(), "Result".to_string()])
 }
 
-fn authenticated_user_outcome_path() -> CanonicalPath {
+fn authenticated_user_inference_path() -> CanonicalPath {
     CanonicalPath::new(vec![
         "margaret".to_string(),
         "framework".to_string(),
         "identity".to_string(),
-        "authenticated_user_outcome".to_string(),
-        "AuthenticatedUserOutcome".to_string(),
+        "authenticated_user_inference".to_string(),
+        "AuthenticatedUserInference".to_string(),
     ])
 }
 
@@ -119,7 +118,7 @@ fn verify_outcome(
     };
 
     if index.resolve_item_type(item, inner_outcome).as_ref()
-        != Some(&authenticated_user_outcome_path())
+        != Some(&authenticated_user_inference_path())
     {
         return Err(RequestBindingError::InferenceReturnTypeMismatch {
             provider: provider.to_string(),
@@ -167,6 +166,7 @@ pub fn authenticated_user_providers(
         }
 
         let InfersAuthenticatedUserArguments {
+            login_route: declared_login_route,
             user_model: declared_model,
         } = InfersAuthenticatedUserArguments::parse(matched.args()?, &provider)?;
         let model = index
@@ -178,6 +178,13 @@ pub fn authenticated_user_providers(
                     written: format_path(&declared_model),
                 },
             )?;
+        let login_route = index
+            .resolve_item_path(item, &declared_login_route)
+            .filter(|resolved| index.struct_identifier(resolved).is_some())
+            .ok_or_else(|| RequestBindingError::AuthenticatedUserLoginRouteUnknown {
+                provider: provider.clone(),
+                written: format_path(&declared_login_route),
+            })?;
 
         let method = infer_from_request_method(item, &provider)?;
         let signature = method.signature();
@@ -210,8 +217,8 @@ pub fn authenticated_user_providers(
         let application = AuthenticatedUserApplication {
             concrete,
             field: identifier.field().to_string(),
-            injects_routes: injects_routes(&parameters),
             injects_views: injects_views(&parameters),
+            login_route,
             model: model.clone(),
             wrapper: format_ident!("{}", identifier.type_name()),
         };

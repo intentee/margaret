@@ -849,7 +849,7 @@ impl Bad {
 
     const AUTHENTICATED_HANDSHAKE: &str = r#"
 use margaret::framework::http::request::Request;
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 struct User;
@@ -857,12 +857,21 @@ struct User;
 struct SessionCookie;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -893,7 +902,7 @@ impl RespondsToWebSocketMessage for Chatter {
             "structFactory{session_user_provider:::std::sync::Arc<super::super::authenticated_users::SessionUserProvider,>,}"
         ));
         assert!(source.contains(
-            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider().await,}),}"
+            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider().await,routes:routes.clone(),}),}"
         ));
     }
 
@@ -925,18 +934,27 @@ impl RespondsToWebSocketMessage for Chatter {
     fn hands_the_routes_to_a_handshake_authenticated_user_provider() {
         let source = generated(
             r#"
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 struct User;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, routes: &crate::margaret::routes::Routes) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -967,7 +985,7 @@ impl RespondsToWebSocketMessage for Chatter {
     fn keeps_a_captured_provider_clear_of_a_session_parameter_that_takes_its_name() {
         let source = generated(
             r#"
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[singleton]
@@ -981,12 +999,21 @@ impl SystemClock {
 struct User;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct Session;
 
 impl Session {
     #[infer_from_request]
-    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1020,13 +1047,22 @@ impl RespondsToWebSocketMessage for Chatter {
     }
 
     const CONSOLE_ARGUMENT_PROVIDER: &str = r#"
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 struct User;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct SessionUserProvider;
 
 impl SessionUserProvider {
@@ -1034,7 +1070,7 @@ impl SessionUserProvider {
     fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
 
     #[infer_from_request]
-    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1061,14 +1097,14 @@ impl RespondsToWebSocketMessage for Chatter {
     fn threads_the_console_arguments_of_an_authenticated_user_provider_through_the_handshake() {
         let source = generated(CONSOLE_ARGUMENT_PROVIDER);
 
-        assert!(source.contains("pubasyncfnupgrade_entry(container:&super::super::container::Container,console_argument_0:&str,)"));
+        assert!(source.contains("pubasyncfnupgrade_entry(container:&super::super::container::Container,console_argument_0:&str,routes:&::std::sync::Arc<super::super::routes::Routes>,)"));
         assert!(source.contains(
             "inner:container.session_user_provider(console_argument_0.to_owned()).await,"
         ));
         assert!(source.contains(
-            "pubasyncfnpublic_routes(container:&super::container::Container,console_argument_0:&str,_routes:"
+            "pubasyncfnpublic_routes(container:&super::container::Container,console_argument_0:&str,routes:"
         ));
-        assert!(source.contains("upgrade_entry(container,console_argument_0).await"));
+        assert!(source.contains("upgrade_entry(container,console_argument_0,routes).await"));
     }
 
     #[test]
@@ -1107,17 +1143,26 @@ impl Room {
         assert!(
             error(
                 r#"
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 
 struct User;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1158,19 +1203,28 @@ impl Bad {
         assert!(
             error(
                 r#"
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 
 struct User;
 
 struct Credentials;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]

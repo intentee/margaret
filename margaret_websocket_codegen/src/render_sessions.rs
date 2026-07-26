@@ -117,9 +117,7 @@ fn factory_initializers(
                 let wrapper = &application.wrapper;
                 let arguments =
                     bindings.console_weaves(bindings.console_arguments(&application.concrete));
-                let routes_init = application
-                    .injects_routes
-                    .then(|| quote! { routes: routes.clone(), });
+                let routes_init = quote! { routes: routes.clone(), };
 
                 quote! {
                     #local: ::std::sync::Arc::new(

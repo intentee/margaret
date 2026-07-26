@@ -1,6 +1,6 @@
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
@@ -13,7 +13,10 @@ pub struct Reader {
 }
 
 #[singleton]
-#[infers_authenticated_user(user_model = crate::collision::Reader)]
+#[infers_authenticated_user(
+    login_route = crate::collision::SignIn,
+    user_model = crate::collision::Reader
+)]
 pub struct Session;
 
 impl Session {
@@ -24,10 +27,21 @@ impl Session {
     }
 
     #[infer_from_request]
-    pub async fn infer_reader(&self) -> anyhow::Result<AuthenticatedUserOutcome<Reader>> {
-        Ok(AuthenticatedUserOutcome::Authenticated(Reader {
+    pub async fn infer_reader(&self) -> anyhow::Result<AuthenticatedUserInference<Reader>> {
+        Ok(AuthenticatedUserInference::Authenticated(Reader {
             name: "milo".to_string(),
         }))
+    }
+}
+
+#[singleton]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+pub struct SignIn;
+
+impl SignIn {
+    #[process]
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok(Response::text(200, "sign in"))
     }
 }
 

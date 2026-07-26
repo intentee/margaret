@@ -6,8 +6,8 @@ use margaret_attributes::canonical_path::CanonicalPath;
 pub struct AuthenticatedUserApplication {
     pub concrete: CanonicalPath,
     pub field: String,
-    pub injects_routes: bool,
     pub injects_views: bool,
+    pub login_route: CanonicalPath,
     pub model: CanonicalPath,
     pub wrapper: Ident,
 }

@@ -6,7 +6,9 @@ use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
+use crate::authenticated_user_login_route::AuthenticatedUserLoginRoute;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
+use crate::authenticated_user_wrapper_binding::AuthenticatedUserWrapperBinding;
 use crate::binding_reads_request::binding_reads_request;
 use crate::binding_shadows_request::binding_shadows_request;
 use crate::bound_parameter::BoundParameter;
@@ -26,7 +28,11 @@ fn provider_argument_value(parameter: &BoundParameter) -> TokenStream {
     }
 }
 
-fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
+fn provider_wrapper(binding: &AuthenticatedUserWrapperBinding<'_>) -> TokenStream {
+    let AuthenticatedUserWrapperBinding {
+        login_route,
+        provider,
+    } = binding;
     let AuthenticatedUserProvider {
         application,
         method_name,
@@ -34,16 +40,16 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     } = provider;
     let AuthenticatedUserApplication {
         concrete,
-        injects_routes,
         injects_views,
         model,
         wrapper,
         ..
     } = application;
+    let AuthenticatedUserLoginRoute { route, server } = login_route;
     let concrete = path_tokens(concrete);
     let model = path_tokens(model);
-    let routes_field =
-        injects_routes.then(|| quote! { pub routes: std::sync::Arc<super::routes::Routes>, });
+    let login_server = format_ident!("{}", server);
+    let login_route = format_ident!("{}", route);
     let views_field =
         injects_views.then(|| quote! { pub views: std::sync::Arc<super::views::Views>, });
 
@@ -66,10 +72,8 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
 
     let extraction_return = quote! {
         {
-            let _ = response;
-
             return ::std::result::Result::Ok(
-                margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Anonymous,
+                margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Rejected(response),
             );
         }
     };
@@ -91,7 +95,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     quote! {
         pub struct #wrapper {
             pub inner: std::sync::Arc<#concrete>,
-            #routes_field
+            pub routes: std::sync::Arc<super::routes::Routes>,
             #views_field
         }
 
@@ -104,15 +108,32 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
                 #request_binding: &margaret::framework::http::request::Request,
             ) -> ::anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>> {
                 #(#extractions)*
-                self.inner.#method_name(#(#call_arguments),*).await
+
+                ::std::result::Result::Ok(
+                    match self.inner.#method_name(#(#call_arguments),*).await? {
+                        margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference::Anonymous => {
+                            margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Anonymous
+                        }
+                        margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference::Authenticated(user) => {
+                            margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Authenticated(user)
+                        }
+                        margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference::LoginRequired => {
+                            margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::LoginPageRedirect(
+                                self.routes.#login_server.#login_route.see_other(),
+                            )
+                        }
+                    },
+                )
             }
         }
     }
 }
 
 #[must_use]
-pub fn render_authenticated_user_wrappers(providers: &[&AuthenticatedUserProvider]) -> TokenStream {
-    let wrappers = providers.iter().copied().map(provider_wrapper);
+pub fn render_authenticated_user_wrappers(
+    bindings: &[AuthenticatedUserWrapperBinding<'_>],
+) -> TokenStream {
+    let wrappers = bindings.iter().map(provider_wrapper);
 
     quote! {
         #(#wrappers)*

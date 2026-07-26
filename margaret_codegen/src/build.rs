@@ -1066,17 +1066,26 @@ impl RequestLog {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 
 struct User;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = \"get\", name = \"sign_in\", path = \"/sign-in\", server = \"public\")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 #[singleton]
@@ -1103,17 +1112,6 @@ impl GetProfile {
     #[test]
     fn omits_the_authenticated_users_module_without_a_provider() {
         let code = generate(WEB_CRATE).expect("the build succeeds");
-
-        assert!(!module(&code, "mod").contains("pub mod authenticated_users;"));
-        assert!(!has_module(&code, "authenticated_users"));
-    }
-
-    #[test]
-    fn omits_the_authenticated_users_module_without_a_served_request() {
-        let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
-        )
-        .expect("the build succeeds");
 
         assert!(!module(&code, "mod").contains("pub mod authenticated_users;"));
         assert!(!has_module(&code, "authenticated_users"));

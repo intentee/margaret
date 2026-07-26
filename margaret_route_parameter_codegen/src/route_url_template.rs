@@ -31,9 +31,12 @@ pub fn route_url_template(path: &str) -> Vec<UrlSegment> {
                     name.push(inner);
                 }
 
-                let name = name.strip_prefix('*').unwrap_or(&name).to_string();
-
-                segments.push(UrlSegment::Parameter(name));
+                match name.strip_prefix('*') {
+                    Some(catch_all) => {
+                        segments.push(UrlSegment::CatchAll(catch_all.to_string()));
+                    }
+                    None => segments.push(UrlSegment::Parameter(name)),
+                }
             }
             _ => literal.push(character),
         }
@@ -55,6 +58,7 @@ mod tests {
         route_url_template(path)
             .into_iter()
             .map(|segment| match segment {
+                UrlSegment::CatchAll(name) => format!("catchall:{name}"),
                 UrlSegment::Literal(text) => format!("literal:{text}"),
                 UrlSegment::Parameter(name) => format!("param:{name}"),
             })
@@ -75,10 +79,10 @@ mod tests {
     }
 
     #[test]
-    fn strips_the_catch_all_marker_from_a_wildcard() {
+    fn emits_a_catch_all_segment_for_a_wildcard() {
         assert_eq!(
             describe("/files/{*rest}"),
-            vec!["literal:/files/", "param:rest"]
+            vec!["literal:/files/", "catchall:rest"]
         );
     }
 

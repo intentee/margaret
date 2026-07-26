@@ -147,6 +147,16 @@ pub enum RequestBindingError {
     )]
     AuthenticatedUserProviderUnknownUserModel { provider: String, written: String },
 
+    #[error(
+        "#[infers_authenticated_user] '{provider}' is missing `login_route = <route>`; it must name the route to redirect unauthenticated visitors to"
+    )]
+    AuthenticatedUserProviderMissingLoginRoute { provider: String },
+
+    #[error(
+        "#[infers_authenticated_user] '{provider}' names the login route '{written}', which matches no struct"
+    )]
+    AuthenticatedUserLoginRouteUnknown { provider: String, written: String },
+
     #[error("#[infers_authenticated_user] '{provider}' has no #[infer_from_request] method")]
     MissingInferFromRequest { provider: String },
 
@@ -156,7 +166,7 @@ pub enum RequestBindingError {
     AmbiguousInferFromRequest { provider: String, methods: String },
 
     #[error(
-        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>>"
+        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference<Model>>"
     )]
     InferenceReturnTypeMismatch { provider: String, written: String },
 

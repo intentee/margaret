@@ -9,9 +9,11 @@ mod http_routes;
 pub mod http_server;
 mod named_route;
 mod render;
+mod render_authenticated_users;
 mod render_forwarders;
 pub mod render_http;
 mod render_routes;
+mod responder_route;
 mod route_group;
 mod server_route_group;
 pub mod server_transport_policy;
@@ -159,12 +161,21 @@ impl GetUser {
 "#;
 
     const AUTHENTICATED_RESPONDER: &str = r#"
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 
 struct User;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct SessionUserProvider;
 
 impl SessionUserProvider {
@@ -172,7 +183,7 @@ impl SessionUserProvider {
     fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
 
     #[infer_from_request]
-    fn infer(&self, routes: &crate::margaret::routes::Routes) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 #[singleton]
@@ -221,7 +232,7 @@ impl GetProfile {
     #[test]
     fn hands_the_views_to_an_authenticated_user_provider_that_renders_them() {
         let source: String = source_for_with_views(
-            "use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n",
+            "use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;\n\nstruct User;\n\n#[singleton]\n#[responds_to_http(method = \"get\", name = \"sign_in\", path = \"/sign-in\", server = \"public\")]\nstruct SignIn;\n\nimpl SignIn {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]\nstruct GetProfile;\n\nimpl GetProfile {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n",
         )
         .split_whitespace()
         .collect();
@@ -243,7 +254,7 @@ impl GetProfile {
     fn rejects_an_authenticated_user_in_a_middleware() {
         assert!(
             error_for(
-                "use margaret::framework::http::next::Next;\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> ResponseContinuation {}\n}\n"
+                "use margaret::framework::http::next::Next;\nuse margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;\n\nstruct User;\n\n#[singleton]\n#[responds_to_http(method = \"get\", name = \"sign_in\", path = \"/sign-in\", server = \"public\")]\nstruct SignIn;\n\nimpl SignIn {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> ResponseContinuation {}\n}\n"
             )
             .contains("only available in an HTTP responder")
         );
@@ -251,17 +262,26 @@ impl GetProfile {
 
     const COLLIDING_PROVIDER: &str = r#"
 use margaret::framework::http::request::Request;
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 
 struct User;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct Session;
 
 impl Session {
     #[infer_from_request]
-    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 #[singleton]
@@ -279,7 +299,7 @@ impl GetProfile {
         let source: String = source_for(COLLIDING_PROVIDER).split_whitespace().collect();
 
         assert!(source.contains(
-            "letsession_2=std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session().await,});"
+            "letsession_2=std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session().await,routes:routes.clone(),});"
         ));
         assert!(source.contains("letsession_2=session_2.clone();"));
         assert!(source.contains("letsession=request;"));
@@ -361,20 +381,29 @@ impl GetAsset {
 
     const PROVIDER_THAT_ALSO_BINDS: &str = r#"
 use margaret::framework::http::request::Request;
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 
 struct User;
 
 struct Article;
 
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[responds_to_http(method = "get", name = "sign_in", path = "/sign-in", server = "public")]
+struct SignIn;
+
+impl SignIn {
+    #[process]
+    fn respond(&self) -> Response {}
+}
+
+#[singleton]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 #[provides_route_parameter]
 struct Store;
 
 impl Store {
     #[infer_from_request]
-    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 
 impl HttpRouteParameterBinder for Store {
@@ -403,7 +432,7 @@ impl GetArticle {
             .collect();
 
         assert!(source.contains(
-            "letstore=std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store().await,});"
+            "letstore=std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store().await,routes:routes.clone(),});"
         ));
         assert!(source.contains("letstore_2=container.store().await;"));
         assert!(source.contains(
@@ -608,6 +637,34 @@ impl Echo {
             .to_string()
     }
 
+    fn authenticated_users_source(lib_source: &str) -> String {
+        let index = index_for(lib_source);
+        let registries = registries_for(&index, false);
+        let plans = middleware_plans(&index, &registries).expect("the middleware plans are built");
+        let bindings = bindings_for(&index);
+
+        render_http(
+            &index,
+            false,
+            &[],
+            &plans,
+            &bindings,
+            &no_websocket_arguments(),
+            &registries,
+        )
+        .expect("the http source is generated")
+        .into_modules()
+        .into_iter()
+        .find(|module| module.name() == "authenticated_users")
+        .expect("the authenticated_users module is generated")
+        .format()
+        .expect("the module formats")
+        .source()
+        .to_string()
+        .split_whitespace()
+        .collect()
+    }
+
     const VIEWS_INJECTION: &str = r#"
 #[responds_to_http(method = "get", path = "/card", server = "public")]
 struct GetCard;
@@ -774,6 +831,10 @@ impl PostPing { #[process] fn respond(&self) -> Response {} }
 struct PatchArticle;
 impl PatchArticle { #[process] fn respond(&self, #[route_parameter(from = "article")] article: String) -> Response {} }
 
+#[responds_to_http(method = "get", name = "get_asset", path = "/assets/{*asset_path}", server = "public")]
+struct GetAsset;
+impl GetAsset { #[process] fn respond(&self, #[route_parameter(from = "asset_path")] asset_path: String) -> Response {} }
+
 #[responds_to_http(method = "get", path = "/health", server = "internal")]
 struct GetHealth;
 impl GetHealth { #[process] fn respond(&self) -> Response {} }
@@ -802,6 +863,18 @@ impl GetHealth { #[process] fn respond(&self) -> Response {} }
             "margaret::framework::http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/articles/\",),margaret::framework::http::url_segment::UrlSegment::Parameter(margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
         ));
         assert!(!source.contains("Params"));
+    }
+
+    #[test]
+    fn generates_a_catch_all_segment_for_a_wildcard_route() {
+        let source = routes_source_for(ROUTES_FIXTURE);
+
+        assert!(source.contains(
+            "pubfnget_asset(&self,asset_path:String,)->margaret::framework::http::forwardable_route::ForwardableRoute"
+        ));
+        assert!(source.contains(
+            "margaret::framework::http::url_segment::UrlSegment::CatchAll(margaret::framework::http::url_parameter::UrlParameter{name:\"asset_path\",value:asset_path,})"
+        ));
     }
 
     #[test]
@@ -1942,5 +2015,66 @@ impl Configured {
         assert!(source.contains(
             "container.configured(console_argument_0.to_owned(),console_argument_1.to_owned(),console_argument_2.to_owned(),*console_argument_3,*console_argument_4,console_argument_5.clone(),)"
         ));
+    }
+
+    #[test]
+    fn redirects_an_unauthenticated_visitor_to_the_declared_login_route() {
+        let source = authenticated_users_source(
+            "use margaret::framework::http::request::Request;\nuse margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;\n\nstruct User;\n\n#[singleton]\n#[responds_to_http(method = \"get\", name = \"sign_in\", path = \"/sign-in\", server = \"public\")]\nstruct SignIn;\n\nimpl SignIn {\n    #[process]\n    fn respond(&self, request: &Request) -> Response {}\n}\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n",
+        );
+
+        assert!(source.contains(
+            "margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference::LoginRequired=>{margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::LoginPageRedirect(self.routes.public.sign_in.see_other(),)}"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_login_route_that_itself_requires_authentication() {
+        assert!(
+            error_for(
+                "use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;\n\nstruct User;\n\n#[singleton]\n#[responds_to_http(method = \"get\", name = \"sign_in\", path = \"/sign-in\", server = \"public\")]\nstruct SignIn;\n\nimpl SignIn {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: User) -> Response {}\n}\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
+            )
+            .contains("must be reachable without authentication")
+        );
+    }
+
+    #[test]
+    fn rejects_a_login_route_that_is_not_a_responder() {
+        assert!(
+            error_for(
+                "use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;\n\nstruct User;\n\nstruct NotARoute;\n\n#[singleton]\n#[infers_authenticated_user(login_route = NotARoute, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
+            )
+            .contains("is not a #[responds_to_http] responder")
+        );
+    }
+
+    #[test]
+    fn rejects_a_login_route_that_is_not_a_get_route() {
+        assert!(
+            error_for(
+                "use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;\n\nstruct User;\n\n#[singleton]\n#[responds_to_http(method = \"post\", name = \"submit\", path = \"/submit\", server = \"public\")]\nstruct Submit;\n\nimpl Submit {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[singleton]\n#[infers_authenticated_user(login_route = Submit, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
+            )
+            .contains("is not a GET route")
+        );
+    }
+
+    #[test]
+    fn rejects_a_login_route_without_a_name() {
+        assert!(
+            error_for(
+                "use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;\n\nstruct User;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/anon\", server = \"public\")]\nstruct Anon;\n\nimpl Anon {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n\n#[singleton]\n#[infers_authenticated_user(login_route = Anon, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
+            )
+            .contains("a login route must be a named route")
+        );
+    }
+
+    #[test]
+    fn rejects_a_login_route_that_takes_path_parameters() {
+        assert!(
+            error_for(
+                "use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;\n\nstruct User;\n\n#[singleton]\n#[responds_to_http(method = \"get\", name = \"tenant_sign_in\", path = \"/sign-in/{tenant}\", server = \"public\")]\nstruct TenantSignIn;\n\nimpl TenantSignIn {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"tenant\")] tenant: String) -> Response {}\n}\n\n#[singleton]\n#[infers_authenticated_user(login_route = TenantSignIn, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
+            )
+            .contains("a login route must have a parameter-free path")
+        );
     }
 }

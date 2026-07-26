@@ -2060,6 +2060,7 @@ dependencies = [
  "maud",
  "mime",
  "multer",
+ "percent-encoding",
  "rustls",
  "serde",
  "serde_json",

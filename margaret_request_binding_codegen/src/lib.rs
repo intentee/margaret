@@ -1,7 +1,9 @@
 pub mod authenticated_user_application;
+pub mod authenticated_user_login_route;
 pub mod authenticated_user_provider;
 pub mod authenticated_user_providers;
 pub mod authenticated_user_requirement;
+pub mod authenticated_user_wrapper_binding;
 pub mod binding_console_arguments;
 pub mod binding_context;
 pub mod binding_reads_request;
@@ -44,7 +46,9 @@ mod tests {
     use margaret_injection_codegen::process_method::process_method;
     use margaret_route_parameter_codegen::route_path::RoutePath;
 
+    use crate::authenticated_user_login_route::AuthenticatedUserLoginRoute;
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
+    use crate::authenticated_user_wrapper_binding::AuthenticatedUserWrapperBinding;
     use crate::binding_console_arguments::binding_console_arguments;
     use crate::binding_context::BindingContext;
     use crate::binding_registries::BindingRegistries;
@@ -59,9 +63,12 @@ mod tests {
     const PRELUDE: &str = "\
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
-use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference;
 
 struct User;
+
+#[responds_to_http(method = \"get\", name = \"sign_in\", path = \"/sign-in\", server = \"public\")]
+struct SignIn;
 ";
 
     fn index_for(lib_source: &str) -> AttributeIndex {
@@ -90,6 +97,20 @@ struct User;
         registries_with(declaration, ViewsAvailability::Available)
     }
 
+    fn bindings_for(registries: &BindingRegistries) -> Vec<AuthenticatedUserWrapperBinding<'_>> {
+        registries
+            .providers()
+            .into_iter()
+            .map(|provider| AuthenticatedUserWrapperBinding {
+                login_route: AuthenticatedUserLoginRoute {
+                    route: "sign_in".to_string(),
+                    server: "public".to_string(),
+                },
+                provider,
+            })
+            .collect()
+    }
+
     fn rejection_for(declaration: &str) -> String {
         BindingRegistries::collect(
             &index_for(&provider_source(declaration)),
@@ -102,12 +123,12 @@ struct User;
 
     const SESSION_PROVIDER: &str = "\
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, request: &Request) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, request: &Request) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 ";
 
@@ -144,7 +165,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_on_a_non_struct() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nenum Bad {}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nenum Bad {}\n"
             )
             .contains("is only supported on structs")
         );
@@ -154,7 +175,7 @@ impl SessionUserProvider {
     fn rejects_a_repeated_provider_attribute() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n"
             )
             .contains("is repeated on")
         );
@@ -163,16 +184,34 @@ impl SessionUserProvider {
     #[test]
     fn rejects_a_provider_that_is_not_a_singleton() {
         assert!(
-            rejection_for("#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n")
+            rejection_for("#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n")
                 .contains("must also be declared as a #[singleton]")
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_without_a_login_route() {
+        assert!(
+            rejection_for("#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n")
+                .contains("is missing `login_route")
         );
     }
 
     #[test]
     fn rejects_a_provider_without_a_user_model() {
         assert!(
-            rejection_for("#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n")
+            rejection_for("#[singleton]\n#[infers_authenticated_user(login_route = SignIn)]\nstruct Bad;\n")
                 .contains("is missing `user_model")
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_whose_login_route_is_not_a_path() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(login_route = \"SignIn\", user_model = User)]\nstruct Bad;\n"
+            )
+            .contains("is not a path")
         );
     }
 
@@ -180,7 +219,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_whose_user_model_is_not_a_path() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = \"User\")]\nstruct Bad;\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = \"User\")]\nstruct Bad;\n"
             )
             .contains("is not a path")
         );
@@ -190,7 +229,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_whose_user_model_matches_no_struct() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = Ghost)]\nstruct Bad;\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = Ghost)]\nstruct Bad;\n"
             )
             .contains("matches no struct")
         );
@@ -208,7 +247,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_without_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n"
             )
             .contains("no #[infer_from_request] method")
         );
@@ -218,7 +257,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_with_more_than_one_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn first(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n\n    #[infer_from_request]\n    fn second(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn first(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n\n    #[infer_from_request]\n    fn second(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
             )
             .contains("more than one #[infer_from_request] method")
         );
@@ -228,10 +267,10 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_that_does_not_infer_an_outcome() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> User {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> User {}\n}\n"
             )
             .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference"
             )
         );
     }
@@ -240,10 +279,10 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_without_a_return_type() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) {}\n}\n"
             )
             .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference"
             )
         );
     }
@@ -252,10 +291,10 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_that_returns_a_type_that_is_not_a_path() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> (u8, u8) {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> (u8, u8) {}\n}\n"
             )
             .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference"
             )
         );
     }
@@ -264,10 +303,10 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_that_omits_the_result_wrapper() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserInference<User> {}\n}\n"
             )
             .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference"
             )
         );
     }
@@ -276,7 +315,7 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_that_infers_a_borrowed_outcome() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<&AuthenticatedUserOutcome<User>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<&AuthenticatedUserInference<User>> {}\n}\n"
             )
             .contains("but the provider declares the user model 'crate::User'")
         );
@@ -286,7 +325,7 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_whose_outcome_carries_no_user_model() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<'static>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<'static>> {}\n}\n"
             )
             .contains("but the provider declares the user model 'crate::User'")
         );
@@ -296,7 +335,7 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_whose_outcome_omits_its_generics() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference> {}\n}\n"
             )
             .contains("but the provider declares the user model 'crate::User'")
         );
@@ -306,10 +345,10 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_that_wraps_the_outcome_in_option() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Option<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Option<AuthenticatedUserInference<User>> {}\n}\n"
             )
             .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference"
             )
         );
     }
@@ -318,10 +357,10 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_that_wraps_the_outcome_in_a_collection() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Vec<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Vec<AuthenticatedUserInference<User>> {}\n}\n"
             )
             .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference"
             )
         );
     }
@@ -330,10 +369,10 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_that_uses_a_non_anyhow_result() {
         assert!(
             rejection_for(
-                "struct CustomError;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserOutcome<User>, CustomError> {}\n}\n"
+                "struct CustomError;\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> Result<AuthenticatedUserInference<User>, CustomError> {}\n}\n"
             )
             .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference"
             )
         );
     }
@@ -342,10 +381,10 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_that_returns_a_bare_result() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result {}\n}\n"
             )
             .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference"
             )
         );
     }
@@ -354,10 +393,10 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_whose_outcome_is_not_the_authenticated_user_outcome() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<User> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<User> {}\n}\n"
             )
             .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
+                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference"
             )
         );
     }
@@ -365,7 +404,7 @@ impl SessionUserProvider {
     #[test]
     fn orders_the_providers_by_the_struct_that_declares_them() {
         let registries = registries_for(
-            "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct SecondProvider;\n\nimpl SecondProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct FirstProvider;\n\nimpl FirstProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = Admin)]\nstruct SecondProvider;\n\nimpl SecondProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<Admin>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct FirstProvider;\n\nimpl FirstProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n",
         );
         let providers = registries.providers();
 
@@ -385,7 +424,7 @@ impl SessionUserProvider {
     fn rejects_an_inference_method_that_infers_another_user_model() {
         assert!(
             rejection_for(
-                "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {}\n}\n"
+                "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<Admin>> {}\n}\n"
             )
             .contains("but the provider declares the user model 'crate::User'")
         );
@@ -395,7 +434,7 @@ impl SessionUserProvider {
     fn rejects_two_providers_for_the_same_user_model() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct First;\n\nimpl First {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Second;\n\nimpl Second {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct First;\n\nimpl First {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Second;\n\nimpl Second {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
             )
             .contains("has more than one authenticated user provider")
         );
@@ -405,7 +444,7 @@ impl SessionUserProvider {
     fn rejects_the_next_handler_in_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, next: Next) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, next: Next) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
             )
             .contains("only available inside an HTTP middleware")
         );
@@ -415,7 +454,7 @@ impl SessionUserProvider {
     fn rejects_a_route_parameter_in_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
             )
             .contains("has no route path to bind from")
         );
@@ -425,7 +464,7 @@ impl SessionUserProvider {
     fn rejects_an_authenticated_user_in_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[authenticated_user] user: User) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[authenticated_user] user: User) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
             )
             .contains("only available in an HTTP responder")
         );
@@ -435,7 +474,7 @@ impl SessionUserProvider {
     fn rejects_an_unmarked_parameter_in_an_inference_method() {
         assert!(
             rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, flag: bool) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, flag: bool) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
             )
             .contains("must be the current request, a form request")
         );
@@ -573,7 +612,7 @@ impl SessionUserProvider {
     fn rejects_a_provider_that_renders_views_this_crate_does_not_generate() {
         let rejection = BindingRegistries::collect(
             &index_for(&provider_source(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+                "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n",
             )),
             ViewsAvailability::Unavailable,
         )
@@ -586,7 +625,7 @@ impl SessionUserProvider {
 
     const CONSOLE_ARGUMENT_PROVIDER: &str = "\
 #[singleton]
-#[infers_authenticated_user(user_model = User)]
+#[infers_authenticated_user(login_route = SignIn, user_model = User)]
 struct SessionUserProvider;
 
 impl SessionUserProvider {
@@ -594,7 +633,7 @@ impl SessionUserProvider {
     fn create(#[console_argument(from = \"realm\")] realm: String) -> Self {}
 
     #[infer_from_request]
-    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}
 }
 ";
 
@@ -630,27 +669,30 @@ impl SessionUserProvider {
     #[test]
     fn renders_a_wrapper_that_infers_through_the_declared_method() {
         let registries = registries_for(SESSION_PROVIDER);
-        let source: String = render_authenticated_user_wrappers(&registries.providers())
+        let source: String = render_authenticated_user_wrappers(&bindings_for(&registries))
             .to_string()
             .split_whitespace()
             .collect();
 
         assert!(source.contains(
-            "pubstructSessionUserProvider{pubinner:std::sync::Arc<crate::SessionUserProvider>,}"
+            "pubstructSessionUserProvider{pubinner:std::sync::Arc<crate::SessionUserProvider>,pubroutes:std::sync::Arc<super::routes::Routes>,}"
         ));
         assert!(source.contains("typeUser=crate::User;"));
         assert!(source.contains(
             "->::anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>>"
         ));
-        assert!(source.contains("self.inner.infer(request).await"));
+        assert!(source.contains("matchself.inner.infer(request).await?{"));
+        assert!(source.contains(
+            "margaret::framework::identity::authenticated_user_inference::AuthenticatedUserInference::LoginRequired=>{margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::LoginPageRedirect(self.routes.public.sign_in.see_other(),)}"
+        ));
     }
 
     #[test]
     fn renders_a_wrapper_that_carries_the_routes_and_views_it_infers_from() {
         let registries = registries_for(
-            "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, routes: &crate::margaret::routes::Routes, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, routes: &crate::margaret::routes::Routes, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n",
         );
-        let source: String = render_authenticated_user_wrappers(&registries.providers())
+        let source: String = render_authenticated_user_wrappers(&bindings_for(&registries))
             .to_string()
             .split_whitespace()
             .collect();
@@ -661,17 +703,27 @@ impl SessionUserProvider {
     }
 
     #[test]
-    fn renders_a_wrapper_that_treats_a_failed_form_request_as_anonymous() {
+    fn renders_a_wrapper_that_surfaces_a_failed_form_request_as_a_rejection() {
         let registries = registries_for(
-            "struct Cookie;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, #[form_request(from = Cookie)] cookie: Cookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "struct Cookie;\n\n#[singleton]\n#[infers_authenticated_user(login_route = SignIn, user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, #[form_request(from = Cookie)] cookie: Cookie) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n",
         );
-        let source: String = render_authenticated_user_wrappers(&registries.providers())
+        let source: String = render_authenticated_user_wrappers(&bindings_for(&registries))
             .to_string()
             .split_whitespace()
             .collect();
 
         assert!(source.contains(
-            "return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Anonymous,);"
+            "return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Rejected(response),);"
         ));
+    }
+
+    #[test]
+    fn rejects_a_provider_whose_login_route_matches_no_struct() {
+        assert!(
+            rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(login_route = Ghost, user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserInference<User>> {}\n}\n"
+            )
+            .contains("names the login route 'Ghost', which matches no struct")
+        );
     }
 }

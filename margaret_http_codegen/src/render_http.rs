@@ -13,6 +13,7 @@ use crate::http_routes::http_routes;
 use crate::http_server::HttpServer;
 use crate::render::render;
 use crate::render::server_console_arguments;
+use crate::render_authenticated_users::render_authenticated_users;
 use crate::render_forwarders::render_forwarders;
 use crate::render_routes::render_routes;
 use crate::server_transport_policy::ServerTransportPolicy;
@@ -63,6 +64,7 @@ pub fn render_http(
 
     modules.extend(render_routes(&table, &servers));
     modules.extend(render_forwarders(&table, &servers));
+    modules.extend(render_authenticated_users(&table, registries)?);
 
     Ok(HttpArtifacts::new(modules, servers, server_arguments))
 }

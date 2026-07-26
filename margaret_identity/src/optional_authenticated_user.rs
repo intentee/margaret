@@ -12,6 +12,9 @@ pub fn optional_authenticated_user<User>(
         Ok(AuthenticatedUserOutcome::LoginPageRedirect(redirect)) => {
             Err(ResponseContinuation::from(redirect))
         }
+        Ok(AuthenticatedUserOutcome::Rejected(response)) => {
+            Err(ResponseContinuation::from(response))
+        }
         Err(error) => Err(respond_with_identity_error(error)),
     }
 }
@@ -21,6 +24,7 @@ mod tests {
     use std::sync::Arc;
 
     use margaret_http::forwardable_route::ForwardableRoute;
+    use margaret_http::response::Response;
     use margaret_http::response_continuation::ResponseContinuation;
     use margaret_http::url_segment::UrlSegment;
 
@@ -64,6 +68,17 @@ mod tests {
         assert_eq!(
             rejection_status(Ok(AuthenticatedUserOutcome::LoginPageRedirect(sign_in_redirect))),
             None
+        );
+    }
+
+    #[test]
+    fn surfaces_a_rejected_extraction_response() {
+        assert_eq!(
+            rejection_status(Ok(AuthenticatedUserOutcome::Rejected(Response::text(
+                403,
+                "the peer identity is missing"
+            )))),
+            Some(403)
         );
     }
 

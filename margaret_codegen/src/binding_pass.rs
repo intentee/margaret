@@ -1,6 +1,4 @@
-use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
-use margaret_request_binding_codegen::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
 use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 
 use crate::build_context::BuildContext;
@@ -13,16 +11,6 @@ pub(crate) fn binding_pass(context: &mut BuildContext) -> Result<BindingRegistri
     } else {
         ViewsAvailability::Unavailable
     };
-    let registries = BindingRegistries::collect(context.index(), views)?;
 
-    if capabilities.has_authenticated_users
-        && (capabilities.has_http || capabilities.has_websockets)
-    {
-        context.extend_modules(vec![GeneratedModuleTokens::new(
-            "authenticated_users",
-            render_authenticated_user_wrappers(&registries.providers()),
-        )]);
-    }
-
-    Ok(registries)
+    BindingRegistries::collect(context.index(), views).map_err(CodegenError::from)
 }

@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
 use crate::named_route::NamedRoute;
+use crate::responder_route::ResponderRoute;
 use crate::route_group::RouteGroup;
 use crate::server_route_group::ServerRouteGroup;
 
@@ -17,6 +19,21 @@ impl HttpRouteTable {
         Self {
             servers: BTreeMap::new(),
         }
+    }
+
+    pub(crate) fn find_by_responder(&self, responder: &CanonicalPath) -> Option<ResponderRoute<'_>> {
+        self.servers
+            .values()
+            .flat_map(ServerRouteGroup::route_groups)
+            .find_map(|group| {
+                group
+                    .method_routes()
+                    .find(|route| &route.responder_path == responder)
+                    .map(|route| ResponderRoute {
+                        path: group.path(),
+                        route,
+                    })
+            })
     }
 
     pub(crate) fn insert(
