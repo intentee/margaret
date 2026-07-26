@@ -12,49 +12,56 @@ use crate::accessor_error_path::accessor_error_path;
 use crate::console_closures::ConsoleClosures;
 use crate::console_weave_ledger::ConsoleWeaveLedger;
 use crate::construction_error_path::construction_error_path;
+use crate::construction_slot_path::construction_slot_path;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
 use crate::field_ident::field_ident;
+use crate::ordered_providers::ordered_providers;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provides_endpoint_path::provides_endpoint_path;
 
 fn field_declaration(provider: &Provider, fallible: bool) -> TokenStream {
     let name = field_ident(provider);
-    let cell_type = cell_type(provider, fallible);
-
-    quote! { #name: tokio::sync::OnceCell<#cell_type> }
-}
-
-fn cell_type(provider: &Provider, fallible: bool) -> TokenStream {
-    let field_type = field_type(provider);
 
     if fallible {
-        let error = accessor_error_path();
+        let slot = construction_slot_path();
+        let constructed = constructed_type(provider);
 
-        quote! { Result<#field_type, #error> }
+        quote! { #name: #slot<#constructed> }
     } else {
-        field_type
+        let field_type = field_type(provider);
+
+        quote! { #name: tokio::sync::OnceCell<#field_type> }
     }
 }
 
-fn field_type(provider: &Provider) -> TokenStream {
-    match &provider.provided {
-        ProvidedType::Concrete(path) => {
-            let concrete = path_tokens(path);
+fn accessor_return_type(provider: &Provider) -> TokenStream {
+    let field_type = field_type(provider);
+    let error = accessor_error_path();
 
-            quote! { std::sync::Arc<#concrete> }
-        }
+    quote! { Result<#field_type, #error> }
+}
+
+fn field_type(provider: &Provider) -> TokenStream {
+    let constructed = constructed_type(provider);
+
+    quote! { std::sync::Arc<#constructed> }
+}
+
+fn constructed_type(provider: &Provider) -> TokenStream {
+    match &provider.provided {
+        ProvidedType::Concrete(path) => path_tokens(path),
         ProvidedType::Endpoint(_) => {
             let interface = path_tokens(&provides_endpoint_path());
 
-            quote! { std::sync::Arc<dyn #interface> }
+            quote! { dyn #interface }
         }
         ProvidedType::UriSelected(trait_path) => {
             let interface = path_tokens(trait_path);
 
-            quote! { std::sync::Arc<dyn #interface> }
+            quote! { dyn #interface }
         }
     }
 }
@@ -80,21 +87,18 @@ fn accessor(
     let construction = construction(provider, plan, closures);
 
     if plan.fallibility.of(key) {
-        let cell_type = cell_type(provider, true);
+        let accessor_return_type = accessor_return_type(provider);
         let singleton = provider.concrete_path.to_string();
 
         quote! {
-            pub async fn #name(&self #(, #parameters)*) -> #cell_type {
-                margaret::framework::container_error::construct_once::construct_once(
-                    &self.#name,
-                    #singleton,
-                    async move {
+            pub async fn #name(&self #(, #parameters)*) -> #accessor_return_type {
+                self.#name
+                    .construct_once(#singleton, async move {
                         let provided: #field_type = #construction;
 
                         Ok(provided)
-                    },
-                )
-                .await
+                    })
+                    .await
             }
         }
     } else {
@@ -268,13 +272,7 @@ fn dependency_expression(
 }
 
 pub(crate) fn render(plan: &ContainerPlan, closures: &ConsoleClosures) -> TokenStream {
-    let mut ordered: Vec<(&CanonicalPath, &Provider)> = plan
-        .providers
-        .iter()
-        .chain(plan.constructions.iter())
-        .collect();
-
-    ordered.sort_by(|(_, first), (_, second)| first.field_name.cmp(&second.field_name));
+    let ordered = ordered_providers(plan);
 
     let fields = ordered
         .iter()

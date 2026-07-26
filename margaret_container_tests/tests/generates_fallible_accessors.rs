@@ -25,12 +25,16 @@ fn renders_a_fallible_constructor_accessor_returning_a_result() {
 }
 
 #[test]
-fn caches_a_fallible_construction_through_construct_once_not_get_or_try_init() {
+fn caches_a_fallible_construction_through_a_construction_slot_not_get_or_try_init() {
     let source = fixture("fallible_constructor");
 
     assert!(source.contains(
-        "margaret::framework::container_error::construct_once::construct_once(&self.loader,\"crate::Loader\",asyncmove"
+        "loader:margaret::framework::container_error::construction_slot::ConstructionSlot<crate::Loader,>"
     ));
+    assert!(source.contains(
+        "loader:margaret::framework::container_error::construction_slot::ConstructionSlot::default()"
+    ));
+    assert!(source.contains("self.loader.construct_once(\"crate::Loader\",asyncmove"));
     assert!(!source.contains("get_or_try_init"));
 }
 
