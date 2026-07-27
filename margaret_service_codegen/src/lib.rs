@@ -1,9 +1,8 @@
 pub mod framework_service;
 pub mod framework_service_kind;
-pub mod has_services;
 pub mod render_services;
-pub mod serve_console_arguments;
 pub mod service_codegen_error;
+pub mod service_plan;
 
 mod service_kind;
 mod service_unit;
@@ -14,7 +13,6 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::fs;
 
     use tempfile::TempDir;
@@ -22,9 +20,10 @@ mod tests {
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::attribute_selector::AttributeSelector;
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes::framework_attribute::FrameworkAttribute;
+    use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_console_argument_codegen::scan::scan;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
@@ -33,9 +32,8 @@ mod tests {
 
     use crate::framework_service::FrameworkService;
     use crate::framework_service_kind::FrameworkServiceKind;
-    use crate::has_services::has_services;
     use crate::render_services::render_services;
-    use crate::serve_console_arguments::ServeConsoleArguments;
+    use crate::service_plan::ServicePlan;
 
     fn crate_with(lib_source: &str) -> TempDir {
         let directory = tempdir().expect("a temporary crate directory is created");
@@ -67,13 +65,13 @@ mod tests {
     fn serve_roots(index: &AttributeIndex) -> Vec<CanonicalPath> {
         let mut roots = Vec::new();
 
-        for marker in [
-            "service",
-            "scheduled_with_tick_timer",
-            "responds_to_http",
-            "renders_view",
+        for framework_attribute in [
+            FrameworkAttribute::Service,
+            FrameworkAttribute::ScheduledWithTickTimer,
+            FrameworkAttribute::RespondsToHttp,
+            FrameworkAttribute::RendersView,
         ] {
-            for matched in index.select(&AttributeSelector::from_marker(marker)) {
+            for matched in index.select_framework_attribute(framework_attribute) {
                 roots.push(matched.item().canonical_path().clone());
             }
         }
@@ -84,26 +82,19 @@ mod tests {
     fn render_source(lib_source: &str, servers: &[HttpServer], has_views: bool) -> String {
         let index = index_for(lib_source);
         let bindings = bindings(&index);
-        let serve_arguments = bindings.serve_arguments(&serve_roots(&index), &[]);
+        let serve_arguments = bindings
+            .serve_arguments(&serve_roots(&index), &[])
+            .expect("the rendered roots have planned console arguments");
 
-        render_services(
-            &index,
-            servers,
-            has_views,
-            &bindings,
-            ServeConsoleArguments {
-                serve_arguments: &serve_arguments,
-                server_console_arguments: &BTreeMap::new(),
-                views_console_arguments: &[],
-            },
-            &[],
-        )
-        .expect("the services source is generated")
-        .format()
-        .expect("the module formats")
-        .source()
-        .split_whitespace()
-        .collect()
+        let plan = ServicePlan::build(&index, &[], &bindings, &serve_arguments)
+            .expect("the service construction is planned");
+
+        render_services(&plan, servers, has_views, &bindings)
+            .format()
+            .expect("the module formats")
+            .source()
+            .split_whitespace()
+            .collect()
     }
 
     fn rendered(lib_source: &str, servers: &[HttpServer]) -> String {
@@ -117,20 +108,11 @@ mod tests {
     fn error_for(lib_source: &str) -> String {
         let placeholder = bindings(&index_for("#[singleton]\nstruct Placeholder;\n"));
 
-        render_services(
-            &index_for(lib_source),
-            &[],
-            false,
-            &placeholder,
-            ServeConsoleArguments {
-                serve_arguments: &[],
-                server_console_arguments: &BTreeMap::new(),
-                views_console_arguments: &[],
-            },
-            &[],
-        )
-        .expect_err("the services source fails to generate")
-        .to_string()
+        let index = index_for(lib_source);
+        ServicePlan::build(&index, &[], &placeholder, &[])
+            .err()
+            .expect("the services source fails to generate")
+            .to_string()
     }
 
     fn public() -> Vec<HttpServer> {
@@ -141,7 +123,7 @@ mod tests {
     }
 
     const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
-    const STATELESS_RESPONDER: &str = "#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
+    const STATELESS_RESPONDER: &str = "#[singleton]\n#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
     const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n";
     const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
 
@@ -149,20 +131,15 @@ mod tests {
     fn invokes_server_and_views_helpers_directly_when_the_container_has_no_accessors() {
         let source = rendered_with_views(STATELESS_RESPONDER, &public());
 
-        assert!(source.contains(
-            "routes:super::http::server_public::server_public(container,&routes,&views).await,"
-        ));
+        assert!(
+            source.contains(
+                "routes:super::http::server_public::server_public(container,&routes,&views"
+            )
+        );
         assert!(source.contains(
             "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
         ));
         assert!(source.contains("super::container::build::serve("));
-    }
-
-    #[test]
-    fn reports_units_present() {
-        assert!(has_services(&index_for(SERVICE)));
-        assert!(has_services(&index_for(TICKER)));
-        assert!(!has_services(&index_for("#[singleton]\nstruct S;\n")));
     }
 
     #[test]
@@ -295,24 +272,15 @@ impl Flusher {
                 type_name: "JwksClient".to_string(),
             },
         ];
-        let source: String = render_services(
-            &index,
-            &public(),
-            false,
-            &bindings(&index),
-            ServeConsoleArguments {
-                serve_arguments: &[],
-                server_console_arguments: &BTreeMap::new(),
-                views_console_arguments: &[],
-            },
-            &framework_services,
-        )
-        .expect("the services source is generated")
-        .format()
-        .expect("the module formats")
-        .source()
-        .split_whitespace()
-        .collect();
+        let container_bindings = bindings(&index);
+        let plan = ServicePlan::build(&index, &framework_services, &container_bindings, &[])
+            .expect("the framework services are planned");
+        let source: String = render_services(&plan, &public(), false, &container_bindings)
+            .format()
+            .expect("the module formats")
+            .source()
+            .split_whitespace()
+            .collect();
 
         assert!(source.contains("impltrzcina::TickerforJwksRoller"));
         assert!(source.contains(
@@ -398,24 +366,29 @@ impl Flusher {
     fn builds_one_mutable_manager_for_a_units_only_application() {
         let source = rendered(SERVICE, &[]);
 
-        assert!(source.contains("letmutmanager=trzcina::ServiceManager::default();"));
+        assert_eq!(
+            source
+                .matches("letmutmanager=trzcina::ServiceManager::default();")
+                .count(),
+            1
+        );
         assert!(source.contains("manager.register_service(Pump{"));
         assert!(source.contains("inner:container.pump()"));
         assert!(!source.contains("serve_application"));
     }
 
     #[test]
-    fn builds_views_once_and_weaves_them_into_each_server() {
-        let source = rendered_with_views("#[singleton]\nstruct Store;\n", &public());
+    fn rejects_a_serve_input_absent_from_the_container_plan() {
+        let index = index_for("");
+        let bindings = bindings(&index);
+        let serve_arguments = [ConsoleArgument::Flag {
+            name: "missing".to_string(),
+        }];
+        let error = ServicePlan::build(&index, &[], &bindings, &serve_arguments)
+            .err()
+            .expect("every serve input must belong to the container plan");
 
-        assert!(source.contains(
-            "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
-        ));
-        assert!(
-            source.contains(
-                "super::http::server_public::server_public(container,&routes,&views).await"
-            )
-        );
+        assert!(error.to_string().contains("missing"));
     }
 
     #[test]

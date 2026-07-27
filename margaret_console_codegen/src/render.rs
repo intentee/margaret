@@ -63,16 +63,15 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
     if command.takes_token {
         quote! {
             Some((#name, #matches_binding)) => {
-                let cancellation_token = match margaret::framework::service::install::install() {
-                    Ok(cancellation_token) => cancellation_token,
-                    Err(error) => {
-                        return margaret::framework::console::report_failure::report_failure(error);
-                    }
-                };
-
-                margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
-                    #accessor_access.run(cancellation_token).await,
+                margaret::framework::service::dispatch_serve::dispatch_serve(
+                    margaret::framework::service::install::install,
+                    |cancellation_token| async move {
+                        margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
+                            #accessor_access.run(cancellation_token).await,
+                        )
+                    },
                 )
+                .await
             }
         }
     } else {

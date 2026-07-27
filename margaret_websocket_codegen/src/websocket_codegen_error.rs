@@ -1,11 +1,18 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_container::container_error::ContainerError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 
 #[derive(Debug, Error)]
 pub enum WebSocketCodegenError {
+    #[error(transparent)]
+    Container {
+        #[from]
+        source: ContainerError,
+    },
+
     #[error("failed to read a websocket attribute: {source}")]
     Index {
         #[from]

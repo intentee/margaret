@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use quote::format_ident;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
@@ -23,11 +23,10 @@ pub(crate) fn http_routes(
     middleware_plans: &[MiddlewarePlan],
     registries: &BindingRegistries,
 ) -> Result<HttpRouteTable, HttpCodegenError> {
-    let selector = AttributeSelector::from_marker("responds_to_http");
     let mut table = HttpRouteTable::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
 
-    for matched in index.select(&selector) {
+    for matched in index.select_framework_attribute(FrameworkAttribute::RespondsToHttp) {
         let item = matched.item();
 
         let Some(identifier) = index.struct_identifier(item.canonical_path()) else {

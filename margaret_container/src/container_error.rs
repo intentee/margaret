@@ -102,4 +102,13 @@ pub enum ContainerError {
 
     #[error("dependency cycle detected: {path}")]
     DependencyCycle { path: String },
+
+    #[error("the container plan does not contain provider '{path}'")]
+    MissingPlannedProvider { path: String },
+
+    #[error("the container plan does not contain the console argument closure for '{path}'")]
+    MissingConsoleClosure { path: String },
+
+    #[error("the container plan does not contain console argument slot '{key}'")]
+    MissingConsoleSlot { key: String },
 }

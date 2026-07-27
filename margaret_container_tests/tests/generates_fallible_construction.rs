@@ -18,19 +18,9 @@ fn fixture(name: &str) -> String {
 fn renders_a_fallible_root_builder_returning_a_result() {
     let source = fixture("fallible_constructor");
 
-    assert!(source.contains("pubasyncfnconstruct_loader("));
+    assert!(source.contains("pub(crate)fnconstruct_loader("));
     assert!(source.contains("::std::sync::Arc<crate::Loader>"));
     assert!(source.contains("margaret::framework::construction_error::ConstructionError"));
-}
-
-#[test]
-fn generates_no_runtime_construction_cache_or_guard() {
-    let source = fixture("fallible_constructor");
-
-    assert!(!source.contains("ConstructionSlot"));
-    assert!(!source.contains("OnceCell"));
-    assert!(!source.contains("construct_once"));
-    assert!(!source.contains("get_or_try_init"));
 }
 
 #[test]
@@ -47,7 +37,7 @@ fn wraps_a_fallible_constructor_through_the_framework_error_adapter() {
 fn propagates_fallibility_to_an_explicitly_constructed_dependent() {
     let source = fixture("fallible_constructor");
 
-    assert!(source.contains("pubasyncfnconstruct_consumer("));
+    assert!(source.contains("pub(crate)fnconstruct_consumer("));
     assert!(source.contains("::std::sync::Arc<crate::Consumer>"));
     assert!(source.contains("crate::Consumer::new("));
     assert!(source.contains("::std::sync::Arc::clone(&loader)"));
@@ -58,7 +48,7 @@ fn propagates_fallibility_to_an_explicitly_constructed_dependent() {
 fn renders_a_fallible_service_construction_that_depends_on_a_fallible_singleton() {
     let source = fixture("fallible_service");
 
-    assert!(source.contains("pubasyncfnconstruct_worker("));
+    assert!(source.contains("pub(crate)fnconstruct_worker("));
     assert!(source.contains("::std::sync::Arc<crate::Worker>"));
     assert!(source.contains(
         "margaret::framework::construction_error::ConstructionError::wrap(\"crate::Worker\""
@@ -72,7 +62,5 @@ fn constructs_a_fieldless_singleton_without_wrapping() {
     let source = fixture("fieldless");
 
     assert!(source.contains("crate::UnitMarker"));
-    assert!(!source.contains("construct_once"));
-    assert!(!source.contains("get_or_try_init"));
     assert!(!source.contains("::wrap("));
 }

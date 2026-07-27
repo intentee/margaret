@@ -21,27 +21,27 @@ use crate::canonical_path::CanonicalPath;
 use crate::field_identifier::FieldIdentifier;
 use crate::flatten_use_tree::flatten_use_tree;
 use crate::indexed_associated_type::IndexedAssociatedType;
-use crate::indexed_field::IndexedField;
-use crate::indexed_item::IndexedItem;
-use crate::indexed_method::IndexedMethod;
 use crate::indexed_trait_impl::IndexedTraitImpl;
 use crate::indexed_variant::IndexedVariant;
 use crate::item_kind::ItemKind;
 use crate::module_imports::ModuleImports;
 use crate::resolve_type::resolve_type;
+use crate::scanned_field::ScannedField;
+use crate::scanned_item::ScannedItem;
+use crate::scanned_method::ScannedMethod;
 use crate::struct_shape::StructShape;
 use crate::walk_output::WalkOutput;
 
 struct Recordable<'item> {
     attributes: &'item [Attribute],
-    fields: Vec<IndexedField>,
+    fields: Vec<ScannedField>,
     identifier: &'item Ident,
     kind: ItemKind,
     variants: Vec<IndexedVariant>,
 }
 
 enum PendingMemberKind {
-    Method(IndexedMethod),
+    Method(ScannedMethod),
     TraitImpl {
         associated_types: Vec<IndexedAssociatedType>,
         trait_path: syn::Path,
@@ -71,7 +71,7 @@ fn member_path(module_path: &[String], identifier: &Ident) -> String {
     segments.join("::")
 }
 
-fn index_fields(fields: &Fields) -> Vec<IndexedField> {
+fn scan_fields(fields: &Fields) -> Vec<ScannedField> {
     fields
         .iter()
         .enumerate()
@@ -81,7 +81,7 @@ fn index_fields(fields: &Fields) -> Vec<IndexedField> {
                 None => FieldIdentifier::Positional(position),
             };
 
-            IndexedField::new(identifier, field.ty.clone(), field.attrs.clone())
+            ScannedField::new(identifier, field.ty.clone(), field.attrs.clone())
         })
         .collect()
 }
@@ -141,7 +141,7 @@ fn resolve_module_file(directory: &Path, identifier: &Ident) -> Result<PathBuf, 
 pub(crate) struct ModuleWalker {
     excluded_root_modules: BTreeSet<String>,
     imports: HashMap<CanonicalPath, ModuleImports>,
-    items: Vec<IndexedItem>,
+    items: Vec<ScannedItem>,
     pending_members: Vec<PendingMember>,
     seen_paths: HashSet<CanonicalPath>,
 }
@@ -221,9 +221,33 @@ impl ModuleWalker {
 
         items.sort_by(|left, right| left.canonical_path().cmp(right.canonical_path()));
 
-        for item in &mut items {
-            item.sort_members();
-        }
+        let items = items
+            .into_iter()
+            .map(|item| {
+                item.resolve(|module_path, path| {
+                    let module = CanonicalPath::new(module_path.to_vec());
+                    let module_imports = imports.get(&module).unwrap_or(&empty_imports);
+
+                    resolve_type(
+                        &Type::Path(syn::TypePath {
+                            qself: None,
+                            path: path.clone(),
+                        }),
+                        module_path,
+                        module_imports,
+                        &item_paths,
+                    )
+                    .unwrap_or_else(|| {
+                        CanonicalPath::new(
+                            path.segments
+                                .iter()
+                                .map(|segment| segment.ident.to_string())
+                                .collect(),
+                        )
+                    })
+                })
+            })
+            .collect();
 
         WalkOutput { imports, items }
     }
@@ -252,7 +276,7 @@ impl ModuleWalker {
         }
 
         self.seen_paths.insert(canonical_path.clone());
-        self.items.push(IndexedItem::new(
+        self.items.push(ScannedItem::new(
             kind,
             identifier.to_string(),
             canonical_path,
@@ -320,10 +344,11 @@ impl ModuleWalker {
         for impl_item in &item_impl.items {
             if let ImplItem::Fn(method) = impl_item {
                 self.pending_members.push(PendingMember {
-                    kind: PendingMemberKind::Method(IndexedMethod::new(
+                    kind: PendingMemberKind::Method(ScannedMethod::new(
                         method.sig.ident.to_string(),
                         method.attrs.clone(),
                         method.sig.clone(),
+                        module_path.to_vec(),
                     )),
                     module_path: module_path.to_vec(),
                     self_type: (*item_impl.self_ty).clone(),
@@ -342,7 +367,7 @@ impl ModuleWalker {
         let recordable = match item {
             Item::Struct(item_struct) => Some(Recordable {
                 attributes: &item_struct.attrs,
-                fields: index_fields(&item_struct.fields),
+                fields: scan_fields(&item_struct.fields),
                 identifier: &item_struct.ident,
                 kind: ItemKind::Struct(StructShape::from(&item_struct.fields)),
                 variants: Vec::new(),

@@ -8,15 +8,15 @@ use quote::quote;
 
 use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_identifier::FieldIdentifier;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_attributes::indexed_field::IndexedField;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
-use margaret_attributes::select_matching_attributes::select_matching_attributes;
-use margaret_attributes::select_unique_attribute::select_unique_attribute;
+use margaret_attributes::select_framework_attributes::select_framework_attributes;
+use margaret_attributes::select_unique_framework_attribute::select_unique_framework_attribute;
 use margaret_schema_identifier_naming::index_name::index_name;
 use margaret_schema_identifier_naming::primary_key_index_name::primary_key_index_name;
 use margaret_schema_identifier_naming::schema_identifier::schema_identifier;
@@ -395,15 +395,11 @@ fn collect_models(
     targets: &mut HashMap<CanonicalPath, ForeignKeyTarget>,
     seen_table_names: &mut HashMap<String, String>,
 ) -> Result<Vec<CollectedModel>, ModelCodegenError> {
-    let selector = AttributeSelector::from_marker("model");
-    let column_selector = AttributeSelector::from_marker("column");
-    let foreign_key_selector = AttributeSelector::from_marker("foreign_key");
-    let index_selector = AttributeSelector::from_marker("index");
     let mut collected: Vec<CollectedModel> = Vec::new();
     let mut seen_models: HashSet<String> = HashSet::new();
     let mut validated_enums: HashSet<CanonicalPath> = HashSet::new();
 
-    for matched in attribute_index.select(&selector) {
+    for matched in attribute_index.select_framework_attribute(FrameworkAttribute::Model) {
         let item = matched.item();
         let model = item.canonical_path().to_string();
 
@@ -432,13 +428,18 @@ fn collect_models(
         let mut seen_columns: HashSet<String> = HashSet::new();
 
         for (position, field) in item.fields().iter().enumerate() {
-            let column_attribute =
-                select_unique_attribute(field.attributes(), &column_selector, || model.clone())?;
-            let foreign_key_attribute =
-                select_unique_attribute(field.attributes(), &foreign_key_selector, || {
-                    model.clone()
-                })?;
-            let index_attributes = select_matching_attributes(field.attributes(), &index_selector);
+            let column_attribute = select_unique_framework_attribute(
+                field.attributes(),
+                FrameworkAttribute::Column,
+                || model.clone(),
+            )?;
+            let foreign_key_attribute = select_unique_framework_attribute(
+                field.attributes(),
+                FrameworkAttribute::ForeignKey,
+                || model.clone(),
+            )?;
+            let index_attributes =
+                select_framework_attributes(field.attributes(), FrameworkAttribute::Index);
 
             if !index_attributes.is_empty() && column_attribute.is_none() {
                 return Err(ModelCodegenError::IndexRequiresColumn {

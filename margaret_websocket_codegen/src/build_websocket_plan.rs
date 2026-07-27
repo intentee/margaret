@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -9,11 +10,11 @@ use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 
 use crate::message_kind::MessageKind;
 use crate::session_handler_plan::SessionHandlerPlan;
+use crate::session_plan::SessionPlan;
 use crate::websocket_codegen_error::WebSocketCodegenError;
 use crate::websocket_handlers::websocket_handlers;
 use crate::websocket_message::WebSocketMessage;
 use crate::websocket_messages::websocket_messages;
-use crate::websocket_plan::WebSocketPlan;
 use crate::websocket_sessions::websocket_sessions;
 
 fn reject_duplicate_response_methods(
@@ -43,7 +44,7 @@ pub(crate) fn build_websocket_plan(
     bindings: &ContainerBindings,
     middleware_plans: &[MiddlewarePlan],
     registries: &BindingRegistries,
-) -> Result<WebSocketPlan, WebSocketCodegenError> {
+) -> Result<(Vec<WebSocketMessage>, Vec<SessionPlan>), WebSocketCodegenError> {
     let messages = websocket_messages(index)?;
 
     reject_duplicate_response_methods(&messages)?;
@@ -54,20 +55,22 @@ pub(crate) fn build_websocket_plan(
         .iter()
         .map(|message| (&message.path, message))
         .collect();
-    let session_by_path: HashMap<CanonicalPath, usize> = sessions
-        .iter()
-        .enumerate()
-        .map(|(position, session)| (session.session_path.clone(), position))
-        .collect();
     let mut handled_messages: HashSet<&CanonicalPath> = HashSet::new();
-    let mut session_plans: Vec<SessionHandlerPlan> =
-        sessions.into_iter().map(SessionHandlerPlan::new).collect();
+    let mut session_plans: BTreeMap<CanonicalPath, SessionHandlerPlan> = sessions
+        .into_iter()
+        .map(|session| {
+            (
+                session.session_path.clone(),
+                SessionHandlerPlan::new(session),
+            )
+        })
+        .collect();
 
     for handler in &handlers {
-        let Some(session_position) = handler
+        let Some(session_plan) = handler
             .session_path
             .as_ref()
-            .and_then(|path| session_by_path.get(path))
+            .and_then(|path| session_plans.get_mut(path))
         else {
             return Err(WebSocketCodegenError::HandlerSessionNotASession {
                 handler: handler.handler_path.to_string(),
@@ -83,7 +86,7 @@ pub(crate) fn build_websocket_plan(
             });
         };
 
-        session_plans[*session_position].bind(handler, message)?;
+        session_plan.bind(handler, message)?;
         handled_messages.insert(&message.path);
     }
 
@@ -100,11 +103,11 @@ pub(crate) fn build_websocket_plan(
         }
     }
 
-    Ok(WebSocketPlan {
+    Ok((
         messages,
-        sessions: session_plans
-            .into_iter()
+        session_plans
+            .into_values()
             .map(SessionHandlerPlan::finish)
             .collect(),
-    })
+    ))
 }

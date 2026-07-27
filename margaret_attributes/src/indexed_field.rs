@@ -1,5 +1,7 @@
-use syn::Attribute;
 use syn::Type;
+
+#[cfg(test)]
+use syn::Attribute;
 
 use crate::field_identifier::FieldIdentifier;
 use crate::indexed_attribute::IndexedAttribute;
@@ -11,9 +13,22 @@ pub struct IndexedField {
 }
 
 impl IndexedField {
+    #[cfg(test)]
     pub(crate) fn new(identifier: FieldIdentifier, ty: Type, attributes: Vec<Attribute>) -> Self {
         Self {
             attributes: attributes.into_iter().map(IndexedAttribute::new).collect(),
+            identifier,
+            ty,
+        }
+    }
+
+    pub(crate) fn from_parts(
+        identifier: FieldIdentifier,
+        ty: Type,
+        attributes: Vec<IndexedAttribute>,
+    ) -> Self {
+        Self {
+            attributes,
             identifier,
             ty,
         }

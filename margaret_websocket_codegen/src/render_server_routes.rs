@@ -8,22 +8,23 @@ use margaret_middleware_codegen::middleware_vec_tokens::middleware_vec_tokens;
 
 use crate::session_console_arguments::session_console_arguments;
 use crate::session_plan::SessionPlan;
+use crate::websocket_codegen_error::WebSocketCodegenError;
 
 pub(crate) fn server_console_arguments(
     sessions: &[&SessionPlan],
     bindings: &ContainerBindings,
-) -> Vec<ConsoleArgument> {
+) -> Result<Vec<ConsoleArgument>, WebSocketCodegenError> {
     let mut collected: Vec<ConsoleArgument> = Vec::new();
 
     for session_plan in sessions {
-        collected.extend(session_console_arguments(session_plan, bindings));
+        collected.extend(session_console_arguments(session_plan, bindings)?);
 
         for layer in &session_plan.session.layers {
-            collected.extend_from_slice(bindings.console_arguments(&layer.concrete));
+            collected.extend_from_slice(bindings.console_arguments(&layer.concrete)?);
         }
     }
 
-    bindings.console_union(&collected)
+    bindings.console_union(&collected).map_err(Into::into)
 }
 
 pub(crate) fn render_server_routes(

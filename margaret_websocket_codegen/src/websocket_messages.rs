@@ -1,5 +1,5 @@
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 
 use crate::message_kind::MessageKind;
 use crate::websocket_codegen_error::WebSocketCodegenError;
@@ -8,10 +8,9 @@ use crate::websocket_message::WebSocketMessage;
 pub(crate) fn websocket_messages(
     index: &AttributeIndex,
 ) -> Result<Vec<WebSocketMessage>, WebSocketCodegenError> {
-    let selector = AttributeSelector::from_marker("websocket_message");
     let mut messages = Vec::new();
 
-    for matched in index.select(&selector) {
+    for matched in index.select_framework_attribute(FrameworkAttribute::WebsocketMessage) {
         let item = matched.item();
         let message = item.canonical_path().to_string();
 

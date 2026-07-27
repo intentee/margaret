@@ -1,6 +1,6 @@
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_trait_impl::IndexedTraitImpl;
 
 use crate::discovered_handler::DiscoveredHandler;
@@ -59,7 +59,6 @@ fn associated(
 pub(crate) fn websocket_handlers(
     index: &AttributeIndex,
 ) -> Result<Vec<DiscoveredHandler>, WebSocketCodegenError> {
-    let singleton_selector = AttributeSelector::from_marker("singleton");
     let mut handlers = Vec::new();
 
     for item in index.items() {
@@ -69,7 +68,7 @@ pub(crate) fn websocket_handlers(
             };
             let handler = item.canonical_path().to_string();
 
-            if !item.has_attribute(&singleton_selector) {
+            if !item.has_framework_attribute(FrameworkAttribute::Singleton) {
                 return Err(WebSocketCodegenError::HandlerNotSingleton { handler });
             }
 

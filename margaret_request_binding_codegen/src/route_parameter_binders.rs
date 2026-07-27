@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_container::is_singleton::is_singleton;
 
@@ -24,15 +24,10 @@ fn associated_model(index: &AttributeIndex, item: &IndexedItem) -> Option<Canoni
 pub fn route_parameter_binders(
     index: &AttributeIndex,
 ) -> Result<HashMap<CanonicalPath, RouteParameterBinder>, RequestBindingError> {
-    let selector = AttributeSelector::from_marker("provides_route_parameter");
     let mut registry: HashMap<CanonicalPath, RouteParameterBinder> = HashMap::new();
 
     for item in index.items() {
-        if !item
-            .attributes()
-            .iter()
-            .any(|attribute| selector.matches(attribute.path()))
-        {
+        if !item.has_framework_attribute(FrameworkAttribute::ProvidesRouteParameter) {
             continue;
         }
 

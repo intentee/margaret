@@ -1,7 +1,7 @@
-pub mod has_websocket_sessions;
 pub mod render_websocket;
 pub mod websocket_artifacts;
 pub mod websocket_codegen_error;
+pub mod websocket_plan;
 
 mod build_for_session_method;
 mod build_websocket_plan;
@@ -20,7 +20,6 @@ mod session_plan;
 mod websocket_handlers;
 mod websocket_message;
 mod websocket_messages;
-mod websocket_plan;
 mod websocket_session;
 mod websocket_sessions;
 
@@ -35,14 +34,32 @@ mod tests {
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_middleware_codegen::layer_application::LayerApplication;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+    use margaret_request_binding_codegen::bound_parameter::BoundParameter;
+    use margaret_request_binding_codegen::request_binding::RequestBinding;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
+    use quote::format_ident;
 
-    use crate::has_websocket_sessions::has_websocket_sessions;
-    use crate::render_websocket::render_websocket;
+    use crate::handler_binding::HandlerBinding;
+    use crate::render_server_routes::server_console_arguments;
+    use crate::session_console_arguments::session_console_arguments;
+    use crate::session_plan::SessionPlan;
     use crate::websocket_codegen_error::WebSocketCodegenError;
     use crate::websocket_handlers::websocket_handlers;
+    use crate::websocket_plan::WebSocketPlan;
+    use crate::websocket_session::WebSocketSession;
+
+    fn render_websocket(
+        index: &AttributeIndex,
+        bindings: &ContainerBindings,
+        middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+        registries: &BindingRegistries,
+    ) -> Result<crate::websocket_artifacts::WebSocketArtifacts, WebSocketCodegenError> {
+        WebSocketPlan::build(index, bindings, middleware_plans, registries)
+            .map(|plan| crate::render_websocket::render_websocket(plan, bindings))
+    }
 
     const REQUEST_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
     const NOTIFICATION_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;\n";
@@ -153,6 +170,41 @@ impl RespondsToWebSocketNotification for Typist {
             .expect("the binding registries are collected")
     }
 
+    fn missing_path() -> margaret_attributes::canonical_path::CanonicalPath {
+        margaret_attributes::canonical_path::CanonicalPath::new(vec![
+            "crate".to_string(),
+            "Missing".to_string(),
+        ])
+    }
+
+    fn empty_session_plan() -> SessionPlan {
+        SessionPlan {
+            notification_handlers: Vec::new(),
+            request_handlers: Vec::new(),
+            session: WebSocketSession {
+                layers: Vec::new(),
+                method_name: format_ident!("build"),
+                module_name: "room".to_string(),
+                parameters: Vec::new(),
+                path: "/room".to_string(),
+                server: "public".to_string(),
+                session_path: margaret_attributes::canonical_path::CanonicalPath::new(vec![
+                    "crate".to_string(),
+                    "Room".to_string(),
+                ]),
+            },
+        }
+    }
+
+    fn missing_handler() -> HandlerBinding {
+        HandlerBinding {
+            dispatch_ident: "MissingDispatch".to_string(),
+            handler_field: "missing".to_string(),
+            handler_path: missing_path(),
+            method: "missing".to_string(),
+        }
+    }
+
     fn generated(source: &str) -> String {
         let index = index_for(source);
         let registries = registries_for(&index);
@@ -225,6 +277,149 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(source.contains("public_routes(container:&super::container::Container,"));
         assert!(source.contains("upgrade_entry(container"));
         assert!(!source.contains("console_argument_"));
+    }
+
+    const CONSOLE_ARGUMENT_NOTIFICATION_HANDLER: &str = r#"
+use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> anyhow::Result<Self> {}
+}
+
+#[websocket_message(notification, method = "typing")]
+struct Typing;
+
+#[singleton]
+struct Typist;
+
+impl Typist {
+    #[constructor]
+    fn create(#[console_argument(from = "channel")] channel: String) -> anyhow::Result<Self> {}
+}
+
+impl RespondsToWebSocketNotification for Typist {
+    type Session = Room;
+    type Message = Typing;
+}
+"#;
+
+    #[test]
+    fn reads_a_preconstructed_notification_handler_through_the_dispatch_chain() {
+        let source = generated(CONSOLE_ARGUMENT_NOTIFICATION_HANDLER);
+
+        assert!(source.contains("container.typist()"));
+        assert!(source.contains("dispatch_table(container).await"));
+        assert!(!source.contains("console_argument_"));
+    }
+
+    #[test]
+    fn reports_a_notification_handler_absent_from_the_container_plan() {
+        let index = index_for("#[singleton]\nstruct Known;\n");
+        let mut plan = empty_session_plan();
+        plan.notification_handlers.push(missing_handler());
+
+        let error = session_console_arguments(&plan, &bindings(&index))
+            .expect_err("an unplanned handler has no console argument closure");
+
+        assert!(error.to_string().contains("crate::Missing"));
+    }
+
+    #[test]
+    fn reports_a_request_handler_absent_from_the_container_plan() {
+        let index = index_for("#[singleton]\nstruct Known;\n");
+        let mut plan = empty_session_plan();
+        plan.request_handlers.push(missing_handler());
+
+        let error = session_console_arguments(&plan, &bindings(&index))
+            .expect_err("an unplanned handler has no console arguments");
+
+        assert!(error.to_string().contains("crate::Missing"));
+
+        let error = server_console_arguments(&[&plan], &bindings(&index))
+            .expect_err("a server cannot include an unplanned handler");
+
+        assert!(error.to_string().contains("crate::Missing"));
+    }
+
+    #[test]
+    fn reports_a_session_binding_absent_from_the_container_plan() {
+        let index = index_for("#[singleton]\nstruct Known;\n");
+        let mut plan = empty_session_plan();
+        plan.session.parameters.push(BoundParameter {
+            binding: RequestBinding::Bound {
+                binder_field: "missing".to_string(),
+                binder_provider: missing_path(),
+                path_key: "room".to_string(),
+            },
+            holder: format_ident!("room"),
+        });
+
+        let error = session_console_arguments(&plan, &bindings(&index))
+            .expect_err("an unplanned binding has no console arguments");
+
+        assert!(error.to_string().contains("crate::Missing"));
+    }
+
+    #[test]
+    fn reports_a_session_layer_absent_from_the_container_plan() {
+        let index = index_for("#[singleton]\nstruct Known;\n");
+        let mut plan = empty_session_plan();
+        plan.session.layers.push(LayerApplication {
+            concrete: missing_path(),
+            field: format_ident!("missing"),
+            injects_peer_spiffe_id: false,
+            injects_routes: false,
+            injects_views: false,
+            wrapper: format_ident!("Missing"),
+        });
+
+        let error = server_console_arguments(&[&plan], &bindings(&index))
+            .expect_err("an unplanned middleware layer has no console arguments");
+
+        assert!(error.to_string().contains("crate::Missing"));
+    }
+
+    #[test]
+    fn propagates_a_container_mismatch_from_websocket_rendering() {
+        let index = index_for(
+            r#"
+use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> anyhow::Result<Self> {}
+}
+
+#[websocket_message(request, method = "ping", response = single)]
+struct Ping;
+
+#[singleton]
+struct Ponger;
+
+impl RespondsToWebSocketMessage for Ponger {
+    type Session = Room;
+    type Message = Ping;
+}
+"#,
+        );
+        let registries = registries_for(&index);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let empty_index = index_for("");
+        let error = render_websocket(&index, &bindings(&empty_index), &plans, &registries)
+            .map(drop)
+            .expect_err("websocket rendering requires the same container plan");
+
+        let message = error.to_string();
+
+        assert!(message.contains("crate::"));
     }
 
     const NON_STRUCT_HANDLER: &str = r#"
@@ -1557,18 +1752,6 @@ mod second_notification {
             "#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n";
 
         assert!(error(source).to_string().contains("has no handler"));
-    }
-
-    #[test]
-    fn detects_the_presence_of_websocket_sessions() {
-        let index = index_for(r#"#[websocket_session(path = "/x", server = "public")] struct S;"#);
-
-        assert!(has_websocket_sessions(&index));
-    }
-
-    #[test]
-    fn detects_the_absence_of_websocket_sessions() {
-        assert!(!has_websocket_sessions(&index_for("struct Plain;")));
     }
 
     #[test]

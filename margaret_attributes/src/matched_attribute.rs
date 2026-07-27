@@ -1,6 +1,5 @@
 use crate::attribute_args::AttributeArgs;
 use crate::attribute_error::AttributeError;
-use crate::attribute_selector::AttributeSelector;
 use crate::format_path::format_path;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_item::IndexedItem;
@@ -25,11 +24,6 @@ impl<'index> MatchedAttribute<'index> {
     }
 
     #[must_use]
-    pub fn matches(&self, selector: &AttributeSelector) -> bool {
-        selector.matches(self.attribute.path())
-    }
-
-    #[must_use]
     pub fn path(&self) -> String {
         format_path(self.attribute.path())
     }
@@ -40,7 +34,6 @@ mod tests {
     use syn::Attribute;
     use syn::parse_quote;
 
-    use crate::attribute_selector::AttributeSelector;
     use crate::canonical_path::CanonicalPath;
     use crate::indexed_item::IndexedItem;
     use crate::item_kind::ItemKind;
@@ -83,14 +76,5 @@ mod tests {
         let second = matched.args().expect("the arguments parse");
 
         assert!(std::ptr::eq(first, second));
-    }
-
-    #[test]
-    fn matches_tests_the_attribute_against_a_selector() {
-        let item = item_bearing(parse_quote!(#[tagged(crate::markers::Tag)]));
-        let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
-
-        assert!(matched.matches(&AttributeSelector::parse("tagged").expect("a valid selector")));
-        assert!(!matched.matches(&AttributeSelector::parse("traced").expect("a valid selector")));
     }
 }

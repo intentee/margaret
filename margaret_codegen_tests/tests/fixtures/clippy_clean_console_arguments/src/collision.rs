@@ -24,6 +24,8 @@ impl Session {
 
     #[infer_from_request]
     pub async fn infer_reader(&self) -> anyhow::Result<AuthenticatedUserOutcome<Reader>> {
+        tokio::task::yield_now().await;
+
         Ok({
             AuthenticatedUserOutcome::Authenticated(Reader {
                 name: "milo".to_string(),
@@ -43,6 +45,8 @@ impl GetCollision {
         collision_session: &Request,
         #[authenticated_user] reader: Reader,
     ) -> anyhow::Result<Response> {
+        tokio::task::yield_now().await;
+
         Ok({
             Response::text(
                 200,

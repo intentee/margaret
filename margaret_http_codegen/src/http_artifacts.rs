@@ -7,10 +7,10 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use crate::http_server::HttpServer;
 
 pub struct HttpArtifacts {
-    construction_roots: Vec<CanonicalPath>,
-    modules: Vec<GeneratedModuleTokens>,
-    server_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
-    servers: Vec<HttpServer>,
+    pub retained_roots: Vec<CanonicalPath>,
+    pub modules: Vec<GeneratedModuleTokens>,
+    pub server_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
+    pub servers: Vec<HttpServer>,
 }
 
 impl HttpArtifacts {
@@ -18,10 +18,10 @@ impl HttpArtifacts {
         modules: Vec<GeneratedModuleTokens>,
         servers: Vec<HttpServer>,
         server_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
-        construction_roots: Vec<CanonicalPath>,
+        retained_roots: Vec<CanonicalPath>,
     ) -> Self {
         Self {
-            construction_roots,
+            retained_roots,
             modules,
             server_console_arguments,
             servers,
@@ -29,18 +29,8 @@ impl HttpArtifacts {
     }
 
     #[must_use]
-    pub fn construction_roots(&self) -> &[CanonicalPath] {
-        &self.construction_roots
-    }
-
-    #[must_use]
     pub fn into_modules(self) -> Vec<GeneratedModuleTokens> {
         self.modules
-    }
-
-    #[must_use]
-    pub fn server_console_arguments(&self) -> &BTreeMap<String, Vec<ConsoleArgument>> {
-        &self.server_console_arguments
     }
 
     #[must_use]

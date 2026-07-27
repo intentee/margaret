@@ -18,9 +18,6 @@ pub enum HandlerError {
 
     #[error("no forward target is registered for '{responder}' on this server")]
     UnknownForwardTarget { responder: &'static str },
-
-    #[error("the websocket upgrade terminal was entered more than once for one handshake")]
-    RepeatedWebSocketUpgrade,
 }
 
 impl HandlerError {

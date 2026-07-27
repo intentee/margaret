@@ -1,7 +1,7 @@
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::format_path::format_path;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::matched_attribute::MatchedAttribute;
@@ -48,7 +48,7 @@ fn validate_runner(
             return Err(ServiceCodegenError::RunnerRequestBinding {
                 path: path.to_string(),
                 parameter: view.holder.to_string(),
-                marker: name.to_string(),
+                marker: name.name().to_string(),
             });
         }
 
@@ -115,13 +115,19 @@ fn build_unit(
 
 fn has_conflicting_roles(item: &IndexedItem, role: Role) -> bool {
     let others = match role {
-        Role::Service => ["console_command", "scheduled_with_tick_timer"],
-        Role::Ticker => ["console_command", "service"],
+        Role::Service => [
+            FrameworkAttribute::ConsoleCommand,
+            FrameworkAttribute::ScheduledWithTickTimer,
+        ],
+        Role::Ticker => [
+            FrameworkAttribute::ConsoleCommand,
+            FrameworkAttribute::Service,
+        ],
     };
 
     others
         .iter()
-        .any(|other| item.has_attribute(&selector(other)))
+        .any(|other| item.has_framework_attribute(*other))
 }
 
 fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, method: &IndexedMethod) -> bool {
@@ -130,20 +136,16 @@ fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, method: &Index
         .any(|view| is_cancellation_token(index, item, view.declared))
 }
 
-fn selector(name: &str) -> AttributeSelector {
-    AttributeSelector::from_marker(name)
-}
-
 pub(crate) fn service_units(
     index: &AttributeIndex,
 ) -> Result<Vec<ServiceUnit>, ServiceCodegenError> {
     let mut units = Vec::new();
 
-    for matched in index.select(&selector("service")) {
+    for matched in index.select_framework_attribute(FrameworkAttribute::Service) {
         units.push(build_unit(&matched, index, Role::Service)?);
     }
 
-    for matched in index.select(&selector("scheduled_with_tick_timer")) {
+    for matched in index.select_framework_attribute(FrameworkAttribute::ScheduledWithTickTimer) {
         units.push(build_unit(&matched, index, Role::Ticker)?);
     }
 

@@ -21,6 +21,14 @@ struct BadArgs;
 #[ns::tagged]
 struct Qualified;
 
+use margaret_macros::singleton as application_singleton;
+
+#[application_singleton]
+struct AliasedSingleton;
+
+#[ns::singleton]
+struct UnrelatedSingleton;
+
 #[singleton]
 #[singleton]
 struct RepeatedAttrs;
@@ -55,6 +63,19 @@ struct AnotherService;
 
 impl AnotherService {
     fn build() {}
+}
+
+struct WithAliasedConstructor;
+
+mod implementation {
+    use margaret_macros::constructor as builds;
+
+    use super::WithAliasedConstructor;
+
+    impl WithAliasedConstructor {
+        #[builds]
+        fn create() -> Self {}
+    }
 }
 
 trait SomeTrait {}

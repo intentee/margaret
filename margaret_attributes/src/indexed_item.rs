@@ -1,9 +1,11 @@
+#[cfg(test)]
 use syn::Attribute;
 
-use crate::attribute_selector::AttributeSelector;
 use crate::canonical_path::CanonicalPath;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_field::IndexedField;
+use crate::indexed_item_parts::IndexedItemParts;
 use crate::indexed_method::IndexedMethod;
 use crate::indexed_trait_impl::IndexedTraitImpl;
 use crate::indexed_variant::IndexedVariant;
@@ -21,6 +23,7 @@ pub struct IndexedItem {
 }
 
 impl IndexedItem {
+    #[cfg(test)]
     pub(crate) fn new(
         kind: ItemKind,
         identifier: String,
@@ -41,6 +44,30 @@ impl IndexedItem {
         }
     }
 
+    pub(crate) fn from_parts(parts: IndexedItemParts) -> Self {
+        let IndexedItemParts {
+            attributes,
+            canonical_path,
+            fields,
+            identifier,
+            kind,
+            methods,
+            trait_impls,
+            variants,
+        } = parts;
+
+        Self {
+            attributes,
+            canonical_path,
+            fields,
+            identifier,
+            kind,
+            methods,
+            trait_impls,
+            variants,
+        }
+    }
+
     #[must_use]
     pub fn attributes(&self) -> &[IndexedAttribute] {
         &self.attributes
@@ -57,10 +84,10 @@ impl IndexedItem {
     }
 
     #[must_use]
-    pub fn has_attribute(&self, selector: &AttributeSelector) -> bool {
+    pub fn has_framework_attribute(&self, attribute: FrameworkAttribute) -> bool {
         self.attributes
             .iter()
-            .any(|attribute| selector.matches(attribute.path()))
+            .any(|indexed| indexed.framework_attribute() == Some(attribute))
     }
 
     #[must_use]
@@ -86,18 +113,5 @@ impl IndexedItem {
     #[must_use]
     pub fn variants(&self) -> &[IndexedVariant] {
         &self.variants
-    }
-
-    pub(crate) fn add_method(&mut self, method: IndexedMethod) {
-        self.methods.push(method);
-    }
-
-    pub(crate) fn add_trait_impl(&mut self, trait_impl: IndexedTraitImpl) {
-        self.trait_impls.push(trait_impl);
-    }
-
-    pub(crate) fn sort_members(&mut self) {
-        self.methods
-            .sort_by(|left, right| left.identifier().cmp(right.identifier()));
     }
 }

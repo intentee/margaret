@@ -1,4 +1,4 @@
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 
@@ -8,11 +8,10 @@ pub(crate) fn build_for_session_method<'index>(
     item: &'index IndexedItem,
     session: &str,
 ) -> Result<&'index IndexedMethod, WebSocketCodegenError> {
-    let selector = AttributeSelector::from_marker("build_for_session");
     let mut found: Vec<&IndexedMethod> = item
         .methods()
         .iter()
-        .filter(|method| method.has_attribute(&selector))
+        .filter(|method| method.has_framework_attribute(FrameworkAttribute::BuildForSession))
         .collect();
 
     if found.len() > 1 {

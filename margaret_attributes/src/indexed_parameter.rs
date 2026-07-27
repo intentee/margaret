@@ -4,7 +4,7 @@ use syn::Attribute;
 use syn::Pat;
 use syn::Type;
 
-use crate::attribute_selector::AttributeSelector;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 
 pub struct IndexedParameter {
@@ -38,6 +38,22 @@ impl IndexedParameter {
         }
     }
 
+    pub(crate) fn from_parts(
+        attributes: Vec<IndexedAttribute>,
+        declared: Type,
+        diagnostic_name: String,
+        holder: Ident,
+        position: usize,
+    ) -> Self {
+        Self {
+            attributes,
+            declared,
+            diagnostic_name,
+            holder,
+            position,
+        }
+    }
+
     #[must_use]
     pub fn attributes(&self) -> &[IndexedAttribute] {
         &self.attributes
@@ -54,10 +70,10 @@ impl IndexedParameter {
     }
 
     #[must_use]
-    pub fn attribute(&self, selector: &AttributeSelector) -> Option<&IndexedAttribute> {
+    pub fn framework_attribute(&self, attribute: FrameworkAttribute) -> Option<&IndexedAttribute> {
         self.attributes
             .iter()
-            .find(|attribute| selector.matches(attribute.path()))
+            .find(|indexed| indexed.framework_attribute() == Some(attribute))
     }
 
     #[must_use]

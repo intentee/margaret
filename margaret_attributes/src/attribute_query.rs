@@ -1,9 +1,9 @@
 use crate::attribute_error::AttributeError;
-use crate::attribute_selector::AttributeSelector;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_item::IndexedItem;
 use crate::matched_attribute::MatchedAttribute;
-use crate::select_matching_attributes::select_matching_attributes;
-use crate::select_unique_attribute::select_unique_attribute;
+use crate::select_framework_attributes::select_framework_attributes;
+use crate::select_unique_framework_attribute::select_unique_framework_attribute;
 
 pub struct AttributeQuery<'index> {
     item: &'index IndexedItem,
@@ -15,20 +15,24 @@ impl<'index> AttributeQuery<'index> {
         Self { item }
     }
 
-    pub fn find(
+    pub fn find_framework(
         &self,
-        selector: &AttributeSelector,
+        framework_attribute: FrameworkAttribute,
     ) -> Result<Option<MatchedAttribute<'index>>, AttributeError> {
-        let unique = select_unique_attribute(self.item.attributes(), selector, || {
-            self.item.canonical_path().to_string()
-        })?;
+        let unique =
+            select_unique_framework_attribute(self.item.attributes(), framework_attribute, || {
+                self.item.canonical_path().to_string()
+            })?;
 
         Ok(unique.map(|attribute| MatchedAttribute::new(self.item, attribute)))
     }
 
     #[must_use]
-    pub fn find_all(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'index>> {
-        select_matching_attributes(self.item.attributes(), selector)
+    pub fn find_all_framework(
+        &self,
+        framework_attribute: FrameworkAttribute,
+    ) -> Vec<MatchedAttribute<'index>> {
+        select_framework_attributes(self.item.attributes(), framework_attribute)
             .into_iter()
             .map(|attribute| MatchedAttribute::new(self.item, attribute))
             .collect()
@@ -41,8 +45,8 @@ mod tests {
     use syn::parse_quote;
 
     use crate::attribute_query::AttributeQuery;
-    use crate::attribute_selector::AttributeSelector;
     use crate::canonical_path::CanonicalPath;
+    use crate::framework_attribute::FrameworkAttribute;
     use crate::indexed_item::IndexedItem;
     use crate::item_kind::ItemKind;
     use crate::struct_shape::StructShape;
@@ -58,17 +62,13 @@ mod tests {
         )
     }
 
-    fn selector(input: &str) -> AttributeSelector {
-        AttributeSelector::parse(input).expect("the selector parses")
-    }
-
     #[test]
     fn find_returns_the_single_matching_sibling() {
         let item = item(vec![parse_quote!(#[singleton])]);
 
         assert!(
             AttributeQuery::new(&item)
-                .find(&selector("singleton"))
+                .find_framework(FrameworkAttribute::Singleton)
                 .expect("the lookup succeeds")
                 .is_some()
         );
@@ -80,7 +80,7 @@ mod tests {
 
         assert!(
             AttributeQuery::new(&item)
-                .find(&selector("does_not_exist"))
+                .find_framework(FrameworkAttribute::Model)
                 .expect("the lookup succeeds")
                 .is_none()
         );
@@ -90,7 +90,7 @@ mod tests {
     fn find_rejects_a_repeated_sibling() {
         let item = item(vec![parse_quote!(#[singleton]), parse_quote!(#[singleton])]);
         let message = AttributeQuery::new(&item)
-            .find(&selector("singleton"))
+            .find_framework(FrameworkAttribute::Singleton)
             .err()
             .expect("a repeated sibling is rejected")
             .to_string();
@@ -104,7 +104,7 @@ mod tests {
 
         assert_eq!(
             AttributeQuery::new(&item)
-                .find_all(&selector("singleton"))
+                .find_all_framework(FrameworkAttribute::Singleton)
                 .len(),
             2
         );

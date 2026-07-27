@@ -1,5 +1,4 @@
 mod build_plan;
-mod console_closures;
 pub mod construction_error_path;
 mod construction_flow;
 mod construction_source;
@@ -21,6 +20,8 @@ mod path_text;
 mod peel_target;
 pub mod plan_container;
 pub mod planned_container;
+mod planned_dependency;
+mod planned_provider;
 mod provided_type;
 mod provider;
 mod provider_binding;

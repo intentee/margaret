@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::format_path::format_path;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::is_singleton::is_singleton;
@@ -24,16 +24,10 @@ fn infer_from_request_method<'index>(
     item: &'index IndexedItem,
     provider: &str,
 ) -> Result<&'index IndexedMethod, RequestBindingError> {
-    let selector = AttributeSelector::from_marker("infer_from_request");
     let mut found: Vec<&IndexedMethod> = item
         .methods()
         .iter()
-        .filter(|method| {
-            method
-                .attributes()
-                .iter()
-                .any(|attribute| selector.matches(attribute.path()))
-        })
+        .filter(|method| method.has_framework_attribute(FrameworkAttribute::InferFromRequest))
         .collect();
 
     if found.len() > 1 {
@@ -58,11 +52,12 @@ pub fn authenticated_user_providers(
     index: &AttributeIndex,
     registries: &BindingRegistries,
 ) -> Result<HashMap<CanonicalPath, AuthenticatedUserProvider>, RequestBindingError> {
-    let selector = AttributeSelector::from_marker("infers_authenticated_user");
     let mut registry: HashMap<CanonicalPath, AuthenticatedUserProvider> = HashMap::new();
 
     for item in index.items() {
-        let Some(matched) = AttributeQuery::new(item).find(&selector)? else {
+        let Some(matched) = AttributeQuery::new(item)
+            .find_framework(FrameworkAttribute::InfersAuthenticatedUser)?
+        else {
             continue;
         };
 

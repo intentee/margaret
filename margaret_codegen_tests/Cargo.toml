@@ -16,6 +16,7 @@ margaret_codegen = { path = "../margaret_codegen" }
 margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
 margaret_codegen_fallible_roles_fixture = { path = "tests/fixtures/fallible_roles" }
 margaret_codegen_linear_construction_future_fixture = { path = "tests/fixtures/linear_construction_future" }
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [[test]]
 name = "main"

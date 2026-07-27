@@ -26,7 +26,11 @@ fn value_expression(
 
         required_flag_read(&value_type, id, &present)
     } else {
-        quote! { matches.get_one::<#value_type>(#id).cloned() }
+        if is_copy {
+            quote! { matches.get_one::<#value_type>(#id).copied() }
+        } else {
+            quote! { matches.get_one::<#value_type>(#id).cloned() }
+        }
     }
 }
 
@@ -133,6 +137,21 @@ mod tests {
         assert_eq!(
             collapsed(&named),
             r#"matches.get_one::<std::string::String>("note").cloned()"#
+        );
+    }
+
+    #[test]
+    fn an_optional_copy_argument_reads_a_copied_qualified_option() {
+        let named = ConsoleArgument::Named {
+            name: "retries".to_string(),
+            required: false,
+            weaving: WeavingKind::Copy,
+            value_type: path(&["u16"]),
+        };
+
+        assert_eq!(
+            collapsed(&named),
+            r#"matches.get_one::<u16>("retries").copied()"#
         );
     }
 

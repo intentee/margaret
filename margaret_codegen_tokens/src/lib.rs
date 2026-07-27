@@ -4,7 +4,6 @@ pub mod console_argument_clone;
 pub mod console_argument_deref;
 pub mod console_argument_ident;
 pub mod console_argument_parameter;
-pub mod console_argument_to_owned;
 pub mod path_tokens;
 pub mod spiffe_http_client_ident;
 pub mod too_many_arguments_expect;

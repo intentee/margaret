@@ -16,7 +16,8 @@ use hyper_util::server::graceful::Watcher;
 use hyper_util::service::TowerToHyperService;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
-use tokio::task::JoinHandle;
+use tokio::task::JoinError;
+use tokio::task::JoinSet;
 use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 use tokio_util::sync::CancellationToken;
@@ -24,12 +25,14 @@ use tokio_util::sync::CancellationToken;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::body_limit::BodyLimit;
+use crate::drive_connection::drive_connection;
 use crate::forward_targets::ForwardTargets;
-use crate::handler::Handler;
-use crate::layer::layer;
+use crate::one_shot_handler::OneShotHandler;
+use crate::one_shot_layer::one_shot_layer;
 use crate::request::Request;
 use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
+use crate::respond_recursively::respond_once;
 use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
 use crate::router::RequestRoute;
@@ -39,6 +42,8 @@ use crate::router::UpgradeRoute;
 use crate::server_registry::ServerRegistry;
 use crate::transport_config::TransportConfig;
 use crate::upload_config::UploadConfig;
+use crate::web_socket_driver_sender::WebSocketDriverSender;
+use crate::web_socket_driver_sender::web_socket_driver_channel;
 use crate::web_socket_upgrade_terminal::WebSocketUpgradeTerminal;
 
 #[derive(Clone)]
@@ -107,21 +112,39 @@ impl BoundServer {
     pub async fn serve(self, cancellation_token: CancellationToken) {
         let builder = Arc::new(Builder::new(TokioExecutor::new()));
         let graceful = GracefulShutdown::new();
+        let mut connections = JoinSet::new();
 
-        while let Some(accepted) = cancellation_token
-            .run_until_cancelled(self.listener.accept())
-            .await
-        {
-            accept_outcome(accepted).map(|connection| {
-                self.spawn_connection(&builder, &graceful, connection, &cancellation_token)
-            });
+        loop {
+            tokio::select! {
+                biased;
+                () = cancellation_token.cancelled() => break,
+                Some(outcome) = connections.join_next(), if !connections.is_empty() => {
+                    report_connection_task_outcome(outcome);
+                }
+                accepted = self.listener.accept() => {
+                    accept_outcome(accepted, |connection| {
+                        self.spawn_connection(
+                            &mut connections,
+                            &builder,
+                            &graceful,
+                            connection,
+                            &cancellation_token,
+                        );
+                    });
+                }
+            }
         }
 
         graceful.shutdown().await;
+
+        while let Some(outcome) = connections.join_next().await {
+            report_connection_task_outcome(outcome);
+        }
     }
 
     fn spawn_connection(
         &self,
+        connections: &mut JoinSet<()>,
         builder: &Arc<Builder<TokioExecutor>>,
         graceful: &GracefulShutdown,
         AcceptedConnection {
@@ -129,7 +152,7 @@ impl BoundServer {
             stream,
         }: AcceptedConnection,
         cancellation_token: &CancellationToken,
-    ) -> JoinHandle<()> {
+    ) {
         let builder = builder.clone();
         let watcher = graceful.watcher();
         let transport = self.transport.clone();
@@ -139,7 +162,7 @@ impl BoundServer {
         let body_limit = self.body_limit;
         let cancellation_token = cancellation_token.clone();
 
-        tokio::spawn(async move {
+        drop(connections.spawn(async move {
             match transport {
                 BoundTransport::Plain => {
                     serve_connection(
@@ -186,7 +209,7 @@ impl BoundServer {
                     .await;
                 }
             }
-        })
+        }));
     }
 }
 
@@ -195,18 +218,17 @@ struct AcceptedConnection {
     stream: TcpStream,
 }
 
-fn accept_outcome(
-    accepted: std::io::Result<(TcpStream, SocketAddr)>,
-) -> Option<AcceptedConnection> {
+fn accept_outcome<Accept>(accepted: std::io::Result<(TcpStream, SocketAddr)>, accept: Accept)
+where
+    Accept: FnOnce(AcceptedConnection),
+{
     match accepted {
-        Ok((stream, remote_addr)) => Some(AcceptedConnection {
+        Ok((stream, remote_addr)) => accept(AcceptedConnection {
             remote_addr,
             stream,
         }),
         Err(error) => {
             eprintln!("margaret_http: accept error: {error}");
-
-            None
         }
     }
 }
@@ -228,6 +250,12 @@ fn report_connection_outcome<Error: Display>(outcome: Result<(), Error>) {
     }
 }
 
+fn report_connection_task_outcome(outcome: Result<(), JoinError>) {
+    if let Err(error) = outcome {
+        eprintln!("margaret_http: connection task failed: {error}");
+    }
+}
+
 fn error_response(error: RequestError) -> Response {
     match error {
         RequestError::PayloadTooLarge { .. } => Response::text(413, "Payload Too Large"),
@@ -243,19 +271,22 @@ async fn serve_connection<Io>(
 ) where
     Io: hyper::rt::Read + hyper::rt::Write + Unpin + Send + 'static,
 {
+    let (driver_sender, driver_receiver) = web_socket_driver_channel();
     let service = TowerToHyperService::new(tower::service_fn(
         move |request: http::Request<Incoming>| {
             let connection_context = connection_context.clone();
+            let driver_sender = driver_sender.clone();
 
-            async move { Ok::<_, Infallible>(dispatch(connection_context, request).await) }
+            async move {
+                Ok::<_, Infallible>(dispatch(connection_context, driver_sender, request).await)
+            }
         },
     ));
 
-    report_connection_outcome(
-        watcher
-            .watch(builder.serve_connection_with_upgrades(io, service))
-            .await,
-    );
+    let connection = watcher.watch(builder.serve_connection_with_upgrades(io, service));
+    let outcome = drive_connection(connection, driver_receiver).await;
+
+    report_connection_outcome(outcome);
 }
 
 async fn parse_request(
@@ -319,6 +350,7 @@ async fn dispatch_web_socket(
         upgrade,
     }: UpgradeRoute,
     forward_targets: &Arc<ForwardTargets>,
+    driver_sender: WebSocketDriverSender,
 ) -> http::Response<Full<Bytes>> {
     let on_upgrade = hyper::upgrade::on(&mut request);
     let (parts, _incoming) = request.into_parts();
@@ -335,17 +367,18 @@ async fn dispatch_web_socket(
                 .with_peer_identity(peer_identity)
                 .with_path_params(path_params);
 
-            let mut onion: Arc<dyn Handler> = Arc::new(WebSocketUpgradeTerminal::new(
+            let mut onion: Box<dyn OneShotHandler> = Box::new(WebSocketUpgradeTerminal::new(
                 upgrade,
                 on_upgrade,
                 cancellation_token,
+                driver_sender,
             ));
 
             for middleware_layer in middleware.iter().rev() {
-                onion = layer(middleware_layer.clone(), onion);
+                onion = one_shot_layer(middleware_layer.clone(), onion);
             }
 
-            respond_recursively(forward_targets, handshake, onion)
+            respond_once(forward_targets, handshake, onion)
                 .await
                 .into_http()
         }
@@ -363,6 +396,7 @@ async fn dispatch(
         router,
         upload_config,
     }: ConnectionContext,
+    driver_sender: WebSocketDriverSender,
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
     match router.resolve(request.method().as_str(), request.uri().path()) {
@@ -374,6 +408,7 @@ async fn dispatch(
                 cancellation_token.child_token(),
                 upgrade_route,
                 &forward_targets,
+                driver_sender,
             )
             .await
         }
@@ -411,6 +446,7 @@ mod tests {
     use super::BoundServer;
     use super::accept_outcome;
     use super::error_response;
+    use super::report_connection_task_outcome;
     use crate::body_limit::BodyLimit;
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
@@ -431,6 +467,7 @@ mod tests {
     use crate::server_registry::ServerRegistry;
     use crate::transport_config::TransportConfig;
     use crate::upload_config::UploadConfig;
+    use crate::web_socket_driver_sender::WebSocketDriverSender;
     use crate::web_socket_upgrade::WebSocketUpgrade;
 
     struct PlainOk;
@@ -479,6 +516,17 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn reports_a_failed_connection_task() {
+        let failure = tokio::spawn(async {
+            panic!("connection task failure");
+        })
+        .await
+        .expect_err("the connection task panics");
+
+        report_connection_task_outcome(Err(failure));
+    }
+
     #[test]
     fn rejects_conflicting_route_paths() {
         let conflict = Router::build(vec![
@@ -510,11 +558,9 @@ mod tests {
 
     #[test]
     fn skips_a_failed_accept() {
-        assert!(
-            accept_outcome(Err(std::io::Error::from(
-                std::io::ErrorKind::ConnectionAborted
-            )))
-            .is_none()
+        accept_outcome(
+            Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)),
+            drop,
         );
     }
 
@@ -632,6 +678,7 @@ mod tests {
             handshake: &Request,
             _on_upgrade: OnUpgrade,
             _cancellation_token: CancellationToken,
+            _driver_sender: WebSocketDriverSender,
         ) -> ResponseContinuation {
             ResponseContinuation::from(Response::text(
                 200,

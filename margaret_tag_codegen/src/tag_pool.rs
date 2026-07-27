@@ -4,9 +4,9 @@ use syn::Path;
 
 use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_base::field_base;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_attributes::tag::Tag;
 
@@ -22,11 +22,11 @@ struct TagEntry {
 
 fn collect_kind(
     index: &AttributeIndex,
-    selector: &AttributeSelector,
+    framework_attribute: FrameworkAttribute,
     kind: TagKind,
     entries: &mut HashMap<Tag, TagEntry>,
 ) -> Result<(), TagError> {
-    for matched in index.select(selector) {
+    for matched in index.select_framework_attribute(framework_attribute) {
         let concrete = matched.item().canonical_path().clone();
         let declared = declared_tag_path(matched.args()?, kind)?;
         let path = declared.ok_or_else(|| TagError::MissingTag {
@@ -61,14 +61,6 @@ fn declared_tag_path(args: &AttributeArgs, kind: TagKind) -> Result<Option<Path>
     }
 }
 
-fn jwks_endpoint_selector() -> AttributeSelector {
-    AttributeSelector::from_marker("provides_jwks_endpoint")
-}
-
-fn middleware_selector() -> AttributeSelector {
-    AttributeSelector::from_marker("handles_middleware_attribute")
-}
-
 pub struct TagPool {
     entries: HashMap<Tag, TagEntry>,
 }
@@ -79,13 +71,13 @@ impl TagPool {
 
         collect_kind(
             index,
-            &jwks_endpoint_selector(),
+            FrameworkAttribute::ProvidesJwksEndpoint,
             TagKind::JwksClient,
             &mut entries,
         )?;
         collect_kind(
             index,
-            &middleware_selector(),
+            FrameworkAttribute::HandlesMiddlewareAttribute,
             TagKind::Middleware,
             &mut entries,
         )?;

@@ -2,7 +2,7 @@ use syn::Attribute;
 use syn::FnArg;
 use syn::Signature;
 
-use crate::attribute_selector::AttributeSelector;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_parameter::IndexedParameter;
 
@@ -38,6 +38,20 @@ impl IndexedMethod {
         }
     }
 
+    pub(crate) fn from_parts(
+        attributes: Vec<IndexedAttribute>,
+        identifier: String,
+        parameters: Vec<IndexedParameter>,
+        signature: Box<Signature>,
+    ) -> Self {
+        Self {
+            attributes,
+            identifier,
+            parameters,
+            signature,
+        }
+    }
+
     #[must_use]
     pub fn attributes(&self) -> &[IndexedAttribute] {
         &self.attributes
@@ -49,10 +63,10 @@ impl IndexedMethod {
     }
 
     #[must_use]
-    pub fn has_attribute(&self, selector: &AttributeSelector) -> bool {
+    pub fn has_framework_attribute(&self, attribute: FrameworkAttribute) -> bool {
         self.attributes
             .iter()
-            .any(|attribute| selector.matches(attribute.path()))
+            .any(|indexed| indexed.framework_attribute() == Some(attribute))
     }
 
     #[must_use]

@@ -39,4 +39,12 @@ impl DirectConstruction {
             DirectConstruction::Fieldless { .. } | DirectConstruction::FrameworkUnit => &[],
         }
     }
+
+    pub(crate) fn is_async(&self) -> bool {
+        matches!(
+            self,
+            Self::Constructor { is_async: true, .. }
+                | Self::FrameworkConstructor { is_async: true, .. }
+        )
+    }
 }

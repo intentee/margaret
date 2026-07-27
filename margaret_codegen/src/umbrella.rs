@@ -1,9 +1,9 @@
 use margaret_generated_module::generated_module::GeneratedModule;
 
-use crate::capabilities::Capabilities;
+use crate::generated_features::GeneratedFeatures;
 
 pub(crate) fn umbrella(
-    Capabilities {
+    GeneratedFeatures {
         has_asset_bag,
         has_authenticated_users,
         has_console,
@@ -14,10 +14,11 @@ pub(crate) fn umbrella(
         has_views,
         has_websockets,
         serves,
-    }: Capabilities,
+    }: GeneratedFeatures,
 ) -> GeneratedModule {
     let serves_http = has_http || has_websockets;
-    let mut source = String::from("#[rustfmt::skip]\npub use ::margaret::framework;\n");
+    let mut source =
+        String::from("#![forbid(unsafe_code)]\n#[rustfmt::skip]\npub use ::margaret::framework;\n");
 
     source.push_str("#[rustfmt::skip]\npub mod container;\n");
 
@@ -68,12 +69,12 @@ pub(crate) fn umbrella(
 
 #[cfg(test)]
 mod tests {
-    use crate::capabilities::Capabilities;
+    use crate::generated_features::GeneratedFeatures;
 
     use super::umbrella;
 
-    fn minimal_capabilities() -> Capabilities {
-        Capabilities {
+    fn minimal_features() -> GeneratedFeatures {
+        GeneratedFeatures {
             has_asset_bag: false,
             has_authenticated_users: false,
             has_console: false,
@@ -90,9 +91,18 @@ mod tests {
     #[test]
     fn forwards_the_framework_re_exports_into_the_generated_module() {
         assert!(
-            umbrella(minimal_capabilities())
+            umbrella(minimal_features())
                 .source()
                 .contains("pub use ::margaret::framework;")
+        );
+    }
+
+    #[test]
+    fn forbids_unsafe_code_throughout_the_generated_module() {
+        assert!(
+            umbrella(minimal_features())
+                .source()
+                .starts_with("#![forbid(unsafe_code)]")
         );
     }
 }

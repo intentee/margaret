@@ -33,6 +33,6 @@ fn invokes_the_selected_root_construction_function() {
 
     assert_eq!(
         collapsed(invocation),
-        "super::container::build::construct_loader().await"
+        "super::container::build::construct_loader()"
     );
 }

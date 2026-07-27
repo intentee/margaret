@@ -6,6 +6,7 @@ use crate::server_transport_policy::ServerTransportPolicy;
 #[derive(Clone)]
 pub struct HttpServer {
     name: String,
+    routes_are_async: bool,
     transport_policy: ServerTransportPolicy,
 }
 
@@ -14,8 +15,15 @@ impl HttpServer {
     pub fn new(name: String, transport_policy: ServerTransportPolicy) -> Self {
         Self {
             name,
+            routes_are_async: false,
             transport_policy,
         }
+    }
+
+    #[must_use]
+    pub fn with_async_routes(mut self) -> Self {
+        self.routes_are_async = true;
+        self
     }
 
     #[must_use]
@@ -31,6 +39,11 @@ impl HttpServer {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    #[must_use]
+    pub fn routes_are_async(&self) -> bool {
+        self.routes_are_async
     }
 
     #[must_use]

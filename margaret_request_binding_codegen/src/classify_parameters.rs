@@ -5,8 +5,8 @@ use quote::ToTokens;
 use syn::Type;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
@@ -369,9 +369,6 @@ pub fn classify_parameters(
     registries: &BindingRegistries,
 ) -> Result<Vec<BoundParameter>, RequestBindingError> {
     let subject = context.subject();
-    let authenticated_user_selector = AttributeSelector::from_marker("authenticated_user");
-    let route_parameter_selector = AttributeSelector::from_marker("route_parameter");
-    let form_request_selector = AttributeSelector::from_marker("form_request");
     let mut bound = Vec::new();
     let mut bound_route_parameters = HashSet::new();
 
@@ -382,15 +379,15 @@ pub fn classify_parameters(
         position,
     } in parameters(method)
     {
-        let authenticated_user = attributes
-            .iter()
-            .find(|attribute| authenticated_user_selector.matches(attribute.path()));
-        let route_parameter = attributes
-            .iter()
-            .find(|attribute| route_parameter_selector.matches(attribute.path()));
-        let form_request = attributes
-            .iter()
-            .find(|attribute| form_request_selector.matches(attribute.path()));
+        let authenticated_user = attributes.iter().find(|attribute| {
+            attribute.framework_attribute() == Some(FrameworkAttribute::AuthenticatedUser)
+        });
+        let route_parameter = attributes.iter().find(|attribute| {
+            attribute.framework_attribute() == Some(FrameworkAttribute::RouteParameter)
+        });
+        let form_request = attributes.iter().find(|attribute| {
+            attribute.framework_attribute() == Some(FrameworkAttribute::FormRequest)
+        });
         let resolved = index.resolve_item_type(item, declared);
         let is_reference = matches!(declared, Type::Reference(_));
         let is_asset_bag = RequestInjectable::AssetBag.matches(resolved.as_ref(), is_reference);

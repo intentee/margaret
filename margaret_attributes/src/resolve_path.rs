@@ -51,7 +51,7 @@ pub fn resolve_path(
     }
 
     if leading == "super" {
-        let parent = &module_path[..module_path.len().saturating_sub(1)];
+        let parent: &[String] = module_path.split_last().map_or(&[], |(_, parent)| parent);
 
         return Some(rooted(parent, trailing));
     }

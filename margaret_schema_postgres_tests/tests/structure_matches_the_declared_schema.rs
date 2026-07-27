@@ -5,10 +5,10 @@ use sqlx::PgPool;
 use sqlx::query_as;
 use sqlx::query_scalar;
 
-use margaret_example::margaret::schema::schema;
 use margaret_model::table::Table;
 
 use margaret_schema_postgres_tests::apply_schema::apply_schema;
+use margaret_schema_postgres_tests::schema_fixture::schema_fixture;
 use margaret_schema_postgres_tests::start_database::start_database;
 
 async fn unique_column_sets(pool: &PgPool, table: &str) -> Vec<Vec<String>> {
@@ -160,7 +160,7 @@ async fn the_applied_schema_matches_the_declared_structure() {
 
     apply_schema(pool).await;
 
-    let declared = schema();
+    let declared = schema_fixture();
 
     for table in &declared.tables {
         assert_columns_match(pool, table).await;

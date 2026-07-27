@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_injection_codegen::parameters::parameters;
@@ -14,11 +14,10 @@ use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument_registry::ConsoleArgumentRegistry;
 
 fn single_constructor(item: &IndexedItem) -> Option<&IndexedMethod> {
-    let selector = AttributeSelector::from_marker("constructor");
     let mut constructors = item
         .methods()
         .iter()
-        .filter(|method| method.has_attribute(&selector));
+        .filter(|method| method.has_framework_attribute(FrameworkAttribute::Constructor));
 
     let constructor = constructors.next()?;
 
@@ -65,7 +64,6 @@ fn validate_named_type_consistency(
 pub fn scan(
     index: &AttributeIndex,
 ) -> Result<ConsoleArgumentRegistry, ConsoleArgumentCodegenError> {
-    let console_argument_selector = AttributeSelector::from_marker("console_argument");
     let mut arguments: BTreeMap<CanonicalPath, BTreeMap<usize, ConsoleArgument>> = BTreeMap::new();
 
     for item in index.items() {
@@ -75,14 +73,12 @@ pub fn scan(
 
         let owner = item.canonical_path();
         let owner_text = owner.to_string();
-        let is_command = item.has_attribute(&AttributeSelector::from_marker("console_command"));
+        let is_command = item.has_framework_attribute(FrameworkAttribute::ConsoleCommand);
 
         for view in parameters(constructor) {
-            let Some(attribute) = view
-                .attributes
-                .iter()
-                .find(|attribute| console_argument_selector.matches(attribute.path()))
-            else {
+            let Some(attribute) = view.attributes.iter().find(|attribute| {
+                attribute.framework_attribute() == Some(FrameworkAttribute::ConsoleArgument)
+            }) else {
                 continue;
             };
 

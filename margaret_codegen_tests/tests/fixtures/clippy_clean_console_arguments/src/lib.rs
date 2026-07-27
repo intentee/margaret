@@ -1,4 +1,5 @@
 #[rustfmt::skip]
+#[warn(clippy::pedantic)]
 #[path = "../margaret/mod.rs"]
 pub mod margaret;
 

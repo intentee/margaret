@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
+use futures_util::FutureExt;
 use futures_util::SinkExt;
 use futures_util::StreamExt;
+use futures_util::future::BoxFuture;
+use futures_util::stream::FuturesUnordered;
 use futures_util::stream::SplitSink;
 use futures_util::stream::SplitStream;
 use serde_json::Value;
@@ -47,6 +50,7 @@ async fn dispatch_frame<Session>(
     session: &Arc<Session>,
     dispatch_table: &Arc<WebSocketDispatchTable<Session>>,
     socket: &WebSocket,
+    pending: &mut FuturesUnordered<BoxFuture<'static, ()>>,
     frame: InboundFrame,
 ) where
     Session: Send + Sync + 'static,
@@ -59,11 +63,14 @@ async fn dispatch_frame<Session>(
                 let session = session.clone();
                 let socket = socket.clone();
 
-                tokio::spawn(async move {
-                    dispatch
-                        .dispatch(cancellation_token, session, id, params, socket)
-                        .await;
-                });
+                pending.push(
+                    async move {
+                        dispatch
+                            .dispatch(cancellation_token, session, id, params, socket)
+                            .await;
+                    }
+                    .boxed(),
+                );
             }
             None => {
                 report_send_failure(
@@ -85,11 +92,14 @@ async fn dispatch_frame<Session>(
                 let session = session.clone();
                 let socket = socket.clone();
 
-                tokio::spawn(async move {
-                    dispatch
-                        .dispatch(cancellation_token, session, params, socket)
-                        .await;
-                });
+                pending.push(
+                    async move {
+                        dispatch
+                            .dispatch(cancellation_token, session, params, socket)
+                            .await;
+                    }
+                    .boxed(),
+                );
             }
         }
     }
@@ -105,14 +115,24 @@ async fn run_source<Io, Session>(
     Io: AsyncRead + AsyncWrite + Unpin,
     Session: Send + Sync + 'static,
 {
+    let mut pending = FuturesUnordered::new();
+
     loop {
         tokio::select! {
             biased;
             () = cancellation_token.cancelled() => break,
+            Some(()) = pending.next(), if !pending.is_empty() => {}
             inbound = source.next() => match inbound {
                 Some(Ok(Message::Text(text))) => match serde_json::from_str::<InboundFrame>(text.as_str()) {
                     Ok(frame) => {
-                        dispatch_frame(&cancellation_token, &session, &dispatch_table, &socket, frame)
+                        dispatch_frame(
+                            &cancellation_token,
+                            &session,
+                            &dispatch_table,
+                            &socket,
+                            &mut pending,
+                            frame,
+                        )
                             .await;
                     }
                     Err(_) => break,

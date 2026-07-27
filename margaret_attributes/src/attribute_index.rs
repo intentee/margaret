@@ -4,9 +4,9 @@ use std::collections::HashSet;
 use syn::Path;
 use syn::Type;
 
-use crate::attribute_selector::AttributeSelector;
 use crate::canonical_path::CanonicalPath;
 use crate::field_base::field_base;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::identifier::Identifier;
 use crate::indexed_item::IndexedItem;
 use crate::matched_attribute::MatchedAttribute;
@@ -46,11 +46,9 @@ impl AttributeIndex {
         imports: HashMap<CanonicalPath, ModuleImports>,
     ) -> Self {
         let mut item_paths = HashSet::new();
-
         for item in &items {
             item_paths.insert(item.canonical_path().clone());
         }
-
         Self {
             empty_imports: ModuleImports::default(),
             identifiers: allocate_identifiers(&items),
@@ -61,8 +59,8 @@ impl AttributeIndex {
     }
 
     #[must_use]
-    pub fn has(&self, selector: &AttributeSelector) -> bool {
-        self.items.iter().any(|item| item.has_attribute(selector))
+    pub fn has_framework_attribute(&self, attribute: FrameworkAttribute) -> bool {
+        self.select_framework_attribute(attribute).next().is_some()
     }
 
     #[must_use]
@@ -70,7 +68,7 @@ impl AttributeIndex {
         self.items
             .binary_search_by(|item| item.canonical_path().cmp(path))
             .ok()
-            .map(|index| &self.items[index])
+            .and_then(|index| self.items.get(index))
     }
 
     #[must_use]
@@ -119,17 +117,16 @@ impl AttributeIndex {
         )
     }
 
-    #[must_use]
-    pub fn select(&self, selector: &AttributeSelector) -> Vec<MatchedAttribute<'_>> {
-        self.items
-            .iter()
-            .flat_map(|item| {
-                item.attributes()
-                    .iter()
-                    .filter(|attribute| selector.matches(attribute.path()))
-                    .map(move |attribute| MatchedAttribute::new(item, attribute))
-            })
-            .collect()
+    pub fn select_framework_attribute(
+        &self,
+        attribute: FrameworkAttribute,
+    ) -> impl Iterator<Item = MatchedAttribute<'_>> {
+        self.items.iter().flat_map(move |item| {
+            item.attributes()
+                .iter()
+                .filter(move |indexed| indexed.framework_attribute() == Some(attribute))
+                .map(move |indexed| MatchedAttribute::new(item, indexed))
+        })
     }
 
     #[must_use]
@@ -144,8 +141,9 @@ impl AttributeIndex {
     }
 
     fn module_of<'index>(&self, item: &'index IndexedItem) -> &'index [String] {
-        let segments = item.canonical_path().segments();
-
-        &segments[..segments.len().saturating_sub(1)]
+        item.canonical_path()
+            .segments()
+            .split_last()
+            .map_or(&[], |(_, module)| module)
     }
 }

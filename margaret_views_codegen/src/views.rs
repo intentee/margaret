@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 
 use crate::view::View;
@@ -10,12 +10,11 @@ use crate::view_arguments::ViewArguments;
 use crate::views_codegen_error::ViewsCodegenError;
 
 pub(crate) fn views(index: &AttributeIndex) -> Result<Vec<View>, ViewsCodegenError> {
-    let selector = AttributeSelector::from_marker("renders_view");
     let mut resolved: Vec<View> = Vec::new();
     let mut seen_views: HashSet<String> = HashSet::new();
     let mut seen_names: HashMap<String, String> = HashMap::new();
 
-    for matched in index.select(&selector) {
+    for matched in index.select_framework_attribute(FrameworkAttribute::RendersView) {
         let item = matched.item();
         let view = item.canonical_path().to_string();
 

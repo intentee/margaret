@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
@@ -9,58 +10,55 @@ use quote::quote;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::console_argument_clone::console_argument_clone;
 use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
-use margaret_codegen_tokens::console_argument_to_owned::console_argument_to_owned;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
 use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 
-use crate::console_closures::ConsoleClosures;
+use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::injected_dependency::InjectedDependency;
 use crate::provider_binding::ProviderBinding;
 
 pub struct ContainerBindings {
-    accessor_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
-    console_arguments: BTreeMap<CanonicalPath, Vec<ConsoleArgument>>,
-    console_slots: BTreeMap<ServeInputKey, usize>,
+    arguments: Arc<[ConsoleArgument]>,
+    asynchronous_constructions: BTreeSet<String>,
+    concrete_providers: BTreeMap<CanonicalPath, Arc<[ConsoleArgument]>>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
+    slots: Arc<BTreeMap<ServeInputKey, usize>>,
 }
 
 impl ContainerBindings {
-    pub(crate) fn from_plan(plan: &ContainerPlan, closures: &ConsoleClosures) -> Self {
-        let providers = plan
-            .injectable
-            .iter()
-            .map(|provider_key| (provider_key, plan.entry(provider_key)))
-            .map(|(provider_key, provider)| {
-                (
-                    provider_key.clone(),
+    pub(crate) fn from_plan(plan: &ContainerPlan) -> Self {
+        let mut providers = BTreeMap::new();
+        let mut asynchronous_constructions = BTreeSet::new();
+        let mut concrete_providers = BTreeMap::new();
+
+        for entry in plan.planned_entries() {
+            if entry.is_async {
+                asynchronous_constructions.insert(entry.provider.field_name.clone());
+            }
+
+            if plan.injectable(&entry.key) {
+                providers.insert(
+                    entry.key.clone(),
                     ProviderBinding {
-                        field_name: provider.field_name.clone(),
-                        type_name: provider.type_name.clone(),
+                        field_name: entry.provider.field_name.clone(),
+                        type_name: entry.provider.type_name.clone(),
                     },
-                )
-            })
-            .collect();
-        let console_arguments = plan
-            .entries
-            .iter()
-            .map(|(entry_key, entry)| {
-                (entry.concrete_path.clone(), closures.of(entry_key).to_vec())
-            })
-            .collect();
-        let accessor_console_arguments = plan
-            .entries
-            .iter()
-            .map(|(entry_key, entry)| (entry.field_name.clone(), closures.of(entry_key).to_vec()))
-            .collect();
-        let console_slots = closures.slots().clone();
+                );
+            }
+            concrete_providers.insert(
+                entry.provider.concrete_path.clone(),
+                Arc::clone(&entry.console_arguments),
+            );
+        }
 
         Self {
-            accessor_console_arguments,
-            console_arguments,
-            console_slots,
+            arguments: plan.arguments(),
+            asynchronous_constructions,
+            concrete_providers,
             providers,
+            slots: plan.slots(),
         }
     }
 
@@ -71,37 +69,51 @@ impl ContainerBindings {
         quote! { #container.#accessor() }
     }
 
-    #[must_use]
-    pub fn console_arguments(&self, concrete_path: &CanonicalPath) -> &[ConsoleArgument] {
-        match self.console_arguments.get(concrete_path) {
-            Some(arguments) => arguments,
-            None => &[],
-        }
+    pub fn console_arguments(
+        &self,
+        concrete_path: &CanonicalPath,
+    ) -> Result<&[ConsoleArgument], ContainerError> {
+        self.concrete_providers
+            .get(concrete_path)
+            .map(AsRef::as_ref)
+            .ok_or_else(|| ContainerError::MissingConsoleClosure {
+                path: concrete_path.to_string(),
+            })
     }
 
-    #[must_use]
-    pub fn console_slot(&self, key: &ServeInputKey) -> usize {
-        self.console_slots[key]
+    pub fn console_slot(&self, key: &ServeInputKey) -> Result<usize, ContainerError> {
+        self.slots
+            .get(key)
+            .copied()
+            .ok_or_else(|| ContainerError::MissingConsoleSlot {
+                key: format!("{key:?}"),
+            })
     }
 
-    #[must_use]
-    pub fn console_union(&self, arguments: &[ConsoleArgument]) -> Vec<ConsoleArgument> {
+    pub fn console_union(
+        &self,
+        arguments: &[ConsoleArgument],
+    ) -> Result<Vec<ConsoleArgument>, ContainerError> {
         let mut seen: BTreeSet<ServeInputKey> = BTreeSet::new();
-        let mut unified: Vec<ConsoleArgument> = Vec::new();
+        let mut unified: Vec<(usize, ConsoleArgument)> = Vec::new();
 
         for argument in arguments {
-            if seen.insert(argument.slot_key()) {
-                unified.push(argument.clone());
+            let key = argument.slot_key();
+
+            if seen.insert(key.clone()) {
+                unified.push((self.console_slot(&key)?, argument.clone()));
             }
         }
 
-        unified.sort_by_key(|argument| self.console_slot(&argument.slot_key()));
+        unified.sort_by_key(|(slot, _)| *slot);
 
-        unified
+        Ok(unified.into_iter().map(|(_, argument)| argument).collect())
     }
 
-    #[must_use]
-    pub fn console_weaves_owned(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
+    pub fn console_weaves_owned(
+        &self,
+        arguments: &[ConsoleArgument],
+    ) -> Result<Vec<TokenStream>, ContainerError> {
         arguments
             .iter()
             .map(|argument| self.materialize(argument))
@@ -116,15 +128,31 @@ impl ContainerBindings {
     ) -> TokenStream {
         let function = format_ident!("construct_{field_name}");
 
-        quote! { super::container::build::#function(#(#arguments),*).await }
+        let invocation = quote! { super::container::build::#function(#(#arguments),*) };
+
+        if self.asynchronous_constructions.contains(field_name) {
+            quote! { #invocation.await }
+        } else {
+            invocation
+        }
     }
 
     #[must_use]
+    pub fn serve_invocation(&self, arguments: &[TokenStream]) -> TokenStream {
+        let invocation = quote! { super::container::build::serve(#(#arguments),*) };
+
+        if self.asynchronous_constructions.is_empty() {
+            invocation
+        } else {
+            quote! { #invocation.await }
+        }
+    }
+
     pub fn injected_console_arguments(
         &self,
         dependency: &InjectedDependency,
-    ) -> Vec<ConsoleArgument> {
-        self.accessor_console_arguments(&dependency.field).to_vec()
+    ) -> Result<Vec<ConsoleArgument>, ContainerError> {
+        Ok(self.console_arguments(&dependency.concrete)?.to_vec())
     }
 
     #[must_use]
@@ -137,16 +165,15 @@ impl ContainerBindings {
         self.providers.contains_key(provider_key)
     }
 
-    #[must_use]
     pub fn serve_arguments(
         &self,
         roots: &[CanonicalPath],
         woven: &[ConsoleArgument],
-    ) -> Vec<ConsoleArgument> {
+    ) -> Result<Vec<ConsoleArgument>, ContainerError> {
         let mut collected: Vec<ConsoleArgument> = Vec::new();
 
         for root in roots {
-            collected.extend_from_slice(self.console_arguments(root));
+            collected.extend_from_slice(self.console_arguments(root)?);
         }
 
         collected.extend_from_slice(woven);
@@ -154,21 +181,23 @@ impl ContainerBindings {
         self.console_union(&collected)
     }
 
-    fn accessor_console_arguments(&self, field: &str) -> &[ConsoleArgument] {
-        &self.accessor_console_arguments[field]
+    #[must_use]
+    pub fn all_console_arguments(&self) -> &[ConsoleArgument] {
+        &self.arguments
     }
 
-    fn materialize(&self, argument: &ConsoleArgument) -> TokenStream {
-        let slot = self.console_slot(&argument.slot_key());
+    fn materialize(&self, argument: &ConsoleArgument) -> Result<TokenStream, ContainerError> {
+        let slot = self.console_slot(&argument.slot_key())?;
 
-        match argument.weaving() {
+        Ok(match argument.weaving() {
             WeavingKind::Copy => {
                 let ident = console_argument_ident(slot);
 
                 quote! { #ident }
             }
-            WeavingKind::BorrowedStr | WeavingKind::BorrowedPath => console_argument_to_owned(slot),
-            WeavingKind::Cloned => console_argument_clone(slot),
-        }
+            WeavingKind::BorrowedStr | WeavingKind::BorrowedPath | WeavingKind::Cloned => {
+                console_argument_clone(slot)
+            }
+        })
     }
 }

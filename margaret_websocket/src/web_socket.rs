@@ -64,3 +64,35 @@ impl WebSocket {
             .map_err(|source| WebSocketError::Send { source })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tokio::sync::mpsc;
+
+    use super::WebSocket;
+    use crate::outbound_response::OutboundResponse;
+    use crate::request_id::RequestId;
+
+    #[tokio::test]
+    async fn reports_a_closed_outbound_channel() {
+        let (sender, receiver) = mpsc::channel(1);
+        drop(receiver);
+        let socket = WebSocket::new(sender);
+        let response = OutboundResponse {
+            id: RequestId::Number(1),
+            is_done: true,
+            method: "complete",
+            payload: (),
+        };
+        let error = socket
+            .send(response)
+            .await
+            .expect_err("the closed channel rejects the frame");
+
+        assert!(
+            error
+                .to_string()
+                .starts_with("the websocket connection is closed")
+        );
+    }
+}

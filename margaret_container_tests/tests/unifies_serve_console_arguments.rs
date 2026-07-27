@@ -20,18 +20,30 @@ fn unifies_serve_console_arguments_across_roots() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/console_argument_propagation");
     let bindings = bindings_for_fixture("crate", &directory);
 
-    let serve = bindings.serve_arguments(&[path("Config"), path("Service")], &[]);
+    let serve = bindings
+        .serve_arguments(&[path("Config"), path("Service")], &[])
+        .expect("the service roots have complete console argument plans");
     let names: Vec<&str> = serve.iter().map(|argument| argument.name()).collect();
 
     assert_eq!(serve.len(), 2);
     assert!(names.contains(&"path"));
     assert!(names.contains(&"alpha"));
 
-    assert_eq!(bindings.console_arguments(&path("Config")).len(), 1);
-    assert!(bindings.console_arguments(&path("Absent")).is_empty());
+    assert_eq!(
+        bindings
+            .console_arguments(&path("Config"))
+            .expect("Config has a planned console closure")
+            .len(),
+        1
+    );
+    assert!(bindings.console_arguments(&path("Absent")).is_err());
 
-    let path_slot = bindings.console_slot(&console_key("path"));
-    let alpha_slot = bindings.console_slot(&console_key("alpha"));
+    let path_slot = bindings
+        .console_slot(&console_key("path"))
+        .expect("the path argument has a slot");
+    let alpha_slot = bindings
+        .console_slot(&console_key("alpha"))
+        .expect("the alpha argument has a slot");
 
     assert_ne!(path_slot, alpha_slot);
 }
