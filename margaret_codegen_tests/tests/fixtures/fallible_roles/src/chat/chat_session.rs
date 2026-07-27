@@ -2,7 +2,7 @@ use failures as errors;
 use margaret::framework::macros::build_for_session;
 use margaret::framework::macros::websocket_session;
 
-#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = "https://example.test", path = "/chat", server = "public")]
+#[websocket_session(origin = "https://example.test", path = "/chat", server = "public")]
 pub struct ChatSession;
 
 impl ChatSession {

@@ -7,7 +7,7 @@ struct WithProvides;
 #[singleton]
 enum RootEnum {}
 
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = Get, pattern = "/home", count = 5, Marker, (grouped) = 1, qualified::path = 2)]
+#[responds_to_http(method = Get, pattern = "/home", count = 5, Marker, (grouped) = 1, qualified::path = 2)]
 fn root_function() {}
 
 trait RootTrait {}

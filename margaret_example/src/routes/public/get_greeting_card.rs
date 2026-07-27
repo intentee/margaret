@@ -13,7 +13,7 @@ use crate::margaret::views::Views;
 use crate::views::greeting_view::GreetingViewProps;
 
 #[singleton]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/greeting-card", server = "public")]
+#[responds_to_http(method = "get", path = "/greeting-card", server = "public")]
 pub struct GetGreetingCard {
     greeter: Arc<EnglishGreeter>,
 }

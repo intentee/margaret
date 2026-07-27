@@ -1,7 +1,7 @@
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
 #[renders_view(name = "configured")]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/configured", server = "public")]
+#[responds_to_http(method = "get", path = "/configured", server = "public")]
 #[singleton]
 struct Configured;
 
@@ -13,7 +13,7 @@ impl Configured {
     fn respond(&self) -> anyhow::Result<Response> {}
 }
 
-#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = "https://example.test", path = "/room", server = "public")]
+#[websocket_session(origin = "https://example.test", path = "/room", server = "public")]
 struct Room;
 
 impl Room {

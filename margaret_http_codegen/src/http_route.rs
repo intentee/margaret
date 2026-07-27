@@ -4,10 +4,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_middleware_codegen::layer_application::LayerApplication;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 
-use crate::access_policy_binding::AccessPolicyBinding;
-
 pub(crate) struct HttpRoute {
-    pub(crate) access_policy: AccessPolicyBinding,
     pub(crate) arguments: Vec<BoundParameter>,
     pub(crate) layers: Vec<LayerApplication>,
     pub(crate) method: http::Method,

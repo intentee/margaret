@@ -8,7 +8,6 @@ use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
-use crate::access_policy_binding::AccessPolicyBinding;
 use crate::active_servers::active_servers;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route_table::HttpRouteTable;
@@ -77,10 +76,6 @@ fn retained_roots(table: &HttpRouteTable) -> Vec<CanonicalPath> {
 
     for route in table.routes() {
         roots.insert(route.responder_path.clone());
-
-        if let AccessPolicyBinding::Singleton { path, .. } = &route.access_policy {
-            roots.insert(path.clone());
-        }
 
         for layer in &route.layers {
             roots.insert(layer.concrete.clone());

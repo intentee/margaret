@@ -8,7 +8,6 @@ use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
-use crate::access_policy_binding::AccessPolicyBinding;
 use crate::build_websocket_plan::build_websocket_plan;
 use crate::server_console_arguments::server_console_arguments;
 use crate::session_plan::SessionPlan;
@@ -91,10 +90,6 @@ fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
     let mut roots = std::collections::BTreeSet::new();
 
     for session_plan in sessions {
-        if let AccessPolicyBinding::Singleton { path, .. } = &session_plan.session.access_policy {
-            roots.insert(path.clone());
-        }
-
         for layer in &session_plan.session.layers {
             roots.insert(layer.concrete.clone());
         }

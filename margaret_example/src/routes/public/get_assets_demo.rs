@@ -12,7 +12,7 @@ use crate::views::asset_page::AssetPage;
 use crate::views::asset_page::AssetPageProps;
 
 #[singleton]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/assets-demo", server = "public")]
+#[responds_to_http(method = "get", path = "/assets-demo", server = "public")]
 pub struct GetAssetsDemo {
     asset_page: Arc<AssetPage>,
 }

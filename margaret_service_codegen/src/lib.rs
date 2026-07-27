@@ -123,7 +123,7 @@ mod tests {
     }
 
     const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
-    const STATELESS_RESPONDER: &str = "#[singleton]\n#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
+    const STATELESS_RESPONDER: &str = "#[singleton]\n#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
     const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n";
     const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
 

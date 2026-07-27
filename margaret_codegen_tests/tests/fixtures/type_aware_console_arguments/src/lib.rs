@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 #[singleton]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/configured", server = "public")]
+#[responds_to_http(method = "get", path = "/configured", server = "public")]
 struct Configured;
 
 impl Configured {

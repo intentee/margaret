@@ -43,20 +43,6 @@ pub enum HttpCodegenError {
     #[error("#[responds_to_http] is only supported on structs, but '{target}' is not a struct")]
     RespondsToHttpNotOnStruct { target: String },
 
-    #[error("responder '{responder}' is missing the required typed 'access' policy")]
-    MissingAccessPolicy { responder: String },
-
-    #[error("responder '{responder}' references an access policy that cannot be resolved")]
-    UnresolvedAccessPolicy { responder: String },
-
-    #[error("responder '{responder}' references access policy '{policy}', which is not a struct")]
-    AccessPolicyNotAStruct { policy: String, responder: String },
-
-    #[error(
-        "responder '{responder}' references access policy '{policy}', which is not a #[singleton]"
-    )]
-    AccessPolicyNotSingleton { policy: String, responder: String },
-
     #[error("responder '{responder}' is missing the 'method' argument")]
     MissingHttpMethod { responder: String },
 

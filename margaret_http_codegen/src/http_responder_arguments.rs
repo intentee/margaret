@@ -1,7 +1,5 @@
-use margaret_attributes::attribute_args::AttributeArgs;
-use syn::Path;
-
 use crate::http_codegen_error::HttpCodegenError;
+use margaret_attributes::attribute_args::AttributeArgs;
 
 fn normalized_method(method: String, responder: &str) -> Result<http::Method, HttpCodegenError> {
     let method = method.to_uppercase();
@@ -16,7 +14,6 @@ fn normalized_method(method: String, responder: &str) -> Result<http::Method, Ht
 }
 
 pub(crate) struct HttpResponderArguments {
-    pub(crate) access: Path,
     pub(crate) method: http::Method,
     pub(crate) name: Option<String>,
     pub(crate) path: String,
@@ -29,11 +26,6 @@ impl HttpResponderArguments {
         responder: &str,
     ) -> Result<Self, HttpCodegenError> {
         arguments.interpret(|reader| {
-            let Some(access) = reader.take_path("access")? else {
-                return Err(HttpCodegenError::MissingAccessPolicy {
-                    responder: responder.to_string(),
-                });
-            };
             let method = normalized_method(
                 reader.take_string("method")?.ok_or_else(|| {
                     HttpCodegenError::MissingHttpMethod {
@@ -56,7 +48,6 @@ impl HttpResponderArguments {
             })?;
 
             Ok(Self {
-                access,
                 method,
                 name,
                 path,

@@ -10,7 +10,7 @@ use crate::forms::post_article_form::PostArticleForm;
 use crate::stores::article_store::ArticleStore;
 
 #[singleton]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess,
+#[responds_to_http(
     method = "post",
     name = "post_article",
     path = "/articles",

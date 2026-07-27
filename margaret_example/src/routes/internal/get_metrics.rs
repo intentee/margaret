@@ -9,7 +9,7 @@ use margaret::framework::macros::singleton;
 use crate::metrics::Metrics;
 
 #[singleton]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/metrics", server = "internal")]
+#[responds_to_http(method = "get", path = "/metrics", server = "internal")]
 pub struct GetMetrics {
     metrics: Arc<Metrics>,
 }

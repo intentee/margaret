@@ -13,7 +13,7 @@ use crate::margaret::views::Views;
 use crate::views::farewell_view::FarewellViewProps;
 
 #[singleton]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/farewell-card", server = "public")]
+#[responds_to_http(method = "get", path = "/farewell-card", server = "public")]
 pub struct GetFarewellCard {
     app_name: Arc<AppName>,
 }

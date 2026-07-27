@@ -6,7 +6,7 @@ use margaret::framework::macros::singleton;
 use crate::forms::reader_preferences_cookie::ReaderPreferencesCookie;
 
 #[singleton]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/preferences", server = "public")]
+#[responds_to_http(method = "get", path = "/preferences", server = "public")]
 pub struct GetPreferences;
 
 impl GetPreferences {

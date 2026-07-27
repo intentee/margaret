@@ -6,7 +6,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 
 #[singleton]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/identity", server = "internal")]
+#[responds_to_http(method = "get", path = "/identity", server = "internal")]
 pub struct GetIdentity;
 
 impl GetIdentity {

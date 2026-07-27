@@ -59,18 +59,6 @@ pub enum WebSocketCodegenError {
     #[error("'{session}' carries #[websocket_session] but is not a struct")]
     SessionNotAStruct { session: String },
 
-    #[error("session '{session}' is missing the required typed 'access' policy")]
-    MissingSessionAccessPolicy { session: String },
-
-    #[error("session '{session}' references an access policy that cannot be resolved")]
-    UnresolvedSessionAccessPolicy { session: String },
-
-    #[error("session '{session}' references access policy '{policy}', which is not a struct")]
-    SessionAccessPolicyNotAStruct { policy: String, session: String },
-
-    #[error("session '{session}' references access policy '{policy}', which is not a #[singleton]")]
-    SessionAccessPolicyNotSingleton { policy: String, session: String },
-
     #[error("session '{session}' is missing the required 'path' argument")]
     MissingSessionPath { session: String },
 

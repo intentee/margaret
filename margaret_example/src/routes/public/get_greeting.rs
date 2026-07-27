@@ -9,7 +9,7 @@ use margaret::framework::macros::singleton;
 use crate::english_greeter::EnglishGreeter;
 
 #[singleton]
-#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess,
+#[responds_to_http(
     method = "get",
     name = "get_greeting",
     path = "/greeting",

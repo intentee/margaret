@@ -24,7 +24,6 @@ use margaret_request_binding_codegen::render_bound_request_extractions::render_b
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
-use crate::access_policy_binding::AccessPolicyBinding;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
@@ -225,26 +224,12 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         }
     };
 
-    let handler = fold_layers(
+    fold_layers(
         &route.layers,
         handler,
         &quote! { super::super::middleware },
         bindings,
-    );
-    let policy = match &route.access_policy {
-        AccessPolicyBinding::Public => quote! {
-            std::sync::Arc::new(
-                margaret::framework::http::public_access::PublicAccess,
-            )
-        },
-        AccessPolicyBinding::Singleton { field, .. } => {
-            bindings.accessor_invocation(&format_ident!("container"), &field.to_string())
-        }
-    };
-
-    quote! {
-        margaret::framework::http::access_control::access_control(#policy, #handler)
-    }
+    )
 }
 
 fn argument_value(

@@ -5,7 +5,6 @@ use quote::quote;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_vec_tokens::middleware_vec_tokens;
 
-use crate::access_policy_binding::AccessPolicyBinding;
 use crate::session_plan::SessionPlan;
 
 pub(crate) fn render_server_routes(
@@ -39,16 +38,6 @@ pub(crate) fn render_server_routes(
                 bindings,
             )
         };
-        let policy = match &session_plan.session.access_policy {
-            AccessPolicyBinding::Public => quote! {
-                std::sync::Arc::new(
-                    margaret::framework::http::public_access::PublicAccess,
-                )
-            },
-            AccessPolicyBinding::Singleton { field, .. } => {
-                bindings.accessor_invocation(&format_ident!("container"), &field.to_string())
-            }
-        };
         let upgrade_call = quote! {
             super::#module::upgrade_entry(container, #routes_argument).await
         };
@@ -57,10 +46,7 @@ pub(crate) fn render_server_routes(
                 #path,
                 margaret::framework::http::http::HeaderValue::try_from(#origin)?,
                 #upgrade_call,
-                margaret::framework::http::access_policy_middleware::access_policy_middleware(
-                    #policy,
-                    #middleware,
-                ),
+                #middleware,
             ),
         }
     });
