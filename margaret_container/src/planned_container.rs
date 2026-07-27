@@ -41,18 +41,16 @@ impl PlannedContainer {
             .iter()
             .map(|root| self.plan.planned_entry(root))
             .collect::<Result<Vec<_>, _>>()?;
-        let modules = vec![
-            GeneratedModuleTokens::new("container", render(&construction_roots, &retained_roots)),
-            GeneratedModuleTokens::new(
-                "container/build",
-                render_build(
-                    &self.plan,
-                    &construction_roots,
-                    &retained_roots,
-                    &builder_roots,
-                ),
-            ),
-        ];
+        let mut modules = vec![GeneratedModuleTokens::new(
+            "container",
+            render(&construction_roots, &retained_roots),
+        )];
+        modules.extend(render_build(
+            &self.plan,
+            &construction_roots,
+            &retained_roots,
+            &builder_roots,
+        ));
 
         Ok(RenderedContainer {
             bindings: self.bindings,

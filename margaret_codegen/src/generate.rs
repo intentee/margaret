@@ -5,12 +5,11 @@ use std::path::Path;
 
 use margaret_attributes::crate_root::CrateRoot;
 
+use crate::assets_directory_name::ASSETS_DIRECTORY_NAME;
 use crate::build::build;
 use crate::codegen_error::CodegenError;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 use crate::workspace_root::workspace_root;
-
-pub(crate) const ASSETS_DIRECTORY_NAME: &str = "assets";
 
 fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
     match fs::read_to_string(metafile_path) {

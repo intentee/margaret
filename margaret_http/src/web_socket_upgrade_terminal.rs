@@ -70,8 +70,8 @@ mod tests {
     use crate::resolve_continuation::resolve_continuation;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
+    use crate::web_socket_driver_channel::web_socket_driver_channel;
     use crate::web_socket_driver_sender::WebSocketDriverSender;
-    use crate::web_socket_driver_sender::web_socket_driver_channel;
     use crate::web_socket_upgrade::WebSocketUpgrade;
 
     struct AcceptingUpgrade;

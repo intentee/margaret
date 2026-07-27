@@ -6,7 +6,7 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 
 use crate::message_cardinality::MessageCardinality;
 use crate::message_kind::MessageKind;
-use crate::websocket_message::WebSocketMessage;
+use crate::web_socket_message::WebSocketMessage;
 
 fn render_request_message(path: &CanonicalPath, cardinality: &MessageCardinality) -> TokenStream {
     let message = path_tokens(path);

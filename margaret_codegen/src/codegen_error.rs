@@ -14,7 +14,7 @@ use margaret_model_codegen::model_codegen_error::ModelCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 use margaret_service_codegen::service_codegen_error::ServiceCodegenError;
 use margaret_views_codegen::views_codegen_error::ViewsCodegenError;
-use margaret_websocket_codegen::websocket_codegen_error::WebSocketCodegenError;
+use margaret_websocket_codegen::web_socket_codegen_error::WebSocketCodegenError;
 
 #[derive(Debug, Error)]
 pub enum CodegenError {

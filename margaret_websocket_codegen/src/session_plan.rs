@@ -1,5 +1,5 @@
 use crate::handler_binding::HandlerBinding;
-use crate::websocket_session::WebSocketSession;
+use crate::web_socket_session::WebSocketSession;
 
 pub(crate) struct SessionPlan {
     pub(crate) notification_handlers: Vec<HandlerBinding>,

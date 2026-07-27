@@ -1,3 +1,4 @@
+use heck::ToSnakeCase;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -5,6 +6,7 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::binding_reads_request::binding_reads_request;
 use margaret_request_binding_codegen::binding_shadows_request::binding_shadows_request;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
@@ -37,10 +39,10 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
         ..
     } = plan;
     let concrete = path_tokens(concrete);
-    let routes_field =
-        injects_routes.then(|| quote! { pub routes: std::sync::Arc<super::routes::Routes>, });
+    let routes_field = injects_routes
+        .then(|| quote! { pub routes: std::sync::Arc<super::super::routes::Routes>, });
     let views_field =
-        injects_views.then(|| quote! { pub views: std::sync::Arc<super::views::Views>, });
+        injects_views.then(|| quote! { pub views: std::sync::Arc<super::super::views::Views>, });
 
     let mut allocator = NameAllocator::new();
 
@@ -128,10 +130,32 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     }
 }
 
-pub fn render_middleware_wrappers(plans: &[MiddlewarePlan]) -> TokenStream {
-    let wrappers = plans.iter().map(middleware_wrapper);
+#[must_use]
+pub fn render_middleware_wrappers(plans: &[MiddlewarePlan]) -> Vec<GeneratedModuleTokens> {
+    let modules = plans.iter().map(|plan| {
+        let wrapper = &plan.wrapper;
+        format_ident!("{}", wrapper.to_string().to_snake_case())
+    });
+    let exports = plans.iter().map(|plan| {
+        let wrapper = &plan.wrapper;
+        let module = format_ident!("{}", wrapper.to_string().to_snake_case());
 
-    quote! {
-        #(#wrappers)*
-    }
+        quote! { pub use #module::#wrapper; }
+    });
+    let mut generated = vec![GeneratedModuleTokens::new(
+        "middleware",
+        quote! {
+            #(pub mod #modules;)*
+            #(#exports)*
+        },
+    )];
+
+    generated.extend(plans.iter().map(|plan| {
+        let wrapper = &plan.wrapper;
+        let module = wrapper.to_string().to_snake_case();
+
+        GeneratedModuleTokens::new(format!("middleware/{module}"), middleware_wrapper(plan))
+    }));
+
+    generated
 }

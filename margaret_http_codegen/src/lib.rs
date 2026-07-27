@@ -13,6 +13,7 @@ mod render_forwarders;
 pub mod render_http;
 mod render_routes;
 mod route_group;
+mod server_console_arguments;
 mod server_route_group;
 pub mod server_transport_policy;
 pub mod serves_spiffe;
@@ -1687,10 +1688,10 @@ impl GetMetrics {
         let source = source_for(MULTIPLE_SERVERS);
 
         assert!(source.contains(
-            "server_public(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::router::Router::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","
+            "server_public(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::router::Router::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","
         ));
         assert!(source.contains(
-            "server_internal(container:&super::super::container::Container,_routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::router::Router::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/metrics\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","
+            "server_internal(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::router::Router::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/metrics\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","
         ));
     }
 

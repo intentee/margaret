@@ -13,7 +13,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::asset_arm::AssetArm;
 use crate::asset_bag_codegen_error::AssetBagCodegenError;
-use crate::asset_responder_identity::asset_responder_canonical_suffix;
+use crate::asset_responder_canonical_suffix::asset_responder_canonical_suffix;
 use crate::asset_slot::AssetSlot;
 use crate::bundle_tokens::bundle_tokens;
 use crate::cache_policy::CachePolicy;

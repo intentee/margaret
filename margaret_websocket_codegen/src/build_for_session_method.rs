@@ -2,7 +2,7 @@ use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 
-use crate::websocket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_codegen_error::WebSocketCodegenError;
 
 pub(crate) fn build_for_session_method<'index>(
     item: &'index IndexedItem,

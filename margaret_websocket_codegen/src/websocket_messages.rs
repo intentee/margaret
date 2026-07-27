@@ -2,8 +2,8 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 
 use crate::message_kind::MessageKind;
-use crate::websocket_codegen_error::WebSocketCodegenError;
-use crate::websocket_message::WebSocketMessage;
+use crate::web_socket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_message::WebSocketMessage;
 
 pub(crate) fn websocket_messages(
     index: &AttributeIndex,

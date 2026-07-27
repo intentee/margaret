@@ -17,7 +17,7 @@ pub(crate) struct LevelSeven {
 impl LevelSeven {
     #[constructor]
     pub(crate) async fn create(dependency: Arc<LevelSix>) -> anyhow::Result<Self> {
-        super::construction_counts::record(6);
+        super::record::record(6);
         Ok(Self {
             _dependency: dependency,
         })

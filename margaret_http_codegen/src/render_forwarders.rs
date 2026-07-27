@@ -75,6 +75,13 @@ pub(crate) fn render_forwarders(
     for server in servers {
         modules.push(GeneratedModuleTokens::new(
             format!("forwarders/{}", server.name()),
+            quote! {
+                pub mod forwarder;
+                pub use forwarder::Forwarder;
+            },
+        ));
+        modules.push(GeneratedModuleTokens::new(
+            format!("forwarders/{}/forwarder", server.name()),
             server_forwarder(table, server),
         ));
     }

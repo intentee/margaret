@@ -2,35 +2,10 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use margaret_codegen_tokens::path_tokens::path_tokens;
-
 use crate::field_ident::field_ident;
+use crate::field_type::field_type;
 use crate::planned_provider::PlannedProvider;
-use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
-use crate::provides_endpoint_path::provides_endpoint_path;
-
-pub(crate) fn constructed_type(provider: &Provider) -> TokenStream {
-    match &provider.provided {
-        ProvidedType::Concrete(path) => path_tokens(path),
-        ProvidedType::Endpoint(_) => {
-            let interface = path_tokens(&provides_endpoint_path());
-
-            quote! { dyn #interface }
-        }
-        ProvidedType::UriSelected(trait_path) => {
-            let interface = path_tokens(trait_path);
-
-            quote! { dyn #interface }
-        }
-    }
-}
-
-pub(crate) fn field_type(provider: &Provider) -> TokenStream {
-    let constructed = constructed_type(provider);
-
-    quote! { ::std::sync::Arc<#constructed> }
-}
 
 fn field_declaration(provider: &Provider, accessible: bool) -> TokenStream {
     let field = field_ident(provider);

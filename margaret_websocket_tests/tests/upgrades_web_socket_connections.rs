@@ -4,7 +4,7 @@ use margaret_websocket_tests::failing_session_factory::FailingSessionFactory;
 use margaret_websocket_tests::raw_http_exchange::raw_http_exchange;
 use margaret_websocket_tests::redirecting_session_factory::RedirectingSessionFactory;
 use margaret_websocket_tests::rejecting_session_factory::RejectingSessionFactory;
-use margaret_websocket_tests::running_websocket_server::RunningWebSocketServer;
+use margaret_websocket_tests::running_web_socket_server::RunningWebSocketServer;
 use margaret_websocket_tests::validating_session_factory::ValidatingSessionFactory;
 use tokio::net::TcpStream;
 use tokio_tungstenite::client_async;

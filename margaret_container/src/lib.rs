@@ -1,4 +1,5 @@
 mod build_plan;
+mod constructed_type;
 pub mod construction_error_path;
 mod construction_flow;
 mod construction_source;
@@ -8,6 +9,7 @@ mod container_plan;
 mod dependency_kind;
 mod direct_construction;
 mod field_ident;
+mod field_type;
 pub mod framework_construction;
 pub mod framework_dependency;
 pub mod framework_enablement;

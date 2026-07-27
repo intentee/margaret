@@ -7,12 +7,9 @@ use margaret::framework::views::maud::Markup;
 use margaret::framework::views::maud::html;
 use margaret::framework::views::renders_view::RendersView;
 
+pub use super::home_view_props::HomeViewProps;
 use super::margaret::asset_bag::asset;
 use super::secrets::Secrets;
-
-pub struct HomeViewProps {
-    pub heading: String,
-}
 
 #[renders_view(name = "home_view")]
 #[singleton]

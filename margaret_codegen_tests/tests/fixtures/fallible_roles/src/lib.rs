@@ -9,6 +9,8 @@ mod get_profile;
 mod get_user;
 mod guard;
 mod home_view;
+mod home_view_props;
+mod interval;
 mod pulse;
 mod result;
 mod secrets;

@@ -19,7 +19,7 @@ use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::handler_binding::HandlerBinding;
 use crate::session_plan::SessionPlan;
-use crate::websocket_session::WebSocketSession;
+use crate::web_socket_session::WebSocketSession;
 
 fn injected_field_type(dependency: &InjectedDependency) -> TokenStream {
     let concrete = path_tokens(&dependency.concrete);
@@ -60,7 +60,7 @@ fn factory_fields(session: &WebSocketSession, captured: &CapturedProviders) -> T
                 Some(quote! { #holder: #field_type, })
             }
             RequestBinding::Routes => Some(quote! {
-                #holder: ::std::sync::Arc<super::super::routes::Routes>,
+                #holder: ::std::sync::Arc<super::super::super::routes::Routes>,
             }),
             _ => None,
         }
@@ -72,7 +72,7 @@ fn factory_fields(session: &WebSocketSession, captured: &CapturedProviders) -> T
                 let wrapper = &application.wrapper;
 
                 quote! {
-                    #local: ::std::sync::Arc<super::super::authenticated_users::#wrapper>,
+                    #local: ::std::sync::Arc<super::super::super::authenticated_users::#wrapper>,
                 }
             }
             CapturedProviderKind::Binder { provider, .. } => {
@@ -116,7 +116,7 @@ fn factory_initializers(
 
                 quote! {
                     #local: ::std::sync::Arc::new(
-                        super::super::authenticated_users::#wrapper {
+                        super::super::super::authenticated_users::#wrapper {
                             inner: #inner,
                             #routes_init
                         },
@@ -398,7 +398,7 @@ fn render_dispatch_table(
     };
     quote! {
         async fn dispatch_table(
-            #container: &super::super::container::Container,
+            #container: &super::super::super::container::Container,
         ) -> #table_type {
             let #requests_mutability #requests: ::std::collections::HashMap<
                 ::std::string::String,
@@ -431,7 +431,7 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
     let factory = render_factory(&plan.session, &captured);
     let initializers = factory_initializers(&plan.session, bindings, &captured);
     let routes_parameter = plan.session.injects_routes().then(|| {
-        quote! { routes: &::std::sync::Arc<super::super::routes::Routes>, }
+        quote! { routes: &::std::sync::Arc<super::super::super::routes::Routes>, }
     });
     let request_dispatches = plan
         .request_handlers
@@ -465,7 +465,7 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
         #dispatch_table
 
         pub async fn upgrade_entry(
-            container: &super::super::container::Container,
+            container: &super::super::super::container::Container,
             #routes_parameter
         ) -> #upgrade_type {
             #upgrade_value
@@ -479,11 +479,22 @@ pub(crate) fn render_sessions(
 ) -> Vec<GeneratedModuleTokens> {
     sessions
         .iter()
-        .map(|plan| {
-            GeneratedModuleTokens::new(
-                format!("websocket/{}", plan.session.module_name),
-                render_session(plan, bindings),
-            )
+        .flat_map(|plan| {
+            let module_name = &plan.session.module_name;
+
+            [
+                GeneratedModuleTokens::new(
+                    format!("websocket/{module_name}"),
+                    quote! {
+                        pub mod upgrade_entry;
+                        pub use upgrade_entry::upgrade_entry;
+                    },
+                ),
+                GeneratedModuleTokens::new(
+                    format!("websocket/{module_name}/upgrade_entry"),
+                    render_session(plan, bindings),
+                ),
+            ]
         })
         .collect()
 }

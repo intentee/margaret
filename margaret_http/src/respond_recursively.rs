@@ -2,47 +2,14 @@ use std::sync::Arc;
 
 use crate::forward_targets::ForwardTargets;
 use crate::handler::Handler;
-use crate::handler_error::HandlerError;
-use crate::one_shot_handler::OneShotHandler;
 use crate::request::Request;
-use crate::resolve_continuation::resolve_continuation;
+use crate::respond_to_outcome::respond_to_outcome;
 use crate::response::Response;
-use crate::response_continuation::ResponseContinuation;
-
-async fn respond_to_outcome(
-    forward_targets: &Arc<ForwardTargets>,
-    request: Request,
-    outcome: Result<ResponseContinuation, HandlerError>,
-) -> Response {
-    let outcome = match outcome {
-        Ok(outcome) => resolve_continuation(forward_targets, request, outcome).await,
-        Err(error) => Err(error),
-    };
-
-    match outcome {
-        Ok(response) => response,
-        Err(error) => {
-            eprintln!("margaret_http: request handling failed: {error:#}");
-
-            Response::text(500, "Internal Server Error")
-        }
-    }
-}
 
 pub(crate) async fn respond_recursively(
     forward_targets: &Arc<ForwardTargets>,
     request: Request,
     first: Arc<dyn Handler>,
-) -> Response {
-    let outcome = first.handle(&request).await;
-
-    respond_to_outcome(forward_targets, request, outcome).await
-}
-
-pub(crate) async fn respond_once(
-    forward_targets: &Arc<ForwardTargets>,
-    request: Request,
-    first: Box<dyn OneShotHandler>,
 ) -> Response {
     let outcome = first.handle(&request).await;
 

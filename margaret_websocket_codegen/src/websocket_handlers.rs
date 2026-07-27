@@ -5,7 +5,7 @@ use margaret_attributes::indexed_trait_impl::IndexedTraitImpl;
 
 use crate::discovered_handler::DiscoveredHandler;
 use crate::handler_kind::HandlerKind;
-use crate::websocket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_codegen_error::WebSocketCodegenError;
 
 fn responds_to_message_path() -> CanonicalPath {
     CanonicalPath::new(vec![

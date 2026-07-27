@@ -5,13 +5,13 @@ use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_tag_codegen::jwks_client_binding::JwksClientBinding;
 
-use crate::jwks_client_path::jwks_client_canonical_path;
-use crate::jwks_handler_path::public_jwks_handler_canonical_path;
-use crate::jwks_roller_path::jwks_roller_canonical_path;
-use crate::jwks_secret_storage_path::jwks_secret_storage_canonical_path;
-use crate::jwks_secret_store_path::server_secret_store_canonical_path;
-use crate::jwks_verifier_path::public_jwks_verifier_canonical_path;
-use crate::mint_access_token_handler_path::mint_access_token_handler_canonical_path;
+use crate::jwks_client_canonical_path::jwks_client_canonical_path;
+use crate::jwks_roller_canonical_path::jwks_roller_canonical_path;
+use crate::jwks_secret_storage_canonical_path::jwks_secret_storage_canonical_path;
+use crate::mint_access_token_handler_canonical_path::mint_access_token_handler_canonical_path;
+use crate::public_jwks_handler_canonical_path::public_jwks_handler_canonical_path;
+use crate::public_jwks_verifier_canonical_path::public_jwks_verifier_canonical_path;
+use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
 
 fn client_providers(binding: &JwksClientBinding) -> [FrameworkProvider; 2] {
     let client = jwks_client_canonical_path(&binding.module_segment);

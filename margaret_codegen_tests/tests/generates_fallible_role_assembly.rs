@@ -68,9 +68,12 @@ fn http_server_assembly_reads_only_completed_dependencies() {
 
 #[test]
 fn websocket_dispatch_reads_only_completed_dependencies() {
-    let source = module(&generated(), "websocket/chat_chat_session");
+    let source = module(
+        &generated(),
+        "websocket/chat_chat_session_chat_session/upgrade_entry",
+    );
 
-    assert!(source.contains("handler:container.chat_chat_responder()"));
+    assert!(source.contains("handler:container.chat_chat_responder_chat_responder()"));
     assert!(source.contains("dispatch_table(container).await"));
     assert!(!source.contains("ConstructionError"));
 }

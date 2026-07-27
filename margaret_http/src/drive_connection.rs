@@ -45,7 +45,7 @@ mod tests {
     use tokio::sync::oneshot;
 
     use super::drive_connection;
-    use crate::web_socket_driver_sender::web_socket_driver_channel;
+    use crate::web_socket_driver_channel::web_socket_driver_channel;
 
     #[tokio::test]
     async fn polls_a_received_driver_while_the_connection_is_open() {
