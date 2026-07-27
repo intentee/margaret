@@ -11,6 +11,7 @@ pub(crate) struct LevelOne;
 impl LevelOne {
     #[constructor]
     pub(crate) async fn create() -> anyhow::Result<Self> {
+        super::construction_counts::record(0);
         Ok(Self)
     }
 

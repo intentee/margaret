@@ -15,5 +15,4 @@ fn generates_linear_async_construction() {
     assert!(source.contains("crate::Pool::new(::std::sync::Arc::clone(&config)).await"));
     assert!(source.contains("crate::Config::new()"));
     assert!(!source.contains("crate::Config::new().await"));
-    assert!(!source.contains("construct_once"));
 }

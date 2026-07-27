@@ -1,6 +1,7 @@
 mod active_servers;
 pub mod http_artifacts;
 pub mod http_codegen_error;
+pub mod http_plan;
 mod http_responder_arguments;
 mod http_route;
 mod http_route_table;
@@ -37,8 +38,29 @@ mod tests {
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 
     use crate::http_codegen_error::HttpCodegenError;
-    use crate::render_http::render_http;
+    use crate::http_plan::HttpPlan;
     use crate::serves_spiffe::serves_spiffe;
+
+    fn render_http(
+        index: &AttributeIndex,
+        has_views: bool,
+        websocket_servers: &[String],
+        middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+        bindings: &ContainerBindings,
+        websocket_server_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
+        registries: &BindingRegistries,
+    ) -> Result<crate::http_artifacts::HttpArtifacts, HttpCodegenError> {
+        HttpPlan::build(
+            index,
+            has_views,
+            websocket_servers,
+            middleware_plans,
+            bindings,
+            websocket_server_arguments,
+            registries,
+        )
+        .map(|plan| crate::render_http::render_http(plan, bindings))
+    }
 
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
@@ -789,7 +811,7 @@ impl Health {
             middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
-        crate::render_http::render_http(
+        render_http(
             &index,
             false,
             &[],

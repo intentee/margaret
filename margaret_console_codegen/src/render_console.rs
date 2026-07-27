@@ -1,33 +1,26 @@
-use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 
 use crate::console_artifacts::ConsoleArtifacts;
-use crate::console_codegen_error::ConsoleCodegenError;
-use crate::console_commands::console_commands;
+use crate::console_plan::ConsolePlan;
 use crate::render::render;
 
+#[must_use]
 pub fn render_console(
-    index: &AttributeIndex,
+    plan: ConsolePlan,
     serves: bool,
     has_models: bool,
     servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
     bindings: &ContainerBindings,
-) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
-    let commands = console_commands(index, bindings)?;
-    let construction_roots = commands
-        .iter()
-        .map(|command| command.construction_root.clone())
-        .collect();
-
-    Ok(ConsoleArtifacts {
+) -> ConsoleArtifacts {
+    ConsoleArtifacts {
         module: GeneratedModuleTokens::new(
             "run",
             render(
-                &commands,
+                &plan.commands,
                 serves,
                 has_models,
                 servers,
@@ -35,6 +28,6 @@ pub fn render_console(
                 bindings,
             ),
         ),
-        construction_roots,
-    })
+        construction_roots: plan.construction_roots().to_vec(),
+    }
 }

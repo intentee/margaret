@@ -13,6 +13,4 @@ fn wires_dependencies_through_linear_construction() {
     assert!(source.contains(
         "crate::App::new(::std::sync::Arc::clone(&english_greeter),::std::sync::Arc::clone(&config),)"
     ));
-    assert!(!source.contains("construct_once"));
-    assert!(!source.contains("ConstructionSlot"));
 }

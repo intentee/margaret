@@ -13,7 +13,6 @@ fn selects_one_entry_per_repeated_attribute_occurrence() {
         .build();
     let occurrences = index
         .select_framework_attribute(FrameworkAttribute::Singleton)
-        .iter()
         .filter(|matched| {
             matched.item().canonical_path().to_string() == "valid_crate::RepeatedAttrs"
         })

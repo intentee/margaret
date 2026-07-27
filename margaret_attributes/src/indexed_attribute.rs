@@ -23,13 +23,25 @@ enum IndexedAttributeArgs {
 pub struct IndexedAttribute {
     args: IndexedAttributeArgs,
     attribute: Attribute,
-    canonical_path: CanonicalPath,
     framework_attribute: Option<FrameworkAttribute>,
 }
 
 impl IndexedAttribute {
     #[must_use]
     pub fn new(attribute: Attribute) -> Self {
+        let canonical_path = CanonicalPath::new(
+            attribute
+                .path()
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect(),
+        );
+
+        Self::from_canonical(attribute, canonical_path)
+    }
+
+    pub(crate) fn from_canonical(attribute: Attribute, canonical_path: CanonicalPath) -> Self {
         let args = match AttributeArgs::from_attribute(&attribute) {
             Ok(args) => IndexedAttributeArgs::Parsed(args),
             Err(AttributeArgsParseError::Malformed {
@@ -48,21 +60,11 @@ impl IndexedAttribute {
             },
         };
 
-        let canonical_path = CanonicalPath::new(
-            attribute
-                .path()
-                .segments
-                .iter()
-                .map(|segment| segment.ident.to_string())
-                .collect(),
-        );
-
         let framework_attribute = FrameworkAttribute::from_canonical_path(&canonical_path);
 
         Self {
             args,
             attribute,
-            canonical_path,
             framework_attribute,
         }
     }
@@ -75,11 +77,6 @@ impl IndexedAttribute {
     #[must_use]
     pub fn framework_attribute(&self) -> Option<FrameworkAttribute> {
         self.framework_attribute
-    }
-
-    pub(crate) fn set_canonical_path(&mut self, canonical_path: CanonicalPath) {
-        self.framework_attribute = FrameworkAttribute::from_canonical_path(&canonical_path);
-        self.canonical_path = canonical_path;
     }
 
     pub fn args(&self) -> Result<&AttributeArgs, AttributeError> {

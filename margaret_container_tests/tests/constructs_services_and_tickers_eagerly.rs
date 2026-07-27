@@ -12,5 +12,4 @@ fn constructs_services_and_tickers_eagerly() {
     assert!(source.contains("pub(crate)fnconstruct_pulse("));
     assert!(source.contains("pub(crate)fnconstruct_sweeper("));
     assert!(source.contains("pub(crate)fnserve("));
-    assert!(!source.contains("construct_once"));
 }

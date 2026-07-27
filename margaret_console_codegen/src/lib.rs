@@ -3,6 +3,7 @@ pub mod console_codegen_error;
 mod console_command;
 mod console_command_arguments;
 mod console_commands;
+pub mod console_plan;
 mod render;
 pub mod render_console;
 
@@ -22,6 +23,9 @@ mod tests {
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 
+    use crate::console_artifacts::ConsoleArtifacts;
+    use crate::console_codegen_error::ConsoleCodegenError;
+    use crate::console_plan::ConsolePlan;
     use crate::render_console::render_console;
 
     const COMMANDS: &str = r#"
@@ -94,6 +98,26 @@ impl Farewell {
             .bindings
     }
 
+    fn render_planned_console(
+        index: &AttributeIndex,
+        serves: bool,
+        has_models: bool,
+        servers: &[HttpServer],
+        serve_arguments: &[margaret_console_argument_codegen::console_argument::ConsoleArgument],
+        bindings: &ContainerBindings,
+    ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
+        let plan = ConsolePlan::build(index, bindings)?;
+
+        Ok(render_console(
+            plan,
+            serves,
+            has_models,
+            servers,
+            serve_arguments,
+            bindings,
+        ))
+    }
+
     fn source_for(lib_source: &str, has_http: bool) -> String {
         let index = index_for(lib_source);
         let servers = if has_http {
@@ -105,8 +129,10 @@ impl Farewell {
             Vec::new()
         };
 
-        render_console(&index, has_http, false, &servers, &[], &bindings(&index))
-            .expect("the console source is generated")
+        let bindings = bindings(&index);
+        let plan = ConsolePlan::build(&index, &bindings).expect("the console is planned");
+
+        render_console(plan, has_http, false, &servers, &[], &bindings)
             .module
             .format()
             .expect("the module formats")
@@ -118,7 +144,7 @@ impl Farewell {
     fn error_for(lib_source: &str) -> String {
         let index = index_for(lib_source);
 
-        render_console(&index, false, false, &[], &[], &bindings(&index))
+        render_planned_console(&index, false, false, &[], &[], &bindings(&index))
             .expect_err("the console source fails to generate")
             .to_string()
     }
@@ -127,7 +153,7 @@ impl Farewell {
     fn rejects_a_command_absent_from_the_container_plan() {
         let index = index_for(COMMANDS);
         let empty_bindings = bindings(&index_for(""));
-        let error = render_console(&index, false, false, &[], &[], &empty_bindings)
+        let error = render_planned_console(&index, false, false, &[], &[], &empty_bindings)
             .map(drop)
             .expect_err("every command must belong to the same container plan");
 
@@ -193,7 +219,7 @@ impl Farewell {
     #[test]
     fn emits_spiffe_transport_flags_when_a_server_is_pinned() {
         let index = index_for("struct App;\n");
-        let source: String = render_console(
+        let source: String = render_planned_console(
             &index,
             true,
             false,
@@ -240,7 +266,7 @@ impl Farewell {
     #[test]
     fn registers_one_address_argument_per_active_server() {
         let index = index_for("struct App;\n");
-        let source: String = render_console(
+        let source: String = render_planned_console(
             &index,
             true,
             false,
@@ -272,14 +298,15 @@ impl Farewell {
     #[test]
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
         let index = index_for("struct App;\n");
-        let source: String = render_console(&index, true, false, &[], &[], &bindings(&index))
-            .expect("the console source is generated")
-            .module
-            .format()
-            .expect("the module formats")
-            .source()
-            .split_whitespace()
-            .collect();
+        let source: String =
+            render_planned_console(&index, true, false, &[], &[], &bindings(&index))
+                .expect("the console source is generated")
+                .module
+                .format()
+                .expect("the module formats")
+                .source()
+                .split_whitespace()
+                .collect();
 
         assert!(source.contains(r#"clap::Command::new("serve")"#));
         assert!(!source.contains(r#"clap::Arg::new("addr")"#));
@@ -289,14 +316,15 @@ impl Farewell {
     #[test]
     fn adds_a_schema_command_when_models_exist() {
         let index = index_for("struct App;\n");
-        let source: String = render_console(&index, false, true, &[], &[], &bindings(&index))
-            .expect("the console source is generated")
-            .module
-            .format()
-            .expect("the module formats")
-            .source()
-            .split_whitespace()
-            .collect();
+        let source: String =
+            render_planned_console(&index, false, true, &[], &[], &bindings(&index))
+                .expect("the console source is generated")
+                .module
+                .format()
+                .expect("the module formats")
+                .source()
+                .split_whitespace()
+                .collect();
 
         assert!(source.contains(r#"clap::Command::new("schema")"#));
         assert!(source.contains(r#"Some(("schema",_matches))=>{"#));
@@ -308,14 +336,15 @@ impl Farewell {
     #[test]
     fn emits_a_synchronous_run_when_only_the_schema_command_exists() {
         let index = index_for("struct App;\n");
-        let source: String = render_console(&index, false, true, &[], &[], &bindings(&index))
-            .expect("the console source is generated")
-            .module
-            .format()
-            .expect("the module formats")
-            .source()
-            .split_whitespace()
-            .collect();
+        let source: String =
+            render_planned_console(&index, false, true, &[], &[], &bindings(&index))
+                .expect("the console source is generated")
+                .module
+                .format()
+                .expect("the module formats")
+                .source()
+                .split_whitespace()
+                .collect();
 
         assert!(source.contains("pubfnrun<Arguments,Argument>"));
         assert!(!source.contains("pubasyncfnrun"));

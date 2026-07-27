@@ -4,7 +4,6 @@ use syn::Attribute;
 use syn::Pat;
 use syn::Type;
 
-use crate::canonical_path::CanonicalPath;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 
@@ -32,6 +31,22 @@ impl IndexedParameter {
 
         Self {
             attributes: attributes.into_iter().map(IndexedAttribute::new).collect(),
+            declared,
+            diagnostic_name,
+            holder,
+            position,
+        }
+    }
+
+    pub(crate) fn from_parts(
+        attributes: Vec<IndexedAttribute>,
+        declared: Type,
+        diagnostic_name: String,
+        holder: Ident,
+        position: usize,
+    ) -> Self {
+        Self {
+            attributes,
             declared,
             diagnostic_name,
             holder,
@@ -69,14 +84,5 @@ impl IndexedParameter {
     #[must_use]
     pub fn position(&self) -> usize {
         self.position
-    }
-
-    pub(crate) fn resolve_attribute_paths(
-        &mut self,
-        resolve: impl Fn(&syn::Path) -> CanonicalPath,
-    ) {
-        for attribute in &mut self.attributes {
-            attribute.set_canonical_path(resolve(attribute.path()));
-        }
     }
 }

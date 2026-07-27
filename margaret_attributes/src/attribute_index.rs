@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -18,7 +17,6 @@ use crate::resolve_type::resolve_type;
 
 pub struct AttributeIndex {
     empty_imports: ModuleImports,
-    framework_attributes: BTreeSet<FrameworkAttribute>,
     identifiers: HashMap<CanonicalPath, Identifier>,
     imports: HashMap<CanonicalPath, ModuleImports>,
     item_paths: HashSet<CanonicalPath>,
@@ -48,19 +46,11 @@ impl AttributeIndex {
         imports: HashMap<CanonicalPath, ModuleImports>,
     ) -> Self {
         let mut item_paths = HashSet::new();
-        let mut framework_attributes = BTreeSet::new();
         for item in &items {
             item_paths.insert(item.canonical_path().clone());
-            framework_attributes.extend(
-                item.attributes()
-                    .iter()
-                    .filter_map(|attribute| attribute.framework_attribute()),
-            );
         }
-
         Self {
             empty_imports: ModuleImports::default(),
-            framework_attributes,
             identifiers: allocate_identifiers(&items),
             imports,
             item_paths,
@@ -70,7 +60,7 @@ impl AttributeIndex {
 
     #[must_use]
     pub fn has_framework_attribute(&self, attribute: FrameworkAttribute) -> bool {
-        self.framework_attributes.contains(&attribute)
+        self.select_framework_attribute(attribute).next().is_some()
     }
 
     #[must_use]
@@ -127,20 +117,16 @@ impl AttributeIndex {
         )
     }
 
-    #[must_use]
     pub fn select_framework_attribute(
         &self,
         attribute: FrameworkAttribute,
-    ) -> Vec<MatchedAttribute<'_>> {
-        self.items
-            .iter()
-            .flat_map(|item| {
-                item.attributes()
-                    .iter()
-                    .filter(move |indexed| indexed.framework_attribute() == Some(attribute))
-                    .map(move |indexed| MatchedAttribute::new(item, indexed))
-            })
-            .collect()
+    ) -> impl Iterator<Item = MatchedAttribute<'_>> {
+        self.items.iter().flat_map(move |item| {
+            item.attributes()
+                .iter()
+                .filter(move |indexed| indexed.framework_attribute() == Some(attribute))
+                .map(move |indexed| MatchedAttribute::new(item, indexed))
+        })
     }
 
     #[must_use]

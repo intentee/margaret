@@ -19,7 +19,6 @@ use crate::generated_code::GeneratedCode;
 use crate::generated_features::GeneratedFeatures;
 use crate::jwks_artifacts::jwks_artifacts;
 use crate::serve_arguments::serve_arguments;
-use crate::serve_arguments::serve_roots;
 use crate::umbrella::umbrella;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
@@ -95,12 +94,14 @@ pub fn build(
 
     let (websocket_roots, websocket_servers, websocket_server_arguments) =
         if features.has_websockets {
-            let artifacts = margaret_websocket_codegen::render_websocket::render_websocket(
+            let plan = margaret_websocket_codegen::websocket_plan::WebSocketPlan::build(
                 &index,
                 bindings,
                 &middleware_plans,
                 &registries,
             )?;
+            let artifacts =
+                margaret_websocket_codegen::render_websocket::render_websocket(plan, bindings);
             module_tokens.extend(artifacts.modules);
 
             (
@@ -112,53 +113,50 @@ pub fn build(
             (Vec::new(), Vec::new(), BTreeMap::new())
         };
 
-    let (view_roots, views_console_arguments) = if features.has_views {
-        let artifacts = margaret_views_codegen::render_views::render_views(&index, bindings)?;
+    let view_roots = if features.has_views {
+        let plan = margaret_views_codegen::views_plan::ViewsPlan::build(&index, bindings)?;
+        let artifacts = margaret_views_codegen::render_views::render_views(plan, bindings);
         module_tokens.extend(artifacts.modules);
 
-        (artifacts.retained_roots, artifacts.console_arguments)
+        artifacts.retained_roots
+    } else {
+        Vec::new()
+    };
+
+    let (http_roots, servers) = if features.has_http || features.has_websockets {
+        let plan = margaret_http_codegen::http_plan::HttpPlan::build(
+            &index,
+            features.has_views,
+            &websocket_servers,
+            &middleware_plans,
+            bindings,
+            &websocket_server_arguments,
+            &registries,
+        )?;
+        let artifacts = margaret_http_codegen::render_http::render_http(plan, bindings);
+        module_tokens.extend(artifacts.modules);
+
+        (artifacts.retained_roots, artifacts.servers)
     } else {
         (Vec::new(), Vec::new())
     };
 
-    let (http_roots, servers, server_console_arguments) =
-        if features.has_http || features.has_websockets {
-            let artifacts = margaret_http_codegen::render_http::render_http(
-                &index,
-                features.has_views,
-                &websocket_servers,
-                &middleware_plans,
-                bindings,
-                &websocket_server_arguments,
-                &registries,
-            )?;
-            module_tokens.extend(artifacts.modules);
-
-            (
-                artifacts.retained_roots,
-                artifacts.servers,
-                artifacts.server_console_arguments,
-            )
-        } else {
-            (Vec::new(), Vec::new(), BTreeMap::new())
-        };
-
-    let service_roots = serve_roots(&index);
     let serve_arguments = serve_arguments(bindings);
+    let service_plan = margaret_service_codegen::service_plan::ServicePlan::build(
+        &index,
+        &jwks.services,
+        bindings,
+        &serve_arguments,
+    )?;
+    let service_roots = service_plan.roots().to_vec();
 
     if features.serves {
         module_tokens.push(margaret_service_codegen::render_services::render_services(
-            &index,
+            &service_plan,
             &servers,
             features.has_views,
             bindings,
-            margaret_service_codegen::serve_console_arguments::ServeConsoleArguments {
-                serve_arguments: &serve_arguments,
-                server_console_arguments: &server_console_arguments,
-                views_console_arguments: &views_console_arguments,
-            },
-            &jwks.services,
-        )?);
+        ));
     }
 
     if features.has_models {
@@ -169,14 +167,15 @@ pub fn build(
     }
 
     let console_roots = if features.has_console {
+        let plan = margaret_console_codegen::console_plan::ConsolePlan::build(&index, bindings)?;
         let console = margaret_console_codegen::render_console::render_console(
-            &index,
+            plan,
             features.serves,
             features.has_models,
             &servers,
             &serve_arguments,
             bindings,
-        )?;
+        );
         module_tokens.push(console.module);
 
         console.construction_roots
@@ -188,11 +187,6 @@ pub fn build(
     retained_roots.extend(websocket_roots);
     retained_roots.extend(view_roots);
     retained_roots.extend(http_roots);
-    retained_roots.extend(
-        jwks.services
-            .iter()
-            .map(|service| service.concrete_path.clone()),
-    );
     let retained_roots = retained_roots.into_iter().collect::<Vec<_>>();
     planned_container
         .render(&application_roots, &retained_roots, &console_roots)

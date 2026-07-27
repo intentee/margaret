@@ -65,6 +65,19 @@ impl AnotherService {
     fn build() {}
 }
 
+struct WithAliasedConstructor;
+
+mod implementation {
+    use margaret_macros::constructor as builds;
+
+    use super::WithAliasedConstructor;
+
+    impl WithAliasedConstructor {
+        #[builds]
+        fn create() -> Self {}
+    }
+}
+
 trait SomeTrait {}
 
 impl SomeTrait for WithConstructor {

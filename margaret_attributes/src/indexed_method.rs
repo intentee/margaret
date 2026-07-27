@@ -2,7 +2,6 @@ use syn::Attribute;
 use syn::FnArg;
 use syn::Signature;
 
-use crate::canonical_path::CanonicalPath;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_parameter::IndexedParameter;
@@ -39,6 +38,20 @@ impl IndexedMethod {
         }
     }
 
+    pub(crate) fn from_parts(
+        attributes: Vec<IndexedAttribute>,
+        identifier: String,
+        parameters: Vec<IndexedParameter>,
+        signature: Box<Signature>,
+    ) -> Self {
+        Self {
+            attributes,
+            identifier,
+            parameters,
+            signature,
+        }
+    }
+
     #[must_use]
     pub fn attributes(&self) -> &[IndexedAttribute] {
         &self.attributes
@@ -69,18 +82,5 @@ impl IndexedMethod {
     #[must_use]
     pub fn has_receiver(&self) -> bool {
         self.signature.receiver().is_some()
-    }
-
-    pub(crate) fn resolve_attribute_paths(
-        &mut self,
-        resolve: impl Copy + Fn(&syn::Path) -> CanonicalPath,
-    ) {
-        for attribute in &mut self.attributes {
-            attribute.set_canonical_path(resolve(attribute.path()));
-        }
-
-        for parameter in &mut self.parameters {
-            parameter.resolve_attribute_paths(resolve);
-        }
     }
 }

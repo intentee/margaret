@@ -1,3 +1,4 @@
+mod canonicalizes_method_attributes_at_the_impl_site;
 mod does_not_exclude_a_nested_module_with_the_excluded_name;
 mod drops_members_without_an_indexed_item;
 mod excludes_the_named_crate_root_module;

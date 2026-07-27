@@ -10,11 +10,11 @@ use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 
 use crate::message_kind::MessageKind;
 use crate::session_handler_plan::SessionHandlerPlan;
+use crate::session_plan::SessionPlan;
 use crate::websocket_codegen_error::WebSocketCodegenError;
 use crate::websocket_handlers::websocket_handlers;
 use crate::websocket_message::WebSocketMessage;
 use crate::websocket_messages::websocket_messages;
-use crate::websocket_plan::WebSocketPlan;
 use crate::websocket_sessions::websocket_sessions;
 
 fn reject_duplicate_response_methods(
@@ -44,7 +44,7 @@ pub(crate) fn build_websocket_plan(
     bindings: &ContainerBindings,
     middleware_plans: &[MiddlewarePlan],
     registries: &BindingRegistries,
-) -> Result<WebSocketPlan, WebSocketCodegenError> {
+) -> Result<(Vec<WebSocketMessage>, Vec<SessionPlan>), WebSocketCodegenError> {
     let messages = websocket_messages(index)?;
 
     reject_duplicate_response_methods(&messages)?;
@@ -103,11 +103,11 @@ pub(crate) fn build_websocket_plan(
         }
     }
 
-    Ok(WebSocketPlan {
+    Ok((
         messages,
-        sessions: session_plans
+        session_plans
             .into_values()
             .map(SessionHandlerPlan::finish)
             .collect(),
-    })
+    ))
 }

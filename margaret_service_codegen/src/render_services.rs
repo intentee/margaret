@@ -1,13 +1,7 @@
-use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
-use margaret_console_argument_codegen::argument_value::argument_value;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
-use margaret_console_argument_codegen::owned_weave::owned_weave;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
@@ -19,13 +13,10 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use crate::framework_service::FrameworkService;
-use crate::serve_console_arguments::ServeConsoleArguments;
-use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
+use crate::service_plan::ServicePlan;
 use crate::service_unit::ServiceUnit;
 use crate::service_unit_origin::ServiceUnitOrigin;
-use crate::service_units::service_units;
 use crate::spiffe_activation::SpiffeActivation;
 
 fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
@@ -386,55 +377,27 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
     format_ident!("{}", unit.type_name)
 }
 
-fn serve_inputs(
-    serve_arguments: &[ConsoleArgument],
-    bindings: &ContainerBindings,
-) -> Result<(TokenStream, Vec<TokenStream>), ServiceCodegenError> {
-    let mut resolutions = Vec::with_capacity(serve_arguments.len());
-    let mut construction_arguments = Vec::with_capacity(serve_arguments.len());
-
-    for argument in serve_arguments {
-        let slot = bindings.console_slot(&argument.slot_key())?;
-        let ident = console_argument_ident(slot);
-        let value = argument_value(argument);
-
-        resolutions.push(quote! { let #ident = #value; });
-        construction_arguments.push(owned_weave(argument, slot, true));
-    }
-
-    Ok((quote! { #(#resolutions)* }, construction_arguments))
-}
-
+#[must_use]
 pub fn render_services(
-    index: &AttributeIndex,
+    plan: &ServicePlan,
     servers: &[HttpServer],
     has_views: bool,
     bindings: &ContainerBindings,
-    ServeConsoleArguments {
-        serve_arguments,
-        server_console_arguments: _,
-        views_console_arguments: _,
-    }: ServeConsoleArguments,
-    framework_services: &[FrameworkService],
-) -> Result<GeneratedModuleTokens, ServiceCodegenError> {
-    let mut units = service_units(index)?;
-
-    units.extend(framework_services.iter().map(ServiceUnit::from_framework));
-
+) -> GeneratedModuleTokens {
     let activation = SpiffeActivation {
-        client_active: has_spiffe_http_client(serve_arguments),
+        client_active: plan.has_spiffe_http_client,
         server_active: serves_spiffe(servers),
     };
 
-    let adapters = units.iter().map(adapter);
-    let unit_registrations = units
+    let adapters = plan.units.iter().map(adapter);
+    let unit_registrations = plan
+        .units
         .iter()
         .map(|unit| registration(unit, bindings, activation.client_active));
     let identity_prelude = svid_identity_prelude(activation);
     let bundle_registration = bundle_registration(activation);
     let server_registration = server_registration(servers, has_views, activation);
-    let (prelude, construction_arguments) = serve_inputs(serve_arguments, bindings)?;
-    let construction_invocation = bindings.serve_invocation(&construction_arguments);
+    let construction_invocation = bindings.serve_invocation(&plan.construction_arguments);
     let construction = quote! {
         let container = match #construction_invocation {
             Ok(container) => container,
@@ -444,11 +407,12 @@ pub fn render_services(
         };
         let container = &container;
     };
-    let matches_binding = if servers.is_empty() && serve_arguments.is_empty() {
+    let matches_binding = if servers.is_empty() && plan.construction_arguments.is_empty() {
         quote! { _matches }
     } else {
         quote! { matches }
     };
+    let prelude = &plan.prelude;
 
     let tokens = quote! {
         #(#adapters)*
@@ -476,5 +440,5 @@ pub fn render_services(
         }
     };
 
-    Ok(GeneratedModuleTokens::new("serve", tokens))
+    GeneratedModuleTokens::new("serve", tokens)
 }

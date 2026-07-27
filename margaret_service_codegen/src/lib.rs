@@ -1,8 +1,8 @@
 pub mod framework_service;
 pub mod framework_service_kind;
 pub mod render_services;
-pub mod serve_console_arguments;
 pub mod service_codegen_error;
+pub mod service_plan;
 
 mod service_kind;
 mod service_unit;
@@ -13,7 +13,6 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::fs;
 
     use tempfile::TempDir;
@@ -34,7 +33,7 @@ mod tests {
     use crate::framework_service::FrameworkService;
     use crate::framework_service_kind::FrameworkServiceKind;
     use crate::render_services::render_services;
-    use crate::serve_console_arguments::ServeConsoleArguments;
+    use crate::service_plan::ServicePlan;
 
     fn crate_with(lib_source: &str) -> TempDir {
         let directory = tempdir().expect("a temporary crate directory is created");
@@ -87,24 +86,15 @@ mod tests {
             .serve_arguments(&serve_roots(&index), &[])
             .expect("the rendered roots have planned console arguments");
 
-        render_services(
-            &index,
-            servers,
-            has_views,
-            &bindings,
-            ServeConsoleArguments {
-                serve_arguments: &serve_arguments,
-                server_console_arguments: &BTreeMap::new(),
-                views_console_arguments: &[],
-            },
-            &[],
-        )
-        .expect("the services source is generated")
-        .format()
-        .expect("the module formats")
-        .source()
-        .split_whitespace()
-        .collect()
+        let plan = ServicePlan::build(&index, &[], &bindings, &serve_arguments)
+            .expect("the service construction is planned");
+
+        render_services(&plan, servers, has_views, &bindings)
+            .format()
+            .expect("the module formats")
+            .source()
+            .split_whitespace()
+            .collect()
     }
 
     fn rendered(lib_source: &str, servers: &[HttpServer]) -> String {
@@ -118,20 +108,11 @@ mod tests {
     fn error_for(lib_source: &str) -> String {
         let placeholder = bindings(&index_for("#[singleton]\nstruct Placeholder;\n"));
 
-        render_services(
-            &index_for(lib_source),
-            &[],
-            false,
-            &placeholder,
-            ServeConsoleArguments {
-                serve_arguments: &[],
-                server_console_arguments: &BTreeMap::new(),
-                views_console_arguments: &[],
-            },
-            &[],
-        )
-        .expect_err("the services source fails to generate")
-        .to_string()
+        let index = index_for(lib_source);
+        ServicePlan::build(&index, &[], &placeholder, &[])
+            .err()
+            .expect("the services source fails to generate")
+            .to_string()
     }
 
     fn public() -> Vec<HttpServer> {
@@ -291,24 +272,15 @@ impl Flusher {
                 type_name: "JwksClient".to_string(),
             },
         ];
-        let source: String = render_services(
-            &index,
-            &public(),
-            false,
-            &bindings(&index),
-            ServeConsoleArguments {
-                serve_arguments: &[],
-                server_console_arguments: &BTreeMap::new(),
-                views_console_arguments: &[],
-            },
-            &framework_services,
-        )
-        .expect("the services source is generated")
-        .format()
-        .expect("the module formats")
-        .source()
-        .split_whitespace()
-        .collect();
+        let container_bindings = bindings(&index);
+        let plan = ServicePlan::build(&index, &framework_services, &container_bindings, &[])
+            .expect("the framework services are planned");
+        let source: String = render_services(&plan, &public(), false, &container_bindings)
+            .format()
+            .expect("the module formats")
+            .source()
+            .split_whitespace()
+            .collect();
 
         assert!(source.contains("impltrzcina::TickerforJwksRoller"));
         assert!(source.contains(
@@ -412,20 +384,9 @@ impl Flusher {
         let serve_arguments = [ConsoleArgument::Flag {
             name: "missing".to_string(),
         }];
-        let error = render_services(
-            &index,
-            &[],
-            false,
-            &bindings,
-            ServeConsoleArguments {
-                serve_arguments: &serve_arguments,
-                server_console_arguments: &BTreeMap::new(),
-                views_console_arguments: &[],
-            },
-            &[],
-        )
-        .map(drop)
-        .expect_err("every serve input must belong to the container plan");
+        let error = ServicePlan::build(&index, &[], &bindings, &serve_arguments)
+            .err()
+            .expect("every serve input must belong to the container plan");
 
         assert!(error.to_string().contains("missing"));
     }

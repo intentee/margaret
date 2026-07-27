@@ -1,7 +1,8 @@
-use syn::Attribute;
 use syn::Type;
 
-use crate::canonical_path::CanonicalPath;
+#[cfg(test)]
+use syn::Attribute;
+
 use crate::field_identifier::FieldIdentifier;
 use crate::indexed_attribute::IndexedAttribute;
 
@@ -12,9 +13,22 @@ pub struct IndexedField {
 }
 
 impl IndexedField {
+    #[cfg(test)]
     pub(crate) fn new(identifier: FieldIdentifier, ty: Type, attributes: Vec<Attribute>) -> Self {
         Self {
             attributes: attributes.into_iter().map(IndexedAttribute::new).collect(),
+            identifier,
+            ty,
+        }
+    }
+
+    pub(crate) fn from_parts(
+        identifier: FieldIdentifier,
+        ty: Type,
+        attributes: Vec<IndexedAttribute>,
+    ) -> Self {
+        Self {
+            attributes,
             identifier,
             ty,
         }
@@ -33,15 +47,6 @@ impl IndexedField {
     #[must_use]
     pub fn ty(&self) -> &Type {
         &self.ty
-    }
-
-    pub(crate) fn resolve_attribute_paths(
-        &mut self,
-        resolve: impl Fn(&syn::Path) -> CanonicalPath,
-    ) {
-        for attribute in &mut self.attributes {
-            attribute.set_canonical_path(resolve(attribute.path()));
-        }
     }
 }
 

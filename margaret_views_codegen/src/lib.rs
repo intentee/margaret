@@ -1,6 +1,7 @@
 pub mod render_views;
 pub mod views_artifacts;
 pub mod views_codegen_error;
+pub mod views_plan;
 
 mod render;
 mod render_build;
@@ -24,6 +25,7 @@ mod tests {
 
     use crate::render_views::render_views;
     use crate::views_artifacts::ViewsArtifacts;
+    use crate::views_plan::ViewsPlan;
 
     fn crate_with(lib_source: &str) -> TempDir {
         let directory = tempdir().expect("a temporary crate directory is created");
@@ -60,11 +62,14 @@ mod tests {
         let index = index_for(lib_source);
         let bindings = bindings_for(&index);
 
-        render_views(&index, &bindings).expect("the views are generated")
+        let plan = ViewsPlan::build(&index, &bindings).expect("the views are planned");
+
+        render_views(plan, &bindings)
     }
 
     fn rejection(lib_source: &str) -> String {
-        render_views(&index_for(lib_source), &empty_bindings())
+        ViewsPlan::build(&index_for(lib_source), &empty_bindings())
+            .map(drop)
             .expect_err("the invalid view is rejected")
             .to_string()
     }

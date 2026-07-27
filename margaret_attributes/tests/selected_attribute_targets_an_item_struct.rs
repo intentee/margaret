@@ -13,7 +13,6 @@ fn canonical_framework_attributes_target_item_structs() {
         .build();
     let targets: Vec<String> = index
         .select_framework_attribute(FrameworkAttribute::Singleton)
-        .iter()
         .map(|matched| matched.item().canonical_path().to_string())
         .collect();
 

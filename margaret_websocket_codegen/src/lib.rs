@@ -1,6 +1,7 @@
 pub mod render_websocket;
 pub mod websocket_artifacts;
 pub mod websocket_codegen_error;
+pub mod websocket_plan;
 
 mod build_for_session_method;
 mod build_websocket_plan;
@@ -19,7 +20,6 @@ mod session_plan;
 mod websocket_handlers;
 mod websocket_message;
 mod websocket_messages;
-mod websocket_plan;
 mod websocket_session;
 mod websocket_sessions;
 
@@ -44,12 +44,22 @@ mod tests {
 
     use crate::handler_binding::HandlerBinding;
     use crate::render_server_routes::server_console_arguments;
-    use crate::render_websocket::render_websocket;
     use crate::session_console_arguments::session_console_arguments;
     use crate::session_plan::SessionPlan;
     use crate::websocket_codegen_error::WebSocketCodegenError;
     use crate::websocket_handlers::websocket_handlers;
+    use crate::websocket_plan::WebSocketPlan;
     use crate::websocket_session::WebSocketSession;
+
+    fn render_websocket(
+        index: &AttributeIndex,
+        bindings: &ContainerBindings,
+        middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+        registries: &BindingRegistries,
+    ) -> Result<crate::websocket_artifacts::WebSocketArtifacts, WebSocketCodegenError> {
+        WebSocketPlan::build(index, bindings, middleware_plans, registries)
+            .map(|plan| crate::render_websocket::render_websocket(plan, bindings))
+    }
 
     const REQUEST_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
     const NOTIFICATION_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;\n";

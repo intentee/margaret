@@ -13,8 +13,27 @@ async fn keeps_deep_construction_futures_below_the_linear_size_ceiling() {
         );
     }
 
+    let before = margaret_codegen_linear_construction_future_fixture::construction_counts();
+    assert!(matches!(
+        margaret_codegen_linear_construction_future_fixture::margaret::run::run([
+            "future-size-fixture",
+            "level-eight",
+        ])
+        .await,
+        CommandOutcome::Succeeded
+    ));
+    let after = margaret_codegen_linear_construction_future_fixture::construction_counts();
+
+    assert_eq!(
+        after
+            .into_iter()
+            .zip(before)
+            .map(|(after, before)| after - before)
+            .collect::<Vec<_>>(),
+        vec![1; 8],
+    );
+
     for command in [
-        "level-eight",
         "level-five",
         "level-four",
         "level-one",

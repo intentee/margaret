@@ -1,9 +1,11 @@
+#[cfg(test)]
 use syn::Attribute;
 
 use crate::canonical_path::CanonicalPath;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_field::IndexedField;
+use crate::indexed_item_parts::IndexedItemParts;
 use crate::indexed_method::IndexedMethod;
 use crate::indexed_trait_impl::IndexedTraitImpl;
 use crate::indexed_variant::IndexedVariant;
@@ -21,6 +23,7 @@ pub struct IndexedItem {
 }
 
 impl IndexedItem {
+    #[cfg(test)]
     pub(crate) fn new(
         kind: ItemKind,
         identifier: String,
@@ -37,6 +40,30 @@ impl IndexedItem {
             kind,
             methods: Vec::new(),
             trait_impls: Vec::new(),
+            variants,
+        }
+    }
+
+    pub(crate) fn from_parts(parts: IndexedItemParts) -> Self {
+        let IndexedItemParts {
+            attributes,
+            canonical_path,
+            fields,
+            identifier,
+            kind,
+            methods,
+            trait_impls,
+            variants,
+        } = parts;
+
+        Self {
+            attributes,
+            canonical_path,
+            fields,
+            identifier,
+            kind,
+            methods,
+            trait_impls,
             variants,
         }
     }
@@ -86,35 +113,5 @@ impl IndexedItem {
     #[must_use]
     pub fn variants(&self) -> &[IndexedVariant] {
         &self.variants
-    }
-
-    pub(crate) fn add_method(&mut self, method: IndexedMethod) {
-        self.methods.push(method);
-    }
-
-    pub(crate) fn add_trait_impl(&mut self, trait_impl: IndexedTraitImpl) {
-        self.trait_impls.push(trait_impl);
-    }
-
-    pub(crate) fn sort_members(&mut self) {
-        self.methods
-            .sort_by(|left, right| left.identifier().cmp(right.identifier()));
-    }
-
-    pub(crate) fn resolve_attribute_paths(
-        &mut self,
-        resolve: impl Copy + Fn(&syn::Path) -> CanonicalPath,
-    ) {
-        for attribute in &mut self.attributes {
-            attribute.set_canonical_path(resolve(attribute.path()));
-        }
-
-        for field in &mut self.fields {
-            field.resolve_attribute_paths(resolve);
-        }
-
-        for method in &mut self.methods {
-            method.resolve_attribute_paths(resolve);
-        }
     }
 }

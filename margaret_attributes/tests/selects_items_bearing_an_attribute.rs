@@ -13,7 +13,6 @@ fn selects_items_bearing_an_attribute() {
         .build();
     let targets: Vec<String> = index
         .select_framework_attribute(FrameworkAttribute::Singleton)
-        .iter()
         .map(|matched| matched.item().canonical_path().to_string())
         .collect();
 
