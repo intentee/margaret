@@ -1,12 +1,5 @@
-use std::collections::BTreeMap;
-
-use proc_macro2::Ident;
-use proc_macro2::TokenStream;
-use quote::format_ident;
-use quote::quote;
-use syn::Path;
-
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
@@ -15,12 +8,15 @@ use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
-use margaret_container::accessor_failure::AccessorFailure;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
+use proc_macro2::Ident;
+use proc_macro2::TokenStream;
+use quote::format_ident;
+use quote::quote;
 
 use crate::framework_service::FrameworkService;
 use crate::serve_console_arguments::ServeConsoleArguments;
@@ -47,10 +43,13 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
 
             quote! {
                 match matches.get_one::<String>(#transport_argument).map(String::as_str) {
+                    Some("plain") => margaret::framework::http::transport_config::TransportConfig::Plain,
                     Some("spiffe_mtls") => margaret::framework::http::transport_config::TransportConfig::MutualTls {
                         server_config: spiffe_server_config.clone(),
                     },
-                    _ => margaret::framework::http::transport_config::TransportConfig::Plain,
+                    Some(_) | None => {
+                        return margaret::framework::console::command_outcome::CommandOutcome::Failed;
+                    }
                 }
             }
         }
@@ -163,9 +162,6 @@ fn server_registration(
     servers: &[HttpServer],
     has_views: bool,
     activation: SpiffeActivation,
-    bindings: &ContainerBindings,
-    server_console_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
-    views_console_arguments: &[ConsoleArgument],
 ) -> TokenStream {
     if servers.is_empty() {
         return quote! {};
@@ -190,7 +186,6 @@ fn server_registration(
         quote! { #origin_variable.clone() }
     });
 
-    let empty_arguments: Vec<ConsoleArgument> = Vec::new();
     let views_argument = has_views.then(|| quote! { , &views });
     let assemblies = servers.iter().map(|server| {
         let function_name = server.function_name();
@@ -199,24 +194,8 @@ fn server_registration(
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
         let transport = transport_expression(server, activation.server_active);
-        let server_borrows = bindings.console_borrows(
-            server_console_arguments
-                .get(server.name())
-                .unwrap_or(&empty_arguments),
-        );
-        let routes_call = quote! { super::http::#function_name::#function_name(container, #(#server_borrows)* &routes #views_argument).await };
-        let routes = if bindings.has_accessors() {
-            quote! {
-                match #routes_call {
-                    Ok(routes) => routes,
-                    Err(error) => {
-                        return margaret::framework::console::report_failure::report_failure(error);
-                    }
-                }
-            }
-        } else {
-            routes_call
-        };
+        let routes =
+            quote! { super::http::#function_name::#function_name(container, &routes #views_argument).await };
 
         quote! {
             margaret::framework::service::server_assembly::ServerAssembly {
@@ -232,20 +211,7 @@ fn server_registration(
     let assemblies = vec_literal_tokens(assemblies);
 
     let views_setup = has_views.then(|| {
-        let views_borrows = bindings.console_borrows(views_console_arguments);
-        let build = quote! { super::views::build::build(container, #(#views_borrows)*).await };
-        let built = if bindings.has_accessors() {
-            quote! {
-                match #build {
-                    Ok(views) => views,
-                    Err(error) => {
-                        return margaret::framework::console::report_failure::report_failure(error);
-                    }
-                }
-            }
-        } else {
-            build
-        };
+        let built = quote! { super::views::build::build(container).await };
 
         quote! {
             let views = ::std::sync::Arc::new(#built);
@@ -277,13 +243,17 @@ fn server_registration(
     }
 }
 
-fn missed_tick_behavior_method(behavior: &Option<Path>) -> TokenStream {
+fn missed_tick_behavior_method(behavior: &Option<CanonicalPath>) -> TokenStream {
     match behavior {
-        Some(behavior) => quote! {
-            fn missed_tick_behavior(&self) -> tokio::time::MissedTickBehavior {
-                #behavior
+        Some(behavior) => {
+            let behavior = path_tokens(behavior);
+
+            quote! {
+                fn missed_tick_behavior(&self) -> tokio::time::MissedTickBehavior {
+                    #behavior
+                }
             }
-        },
+        }
         None => quote! {},
     }
 }
@@ -310,9 +280,14 @@ fn runner_outcome(unit: &ServiceUnit, call: &TokenStream) -> TokenStream {
     }
 }
 
-fn ticker_adapter(unit: &ServiceUnit, behavior: &Option<Path>, interval: &Path) -> TokenStream {
+fn ticker_adapter(
+    unit: &ServiceUnit,
+    behavior: &Option<CanonicalPath>,
+    interval: &CanonicalPath,
+) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
+    let interval = path_tokens(interval);
     let runner = format_ident!("{}", unit.runner);
     let missed_tick_behavior_method = missed_tick_behavior_method(behavior);
     let (token_binding, call) = if unit.takes_token {
@@ -386,10 +361,6 @@ fn service_adapter(unit: &ServiceUnit) -> TokenStream {
     }
 }
 
-fn woven_arguments(unit: &ServiceUnit, bindings: &ContainerBindings) -> Vec<TokenStream> {
-    bindings.console_weaves_owned(bindings.console_arguments(&unit.concrete_path))
-}
-
 fn registration(
     unit: &ServiceUnit,
     bindings: &ContainerBindings,
@@ -397,15 +368,7 @@ fn registration(
 ) -> TokenStream {
     let name = adapter_ident(unit);
     let container = format_ident!("container");
-    let woven = woven_arguments(unit, bindings);
-    let access = bindings.accessor_invocation(
-        &container,
-        &unit.field_name,
-        &woven,
-        &AccessorFailure::Report(quote! {
-            return margaret::framework::console::report_failure::report_failure(error)
-        }),
-    );
+    let access = bindings.accessor_invocation(&container, &unit.field_name);
     let inner = quote! { #name { inner: #access } };
 
     gated_registration(&inner, client_active)
@@ -433,8 +396,8 @@ pub fn render_services(
     bindings: &ContainerBindings,
     ServeConsoleArguments {
         serve_arguments,
-        server_console_arguments,
-        views_console_arguments,
+        server_console_arguments: _,
+        views_console_arguments: _,
     }: ServeConsoleArguments,
     framework_services: &[FrameworkService],
 ) -> Result<GeneratedModuleTokens, ServiceCodegenError> {
@@ -453,15 +416,22 @@ pub fn render_services(
         .map(|unit| registration(unit, bindings, activation.client_active));
     let identity_prelude = svid_identity_prelude(activation);
     let bundle_registration = bundle_registration(activation);
-    let server_registration = server_registration(
-        servers,
-        has_views,
-        activation,
-        bindings,
-        server_console_arguments,
-        views_console_arguments,
-    );
+    let server_registration = server_registration(servers, has_views, activation);
     let prelude = serve_prelude(serve_arguments, bindings);
+    let construction_arguments = bindings.console_weaves_owned(serve_arguments);
+    let construction = quote! {
+        let container = match super::container::build::serve(
+            #(#construction_arguments),*
+        )
+        .await
+        {
+            Ok(container) => container,
+            Err(error) => {
+                return margaret::framework::console::report_failure::report_failure(error);
+            }
+        };
+        let container = &container;
+    };
     let matches_binding = if servers.is_empty() && serve_arguments.is_empty() {
         quote! { _matches }
     } else {
@@ -472,12 +442,12 @@ pub fn render_services(
         #(#adapters)*
 
         pub async fn serve(
-            container: &super::container::Container,
             #matches_binding: &clap::ArgMatches,
             cancellation_token: tokio_util::sync::CancellationToken,
         ) -> margaret::framework::console::command_outcome::CommandOutcome {
             #identity_prelude
             #prelude
+            #construction
 
             let mut manager = trzcina::ServiceManager::default();
 

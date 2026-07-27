@@ -3,6 +3,7 @@ use margaret_attributes::struct_shape::StructShape;
 
 use crate::dependency_kind::DependencyKind;
 
+#[derive(Clone)]
 pub(crate) enum DirectConstruction {
     Constructor {
         dependencies: Vec<DependencyKind>,

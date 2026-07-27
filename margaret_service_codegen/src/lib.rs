@@ -84,9 +84,7 @@ mod tests {
     fn render_source(lib_source: &str, servers: &[HttpServer], has_views: bool) -> String {
         let index = index_for(lib_source);
         let bindings = bindings(&index);
-        let serve_arguments = bindings
-            .serve_arguments(&serve_roots(&index), &[])
-            .expect("the serve arguments unify");
+        let serve_arguments = bindings.serve_arguments(&serve_roots(&index), &[]);
 
         render_services(
             &index,
@@ -157,7 +155,7 @@ mod tests {
         assert!(source.contains(
             "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
         ));
-        assert!(!source.contains("report_failure"));
+        assert!(source.contains("super::container::build::serve("));
     }
 
     #[test]
@@ -175,9 +173,7 @@ mod tests {
         assert!(source.contains(
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
         ));
-        assert!(
-            source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await")
-        );
+        assert!(source.contains("manager.register_service(Pump{inner:container.pump()})"));
     }
 
     #[test]
@@ -196,6 +192,57 @@ mod tests {
         assert!(source.contains(
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
         ));
+    }
+
+    #[test]
+    fn canonicalizes_imported_ticker_paths_before_rendering() {
+        let source = rendered(
+            r#"
+mod schedule {}
+
+use crate::schedule as cadence;
+use tokio::time::MissedTickBehavior as Behavior;
+
+#[scheduled_with_tick_timer(
+    interval = cadence::PERIOD,
+    behavior = Behavior::Delay
+)]
+struct Flusher;
+
+impl Flusher {
+    #[process]
+    fn run(&self) -> anyhow::Result<()> {}
+}
+"#,
+            &[],
+        );
+
+        assert!(
+            source.contains("fntick_interval(&self)->std::time::Duration{crate::schedule::PERIOD}")
+        );
+        assert!(source.contains(
+            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
+        ));
+    }
+
+    #[test]
+    fn rejects_an_unresolvable_ticker_interval_path() {
+        let message = error_for(
+            "#[scheduled_with_tick_timer(interval = PERIOD)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+        );
+
+        assert!(message.contains("'interval' path 'PERIOD'"));
+        assert!(message.contains("cannot be resolved"));
+    }
+
+    #[test]
+    fn rejects_an_unresolvable_ticker_behavior_path() {
+        let message = error_for(
+            "#[scheduled_with_tick_timer(interval = crate::PERIOD, behavior = Delay)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+        );
+
+        assert!(message.contains("'behavior' path 'Delay'"));
+        assert!(message.contains("cannot be resolved"));
     }
 
     fn canonical(segments: &[&str]) -> CanonicalPath {
@@ -272,7 +319,7 @@ mod tests {
             "fntick_interval(&self)->std::time::Duration{margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL}"
         ));
         assert!(source.contains(
-            "manager.register_service(JwksRoller{inner:(matchcontainer.framework_jwks_roller_server_jwks_roller_jwks_roller().await"
+            "manager.register_service(JwksRoller{inner:container.framework_jwks_roller_server_jwks_roller_jwks_roller(),});"
         ));
         assert!(source.contains("impltrzcina::ServiceforJwksClient"));
         assert!(
@@ -281,7 +328,7 @@ mod tests {
             )
         );
         assert!(source.contains(
-            "manager.register_service(JwksClient{inner:(matchcontainer.framework_jwks_client_jwks_client_jwks_client().await"
+            "manager.register_service(JwksClient{inner:container.framework_jwks_client_jwks_client_jwks_client(),});"
         ));
     }
 
@@ -329,7 +376,7 @@ mod tests {
 
         assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:matchsuper::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
@@ -340,7 +387,8 @@ mod tests {
         assert!(source.contains(
             "forserver_serviceinserver_services{manager.register_service(server_service);}"
         ));
-        assert!(source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"));
+        assert!(source.contains("manager.register_service(Pump{"));
+        assert!(source.contains("inner:container.pump()"));
         assert!(!source.contains("bundle_services"));
         assert!(!source.contains("resolved_services"));
         assert!(source.contains("letmutmanager=trzcina::ServiceManager::default();"));
@@ -351,7 +399,8 @@ mod tests {
         let source = rendered(SERVICE, &[]);
 
         assert!(source.contains("letmutmanager=trzcina::ServiceManager::default();"));
-        assert!(source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"));
+        assert!(source.contains("manager.register_service(Pump{"));
+        assert!(source.contains("inner:container.pump()"));
         assert!(!source.contains("serve_application"));
     }
 
@@ -360,11 +409,13 @@ mod tests {
         let source = rendered_with_views("#[singleton]\nstruct Store;\n", &public());
 
         assert!(source.contains(
-            "letviews=::std::sync::Arc::new(matchsuper::views::build::build(container).await{Ok(views)=>views,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}},);"
+            "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
         ));
-        assert!(source.contains(
-            "super::http::server_public::server_public(container,&routes,&views,).await"
-        ));
+        assert!(
+            source.contains(
+                "super::http::server_public::server_public(container,&routes,&views).await"
+            )
+        );
     }
 
     #[test]
@@ -400,11 +451,12 @@ mod tests {
         assert!(source.contains(
             r#"Some("spiffe_mtls")=>{margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
         ));
-        assert!(
-            source.contains(
-                "_=>margaret::framework::http::transport_config::TransportConfig::Plain,"
-            )
-        );
+        assert!(source.contains(
+            r#"Some("plain")=>{margaret::framework::http::transport_config::TransportConfig::Plain}"#
+        ));
+        assert!(source.contains(
+            "Some(_)|None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}"
+        ));
         assert!(source.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
@@ -432,7 +484,7 @@ mod tests {
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(source.contains(
-            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:(matchcontainer.worker(console_argument_0.clone()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),},),);"
+            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:container.worker(),},),);"
         ));
         assert!(source.contains(
             "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
@@ -506,13 +558,13 @@ mod tests {
         );
 
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:matchsuper::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:matchsuper::http::server_internal::server_internal(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#
@@ -651,9 +703,7 @@ impl Roller {
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
         ));
         assert!(!source.contains("impltrzcina::Servicefor"));
-        assert!(source.contains(
-            "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
+        assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
         assert!(source.contains(
             r#"letconsole_argument_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
         ));
@@ -685,9 +735,7 @@ impl Roller {
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
         ));
         assert!(!source.contains("_cancellation_token"));
-        assert!(source.contains(
-            "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
+        assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
     }
 
     #[test]
@@ -714,9 +762,7 @@ impl Worker {
         assert!(source.contains(
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
         ));
-        assert!(source.contains(
-            "manager.register_service(Worker{inner:(matchcontainer.worker(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
+        assert!(source.contains("manager.register_service(Worker{inner:container.worker(),});"));
     }
 
     #[test]
@@ -742,9 +788,7 @@ impl Worker {
         assert!(source.contains(
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
         ));
-        assert!(source.contains(
-            "manager.register_service(Worker{inner:(matchcontainer.worker(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
+        assert!(source.contains("manager.register_service(Worker{inner:container.worker(),});"));
         assert!(source.contains(
             r#"letconsole_argument_0=matchmatches.get_one::<std::string::String>("label")"#
         ));
@@ -769,9 +813,7 @@ impl Watcher {
             &[],
         );
 
-        assert!(source.contains(
-            "manager.register_service(Watcher{inner:(matchcontainer.watcher(console_argument_0).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
+        assert!(source.contains("manager.register_service(Watcher{inner:container.watcher(),});"));
         assert!(source.contains(r#"letconsole_argument_0=matches.get_flag("verbose")"#));
     }
 
@@ -807,12 +849,9 @@ impl Second {
             &[],
         );
 
-        assert!(source.contains(
-            "manager.register_service(First{inner:(matchcontainer.first(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
-        assert!(source.contains(
-            "manager.register_service(Second{inner:(matchcontainer.second(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
+        assert!(source.contains("structFirst"));
+        assert!(source.contains("structSecond"));
+        assert_eq!(source.matches("manager.register_service(").count(), 2);
         assert_eq!(source.matches("letconsole_argument_0=").count(), 1);
     }
 

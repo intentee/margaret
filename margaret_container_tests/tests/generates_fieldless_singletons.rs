@@ -9,7 +9,7 @@ fn generates_fieldless_singletons() {
         .expect("fieldless singletons generate without a #[constructor]");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("std::sync::Arc::new(crate::UnitMarker,)"));
-    assert!(source.contains("std::sync::Arc::new(crate::EmptyNamed{})"));
-    assert!(source.contains("std::sync::Arc::new(crate::EmptyTuple(),)"));
+    assert!(source.contains("crate::UnitMarker"));
+    assert!(source.contains("crate::EmptyNamed{}"));
+    assert!(source.contains("crate::EmptyTuple()"));
 }

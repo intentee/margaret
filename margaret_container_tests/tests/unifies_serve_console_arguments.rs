@@ -20,9 +20,7 @@ fn unifies_serve_console_arguments_across_roots() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/console_argument_propagation");
     let bindings = bindings_for_fixture("crate", &directory);
 
-    let serve = bindings
-        .serve_arguments(&[path("Config"), path("Service")], &[])
-        .expect("the roots unify");
+    let serve = bindings.serve_arguments(&[path("Config"), path("Service")], &[]);
     let names: Vec<&str> = serve.iter().map(|argument| argument.name()).collect();
 
     assert_eq!(serve.len(), 2);

@@ -106,7 +106,7 @@ struct CardLayout;
         assert!(source.contains("pub struct Views"));
         assert!(source.contains("pub the_card: ::std::sync::Arc<crate::CardLayout>"));
         assert!(source.contains("pub async fn build("));
-        assert!(source.contains("the_card: container.card_layout().await"));
+        assert!(source.contains("the_card: container.card_layout()"));
     }
 
     const CONSOLE_ARGUMENT_VIEW: &str = "\
@@ -121,15 +121,15 @@ impl Banner {
 ";
 
     #[test]
-    fn weaves_a_console_argument_into_the_view_builder() {
+    fn records_a_view_console_argument_and_reads_the_preconstructed_view() {
         let artifacts = generated(CONSOLE_ARGUMENT_VIEW);
         let source = formatted(artifacts.modules);
         let slot = artifacts.console_arguments.len();
 
         assert_eq!(slot, 1);
         assert_eq!(artifacts.console_arguments[0].name(), "title");
-        assert!(source.contains("console_argument_0: &str"));
-        assert!(source.contains("banner: container.banner(console_argument_0.to_owned()).await"));
+        assert!(source.contains("banner: container.banner()"));
+        assert!(!source.contains("console_argument_"));
     }
 
     #[test]
@@ -146,7 +146,7 @@ impl Banner {
             formatted(generated("#[renders_view(name = \"plain\")]\nstruct Plain;\n").modules);
 
         assert!(source.contains("pub plain: ::std::sync::Arc<crate::Plain>"));
-        assert!(source.contains("plain: container.plain().await"));
+        assert!(source.contains("plain: container.plain()"));
     }
 
     #[test]

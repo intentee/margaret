@@ -4,6 +4,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
@@ -17,6 +18,52 @@ use crate::render_sessions::render_sessions;
 use crate::session_plan::SessionPlan;
 use crate::websocket_artifacts::WebSocketArtifacts;
 use crate::websocket_codegen_error::WebSocketCodegenError;
+use margaret_request_binding_codegen::request_binding::RequestBinding;
+
+fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
+    match binding {
+        RequestBinding::AuthenticatedUser { application, .. } => Some(&application.concrete),
+        RequestBinding::Bound {
+            binder_provider, ..
+        } => Some(binder_provider),
+        RequestBinding::Injectable { dependency } => Some(&dependency.concrete),
+        RequestBinding::AssetBag
+        | RequestBinding::CurrentRequest
+        | RequestBinding::FormRequest { .. }
+        | RequestBinding::Forwarder
+        | RequestBinding::Next
+        | RequestBinding::PeerSpiffeId
+        | RequestBinding::Raw { .. }
+        | RequestBinding::Routes
+        | RequestBinding::Views => None,
+    }
+}
+
+fn construction_roots(plan: &crate::websocket_plan::WebSocketPlan) -> Vec<CanonicalPath> {
+    let mut roots = std::collections::BTreeSet::new();
+
+    for session_plan in &plan.sessions {
+        for layer in &session_plan.session.layers {
+            roots.insert(layer.concrete.clone());
+        }
+
+        for parameter in &session_plan.session.parameters {
+            if let Some(root) = binding_root(&parameter.binding) {
+                roots.insert(root.clone());
+            }
+        }
+
+        for handler in session_plan
+            .request_handlers
+            .iter()
+            .chain(&session_plan.notification_handlers)
+        {
+            roots.insert(handler.handler_path.clone());
+        }
+    }
+
+    roots.into_iter().collect()
+}
 
 pub fn render_websocket(
     index: &AttributeIndex,
@@ -67,6 +114,7 @@ pub fn render_websocket(
         .collect();
 
     Ok(WebSocketArtifacts {
+        construction_roots: construction_roots(&plan),
         modules,
         server_console_arguments,
         servers: sessions_by_server.into_keys().collect(),

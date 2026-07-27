@@ -128,7 +128,7 @@ impl Farewell {
         let source = source_for(COMMANDS, false);
 
         assert!(source.contains("pubasyncfnrun"));
-        assert!(source.contains("run<Arguments,Argument>(container:&super::container::Container,"));
+        assert!(source.contains("run<Arguments,Argument>(args:Arguments,)"));
         assert!(source.contains(r#"clap::Command::new("demo").about("Demonstratesarguments")"#));
 
         assert!(source.contains(r#"clap::Arg::new("name").required(true)"#));
@@ -142,7 +142,7 @@ impl Farewell {
         );
         assert!(source.contains("clap::value_parser!(std::string::String)"));
 
-        assert!(source.contains("container.demo("));
+        assert!(source.contains("super::container::build::construct_demo("));
         assert!(source.contains(r#"matches.get_one::<std::string::String>("name")"#));
         assert!(
             source.contains(r#"matches.get_one::<std::string::String>("salutation").cloned()"#)
@@ -150,9 +150,9 @@ impl Farewell {
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 
         assert!(source.contains(r#"("farewell",_matches)"#));
-        assert!(source.contains(
-            "(matchcontainer.farewell().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}).run().await"
-        ));
+        assert!(source.contains("super::container::build::construct_farewell().await"));
+        assert!(source.contains("report_failure::report_failure(error"));
+        assert!(source.contains(".run().await"));
     }
 
     #[test]
@@ -174,7 +174,7 @@ impl Farewell {
             r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(false).requires("public-uploads")"#
         ));
         assert!(source.contains(
-            "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|super::serve::serve(container,matches,cancellation_token,),)"
+            "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|super::serve::serve(matches,cancellation_token,),)"
         ));
     }
 
@@ -286,9 +286,7 @@ impl Farewell {
         assert!(source.contains(r#"Some(("schema",_matches))=>{"#));
         assert!(source.contains("render_postgres(&super::schema::schema())"));
         assert!(source.contains("CommandOutcome::Succeeded"));
-        assert!(
-            source.contains("run<Arguments,Argument>(_container:&super::container::Container,")
-        );
+        assert!(source.contains("run<Arguments,Argument>(args:Arguments,)"));
     }
 
     #[test]
@@ -326,9 +324,10 @@ impl Farewell {
             false,
         );
 
-        assert!(
-            source.contains(r#"(matchcontainer.flagged(matches.get_flag("loud")).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}).run().await"#)
-        );
+        assert!(source.contains("super::container::build::construct_flagged("));
+        assert!(source.contains(r#"matches.get_flag("loud")"#));
+        assert!(source.contains("report_failure::report_failure(error"));
+        assert!(source.contains(".run().await"));
     }
 
     #[test]
@@ -392,9 +391,9 @@ impl Farewell {
         );
 
         assert!(source.contains(r#"("bare",_matches)"#));
-        assert!(source.contains(
-            "(matchcontainer.bare().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}).run().await"
-        ));
+        assert!(source.contains("super::container::build::construct_bare().await"));
+        assert!(source.contains("report_failure::report_failure(error"));
+        assert!(source.contains(".run().await"));
     }
 
     #[test]

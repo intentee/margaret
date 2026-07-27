@@ -93,13 +93,12 @@ pub fn authenticated_user_providers(
             )?;
 
         let method = infer_from_request_method(item, &provider)?;
-        let signature = method.signature();
 
         let subject = format!("authenticated user provider '{provider}'");
         let parameters = classify_parameters(
             index,
             item,
-            signature,
+            method,
             &BindingContext::AuthenticatedUserProvider { subject: &subject },
             registries,
         )?;

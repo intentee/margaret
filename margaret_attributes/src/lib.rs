@@ -1,4 +1,5 @@
 pub mod attribute_args;
+pub mod attribute_args_parse_error;
 pub mod attribute_arguments_reader;
 pub mod attribute_error;
 pub mod attribute_index;
@@ -15,6 +16,7 @@ pub mod indexed_attribute;
 pub mod indexed_field;
 pub mod indexed_item;
 pub mod indexed_method;
+pub mod indexed_parameter;
 pub mod indexed_trait_impl;
 pub mod indexed_variant;
 pub mod is_copy_primitive;

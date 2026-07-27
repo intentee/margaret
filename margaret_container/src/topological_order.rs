@@ -37,13 +37,11 @@ fn dependency_keys(provider: &Provider) -> BTreeSet<CanonicalPath> {
 
 pub(crate) fn topological_order(
     providers: &BTreeMap<CanonicalPath, Provider>,
-) -> Result<(), ContainerError> {
+) -> Result<Vec<CanonicalPath>, ContainerError> {
     let dependencies: BTreeMap<CanonicalPath, BTreeSet<CanonicalPath>> = providers
         .iter()
         .map(|(key, provider)| (key.clone(), dependency_keys(provider)))
         .collect();
 
-    order_by_dependencies(&dependencies).map_err(dependency_cycle)?;
-
-    Ok(())
+    order_by_dependencies(&dependencies).map_err(dependency_cycle)
 }

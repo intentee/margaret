@@ -1,5 +1,6 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 
+#[derive(Clone)]
 pub(crate) enum ProvidedType {
     Concrete(CanonicalPath),
     Endpoint(CanonicalPath),

@@ -4,6 +4,7 @@ use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
 use crate::provided_type::ProvidedType;
 
+#[derive(Clone)]
 pub(crate) struct Provider {
     pub(crate) concrete_path: CanonicalPath,
     pub(crate) construction: DirectConstruction,

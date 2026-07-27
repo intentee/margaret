@@ -314,7 +314,7 @@ impl SessionUserProvider {
         classify_parameters(
             &index,
             item,
-            method.signature(),
+            method,
             &BindingContext::Responder {
                 route_path: &route_path,
                 server: "public",

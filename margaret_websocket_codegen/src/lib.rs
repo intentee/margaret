@@ -217,16 +217,14 @@ impl RespondsToWebSocketMessage for Chatter {
 "#;
 
     #[test]
-    fn weaves_a_console_argument_through_the_websocket_dispatch_chain() {
+    fn reads_a_preconstructed_websocket_handler_through_the_dispatch_chain() {
         let source = generated(CONSOLE_ARGUMENT_HANDLER);
 
-        assert!(source.contains("console_argument_0:&str"));
-        assert!(source.contains("container.chatter(console_argument_0.to_owned()).await"));
-        assert!(source.contains("dispatch_table(container,console_argument_0).await"));
-        assert!(source.contains(
-            "public_routes(container:&super::container::Container,console_argument_0:&str,"
-        ));
-        assert!(source.contains("upgrade_entry(container,console_argument_0"));
+        assert!(source.contains("container.chatter()"));
+        assert!(source.contains("dispatch_table(container).await"));
+        assert!(source.contains("public_routes(container:&super::container::Container,"));
+        assert!(source.contains("upgrade_entry(container"));
+        assert!(!source.contains("console_argument_"));
     }
 
     const NON_STRUCT_HANDLER: &str = r#"
@@ -438,7 +436,7 @@ impl Room {
 
         assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::web_socket("));
         assert!(source.contains(
-            "middleware.push(std::sync::Arc::new(super::middleware::Guard{inner:container.guard().await"
+            "middleware.push(std::sync::Arc::new(super::middleware::Guard{inner:container.guard()"
         ));
         assert!(!source.contains("GatedWebSocketUpgrade"));
     }
@@ -470,13 +468,12 @@ impl Guard {
 "#;
 
     #[test]
-    fn weaves_a_console_argument_into_a_session_middleware() {
+    fn reads_a_preconstructed_session_middleware() {
         let source = generated(SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE);
 
-        assert!(source.contains(
-            "public_routes(container:&super::container::Container,console_argument_0:&str,"
-        ));
-        assert!(source.contains("container.guard(console_argument_0.to_owned()).await"));
+        assert!(source.contains("public_routes(container:&super::container::Container,"));
+        assert!(source.contains("container.guard()"));
+        assert!(!source.contains("console_argument_"));
     }
 
     #[test]
@@ -495,9 +492,11 @@ impl Guard {
         let source = generated(SESSION_WITH_ROUTES_MIDDLEWARE);
 
         assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
-        assert!(source.contains(
-            "super::middleware::Tracer{inner:container.tracer().await?,routes:routes.clone()"
-        ));
+        assert!(
+            source.contains(
+                "super::middleware::Tracer{inner:container.tracer(),routes:routes.clone()"
+            )
+        );
         assert!(source.contains("upgrade_entry(container)"));
     }
 
@@ -533,9 +532,9 @@ impl Guard {
         assert!(source.contains("clock:::std::sync::Arc<crate::SystemClock>"));
         assert!(source.contains("config:::std::sync::Arc<crate::Config>"));
         assert!(source.contains("plugin:::std::sync::Arc<crate::LogPlugin>"));
-        assert!(source.contains("container.system_clock().await"));
-        assert!(source.contains("container.config().await"));
-        assert!(source.contains("container.log_plugin().await"));
+        assert!(source.contains("container.system_clock()"));
+        assert!(source.contains("container.config()"));
+        assert!(source.contains("container.log_plugin()"));
     }
 
     #[test]
@@ -558,7 +557,7 @@ impl Guard {
         assert!(source.contains("dispatch_notification::dispatch_notification"));
         assert!(source.contains("requests.insert(\"say\""));
         assert!(source.contains("notifications.insert(\"typing\""));
-        assert!(source.contains("container.speaker().await"));
+        assert!(source.contains("container.speaker()"));
     }
 
     #[test]
@@ -876,7 +875,7 @@ impl RespondsToWebSocketMessage for Chatter {
             "structFactory{session_user_provider:::std::sync::Arc<super::super::authenticated_users::SessionUserProvider,>,}"
         ));
         assert!(source.contains(
-            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider().await?,}),}"
+            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(),}),}"
         ));
     }
 
@@ -1053,14 +1052,18 @@ impl RespondsToWebSocketMessage for Chatter {
     fn threads_the_console_arguments_of_an_authenticated_user_provider_through_the_handshake() {
         let source = generated(CONSOLE_ARGUMENT_PROVIDER);
 
-        assert!(source.contains("pubasyncfnupgrade_entry(container:&super::super::container::Container,console_argument_0:&str,)"));
-        assert!(source.contains(
-            "inner:container.session_user_provider(console_argument_0.to_owned()).await?,"
-        ));
-        assert!(source.contains(
-            "pubasyncfnpublic_routes(container:&super::container::Container,console_argument_0:&str,_routes:"
-        ));
-        assert!(source.contains("upgrade_entry(container,console_argument_0).await"));
+        assert!(
+            source.contains(
+                "pubasyncfnupgrade_entry(container:&super::super::container::Container,)"
+            )
+        );
+        assert!(source.contains("inner:container.session_user_provider(),"));
+        assert!(
+            source.contains(
+                "pubasyncfnpublic_routes(container:&super::container::Container,_routes:"
+            )
+        );
+        assert!(source.contains("upgrade_entry(container).await"));
     }
 
     #[test]

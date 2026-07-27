@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
@@ -18,6 +19,7 @@ use crate::jwks_pass::jwks_pass;
 use crate::middleware_pass::middleware_pass;
 use crate::model_pass::model_pass;
 use crate::serve_arguments::serve_arguments;
+use crate::serve_arguments::serve_roots;
 use crate::services_pass::services_pass;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 use crate::views_pass::views_pass;
@@ -39,23 +41,39 @@ pub fn build(
     let client_bindings = TagPool::collect(&index)
         .map_err(ContainerError::from)?
         .jwks_client_bindings();
-    let bindings = container_pass(&mut context, &registry, &client_bindings)?;
-    asset_bag_pass(&mut context, &bindings, assets_directory, embed_relative)?;
-    jwks_pass(&mut context, &bindings, &client_bindings);
+    let planned_container = container_pass(&context, &registry, &client_bindings)?;
+    let bindings = planned_container.bindings();
+    asset_bag_pass(&mut context, bindings, assets_directory, embed_relative)?;
+    jwks_pass(&mut context, bindings, &client_bindings);
     let registries = binding_pass(&mut context)?;
     middleware_pass(&mut context, &registries)?;
-    websocket_pass(&mut context, &bindings, &registries)?;
-    views_pass(&mut context, &bindings)?;
-    http_pass(&mut context, &bindings, &registries)?;
+    let websocket_roots = websocket_pass(&mut context, bindings, &registries)?;
+    let view_roots = views_pass(&mut context, bindings)?;
+    let http_roots = http_pass(&mut context, bindings, &registries)?;
+    let service_roots = serve_roots(&index);
     let serve_arguments = serve_arguments(
-        &index,
-        &bindings,
+        &service_roots,
+        bindings,
         context.server_console_arguments(),
         context.views_console_arguments(),
-    )?;
-    services_pass(&mut context, &bindings, &serve_arguments)?;
+    );
+    services_pass(&mut context, bindings, &serve_arguments)?;
     model_pass(&mut context)?;
-    console_pass(&mut context, &bindings, &serve_arguments)?;
+    console_pass(&mut context, bindings, &serve_arguments)?;
+
+    let mut construction_roots: BTreeSet<_> = service_roots.into_iter().collect();
+    construction_roots.extend(websocket_roots);
+    construction_roots.extend(view_roots);
+    construction_roots.extend(http_roots);
+    construction_roots.extend(
+        context
+            .framework_services()
+            .iter()
+            .map(|service| service.concrete_path.clone()),
+    );
+    let rendered_container =
+        planned_container.render(&construction_roots.into_iter().collect::<Vec<_>>());
+    context.extend_modules(rendered_container.modules);
 
     context.into_generated_code()
 }
@@ -68,30 +86,12 @@ mod tests {
     use tempfile::TempDir;
     use tempfile::tempdir;
 
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
-    use margaret_generated_module::generated_module::GeneratedModule;
-    use margaret_tag_codegen::tag_pool::TagPool;
 
     use super::build;
-    use crate::asset_bag_pass::asset_bag_pass;
-    use crate::binding_pass::binding_pass;
-    use crate::build_context::BuildContext;
     use crate::codegen_error::CodegenError;
-    use crate::console_arguments_pass::console_arguments_pass;
-    use crate::console_pass::console_pass;
-    use crate::container_pass::container_pass;
     use crate::generated_code::GeneratedCode;
-    use crate::http_pass::http_pass;
-    use crate::jwks_pass::jwks_pass;
-    use crate::middleware_pass::middleware_pass;
-    use crate::model_pass::model_pass;
-    use crate::serve_arguments::serve_arguments;
-    use crate::services_pass::services_pass;
-    use crate::umbrella::umbrella;
     use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
-    use crate::views_pass::views_pass;
-    use crate::websocket_pass::websocket_pass;
 
     const WEB_CRATE: &str = "\
 #[rustfmt::skip]
@@ -215,54 +215,14 @@ struct Room;
         )
     }
 
-    fn generate_unformatted(source: &Path) -> GeneratedCode {
-        let index = AttributeIndexBuilder::new()
-            .exclude_root_module(UMBRELLA_MODULE_NAME)
-            .index_crate(&CrateRoot::new("crate", source))
-            .expect("the crate is indexed")
-            .build();
-        let mut context = BuildContext::new(&index, None);
-
-        let registry = console_arguments_pass(&index).expect("the console arguments pass succeeds");
-        let client_bindings = TagPool::collect(&index)
-            .expect("the tag pool collects")
-            .jwks_client_bindings();
-        let bindings = container_pass(&mut context, &registry, &client_bindings)
-            .expect("the container pass succeeds");
-        asset_bag_pass(
-            &mut context,
-            &bindings,
+    fn generate_from_source(source: &Path) -> GeneratedCode {
+        build(
+            &CrateRoot::new("crate", source),
+            None,
             &source.join("assets"),
             EMBED_RELATIVE,
         )
-        .expect("the asset bag pass succeeds");
-        jwks_pass(&mut context, &bindings, &client_bindings);
-        let registries = binding_pass(&mut context).expect("the binding pass succeeds");
-        middleware_pass(&mut context, &registries).expect("the middleware pass succeeds");
-        websocket_pass(&mut context, &bindings, &registries).expect("the websocket pass succeeds");
-        views_pass(&mut context, &bindings).expect("the views pass succeeds");
-        http_pass(&mut context, &bindings, &registries).expect("the http pass succeeds");
-        let serve_arguments = serve_arguments(
-            &index,
-            &bindings,
-            context.server_console_arguments(),
-            context.views_console_arguments(),
-        )
-        .expect("the serve arguments pass succeeds");
-        services_pass(&mut context, &bindings, &serve_arguments)
-            .expect("the services pass succeeds");
-        model_pass(&mut context).expect("the model pass succeeds");
-        console_pass(&mut context, &bindings, &serve_arguments).expect("the console pass succeeds");
-
-        let mut modules: Vec<GeneratedModule> = context
-            .module_tokens()
-            .iter()
-            .map(|module| GeneratedModule::new(module.name(), module.to_source()))
-            .collect();
-
-        modules.push(umbrella(context.capabilities()));
-
-        GeneratedCode::new(modules)
+        .expect("the crate generates")
     }
 
     fn module<'code>(code: &'code GeneratedCode, name: &str) -> &'code str {
@@ -380,7 +340,9 @@ impl AssetRoute {
         assert!(responder.contains("public, max-age=31536000, immutable"));
         assert!(responder.contains("\"service_worker.js\" =>"));
         assert!(responder.contains("\"no-cache\""));
-        assert!(module(&code, "container").contains("asset_bag::asset_responder::AssetResponder"));
+        assert!(
+            module(&code, "container/build").contains("asset_bag::asset_responder::AssetResponder")
+        );
     }
 
     #[test]
@@ -563,7 +525,7 @@ impl Worker {
         ));
         assert!(serve.contains("letconsole_argument_0=spiffe_http_client.clone();"));
         assert!(serve.contains(
-            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:(matchcontainer.worker(console_argument_0.clone()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),},),);"
+            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:container.worker(),},),);"
         ));
         assert!(serve.contains(
             "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
@@ -574,8 +536,10 @@ impl Worker {
         assert!(!serve.contains("bundle_services"));
         assert!(!serve.contains("spiffe_server_config"));
 
-        let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains("console_argument_0:reqwest::Client"));
+        let construction: String = module(&code, "container/build")
+            .split_whitespace()
+            .collect();
+        assert!(construction.contains("console_argument_0:reqwest::Client"));
 
         let run: String = module(&code, "run").split_whitespace().collect();
         assert!(run.contains(
@@ -760,10 +724,12 @@ impl GetIdentity {
             "pub use margaret::framework::jwks_roller_server::public_jwks_handler::PublicJwksHandler;"
         ));
 
-        let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains("crate::margaret::jwks::JwksRoller::create("));
-        assert!(container.contains(".public_jwks_handler()"));
-        assert!(container.contains(
+        let construction: String = module(&code, "container/build")
+            .split_whitespace()
+            .collect();
+        assert!(construction.contains("crate::margaret::jwks::JwksRoller::create("));
+        assert!(construction.contains(".public_jwks_handler()"));
+        assert!(construction.contains(
             "margaret::framework::jwks_secret_storage_selection::resolve_jwks_secret_storage::resolve_jwks_secret_storage"
         ));
 
@@ -793,12 +759,15 @@ impl GetIdentity {
             "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
 
-        let container: String = module(&code, "container").split_whitespace().collect();
+        let construction: String = module(&code, "container/build")
+            .split_whitespace()
+            .collect();
         assert!(
-            container.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
+            construction.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
         );
         assert!(
-            container.contains("crate::margaret::jwks::partner_jwks_endpoint::JwksClient::create(")
+            construction
+                .contains("crate::margaret::jwks::partner_jwks_endpoint::JwksClient::create(")
         );
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
@@ -823,9 +792,11 @@ impl GetIdentity {
             "pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
         ));
 
-        let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains(".server_secret_store()"));
-        assert!(container.contains("crate::margaret::jwks::MintAccessTokenHandler::create("));
+        let construction: String = module(&code, "container/build")
+            .split_whitespace()
+            .collect();
+        assert!(construction.contains(".server_secret_store()"));
+        assert!(construction.contains("crate::margaret::jwks::MintAccessTokenHandler::create("));
         assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
 
@@ -865,10 +836,13 @@ impl GetVerify {
     fn weaves_a_console_argument_from_the_jwks_endpoint_through_the_verifier_accessor() {
         let code = generate(JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE).expect("the build succeeds");
 
-        let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains(".await?.verifier()"));
+        let construction: String = module(&code, "container/build")
+            .split_whitespace()
+            .collect();
+        assert!(construction.contains(".verifier()"));
+        assert!(!construction.contains(".await?.verifier()"));
         assert!(
-            container.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
+            construction.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
         );
 
         let run = module(&code, "run");
@@ -902,9 +876,11 @@ impl GetJwks {
         let code = generate(JWKS_NAME_COLLISION_CRATE)
             .expect("a user component named JwksRoller coexists");
 
-        let container: String = module(&code, "container").split_whitespace().collect();
-        assert!(container.contains("std::sync::Arc<crate::JwksRoller>"));
-        assert!(container.contains("std::sync::Arc<crate::margaret::jwks::JwksRoller>"));
+        let construction: String = module(&code, "container/build")
+            .split_whitespace()
+            .collect();
+        assert!(construction.contains("std::sync::Arc<crate::JwksRoller>"));
+        assert!(construction.contains("std::sync::Arc<crate::margaret::jwks::JwksRoller>"));
     }
 
     const JWKS_FIELD_COLLISION_CRATE: &str = "\
@@ -936,10 +912,12 @@ impl GetJwks {
         let code = generate(JWKS_FIELD_COLLISION_CRATE)
             .expect("a user component flattening to a framework field coexists");
 
-        let container: String = module(&code, "container").split_whitespace().collect();
+        let construction: String = module(&code, "container/build")
+            .split_whitespace()
+            .collect();
 
-        assert!(container.contains("std::sync::Arc<crate::margaret_jwks::JwksRoller>"));
-        assert!(container.contains("margaret_jwks_jwks_roller_2"));
+        assert!(construction.contains("std::sync::Arc<crate::margaret_jwks::JwksRoller>"));
+        assert!(construction.contains("margaret_jwks_jwks_roller_2"));
     }
 
     #[test]
@@ -1211,7 +1189,7 @@ impl RequestLog {
         let source = directory.path().join("src");
         let generated = directory.path().join(UMBRELLA_MODULE_NAME);
 
-        generate_unformatted(&source)
+        generate_from_source(&source)
             .write_to(&generated)
             .expect("the first sources are written");
 
@@ -1219,7 +1197,7 @@ impl RequestLog {
 
         write_lib(&directory, PLAIN_CRATE);
 
-        generate_unformatted(&source)
+        generate_from_source(&source)
             .write_to(&generated)
             .expect("the second sources are written");
 
@@ -1239,8 +1217,8 @@ impl RequestLog {
         let directory = crate_with(WEB_CRATE);
         let source = directory.path().join("src");
 
-        let first = generate_unformatted(&source);
-        let second = generate_unformatted(&source);
+        let first = generate_from_source(&source);
+        let second = generate_from_source(&source);
 
         assert_eq!(module(&first, "mod"), module(&second, "mod"));
         assert_eq!(module(&first, "http"), module(&second, "http"));
@@ -1476,7 +1454,7 @@ impl RespondsToWebSocketMessage for Chatter {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(module(&code, "container").contains("Pool::create().await"));
+        assert!(module(&code, "container/build").contains("Pool::create().await"));
         assert!(concatenated(&code).contains("async fn server_public"));
         assert!(serve.contains("super::http::server_public::server_public(container,"));
     }
@@ -1586,20 +1564,19 @@ impl New {
     fn generates_without_reserving_names_for_components_named_after_framework_identifiers() {
         let code = generate(FRAMEWORK_NAMED_CRATE).expect("the build succeeds");
 
-        let container: String = module(&code, "container").split_whitespace().collect();
         let build: String = module(&code, "container/build")
             .split_whitespace()
             .collect();
         let routes: String = module(&code, "routes").split_whitespace().collect();
         let http: String = concatenated(&code).split_whitespace().collect();
 
-        assert!(build.contains("pubfnbuild()->super::Container"));
-        assert!(container.contains("pubasyncfnbuild(&self,)"));
-        assert!(container.contains("pubasyncfncontainer(&self,)"));
-        assert!(container.contains("pubasyncfnroutes(&self,)"));
-        assert!(!container.contains("build_2"));
-        assert!(!container.contains("container_2"));
-        assert!(!container.contains("routes_2"));
+        assert!(build.contains("pubasyncfnserve("));
+        assert!(build.contains("pubasyncfnconstruct_build("));
+        assert!(build.contains("pubasyncfnconstruct_container("));
+        assert!(build.contains("pubasyncfnconstruct_routes("));
+        assert!(!build.contains("construct_build_2"));
+        assert!(!build.contains("construct_container_2"));
+        assert!(!build.contains("construct_routes_2"));
 
         assert!(routes.contains("pubstructRoutes{pubroutes:servers::routes::Routes,}"));
         assert!(module(&code, "routes/servers/routes").contains("pub struct Routes"));
@@ -1656,12 +1633,14 @@ impl Page {
 ";
 
     #[test]
-    fn weaves_a_console_argument_from_serve_into_the_http_server() {
+    fn resolves_a_responder_console_argument_during_container_construction() {
         let code = generate(CONSOLE_ARGUMENT_RESPONDER_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("server_public(container,&console_argument_0,"));
+        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains("server_public(container,&routes"));
+        assert!(!serve.contains("server_public(container,&console_argument_0"));
 
         let run = module(&code, "run");
         assert!(run.contains(r#"clap::Arg::new("greeting")"#));
@@ -1691,12 +1670,13 @@ impl Page {
 ";
 
     #[test]
-    fn weaves_a_console_argument_from_serve_into_the_view_builder() {
+    fn resolves_a_view_console_argument_during_container_construction() {
         let code = generate(CONSOLE_ARGUMENT_VIEW_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("super::views::build::build(container,&console_argument_0)"));
+        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains("super::views::build::build(container)"));
     }
 
     const CONSOLE_ARGUMENT_WEBSOCKET_CRATE: &str = "\
@@ -1731,12 +1711,14 @@ impl RespondsToWebSocketMessage for Chatter {
 ";
 
     #[test]
-    fn weaves_a_console_argument_from_serve_into_the_websocket_handler() {
+    fn resolves_a_websocket_handler_console_argument_during_container_construction() {
         let code = generate(CONSOLE_ARGUMENT_WEBSOCKET_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("server_public(container,&console_argument_0,"));
+        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains("server_public(container,&routes"));
+        assert!(!serve.contains("server_public(container,&console_argument_0"));
     }
 
     const CONSOLE_ARGUMENT_SESSION_DEPENDENCY_CRATE: &str = "\
@@ -1785,6 +1767,8 @@ impl RespondsToWebSocketMessage for Chatter {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("server_public(container,&console_argument_0,"));
+        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains("server_public(container,&routes"));
+        assert!(!serve.contains("server_public(container,&console_argument_0"));
     }
 }

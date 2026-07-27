@@ -39,7 +39,7 @@ pub fn middleware_plans(
         let parameters = classify_parameters(
             index,
             item,
-            method.signature(),
+            method,
             &BindingContext::Middleware { subject: &subject },
             registries,
         )?;

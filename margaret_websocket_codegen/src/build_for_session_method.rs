@@ -1,7 +1,6 @@
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
-use margaret_attributes::marker::marker;
 
 use crate::websocket_codegen_error::WebSocketCodegenError;
 
@@ -13,7 +12,7 @@ pub(crate) fn build_for_session_method<'index>(
     let mut found: Vec<&IndexedMethod> = item
         .methods()
         .iter()
-        .filter(|method| marker(method.attributes(), &selector).is_some())
+        .filter(|method| method.has_attribute(&selector))
         .collect();
 
     if found.len() > 1 {

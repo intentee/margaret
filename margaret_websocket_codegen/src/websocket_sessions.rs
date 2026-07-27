@@ -39,7 +39,7 @@ pub(crate) fn websocket_sessions(
         let parameters = classify_parameters(
             index,
             item,
-            method.signature(),
+            method,
             &BindingContext::Handshake {
                 container_bindings: bindings,
                 route_path: &route_path,

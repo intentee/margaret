@@ -9,40 +9,8 @@ use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
 
-fn collect(
-    key: &CanonicalPath,
-    plan: &ContainerPlan,
-    closures: &mut BTreeMap<CanonicalPath, Vec<ConsoleArgument>>,
-) -> Result<Vec<ConsoleArgument>, ContainerError> {
-    if let Some(existing) = closures.get(key) {
-        return Ok(existing.clone());
-    }
-
-    let entry = plan
-        .providers
-        .get(key)
-        .unwrap_or_else(|| &plan.constructions[key]);
-    let mut collected: Vec<ConsoleArgument> = Vec::new();
-
-    for dependency in entry.dependencies() {
-        match dependency {
-            DependencyKind::ConsoleArgument { argument } => {
-                collected.push(argument.as_ref().clone());
-            }
-            DependencyKind::Single { provider_key } => {
-                collected.extend(collect(provider_key, plan, closures)?);
-            }
-        }
-    }
-
-    let unified = unify_by_key(&collected)?;
-
-    closures.insert(key.clone(), unified.clone());
-
-    Ok(unified)
-}
-
 pub(crate) struct ConsoleClosures {
+    arguments: Vec<ConsoleArgument>,
     closures: BTreeMap<CanonicalPath, Vec<ConsoleArgument>>,
     slots: BTreeMap<ServeInputKey, usize>,
 }
@@ -51,24 +19,36 @@ impl ConsoleClosures {
     pub(crate) fn from_plan(plan: &ContainerPlan) -> Result<Self, ContainerError> {
         let mut closures: BTreeMap<CanonicalPath, Vec<ConsoleArgument>> = BTreeMap::new();
 
-        for key in plan.providers.keys().chain(plan.constructions.keys()) {
-            collect(key, plan, &mut closures)?;
-        }
+        for key in &plan.dependency_order {
+            let mut collected = Vec::new();
 
-        let mut slots: BTreeMap<ServeInputKey, usize> = BTreeMap::new();
-        let mut next = 0;
-
-        for closure in closures.values() {
-            for argument in closure {
-                slots.entry(argument.slot_key()).or_insert_with(|| {
-                    let assigned = next;
-                    next += 1;
-                    assigned
-                });
+            for dependency in plan.entry(key).dependencies() {
+                match dependency {
+                    DependencyKind::ConsoleArgument { argument } => {
+                        collected.push(argument.as_ref().clone());
+                    }
+                    DependencyKind::Single { provider_key } => {
+                        collected.extend_from_slice(&closures[provider_key]);
+                    }
+                }
             }
+
+            closures.insert(key.clone(), unify_by_key(&collected)?);
         }
 
-        Ok(Self { closures, slots })
+        let collected = closures.values().flatten().cloned().collect::<Vec<_>>();
+        let arguments = unify_by_key(&collected)?;
+        let slots = arguments
+            .iter()
+            .enumerate()
+            .map(|(slot, argument)| (argument.slot_key(), slot))
+            .collect();
+
+        Ok(Self {
+            arguments,
+            closures,
+            slots,
+        })
     }
 
     pub(crate) fn of(&self, key: &CanonicalPath) -> &[ConsoleArgument] {
@@ -81,5 +61,9 @@ impl ConsoleClosures {
 
     pub(crate) fn slots(&self) -> &BTreeMap<ServeInputKey, usize> {
         &self.slots
+    }
+
+    pub(crate) fn argument(&self, slot: usize) -> &ConsoleArgument {
+        &self.arguments[slot]
     }
 }

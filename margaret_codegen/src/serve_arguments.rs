@@ -6,9 +6,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 
-use crate::codegen_error::CodegenError;
-
-fn serve_roots(index: &AttributeIndex) -> Vec<CanonicalPath> {
+pub(crate) fn serve_roots(index: &AttributeIndex) -> Vec<CanonicalPath> {
     let markers = ["service", "scheduled_with_tick_timer"];
     let mut roots = Vec::new();
 
@@ -24,11 +22,11 @@ fn serve_roots(index: &AttributeIndex) -> Vec<CanonicalPath> {
 }
 
 pub(crate) fn serve_arguments(
-    index: &AttributeIndex,
+    roots: &[CanonicalPath],
     bindings: &ContainerBindings,
     server_console_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
     views_console_arguments: &[ConsoleArgument],
-) -> Result<Vec<ConsoleArgument>, CodegenError> {
+) -> Vec<ConsoleArgument> {
     let mut woven: Vec<ConsoleArgument> = Vec::new();
 
     for arguments in server_console_arguments.values() {
@@ -37,5 +35,5 @@ pub(crate) fn serve_arguments(
 
     woven.extend_from_slice(views_console_arguments);
 
-    Ok(bindings.serve_arguments(&serve_roots(index), &woven)?)
+    bindings.serve_arguments(roots, &woven)
 }

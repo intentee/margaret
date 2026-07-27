@@ -54,24 +54,25 @@ fn drafts_a_jwks_endpoint_as_the_provides_endpoint_interface() {
 
 #[test]
 fn injects_the_endpoints_own_dependencies_and_console_argument() {
-    assert!(
-        endpoints_container()
-            .contains("crate::JwksEndpoint::new(self.dns_resolver().await?,console_argument_0,)")
-    );
+    assert!(endpoints_container().contains(
+        "crate::JwksEndpoint::new(::std::sync::Arc::clone(&dns_resolver),console_argument_0,)"
+    ));
 }
 
 #[test]
 fn injects_the_endpoint_into_the_framework_client_by_tag() {
-    assert!(endpoints_container().contains(
-        "crate::JwksClientRuntime::new(self.jwks_endpoint(console_argument_0).await?,).await"
-    ));
+    let source = endpoints_container();
+
+    assert!(source.contains("crate::JwksClientRuntime::new("));
+    assert!(source.contains("::std::sync::Arc::clone(&jwks_endpoint)"));
+    assert!(source.contains(".await"));
 }
 
 #[test]
 fn constructs_the_endpoint_wrapped_in_an_arc() {
     let source = endpoints_container();
 
-    assert!(source.contains("=std::sync::Arc::new("));
+    assert!(source.contains("::std::sync::Arc::new("));
     assert!(
         source.contains("ConstructionError::wrap(\"crate::JwksEndpoint\",crate::JwksEndpoint::new")
     );

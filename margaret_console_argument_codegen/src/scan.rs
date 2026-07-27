@@ -1,12 +1,10 @@
 use std::collections::BTreeMap;
 
-use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
-use margaret_attributes::marker::marker;
 use margaret_injection_codegen::parameters::parameters;
 
 use crate::classify::classify;
@@ -16,13 +14,11 @@ use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::console_argument_registry::ConsoleArgumentRegistry;
 
 fn single_constructor(item: &IndexedItem) -> Option<&IndexedMethod> {
-    let mut constructors = item.methods().iter().filter(|method| {
-        marker(
-            method.attributes(),
-            &AttributeSelector::from_marker("constructor"),
-        )
-        .is_some()
-    });
+    let selector = AttributeSelector::from_marker("constructor");
+    let mut constructors = item
+        .methods()
+        .iter()
+        .filter(|method| method.has_attribute(&selector));
 
     let constructor = constructors.next()?;
 
@@ -81,15 +77,19 @@ pub fn scan(
         let owner_text = owner.to_string();
         let is_command = item.has_attribute(&AttributeSelector::from_marker("console_command"));
 
-        for view in parameters(constructor.signature()) {
-            let Some(attribute) = marker(view.attributes, &console_argument_selector) else {
+        for view in parameters(constructor) {
+            let Some(attribute) = view
+                .attributes
+                .iter()
+                .find(|attribute| console_argument_selector.matches(attribute.path()))
+            else {
                 continue;
             };
 
             let parameter = view.holder.to_string();
-            let attribute_arguments = AttributeArgs::from_attribute(attribute)?;
+            let attribute_arguments = attribute.args()?;
             let ConsoleArgumentArguments { form } =
-                ConsoleArgumentArguments::parse(&attribute_arguments, &owner_text, &parameter)?;
+                ConsoleArgumentArguments::parse(attribute_arguments, &owner_text, &parameter)?;
             let argument = classify(index, item, form, &parameter, view.declared, &owner_text)?;
 
             if matches!(argument, ConsoleArgument::Positional { .. }) && !is_command {

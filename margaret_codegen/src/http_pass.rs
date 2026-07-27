@@ -1,3 +1,4 @@
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 
@@ -8,11 +9,11 @@ pub(crate) fn http_pass(
     context: &mut BuildContext,
     bindings: &ContainerBindings,
     registries: &BindingRegistries,
-) -> Result<(), CodegenError> {
+) -> Result<Vec<CanonicalPath>, CodegenError> {
     let capabilities = context.capabilities();
 
     if !capabilities.has_http && !capabilities.has_websockets {
-        return Ok(());
+        return Ok(Vec::new());
     }
 
     let artifacts = margaret_http_codegen::render_http::render_http(
@@ -25,9 +26,10 @@ pub(crate) fn http_pass(
         registries,
     )?;
 
+    let construction_roots = artifacts.construction_roots().to_vec();
     context.set_servers(artifacts.servers().to_vec());
     context.set_server_console_arguments(artifacts.server_console_arguments().clone());
     context.extend_modules(artifacts.into_modules());
 
-    Ok(())
+    Ok(construction_roots)
 }

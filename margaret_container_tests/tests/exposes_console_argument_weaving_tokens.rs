@@ -49,24 +49,15 @@ fn unifies_and_orders_a_console_argument_union_by_slot() {
 }
 
 #[test]
-fn renders_the_console_argument_weaving_tokens() {
+fn renders_owned_console_argument_construction_tokens() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/console_argument_propagation");
     let bindings = bindings_for_fixture("crate", &directory);
     let slot = bindings.console_slot(&console_key("path"));
     let arguments = [named("path")];
 
-    let parameters = bindings.console_parameters(&arguments);
-    let borrows = bindings.console_borrows(&arguments);
-    let forwards = bindings.console_forwards(&arguments);
-    let weaves = bindings.console_weaves(&arguments);
+    let weaves = bindings.console_weaves_owned(&arguments);
 
-    assert_eq!(
-        collapsed(&parameters[0]),
-        format!("console_argument_{slot}:&str,")
-    );
-    assert_eq!(collapsed(&borrows[0]), format!("&console_argument_{slot},"));
-    assert_eq!(collapsed(&forwards[0]), format!("console_argument_{slot},"));
     assert_eq!(
         collapsed(&weaves[0]),
         format!("console_argument_{slot}.to_owned()")

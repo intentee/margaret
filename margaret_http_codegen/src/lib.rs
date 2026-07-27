@@ -192,7 +192,7 @@ impl GetProfile {
             .collect();
 
         assert!(source.contains(
-            "letsession_user_provider=std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(console_argument_0.to_owned()).await?,routes:routes.clone(),});"
+            "letsession_user_provider=std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(),routes:routes.clone(),});"
         ));
         assert!(source.contains("letsession_user_provider=session_user_provider.clone();"));
         assert!(source.contains(
@@ -204,12 +204,13 @@ impl GetProfile {
     }
 
     #[test]
-    fn registers_the_console_arguments_of_an_authenticated_user_provider() {
+    fn reads_a_preconstructed_authenticated_user_provider() {
         let source: String = source_for(AUTHENTICATED_RESPONDER)
             .split_whitespace()
             .collect();
 
-        assert!(source.contains("console_argument_0:&str,"));
+        assert!(source.contains("container.session_user_provider()"));
+        assert!(!source.contains("console_argument_"));
     }
 
     #[test]
@@ -282,7 +283,7 @@ impl GetProfile {
         let source: String = source_for(COLLIDING_PROVIDER).split_whitespace().collect();
 
         assert!(source.contains(
-            "letsession_2=std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session().await?,});"
+            "letsession_2=std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session(),});"
         ));
         assert!(source.contains("letsession_2=session_2.clone();"));
         assert!(source.contains("letsession=request;"));
@@ -323,7 +324,7 @@ impl GetUser {
     fn keeps_a_captured_binder_clear_of_a_parameter_that_takes_its_name() {
         let source: String = source_for(COLLIDING_BINDER).split_whitespace().collect();
 
-        assert!(source.contains("letstore_2=container.store().await?;"));
+        assert!(source.contains("letstore_2=container.store();"));
         assert!(source.contains("letstore_2=store_2.clone();"));
         assert!(source.contains(
             "margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,\"user\",store_2.as_ref(),)"
@@ -406,9 +407,9 @@ impl GetArticle {
             .collect();
 
         assert!(source.contains(
-            "letstore=std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store().await?,});"
+            "letstore=std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store(),});"
         ));
-        assert!(source.contains("letstore_2=container.store().await?;"));
+        assert!(source.contains("letstore_2=container.store();"));
         assert!(source.contains(
             "margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(store.as_ref(),request,)"
         ));
@@ -449,7 +450,7 @@ impl GetPair {
 
         assert_eq!(
             source
-                .matches("letuser_binder=container.user_binder().await?;")
+                .matches("letuser_binder=container.user_binder();")
                 .count(),
             1
         );
@@ -937,17 +938,17 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains("container:&super::super::container::Container"));
         assert!(source.contains("\"GET\""));
         assert!(source.contains(
-            "margaret::framework::http::responder_handler::responder_handler(container.open().await"
+            "margaret::framework::http::responder_handler::responder_handler(container.open()"
         ));
         assert!(source.contains(
             "|responder:std::sync::Arc<crate::Open>,_request:&margaret::framework::http::request::Request"
         ));
         assert!(source.contains("responder.respond().await"));
         assert!(source.contains(
-            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard().await?,}),margaret::framework::http::responder_handler::responder_handler(container.resource().await?"
+            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard(),}),margaret::framework::http::responder_handler::responder_handler(container.resource()"
         ));
         assert!(source.contains(
-            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await?,}),margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{"
+            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer(),}),margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{"
         ));
 
         let guard = source.find("container.guard").expect("the guard is wired");
@@ -965,7 +966,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(source.contains(
-            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await?,routes:routes.clone()"
+            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer(),routes:routes.clone()"
         ));
     }
 
@@ -974,7 +975,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         let source = source_for(ROUTE_PARAMETER);
 
         assert!(source.contains("\"/users/{id}\""));
-        assert!(source.contains("container.get_user().await"));
+        assert!(source.contains("container.get_user()"));
         assert!(source.contains(
             "|responder:std::sync::Arc<crate::GetUser>,request:&margaret::framework::http::request::Request"
         ));
@@ -1049,7 +1050,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     fn injects_a_bound_model() {
         let source = source_for(BOUND_MODEL);
 
-        assert!(source.contains("container.user_binder().await"));
+        assert!(source.contains("container.user_binder()"));
         assert!(source.contains(
             r#"margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,"user",user_binder.as_ref()"#
         ));
@@ -1064,7 +1065,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             "struct User;\n\ntrait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct UserBinder;\n\nimpl Marker for UserBinder {}\n\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n\n#[responds_to_http(method = \"get\", path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\n\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(source.contains("container.user_binder().await"));
+        assert!(source.contains("container.user_binder()"));
     }
 
     #[test]
@@ -1677,7 +1678,7 @@ impl Tracer {
         );
 
         assert!(source.contains(
-            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer().await?,views:views.clone()"
+            "std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer(),views:views.clone()"
         ));
         assert!(source.contains("views:&::std::sync::Arc<super::super::views::Views>"));
     }
@@ -1790,10 +1791,11 @@ impl Greeting {
     fn weaves_a_console_argument_into_a_responder_and_its_server() {
         let source = source_for(CONSOLE_ARGUMENT_RESPONDER);
 
-        assert!(source.contains(
-            "pubasyncfnserver_public(container:&super::super::container::Container,console_argument_0:&str,"
-        ));
-        assert!(source.contains("container.greeting(console_argument_0.to_owned())"));
+        assert!(
+            source
+                .contains("pubasyncfnserver_public(container:&super::super::container::Container,")
+        );
+        assert!(source.contains("container.greeting()"));
     }
 
     const CONSOLE_ARGUMENT_BINDER: &str = r#"
@@ -1823,11 +1825,11 @@ impl GetUser {
 "#;
 
     #[test]
-    fn weaves_a_console_argument_into_a_route_parameter_binder() {
+    fn reads_a_preconstructed_route_parameter_binder() {
         let source = source_for(CONSOLE_ARGUMENT_BINDER);
 
-        assert!(source.contains("console_argument_0:&str,"));
-        assert!(source.contains("container.user_binder(console_argument_0.to_owned())"));
+        assert!(source.contains("container.user_binder()"));
+        assert!(!source.contains("console_argument_"));
     }
 
     const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
@@ -1860,10 +1862,11 @@ impl Guard {
     fn weaves_a_console_argument_into_a_middleware_and_its_server() {
         let source = source_for(CONSOLE_ARGUMENT_MIDDLEWARE);
 
-        assert!(source.contains(
-            "pubasyncfnserver_public(container:&super::super::container::Container,console_argument_0:&str,"
-        ));
-        assert!(source.contains("container.guard(console_argument_0.to_owned())"));
+        assert!(
+            source
+                .contains("pubasyncfnserver_public(container:&super::super::container::Container,")
+        );
+        assert!(source.contains("container.guard()"));
     }
 
     const CONSOLE_ARGUMENT_MIXED_CATEGORIES: &str = r#"
@@ -1890,17 +1893,11 @@ impl Configured {
 "#;
 
     #[test]
-    fn expects_too_many_arguments_and_weaves_each_category_by_its_type() {
+    fn keeps_the_http_boundary_thin_for_a_configured_responder() {
         let source = source_for(CONSOLE_ARGUMENT_MIXED_CATEGORIES);
 
-        assert!(source.contains("#[expect(clippy::too_many_arguments"));
-        assert!(source.contains(":&str,"));
-        assert!(source.contains(":&::std::path::Path,"));
-        assert!(source.contains(":&bool,"));
-        assert!(source.contains(":&::std::option::Option<u16>,"));
-        assert!(source.contains(":&::std::option::Option<std::string::String>,"));
-        assert!(source.contains(
-            "container.configured(console_argument_0.to_owned(),console_argument_1.to_owned(),console_argument_2.to_owned(),*console_argument_3,*console_argument_4,console_argument_5.clone(),)"
-        ));
+        assert!(!source.contains("#[expect("));
+        assert!(source.contains("container.configured()"));
+        assert!(!source.contains("console_argument_"));
     }
 }

@@ -80,11 +80,6 @@ impl<'index> BuildContext<'index> {
         Ok(GeneratedCode::new(modules))
     }
 
-    #[cfg(test)]
-    pub(crate) fn module_tokens(&self) -> &[GeneratedModuleTokens] {
-        &self.module_tokens
-    }
-
     pub(crate) fn server_console_arguments(&self) -> &BTreeMap<String, Vec<ConsoleArgument>> {
         &self.server_console_arguments
     }

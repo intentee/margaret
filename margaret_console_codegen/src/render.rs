@@ -1,13 +1,10 @@
-use proc_macro2::Ident;
 use proc_macro2::TokenStream;
-use quote::format_ident;
 use quote::quote;
 
 use margaret_console_argument_codegen::argument_registration::argument_registration;
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
-use margaret_container::accessor_failure::AccessorFailure;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
@@ -45,11 +42,7 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
     }
 }
 
-fn command_arm(
-    command: &ConsoleCommand,
-    container: &Ident,
-    bindings: &ContainerBindings,
-) -> TokenStream {
+fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenStream {
     let name = &command.name;
     let matches_binding = if command.arguments.is_empty() {
         quote! { _matches }
@@ -57,14 +50,15 @@ fn command_arm(
         quote! { matches }
     };
     let values: Vec<TokenStream> = command.arguments.iter().map(argument_value).collect();
-    let accessor_access = bindings.accessor_invocation(
-        container,
-        &command.accessor.to_string(),
-        &values,
-        &AccessorFailure::Report(quote! {
-            return margaret::framework::console::report_failure::report_failure(error)
-        }),
-    );
+    let construction = bindings.construction_invocation(&command.accessor.to_string(), &values);
+    let accessor_access = quote! {
+        (match #construction {
+            Ok(value) => value,
+            Err(error) => {
+                return margaret::framework::console::report_failure::report_failure(error);
+            }
+        })
+    };
 
     if command.takes_token {
         quote! {
@@ -101,11 +95,6 @@ pub(crate) fn render(
     bindings: &ContainerBindings,
 ) -> TokenStream {
     let dispatches_asynchronously = !commands.is_empty() || serves;
-    let container = if dispatches_asynchronously {
-        format_ident!("container")
-    } else {
-        format_ident!("_container")
-    };
     let run_asyncness = if dispatches_asynchronously {
         quote! { async }
     } else {
@@ -114,7 +103,7 @@ pub(crate) fn render(
     let subcommands = commands.iter().map(subcommand_registration);
     let arms = commands
         .iter()
-        .map(|command| command_arm(command, &container, bindings));
+        .map(|command| command_arm(command, bindings));
 
     let schema_registration = if has_models {
         quote! {
@@ -178,7 +167,7 @@ pub(crate) fn render(
             Some(("serve", matches)) => {
                 margaret::framework::service::dispatch_serve::dispatch_serve(
                     margaret::framework::service::install::install,
-                    |cancellation_token| super::serve::serve(#container, matches, cancellation_token),
+                            |cancellation_token| super::serve::serve(matches, cancellation_token),
                 )
                 .await
             }
@@ -189,7 +178,6 @@ pub(crate) fn render(
 
     quote! {
         pub #run_asyncness fn run<Arguments, Argument>(
-            #container: &super::container::Container,
             args: Arguments,
         ) -> margaret::framework::console::command_outcome::CommandOutcome
         where

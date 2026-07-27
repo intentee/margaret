@@ -2,9 +2,7 @@ use margaret::framework::console::command_outcome::CommandOutcome;
 
 #[tokio::main]
 async fn main() -> CommandOutcome {
-    let container = margaret_example::margaret::container::build::build();
-
-    margaret_example::margaret::run::run(&container, std::env::args_os()).await
+    margaret_example::margaret::run::run(std::env::args_os()).await
 }
 
 #[cfg(test)]

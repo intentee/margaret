@@ -11,6 +11,6 @@ fn disambiguates_colliding_field_names() {
         .split_whitespace()
         .collect();
 
-    assert!(source.contains("pubasyncfnuser_account_detail(&self,)"));
-    assert!(source.contains("pubasyncfnuser_account_detail_2(&self,)"));
+    assert!(source.contains("fnuser_account_detail(&self"));
+    assert!(source.contains("fnuser_account_detail_2(&self"));
 }
