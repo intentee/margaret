@@ -1,5 +1,4 @@
 pub mod fold_layers;
-pub mod has_middleware;
 pub mod layer_application;
 mod middleware_attribute_arguments;
 pub mod middleware_codegen_error;
@@ -21,9 +20,9 @@ mod tests {
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::attribute_selector::AttributeSelector;
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes::framework_attribute::FrameworkAttribute;
     use margaret_console_argument_codegen::scan::scan;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
@@ -31,7 +30,6 @@ mod tests {
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 
     use crate::fold_layers::fold_layers;
-    use crate::has_middleware::has_middleware;
     use crate::layer_application::LayerApplication;
     use crate::middleware_codegen_error::MiddlewareCodegenError;
     use crate::middleware_plans::middleware_plans;
@@ -98,7 +96,7 @@ mod tests {
     fn layers_for(lib_source: &str) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
         let index = index_for(lib_source);
         let plans = middleware_plans(&index, &registries_for(&index))?;
-        let selected = index.select(&AttributeSelector::from_marker("middleware"));
+        let selected = index.select_framework_attribute(FrameworkAttribute::Middleware);
         let site = selected
             .into_iter()
             .next()
@@ -407,21 +405,6 @@ struct Site;
         .collect::<String>();
 
         assert!(folded.contains("container.guard()"));
-    }
-
-    #[test]
-    fn reports_middleware_present() {
-        let index =
-            index_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n");
-
-        assert!(has_middleware(&index));
-    }
-
-    #[test]
-    fn reports_no_middleware() {
-        let index = index_for("#[singleton]\nstruct Config;\n");
-
-        assert!(!has_middleware(&index));
     }
 
     #[test]

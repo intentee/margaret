@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use quote::format_ident;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
@@ -34,7 +34,7 @@ fn validate_runner(
             return Err(ConsoleCodegenError::ConsoleCommandRunnerRequestBinding {
                 command: command.to_string(),
                 parameter: view.holder.to_string(),
-                marker: name.to_string(),
+                marker: name.name().to_string(),
             });
         }
 
@@ -49,17 +49,13 @@ fn validate_runner(
     Ok(())
 }
 
-fn selector(name: &str) -> AttributeSelector {
-    AttributeSelector::from_marker(name)
-}
-
 pub(crate) fn console_commands(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
 ) -> Result<Vec<ConsoleCommand>, ConsoleCodegenError> {
     let mut commands: BTreeMap<String, ConsoleCommand> = BTreeMap::new();
 
-    for matched in index.select(&selector("console_command")) {
+    for matched in index.select_framework_attribute(FrameworkAttribute::ConsoleCommand) {
         let item = matched.item();
 
         let Some(identifier) = index.struct_identifier(item.canonical_path()) else {
@@ -76,7 +72,7 @@ pub(crate) fn console_commands(
 
         validate_runner(index, item, runner, &command)?;
 
-        let arguments = bindings.console_arguments(item.canonical_path()).to_vec();
+        let arguments = bindings.console_arguments(item.canonical_path())?.to_vec();
 
         if arguments
             .iter()
@@ -91,6 +87,7 @@ pub(crate) fn console_commands(
                 accessor,
                 arguments,
                 command_path: command.clone(),
+                construction_root: item.canonical_path().clone(),
                 description,
                 name: name.clone(),
                 takes_token: runner_takes_token(index, item, runner),

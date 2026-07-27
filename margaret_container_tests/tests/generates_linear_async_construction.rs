@@ -11,7 +11,7 @@ fn generates_linear_async_construction() {
 
     assert!(source.contains("pool:::std::sync::Arc<crate::Pool>"));
     assert!(source.contains("config:::std::sync::Arc<crate::Config>"));
-    assert!(source.contains("pubasyncfnconstruct_pool"));
+    assert!(source.contains("pub(crate)asyncfnconstruct_pool"));
     assert!(source.contains("crate::Pool::new(::std::sync::Arc::clone(&config)).await"));
     assert!(source.contains("crate::Config::new()"));
     assert!(!source.contains("crate::Config::new().await"));

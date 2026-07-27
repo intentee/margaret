@@ -1926,6 +1926,7 @@ name = "margaret_codegen_linear_construction_future_fixture"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "margaret",
 ]
 
@@ -1938,6 +1939,7 @@ dependencies = [
  "margaret_codegen_fallible_roles_fixture",
  "margaret_codegen_linear_construction_future_fixture",
  "margaret_console_argument_codegen",
+ "tokio",
 ]
 
 [[package]]
@@ -2080,6 +2082,7 @@ dependencies = [
  "bytes",
  "cookie",
  "form_urlencoded",
+ "futures-util",
  "http",
  "http-body",
  "http-body-util",
@@ -2492,7 +2495,6 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "ephemeral-postgres",
- "margaret_example",
  "margaret_model",
  "sqlx",
  "tokio",

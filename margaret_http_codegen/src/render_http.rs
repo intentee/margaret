@@ -6,6 +6,7 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::active_servers::active_servers;
 use crate::http_artifacts::HttpArtifacts;
@@ -17,7 +18,6 @@ use crate::render::server_console_arguments;
 use crate::render_forwarders::render_forwarders;
 use crate::render_routes::render_routes;
 use crate::server_transport_policy::ServerTransportPolicy;
-use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
     match binding {
@@ -38,7 +38,7 @@ fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
     }
 }
 
-fn construction_roots(table: &crate::http_route_table::HttpRouteTable) -> Vec<CanonicalPath> {
+fn retained_roots(table: &crate::http_route_table::HttpRouteTable) -> Vec<CanonicalPath> {
     let mut roots = std::collections::BTreeSet::new();
 
     for route in table.routes() {
@@ -57,7 +57,6 @@ fn construction_roots(table: &crate::http_route_table::HttpRouteTable) -> Vec<Ca
 
     roots.into_iter().collect()
 }
-
 fn merge_websocket_servers(
     mut servers: Vec<HttpServer>,
     websocket_servers: &[String],
@@ -67,13 +66,26 @@ fn merge_websocket_servers(
             .iter()
             .any(|server| server.name() == websocket_server)
         {
-            servers.push(HttpServer::new(
-                websocket_server.clone(),
-                ServerTransportPolicy::Negotiable,
-            ));
+            servers.push(
+                HttpServer::new(websocket_server.clone(), ServerTransportPolicy::Negotiable)
+                    .with_async_routes(),
+            );
         }
     }
 
+    servers = servers
+        .into_iter()
+        .map(|server| {
+            if websocket_servers
+                .iter()
+                .any(|websocket_server| websocket_server == server.name())
+            {
+                server.with_async_routes()
+            } else {
+                server
+            }
+        })
+        .collect();
     servers.sort_by_key(|server| server.name().to_string());
 
     servers
@@ -91,7 +103,7 @@ pub fn render_http(
     let table = http_routes(index, middleware_plans, registries)?;
     let servers = merge_websocket_servers(active_servers(&table), websocket_servers);
     let server_arguments =
-        server_console_arguments(&table, &servers, bindings, websocket_server_arguments);
+        server_console_arguments(&table, &servers, bindings, websocket_server_arguments)?;
     let mut modules = render(&table, &servers, has_views, websocket_servers, bindings);
 
     modules.extend(render_routes(&table, &servers));
@@ -101,7 +113,7 @@ pub fn render_http(
         modules,
         servers,
         server_arguments,
-        construction_roots(&table),
+        retained_roots(&table),
     ))
 }
 
@@ -114,12 +126,25 @@ mod tests {
     use super::binding_root;
 
     #[test]
-    fn selects_the_concrete_root_of_a_handshake_injection() {
-        let concrete = CanonicalPath::new(vec!["crate".to_string(), "Dependency".to_string()]);
+    fn identifies_a_route_parameter_binder_as_a_retained_root() {
+        let binder_provider =
+            CanonicalPath::new(vec!["crate".to_string(), "UserBinder".to_string()]);
+        let binding = RequestBinding::Bound {
+            binder_field: "user_binder".to_string(),
+            binder_provider: binder_provider.clone(),
+            path_key: "user".to_string(),
+        };
+
+        assert_eq!(binding_root(&binding), Some(&binder_provider));
+    }
+
+    #[test]
+    fn identifies_an_injected_dependency_as_a_retained_root() {
+        let concrete = CanonicalPath::new(vec!["crate".to_string(), "Store".to_string()]);
         let binding = RequestBinding::Injectable {
             dependency: InjectedDependency {
                 concrete: concrete.clone(),
-                field: "dependency".to_string(),
+                field: "store".to_string(),
             },
         };
 

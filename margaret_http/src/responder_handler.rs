@@ -1,11 +1,10 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 
 use crate::handler::Handler;
 use crate::handler_error::HandlerError;
+use crate::handler_future::HandlerFuture;
 use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;
 
@@ -18,12 +17,8 @@ struct FnHandler<Responder, Extract> {
 impl<Responder, Extract> Handler for FnHandler<Responder, Extract>
 where
     Responder: Send + Sync + 'static,
-    Extract: for<'request> Fn(
-            Arc<Responder>,
-            &'request Request,
-        ) -> Pin<
-            Box<dyn Future<Output = Result<ResponseContinuation, HandlerError>> + Send + 'request>,
-        > + Send
+    Extract: for<'request> Fn(Arc<Responder>, &'request Request) -> HandlerFuture<'request>
+        + Send
         + Sync
         + 'static,
 {
@@ -38,12 +33,8 @@ pub fn responder_handler<Responder, Extract>(
 ) -> Arc<dyn Handler>
 where
     Responder: Send + Sync + 'static,
-    Extract: for<'request> Fn(
-            Arc<Responder>,
-            &'request Request,
-        ) -> Pin<
-            Box<dyn Future<Output = Result<ResponseContinuation, HandlerError>> + Send + 'request>,
-        > + Send
+    Extract: for<'request> Fn(Arc<Responder>, &'request Request) -> HandlerFuture<'request>
+        + Send
         + Sync
         + 'static,
 {

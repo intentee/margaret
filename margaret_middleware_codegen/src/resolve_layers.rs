@@ -1,5 +1,5 @@
 use margaret_attributes::attribute_query::AttributeQuery;
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_tag_codegen::read_reference_tag::read_reference_tag;
 
@@ -12,10 +12,9 @@ pub fn resolve_layers(
     plans: &[MiddlewarePlan],
     site: &str,
 ) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
-    let selector = AttributeSelector::from_marker("middleware");
     let mut layers = Vec::new();
 
-    for matched in AttributeQuery::new(item).find_all(&selector) {
+    for matched in AttributeQuery::new(item).find_all_framework(FrameworkAttribute::Middleware) {
         let tag = read_reference_tag(matched.args()?, site)?;
         let Some(plan) = plans.iter().find(|plan| plan.tag == tag) else {
             return Err(MiddlewareCodegenError::UnknownMiddleware {

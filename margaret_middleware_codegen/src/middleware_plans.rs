@@ -1,7 +1,7 @@
 use quote::format_ident;
 
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::tag::Tag;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_request_binding_codegen::binding_context::BindingContext;
@@ -16,10 +16,10 @@ pub fn middleware_plans(
     index: &AttributeIndex,
     registries: &BindingRegistries,
 ) -> Result<Vec<MiddlewarePlan>, MiddlewareCodegenError> {
-    let selector = AttributeSelector::from_marker("handles_middleware_attribute");
     let mut plans = Vec::new();
 
-    for matched in index.select(&selector) {
+    for matched in index.select_framework_attribute(FrameworkAttribute::HandlesMiddlewareAttribute)
+    {
         let item = matched.item();
 
         let Some(identifier) = index.struct_identifier(item.canonical_path()) else {

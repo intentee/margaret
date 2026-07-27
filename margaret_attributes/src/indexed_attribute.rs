@@ -5,6 +5,8 @@ use syn::Path;
 use crate::attribute_args::AttributeArgs;
 use crate::attribute_args_parse_error::AttributeArgsParseError;
 use crate::attribute_error::AttributeError;
+use crate::canonical_path::CanonicalPath;
+use crate::framework_attribute::FrameworkAttribute;
 
 enum IndexedAttributeArgs {
     DuplicateNamedArgument {
@@ -21,6 +23,8 @@ enum IndexedAttributeArgs {
 pub struct IndexedAttribute {
     args: IndexedAttributeArgs,
     attribute: Attribute,
+    canonical_path: CanonicalPath,
+    framework_attribute: Option<FrameworkAttribute>,
 }
 
 impl IndexedAttribute {
@@ -44,12 +48,38 @@ impl IndexedAttribute {
             },
         };
 
-        Self { args, attribute }
+        let canonical_path = CanonicalPath::new(
+            attribute
+                .path()
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect(),
+        );
+
+        let framework_attribute = FrameworkAttribute::from_canonical_path(&canonical_path);
+
+        Self {
+            args,
+            attribute,
+            canonical_path,
+            framework_attribute,
+        }
     }
 
     #[must_use]
     pub fn path(&self) -> &Path {
         self.attribute.path()
+    }
+
+    #[must_use]
+    pub fn framework_attribute(&self) -> Option<FrameworkAttribute> {
+        self.framework_attribute
+    }
+
+    pub(crate) fn set_canonical_path(&mut self, canonical_path: CanonicalPath) {
+        self.framework_attribute = FrameworkAttribute::from_canonical_path(&canonical_path);
+        self.canonical_path = canonical_path;
     }
 
     pub fn args(&self) -> Result<&AttributeArgs, AttributeError> {

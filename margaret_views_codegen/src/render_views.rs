@@ -10,14 +10,17 @@ use crate::views::views;
 use crate::views_artifacts::ViewsArtifacts;
 use crate::views_codegen_error::ViewsCodegenError;
 
-fn views_console_arguments(views: &[View], bindings: &ContainerBindings) -> Vec<ConsoleArgument> {
+fn views_console_arguments(
+    views: &[View],
+    bindings: &ContainerBindings,
+) -> Result<Vec<ConsoleArgument>, ViewsCodegenError> {
     let mut collected: Vec<ConsoleArgument> = Vec::new();
 
     for view in views {
-        collected.extend_from_slice(bindings.console_arguments(&view.concrete_path));
+        collected.extend_from_slice(bindings.console_arguments(&view.concrete_path)?);
     }
 
-    bindings.console_union(&collected)
+    bindings.console_union(&collected).map_err(Into::into)
 }
 
 pub fn render_views(
@@ -25,18 +28,17 @@ pub fn render_views(
     bindings: &ContainerBindings,
 ) -> Result<ViewsArtifacts, ViewsCodegenError> {
     let views = views(index)?;
-    let console_arguments = views_console_arguments(&views, bindings);
-    let construction_roots = views
+    let console_arguments = views_console_arguments(&views, bindings)?;
+    let retained_roots = views
         .iter()
         .map(|view| view.concrete_path.clone())
         .collect();
-
     Ok(ViewsArtifacts {
         modules: vec![
             GeneratedModuleTokens::new("views", render(&views)),
             GeneratedModuleTokens::new("views/build", render_build(&views, bindings)),
         ],
         console_arguments,
-        construction_roots,
+        retained_roots,
     })
 }

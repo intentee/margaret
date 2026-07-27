@@ -2,51 +2,48 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::singleton;
 
 #[singleton]
-pub struct MicroservicesMap;
+pub struct MicroservicesMap {
+    _mapper: Option<String>,
+}
 
 impl MicroservicesMap {
     #[constructor]
     pub fn create(
         #[console_argument(from = "microservices-map")] mapper: Option<String>,
     ) -> anyhow::Result<Self> {
-        Ok({
-            let _ = mapper;
-
-            Self
-        })
+        Ok(Self { _mapper: mapper })
     }
 }
 
 #[singleton]
-pub struct MicroservicesMapProvider;
+pub struct MicroservicesMapProvider {
+    _map: std::sync::Arc<MicroservicesMap>,
+}
 
 impl MicroservicesMapProvider {
     #[constructor]
     pub fn create(map: std::sync::Arc<MicroservicesMap>) -> anyhow::Result<Self> {
-        Ok({
-            let _ = map;
-
-            Self
-        })
+        Ok(Self { _map: map })
     }
 }
 
 #[singleton]
-pub struct ServiceIdentitySupervisor;
+pub struct ServiceIdentitySupervisor {
+    _map: std::sync::Arc<MicroservicesMap>,
+}
 
 impl ServiceIdentitySupervisor {
     #[constructor]
     pub fn create(map: std::sync::Arc<MicroservicesMap>) -> anyhow::Result<Self> {
-        Ok({
-            let _ = map;
-
-            Self
-        })
+        Ok(Self { _map: map })
     }
 }
 
 #[singleton]
-pub struct SessionValidator;
+pub struct SessionValidator {
+    _provider: std::sync::Arc<MicroservicesMapProvider>,
+    _supervisor: std::sync::Arc<ServiceIdentitySupervisor>,
+}
 
 impl SessionValidator {
     #[constructor]
@@ -54,30 +51,30 @@ impl SessionValidator {
         provider: std::sync::Arc<MicroservicesMapProvider>,
         supervisor: std::sync::Arc<ServiceIdentitySupervisor>,
     ) -> anyhow::Result<Self> {
-        Ok({
-            let _ = (provider, supervisor);
-
-            Self
+        Ok(Self {
+            _provider: provider,
+            _supervisor: supervisor,
         })
     }
 }
 
 #[singleton]
-pub struct RetryChild;
+pub struct RetryChild {
+    _retries: u16,
+}
 
 impl RetryChild {
     #[constructor]
     pub fn create(#[console_argument(from = "retries")] retries: u16) -> anyhow::Result<Self> {
-        Ok({
-            let _ = retries;
-
-            Self
-        })
+        Ok(Self { _retries: retries })
     }
 }
 
 #[singleton]
-pub struct RetrySupervisor;
+pub struct RetrySupervisor {
+    _child: std::sync::Arc<RetryChild>,
+    _retries: u16,
+}
 
 impl RetrySupervisor {
     #[constructor]
@@ -85,10 +82,9 @@ impl RetrySupervisor {
         #[console_argument(from = "retries")] retries: u16,
         child: std::sync::Arc<RetryChild>,
     ) -> anyhow::Result<Self> {
-        Ok({
-            let _ = (retries, child);
-
-            Self
+        Ok(Self {
+            _child: child,
+            _retries: retries,
         })
     }
 }

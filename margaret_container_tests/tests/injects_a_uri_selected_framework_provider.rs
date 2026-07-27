@@ -58,7 +58,7 @@ fn materializes_the_provider_as_a_trait_object_field() {
 fn parameterizes_the_root_builder_with_the_uri_console_argument() {
     assert!(
         render_with_provider("uri_selected_provider").contains(
-            "pubasyncfnconstruct_test_storage(console_argument_0:crate::TestStorageUri,)"
+            "pub(crate)fnconstruct_test_storage(console_argument_0:crate::TestStorageUri,)"
         )
     );
 }

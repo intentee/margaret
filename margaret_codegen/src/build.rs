@@ -1,29 +1,27 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
 
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
 use margaret_container::container_error::ContainerError;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+use margaret_request_binding_codegen::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
+use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 use margaret_tag_codegen::tag_pool::TagPool;
 
-use crate::asset_bag_pass::asset_bag_pass;
-use crate::binding_pass::binding_pass;
-use crate::build_context::BuildContext;
+use crate::application_features::ApplicationFeatures;
+use crate::asset_bag_modules::asset_bag_modules;
 use crate::codegen_error::CodegenError;
-use crate::console_arguments_pass::console_arguments_pass;
-use crate::console_pass::console_pass;
-use crate::container_pass::container_pass;
+use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
-use crate::http_pass::http_pass;
-use crate::jwks_pass::jwks_pass;
-use crate::middleware_pass::middleware_pass;
-use crate::model_pass::model_pass;
+use crate::generated_features::GeneratedFeatures;
+use crate::jwks_artifacts::jwks_artifacts;
 use crate::serve_arguments::serve_arguments;
 use crate::serve_arguments::serve_roots;
-use crate::services_pass::services_pass;
+use crate::umbrella::umbrella;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
-use crate::views_pass::views_pass;
-use crate::websocket_pass::websocket_pass;
 
 pub fn build(
     crate_root: &CrateRoot,
@@ -35,47 +33,192 @@ pub fn build(
         .exclude_root_module(UMBRELLA_MODULE_NAME)
         .index_crate(crate_root)?
         .build();
-    let mut context = BuildContext::new(&index, metafile_contents);
-
-    let registry = console_arguments_pass(&index)?;
+    let features = ApplicationFeatures::from_index(&index);
+    let registry = margaret_console_argument_codegen::scan::scan(&index)?;
     let client_bindings = TagPool::collect(&index)
         .map_err(ContainerError::from)?
         .jwks_client_bindings();
-    let planned_container = container_pass(&context, &registry, &client_bindings)?;
+    let mut framework_providers = vec![
+        margaret_container::framework_provider::FrameworkProvider {
+            construction: margaret_container::framework_construction::FrameworkConstruction::Unit,
+            enablement:
+                margaret_container::framework_enablement::FrameworkEnablement::WhenReferenced,
+            injection:
+                margaret_container::framework_injection_role::FrameworkInjectionRole::Unmarked,
+            provided: crate::asset_responder_path::asset_responder_canonical_path(),
+        },
+        crate::jwks_secret_storage_provider::jwks_secret_storage_provider(),
+    ];
+    framework_providers.extend(crate::jwks_framework_providers::jwks_framework_providers(
+        &client_bindings,
+    ));
+    let planned_container = margaret_container::plan_container::plan_container(
+        &index,
+        &registry,
+        &framework_providers,
+    )?;
     let bindings = planned_container.bindings();
-    asset_bag_pass(&mut context, bindings, assets_directory, embed_relative)?;
-    jwks_pass(&mut context, bindings, &client_bindings);
-    let registries = binding_pass(&mut context)?;
-    middleware_pass(&mut context, &registries)?;
-    let websocket_roots = websocket_pass(&mut context, bindings, &registries)?;
-    let view_roots = views_pass(&mut context, bindings)?;
-    let http_roots = http_pass(&mut context, bindings, &registries)?;
-    let service_roots = serve_roots(&index);
-    let serve_arguments = serve_arguments(
-        &service_roots,
+    let application_roots = planned_container.roots();
+    let has_asset_bag = metafile_contents.is_some();
+    let mut module_tokens = asset_bag_modules(
+        metafile_contents.as_deref(),
         bindings,
-        context.server_console_arguments(),
-        context.views_console_arguments(),
-    );
-    services_pass(&mut context, bindings, &serve_arguments)?;
-    model_pass(&mut context)?;
-    console_pass(&mut context, bindings, &serve_arguments)?;
+        assets_directory,
+        embed_relative,
+    )?;
+    let jwks = jwks_artifacts(bindings, &client_bindings);
+    module_tokens.extend(jwks.modules);
 
-    let mut construction_roots: BTreeSet<_> = service_roots.into_iter().collect();
-    construction_roots.extend(websocket_roots);
-    construction_roots.extend(view_roots);
-    construction_roots.extend(http_roots);
-    construction_roots.extend(
-        context
-            .framework_services()
+    let views_availability = if features.has_views {
+        ViewsAvailability::Available
+    } else {
+        ViewsAvailability::Unavailable
+    };
+    let registries = BindingRegistries::collect(&index, views_availability)?;
+    if features.has_authenticated_users && (features.has_http || features.has_websockets) {
+        module_tokens.push(GeneratedModuleTokens::new(
+            "authenticated_users",
+            render_authenticated_user_wrappers(&registries.providers()),
+        ));
+    }
+
+    let middleware_plans =
+        margaret_middleware_codegen::middleware_plans::middleware_plans(&index, &registries)?;
+    if features.has_middleware && (features.has_http || features.has_websockets) {
+        module_tokens.push(GeneratedModuleTokens::new(
+            "middleware",
+            margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers(
+                &middleware_plans,
+            ),
+        ));
+    }
+
+    let (websocket_roots, websocket_servers, websocket_server_arguments) =
+        if features.has_websockets {
+            let artifacts = margaret_websocket_codegen::render_websocket::render_websocket(
+                &index,
+                bindings,
+                &middleware_plans,
+                &registries,
+            )?;
+            module_tokens.extend(artifacts.modules);
+
+            (
+                artifacts.retained_roots,
+                artifacts.servers,
+                artifacts.server_console_arguments,
+            )
+        } else {
+            (Vec::new(), Vec::new(), BTreeMap::new())
+        };
+
+    let (view_roots, views_console_arguments) = if features.has_views {
+        let artifacts = margaret_views_codegen::render_views::render_views(&index, bindings)?;
+        module_tokens.extend(artifacts.modules);
+
+        (artifacts.retained_roots, artifacts.console_arguments)
+    } else {
+        (Vec::new(), Vec::new())
+    };
+
+    let (http_roots, servers, server_console_arguments) =
+        if features.has_http || features.has_websockets {
+            let artifacts = margaret_http_codegen::render_http::render_http(
+                &index,
+                features.has_views,
+                &websocket_servers,
+                &middleware_plans,
+                bindings,
+                &websocket_server_arguments,
+                &registries,
+            )?;
+            module_tokens.extend(artifacts.modules);
+
+            (
+                artifacts.retained_roots,
+                artifacts.servers,
+                artifacts.server_console_arguments,
+            )
+        } else {
+            (Vec::new(), Vec::new(), BTreeMap::new())
+        };
+
+    let service_roots = serve_roots(&index);
+    let serve_arguments = serve_arguments(bindings);
+
+    if features.serves {
+        module_tokens.push(margaret_service_codegen::render_services::render_services(
+            &index,
+            &servers,
+            features.has_views,
+            bindings,
+            margaret_service_codegen::serve_console_arguments::ServeConsoleArguments {
+                serve_arguments: &serve_arguments,
+                server_console_arguments: &server_console_arguments,
+                views_console_arguments: &views_console_arguments,
+            },
+            &jwks.services,
+        )?);
+    }
+
+    if features.has_models {
+        let models = margaret_model_codegen::models::models(&index)?;
+        module_tokens.push(margaret_schema_codegen::render_schema::render_schema(
+            &models,
+        ));
+    }
+
+    let console_roots = if features.has_console {
+        let console = margaret_console_codegen::render_console::render_console(
+            &index,
+            features.serves,
+            features.has_models,
+            &servers,
+            &serve_arguments,
+            bindings,
+        )?;
+        module_tokens.push(console.module);
+
+        console.construction_roots
+    } else {
+        Vec::new()
+    };
+
+    let mut retained_roots: BTreeSet<_> = service_roots.into_iter().collect();
+    retained_roots.extend(websocket_roots);
+    retained_roots.extend(view_roots);
+    retained_roots.extend(http_roots);
+    retained_roots.extend(
+        jwks.services
             .iter()
             .map(|service| service.concrete_path.clone()),
     );
-    let rendered_container =
-        planned_container.render(&construction_roots.into_iter().collect::<Vec<_>>());
-    context.extend_modules(rendered_container.modules);
+    let retained_roots = retained_roots.into_iter().collect::<Vec<_>>();
+    planned_container
+        .render(&application_roots, &retained_roots, &console_roots)
+        .map_err(CodegenError::from)
+        .and_then(|rendered_container| {
+            module_tokens.extend(rendered_container.modules);
 
-    context.into_generated_code()
+            format_pass(module_tokens)
+                .map_err(CodegenError::from)
+                .map(|mut modules| {
+                    modules.push(umbrella(GeneratedFeatures {
+                        has_asset_bag,
+                        has_authenticated_users: features.has_authenticated_users,
+                        has_console: features.has_console,
+                        has_http: features.has_http,
+                        has_jwks: jwks.enabled,
+                        has_middleware: features.has_middleware,
+                        has_models: features.has_models,
+                        has_views: features.has_views,
+                        has_websockets: features.has_websockets,
+                        serves: features.serves,
+                    }));
+
+                    GeneratedCode::new(modules)
+                })
+        })
 }
 
 #[cfg(test)]
@@ -254,7 +397,8 @@ struct Room;
         assert!(module(&code, "mod").contains("pub mod routes;"));
         assert!(module(&code, "mod").contains("pub mod run;"));
         assert!(concatenated(&code).contains("container: &super::super::container::Container"));
-        assert!(concatenated(&code).contains("async fn server"));
+        assert!(concatenated(&code).contains("fn server"));
+        assert!(!concatenated(&code).contains("async fn server"));
         assert!(module(&code, "routes").contains("pub struct Routes"));
         assert!(module(&code, "container").contains("struct Container"));
         assert!(module(&code, "run").contains("\"serve\""));
@@ -1455,7 +1599,8 @@ impl RespondsToWebSocketMessage for Chatter {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(module(&code, "container/build").contains("Pool::create().await"));
-        assert!(concatenated(&code).contains("async fn server_public"));
+        assert!(concatenated(&code).contains("fn server_public"));
+        assert!(!concatenated(&code).contains("async fn server_public"));
         assert!(serve.contains("super::http::server_public::server_public(container,"));
     }
 
@@ -1487,8 +1632,10 @@ impl Metrics {
         let code = generate(MULTI_SERVER_CRATE).expect("the build succeeds");
 
         let http = concatenated(&code);
-        assert!(http.contains("async fn server_public"));
-        assert!(http.contains("async fn server_internal"));
+        assert!(http.contains("fn server_public"));
+        assert!(http.contains("fn server_internal"));
+        assert!(!http.contains("async fn server_public"));
+        assert!(!http.contains("async fn server_internal"));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains("super::http::server_public::server_public(container,"));
@@ -1570,13 +1717,13 @@ impl New {
         let routes: String = module(&code, "routes").split_whitespace().collect();
         let http: String = concatenated(&code).split_whitespace().collect();
 
-        assert!(build.contains("pubasyncfnserve("));
-        assert!(build.contains("pubasyncfnconstruct_build("));
-        assert!(build.contains("pubasyncfnconstruct_container("));
-        assert!(build.contains("pubasyncfnconstruct_routes("));
-        assert!(!build.contains("construct_build_2"));
-        assert!(!build.contains("construct_container_2"));
-        assert!(!build.contains("construct_routes_2"));
+        assert!(build.contains("pub(crate)fnserve("));
+        assert!(build.contains("std::sync::Arc<crate::Build>"));
+        assert!(build.contains("std::sync::Arc<crate::Container>"));
+        assert!(build.contains("std::sync::Arc<crate::Routes>"));
+        assert!(!build.contains("build_2"));
+        assert!(!build.contains("container_2"));
+        assert!(!build.contains("routes_2"));
 
         assert!(routes.contains("pubstructRoutes{pubroutes:servers::routes::Routes,}"));
         assert!(module(&code, "routes/servers/routes").contains("pub struct Routes"));

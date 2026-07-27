@@ -1,7 +1,7 @@
 use syn::Attribute;
 
-use crate::attribute_selector::AttributeSelector;
 use crate::canonical_path::CanonicalPath;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_field::IndexedField;
 use crate::indexed_method::IndexedMethod;
@@ -57,10 +57,10 @@ impl IndexedItem {
     }
 
     #[must_use]
-    pub fn has_attribute(&self, selector: &AttributeSelector) -> bool {
+    pub fn has_framework_attribute(&self, attribute: FrameworkAttribute) -> bool {
         self.attributes
             .iter()
-            .any(|attribute| selector.matches(attribute.path()))
+            .any(|indexed| indexed.framework_attribute() == Some(attribute))
     }
 
     #[must_use]
@@ -99,5 +99,22 @@ impl IndexedItem {
     pub(crate) fn sort_members(&mut self) {
         self.methods
             .sort_by(|left, right| left.identifier().cmp(right.identifier()));
+    }
+
+    pub(crate) fn resolve_attribute_paths(
+        &mut self,
+        resolve: impl Copy + Fn(&syn::Path) -> CanonicalPath,
+    ) {
+        for attribute in &mut self.attributes {
+            attribute.set_canonical_path(resolve(attribute.path()));
+        }
+
+        for field in &mut self.fields {
+            field.resolve_attribute_paths(resolve);
+        }
+
+        for method in &mut self.methods {
+            method.resolve_attribute_paths(resolve);
+        }
     }
 }

@@ -5,6 +5,7 @@ use margaret_macros::handles_middleware_attribute;
 use margaret_macros::middleware;
 use margaret_macros::model;
 use margaret_macros::process;
+use margaret_macros::provides_jwks_endpoint;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::renders_view;
 use margaret_macros::responds_to_http;
@@ -43,6 +44,9 @@ impl Subject {
 
 #[provides_route_parameter]
 struct Binder;
+
+#[provides_jwks_endpoint]
+struct JwksEndpoint;
 
 impl Binder {
     fn bind(&self, value: String) -> String {
@@ -87,6 +91,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(subject.run(), "typed-name");
     assert_eq!(Binder.bind("bound".to_string()), "bound");
 
+    let _jwks_endpoint = JwksEndpoint;
     let _worker = Worker;
 
     let record = Record {

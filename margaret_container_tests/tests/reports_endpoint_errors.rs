@@ -69,3 +69,11 @@ fn rejects_a_jwks_endpoint_provider_with_fields_but_no_constructor() {
         ContainerError::SingletonRequiresConstructor { .. }
     ));
 }
+
+#[test]
+fn propagates_an_unparseable_jwks_store_on_an_endpoint_constructor() {
+    assert!(matches!(
+        error("endpoint_unparseable_jwks_store"),
+        ContainerError::Index { .. }
+    ));
+}

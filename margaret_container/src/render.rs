@@ -1,10 +1,11 @@
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
 
 use margaret_codegen_tokens::path_tokens::path_tokens;
 
-use crate::container_plan::ContainerPlan;
 use crate::field_ident::field_ident;
+use crate::planned_provider::PlannedProvider;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provides_endpoint_path::provides_endpoint_path;
@@ -31,8 +32,13 @@ pub(crate) fn field_type(provider: &Provider) -> TokenStream {
     quote! { ::std::sync::Arc<#constructed> }
 }
 
-fn field_declaration(provider: &Provider) -> TokenStream {
-    let name = field_ident(provider);
+fn field_declaration(provider: &Provider, accessible: bool) -> TokenStream {
+    let field = field_ident(provider);
+    let name = if accessible {
+        field
+    } else {
+        format_ident!("_{field}")
+    };
     let field_type = field_type(provider);
 
     quote! { #name: #field_type }
@@ -50,13 +56,18 @@ fn accessor(provider: &Provider) -> TokenStream {
 }
 
 pub(crate) fn render(
-    plan: &ContainerPlan,
-    serve_flow: &[margaret_attributes::canonical_path::CanonicalPath],
+    construction_roots: &[&PlannedProvider],
+    accessible_roots: &[&PlannedProvider],
 ) -> TokenStream {
-    let entries: Vec<&Provider> = serve_flow.iter().map(|key| plan.entry(key)).collect();
-    let fields = entries.iter().map(|provider| field_declaration(provider));
-    let accessors = entries.iter().map(|provider| accessor(provider));
-    let accessor_impl = (!entries.is_empty()).then(|| {
+    let accessible: std::collections::BTreeSet<_> =
+        accessible_roots.iter().map(|entry| &entry.key).collect();
+    let entries = construction_roots.iter().map(|entry| &entry.provider);
+    let fields = entries
+        .map(|provider| field_declaration(provider, accessible.contains(&provider.provided.key())));
+    let accessors = accessible_roots
+        .iter()
+        .map(|entry| accessor(&entry.provider));
+    let accessor_impl = (!accessible_roots.is_empty()).then(|| {
         quote! {
             impl Container {
                 #(#accessors)*

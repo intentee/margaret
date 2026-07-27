@@ -2,7 +2,6 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
 
 use crate::build_plan::build_plan;
-use crate::console_closures::ConsoleClosures;
 use crate::container_bindings::ContainerBindings;
 use crate::container_error::ContainerError;
 use crate::framework_provider::FrameworkProvider;
@@ -14,8 +13,7 @@ pub fn plan_container(
     framework_providers: &[FrameworkProvider],
 ) -> Result<PlannedContainer, ContainerError> {
     let plan = build_plan(index, registry, framework_providers)?;
-    let closures = ConsoleClosures::from_plan(&plan)?;
-    let bindings = ContainerBindings::from_plan(&plan, &closures);
+    let bindings = ContainerBindings::from_plan(&plan);
 
-    Ok(PlannedContainer::new(bindings, closures, plan))
+    Ok(PlannedContainer::new(bindings, plan))
 }

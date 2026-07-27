@@ -1,22 +1,24 @@
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
 
-const REQUEST_BINDING_MARKERS: [&str; 3] =
-    ["authenticated_user", "form_request", "route_parameter"];
+const REQUEST_BINDING_MARKERS: [FrameworkAttribute; 3] = [
+    FrameworkAttribute::AuthenticatedUser,
+    FrameworkAttribute::FormRequest,
+    FrameworkAttribute::RouteParameter,
+];
 
 #[must_use]
-pub fn request_binding_marker(attributes: &[IndexedAttribute]) -> Option<&'static str> {
-    REQUEST_BINDING_MARKERS.into_iter().find(|name| {
-        let selector = AttributeSelector::from_marker(name);
-
+pub fn request_binding_marker(attributes: &[IndexedAttribute]) -> Option<FrameworkAttribute> {
+    REQUEST_BINDING_MARKERS.into_iter().find(|marker| {
         attributes
             .iter()
-            .any(|attribute| selector.matches(attribute.path()))
+            .any(|attribute| attribute.framework_attribute() == Some(*marker))
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use margaret_attributes::framework_attribute::FrameworkAttribute;
     use margaret_attributes::indexed_attribute::IndexedAttribute;
     use syn::parse_quote;
 
@@ -28,7 +30,7 @@ mod tests {
 
         assert_eq!(
             request_binding_marker(&attributes),
-            Some("authenticated_user")
+            Some(FrameworkAttribute::AuthenticatedUser)
         );
     }
 
@@ -38,7 +40,10 @@ mod tests {
             parse_quote!(#[form_request(from = Query)]),
         )];
 
-        assert_eq!(request_binding_marker(&attributes), Some("form_request"));
+        assert_eq!(
+            request_binding_marker(&attributes),
+            Some(FrameworkAttribute::FormRequest)
+        );
     }
 
     #[test]
@@ -47,7 +52,10 @@ mod tests {
             parse_quote!(#[route_parameter(from = "id")]),
         )];
 
-        assert_eq!(request_binding_marker(&attributes), Some("route_parameter"));
+        assert_eq!(
+            request_binding_marker(&attributes),
+            Some(FrameworkAttribute::RouteParameter)
+        );
     }
 
     #[test]

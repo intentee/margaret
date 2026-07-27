@@ -4,7 +4,8 @@ use syn::Attribute;
 use syn::Pat;
 use syn::Type;
 
-use crate::attribute_selector::AttributeSelector;
+use crate::canonical_path::CanonicalPath;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 
 pub struct IndexedParameter {
@@ -54,10 +55,10 @@ impl IndexedParameter {
     }
 
     #[must_use]
-    pub fn attribute(&self, selector: &AttributeSelector) -> Option<&IndexedAttribute> {
+    pub fn framework_attribute(&self, attribute: FrameworkAttribute) -> Option<&IndexedAttribute> {
         self.attributes
             .iter()
-            .find(|attribute| selector.matches(attribute.path()))
+            .find(|indexed| indexed.framework_attribute() == Some(attribute))
     }
 
     #[must_use]
@@ -68,5 +69,14 @@ impl IndexedParameter {
     #[must_use]
     pub fn position(&self) -> usize {
         self.position
+    }
+
+    pub(crate) fn resolve_attribute_paths(
+        &mut self,
+        resolve: impl Fn(&syn::Path) -> CanonicalPath,
+    ) {
+        for attribute in &mut self.attributes {
+            attribute.set_canonical_path(resolve(attribute.path()));
+        }
     }
 }

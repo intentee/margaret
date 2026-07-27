@@ -2,7 +2,8 @@ use syn::Attribute;
 use syn::FnArg;
 use syn::Signature;
 
-use crate::attribute_selector::AttributeSelector;
+use crate::canonical_path::CanonicalPath;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_parameter::IndexedParameter;
 
@@ -49,10 +50,10 @@ impl IndexedMethod {
     }
 
     #[must_use]
-    pub fn has_attribute(&self, selector: &AttributeSelector) -> bool {
+    pub fn has_framework_attribute(&self, attribute: FrameworkAttribute) -> bool {
         self.attributes
             .iter()
-            .any(|attribute| selector.matches(attribute.path()))
+            .any(|indexed| indexed.framework_attribute() == Some(attribute))
     }
 
     #[must_use]
@@ -68,5 +69,18 @@ impl IndexedMethod {
     #[must_use]
     pub fn has_receiver(&self) -> bool {
         self.signature.receiver().is_some()
+    }
+
+    pub(crate) fn resolve_attribute_paths(
+        &mut self,
+        resolve: impl Copy + Fn(&syn::Path) -> CanonicalPath,
+    ) {
+        for attribute in &mut self.attributes {
+            attribute.set_canonical_path(resolve(attribute.path()));
+        }
+
+        for parameter in &mut self.parameters {
+            parameter.resolve_attribute_paths(resolve);
+        }
     }
 }

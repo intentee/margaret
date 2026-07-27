@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 
 #[test]
 fn selects_items_bearing_an_attribute() {
@@ -11,9 +11,8 @@ fn selects_items_bearing_an_attribute() {
         .index_crate(&CrateRoot::new("valid_crate", &directory))
         .expect("the valid fixture indexes cleanly")
         .build();
-    let selector = AttributeSelector::parse("singleton").expect("the selector parses");
     let targets: Vec<String> = index
-        .select(&selector)
+        .select_framework_attribute(FrameworkAttribute::Singleton)
         .iter()
         .map(|matched| matched.item().canonical_path().to_string())
         .collect();

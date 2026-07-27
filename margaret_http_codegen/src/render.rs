@@ -28,6 +28,7 @@ use margaret_request_binding_codegen::render_bound_request_extractions::render_b
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
+use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
@@ -146,17 +147,7 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let captures_routes = responder_injects_routes(route);
     let captures_views = responder_injects_views(route);
     let outcome_future = quote! {
-        std::pin::Pin<
-            std::boxed::Box<
-                dyn std::future::Future<
-                    Output = ::std::result::Result<
-                        margaret::framework::http::response_continuation::ResponseContinuation,
-                        margaret::framework::http::handler_error::HandlerError,
-                    >,
-                > + Send
-                + '_,
-            >,
-        >
+        margaret::framework::http::handler_future::HandlerFuture<'_>
     };
 
     let handler = if captured.is_empty() && !captures_routes && !captures_views {
@@ -309,22 +300,22 @@ fn server_routes<'table>(table: &'table HttpRouteTable, server: &str) -> Vec<&'t
 fn responder_and_binder_arguments(
     routes: &[&HttpRoute],
     bindings: &ContainerBindings,
-) -> Vec<ConsoleArgument> {
+) -> Result<Vec<ConsoleArgument>, HttpCodegenError> {
     let mut collected: Vec<ConsoleArgument> = Vec::new();
 
     for route in routes {
-        collected.extend_from_slice(bindings.console_arguments(&route.responder_path));
+        collected.extend_from_slice(bindings.console_arguments(&route.responder_path)?);
 
         for argument in &route.arguments {
-            collected.extend(binding_console_arguments(&argument.binding, bindings));
+            collected.extend(binding_console_arguments(&argument.binding, bindings)?);
         }
 
         for layer in &route.layers {
-            collected.extend_from_slice(bindings.console_arguments(&layer.concrete));
+            collected.extend_from_slice(bindings.console_arguments(&layer.concrete)?);
         }
     }
 
-    collected
+    Ok(collected)
 }
 
 pub(crate) fn server_console_arguments(
@@ -332,21 +323,21 @@ pub(crate) fn server_console_arguments(
     servers: &[HttpServer],
     bindings: &ContainerBindings,
     websocket_server_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
-) -> BTreeMap<String, Vec<ConsoleArgument>> {
+) -> Result<BTreeMap<String, Vec<ConsoleArgument>>, HttpCodegenError> {
     servers
         .iter()
         .map(|server| {
             let routes = server_routes(table, server.name());
-            let mut collected = responder_and_binder_arguments(&routes, bindings);
+            let mut collected = responder_and_binder_arguments(&routes, bindings)?;
 
             if let Some(websocket_arguments) = websocket_server_arguments.get(server.name()) {
                 collected.extend_from_slice(websocket_arguments);
             }
 
-            (
+            Ok((
                 server.name().to_string(),
-                bindings.console_union(&collected),
-            )
+                bindings.console_union(&collected)?,
+            ))
         })
         .collect()
 }
@@ -452,16 +443,33 @@ fn server_module(
             margaret::framework::http::server_routes::ServerRoutes::new(router, #named_handlers)
         })
     };
-    quote! {
+    let body = quote! {
         #too_many_arguments
-        pub async fn #function_name(
-            container: &super::super::container::Container,
-            #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
-            #views_parameter
-        ) -> #inner_return {
             #(#handler_bindings)*
 
             #body_value
+    };
+    if server.routes_are_async() {
+        quote! {
+            #too_many_arguments
+            pub(crate) async fn #function_name(
+                container: &super::super::container::Container,
+                #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
+                #views_parameter
+            ) -> #inner_return {
+                #body
+            }
+        }
+    } else {
+        quote! {
+            #too_many_arguments
+            pub(crate) fn #function_name(
+                container: &super::super::container::Container,
+                #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
+                #views_parameter
+            ) -> #inner_return {
+                #body
+            }
         }
     }
 }

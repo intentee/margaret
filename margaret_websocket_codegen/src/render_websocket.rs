@@ -5,10 +5,12 @@ use quote::quote;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::build_websocket_plan::build_websocket_plan;
 use crate::render_messages::render_messages;
@@ -18,7 +20,19 @@ use crate::render_sessions::render_sessions;
 use crate::session_plan::SessionPlan;
 use crate::websocket_artifacts::WebSocketArtifacts;
 use crate::websocket_codegen_error::WebSocketCodegenError;
-use margaret_request_binding_codegen::request_binding::RequestBinding;
+
+fn server_arguments(
+    sessions_by_server: &BTreeMap<String, Vec<&SessionPlan>>,
+    bindings: &ContainerBindings,
+) -> Result<BTreeMap<String, Vec<ConsoleArgument>>, WebSocketCodegenError> {
+    sessions_by_server
+        .iter()
+        .map(|(server, sessions)| {
+            server_console_arguments(sessions, bindings)
+                .map(|arguments| (server.clone(), arguments))
+        })
+        .collect()
+}
 
 fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
     match binding {
@@ -39,7 +53,7 @@ fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
     }
 }
 
-fn construction_roots(plan: &crate::websocket_plan::WebSocketPlan) -> Vec<CanonicalPath> {
+fn retained_roots(plan: &crate::websocket_plan::WebSocketPlan) -> Vec<CanonicalPath> {
     let mut roots = std::collections::BTreeSet::new();
 
     for session_plan in &plan.sessions {
@@ -64,7 +78,6 @@ fn construction_roots(plan: &crate::websocket_plan::WebSocketPlan) -> Vec<Canoni
 
     roots.into_iter().collect()
 }
-
 pub fn render_websocket(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
@@ -108,14 +121,11 @@ pub fn render_websocket(
 
     modules.extend(render_sessions(&plan.sessions, bindings));
 
-    let server_console_arguments = sessions_by_server
-        .iter()
-        .map(|(server, sessions)| (server.clone(), server_console_arguments(sessions, bindings)))
-        .collect();
+    let server_console_arguments = server_arguments(&sessions_by_server, bindings)?;
 
     Ok(WebSocketArtifacts {
-        construction_roots: construction_roots(&plan),
         modules,
+        retained_roots: retained_roots(&plan),
         server_console_arguments,
         servers: sessions_by_server.into_keys().collect(),
     })

@@ -108,3 +108,11 @@ fn rejects_an_unparseable_jwks_secret_store_marker() {
 
     assert!(matches!(error, ContainerError::Index { .. }));
 }
+
+#[test]
+fn propagates_an_unparseable_jwks_store_on_a_service_constructor() {
+    let error = render("service_unparseable_jwks_store", &[])
+        .expect_err("the unparseable service marker must be rejected");
+
+    assert!(matches!(error, ContainerError::Index { .. }));
+}

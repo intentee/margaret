@@ -1,9 +1,16 @@
 use thiserror::Error;
 
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_container::container_error::ContainerError;
 
 #[derive(Debug, Error)]
 pub enum RequestBindingError {
+    #[error(transparent)]
+    Container {
+        #[from]
+        source: ContainerError,
+    },
+
     #[error("failed to read a binding attribute: {source}")]
     Attribute {
         #[from]

@@ -12,10 +12,10 @@ fn accepts_singletons_named_after_framework_identifiers() {
         .split_whitespace()
         .collect();
 
-    assert!(source.contains("pubasyncfnconstruct_build("));
-    assert!(source.contains("pubasyncfnconstruct_container("));
-    assert!(source.contains("pubasyncfnconstruct_routes("));
-    assert!(source.contains("pubasyncfnserve("));
+    assert!(source.contains("pub(crate)fnconstruct_build("));
+    assert!(source.contains("pub(crate)fnconstruct_container("));
+    assert!(source.contains("pub(crate)fnconstruct_routes("));
+    assert!(source.contains("pub(crate)fnserve("));
     assert!(!source.contains("build_2"));
     assert!(!source.contains("container_2"));
     assert!(!source.contains("routes_2"));

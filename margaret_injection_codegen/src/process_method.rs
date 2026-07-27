@@ -1,15 +1,14 @@
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 
 use crate::injection_error::InjectionError;
 
 pub fn process_method(item: &IndexedItem) -> Result<&IndexedMethod, InjectionError> {
-    let selector = AttributeSelector::from_marker("process");
     let mut found: Vec<&IndexedMethod> = item
         .methods()
         .iter()
-        .filter(|method| method.has_attribute(&selector))
+        .filter(|method| method.has_framework_attribute(FrameworkAttribute::Process))
         .collect();
 
     if found.len() > 1 {

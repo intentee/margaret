@@ -1,37 +1,17 @@
-use std::collections::BTreeMap;
-
 use crate::console_argument::ConsoleArgument;
 use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
-use crate::serve_input_key::ServeInputKey;
+use crate::serve_input_registry::ServeInputRegistry;
 
 pub fn unify_by_key(
     arguments: &[ConsoleArgument],
 ) -> Result<Vec<ConsoleArgument>, ConsoleArgumentCodegenError> {
-    let mut order: Vec<ServeInputKey> = Vec::new();
-    let mut unified: BTreeMap<ServeInputKey, ConsoleArgument> = BTreeMap::new();
+    let mut registry = ServeInputRegistry::empty();
 
     for argument in arguments {
-        let key = argument.slot_key();
-
-        match unified.get(&key) {
-            Some(existing) => {
-                let collides = matches!(argument, ConsoleArgument::Positional { .. })
-                    || matches!(existing, ConsoleArgument::Positional { .. });
-
-                if collides {
-                    return Err(ConsoleArgumentCodegenError::ConflictingConsoleArgumentId {
-                        name: argument.name().to_string(),
-                    });
-                }
-            }
-            None => {
-                unified.insert(key.clone(), argument.clone());
-                order.push(key);
-            }
-        }
+        registry.register(argument.clone())?;
     }
 
-    Ok(order.into_iter().map(|key| unified[&key].clone()).collect())
+    Ok(registry.into_parts().0)
 }
 
 #[cfg(test)]

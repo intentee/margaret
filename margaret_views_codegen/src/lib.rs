@@ -1,4 +1,3 @@
-pub mod has_views;
 pub mod render_views;
 pub mod views_artifacts;
 pub mod views_codegen_error;
@@ -23,7 +22,6 @@ mod tests {
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
 
-    use crate::has_views::has_views;
     use crate::render_views::render_views;
     use crate::views_artifacts::ViewsArtifacts;
 
@@ -71,6 +69,11 @@ mod tests {
             .to_string()
     }
 
+    #[test]
+    fn rejects_a_view_absent_from_the_container_plan() {
+        assert!(rejection(VALID_VIEW).contains("crate::CardLayout"));
+    }
+
     fn formatted(
         modules: Vec<margaret_generated_module::generated_module_tokens::GeneratedModuleTokens>,
     ) -> String {
@@ -92,12 +95,6 @@ mod tests {
 #[singleton]
 struct CardLayout;
 ";
-
-    #[test]
-    fn detects_the_presence_of_views() {
-        assert!(has_views(&index_for(VALID_VIEW)));
-        assert!(!has_views(&index_for("struct Plain;\n")));
-    }
 
     #[test]
     fn generates_a_views_struct_and_builder() {

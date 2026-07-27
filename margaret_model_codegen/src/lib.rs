@@ -1,4 +1,3 @@
-pub mod has_models;
 pub mod index_membership;
 pub mod inferred_column;
 pub mod model;
@@ -40,23 +39,8 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
 
-    use crate::has_models::has_models;
     use crate::inferred_column::InferredColumn;
     use crate::models::models;
-
-    const ARTICLE: &str = "\
-#[model(table = \"articles\")]
-struct Article {
-    #[column(primary_key, name = \"id\")]
-    id: uuid::Uuid,
-    #[column]
-    title: String,
-    #[column(name = \"is_published\")]
-    published: bool,
-    #[column]
-    note: Option<String>,
-}
-";
 
     const AUTHOR_MODEL: &str = "\
 #[model(table = \"authors\")]
@@ -93,15 +77,6 @@ struct Author {
 
     fn with_author(referencing: &str) -> String {
         format!("{AUTHOR_MODEL}\n{referencing}")
-    }
-
-    #[test]
-    fn detects_the_presence_of_models() {
-        let with_models = crate_with(ARTICLE);
-        let without_models = crate_with("struct Plain;\n");
-
-        assert!(has_models(&index_of(with_models.path())));
-        assert!(!has_models(&index_of(without_models.path())));
     }
 
     #[test]

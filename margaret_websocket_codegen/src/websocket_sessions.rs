@@ -1,5 +1,5 @@
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_middleware_codegen::resolve_layers::resolve_layers;
@@ -20,10 +20,9 @@ pub(crate) fn websocket_sessions(
     middleware_plans: &[MiddlewarePlan],
     registries: &BindingRegistries,
 ) -> Result<Vec<WebSocketSession>, WebSocketCodegenError> {
-    let selector = AttributeSelector::from_marker("websocket_session");
     let mut sessions = Vec::new();
 
-    for matched in index.select(&selector) {
+    for matched in index.select_framework_attribute(FrameworkAttribute::WebsocketSession) {
         let item = matched.item();
         let session = item.canonical_path().to_string();
 

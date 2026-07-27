@@ -4,29 +4,29 @@ use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
+use crate::planned_provider::PlannedProvider;
 
-pub(crate) fn construction_flow(
-    plan: &ContainerPlan,
-    roots: &[CanonicalPath],
-) -> Vec<CanonicalPath> {
-    let mut selected: BTreeSet<CanonicalPath> = roots.iter().cloned().collect();
+pub(crate) fn construction_flow<'plan>(
+    plan: &'plan ContainerPlan,
+    roots: &[&'plan PlannedProvider],
+) -> Vec<&'plan PlannedProvider> {
+    let mut selected: BTreeSet<CanonicalPath> =
+        roots.iter().map(|entry| entry.key.clone()).collect();
 
-    for key in plan.dependency_order.iter().rev() {
+    for (key, provider) in plan.entries().rev() {
         if !selected.contains(key) {
             continue;
         }
 
-        for dependency in plan.entry(key).dependencies() {
+        for dependency in provider.dependencies() {
             if let DependencyKind::Single { provider_key } = dependency {
                 selected.insert(provider_key.clone());
             }
         }
     }
 
-    plan.dependency_order
-        .iter()
-        .filter(|key| selected.contains(*key))
-        .cloned()
+    plan.planned_entries()
+        .filter(|entry| selected.contains(&entry.key))
         .collect()
 }
 
@@ -79,22 +79,28 @@ mod tests {
         .map(|(name, provider)| (path(name), provider))
         .collect();
 
-        ContainerPlan {
-            dependency_order: ["Base", "Left", "Right", "Root", "Unused"]
+        ContainerPlan::new(
+            ["Base", "Left", "Right", "Root", "Unused"]
                 .into_iter()
                 .map(path)
                 .collect(),
             entries,
-            injectable: BTreeSet::new(),
-        }
+            BTreeSet::new(),
+        )
+        .expect("the fixture plan is complete")
     }
 
     #[test]
     fn keeps_a_shared_dependency_once_and_excludes_unused_entries() {
+        let plan = plan();
+        let root = plan
+            .planned_entry(&path("Root"))
+            .expect("the root is planned");
+
         assert_eq!(
-            construction_flow(&plan(), &[path("Root")])
+            construction_flow(&plan, &[root])
                 .iter()
-                .map(ToString::to_string)
+                .map(|entry| entry.key.to_string())
                 .collect::<Vec<_>>(),
             ["crate::Base", "crate::Left", "crate::Right", "crate::Root"]
         );

@@ -6,7 +6,6 @@ autotests = false
 
 [dependencies]
 ephemeral-postgres = { workspace = true }
-margaret_example = { path = "../margaret_example" }
 margaret_model = { path = "../margaret_model" }
 sqlx = { workspace = true }
 

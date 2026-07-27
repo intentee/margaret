@@ -13,5 +13,5 @@ pub fn render_container(
     let planned = plan_container(index, registry, framework_providers)?;
     let roots = planned.roots();
 
-    Ok(planned.render(&roots))
+    planned.render(&roots, &roots, &roots)
 }

@@ -15,7 +15,6 @@ pub mod classify_parameters;
 pub mod extraction_context;
 mod form_request_arguments;
 pub mod form_request_extraction;
-pub mod has_authenticated_users;
 mod infers_authenticated_user_arguments;
 pub mod injects_routes;
 pub mod injects_views;
@@ -41,21 +40,23 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_console_argument_codegen::scan::scan;
+    use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
     use margaret_injection_codegen::process_method::process_method;
     use margaret_route_parameter_codegen::route_path::RoutePath;
 
+    use crate::authenticated_user_application::AuthenticatedUserApplication;
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
     use crate::binding_console_arguments::binding_console_arguments;
     use crate::binding_context::BindingContext;
     use crate::binding_registries::BindingRegistries;
     use crate::bound_parameter::BoundParameter;
     use crate::classify_parameters::classify_parameters;
-    use crate::has_authenticated_users::has_authenticated_users;
     use crate::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
     use crate::request_binding::RequestBinding;
     use crate::request_binding_error::RequestBindingError;
     use crate::views_availability::ViewsAvailability;
+    use quote::format_ident;
 
     const PRELUDE: &str = "\
 use margaret::framework::http::next::Next;
@@ -80,6 +81,22 @@ struct User;
 
     fn provider_source(declaration: &str) -> String {
         format!("{PRELUDE}{declaration}")
+    }
+
+    fn empty_bindings() -> margaret_container::container_bindings::ContainerBindings {
+        let index = index_for("");
+        let registry = scan(&index).expect("the empty console argument registry is scanned");
+
+        render_container(&index, &registry, &[])
+            .expect("the empty container is rendered")
+            .bindings
+    }
+
+    fn missing_path() -> margaret_attributes::canonical_path::CanonicalPath {
+        margaret_attributes::canonical_path::CanonicalPath::new(vec![
+            "crate".to_string(),
+            "Missing".to_string(),
+        ])
     }
 
     fn registries_with(declaration: &str, views: ViewsAvailability) -> BindingRegistries {
@@ -125,20 +142,6 @@ impl SessionUserProvider {
             "SessionUserProvider"
         );
         assert_eq!(providers[0].method_name.to_string(), "infer");
-    }
-
-    #[test]
-    fn reports_a_crate_with_a_provider() {
-        assert!(has_authenticated_users(&index_for(&provider_source(
-            SESSION_PROVIDER
-        ))));
-    }
-
-    #[test]
-    fn reports_a_crate_without_a_provider() {
-        assert!(!has_authenticated_users(&index_for(
-            "#[singleton]\nstruct Config;\n"
-        )));
     }
 
     #[test]
@@ -482,12 +485,51 @@ impl SessionUserProvider {
             },
             &bindings,
         )
+        .expect("the provider dependency has planned console arguments")
         .iter()
         .map(|argument| argument.name().to_string())
         .collect();
 
         assert_eq!(names, vec!["realm".to_string()]);
-        assert!(binding_console_arguments(&RequestBinding::CurrentRequest, &bindings).is_empty());
+        assert!(
+            binding_console_arguments(&RequestBinding::CurrentRequest, &bindings)
+                .expect("the current request has no container-backed arguments")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn rejects_container_backed_bindings_absent_from_the_container_plan() {
+        let bindings = empty_bindings();
+        let authenticated_user = RequestBinding::AuthenticatedUser {
+            application: AuthenticatedUserApplication {
+                concrete: missing_path(),
+                field: "missing".to_string(),
+                injects_routes: false,
+                injects_views: false,
+                model: missing_path(),
+                wrapper: format_ident!("Missing"),
+            },
+            requirement: AuthenticatedUserRequirement::Required,
+        };
+        let bound = RequestBinding::Bound {
+            binder_field: "missing".to_string(),
+            binder_provider: missing_path(),
+            path_key: "id".to_string(),
+        };
+        let injectable = RequestBinding::Injectable {
+            dependency: InjectedDependency {
+                concrete: missing_path(),
+                field: "missing".to_string(),
+            },
+        };
+
+        for binding in [authenticated_user, bound, injectable] {
+            let error = binding_console_arguments(&binding, &bindings)
+                .expect_err("the binding must belong to the same container plan");
+
+            assert!(error.to_string().contains("crate::Missing"));
+        }
     }
 
     #[test]

@@ -1,28 +1,14 @@
 use std::io::Result;
 
+use crate::shutdown_signals::ShutdownSignals;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::unix::signal;
-use tokio_util::sync::CancellationToken;
 
-fn install_signals(interrupt: SignalKind, terminate: SignalKind) -> Result<CancellationToken> {
-    let mut interrupt = signal(interrupt)?;
-    let mut terminate = signal(terminate)?;
-    let token = CancellationToken::new();
-    let signal_token = token.clone();
-
-    tokio::spawn(async move {
-        tokio::select! {
-            _ = interrupt.recv() => {}
-            _ = terminate.recv() => {}
-        }
-
-        signal_token.cancel();
-    });
-
-    Ok(token)
+fn install_signals(interrupt: SignalKind, terminate: SignalKind) -> Result<ShutdownSignals> {
+    Ok(ShutdownSignals::new(signal(interrupt)?, signal(terminate)?))
 }
 
-pub fn install() -> Result<CancellationToken> {
+pub fn install() -> Result<ShutdownSignals> {
     install_signals(SignalKind::interrupt(), SignalKind::terminate())
 }
 

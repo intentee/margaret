@@ -37,7 +37,7 @@ fn reports_a_fallible_console_command_into_the_command_outcome() {
     let source = module(&generated(), "run");
 
     assert!(source.contains(
-        "matchsuper::container::build::construct_boot_boot().await{Ok(value)=>value,Err(error)=>"
+        "matchsuper::container::build::construct_boot_boot(){Ok(value)=>value,Err(error)=>"
     ));
     assert!(source.contains("margaret::framework::console::report_failure::report_failure(error"));
     assert!(source.contains(

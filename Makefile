@@ -68,6 +68,75 @@ COVERAGE_PACKAGES := \
 	-p margaret_websocket \
 	-p margaret_websocket_codegen \
 	-p margaret_websocket_tests
+COVERAGE_EXCLUDED_PACKAGES := \
+	--exclude-from-report margaret_example \
+	--exclude-from-report margaret_codegen_clippy_fixture \
+	--exclude-from-report margaret_codegen_fallible_roles_fixture \
+	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
+	--exclude-from-report margaret_codegen_websocket_fixture \
+	--exclude-from-report margaret_self_referential_model_fixture \
+	--exclude-from-report margaret_spiffe_http_client_fixture
+RUNTIME_PACKAGES := \
+	-p margaret \
+	-p margaret_access_token_minter \
+	-p margaret_asset_bag \
+	-p margaret_asset_bag_codegen \
+	-p margaret_attributes \
+	-p margaret_codegen \
+	-p margaret_codegen_tokens \
+	-p margaret_console \
+	-p margaret_console_argument_codegen \
+	-p margaret_console_codegen \
+	-p margaret_container \
+	-p margaret_generated_module \
+	-p margaret_http \
+	-p margaret_http_codegen \
+	-p margaret_http_validation \
+	-p margaret_identity \
+	-p margaret_identity_session \
+	-p margaret_injection_codegen \
+	-p margaret_jwks_client \
+	-p margaret_jwks_codegen \
+	-p margaret_jwks_endpoint \
+	-p margaret_jwks_file_secret_storage \
+	-p margaret_jwks_keygen \
+	-p margaret_jwks_roller \
+	-p margaret_jwks_roller_server \
+	-p margaret_jwks_secret_storage_selection \
+	-p margaret_jwks_secret_store \
+	-p margaret_macros \
+	-p margaret_middleware_codegen \
+	-p margaret_model \
+	-p margaret_model_codegen \
+	-p margaret_peer_identity \
+	-p margaret_request_binding_codegen \
+	-p margaret_route_parameter_codegen \
+	-p margaret_schema_codegen \
+	-p margaret_schema_identifier_naming \
+	-p margaret_service \
+	-p margaret_service_codegen \
+	-p margaret_spiffe_svid \
+	-p margaret_spiffe_svid_bundle \
+	-p margaret_spiffe_svid_client \
+	-p margaret_spiffe_svid_server \
+	-p margaret_sync_holder \
+	-p margaret_tag_codegen \
+	-p margaret_token_signer \
+	-p margaret_toposort \
+	-p margaret_validation \
+	-p margaret_views \
+	-p margaret_views_codegen \
+	-p margaret_websocket \
+	-p margaret_websocket_codegen
+RUNTIME_LINTS := \
+	-D unsafe-code \
+	-D clippy::exit \
+	-D clippy::expect-used \
+	-D clippy::mem-forget \
+	-D clippy::panic \
+	-D clippy::todo \
+	-D clippy::unimplemented \
+	-D clippy::unwrap-used
 
 POSTGRES_FEATURES := --features margaret_schema_postgres_tests/tests_that_use_postgres
 
@@ -88,11 +157,12 @@ node_modules: package.json
 .PHONY: clippy
 clippy:
 	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(SPIRE_FEATURES) -- -D warnings
+	cargo clippy $(RUNTIME_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
 
 .PHONY: coverage
 coverage: node_modules postgres-image
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) --test-threads 4 --no-report
+	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) --no-report
 	cargo llvm-cov report --json --output-path target/llvm-cov.json
 	cargo llvm-cov report --lcov --output-path target/lcov.info
 	cargo llvm-cov report

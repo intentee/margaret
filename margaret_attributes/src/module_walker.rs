@@ -219,6 +219,36 @@ impl ModuleWalker {
             }
         }
 
+        for item in &mut items {
+            let module_path = item
+                .canonical_path()
+                .segments()
+                .split_last()
+                .map_or_else(Vec::new, |(_, module)| module.to_vec());
+            let module = CanonicalPath::new(module_path.clone());
+            let module_imports = imports.get(&module).unwrap_or(&empty_imports);
+
+            item.resolve_attribute_paths(|path| {
+                resolve_type(
+                    &Type::Path(syn::TypePath {
+                        qself: None,
+                        path: path.clone(),
+                    }),
+                    &module_path,
+                    module_imports,
+                    &item_paths,
+                )
+                .unwrap_or_else(|| {
+                    CanonicalPath::new(
+                        path.segments
+                            .iter()
+                            .map(|segment| segment.ident.to_string())
+                            .collect(),
+                    )
+                })
+            });
+        }
+
         items.sort_by(|left, right| left.canonical_path().cmp(right.canonical_path()));
 
         for item in &mut items {

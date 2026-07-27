@@ -7,6 +7,7 @@ use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
+use margaret_console_argument_codegen::owned_weave::owned_weave;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
@@ -194,8 +195,15 @@ fn server_registration(
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
         let transport = transport_expression(server, activation.server_active);
-        let routes =
-            quote! { super::http::#function_name::#function_name(container, &routes #views_argument).await };
+        let routes = if server.routes_are_async() {
+            quote! {
+                super::http::#function_name::#function_name(container, &routes #views_argument).await
+            }
+        } else {
+            quote! {
+                super::http::#function_name::#function_name(container, &routes #views_argument)
+            }
+        };
 
         quote! {
             margaret::framework::service::server_assembly::ServerAssembly {
@@ -378,15 +386,23 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
     format_ident!("{}", unit.type_name)
 }
 
-fn serve_prelude(serve_arguments: &[ConsoleArgument], bindings: &ContainerBindings) -> TokenStream {
-    let resolutions = serve_arguments.iter().map(|argument| {
-        let ident = console_argument_ident(bindings.console_slot(&argument.slot_key()));
+fn serve_inputs(
+    serve_arguments: &[ConsoleArgument],
+    bindings: &ContainerBindings,
+) -> Result<(TokenStream, Vec<TokenStream>), ServiceCodegenError> {
+    let mut resolutions = Vec::with_capacity(serve_arguments.len());
+    let mut construction_arguments = Vec::with_capacity(serve_arguments.len());
+
+    for argument in serve_arguments {
+        let slot = bindings.console_slot(&argument.slot_key())?;
+        let ident = console_argument_ident(slot);
         let value = argument_value(argument);
 
-        quote! { let #ident = #value; }
-    });
+        resolutions.push(quote! { let #ident = #value; });
+        construction_arguments.push(owned_weave(argument, slot, true));
+    }
 
-    quote! { #(#resolutions)* }
+    Ok((quote! { #(#resolutions)* }, construction_arguments))
 }
 
 pub fn render_services(
@@ -417,14 +433,10 @@ pub fn render_services(
     let identity_prelude = svid_identity_prelude(activation);
     let bundle_registration = bundle_registration(activation);
     let server_registration = server_registration(servers, has_views, activation);
-    let prelude = serve_prelude(serve_arguments, bindings);
-    let construction_arguments = bindings.console_weaves_owned(serve_arguments);
+    let (prelude, construction_arguments) = serve_inputs(serve_arguments, bindings)?;
+    let construction_invocation = bindings.serve_invocation(&construction_arguments);
     let construction = quote! {
-        let container = match super::container::build::serve(
-            #(#construction_arguments),*
-        )
-        .await
-        {
+        let container = match #construction_invocation {
             Ok(container) => container,
             Err(error) => {
                 return margaret::framework::console::report_failure::report_failure(error);

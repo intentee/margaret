@@ -4,6 +4,7 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 
+use crate::console_artifacts::ConsoleArtifacts;
 use crate::console_codegen_error::ConsoleCodegenError;
 use crate::console_commands::console_commands;
 use crate::render::render;
@@ -15,18 +16,25 @@ pub fn render_console(
     servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
     bindings: &ContainerBindings,
-) -> Result<GeneratedModuleTokens, ConsoleCodegenError> {
+) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
     let commands = console_commands(index, bindings)?;
+    let construction_roots = commands
+        .iter()
+        .map(|command| command.construction_root.clone())
+        .collect();
 
-    Ok(GeneratedModuleTokens::new(
-        "run",
-        render(
-            &commands,
-            serves,
-            has_models,
-            servers,
-            serve_arguments,
-            bindings,
+    Ok(ConsoleArtifacts {
+        module: GeneratedModuleTokens::new(
+            "run",
+            render(
+                &commands,
+                serves,
+                has_models,
+                servers,
+                serve_arguments,
+                bindings,
+            ),
         ),
-    ))
+        construction_roots,
+    })
 }
