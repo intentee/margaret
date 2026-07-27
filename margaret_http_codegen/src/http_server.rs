@@ -47,11 +47,6 @@ impl HttpServer {
     }
 
     #[must_use]
-    pub fn transport_argument(&self) -> String {
-        format!("{}-transport", self.name)
-    }
-
-    #[must_use]
     pub fn transport_policy(&self) -> ServerTransportPolicy {
         self.transport_policy
     }

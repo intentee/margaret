@@ -17,11 +17,10 @@ pub fn require_authenticated_user<User>(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use margaret_http::forwardable_route::ForwardableRoute;
     use margaret_http::response::Response;
     use margaret_http::response_continuation::ResponseContinuation;
+    use margaret_http::route_origin::RouteOrigin;
     use margaret_http::url_segment::UrlSegment;
 
     use super::require_authenticated_user;
@@ -40,7 +39,7 @@ mod tests {
     fn sign_in_redirect() -> ResponseContinuation {
         ResponseContinuation::from(
             ForwardableRoute::new(
-                Arc::from("http://localhost"),
+                RouteOrigin::parse("https://example.test").expect("a valid origin"),
                 vec![UrlSegment::Literal("/sign-in")],
             )
             .see_other(),

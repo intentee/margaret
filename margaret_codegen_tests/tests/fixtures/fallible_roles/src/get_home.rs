@@ -13,7 +13,7 @@ use super::margaret::views::Views;
 use super::secrets::Secrets;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/", server = "public")]
 pub struct GetHome {
     secrets: Arc<Secrets>,
 }

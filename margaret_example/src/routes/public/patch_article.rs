@@ -11,7 +11,7 @@ use crate::models::article::Article;
 use crate::stores::article_store::ArticleStore;
 
 #[singleton]
-#[responds_to_http(method = "patch", path = "/articles/{article}", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "patch", path = "/articles/{article}", server = "public")]
 pub struct PatchArticle {
     articles: Arc<ArticleStore>,
 }

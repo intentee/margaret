@@ -6,6 +6,7 @@ use margaret_container::container_error::ContainerError;
 use margaret_injection_codegen::injection_error::InjectionError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+use margaret_route_parameter_codegen::route_path_error::RoutePathError;
 
 #[derive(Debug, Error)]
 pub enum HttpCodegenError {
@@ -42,6 +43,20 @@ pub enum HttpCodegenError {
     #[error("#[responds_to_http] is only supported on structs, but '{target}' is not a struct")]
     RespondsToHttpNotOnStruct { target: String },
 
+    #[error("responder '{responder}' is missing the required typed 'access' policy")]
+    MissingAccessPolicy { responder: String },
+
+    #[error("responder '{responder}' references an access policy that cannot be resolved")]
+    UnresolvedAccessPolicy { responder: String },
+
+    #[error("responder '{responder}' references access policy '{policy}', which is not a struct")]
+    AccessPolicyNotAStruct { policy: String, responder: String },
+
+    #[error(
+        "responder '{responder}' references access policy '{policy}', which is not a #[singleton]"
+    )]
+    AccessPolicyNotSingleton { policy: String, responder: String },
+
     #[error("responder '{responder}' is missing the 'method' argument")]
     MissingHttpMethod { responder: String },
 
@@ -63,6 +78,14 @@ pub enum HttpCodegenError {
         source: InsertError,
     },
 
+    #[error("responder '{responder}' has an insecure route path '{path}': {source}")]
+    InsecureRoutePath {
+        responder: String,
+        path: String,
+        #[source]
+        source: RoutePathError,
+    },
+
     #[error(
         "responder '{responder}' registers route path '{path}' on server '{server}', which conflicts with the already registered route path '{conflicting_path}'"
     )]
@@ -78,7 +101,7 @@ pub enum HttpCodegenError {
     )]
     DuplicateRoute {
         existing_responder: String,
-        method: String,
+        method: http::Method,
         path: String,
         responder: String,
         server: String,

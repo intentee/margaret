@@ -13,7 +13,7 @@ use crate::margaret::views::Views;
 use crate::views::farewell_view::FarewellViewProps;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/farewell-card", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/farewell-card", server = "public")]
 pub struct GetFarewellCard {
     app_name: Arc<AppName>,
 }
@@ -42,6 +42,8 @@ impl GetFarewellCard {
 mod tests {
     use std::sync::Arc;
 
+    use margaret::framework::http::route_origin::RouteOrigin;
+
     use super::GetFarewellCard;
     use crate::app_name::AppName;
     use crate::margaret::routes::Routes;
@@ -63,7 +65,10 @@ mod tests {
                 GreetingView::create(card_layout).expect("the greeting view is constructed"),
             ),
         };
-        let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
+        let routes = Routes::from_origins(
+            RouteOrigin::parse("https://internal.example").expect("a valid internal origin"),
+            RouteOrigin::parse("https://public.example").expect("a valid public origin"),
+        );
         let app_name = AppName::create().expect("the app name is constructed");
         let responder =
             GetFarewellCard::create(Arc::new(app_name)).expect("the responder is constructed");

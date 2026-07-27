@@ -123,7 +123,7 @@ impl Farewell {
         let servers = if has_http {
             vec![HttpServer::new(
                 "public".to_string(),
-                ServerTransportPolicy::Negotiable,
+                ServerTransportPolicy::PinnedSpiffeMtls,
             )]
         } else {
             Vec::new()
@@ -202,9 +202,9 @@ impl Farewell {
         assert!(
             source.contains(r#"clap::Arg::new("public-addr").long("public-addr").required(true)"#)
         );
-        assert!(
-            source.contains(r#"clap::Arg::new("public-url").long("public-url").required(true)"#)
-        );
+        assert!(source.contains("route_origin_argument::route_origin_argument"));
+        assert!(source.contains(r#""public-url""#));
+        assert!(!source.contains(r#"clap::Arg::new("public-url")"#));
         assert!(source.contains(
             r#"clap::Arg::new("public-uploads").long("public-uploads").action(clap::ArgAction::SetTrue)"#
         ));
@@ -228,7 +228,10 @@ impl Farewell {
                     "internal".to_string(),
                     ServerTransportPolicy::PinnedSpiffeMtls,
                 ),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
             ],
             &[],
             &bindings(&index),
@@ -241,12 +244,8 @@ impl Farewell {
         .split_whitespace()
         .collect();
 
-        assert!(source.contains(
-            r#"clap::Arg::new("internal-transport").long("internal-transport").required(true).value_parser(["spiffe_mtls"])"#
-        ));
-        assert!(source.contains(
-            r#"clap::Arg::new("public-transport").long("public-transport").required(true).value_parser(["plain","spiffe_mtls"])"#
-        ));
+        assert!(!source.contains("internal-transport"));
+        assert!(!source.contains("public-transport"));
         assert!(source.contains(
             r#"clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true)"#
         ));
@@ -260,7 +259,7 @@ impl Farewell {
         let source = source_for("struct App;\n", true);
 
         assert!(!source.contains("public-transport"));
-        assert!(!source.contains("spiffe-trust-domain"));
+        assert!(source.contains("spiffe-trust-domain"));
     }
 
     #[test]
@@ -271,8 +270,14 @@ impl Farewell {
             true,
             false,
             &[
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
             ],
             &[],
             &bindings(&index),

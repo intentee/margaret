@@ -217,16 +217,16 @@ mod tests {
     fn p384_reports_mismatch_for_non_matching_signature() {
         let keypair = &*P384_KEYPAIR;
 
-        assert!(
-            !verify_signature(
-                "header.payload",
-                &low_s_bytes(96),
-                &keypair.public.x,
-                &keypair.public.y,
-                Curve::P384,
-            )
-            .unwrap()
-        );
+        let verified = verify_signature(
+            "header.payload",
+            &low_s_bytes(96),
+            &keypair.public.x,
+            &keypair.public.y,
+            Curve::P384,
+        )
+        .unwrap();
+
+        assert_eq!(verified.then_some(()), None);
     }
 
     #[test]

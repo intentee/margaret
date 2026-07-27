@@ -1,7 +1,9 @@
 use std::convert::Infallible;
 use std::fmt::Display;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::Bytes;
 use http::request::Parts;
@@ -10,6 +12,7 @@ use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper_util::rt::TokioExecutor;
 use hyper_util::rt::TokioIo;
+use hyper_util::rt::TokioTimer;
 use hyper_util::server::conn::auto::Builder;
 use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::server::graceful::Watcher;
@@ -44,12 +47,57 @@ use crate::upgrade_route::UpgradeRoute;
 use crate::upload_config::UploadConfig;
 use crate::web_socket_driver_channel::web_socket_driver_channel;
 use crate::web_socket_driver_sender::WebSocketDriverSender;
+use crate::web_socket_handshake::web_socket_handshake_rejection;
 use crate::web_socket_upgrade_terminal::WebSocketUpgradeTerminal;
+
+const MAX_CONNECTIONS: usize = 1024;
+const HEADER_READ_TIMEOUT: Duration = Duration::from_secs(5);
+const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
+const BODY_READ_TIMEOUT: Duration = Duration::from_secs(10);
+
+async fn accept_tls_handshake<Handshake, Stream, Error>(
+    handshake: Handshake,
+    deadline: Duration,
+) -> Option<Stream>
+where
+    Handshake: Future<Output = Result<Stream, Error>>,
+    Error: Display,
+{
+    match tokio::time::timeout(deadline, handshake).await {
+        Ok(Ok(stream)) => Some(stream),
+        Ok(Err(error)) => {
+            eprintln!("margaret_http: tls handshake error: {error}");
+
+            None
+        }
+        Err(_) => {
+            eprintln!("margaret_http: tls handshake deadline elapsed");
+
+            None
+        }
+    }
+}
+
+async fn receive_request_before_deadline<Receive>(
+    receive: Receive,
+    deadline: Duration,
+) -> Result<RequestInputs, RequestError>
+where
+    Receive: Future<Output = Result<RequestInputs, RequestError>>,
+{
+    match tokio::time::timeout(deadline, receive).await {
+        Ok(result) => result,
+        Err(_) => Err(RequestError::BodyReadTimeout),
+    }
+}
 
 #[derive(Clone)]
 enum BoundTransport {
-    Plain,
-    MutualTls { acceptor: TlsAcceptor },
+    #[cfg(any(test, feature = "fixture-plain-transport"))]
+    FixturePlain,
+    MutualTls {
+        acceptor: TlsAcceptor,
+    },
 }
 
 #[derive(Clone)]
@@ -87,7 +135,8 @@ impl BoundServer {
         let body_limit = server.body_limit();
         let router = server.router().clone();
         let transport = match server.transport().as_ref() {
-            TransportConfig::Plain => BoundTransport::Plain,
+            #[cfg(any(test, feature = "fixture-plain-transport"))]
+            TransportConfig::FixturePlain => BoundTransport::FixturePlain,
             TransportConfig::MutualTls { server_config } => BoundTransport::MutualTls {
                 acceptor: TlsAcceptor::from(server_config.clone()),
             },
@@ -110,7 +159,14 @@ impl BoundServer {
     }
 
     pub async fn serve(self, cancellation_token: CancellationToken) {
-        let builder = Arc::new(Builder::new(TokioExecutor::new()));
+        let mut builder = Builder::new(TokioExecutor::new());
+        builder
+            .http1()
+            .timer(TokioTimer::new())
+            .header_read_timeout(HEADER_READ_TIMEOUT)
+            .max_headers(64)
+            .max_buf_size(64 * 1024);
+        let builder = Arc::new(builder);
         let graceful = GracefulShutdown::new();
         let mut connections = JoinSet::new();
 
@@ -121,7 +177,7 @@ impl BoundServer {
                 Some(outcome) = connections.join_next(), if !connections.is_empty() => {
                     report_connection_task_outcome(outcome);
                 }
-                accepted = self.listener.accept() => {
+                accepted = self.listener.accept(), if connections.len() < MAX_CONNECTIONS => {
                     accept_outcome(accepted, |connection| {
                         self.spawn_connection(
                             &mut connections,
@@ -164,7 +220,8 @@ impl BoundServer {
 
         drop(connections.spawn(async move {
             match transport {
-                BoundTransport::Plain => {
+                #[cfg(any(test, feature = "fixture-plain-transport"))]
+                BoundTransport::FixturePlain => {
                     serve_connection(
                         builder,
                         watcher,
@@ -182,13 +239,10 @@ impl BoundServer {
                     .await;
                 }
                 BoundTransport::MutualTls { acceptor } => {
-                    let tls_stream = match acceptor.accept(stream).await {
-                        Ok(tls_stream) => tls_stream,
-                        Err(error) => {
-                            eprintln!("margaret_http: tls handshake error: {error}");
-
-                            return;
-                        }
+                    let Some(tls_stream) =
+                        accept_tls_handshake(acceptor.accept(stream), TLS_HANDSHAKE_TIMEOUT).await
+                    else {
+                        return;
                     };
                     let peer_identity = Arc::new(peer_identity_from_tls_stream(&tls_stream));
 
@@ -304,18 +358,20 @@ async fn parse_request(
         ..
     } = parts;
     let body = incoming.map_err(std::io::Error::other).boxed_unsync();
-    let inputs = RequestInputs::parse(
-        method,
-        &uri,
-        headers,
-        remote_addr,
-        body,
-        body_limit,
-        upload_config,
+    receive_request_before_deadline(
+        RequestInputs::parse(
+            method,
+            &uri,
+            headers,
+            remote_addr,
+            body,
+            body_limit,
+            upload_config,
+        ),
+        BODY_READ_TIMEOUT,
     )
-    .await?;
-
-    Ok(Request::from_inputs(inputs).with_peer_identity(peer_identity))
+    .await
+    .map(|inputs| Request::from_inputs(inputs).with_peer_identity(peer_identity))
 }
 
 async fn complete_request(
@@ -346,12 +402,17 @@ async fn dispatch_web_socket(
     cancellation_token: CancellationToken,
     UpgradeRoute {
         middleware,
+        origin,
         path_params,
         upgrade,
     }: UpgradeRoute,
     forward_targets: &Arc<ForwardTargets>,
     driver_sender: WebSocketDriverSender,
 ) -> http::Response<Full<Bytes>> {
+    if let Some(rejection) = web_socket_handshake_rejection(request.headers(), &origin) {
+        return rejection.into_http();
+    }
+
     let on_upgrade = hyper::upgrade::on(&mut request);
     let (parts, _incoming) = request.into_parts();
     let Parts {
@@ -399,7 +460,7 @@ async fn dispatch(
     driver_sender: WebSocketDriverSender,
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
-    match router.resolve(request.method().as_str(), request.uri().path()) {
+    match router.resolve(request.method(), request.uri().path()) {
         RouteResolution::Upgrade(upgrade_route) => {
             dispatch_web_socket(
                 request,
@@ -434,9 +495,9 @@ mod tests {
     use std::collections::HashMap;
     use std::net::SocketAddr;
     use std::sync::Arc;
+    use std::time::Duration;
 
     use async_trait::async_trait;
-    use cookie::Cookie;
     use hyper::upgrade::OnUpgrade;
     use tokio::io::AsyncReadExt;
     use tokio::io::AsyncWriteExt;
@@ -445,7 +506,9 @@ mod tests {
 
     use super::BoundServer;
     use super::accept_outcome;
+    use super::accept_tls_handshake;
     use super::error_response;
+    use super::receive_request_before_deadline;
     use super::report_connection_task_outcome;
     use crate::body_limit::BodyLimit;
     use crate::forward::Forward;
@@ -459,6 +522,7 @@ mod tests {
     use crate::redirect::Redirect;
     use crate::request::Request;
     use crate::request_error::RequestError;
+    use crate::request_inputs::RequestInputs;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
     use crate::route_entry::RouteEntry;
@@ -483,12 +547,12 @@ mod tests {
         Arc::new(ServerRegistry::new(vec![Server::new(
             "test",
             "127.0.0.1:0".to_string(),
-            TransportConfig::Plain,
+            TransportConfig::FixturePlain,
             UploadConfig::Disabled,
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::new(http::Method::GET, Arc::new(PlainOk))],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -532,11 +596,11 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/items/{id}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::new(http::Method::GET, Arc::new(PlainOk))],
             ),
             RouteEntry::new(
                 "/items/{name}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::new(http::Method::GET, Arc::new(PlainOk))],
             ),
         ]);
 
@@ -548,12 +612,93 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/x/{id}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::new(http::Method::GET, Arc::new(PlainOk))],
             ),
-            RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade), Vec::new()),
+            RouteEntry::web_socket(
+                "/x/{name}",
+                http::HeaderValue::from_static("https://example.test"),
+                Arc::new(TestUpgrade),
+                Vec::new(),
+            ),
         ]);
 
         assert!(conflict.is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_methods_within_one_route() {
+        let duplicate = Router::build(vec![RouteEntry::new(
+            "/items",
+            vec![
+                MethodHandler::new(http::Method::GET, Arc::new(PlainOk)),
+                MethodHandler::new(http::Method::GET, Arc::new(PlainOk)),
+            ],
+        )]);
+
+        assert!(duplicate.is_err());
+    }
+
+    #[tokio::test]
+    async fn accepts_only_successful_tls_handshakes_before_the_deadline() {
+        assert_eq!(
+            accept_tls_handshake(
+                async { Ok::<_, std::io::Error>("authenticated") },
+                Duration::from_secs(1),
+            )
+            .await,
+            Some("authenticated")
+        );
+        assert!(
+            accept_tls_handshake(
+                async { Err::<(), _>(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)) },
+                Duration::from_secs(1),
+            )
+            .await
+            .is_none()
+        );
+        assert!(
+            accept_tls_handshake(
+                std::future::pending::<Result<(), std::io::Error>>(),
+                Duration::ZERO,
+            )
+            .await
+            .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn enforces_the_request_body_deadline_without_discarding_parse_errors() {
+        let complete = RequestInputs::empty(http::Method::GET, "/".to_string());
+
+        assert!(
+            receive_request_before_deadline(async { Ok(complete) }, Duration::from_secs(1))
+                .await
+                .is_ok()
+        );
+        let parse_error = receive_request_before_deadline(
+            async { Err(RequestError::MissingMultipartBoundary) },
+            Duration::from_secs(1),
+        )
+        .await
+        .err()
+        .expect("the parse error is preserved");
+
+        assert_eq!(
+            std::mem::discriminant(&parse_error),
+            std::mem::discriminant(&RequestError::MissingMultipartBoundary)
+        );
+        let timeout = receive_request_before_deadline(
+            std::future::pending::<Result<RequestInputs, RequestError>>(),
+            Duration::ZERO,
+        )
+        .await
+        .err()
+        .expect("the pending body reaches its deadline");
+
+        assert_eq!(
+            std::mem::discriminant(&timeout),
+            std::mem::discriminant(&RequestError::BodyReadTimeout)
+        );
     }
 
     #[test]
@@ -582,7 +727,7 @@ mod tests {
         let server_registry = Arc::new(ServerRegistry::new(vec![Server::new(
             "test",
             "this is not an address".to_string(),
-            TransportConfig::Plain,
+            TransportConfig::FixturePlain,
             UploadConfig::Disabled,
             BodyLimit::default(),
             Router::build(Vec::new()).expect("an empty router builds"),
@@ -750,7 +895,7 @@ mod tests {
                 .expect("the delegated test handler succeeds");
 
             Ok(ResponseContinuation::Done(
-                Response::forbidden().set_cookie(Cookie::new("session", "rotated")),
+                Response::forbidden().header("set-cookie", "session=rotated"),
             ))
         }
     }
@@ -777,11 +922,12 @@ mod tests {
         Arc::new(ServerRegistry::new(vec![Server::new(
             "test",
             "127.0.0.1:0".to_string(),
-            TransportConfig::Plain,
+            TransportConfig::FixturePlain,
             UploadConfig::Disabled,
             BodyLimit::default(),
             Router::build(vec![RouteEntry::web_socket(
                 "/room/{id}",
+                http::HeaderValue::from_static("https://example.test"),
                 Arc::new(TestUpgrade),
                 middleware,
             )])
@@ -814,6 +960,15 @@ mod tests {
         response
     }
 
+    const VALID_WEB_SOCKET_REQUEST: &[u8] = b"GET /room/42 HTTP/1.1\r\n\
+Host: test\r\n\
+Connection: Upgrade, close\r\n\
+Upgrade: websocket\r\n\
+Origin: https://example.test\r\n\
+Sec-WebSocket-Version: 13\r\n\
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
+\r\n";
+
     fn response_body(response: &str) -> &str {
         response
             .split_once("\r\n\r\n")
@@ -839,7 +994,7 @@ mod tests {
         let (upgraded, wrong_method, malformed_cookie) = tokio::join!(
             exchange(
                 address,
-                b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                VALID_WEB_SOCKET_REQUEST,
                 false,
             ),
             exchange(
@@ -868,7 +1023,7 @@ mod tests {
     async fn upgrades_a_web_socket_handshake_through_a_delegating_middleware() {
         let response = web_socket_handshake_response(
             registry_with_web_socket_middleware(vec![Arc::new(PassThrough)]),
-            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            VALID_WEB_SOCKET_REQUEST,
         )
         .await;
 
@@ -877,10 +1032,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rejects_ambiguous_web_socket_handshake_query_fields() {
+        let response = web_socket_handshake_response(
+            registry_with_web_socket(),
+            b"GET /room/42?value=one&value=two HTTP/1.1\r\n\
+Host: test\r\n\
+Connection: Upgrade, close\r\n\
+Upgrade: websocket\r\n\
+Origin: https://example.test\r\n\
+Sec-WebSocket-Version: 13\r\n\
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
+\r\n",
+        )
+        .await;
+
+        assert!(response.contains(" 400 "));
+    }
+
+    #[tokio::test]
     async fn honors_a_web_socket_middleware_that_short_circuits_before_upgrading() {
         let response = web_socket_handshake_response(
             registry_with_web_socket_middleware(vec![Arc::new(RespondsWith { status: 403 })]),
-            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            VALID_WEB_SOCKET_REQUEST,
         )
         .await;
 
@@ -892,7 +1065,7 @@ mod tests {
     async fn honors_a_web_socket_middleware_that_redirects_instead_of_upgrading() {
         let response = web_socket_handshake_response(
             registry_with_web_socket_middleware(vec![Arc::new(RedirectsAway)]),
-            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            VALID_WEB_SOCKET_REQUEST,
         )
         .await;
 
@@ -904,7 +1077,7 @@ mod tests {
     async fn honors_a_web_socket_middleware_that_overrides_the_response_after_delegating() {
         let response = web_socket_handshake_response(
             registry_with_web_socket_middleware(vec![Arc::new(OverridesAfterDelegating)]),
-            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            VALID_WEB_SOCKET_REQUEST,
         )
         .await;
 
@@ -921,7 +1094,7 @@ mod tests {
                 Arc::new(RespondsWith { status: 401 }),
                 Arc::new(RespondsWith { status: 403 }),
             ]),
-            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            VALID_WEB_SOCKET_REQUEST,
         )
         .await;
 
@@ -946,12 +1119,7 @@ mod tests {
         let cancellation_token = CancellationToken::new();
         let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 
-        let response = exchange(
-            address,
-            b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-            false,
-        )
-        .await;
+        let response = exchange(address, VALID_WEB_SOCKET_REQUEST, false).await;
 
         assert!(response.contains(" 200 "));
         assert_eq!(response_body(&response), "ok");

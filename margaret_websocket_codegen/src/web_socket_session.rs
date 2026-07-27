@@ -9,10 +9,14 @@ use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::injects_routes::injects_routes;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
+use crate::access_policy_binding::AccessPolicyBinding;
+
 pub(crate) struct WebSocketSession {
+    pub(crate) access_policy: AccessPolicyBinding,
     pub(crate) layers: Vec<LayerApplication>,
     pub(crate) method_name: Ident,
     pub(crate) module_name: String,
+    pub(crate) origin: String,
     pub(crate) parameters: Vec<BoundParameter>,
     pub(crate) path: String,
     pub(crate) server: String,

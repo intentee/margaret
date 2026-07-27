@@ -12,22 +12,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: install nextest
-        uses: taiki-e/install-action@v2
+      - name: install test and coverage tools
+        uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2
         with:
-          tool: cargo-nextest@0.9.137
+          tool: cargo-nextest@0.9.137,cargo-llvm-cov@0.8.7
 
-      - name: run tests
-        run: make test.unit
+      - name: run canonical coverage suite
+        run: make coverage
 
   clippy:
     name: clippy
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: run clippy
         run: make clippy

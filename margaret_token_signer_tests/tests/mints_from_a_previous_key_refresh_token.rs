@@ -4,6 +4,7 @@ use margaret_identity_session::access_token_claims::AccessTokenClaims;
 use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
 use margaret_token_signer::mint_access_token::mint_access_token;
+use margaret_token_signer::mint_access_token_outcome::MintAccessTokenOutcome;
 use margaret_token_signer::minted_tokens::MintedTokens;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_signer_tests::refresh_claims::refresh_claims;
@@ -16,10 +17,13 @@ async fn mints_from_a_previous_key_refresh_token() -> Result<()> {
     let refresh = refresh_claims(10_000);
     let refresh_token = sign_refresh_token(&secret.previous.signing, &refresh).await;
 
-    let MintedTokens {
+    let MintAccessTokenOutcome::Minted(MintedTokens {
         access_token,
         refresh_token,
-    } = mint_access_token(&secret, &refresh_token, unix_time(1_000)).await?;
+    }) = mint_access_token(&secret, &refresh_token, unix_time(1_000)).await?
+    else {
+        anyhow::bail!("a valid refresh token was rejected");
+    };
 
     let access: AccessTokenClaims = secret.current.public.verify(&access_token)?.must()?;
     let migrated: RefreshTokenClaims = secret.current.public.verify(&refresh_token)?.must()?;

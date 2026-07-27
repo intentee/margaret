@@ -1,5 +1,7 @@
 pub mod dispatch_serve;
 pub mod install;
+pub mod register_server_services;
+pub mod route_origin_argument;
 pub mod run;
 pub mod serve_application;
 pub mod server_assembly;

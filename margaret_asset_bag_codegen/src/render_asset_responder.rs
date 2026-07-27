@@ -16,7 +16,7 @@ fn responder_arm(
     embed_relative: &str,
 ) -> TokenStream {
     let resolved_content_type = content_type(tail);
-    let cache_control = policy.header_value();
+    let cache_policy = policy.response_application();
     let output_path = format!("{assets_directory_name}/{tail}");
 
     quote! {
@@ -31,7 +31,7 @@ fn responder_arm(
                 #output_path
             )),
         )
-        .header("cache-control", #cache_control),
+        #cache_policy,
     }
 }
 
@@ -97,8 +97,8 @@ mod tests {
         assert!(source.contains("\"app_A1B2C3D4.js\" =>"));
         assert!(source.contains("\"service_worker.js\" =>"));
         assert!(source.contains("\"text/javascript\""));
-        assert!(source.contains("\"public, max-age=31536000, immutable\""));
-        assert!(source.contains("\"no-cache\""));
+        assert!(source.contains("immutable_asset"));
+        assert!(source.contains("revalidating_asset"));
         assert!(source.contains("CARGO_MANIFEST_DIR"));
         assert!(source.contains("\"..\""));
         assert!(source.contains("\"assets/app_A1B2C3D4.js\""));

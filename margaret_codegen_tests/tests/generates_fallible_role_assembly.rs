@@ -61,7 +61,7 @@ fn http_server_assembly_reads_only_completed_dependencies() {
     assert!(source.contains("container.get_home_get_home()"));
     assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
     assert!(source.contains(
-        "->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>"
+        "->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::router_error::RouterError,>"
     ));
     assert!(!source.contains("ConstructionError"));
 }

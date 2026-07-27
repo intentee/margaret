@@ -21,7 +21,7 @@ async fn binds_and_drains_on_cancellation() {
     let server_registry = Arc::new(ServerRegistry::new(vec![Server::new(
         "public",
         "127.0.0.1:0".to_string(),
-        TransportConfig::Plain,
+        TransportConfig::FixturePlain,
         UploadConfig::Disabled,
         BodyLimit::default(),
         Router::build(Vec::new()).expect("an empty router builds"),

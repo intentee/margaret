@@ -14,9 +14,21 @@ fn public_set_from_rotated_secret_publishes_all_three_keys() -> Result<()> {
     let set = PublicJwks::from(rotated);
 
     assert_eq!(set.keys.len(), 3);
-    assert!(set.find_by_kid(&current_kid).is_some());
-    assert!(set.find_by_kid(&next_kid).is_some());
-    assert!(set.find_by_kid(&previous_kid).is_some());
+    assert!(
+        set.find_by_kid(&current_kid)
+            .expect("published key ids are unique")
+            .is_some()
+    );
+    assert!(
+        set.find_by_kid(&next_kid)
+            .expect("published key ids are unique")
+            .is_some()
+    );
+    assert!(
+        set.find_by_kid(&previous_kid)
+            .expect("published key ids are unique")
+            .is_some()
+    );
 
     Ok(())
 }

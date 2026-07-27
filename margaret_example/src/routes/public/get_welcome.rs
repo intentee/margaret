@@ -6,7 +6,7 @@ use margaret::framework::macros::singleton;
 use crate::margaret::forwarders::public::Forwarder;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/welcome", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/welcome", server = "public")]
 pub struct GetWelcome;
 
 impl GetWelcome {

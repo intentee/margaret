@@ -21,7 +21,7 @@ fn verify_rejects_algorithm_mismatch() -> Result<()> {
         sub: "subject".to_string(),
     };
 
-    let header = Base64UrlUnpadded::encode_string(br#"{"alg":"ES384","kid":"kid"}"#);
+    let header = Base64UrlUnpadded::encode_string(br#"{"alg":"ES384","kid":"kid","typ":"JWT"}"#);
     let payload = Base64UrlUnpadded::encode_string(&serde_json::to_vec(&claims)?);
     let forged = format!("{header}.{payload}.c2lnbmF0dXJl");
 

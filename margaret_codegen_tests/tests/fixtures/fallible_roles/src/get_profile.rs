@@ -7,7 +7,7 @@ use super::result::AppResult;
 use super::user::User;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/profile", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/profile", server = "public")]
 pub struct GetProfile;
 
 impl GetProfile {

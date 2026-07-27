@@ -31,10 +31,11 @@ impl SvidClientSide {
     ) -> Self {
         let svid_server_cert_verifier_facade = Arc::new(SvidServerCertVerifierFacade::default());
 
-        let client_config: ClientConfig = ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(svid_server_cert_verifier_facade.clone())
-            .with_client_cert_resolver(Arc::new(svid_certified_key_holder));
+        let client_config: ClientConfig =
+            ClientConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+                .dangerous()
+                .with_custom_certificate_verifier(svid_server_cert_verifier_facade.clone())
+                .with_client_cert_resolver(Arc::new(svid_certified_key_holder));
 
         Self {
             client_config,

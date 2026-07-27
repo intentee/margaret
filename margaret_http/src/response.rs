@@ -1,16 +1,17 @@
 use bytes::Bytes;
-use cookie::Cookie;
 use http::StatusCode;
 use http_body_util::Full;
 use maud::Markup;
 use serde::Serialize;
 
 use crate::header::Header;
+use crate::security_headers::apply_security_headers;
 
 fn internal_server_error() -> http::Response<Full<Bytes>> {
     let mut response = http::Response::new(Full::new(Bytes::from_static(b"Internal Server Error")));
 
     *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+    apply_security_headers(response.headers_mut());
 
     response
 }
@@ -31,13 +32,18 @@ impl Response {
         Self::text(403, "Forbidden")
     }
 
-    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+    pub(crate) fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.headers.push(Header {
             name: name.into(),
             value: value.into(),
         });
 
         self
+    }
+
+    #[must_use]
+    pub fn immutable_asset(self) -> Self {
+        self.header("cache-control", "public, max-age=31536000, immutable")
     }
 
     pub fn html(status: u16, body: impl Into<String>) -> Self {
@@ -72,8 +78,9 @@ impl Response {
         Self::text(404, "Not Found")
     }
 
-    pub fn set_cookie(self, cookie: Cookie<'static>) -> Self {
-        self.header("set-cookie", cookie.to_string())
+    #[must_use]
+    pub fn revalidating_asset(self) -> Self {
+        self.header("cache-control", "no-cache")
     }
 
     #[must_use]
@@ -94,6 +101,14 @@ impl Response {
         Self::text(401, "Unauthorized")
     }
 
+    #[must_use]
+    pub fn web_socket_upgrade(accept: String) -> Self {
+        Self::text(101, "")
+            .header("connection", "Upgrade")
+            .header("sec-websocket-accept", accept)
+            .header("upgrade", "websocket")
+    }
+
     pub(crate) fn into_http(self) -> http::Response<Full<Bytes>> {
         let status = self.status;
         let mut builder = http::Response::builder().status(status);
@@ -103,7 +118,11 @@ impl Response {
         }
 
         match builder.body(Full::new(self.body)) {
-            Ok(response) => response,
+            Ok(mut response) => {
+                apply_security_headers(response.headers_mut());
+
+                response
+            }
             Err(error) => {
                 eprintln!(
                     "margaret_http: the responder produced a response that is not a valid HTTP response (status `{status}`): {error}"
@@ -123,7 +142,6 @@ impl From<Markup> for Response {
 
 #[cfg(test)]
 mod tests {
-    use cookie::Cookie;
     use http_body_util::BodyExt;
     use serde::Serialize;
     use serde::Serializer;
@@ -235,6 +253,71 @@ mod tests {
     }
 
     #[test]
+    fn applies_mandatory_security_headers_to_every_response() {
+        let response = Response::text(200, "ok").into_http();
+
+        assert_eq!(response.headers()["x-content-type-options"], "nosniff");
+        assert_eq!(response.headers()["x-frame-options"], "DENY");
+        assert_eq!(response.headers()["referrer-policy"], "no-referrer");
+        assert_eq!(
+            response.headers()["strict-transport-security"],
+            "max-age=63072000; includeSubDomains"
+        );
+        assert_eq!(
+            response.headers()["cross-origin-opener-policy"],
+            "same-origin"
+        );
+        assert_eq!(
+            response.headers()["cross-origin-resource-policy"],
+            "same-origin"
+        );
+        assert!(response.headers().contains_key("content-security-policy"));
+        assert!(response.headers().contains_key("permissions-policy"));
+        assert_eq!(response.headers()["cache-control"], "no-store");
+    }
+
+    #[test]
+    fn application_code_cannot_override_mandatory_security_headers() {
+        let response = Response::text(200, "ok")
+            .header("content-security-policy", "default-src *")
+            .header("x-content-type-options", "unsafe")
+            .into_http();
+
+        assert_eq!(
+            response.headers()["content-security-policy"],
+            "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+        );
+        assert_eq!(response.headers()["x-content-type-options"], "nosniff");
+    }
+
+    #[test]
+    fn applies_the_immutable_asset_cache_policy() {
+        let response = Response::text(200, "ok").immutable_asset().into_http();
+
+        assert_eq!(
+            response.headers()["cache-control"],
+            "public, max-age=31536000, immutable"
+        );
+    }
+
+    #[test]
+    fn applies_the_revalidating_asset_cache_policy() {
+        let response = Response::text(200, "ok").revalidating_asset().into_http();
+
+        assert_eq!(response.headers()["cache-control"], "no-cache");
+    }
+
+    #[test]
+    fn builds_a_web_socket_upgrade_response() {
+        let response = Response::web_socket_upgrade("derived-accept".to_string()).into_http();
+
+        assert_eq!(response.status().as_u16(), 101);
+        assert_eq!(response.headers()["connection"], "Upgrade");
+        assert_eq!(response.headers()["sec-websocket-accept"], "derived-accept");
+        assert_eq!(response.headers()["upgrade"], "websocket");
+    }
+
+    #[test]
     fn builds_an_html_response_with_a_content_type() {
         let response = Response::html(200, "<p>hi</p>").into_http();
 
@@ -266,23 +349,6 @@ mod tests {
         let response = Response::text(9999, "unreachable status").into_http();
 
         assert_eq!(response.status().as_u16(), 500);
-    }
-
-    #[test]
-    fn attaches_a_set_cookie_header() {
-        let response = Response::text(200, "")
-            .set_cookie(Cookie::new("session", "abc"))
-            .into_http();
-
-        assert!(
-            response
-                .headers()
-                .get("set-cookie")
-                .expect("the set-cookie header is present")
-                .to_str()
-                .expect("the header is valid text")
-                .starts_with("session=abc")
-        );
     }
 
     #[tokio::test]

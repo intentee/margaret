@@ -12,6 +12,7 @@ pub mod jwks_secret_holder;
 pub mod jwks_secret_verification_result;
 pub mod jws_algorithm;
 mod jws_header;
+mod jws_type;
 pub mod key_type;
 pub mod key_use;
 pub mod persisted_jwks_secret;

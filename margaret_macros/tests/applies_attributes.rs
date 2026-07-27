@@ -16,7 +16,7 @@ use margaret_macros::websocket_message;
 use margaret_macros::websocket_session;
 
 #[singleton]
-#[responds_to_http(method = Get, path = "/subject", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = Get, path = "/subject", server = "public")]
 #[renders_view(name = "subject")]
 #[console_command]
 #[handles_middleware_attribute(attribute = traced)]
@@ -66,7 +66,7 @@ struct Record {
     label: String,
 }
 
-#[websocket_session(path = "/session/{topic}", server = "public")]
+#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = "https://example.test", path = "/session/{topic}", server = "public")]
 struct Session {
     topic: String,
 }

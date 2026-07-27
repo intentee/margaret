@@ -14,7 +14,7 @@ margaret_validation = { path = "../margaret_validation" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt", "sync"] }
+tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
 tokio-tungstenite = { workspace = true }
 tokio-util = { workspace = true }
 validator = { workspace = true }

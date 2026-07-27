@@ -150,8 +150,8 @@ SPIRE_FEATURES := \
 	--features margaret_spiffe_svid_tests/tests_that_use_spire \
 	--features margaret_spiffe_svid_integration_tests/tests_that_use_spire
 
-node_modules: package.json
-	npm install
+node_modules: package.json package-lock.json
+	npm ci --ignore-scripts
 	touch node_modules
 
 .PHONY: clippy

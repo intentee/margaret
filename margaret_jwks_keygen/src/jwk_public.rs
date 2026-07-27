@@ -13,6 +13,7 @@ use crate::verifies_token::VerifiesToken;
 use crate::verify_signature::verify_signature;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct JwkPublic {
     pub crv: Curve,
     pub kid: String,

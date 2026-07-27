@@ -230,7 +230,7 @@ mod tests {
 pub mod margaret;
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/x\", server = \"public\")]
 struct Page;
 
 impl Page {
@@ -291,7 +291,7 @@ impl SystemClock {
     fn create() -> anyhow::Result<Self> {}
 }
 
-#[websocket_session(path = \"/room/{name}\", server = \"public\")]
+#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = \"https://example.test\", path = \"/room/{name}\", server = \"public\")]
 struct Room;
 
 impl Room {
@@ -315,7 +315,7 @@ impl RespondsToWebSocketMessage for Chatter {
 #[rustfmt::skip]
 pub mod margaret;
 
-#[websocket_session(path = \"/x\", server = \"public\")]
+#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = \"https://example.test\", path = \"/x\", server = \"public\")]
 struct Room;
 ";
 
@@ -470,9 +470,9 @@ impl AssetRoute {
         assert!(module(&code, "asset_bag").contains("pub mod asset_responder;"));
         assert!(responder.contains("pub struct AssetResponder"));
         assert!(responder.contains("\"app_ABC.js\" =>"));
-        assert!(responder.contains("public, max-age=31536000, immutable"));
+        assert!(responder.contains("immutable_asset"));
         assert!(responder.contains("\"service_worker.js\" =>"));
-        assert!(responder.contains("\"no-cache\""));
+        assert!(responder.contains("revalidating_asset"));
         assert!(
             module(&code, "container/build/serve")
                 .contains("asset_bag::asset_responder::AssetResponder")
@@ -536,7 +536,7 @@ impl AssetRoute {
 pub mod margaret;
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/.well-known/jwks.json\", server = \"internal\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/.well-known/jwks.json\", server = \"internal\")]
 struct GetJwks {
     handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>,
 }
@@ -569,7 +569,7 @@ struct PartnerJwksEndpoint;
 impl ProvidesEndpoint for PartnerJwksEndpoint {}
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/verify\", server = \"public\")]
 struct GetVerify {
     auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
     partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
@@ -592,7 +592,7 @@ impl GetVerify {
 pub mod margaret;
 
 #[singleton]
-#[responds_to_http(method = \"post\", path = \"/mint\", server = \"internal\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"post\", path = \"/mint\", server = \"internal\")]
 struct PostMint {
     minter: std::sync::Arc<crate::margaret::jwks::MintAccessTokenHandler>,
     store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>,
@@ -699,7 +699,7 @@ impl OutboundCaller {
 }
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/call\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/call\", server = \"public\")]
 struct CallRoute {
     caller: Arc<OutboundCaller>,
 }
@@ -714,12 +714,15 @@ impl CallRoute {
 ";
 
     #[test]
-    fn registers_the_client_bundle_alongside_a_plain_http_server() {
+    fn shares_the_client_and_server_svid_bundle_for_an_http_server() {
         let code = generate(SPIFFE_HTTP_SERVER_CLIENT_CRATE).expect("the build succeeds");
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains(
-            "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+            "letspiffe_bundle=margaret::framework::spiffe_svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+        ));
+        assert!(serve.contains(
+            "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
         ));
         assert!(serve.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
@@ -735,7 +738,7 @@ impl CallRoute {
         ));
         assert!(!serve.contains("run_all"));
         assert!(!serve.contains("bundle_services"));
-        assert!(!serve.contains("spiffe_server_config"));
+        assert!(serve.matches("SvidBundle::new").count() == 1);
     }
 
     const SPIFFE_BOTH_CRATE: &str = "\
@@ -754,7 +757,7 @@ impl OutboundCaller {
 }
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/identity\", server = \"internal\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/identity\", server = \"internal\")]
 struct GetIdentity {
     caller: Arc<OutboundCaller>,
 }
@@ -952,7 +955,7 @@ impl AuthJwksEndpoint {
 impl ProvidesEndpoint for AuthJwksEndpoint {}
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/verify\", server = \"public\")]
 struct GetVerify {
     verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
 }
@@ -991,7 +994,7 @@ pub mod margaret;
 struct JwksRoller;
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/.well-known/jwks.json\", server = \"internal\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/.well-known/jwks.json\", server = \"internal\")]
 struct GetJwks {
     handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>,
 }
@@ -1027,7 +1030,7 @@ pub mod margaret_jwks {
 }
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/.well-known/jwks.json\", server = \"internal\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/.well-known/jwks.json\", server = \"internal\")]
 struct GetJwks {
     handler: std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>,
 }
@@ -1067,7 +1070,7 @@ impl GetJwks {
     #[test]
     fn rejects_a_client_store_referencing_an_unknown_tag() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]\nstruct GetVerify {\n    verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>,\n}\n\nimpl GetVerify {\n    #[constructor]\n    fn create(#[jwks_secret_store(client = missing)] verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/verify\", server = \"public\")]\nstruct GetVerify {\n    verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>,\n}\n\nimpl GetVerify {\n    #[constructor]\n    fn create(#[jwks_secret_store(client = missing)] verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect_err("a client store without a matching jwks endpoint is rejected")
         .to_string();
@@ -1147,7 +1150,7 @@ use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/x\", server = \"public\")]
 #[middleware(logged)]
 struct Page;
 
@@ -1197,7 +1200,7 @@ impl SessionUserProvider {
 }
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/profile\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/profile\", server = \"public\")]
 struct GetProfile;
 
 impl GetProfile {
@@ -1267,7 +1270,7 @@ use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
-#[websocket_session(path = \"/room\", server = \"public\")]
+#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = \"https://example.test\", path = \"/room\", server = \"public\")]
 #[middleware(logged)]
 struct Room;
 
@@ -1410,7 +1413,7 @@ impl Config {
     #[test]
     fn propagates_an_http_failure() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(path = \"/x\")]\nstruct Bad;\n\nimpl Bad {\n    #[constructor]\n    fn create() -> anyhow::Result<Self> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, path = \"/x\")]\nstruct Bad;\n\nimpl Bad {\n    #[constructor]\n    fn create() -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1473,7 +1476,7 @@ impl Worker {
 }
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/x\", server = \"public\")]
 struct Page;
 
 impl Page {
@@ -1503,7 +1506,7 @@ pub mod margaret;
 struct Card;
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/card\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/card\", server = \"public\")]
 struct GetCard;
 
 impl GetCard {
@@ -1533,7 +1536,7 @@ use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWe
 #[renders_view(name = \"banner\")]
 struct Banner;
 
-#[websocket_session(path = \"/room\", server = \"public\")]
+#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = \"https://example.test\", path = \"/room\", server = \"public\")]
 struct Room;
 
 impl Room {
@@ -1566,7 +1569,7 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn propagates_a_views_failure() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[renders_view(name = \"CardLayout\")]\nstruct Card;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[renders_view(name = \"CardLayout\")]\nstruct Card;\n\n#[singleton]\n#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1588,7 +1591,7 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn awaits_an_async_constructor_in_the_container() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Pool;\n\nimpl Pool {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect("the async build succeeds");
 
@@ -1605,7 +1608,7 @@ impl RespondsToWebSocketMessage for Chatter {
 pub mod margaret;
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/\", server = \"public\")]
 struct Index;
 
 impl Index {
@@ -1614,7 +1617,7 @@ impl Index {
 }
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/metrics\", server = \"internal\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/metrics\", server = \"internal\")]
 struct Metrics;
 
 impl Metrics {
@@ -1647,7 +1650,7 @@ impl Metrics {
     #[test]
     fn rejects_a_non_string_server() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();
@@ -1658,7 +1661,7 @@ impl Metrics {
     #[test]
     fn supports_same_struct_name_route_handlers_in_different_modules() {
         let code = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nmod routes {\n#[singleton]\n#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/a\", server = \"public\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n\nmod endpoints {\n#[singleton]\n#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/b\", server = \"internal\")]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n}\n",
         )
         .expect("two `Page` handlers in different modules coexist");
 
@@ -1685,7 +1688,7 @@ struct Container;
 struct Routes;
 
 #[singleton]
-#[responds_to_http(method = \"get\", name = \"origin\", path = \"/o\", server = \"routes\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", name = \"origin\", path = \"/o\", server = \"routes\")]
 struct Origin;
 
 impl Origin {
@@ -1694,7 +1697,7 @@ impl Origin {
 }
 
 #[singleton]
-#[responds_to_http(method = \"get\", name = \"new\", path = \"/n/{id}\", server = \"routes\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", name = \"new\", path = \"/n/{id}\", server = \"routes\")]
 struct New;
 
 impl New {
@@ -1763,7 +1766,7 @@ impl New {
 pub mod margaret;
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/x\", server = \"public\")]
 struct Page;
 
 impl Page {
@@ -1803,7 +1806,7 @@ impl Banner {
 }
 
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/x\", server = \"public\")]
 struct Page;
 
 impl Page {
@@ -1828,7 +1831,7 @@ pub mod margaret;
 
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
-#[websocket_session(path = \"/room\", server = \"public\")]
+#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = \"https://example.test\", path = \"/room\", server = \"public\")]
 struct Room;
 
 impl Room {
@@ -1879,7 +1882,7 @@ impl SystemClock {
     fn create(#[console_argument(from = \"timezone\")] timezone: String) -> anyhow::Result<Self> {}
 }
 
-#[websocket_session(path = \"/room\", server = \"public\")]
+#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = \"https://example.test\", path = \"/room\", server = \"public\")]
 struct Room;
 
 impl Room {

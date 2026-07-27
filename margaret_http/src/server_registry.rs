@@ -37,7 +37,7 @@ mod tests {
         ServerRegistry::new(vec![Server::new(
             "public",
             "127.0.0.1:8080".to_string(),
-            TransportConfig::Plain,
+            TransportConfig::FixturePlain,
             UploadConfig::Disabled,
             BodyLimit::default(),
             Router::build(Vec::new()).expect("an empty router builds"),

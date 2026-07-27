@@ -13,7 +13,7 @@ use crate::margaret::views::Views;
 use crate::views::greeting_view::GreetingViewProps;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/greeting-card", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/greeting-card", server = "public")]
 pub struct GetGreetingCard {
     greeter: Arc<EnglishGreeter>,
 }
@@ -42,6 +42,8 @@ impl GetGreetingCard {
 mod tests {
     use std::sync::Arc;
 
+    use margaret::framework::http::route_origin::RouteOrigin;
+
     use super::GetGreetingCard;
     use crate::app_name::AppName;
     use crate::english_greeter::EnglishGreeter;
@@ -64,7 +66,10 @@ mod tests {
                 GreetingView::create(card_layout).expect("the greeting view is constructed"),
             ),
         };
-        let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
+        let routes = Routes::from_origins(
+            RouteOrigin::parse("https://internal.example").expect("a valid internal origin"),
+            RouteOrigin::parse("https://public.example").expect("a valid public origin"),
+        );
         let app_name = AppName::create().expect("the app name is constructed");
         let greeter =
             EnglishGreeter::create(Arc::new(app_name)).expect("the English greeter is constructed");

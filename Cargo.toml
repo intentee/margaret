@@ -106,11 +106,12 @@ mime = "0.3"
 multer = "3.1"
 p256 = "0.13"
 p384 = "0.13"
+percent-encoding = "2.3"
 prettyplease = "0.2"
 proc-macro2 = "1.0"
 quote = "1.0"
 rcgen = "0.14"
-reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rustls = "0.23"
 rustls-webpki = "0.103"
 serde = "1.0"

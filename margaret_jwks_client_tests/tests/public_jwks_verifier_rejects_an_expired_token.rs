@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use margaret_jwks_client::jwks_client_error::JwksClientError;
 use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
+use margaret_jwks_client::public_token_verification::PublicTokenVerification;
+use margaret_jwks_client::token_rejection::TokenRejection;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
 use margaret_jwks_keygen::curve::Curve;
@@ -29,13 +30,12 @@ async fn public_jwks_verifier_rejects_an_expired_token() {
 
     holder.set(Some(Arc::new(PublicJwks::from(secret))));
 
-    let Err(error) = PublicJwksVerifier::new(holder).verify::<TestClaims>(&token, now) else {
-        panic!("an expired token never verifies even when its signature is valid");
-    };
+    let outcome = PublicJwksVerifier::new(holder)
+        .verify::<TestClaims>(&token, now)
+        .expect("an expired token is an expected validation outcome");
 
-    assert!(matches!(error, JwksClientError::TokenExpired));
     assert_eq!(
-        error.to_string(),
-        "the token expired before it was verified"
+        outcome,
+        PublicTokenVerification::Rejected(TokenRejection::Expired)
     );
 }

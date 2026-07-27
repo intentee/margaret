@@ -4,6 +4,7 @@ use margaret_attributes::attribute_error::AttributeError;
 use margaret_container::container_error::ContainerError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+use margaret_route_parameter_codegen::route_path_error::RoutePathError;
 
 #[derive(Debug, Error)]
 pub enum WebSocketCodegenError {
@@ -58,8 +59,44 @@ pub enum WebSocketCodegenError {
     #[error("'{session}' carries #[websocket_session] but is not a struct")]
     SessionNotAStruct { session: String },
 
+    #[error("session '{session}' is missing the required typed 'access' policy")]
+    MissingSessionAccessPolicy { session: String },
+
+    #[error("session '{session}' references an access policy that cannot be resolved")]
+    UnresolvedSessionAccessPolicy { session: String },
+
+    #[error("session '{session}' references access policy '{policy}', which is not a struct")]
+    SessionAccessPolicyNotAStruct { policy: String, session: String },
+
+    #[error("session '{session}' references access policy '{policy}', which is not a #[singleton]")]
+    SessionAccessPolicyNotSingleton { policy: String, session: String },
+
     #[error("session '{session}' is missing the required 'path' argument")]
     MissingSessionPath { session: String },
+
+    #[error("session '{session}' is missing the required exact HTTPS 'origin'")]
+    MissingSessionOrigin { session: String },
+
+    #[error("session '{session}' has invalid origin '{origin}': {source}")]
+    InvalidSessionOrigin {
+        origin: String,
+        session: String,
+        #[source]
+        source: url::ParseError,
+    },
+
+    #[error(
+        "session '{session}' has non-canonical origin '{origin}'; an exact HTTPS origin without credentials, path, query, or fragment is required"
+    )]
+    NonCanonicalSessionOrigin { origin: String, session: String },
+
+    #[error("session '{session}' has an insecure route path '{path}': {source}")]
+    InsecureSessionPath {
+        path: String,
+        session: String,
+        #[source]
+        source: RoutePathError,
+    },
 
     #[error("session '{session}' is missing the required 'server' argument")]
     MissingSessionServer { session: String },

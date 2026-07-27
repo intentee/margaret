@@ -38,12 +38,11 @@ pub fn serve_application(
             Err(error) => return Err(report_failure(error)),
         };
         let upload_config = if matches.get_flag(uploads_argument) {
-            UploadConfig::enabled(
-                matches
-                    .get_one::<String>(upload_dir_argument)
-                    .map(PathBuf::from)
-                    .unwrap_or_else(std::env::temp_dir),
-            )
+            let Some(directory) = matches.get_one::<String>(upload_dir_argument) else {
+                return Err(CommandOutcome::Failed);
+            };
+
+            UploadConfig::enabled(PathBuf::from(directory))
         } else {
             UploadConfig::Disabled
         };
@@ -106,13 +105,13 @@ mod tests {
     }
 
     fn public_assembly(
-        routes: std::result::Result<ServerRoutes, margaret_http::matchit::InsertError>,
+        routes: std::result::Result<ServerRoutes, margaret_http::router_error::RouterError>,
     ) -> ServerAssembly {
         ServerAssembly {
             address_argument: "public-addr",
             name: "public",
             routes,
-            transport: TransportConfig::Plain,
+            transport: TransportConfig::FixturePlain,
             upload_dir_argument: "public-upload-dir",
             uploads_argument: "public-uploads",
         }
@@ -153,13 +152,13 @@ mod tests {
     }
 
     #[test]
-    fn enables_uploads_into_the_temporary_directory_by_default() {
+    fn rejects_uploads_without_an_explicit_directory() {
         let outcome = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0", "--public-uploads"]),
             vec![public_assembly(Ok(empty_routes()))],
         );
 
-        assert!(outcome.is_ok());
+        assert_eq!(outcome.err(), Some(CommandOutcome::Failed));
     }
 
     #[test]

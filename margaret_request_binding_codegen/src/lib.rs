@@ -311,7 +311,7 @@ impl SessionUserProvider {
             .iter()
             .find(|item| item.identifier() == identifier)
             .expect("the responder is indexed");
-        let route_path = RoutePath::parse("/{x}");
+        let route_path = RoutePath::parse("/{x}").expect("the fixture route is secure");
         let method = process_method(item).expect("the responder has a #[process] method");
 
         classify_parameters(

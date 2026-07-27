@@ -1,3 +1,4 @@
+use std::path::Component;
 use std::path::Path;
 
 use http_body_util::BodyDataStream;
@@ -24,6 +25,19 @@ fn map_multipart_error(source: multer::Error) -> RequestError {
 
 fn upload_write(source: std::io::Error) -> RequestError {
     RequestError::UploadWrite { source }
+}
+
+fn safe_file_name(file_name: &str) -> bool {
+    !file_name.is_empty()
+        && !file_name.contains('\\')
+        && !file_name.chars().any(char::is_control)
+        && matches!(
+            Path::new(file_name)
+                .components()
+                .collect::<Vec<_>>()
+                .as_slice(),
+            [Component::Normal(_)]
+        )
 }
 
 async fn write_field(
@@ -95,13 +109,15 @@ impl MultipartBody {
 
             match file_name {
                 Some(file_name) => {
+                    if !safe_file_name(&file_name) {
+                        return Err(RequestError::UnsafeUploadedFileName);
+                    }
                     let directory = match upload_config {
                         UploadConfig::Enabled { directory, .. } => directory,
                         UploadConfig::Disabled => return Err(RequestError::UploadsDisabled),
                     };
-                    let content_type = content_type.unwrap_or_else(|| {
-                        mime::APPLICATION_OCTET_STREAM.essence_str().to_string()
-                    });
+                    let content_type =
+                        content_type.ok_or(RequestError::MissingUploadedFileContentType)?;
 
                     files.push(
                         stream_field_to_file(field, field_name, file_name, content_type, directory)

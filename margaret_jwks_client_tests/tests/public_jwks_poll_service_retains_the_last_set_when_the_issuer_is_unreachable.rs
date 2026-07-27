@@ -35,5 +35,10 @@ async fn public_jwks_poll_service_retains_the_last_set_when_the_issuer_is_unreac
         .get()
         .expect("the last known good document survives a failed poll");
 
-    assert!(retained.find_by_kid(&known_good_kid).is_some());
+    assert!(
+        retained
+            .find_by_kid(&known_good_kid)
+            .expect("published key ids are unique")
+            .is_some()
+    );
 }

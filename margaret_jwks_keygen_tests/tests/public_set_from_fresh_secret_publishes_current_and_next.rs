@@ -15,8 +15,16 @@ fn public_set_from_fresh_secret_publishes_current_and_next() -> Result<()> {
     let set = PublicJwks::from(secret);
 
     assert_eq!(set.keys.len(), 2);
-    assert!(set.find_by_kid(&current_kid).is_some());
-    assert!(set.find_by_kid(&next_kid).is_some());
+    assert!(
+        set.find_by_kid(&current_kid)
+            .expect("published key ids are unique")
+            .is_some()
+    );
+    assert!(
+        set.find_by_kid(&next_kid)
+            .expect("published key ids are unique")
+            .is_some()
+    );
 
     Ok(())
 }

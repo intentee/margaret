@@ -14,11 +14,10 @@ pub fn optional_authenticated_user<User>(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use margaret_http::forwardable_route::ForwardableRoute;
     use margaret_http::response::Response;
     use margaret_http::response_continuation::ResponseContinuation;
+    use margaret_http::route_origin::RouteOrigin;
     use margaret_http::url_segment::UrlSegment;
 
     use super::optional_authenticated_user;
@@ -68,7 +67,7 @@ mod tests {
         assert_eq!(
             interruption_status(ResponseContinuation::from(
                 ForwardableRoute::new(
-                    Arc::from("http://localhost"),
+                    RouteOrigin::parse("https://example.test").expect("a valid origin"),
                     vec![UrlSegment::Literal("/sign-in")],
                 )
                 .see_other(),

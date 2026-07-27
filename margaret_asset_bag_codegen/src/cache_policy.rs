@@ -1,13 +1,16 @@
+use proc_macro2::TokenStream;
+use quote::quote;
+
 pub(crate) enum CachePolicy {
     Immutable,
     Revalidate,
 }
 
 impl CachePolicy {
-    pub(crate) fn header_value(&self) -> &'static str {
+    pub(crate) fn response_application(&self) -> TokenStream {
         match self {
-            Self::Immutable => "public, max-age=31536000, immutable",
-            Self::Revalidate => "no-cache",
+            Self::Immutable => quote! { .immutable_asset() },
+            Self::Revalidate => quote! { .revalidating_asset() },
         }
     }
 }

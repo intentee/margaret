@@ -14,5 +14,8 @@ tokio = { workspace = true, features = ["macros", "rt", "signal"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
+[dev-dependencies]
+margaret_http = { path = "../margaret_http", features = ["fixture-plain-transport"] }
+
 [lints]
 workspace = true

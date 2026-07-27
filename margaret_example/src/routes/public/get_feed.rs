@@ -6,7 +6,7 @@ use margaret::framework::macros::singleton;
 use crate::models::user::User;
 
 #[singleton]
-#[responds_to_http(method = "get", name = "get_feed", path = "/feed", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", name = "get_feed", path = "/feed", server = "public")]
 pub struct GetFeed;
 
 impl GetFeed {

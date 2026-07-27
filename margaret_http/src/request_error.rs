@@ -16,6 +16,18 @@ pub enum RequestError {
         source: ParseError,
     },
 
+    #[error("the request contains more than one cookie named '{name}'")]
+    DuplicateCookie { name: String },
+
+    #[error("the request query contains more than one field named '{name}'")]
+    DuplicateQueryField { name: String },
+
+    #[error("the request form contains more than one field named '{name}'")]
+    DuplicateFormField { name: String },
+
+    #[error("the multipart request contains more than one file field named '{name}'")]
+    DuplicateFileField { name: String },
+
     #[error("the request content type is not a valid media type: {source}")]
     MalformedContentType {
         #[source]
@@ -40,6 +52,12 @@ pub enum RequestError {
     #[error("a multipart request part is missing its Content-Disposition name")]
     NamelessMultipartField,
 
+    #[error("an uploaded file is missing its required Content-Type")]
+    MissingUploadedFileContentType,
+
+    #[error("an uploaded file name is not a safe single path component")]
+    UnsafeUploadedFileName,
+
     #[error("the request body exceeds the {limit} byte upload limit")]
     PayloadTooLarge { limit: u64 },
 
@@ -63,4 +81,7 @@ pub enum RequestError {
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
+
+    #[error("the request body was not received before the deadline")]
+    BodyReadTimeout,
 }

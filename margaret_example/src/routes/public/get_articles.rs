@@ -11,7 +11,7 @@ use crate::margaret::routes::Routes;
 use crate::stores::article_store::ArticleStore;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/articles", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/articles", server = "public")]
 pub struct GetArticles {
     articles: Arc<ArticleStore>,
 }

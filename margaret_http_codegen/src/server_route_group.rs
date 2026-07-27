@@ -27,7 +27,7 @@ impl ServerRouteGroup {
         &mut self,
         server: &str,
         path: RoutePath,
-        method: String,
+        method: http::Method,
         route: HttpRoute,
     ) -> Result<(), HttpCodegenError> {
         let responder = route.responder_path.to_string();

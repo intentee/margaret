@@ -6,7 +6,7 @@ use margaret::framework::macros::singleton;
 use crate::margaret::routes::Routes;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/home", server = "internal")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/home", server = "internal")]
 pub struct GetHome;
 
 impl GetHome {

@@ -19,32 +19,13 @@ use crate::service_unit::ServiceUnit;
 use crate::service_unit_origin::ServiceUnitOrigin;
 use crate::spiffe_activation::SpiffeActivation;
 
-fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
-    if !spiffe_secured {
-        return quote! { margaret::framework::http::transport_config::TransportConfig::Plain };
-    }
-
+fn transport_expression(server: &HttpServer) -> TokenStream {
     match server.transport_policy() {
         ServerTransportPolicy::PinnedSpiffeMtls => quote! {
             margaret::framework::http::transport_config::TransportConfig::MutualTls {
                 server_config: spiffe_server_config.clone(),
             }
         },
-        ServerTransportPolicy::Negotiable => {
-            let transport_argument = server.transport_argument();
-
-            quote! {
-                match matches.get_one::<String>(#transport_argument).map(String::as_str) {
-                    Some("plain") => margaret::framework::http::transport_config::TransportConfig::Plain,
-                    Some("spiffe_mtls") => margaret::framework::http::transport_config::TransportConfig::MutualTls {
-                        server_config: spiffe_server_config.clone(),
-                    },
-                    Some(_) | None => {
-                        return margaret::framework::console::command_outcome::CommandOutcome::Failed;
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -161,14 +142,14 @@ fn server_registration(
 
     let origins = servers.iter().map(|server| {
         let origin_variable = format_ident!("origin_{}", server.name());
-        let origin_read = required_flag_read(
-            &quote! { String },
+        let origin_value = required_flag_read(
+            &quote! { RouteOrigin },
             &server.url_argument(),
-            &quote! { value.clone().into() },
+            &quote! { value.clone() },
         );
 
         quote! {
-            let #origin_variable: ::std::sync::Arc<str> = #origin_read;
+            let #origin_variable = #origin_value;
         }
     });
 
@@ -185,7 +166,7 @@ fn server_registration(
         let address_argument = server.address_argument();
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
-        let transport = transport_expression(server, activation.server_active);
+        let transport = transport_expression(server);
         let routes = if server.routes_are_async() {
             quote! {
                 super::http::#function_name::#function_name(container, &routes #views_argument).await
@@ -217,7 +198,22 @@ fn server_registration(
         }
     });
 
-    let register_server = gated_registration(&quote! { server_service }, activation.client_active);
+    let register_servers = if activation.client_active {
+        let register_server = gated_registration(&quote! { server_service }, true);
+
+        quote! {
+            for server_service in server_services {
+                #register_server
+            }
+        }
+    } else {
+        quote! {
+            margaret::framework::service::register_server_services::register_server_services(
+                &mut manager,
+                server_services,
+            );
+        }
+    };
 
     quote! {
         #(#origins)*
@@ -236,9 +232,7 @@ fn server_registration(
             Err(outcome) => return outcome,
         };
 
-        for server_service in server_services {
-            #register_server
-        }
+        #register_servers
     }
 }
 
@@ -413,8 +407,15 @@ pub fn render_services(
         quote! { matches }
     };
     let prelude = &plan.prelude;
+    let origin_import = (!servers.is_empty()).then(|| {
+        quote! {
+            use margaret::framework::http::route_origin::RouteOrigin;
+        }
+    });
 
     let tokens = quote! {
+        #origin_import
+
         #(#adapters)*
 
         pub async fn serve(

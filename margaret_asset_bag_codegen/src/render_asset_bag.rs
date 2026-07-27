@@ -310,7 +310,7 @@ mod tests {
         assert!(responder.contains("\"image/png\""));
         assert!(responder.contains("\"favicon_MWST.svg\" =>"));
         assert!(responder.contains("\"image/svg+xml\""));
-        assert!(responder.contains("public, max-age=31536000, immutable"));
+        assert!(responder.contains("immutable_asset"));
     }
 
     #[test]
@@ -329,10 +329,10 @@ mod tests {
             .split_once("\"orphan_DEADBEEF.js\" =>")
             .expect("the hash-like orphan is served");
 
-        assert!(metafile_output_arm.contains("public, max-age=31536000, immutable"));
-        assert!(!metafile_output_arm.contains("no-cache"));
-        assert!(hash_like_orphan_arm.contains("no-cache"));
-        assert!(!hash_like_orphan_arm.contains("public, max-age=31536000, immutable"));
+        assert!(metafile_output_arm.contains("immutable_asset"));
+        assert!(!metafile_output_arm.contains("revalidating_asset"));
+        assert!(hash_like_orphan_arm.contains("revalidating_asset"));
+        assert!(!hash_like_orphan_arm.contains("immutable_asset"));
     }
 
     #[test]

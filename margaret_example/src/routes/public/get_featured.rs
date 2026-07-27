@@ -7,7 +7,7 @@ use crate::margaret::forwarders::public::Forwarder;
 use crate::stores::article_store::FEATURED_ARTICLE_ID;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/featured", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/featured", server = "public")]
 pub struct GetFeatured;
 
 impl GetFeatured {

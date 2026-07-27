@@ -46,6 +46,22 @@ async fn answers_a_single_response_request_with_a_string_id() {
 }
 
 #[tokio::test]
+async fn continues_after_a_pong_control_frame() {
+    let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
+
+    harness.send_raw(Message::Pong(Vec::new().into())).await;
+    harness
+        .send(r#"{"id":8,"method":"ping","params":{"label":"after pong"}}"#)
+        .await;
+
+    let response = harness.recv().await;
+
+    assert!(response.contains("pong after pong"));
+    harness.cancellation_token.cancel();
+    harness.driver.await.expect("the driver finishes");
+}
+
+#[tokio::test]
 async fn applies_a_notification_to_the_session() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
@@ -156,21 +172,12 @@ async fn ignores_invalid_notification_parameters() {
 }
 
 #[tokio::test]
-async fn ignores_non_text_frames() {
+async fn closes_on_a_non_text_frame() {
     let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
 
     harness
         .send_raw(Message::Binary(vec![1, 2, 3].into()))
         .await;
-    harness
-        .send(r#"{"id":5,"method":"ping","params":{"label":"after binary"}}"#)
-        .await;
-
-    let response = harness.recv().await;
-
-    assert!(response.contains("pong after binary"));
-
-    harness.cancellation_token.cancel();
     harness.driver.await.expect("the driver finishes");
 }
 

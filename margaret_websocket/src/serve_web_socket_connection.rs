@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures_util::FutureExt;
 use futures_util::SinkExt;
@@ -23,6 +24,14 @@ use crate::web_socket::WebSocket;
 use crate::web_socket_dispatch_table::WebSocketDispatchTable;
 
 const OUTBOUND_BUFFER_CAPACITY: usize = 1;
+const MAX_PENDING_DISPATCHES: usize = 32;
+const DISPATCH_TIMEOUT: Duration = Duration::from_secs(5);
+
+fn report_dispatch_timeout(outcome: Result<(), tokio::time::error::Elapsed>) {
+    if let Err(error) = outcome {
+        eprintln!("margaret_websocket: message dispatch exceeded its deadline: {error}");
+    }
+}
 
 fn report_close_failure(outcome: Result<(), tokio_tungstenite::tungstenite::Error>) {
     if let Err(error) = outcome {
@@ -65,9 +74,13 @@ async fn dispatch_frame<Session>(
 
                 pending.push(
                     async move {
-                        dispatch
-                            .dispatch(cancellation_token, session, id, params, socket)
-                            .await;
+                        report_dispatch_timeout(
+                            tokio::time::timeout(
+                                DISPATCH_TIMEOUT,
+                                dispatch.dispatch(cancellation_token, session, id, params, socket),
+                            )
+                            .await,
+                        );
                     }
                     .boxed(),
                 );
@@ -94,9 +107,13 @@ async fn dispatch_frame<Session>(
 
                 pending.push(
                     async move {
-                        dispatch
-                            .dispatch(cancellation_token, session, params, socket)
-                            .await;
+                        report_dispatch_timeout(
+                            tokio::time::timeout(
+                                DISPATCH_TIMEOUT,
+                                dispatch.dispatch(cancellation_token, session, params, socket),
+                            )
+                            .await,
+                        );
                     }
                     .boxed(),
                 );
@@ -122,7 +139,7 @@ async fn run_source<Io, Session>(
             biased;
             () = cancellation_token.cancelled() => break,
             Some(()) = pending.next(), if !pending.is_empty() => {}
-            inbound = source.next() => match inbound {
+            inbound = source.next(), if pending.len() < MAX_PENDING_DISPATCHES => match inbound {
                 Some(Ok(Message::Text(text))) => match serde_json::from_str::<InboundFrame>(text.as_str()) {
                     Ok(frame) => {
                         dispatch_frame(
@@ -138,7 +155,8 @@ async fn run_source<Io, Session>(
                     Err(_) => break,
                 },
                 Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
-                Some(Ok(_)) => {}
+                Some(Ok(Message::Pong(_))) => {}
+                Some(Ok(_)) => break,
             },
         }
     }
@@ -170,6 +188,17 @@ pub async fn serve_web_socket_connection<Io, Session>(
 
 #[cfg(test)]
 mod tests {
+    use std::future::pending;
+    use std::time::Duration;
+
+    use super::report_dispatch_timeout;
+
+    #[tokio::test]
+    async fn handles_completed_and_timed_out_dispatches() {
+        report_dispatch_timeout(Ok(()));
+        report_dispatch_timeout(tokio::time::timeout(Duration::ZERO, pending::<()>()).await);
+    }
+
     use tokio_tungstenite::tungstenite::Error;
 
     use super::report_close_failure;

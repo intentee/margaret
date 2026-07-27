@@ -41,7 +41,7 @@ fn server_forwarder(table: &HttpRouteTable, server: &HttpServer) -> TokenStream 
     let methods: Vec<TokenStream> = table
         .named_routes(server.name())
         .iter()
-        .filter(|named| named.route.method == "GET")
+        .filter(|named| named.route.method == http::Method::GET)
         .map(forward_method)
         .collect();
 

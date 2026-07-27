@@ -9,7 +9,7 @@ use margaret::framework::macros::singleton;
 use crate::margaret::jwks::PublicJwksHandler;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/.well-known/jwks.json", server = "internal")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/.well-known/jwks.json", server = "internal")]
 pub struct GetWellKnownJwks {
     public_jwks_handler: Arc<PublicJwksHandler>,
 }

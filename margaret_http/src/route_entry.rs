@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::http_middleware::HttpMiddleware;
 use crate::method_handler::MethodHandler;
 use crate::web_socket_upgrade::WebSocketUpgrade;
+use http::HeaderValue;
 
 pub enum RouteEntry {
     Http {
@@ -11,6 +12,7 @@ pub enum RouteEntry {
     },
     WebSocket {
         middleware: Vec<Arc<dyn HttpMiddleware>>,
+        origin: HeaderValue,
         path: &'static str,
         upgrade: Arc<dyn WebSocketUpgrade>,
     },
@@ -25,11 +27,13 @@ impl RouteEntry {
     #[must_use]
     pub fn web_socket(
         path: &'static str,
+        origin: HeaderValue,
         upgrade: Arc<dyn WebSocketUpgrade>,
         middleware: Vec<Arc<dyn HttpMiddleware>>,
     ) -> Self {
         Self::WebSocket {
             middleware,
+            origin,
             path,
             upgrade,
         }

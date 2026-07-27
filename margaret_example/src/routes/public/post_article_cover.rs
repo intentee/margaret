@@ -7,7 +7,7 @@ use margaret::framework::macros::singleton;
 use crate::models::article::Article;
 
 #[singleton]
-#[responds_to_http(method = "post", path = "/articles/{article}/cover", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "post", path = "/articles/{article}/cover", server = "public")]
 pub struct PostArticleCover;
 
 impl PostArticleCover {

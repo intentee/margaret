@@ -6,7 +6,7 @@ use margaret::framework::macros::singleton;
 use crate::models::article::Article;
 
 #[singleton]
-#[responds_to_http(
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess,
     method = "get",
     name = "get_article",
     path = "/articles/{article}",

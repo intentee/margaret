@@ -9,7 +9,7 @@ use margaret::framework::macros::singleton;
 use crate::app_name::AppName;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/health", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/health", server = "public")]
 pub struct GetHealth {
     app_name: Arc<AppName>,
 }

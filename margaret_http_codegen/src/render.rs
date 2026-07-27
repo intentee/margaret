@@ -24,6 +24,7 @@ use margaret_request_binding_codegen::render_bound_request_extractions::render_b
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
+use crate::access_policy_binding::AccessPolicyBinding;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
@@ -31,6 +32,36 @@ use crate::route_group::RouteGroup;
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
     injects_routes(&route.arguments)
+}
+
+fn render_method(method: &http::Method) -> TokenStream {
+    let method_name = method.as_str();
+
+    if method == http::Method::GET {
+        quote! { margaret::framework::http::http::Method::GET }
+    } else if method == http::Method::HEAD {
+        quote! { margaret::framework::http::http::Method::HEAD }
+    } else if method == http::Method::POST {
+        quote! { margaret::framework::http::http::Method::POST }
+    } else if method == http::Method::PUT {
+        quote! { margaret::framework::http::http::Method::PUT }
+    } else if method == http::Method::DELETE {
+        quote! { margaret::framework::http::http::Method::DELETE }
+    } else if method == http::Method::CONNECT {
+        quote! { margaret::framework::http::http::Method::CONNECT }
+    } else if method == http::Method::OPTIONS {
+        quote! { margaret::framework::http::http::Method::OPTIONS }
+    } else if method == http::Method::TRACE {
+        quote! { margaret::framework::http::http::Method::TRACE }
+    } else if method == http::Method::PATCH {
+        quote! { margaret::framework::http::http::Method::PATCH }
+    } else {
+        quote! {
+            margaret::framework::http::http::Method::from_bytes(
+                #method_name.as_bytes(),
+            )?
+        }
+    }
 }
 
 fn responder_injects_views(route: &HttpRoute) -> bool {
@@ -194,12 +225,26 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         }
     };
 
-    fold_layers(
+    let handler = fold_layers(
         &route.layers,
         handler,
         &quote! { super::super::middleware },
         bindings,
-    )
+    );
+    let policy = match &route.access_policy {
+        AccessPolicyBinding::Public => quote! {
+            std::sync::Arc::new(
+                margaret::framework::http::public_access::PublicAccess,
+            )
+        },
+        AccessPolicyBinding::Singleton { field, .. } => {
+            bindings.accessor_invocation(&format_ident!("container"), &field.to_string())
+        }
+    };
+
+    quote! {
+        margaret::framework::http::access_control::access_control(#policy, #handler)
+    }
 }
 
 fn argument_value(
@@ -370,6 +415,7 @@ fn server_module(
             .map(|(route, rendered_handler)| {
                 let function = &rendered_handler.function;
                 let method = &route.method;
+                let method = render_method(method);
                 let handler_call = quote! {
                     #function(container, #routes_param, #views_argument)
                 };
@@ -406,7 +452,7 @@ fn server_module(
     let router = if has_websocket_routes {
         let websocket_routes = format_ident!("{}_routes", server.name());
         let websocket_call = quote! {
-            super::super::websocket::#websocket_routes(container, #routes_param).await
+            super::super::websocket::#websocket_routes(container, #routes_param).await?
         };
         quote! {
             {
@@ -426,7 +472,7 @@ fn server_module(
     let inner_return = quote! {
         ::std::result::Result<
             margaret::framework::http::server_routes::ServerRoutes,
-            margaret::framework::http::matchit::InsertError,
+            margaret::framework::http::router_error::RouterError,
         >
     };
     let body_value = quote! {
@@ -501,4 +547,27 @@ pub(crate) fn render(
     }
 
     modules
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render_method;
+
+    #[test]
+    fn renders_every_standard_and_extension_http_method() {
+        for method in [
+            http::Method::GET,
+            http::Method::HEAD,
+            http::Method::POST,
+            http::Method::PUT,
+            http::Method::DELETE,
+            http::Method::CONNECT,
+            http::Method::OPTIONS,
+            http::Method::TRACE,
+            http::Method::PATCH,
+            http::Method::from_bytes(b"QUERY").expect("the extension method is valid"),
+        ] {
+            assert!(!render_method(&method).is_empty());
+        }
+    }
 }

@@ -17,6 +17,7 @@ proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

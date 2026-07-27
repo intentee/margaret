@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::is_expired::IsExpired;
 
 #[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct AccessTokenClaims {
     pub sub: Uuid,
     pub exp: i64,
@@ -15,7 +16,7 @@ pub struct AccessTokenClaims {
 
 impl IsExpired for AccessTokenClaims {
     fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
-        Ok(self.exp < now.timestamp())
+        Ok(self.exp <= now.timestamp())
     }
 }
 
@@ -44,6 +45,6 @@ mod tests {
     fn reports_expiry_relative_to_now() {
         assert_eq!(claims(101).is_expired(at(100)).ok(), Some(false));
         assert_eq!(claims(99).is_expired(at(100)).ok(), Some(true));
-        assert_eq!(claims(100).is_expired(at(100)).ok(), Some(false));
+        assert_eq!(claims(100).is_expired(at(100)).ok(), Some(true));
     }
 }

@@ -118,12 +118,12 @@ mod tests {
     fn public() -> Vec<HttpServer> {
         vec![HttpServer::new(
             "public".to_string(),
-            ServerTransportPolicy::Negotiable,
+            ServerTransportPolicy::PinnedSpiffeMtls,
         )]
     }
 
     const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
-    const STATELESS_RESPONDER: &str = "#[singleton]\n#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
+    const STATELESS_RESPONDER: &str = "#[singleton]\n#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
     const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n";
     const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
 
@@ -342,18 +342,18 @@ impl Flusher {
     fn registers_the_http_server_when_responders_exist() {
         let source = rendered(SERVICE, &public());
 
-        assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
+        assert!(source.contains(r#"matches.get_one::<RouteOrigin>("public-url")"#));
         assert!(source.contains(
             r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
-            r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
+            r#"transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),},upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
             "letserver_services=matchmargaret::framework::service::serve_application::serve_application(matches,servers,){Ok(server_services)=>server_services,Err(outcome)=>returnoutcome,};"
         ));
         assert!(source.contains(
-            "forserver_serviceinserver_services{manager.register_service(server_service);}"
+            "margaret::framework::service::register_server_services::register_server_services(&mutmanager,server_services,);"
         ));
         assert!(source.contains("manager.register_service(Pump{"));
         assert!(source.contains("inner:container.pump()"));
@@ -400,7 +400,10 @@ impl Flusher {
                     "internal".to_string(),
                     ServerTransportPolicy::PinnedSpiffeMtls,
                 ),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
             ],
         );
 
@@ -418,18 +421,8 @@ impl Flusher {
         assert!(source.contains(
             "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
         ));
-        assert!(source.contains(
-            r#"transport:matchmatches.get_one::<String>("public-transport").map(String::as_str)"#
-        ));
-        assert!(source.contains(
-            r#"Some("spiffe_mtls")=>{margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
-        ));
-        assert!(source.contains(
-            r#"Some("plain")=>{margaret::framework::http::transport_config::TransportConfig::Plain}"#
-        ));
-        assert!(source.contains(
-            "Some(_)|None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}"
-        ));
+        assert!(!source.contains("public-transport"));
+        assert!(!source.contains("FixturePlain"));
         assert!(source.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
@@ -437,7 +430,7 @@ impl Flusher {
             "letserver_services=matchmargaret::framework::service::serve_application::serve_application(matches,servers,){Ok(server_services)=>server_services,Err(outcome)=>returnoutcome,};"
         ));
         assert!(source.contains(
-            "forserver_serviceinserver_services{manager.register_service(server_service);}"
+            "margaret::framework::service::register_server_services::register_server_services(&mutmanager,server_services,);"
         ));
         assert!(!source.contains("bundle_services"));
     }
@@ -505,13 +498,25 @@ impl Flusher {
         let source = rendered(
             SERVICE,
             &[
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
             ],
         );
 
+        assert_eq!(
+            source
+                .matches("matchmatches.get_one::<RouteOrigin>")
+                .count(),
+            2
+        );
         assert!(source.contains(
-            r#"letorigin_public:::std::sync::Arc<str>=matchmatches.get_one::<String>("public-url"){Some(value)=>value.clone().into(),None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}};"#
+            "Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(source.contains(
             "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(origin_internal.clone(),origin_public.clone(),),);"
@@ -525,8 +530,14 @@ impl Flusher {
         let source = rendered(
             SERVICE,
             &[
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
+                HttpServer::new(
+                    "public".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
+                HttpServer::new(
+                    "internal".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls,
+                ),
             ],
         );
 

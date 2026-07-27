@@ -9,7 +9,7 @@ pub struct ServerParams {
     headers: HeaderMap,
     method: Method,
     path: String,
-    query_string: String,
+    query_string: Option<String>,
     remote_addr: SocketAddr,
 }
 
@@ -17,7 +17,7 @@ impl ServerParams {
     pub(crate) fn new(
         method: Method,
         path: String,
-        query_string: String,
+        query_string: Option<String>,
         remote_addr: SocketAddr,
         headers: HeaderMap,
     ) -> Self {
@@ -48,8 +48,8 @@ impl ServerParams {
     }
 
     #[must_use]
-    pub fn query_string(&self) -> &str {
-        &self.query_string
+    pub fn query_string(&self) -> Option<&str> {
+        self.query_string.as_deref()
     }
 
     #[must_use]
@@ -81,7 +81,7 @@ mod tests {
         ServerParams::new(
             Method::GET,
             "/".to_string(),
-            String::new(),
+            None,
             SocketAddr::from(([127, 0, 0, 1], 0)),
             headers,
         )

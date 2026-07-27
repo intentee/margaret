@@ -5,6 +5,7 @@ use quote::quote;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_vec_tokens::middleware_vec_tokens;
 
+use crate::access_policy_binding::AccessPolicyBinding;
 use crate::session_plan::SessionPlan;
 
 pub(crate) fn render_server_routes(
@@ -24,6 +25,7 @@ pub(crate) fn render_server_routes(
     let entries = sessions.iter().map(|session_plan| {
         let path = &session_plan.session.path;
         let module = format_ident!("{}", session_plan.session.module_name);
+        let origin = &session_plan.session.origin;
         let routes_argument = session_plan
             .session
             .injects_routes()
@@ -37,24 +39,43 @@ pub(crate) fn render_server_routes(
                 bindings,
             )
         };
+        let policy = match &session_plan.session.access_policy {
+            AccessPolicyBinding::Public => quote! {
+                std::sync::Arc::new(
+                    margaret::framework::http::public_access::PublicAccess,
+                )
+            },
+            AccessPolicyBinding::Singleton { field, .. } => {
+                bindings.accessor_invocation(&format_ident!("container"), &field.to_string())
+            }
+        };
         let upgrade_call = quote! {
             super::#module::upgrade_entry(container, #routes_argument).await
         };
         quote! {
             margaret::framework::http::route_entry::RouteEntry::web_socket(
                 #path,
+                margaret::framework::http::http::HeaderValue::try_from(#origin)?,
                 #upgrade_call,
-                #middleware,
+                margaret::framework::http::access_policy_middleware::access_policy_middleware(
+                    #policy,
+                    #middleware,
+                ),
             ),
         }
     });
 
-    let list = quote! { ::std::vec::Vec::from([#(#entries)*]) };
+    let list = quote! {
+        ::std::result::Result::Ok(::std::vec::Vec::from([#(#entries)*]))
+    };
     quote! {
         pub async fn #function(
             container: &super::super::container::Container,
             #routes_name: &::std::sync::Arc<super::super::routes::Routes>,
-        ) -> ::std::vec::Vec<margaret::framework::http::route_entry::RouteEntry> {
+        ) -> ::std::result::Result<
+            ::std::vec::Vec<margaret::framework::http::route_entry::RouteEntry>,
+            margaret::framework::http::router_error::RouterError,
+        > {
             #list
         }
     }

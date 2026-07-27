@@ -9,10 +9,7 @@ use crate::identity_session_error::IdentitySessionError;
 use crate::refresh_token_claims_signed::RefreshTokenClaimsSigned;
 
 #[derive(Clone)]
-pub struct SessionCookieManager {
-    pub cookie_domain: String,
-    pub cookie_secure: bool,
-}
+pub struct SessionCookieManager;
 
 impl SessionCookieManager {
     pub fn access_token_cookie(
@@ -20,7 +17,6 @@ impl SessionCookieManager {
         AccessTokenClaimsSigned { exp, signed_claims }: AccessTokenClaimsSigned,
     ) -> Result<Cookie<'static>, IdentitySessionError> {
         Ok(Cookie::build((COOKIE_NAME_ACCESS_TOKEN, signed_claims))
-            .domain(self.cookie_domain.clone())
             .expires(
                 OffsetDateTime::from_unix_timestamp(exp)
                     .map_err(|source| IdentitySessionError::CookieExpiration { exp, source })?,
@@ -28,18 +24,17 @@ impl SessionCookieManager {
             .http_only(true)
             .path("/")
             .same_site(SameSite::Strict)
-            .secure(self.cookie_secure)
+            .secure(true)
             .build()
             .into_owned())
     }
 
     pub fn access_token_removal_cookie(&self) -> Result<Cookie<'static>, IdentitySessionError> {
         let mut cookie = Cookie::build((COOKIE_NAME_ACCESS_TOKEN, ""))
-            .domain(self.cookie_domain.clone())
             .http_only(true)
             .path("/")
             .same_site(SameSite::Strict)
-            .secure(self.cookie_secure)
+            .secure(true)
             .build()
             .into_owned();
 
@@ -53,7 +48,6 @@ impl SessionCookieManager {
         RefreshTokenClaimsSigned { exp, signed_claims }: RefreshTokenClaimsSigned,
     ) -> Result<Cookie<'static>, IdentitySessionError> {
         Ok(Cookie::build((COOKIE_NAME_REFRESH_TOKEN, signed_claims))
-            .domain(self.cookie_domain.clone())
             .expires(
                 OffsetDateTime::from_unix_timestamp(exp)
                     .map_err(|source| IdentitySessionError::CookieExpiration { exp, source })?,
@@ -61,18 +55,17 @@ impl SessionCookieManager {
             .http_only(true)
             .path("/")
             .same_site(SameSite::Strict)
-            .secure(self.cookie_secure)
+            .secure(true)
             .build()
             .into_owned())
     }
 
     pub fn refresh_token_removal_cookie(&self) -> Result<Cookie<'static>, IdentitySessionError> {
         let mut cookie = Cookie::build((COOKIE_NAME_REFRESH_TOKEN, ""))
-            .domain(self.cookie_domain.clone())
             .http_only(true)
             .path("/")
             .same_site(SameSite::Strict)
-            .secure(self.cookie_secure)
+            .secure(true)
             .build()
             .into_owned();
 
@@ -96,7 +89,7 @@ mod tests {
     use crate::refresh_token_claims_signed::RefreshTokenClaimsSigned;
 
     fn assert_secure_cookie_attributes(cookie: &Cookie<'static>) {
-        assert_eq!(cookie.domain(), Some("example.test"));
+        assert_eq!(cookie.domain(), None);
         assert_eq!(cookie.path(), Some("/"));
         assert_eq!(cookie.http_only(), Some(true));
         assert_eq!(cookie.same_site(), Some(SameSite::Strict));
@@ -104,10 +97,7 @@ mod tests {
     }
 
     fn manager() -> SessionCookieManager {
-        SessionCookieManager {
-            cookie_domain: "example.test".to_string(),
-            cookie_secure: true,
-        }
+        SessionCookieManager
     }
 
     #[test]

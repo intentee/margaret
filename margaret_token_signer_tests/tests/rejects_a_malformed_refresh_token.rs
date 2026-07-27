@@ -1,5 +1,6 @@
 use margaret_token_signer::mint_access_token::mint_access_token;
-use margaret_token_signer::token_signer_error::TokenSignerError;
+use margaret_token_signer::mint_access_token_outcome::MintAccessTokenOutcome;
+use margaret_token_signer::refresh_token_rejection::RefreshTokenRejection;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_signer_tests::unix_time::unix_time;
 
@@ -11,6 +12,8 @@ async fn rejects_a_malformed_refresh_token() {
 
     assert!(matches!(
         result,
-        Err(TokenSignerError::UnverifiableRefreshToken { .. })
+        Ok(MintAccessTokenOutcome::Rejected(
+            RefreshTokenRejection::Invalid
+        ))
     ));
 }

@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use reqwest::Client;
@@ -36,7 +37,13 @@ impl JwksClient {
         client_builder: ClientBuilder,
         cancellation_token: CancellationToken,
     ) -> Result<()> {
-        let http_client = client_builder.build()?;
+        let http_client = client_builder
+            .redirect(reqwest::redirect::Policy::none())
+            .https_only(true)
+            .min_tls_version(reqwest::tls::Version::TLS_1_3)
+            .connect_timeout(Duration::from_secs(3))
+            .timeout(Duration::from_secs(5))
+            .build()?;
         let poll_service = PublicJwksPollService {
             endpoint_provider: self.endpoint_provider.clone(),
             http_client,

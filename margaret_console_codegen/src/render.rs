@@ -7,27 +7,9 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::http_server::HttpServer;
-use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
 use crate::console_command::ConsoleCommand;
-
-fn transport_argument_registration(server: &HttpServer) -> TokenStream {
-    let transport_argument = server.transport_argument();
-    let allowed_values = match server.transport_policy() {
-        ServerTransportPolicy::Negotiable => quote! { ["plain", "spiffe_mtls"] },
-        ServerTransportPolicy::PinnedSpiffeMtls => quote! { ["spiffe_mtls"] },
-    };
-
-    quote! {
-        .arg(
-            clap::Arg::new(#transport_argument)
-                .long(#transport_argument)
-                .required(true)
-                .value_parser(#allowed_values)
-        )
-    }
-}
 
 fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
     let name = &command.name;
@@ -136,15 +118,15 @@ pub(crate) fn render(
             let url_argument = server.url_argument();
             let uploads_argument = server.uploads_argument();
             let upload_dir_argument = server.upload_dir_argument();
-            let transport_argument =
-                spiffe_secured.then(|| transport_argument_registration(server));
-
             quote! {
                 .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
-                .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
-                .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
+                .arg(
+                    margaret::framework::service::route_origin_argument::route_origin_argument(
+                        #url_argument
+                    )
+                )
+                .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue).requires(#upload_dir_argument))
                 .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
-                #transport_argument
             }
         });
         let spiffe_arguments = svid_active.then(|| {

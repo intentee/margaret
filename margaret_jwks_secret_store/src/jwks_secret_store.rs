@@ -11,7 +11,7 @@ use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificatio
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen::verifies_any_token::VerifiesAnyToken;
 use margaret_token_signer::mint_access_token::mint_access_token;
-use margaret_token_signer::minted_tokens::MintedTokens;
+use margaret_token_signer::mint_access_token_outcome::MintAccessTokenOutcome;
 
 use crate::jwks_secret_store_error::JwksSecretStoreError;
 
@@ -29,7 +29,7 @@ impl JwksSecretStore {
         &self,
         refresh_token: &str,
         now: DateTime<Utc>,
-    ) -> Result<MintedTokens, JwksSecretStoreError> {
+    ) -> Result<MintAccessTokenOutcome, JwksSecretStoreError> {
         let secret = self.current_secret()?;
 
         mint_access_token(&secret, refresh_token, now)
@@ -78,16 +78,22 @@ mod tests {
     use serde::ser::Error;
 
     use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
+    use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
     use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
     use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
     use margaret_jwks_keygen::token_verification::TokenVerification;
     use margaret_jwks_keygen::verifies_token::VerifiesToken;
+    use margaret_token_signer::mint_access_token_outcome::MintAccessTokenOutcome;
+    use margaret_token_signer::minted_tokens::MintedTokens;
+    use margaret_token_signer::refresh_token_rejection::RefreshTokenRejection;
+    use margaret_token_signer::token_signer_error::TokenSignerError;
     use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
     use margaret_token_signer_tests::refresh_claims::refresh_claims;
     use margaret_token_signer_tests::sign_refresh_token::sign_refresh_token;
     use margaret_token_signer_tests::unix_time::unix_time;
 
     use super::JwksSecretStore;
+    use crate::jwks_secret_store_error::JwksSecretStoreError;
 
     struct Unserializable;
 
@@ -118,13 +124,18 @@ mod tests {
         let refresh_token =
             sign_refresh_token(&secret.current.signing, &refresh_claims(1_000)).await;
 
-        let minted = store
+        let outcome = store
             .mint_access_token(&refresh_token, unix_time(500))
             .await
             .expect("the access token is minted");
 
-        assert!(!minted.access_token.is_empty());
-        assert!(!minted.refresh_token.is_empty());
+        assert_eq!(
+            std::mem::discriminant(&outcome),
+            std::mem::discriminant(&MintAccessTokenOutcome::Minted(MintedTokens {
+                access_token: "comparison".to_string(),
+                refresh_token: "comparison".to_string(),
+            }))
+        );
     }
 
     #[tokio::test]
@@ -208,14 +219,47 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reports_a_mint_failure_for_an_invalid_refresh_token() {
+    async fn reports_an_invalid_refresh_token_as_a_rejection() {
         let (store, _secret) = store_with_secret();
 
-        assert!(
-            store
-                .mint_access_token("not.a.valid.token", unix_time(500))
-                .await
-                .is_err_and(|error| error.to_string().contains("failed to mint an access token"))
+        let outcome = store
+            .mint_access_token("not.a.valid.token", unix_time(500))
+            .await
+            .expect("invalid user input is not a system error");
+
+        assert_eq!(
+            std::mem::discriminant(&outcome),
+            std::mem::discriminant(&MintAccessTokenOutcome::Rejected(
+                RefreshTokenRejection::Invalid
+            ))
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_a_mint_system_failure_for_corrupt_public_key_material() {
+        let mut secret = fresh_p256_secret();
+        let refresh_token =
+            sign_refresh_token(&secret.current.signing, &refresh_claims(1_000)).await;
+
+        secret.current.public.x = "not-base64url".to_string();
+
+        let holder = JwksSecretHolder::default();
+
+        holder.set(Some(Arc::new(secret)));
+
+        let error = JwksSecretStore::new(holder)
+            .mint_access_token(&refresh_token, unix_time(500))
+            .await
+            .err()
+            .expect("corrupt public key material is a system failure");
+
+        assert_eq!(
+            std::mem::discriminant(&error),
+            std::mem::discriminant(&JwksSecretStoreError::Mint {
+                source: TokenSignerError::Verification {
+                    source: JwksKeyError::MalformedCompactJws,
+                },
+            })
         );
     }
 

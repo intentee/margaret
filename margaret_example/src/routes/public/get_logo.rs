@@ -4,7 +4,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/logo.png", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/logo.png", server = "public")]
 pub struct GetLogo;
 
 impl GetLogo {

@@ -80,7 +80,7 @@ mod tests {
             server: ServerParams::new(
                 Method::POST,
                 "/articles".to_string(),
-                "page=2".to_string(),
+                Some("page=2".to_string()),
                 SocketAddr::from(([203, 0, 113, 7], 4000)),
                 HeaderMap::new(),
             ),
@@ -97,7 +97,7 @@ mod tests {
         );
         assert_eq!(request.inputs.server.method(), "POST");
         assert_eq!(request.inputs.server.path(), "/articles");
-        assert_eq!(request.inputs.server.query_string(), "page=2");
+        assert_eq!(request.inputs.server.query_string(), Some("page=2"));
         assert_eq!(
             request.inputs.server.remote_addr(),
             SocketAddr::from(([203, 0, 113, 7], 4000))

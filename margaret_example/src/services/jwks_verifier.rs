@@ -6,6 +6,7 @@ use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 
 use margaret::framework::identity_session::is_expired::IsExpired;
+use margaret::framework::jwks_client::public_token_verification::PublicTokenVerification;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
@@ -45,7 +46,12 @@ impl JwksVerifier {
             .verifier
             .verify::<AccessClaims>("sample.access.token", self.clock.now())
         {
-            Ok(_) => println!("the jwks verifier accepted the sample access token"),
+            Ok(PublicTokenVerification::Verified(_)) => {
+                println!("the jwks verifier accepted the sample access token")
+            }
+            Ok(PublicTokenVerification::Rejected(reason)) => {
+                println!("the jwks verifier rejected the sample access token: {reason:?}")
+            }
             Err(error) => println!("the jwks verifier could not verify the sample token: {error}"),
         }
 

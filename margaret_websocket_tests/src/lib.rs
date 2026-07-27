@@ -26,4 +26,6 @@ pub mod typing_dispatch;
 pub mod typing_handler;
 pub mod typing_notification;
 pub mod upgrade_query;
+pub mod valid_raw_handshake;
 pub mod validating_session_factory;
+pub mod web_socket_client_request;

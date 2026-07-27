@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use matchit::InsertError;
+use http::Method;
 
 use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
@@ -9,13 +9,15 @@ use crate::method_handler::MethodHandler;
 use crate::request_route::RequestRoute;
 use crate::route_entry::RouteEntry;
 use crate::route_resolution::RouteResolution;
+use crate::router_error::RouterError;
 use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
 enum RouteTarget {
-    Http(HashMap<&'static str, Arc<dyn Handler>>),
+    Http(HashMap<Method, Arc<dyn Handler>>),
     WebSocket {
         middleware: Vec<Arc<dyn HttpMiddleware>>,
+        origin: http::HeaderValue,
         upgrade: Arc<dyn WebSocketUpgrade>,
     },
 }
@@ -25,24 +27,25 @@ pub struct Router {
 }
 
 impl Router {
-    pub fn build(entries: Vec<RouteEntry>) -> Result<Self, InsertError> {
+    pub fn build(entries: Vec<RouteEntry>) -> Result<Self, RouterError> {
         let mut matcher: matchit::Router<RouteTarget> = matchit::Router::new();
 
         for entry in entries {
             match entry {
                 RouteEntry::Http { handlers, path } => {
-                    matcher.insert(
-                        path,
-                        RouteTarget::Http(
-                            handlers
-                                .into_iter()
-                                .map(|MethodHandler { handler, method }| (method, handler))
-                                .collect(),
-                        ),
-                    )?;
+                    let mut indexed = HashMap::new();
+
+                    for MethodHandler { handler, method } in handlers {
+                        if indexed.insert(method.clone(), handler).is_some() {
+                            return Err(RouterError::DuplicateMethod { method, path });
+                        }
+                    }
+
+                    matcher.insert(path, RouteTarget::Http(indexed))?;
                 }
                 RouteEntry::WebSocket {
                     middleware,
+                    origin,
                     path,
                     upgrade,
                 } => {
@@ -50,6 +53,7 @@ impl Router {
                         path,
                         RouteTarget::WebSocket {
                             middleware,
+                            origin,
                             upgrade,
                         },
                     )?;
@@ -60,7 +64,7 @@ impl Router {
         Ok(Self { matcher })
     }
 
-    pub(crate) fn resolve(&self, method: &str, path: &str) -> RouteResolution {
+    pub(crate) fn resolve(&self, method: &Method, path: &str) -> RouteResolution {
         let matched = match self.matcher.at(path) {
             Ok(matched) => matched,
             Err(matchit::MatchError::NotFound) => {
@@ -83,11 +87,13 @@ impl Router {
             },
             RouteTarget::WebSocket {
                 middleware,
+                origin,
                 upgrade,
             } => {
-                if method == "GET" {
+                if method == Method::GET {
                     RouteResolution::Upgrade(UpgradeRoute {
                         middleware: middleware.clone(),
+                        origin: origin.clone(),
                         path_params,
                         upgrade: upgrade.clone(),
                     })

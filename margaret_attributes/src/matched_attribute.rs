@@ -69,7 +69,9 @@ mod tests {
 
     #[test]
     fn args_are_parsed_once_and_reused() {
-        let item = item_bearing(parse_quote!(#[responds_to_http(method = "get")]));
+        let item = item_bearing(
+            parse_quote!(#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get")]),
+        );
         let matched = MatchedAttribute::new(&item, &item.attributes()[0]);
 
         let first = matched.args().expect("the arguments parse");

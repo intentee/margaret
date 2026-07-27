@@ -1,17 +1,16 @@
-use std::sync::Arc;
-
 use crate::build_url::build_url;
 use crate::redirect::Redirect;
+use crate::route_origin::RouteOrigin;
 use crate::url_segment::UrlSegment;
 
 pub struct ForwardableRoute {
-    origin: Arc<str>,
+    origin: RouteOrigin,
     segments: Vec<UrlSegment>,
 }
 
 impl ForwardableRoute {
     #[must_use]
-    pub fn new(origin: Arc<str>, segments: Vec<UrlSegment>) -> Self {
+    pub fn new(origin: RouteOrigin, segments: Vec<UrlSegment>) -> Self {
         Self { origin, segments }
     }
 
@@ -38,15 +37,14 @@ impl ForwardableRoute {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::ForwardableRoute;
+    use crate::route_origin::RouteOrigin;
     use crate::url_parameter::UrlParameter;
     use crate::url_segment::UrlSegment;
 
     fn article_route() -> ForwardableRoute {
         ForwardableRoute::new(
-            Arc::from("http://localhost"),
+            RouteOrigin::parse("https://example.test").expect("a valid origin"),
             vec![
                 UrlSegment::Literal("/articles/"),
                 UrlSegment::Parameter(UrlParameter {
@@ -59,7 +57,7 @@ mod tests {
 
     #[test]
     fn renders_the_url_from_its_origin_and_parameters() {
-        assert_eq!(article_route().url(), "http://localhost/articles/rust");
+        assert_eq!(article_route().url(), "https://example.test/articles/rust");
     }
 
     #[test]
@@ -72,7 +70,7 @@ mod tests {
                 .headers()
                 .get("location")
                 .expect("the location header is present"),
-            "http://localhost/articles/rust"
+            "https://example.test/articles/rust"
         );
     }
 
@@ -89,7 +87,7 @@ mod tests {
                 .headers()
                 .get("location")
                 .expect("the location header is present"),
-            "http://localhost/articles/rust"
+            "https://example.test/articles/rust"
         );
     }
 
@@ -106,7 +104,7 @@ mod tests {
                 .headers()
                 .get("location")
                 .expect("the location header is present"),
-            "http://localhost/articles/rust"
+            "https://example.test/articles/rust"
         );
     }
 }

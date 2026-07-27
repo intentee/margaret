@@ -6,6 +6,7 @@ use hyper_util::rt::TokioIo;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
 use tokio_tungstenite::tungstenite::protocol::Role;
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_util::sync::CancellationToken;
 
 use margaret_http::request::Request;
@@ -35,7 +36,15 @@ async fn drive_web_socket_upgrade<Session>(
             return;
         }
     };
-    let stream = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
+    let config = WebSocketConfig::default()
+        .read_buffer_size(4 * 1024)
+        .write_buffer_size(4 * 1024)
+        .max_write_buffer_size(64 * 1024)
+        .max_message_size(Some(64 * 1024))
+        .max_frame_size(Some(16 * 1024))
+        .accept_unmasked_frames(false);
+    let stream =
+        WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, Some(config)).await;
 
     serve_web_socket_connection(cancellation_token, session, dispatch_table, stream).await;
 }
@@ -109,12 +118,7 @@ where
             return ResponseContinuation::from(Response::text(500, "Internal Server Error"));
         }
 
-        ResponseContinuation::from(
-            Response::text(101, "")
-                .header("connection", "Upgrade")
-                .header("sec-websocket-accept", accept)
-                .header("upgrade", "websocket"),
-        )
+        ResponseContinuation::from(Response::web_socket_upgrade(accept))
     }
 }
 

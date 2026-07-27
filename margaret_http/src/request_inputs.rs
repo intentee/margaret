@@ -34,49 +34,67 @@ fn parse_cookies(headers: &HeaderMap) -> Result<HashMap<String, String>, Request
         let name = cookie.name().to_string();
         let value = cookie.value().to_string();
 
-        cookies.entry(name).or_insert(value);
+        if cookies.insert(name.clone(), value).is_some() {
+            return Err(RequestError::DuplicateCookie { name });
+        }
     }
 
     Ok(cookies)
 }
 
-fn index_fields(fields: Vec<FormField>) -> HashMap<String, String> {
+fn index_query_fields(fields: Vec<FormField>) -> Result<HashMap<String, String>, RequestError> {
     let mut indexed = HashMap::new();
 
     for FormField { name, value } in fields {
-        indexed.entry(name).or_insert(value);
+        if indexed.insert(name.clone(), value).is_some() {
+            return Err(RequestError::DuplicateQueryField { name });
+        }
     }
 
-    indexed
+    Ok(indexed)
 }
 
-fn index_files(files: Vec<UploadedFile>) -> HashMap<String, UploadedFile> {
+fn index_form_fields(fields: Vec<FormField>) -> Result<HashMap<String, String>, RequestError> {
+    let mut indexed = HashMap::new();
+
+    for FormField { name, value } in fields {
+        if indexed.insert(name.clone(), value).is_some() {
+            return Err(RequestError::DuplicateFormField { name });
+        }
+    }
+
+    Ok(indexed)
+}
+
+fn index_files(files: Vec<UploadedFile>) -> Result<HashMap<String, UploadedFile>, RequestError> {
     let mut indexed = HashMap::new();
 
     for file in files {
         let field_name = file.field_name().to_string();
 
-        indexed.entry(field_name).or_insert(file);
+        if indexed.insert(field_name.clone(), file).is_some() {
+            return Err(RequestError::DuplicateFileField { name: field_name });
+        }
     }
 
-    indexed
+    Ok(indexed)
 }
 
 struct ParsedQuery {
     fields: HashMap<String, String>,
-    raw: String,
+    raw: Option<String>,
 }
 
-fn parse_query(uri: &Uri) -> ParsedQuery {
+fn parse_query(uri: &Uri) -> Result<ParsedQuery, RequestError> {
     match uri.query() {
-        Some(raw) => ParsedQuery {
-            fields: index_fields(form_fields(raw.as_bytes())),
-            raw: raw.to_string(),
-        },
-        None => ParsedQuery {
+        Some(raw) => Ok(ParsedQuery {
+            fields: index_query_fields(form_fields(raw.as_bytes()))?,
+            raw: Some(raw.to_string()),
+        }),
+        None => Ok(ParsedQuery {
             fields: HashMap::new(),
-            raw: String::new(),
-        },
+            raw: None,
+        }),
     }
 }
 
@@ -97,13 +115,7 @@ impl RequestInputs {
             json: None,
             form: HashMap::new(),
             query: HashMap::new(),
-            server: ServerParams::new(
-                method,
-                path,
-                String::new(),
-                unspecified_addr(),
-                HeaderMap::new(),
-            ),
+            server: ServerParams::new(method, path, None, unspecified_addr(), HeaderMap::new()),
         }
     }
 
@@ -117,7 +129,7 @@ impl RequestInputs {
         let ParsedQuery {
             fields: query,
             raw: raw_query,
-        } = parse_query(uri);
+        } = parse_query(uri)?;
         let server = ServerParams::new(
             method,
             uri.path().to_string(),
@@ -149,7 +161,7 @@ impl RequestInputs {
         let ParsedQuery {
             fields: query,
             raw: raw_query,
-        } = parse_query(uri);
+        } = parse_query(uri)?;
         let mut files = HashMap::new();
         let mut json: Option<serde_json::Value> = None;
         let mut form = HashMap::new();
@@ -161,13 +173,13 @@ impl RequestInputs {
                     post: parsed_post,
                 } = MultipartBody::parse(body, boundary, body_limit, upload_config).await?;
 
-                files = index_files(parsed_files);
-                form = index_fields(parsed_post);
+                files = index_files(parsed_files)?;
+                form = index_form_fields(parsed_post)?;
             }
             BodyClass::UrlEncoded => {
-                form = index_fields(form_fields(
+                form = index_form_fields(form_fields(
                     &collect_limited(body, body_limit.max_bytes()).await?,
-                ));
+                ))?;
             }
             BodyClass::Json => {
                 let bytes = collect_limited(body, body_limit.max_bytes()).await?;
@@ -228,7 +240,7 @@ mod tests {
             .boxed_unsync()
     }
 
-    const MULTIPART: &[u8] = b"--X\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nhello\r\n--X\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"face.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n--X\r\nContent-Disposition: form-data; name=\"raw\"; filename=\"raw.bin\"\r\n\r\nDATA\r\n--X--\r\n";
+    const MULTIPART: &[u8] = b"--X\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nhello\r\n--X\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"face.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n--X\r\nContent-Disposition: form-data; name=\"raw\"; filename=\"raw.bin\"\r\nContent-Type: application/octet-stream\r\n\r\nDATA\r\n--X--\r\n";
 
     fn upload_in(directory: &TempDir) -> UploadConfig {
         UploadConfig::enabled(directory.path().to_path_buf())
@@ -317,7 +329,7 @@ mod tests {
         );
         assert_eq!(inputs.query.get("room").map(String::as_str), Some("lobby"));
         assert_eq!(inputs.server.path(), "/socket");
-        assert_eq!(inputs.server.query_string(), "room=lobby");
+        assert_eq!(inputs.server.query_string(), Some("room=lobby"));
         assert!(inputs.form.is_empty());
         assert!(inputs.files.is_empty());
         assert!(inputs.json.is_none());
@@ -378,6 +390,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rejects_duplicate_cookie_names() {
+        let message = parse_with_cookie(b"session=first; session=second")
+            .await
+            .err()
+            .expect("duplicate cookie names are ambiguous")
+            .to_string();
+
+        assert!(message.contains("more than one cookie"));
+    }
+
+    #[tokio::test]
     async fn parses_query_string_variables() {
         let directory = tempdir().expect("a temporary directory");
         let inputs = parse_inputs(
@@ -390,8 +413,25 @@ mod tests {
         .expect("the request parses");
 
         assert_eq!(inputs.query.get("term").map(String::as_str), Some("rust"));
-        assert_eq!(inputs.server.query_string(), "term=rust&page=2");
+        assert_eq!(inputs.server.query_string(), Some("term=rust&page=2"));
         assert!(inputs.json.is_none());
+    }
+
+    #[tokio::test]
+    async fn rejects_duplicate_query_fields() {
+        let directory = tempdir().expect("a temporary directory");
+        let message = parse_inputs(
+            None,
+            "/search?q=first&q=second",
+            b"",
+            &upload_in(&directory),
+        )
+        .await
+        .err()
+        .expect("duplicate query fields are ambiguous")
+        .to_string();
+
+        assert!(message.contains("query contains more than one field"));
     }
 
     #[tokio::test]
@@ -410,6 +450,109 @@ mod tests {
             inputs.form.get("username").map(String::as_str),
             Some("margaret")
         );
+    }
+
+    #[tokio::test]
+    async fn rejects_duplicate_form_fields() {
+        let directory = tempdir().expect("a temporary directory");
+        let message = parse_inputs(
+            Some("application/x-www-form-urlencoded"),
+            "/login",
+            b"username=first&username=second",
+            &upload_in(&directory),
+        )
+        .await
+        .err()
+        .expect("duplicate form fields are ambiguous")
+        .to_string();
+
+        assert!(message.contains("form contains more than one field"));
+    }
+
+    #[tokio::test]
+    async fn rejects_duplicate_file_fields() {
+        let directory = tempdir().expect("a temporary directory");
+        let body = b"--X\r\nContent-Disposition: form-data; name=\"upload\"; filename=\"first.bin\"\r\nContent-Type: application/octet-stream\r\n\r\nFIRST\r\n--X\r\nContent-Disposition: form-data; name=\"upload\"; filename=\"second.bin\"\r\nContent-Type: application/octet-stream\r\n\r\nSECOND\r\n--X--\r\n";
+        let message = parse_inputs(
+            Some("multipart/form-data; boundary=X"),
+            "/upload",
+            body,
+            &upload_in(&directory),
+        )
+        .await
+        .err()
+        .expect("duplicate file fields are ambiguous")
+        .to_string();
+
+        assert!(message.contains("more than one file field"));
+    }
+
+    #[tokio::test]
+    async fn rejects_duplicate_multipart_form_fields() {
+        let directory = tempdir().expect("a temporary directory");
+        let body = b"--X\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nfirst\r\n--X\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nsecond\r\n--X--\r\n";
+        let error = parse_inputs(
+            Some("multipart/form-data; boundary=X"),
+            "/upload",
+            body,
+            &upload_in(&directory),
+        )
+        .await
+        .err()
+        .expect("duplicate multipart form fields are ambiguous");
+
+        assert_eq!(
+            std::mem::discriminant(&error),
+            std::mem::discriminant(&RequestError::DuplicateFormField {
+                name: "comparison".to_string(),
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_an_uploaded_file_without_a_content_type() {
+        let directory = tempdir().expect("a temporary directory");
+        let body = b"--X\r\nContent-Disposition: form-data; name=\"upload\"; filename=\"file.bin\"\r\n\r\nDATA\r\n--X--\r\n";
+        let message = parse_inputs(
+            Some("multipart/form-data; boundary=X"),
+            "/upload",
+            body,
+            &upload_in(&directory),
+        )
+        .await
+        .err()
+        .expect("missing file content type is rejected")
+        .to_string();
+
+        assert!(message.contains("missing its required Content-Type"));
+    }
+
+    #[tokio::test]
+    async fn rejects_unsafe_uploaded_file_names() {
+        let directory = tempdir().expect("a temporary directory");
+
+        for file_name in ["../secret", "folder/file.bin", "folder\\file.bin", ""] {
+            let body = format!(
+                "--X\r\nContent-Disposition: form-data; name=\"upload\"; filename=\"{file_name}\"\r\nContent-Type: application/octet-stream\r\n\r\nDATA\r\n--X--\r\n"
+            );
+            let result = RequestInputs::parse(
+                Method::POST,
+                &"/upload".parse().expect("a valid uri"),
+                HeaderMap::from_iter([(
+                    CONTENT_TYPE,
+                    HeaderValue::from_static("multipart/form-data; boundary=X"),
+                )]),
+                unspecified_addr(),
+                Full::new(Bytes::from(body))
+                    .map_err(|error: Infallible| match error {})
+                    .boxed_unsync(),
+                &BodyLimit::default(),
+                &upload_in(&directory),
+            )
+            .await;
+
+            assert!(result.is_err(), "{file_name:?} must be rejected");
+        }
     }
 
     #[tokio::test]
@@ -650,7 +793,7 @@ mod tests {
     async fn reports_a_truncated_uploaded_file() {
         let directory = tempdir().expect("a temporary directory");
         let body: &[u8] =
-            b"--X\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a\"\r\n\r\nunterminated";
+            b"--X\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a\"\r\nContent-Type: application/octet-stream\r\n\r\nunterminated";
         let message = parse_inputs(
             Some("multipart/form-data; boundary=X"),
             "/upload",

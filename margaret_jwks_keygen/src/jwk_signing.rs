@@ -20,13 +20,14 @@ pub struct JwkSigning {
 
 impl JwkSigning {
     fn header_json(&self) -> String {
-        let mut header = Map::with_capacity(2);
+        let mut header = Map::with_capacity(3);
 
         header.insert(
             "alg".to_string(),
             Value::String(self.crv.algorithm().wire_name().to_string()),
         );
         header.insert("kid".to_string(), Value::String(self.kid.clone()));
+        header.insert("typ".to_string(), Value::String("JWT".to_string()));
 
         Value::Object(header).to_string()
     }

@@ -9,6 +9,7 @@ use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
 use crate::is_expired::IsExpired;
 
 #[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RefreshTokenClaims {
     pub exp: i64,
     pub iat: i64,
@@ -25,7 +26,7 @@ impl IsExpired for RefreshTokenClaims {
 impl RefreshTokenClaims {
     #[must_use]
     pub fn is_expired_at(&self, now: DateTime<Utc>) -> bool {
-        self.exp < now.timestamp()
+        self.exp <= now.timestamp()
     }
 
     #[must_use]
@@ -67,7 +68,7 @@ mod tests {
     fn reports_expiry_relative_to_now() {
         assert_eq!(claims(101).is_expired(at(100)).ok(), Some(false));
         assert_eq!(claims(99).is_expired(at(100)).ok(), Some(true));
-        assert_eq!(claims(100).is_expired(at(100)).ok(), Some(false));
+        assert_eq!(claims(100).is_expired(at(100)).ok(), Some(true));
     }
 
     #[test]

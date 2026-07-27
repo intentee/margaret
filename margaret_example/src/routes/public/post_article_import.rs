@@ -11,7 +11,7 @@ use crate::forms::post_article_form::PostArticleForm;
 use crate::stores::article_store::ArticleStore;
 
 #[singleton]
-#[responds_to_http(method = "post", path = "/articles/import", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "post", path = "/articles/import", server = "public")]
 pub struct PostArticleImport {
     articles: Arc<ArticleStore>,
 }

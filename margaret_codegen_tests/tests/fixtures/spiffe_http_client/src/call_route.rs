@@ -9,7 +9,7 @@ use margaret::framework::macros::singleton;
 use crate::identity_client::IdentityClient;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/call", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/call", server = "public")]
 pub struct CallRoute {
     identity_client: Arc<IdentityClient>,
 }

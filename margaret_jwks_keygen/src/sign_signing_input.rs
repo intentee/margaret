@@ -45,6 +45,8 @@ mod tests {
 
     use super::sign_signing_input;
     use crate::curve::Curve;
+    use crate::generate_keypair::generate_keypair;
+    use crate::generate_keypair_params::GenerateKeypairParams;
 
     #[test]
     fn p256_rejects_a_malformed_pem() {
@@ -76,5 +78,25 @@ mod tests {
                     .unwrap()
             )
         );
+    }
+
+    #[test]
+    fn canonicalizes_signatures_across_deterministic_signing_inputs() {
+        for curve in [Curve::P256, Curve::P384] {
+            let keypair = generate_keypair(GenerateKeypairParams {
+                crv: curve,
+                kid: "canonical".to_string(),
+            })
+            .expect("the signing fixture is generated");
+
+            for index in 0..64 {
+                sign_signing_input(
+                    &format!("header.payload.{index}"),
+                    &keypair.signing.pem,
+                    curve,
+                )
+                .expect("every signature is canonicalized");
+            }
+        }
     }
 }

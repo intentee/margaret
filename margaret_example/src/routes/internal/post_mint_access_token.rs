@@ -11,7 +11,7 @@ use crate::margaret::jwks::MintAccessTokenHandler;
 use crate::system_clock::SystemClock;
 
 #[singleton]
-#[responds_to_http(method = "post", path = "/.well-known/mint", server = "internal")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "post", path = "/.well-known/mint", server = "internal")]
 pub struct PostMintAccessToken {
     clock: Arc<SystemClock>,
     mint_access_token_handler: Arc<MintAccessTokenHandler>,

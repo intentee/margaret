@@ -62,11 +62,16 @@ impl RunningWebSocketServer {
         let server = Server::new(
             "public",
             "127.0.0.1:0".to_string(),
-            TransportConfig::Plain,
+            TransportConfig::FixturePlain,
             UploadConfig::Disabled,
             BodyLimit::default(),
-            Router::build(vec![RouteEntry::web_socket("/ws", upgrade, middleware)])
-                .expect("the route entries register cleanly"),
+            Router::build(vec![RouteEntry::web_socket(
+                "/ws",
+                margaret_http::http::HeaderValue::from_static("https://example.test"),
+                upgrade,
+                middleware,
+            )])
+            .expect("the route entries register cleanly"),
         );
         let server_registry = Arc::new(ServerRegistry::new(vec![server]));
         let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));

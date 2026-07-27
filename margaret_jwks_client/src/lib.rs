@@ -5,5 +5,7 @@ pub mod jwks_poll_interval_before_ready;
 pub mod public_jwks_holder;
 pub mod public_jwks_poll_service;
 pub mod public_jwks_verifier;
+pub mod public_token_verification;
+pub mod token_rejection;
 
 pub use crate::jwks_client::JwksClient;

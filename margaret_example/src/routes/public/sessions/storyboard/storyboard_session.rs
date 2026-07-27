@@ -10,7 +10,7 @@ use crate::margaret::routes::Routes;
 use crate::models::article::Article;
 use crate::models::user::User;
 
-#[websocket_session(path = "/storyboard/{topic}/{article}", server = "public")]
+#[websocket_session(access = margaret::framework::http::public_access::PublicAccess, origin = "https://example.test", path = "/storyboard/{topic}/{article}", server = "public")]
 pub struct StoryboardSession {
     article_title: String,
     board_url: String,

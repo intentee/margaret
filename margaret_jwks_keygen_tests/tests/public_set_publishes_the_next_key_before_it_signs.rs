@@ -13,7 +13,12 @@ fn public_set_publishes_the_next_key_before_it_signs() -> Result<()> {
     let published_before_signing = PublicJwks::from(rotated.clone());
 
     assert_ne!(next_kid, signing_kid);
-    assert!(published_before_signing.find_by_kid(&next_kid).is_some());
+    assert!(
+        published_before_signing
+            .find_by_kid(&next_kid)
+            .expect("published key ids are unique")
+            .is_some()
+    );
 
     let promoted = rotated.rotate()?;
 

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
+use margaret_jwks_client::public_token_verification::PublicTokenVerification;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
 use margaret_jwks_keygen::curve::Curve;
@@ -31,5 +32,5 @@ async fn public_jwks_verifier_accepts_a_freshly_signed_token() {
         .verify::<TestClaims>(&token, test_instant(1_700_000_000))
         .expect("the freshly signed token verifies");
 
-    assert_eq!(verified, claims);
+    assert_eq!(verified, PublicTokenVerification::Verified(claims));
 }

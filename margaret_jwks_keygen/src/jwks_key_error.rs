@@ -28,6 +28,9 @@ pub enum JwksKeyError {
         source: base64ct::Error,
     },
 
+    #[error("the jwks document contains more than one key with id '{kid}'")]
+    DuplicateKeyId { kid: String },
+
     #[error("the token header segment is not valid base64url: {source}")]
     HeaderBase64 {
         #[source]

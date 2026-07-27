@@ -9,7 +9,7 @@ use margaret::framework::macros::singleton;
 use crate::margaret::asset_bag::asset_responder::AssetResponder;
 
 #[singleton]
-#[responds_to_http(method = "get", path = "/assets/{*asset_path}", server = "public")]
+#[responds_to_http(access = margaret::framework::http::public_access::PublicAccess, method = "get", path = "/assets/{*asset_path}", server = "public")]
 pub struct GetAsset {
     asset_responder: Arc<AssetResponder>,
 }

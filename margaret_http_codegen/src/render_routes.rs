@@ -35,7 +35,7 @@ fn placeholders<'route>(named: &NamedRoute<'route>) -> Vec<&'route str> {
 }
 
 fn is_get(named: &NamedRoute<'_>) -> bool {
-    named.route.method == "GET"
+    named.route.method == http::Method::GET
 }
 
 fn server_layouts<'server>(
@@ -160,7 +160,9 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
     let has_named = !named.is_empty();
     let has_parameterized = !parameterized.is_empty();
 
-    let origin_field = has_parameterized.then(|| quote! { #origin: ::std::sync::Arc<str>, });
+    let origin_field = has_parameterized.then(|| {
+        quote! { #origin: margaret::framework::http::route_origin::RouteOrigin, }
+    });
     let paramless_field_decls = paramless.iter().map(|named| {
         let field = route_field_ident(named);
         let return_type = route_type_tokens(named);
@@ -191,7 +193,9 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
         }
 
         impl #struct_ident {
-            pub(crate) fn #constructor(#origin_param: ::std::sync::Arc<str>) -> Self {
+            pub(crate) fn #constructor(
+                #origin_param: margaret::framework::http::route_origin::RouteOrigin,
+            ) -> Self {
                 Self {
                     #(#paramless_inits)*
                     #origin_init
@@ -217,7 +221,9 @@ pub(crate) fn render_routes(
     let origin_params = layouts.iter().map(|layout| {
         let param = origin_param_ident(layout.server);
 
-        quote! { #param: ::std::sync::Arc<str>, }
+        quote! {
+            #param: margaret::framework::http::route_origin::RouteOrigin,
+        }
     });
     let server_inits = layouts.iter().map(|layout| {
         let field = server_field_ident(layout.server);

@@ -49,6 +49,7 @@ impl RendersView for FarewellView {
 mod tests {
     use std::sync::Arc;
 
+    use margaret::framework::http::route_origin::RouteOrigin;
     use margaret::framework::views::renders_view::RendersView;
 
     use super::FarewellView;
@@ -61,7 +62,10 @@ mod tests {
         let view = FarewellView {
             card_layout: Arc::new(CardLayout),
         };
-        let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
+        let routes = Routes::from_origins(
+            RouteOrigin::parse("https://internal.example").expect("a valid internal origin"),
+            RouteOrigin::parse("https://public.example").expect("a valid public origin"),
+        );
 
         let markup = view
             .render(FarewellViewProps {

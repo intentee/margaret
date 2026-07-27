@@ -179,9 +179,9 @@ impl AssetRoute {
         let responder = read_generated(host.path(), "asset_bag/asset_responder.rs");
 
         assert!(responder.contains("\"service_worker.js\" =>"));
-        assert!(responder.contains("\"no-cache\""));
+        assert!(responder.contains("revalidating_asset"));
         assert!(responder.contains("\"app_ABC.js\" =>"));
-        assert!(responder.contains("public, max-age=31536000, immutable"));
+        assert!(responder.contains("immutable_asset"));
     }
 
     #[test]

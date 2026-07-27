@@ -26,9 +26,10 @@ impl SvidServerSide {
     ) -> Self {
         let svid_client_cert_verifier_facade = Arc::new(SvidClientCertVerifierFacade::default());
 
-        let server_config: ServerConfig = ServerConfig::builder()
-            .with_client_cert_verifier(svid_client_cert_verifier_facade.clone())
-            .with_cert_resolver(Arc::new(svid_certified_key_holder));
+        let server_config: ServerConfig =
+            ServerConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+                .with_client_cert_verifier(svid_client_cert_verifier_facade.clone())
+                .with_cert_resolver(Arc::new(svid_certified_key_holder));
 
         Self {
             root_cert_store_holder,

@@ -1,5 +1,6 @@
 [profile.default]
 slow-timeout = { period = "100ms", terminate-after = 2 }
+test-threads = 1
 
 [[profile.default.overrides]]
 filter = 'package(~_spiffe_svid)'

@@ -40,18 +40,25 @@ async fn exchange(
     let router = Router::build(vec![
         RouteEntry::new(
             "/submit",
-            vec![MethodHandler::new("POST", Arc::new(Accepts))],
+            vec![MethodHandler::new(
+                margaret_http::http::Method::POST,
+                Arc::new(Accepts),
+            )],
         ),
         RouteEntry::new(
             "/search",
-            vec![MethodHandler::new("QUERY", Arc::new(Accepts))],
+            vec![MethodHandler::new(
+                margaret_http::http::Method::from_bytes(b"QUERY")
+                    .expect("the test method is valid"),
+                Arc::new(Accepts),
+            )],
         ),
     ])
     .expect("the route entries register cleanly");
     let server_registry = Arc::new(ServerRegistry::new(vec![Server::new(
         "public",
         "127.0.0.1:0".to_string(),
-        TransportConfig::Plain,
+        TransportConfig::FixturePlain,
         upload_config,
         body_limit,
         router,
