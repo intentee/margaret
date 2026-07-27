@@ -5,7 +5,6 @@ use std::path::Path;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
 use margaret_container::container_error::ContainerError;
-use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
 use margaret_request_binding_codegen::views_availability::ViewsAvailability;
@@ -13,11 +12,11 @@ use margaret_tag_codegen::tag_pool::TagPool;
 
 use crate::application_features::ApplicationFeatures;
 use crate::asset_bag_modules::asset_bag_modules;
+use crate::build_jwks_artifacts::build_jwks_artifacts;
 use crate::codegen_error::CodegenError;
 use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
 use crate::generated_features::GeneratedFeatures;
-use crate::jwks_artifacts::jwks_artifacts;
 use crate::serve_arguments::serve_arguments;
 use crate::umbrella::umbrella;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
@@ -44,7 +43,7 @@ pub fn build(
                 margaret_container::framework_enablement::FrameworkEnablement::WhenReferenced,
             injection:
                 margaret_container::framework_injection_role::FrameworkInjectionRole::Unmarked,
-            provided: crate::asset_responder_path::asset_responder_canonical_path(),
+            provided: crate::asset_responder_canonical_path::asset_responder_canonical_path(),
         },
         crate::jwks_secret_storage_provider::jwks_secret_storage_provider(),
     ];
@@ -65,7 +64,7 @@ pub fn build(
         assets_directory,
         embed_relative,
     )?;
-    let jwks = jwks_artifacts(bindings, &client_bindings);
+    let jwks = build_jwks_artifacts(bindings, &client_bindings);
     module_tokens.extend(jwks.modules);
 
     let views_availability = if features.has_views {
@@ -75,26 +74,22 @@ pub fn build(
     };
     let registries = BindingRegistries::collect(&index, views_availability)?;
     if features.has_authenticated_users && (features.has_http || features.has_websockets) {
-        module_tokens.push(GeneratedModuleTokens::new(
-            "authenticated_users",
-            render_authenticated_user_wrappers(&registries.providers()),
-        ));
+        module_tokens.extend(render_authenticated_user_wrappers(&registries.providers()));
     }
 
     let middleware_plans =
         margaret_middleware_codegen::middleware_plans::middleware_plans(&index, &registries)?;
     if features.has_middleware && (features.has_http || features.has_websockets) {
-        module_tokens.push(GeneratedModuleTokens::new(
-            "middleware",
+        module_tokens.extend(
             margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers(
                 &middleware_plans,
             ),
-        ));
+        );
     }
 
     let (websocket_roots, websocket_servers, websocket_server_arguments) =
         if features.has_websockets {
-            let plan = margaret_websocket_codegen::websocket_plan::WebSocketPlan::build(
+            let plan = margaret_websocket_codegen::web_socket_plan::WebSocketPlan::build(
                 &index,
                 bindings,
                 &middleware_plans,
@@ -479,7 +474,8 @@ impl AssetRoute {
         assert!(responder.contains("\"service_worker.js\" =>"));
         assert!(responder.contains("\"no-cache\""));
         assert!(
-            module(&code, "container/build").contains("asset_bag::asset_responder::AssetResponder")
+            module(&code, "container/build/serve")
+                .contains("asset_bag::asset_responder::AssetResponder")
         );
     }
 
@@ -674,7 +670,7 @@ impl Worker {
         assert!(!serve.contains("bundle_services"));
         assert!(!serve.contains("spiffe_server_config"));
 
-        let construction: String = module(&code, "container/build")
+        let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
         assert!(construction.contains("console_argument_0:reqwest::Client"));
@@ -862,7 +858,7 @@ impl GetIdentity {
             "pub use margaret::framework::jwks_roller_server::public_jwks_handler::PublicJwksHandler;"
         ));
 
-        let construction: String = module(&code, "container/build")
+        let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
         assert!(construction.contains("crate::margaret::jwks::JwksRoller::create("));
@@ -897,7 +893,7 @@ impl GetIdentity {
             "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
         ));
 
-        let construction: String = module(&code, "container/build")
+        let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
         assert!(
@@ -930,7 +926,7 @@ impl GetIdentity {
             "pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;"
         ));
 
-        let construction: String = module(&code, "container/build")
+        let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
         assert!(construction.contains(".server_secret_store()"));
@@ -974,7 +970,7 @@ impl GetVerify {
     fn weaves_a_console_argument_from_the_jwks_endpoint_through_the_verifier_accessor() {
         let code = generate(JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE).expect("the build succeeds");
 
-        let construction: String = module(&code, "container/build")
+        let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
         assert!(construction.contains(".verifier()"));
@@ -1014,7 +1010,7 @@ impl GetJwks {
         let code = generate(JWKS_NAME_COLLISION_CRATE)
             .expect("a user component named JwksRoller coexists");
 
-        let construction: String = module(&code, "container/build")
+        let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
         assert!(construction.contains("std::sync::Arc<crate::JwksRoller>"));
@@ -1050,7 +1046,7 @@ impl GetJwks {
         let code = generate(JWKS_FIELD_COLLISION_CRATE)
             .expect("a user component flattening to a framework field coexists");
 
-        let construction: String = module(&code, "container/build")
+        let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
 
@@ -1133,7 +1129,7 @@ impl ProvidesEndpoint for SecondEndpoint {}
     }
 
     #[test]
-    fn propagates_a_websocket_codegen_error() {
+    fn propagates_a_web_socket_codegen_error() {
         let error = generate(INVALID_WEBSOCKET_CRATE).expect_err("the invalid session is rejected");
 
         assert!(
@@ -1178,7 +1174,8 @@ impl RequestLog {
         let code = generate(MIDDLEWARE_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod middleware;"));
-        assert!(module(&code, "middleware").contains("pub struct RequestLog"));
+        assert!(module(&code, "middleware").contains("pub mod request_log;"));
+        assert!(module(&code, "middleware/request_log").contains("pub struct RequestLog"));
         assert!(concatenated(&code).contains("super::super::middleware::RequestLog"));
     }
 
@@ -1214,7 +1211,11 @@ impl GetProfile {
         let code = generate(AUTHENTICATED_USER_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod authenticated_users;"));
-        assert!(module(&code, "authenticated_users").contains("pub struct SessionUserProvider"));
+        assert!(module(&code, "authenticated_users").contains("pub mod session_user_provider;"));
+        assert!(
+            module(&code, "authenticated_users/session_user_provider")
+                .contains("pub struct SessionUserProvider")
+        );
         assert!(
             concatenated(&code).contains("super::super::authenticated_users::SessionUserProvider")
         );
@@ -1305,7 +1306,8 @@ impl RequestLog {
 
         assert!(module(&code, "mod").contains("pub mod websocket;"));
         assert!(module(&code, "mod").contains("pub mod middleware;"));
-        assert!(module(&code, "middleware").contains("pub struct RequestLog"));
+        assert!(module(&code, "middleware").contains("pub mod request_log;"));
+        assert!(module(&code, "middleware/request_log").contains("pub struct RequestLog"));
         assert!(concatenated(&code).contains("super::middleware::RequestLog"));
         assert!(!concatenated(&code).contains("GatedWebSocketUpgrade"));
     }
@@ -1592,7 +1594,7 @@ impl RespondsToWebSocketMessage for Chatter {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(module(&code, "container/build").contains("Pool::create().await"));
+        assert!(module(&code, "container/build/serve").contains("Pool::create().await"));
         assert!(concatenated(&code).contains("fn server_public"));
         assert!(!concatenated(&code).contains("async fn server_public"));
         assert!(serve.contains("super::http::server_public::server_public(container,"));
@@ -1705,7 +1707,7 @@ impl New {
     fn generates_without_reserving_names_for_components_named_after_framework_identifiers() {
         let code = generate(FRAMEWORK_NAMED_CRATE).expect("the build succeeds");
 
-        let build: String = module(&code, "container/build")
+        let build: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
         let routes: String = module(&code, "routes").split_whitespace().collect();

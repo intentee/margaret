@@ -3,7 +3,7 @@ use margaret_attributes::attribute_arguments_reader::AttributeArgumentsReader;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 
 use crate::message_cardinality::MessageCardinality;
-use crate::websocket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_codegen_error::WebSocketCodegenError;
 
 fn cardinality(
     reader: &mut AttributeArgumentsReader,

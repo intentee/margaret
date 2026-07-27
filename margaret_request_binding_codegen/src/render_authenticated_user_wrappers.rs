@@ -1,9 +1,11 @@
+use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
@@ -42,10 +44,10 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     } = application;
     let concrete = path_tokens(concrete);
     let model = path_tokens(model);
-    let routes_field =
-        injects_routes.then(|| quote! { pub routes: std::sync::Arc<super::routes::Routes>, });
+    let routes_field = injects_routes
+        .then(|| quote! { pub routes: std::sync::Arc<super::super::routes::Routes>, });
     let views_field =
-        injects_views.then(|| quote! { pub views: std::sync::Arc<super::views::Views>, });
+        injects_views.then(|| quote! { pub views: std::sync::Arc<super::super::views::Views>, });
 
     let mut allocator = NameAllocator::new();
 
@@ -120,10 +122,36 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
 }
 
 #[must_use]
-pub fn render_authenticated_user_wrappers(providers: &[&AuthenticatedUserProvider]) -> TokenStream {
-    let wrappers = providers.iter().copied().map(provider_wrapper);
+pub fn render_authenticated_user_wrappers(
+    providers: &[&AuthenticatedUserProvider],
+) -> Vec<GeneratedModuleTokens> {
+    let modules = providers.iter().map(|provider| {
+        let wrapper = &provider.application.wrapper;
+        format_ident!("{}", wrapper.to_string().to_snake_case())
+    });
+    let exports = providers.iter().map(|provider| {
+        let wrapper = &provider.application.wrapper;
+        let module = format_ident!("{}", wrapper.to_string().to_snake_case());
 
-    quote! {
-        #(#wrappers)*
-    }
+        quote! { pub use #module::#wrapper; }
+    });
+    let mut generated = vec![GeneratedModuleTokens::new(
+        "authenticated_users",
+        quote! {
+            #(pub mod #modules;)*
+            #(#exports)*
+        },
+    )];
+
+    generated.extend(providers.iter().map(|provider| {
+        let wrapper = &provider.application.wrapper;
+        let module = wrapper.to_string().to_snake_case();
+
+        GeneratedModuleTokens::new(
+            format!("authenticated_users/{module}"),
+            provider_wrapper(provider),
+        )
+    }));
+
+    generated
 }

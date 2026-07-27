@@ -9,10 +9,10 @@ use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::build_websocket_plan::build_websocket_plan;
-use crate::render_server_routes::server_console_arguments;
+use crate::server_console_arguments::server_console_arguments;
 use crate::session_plan::SessionPlan;
-use crate::websocket_codegen_error::WebSocketCodegenError;
-use crate::websocket_message::WebSocketMessage;
+use crate::web_socket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_message::WebSocketMessage;
 
 pub struct WebSocketPlan {
     pub(crate) messages: Vec<WebSocketMessage>,

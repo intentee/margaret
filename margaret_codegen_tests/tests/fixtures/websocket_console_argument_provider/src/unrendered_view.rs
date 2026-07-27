@@ -5,10 +5,7 @@ use margaret::framework::views::maud::html;
 use margaret::framework::views::renders_view::RendersView;
 
 use crate::margaret::asset_bag::asset;
-
-pub struct UnrenderedViewProps {
-    pub label: String,
-}
+use crate::unrendered_view_props::UnrenderedViewProps;
 
 #[renders_view(name = "unrendered_view")]
 #[singleton]

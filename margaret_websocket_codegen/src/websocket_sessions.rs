@@ -11,8 +11,8 @@ use quote::format_ident;
 
 use crate::build_for_session_method::build_for_session_method;
 use crate::session_arguments::SessionArguments;
-use crate::websocket_codegen_error::WebSocketCodegenError;
-use crate::websocket_session::WebSocketSession;
+use crate::web_socket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_session::WebSocketSession;
 
 pub(crate) fn websocket_sessions(
     index: &AttributeIndex,

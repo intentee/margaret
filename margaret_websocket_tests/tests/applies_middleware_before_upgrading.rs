@@ -6,7 +6,7 @@ use margaret_http::http_middleware::HttpMiddleware;
 use margaret_websocket_tests::blocking_middleware::BlockingMiddleware;
 use margaret_websocket_tests::passing_middleware::PassingMiddleware;
 use margaret_websocket_tests::raw_http_exchange::raw_http_exchange;
-use margaret_websocket_tests::running_websocket_server::RunningWebSocketServer;
+use margaret_websocket_tests::running_web_socket_server::RunningWebSocketServer;
 use tokio::net::TcpStream;
 use tokio_tungstenite::client_async;
 use tokio_tungstenite::tungstenite::Message;

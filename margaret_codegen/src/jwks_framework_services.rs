@@ -5,8 +5,8 @@ use margaret_service_codegen::framework_service::FrameworkService;
 use margaret_service_codegen::framework_service_kind::FrameworkServiceKind;
 use margaret_tag_codegen::jwks_client_binding::JwksClientBinding;
 
-use crate::jwks_client_path::jwks_client_canonical_path;
-use crate::jwks_roller_path::jwks_roller_canonical_path;
+use crate::jwks_client_canonical_path::jwks_client_canonical_path;
+use crate::jwks_roller_canonical_path::jwks_roller_canonical_path;
 
 fn framework_service(
     bindings: &ContainerBindings,

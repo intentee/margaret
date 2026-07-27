@@ -2,22 +2,9 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_request_binding_codegen::binding_console_arguments::binding_console_arguments;
 
-use crate::handler_binding::HandlerBinding;
+use crate::handler_console_arguments::handler_console_arguments;
 use crate::session_plan::SessionPlan;
-use crate::websocket_codegen_error::WebSocketCodegenError;
-
-pub(crate) fn handler_console_arguments(
-    handlers: &[HandlerBinding],
-    bindings: &ContainerBindings,
-) -> Result<Vec<ConsoleArgument>, WebSocketCodegenError> {
-    let mut collected: Vec<ConsoleArgument> = Vec::new();
-
-    for handler in handlers {
-        collected.extend_from_slice(bindings.console_arguments(&handler.handler_path)?);
-    }
-
-    Ok(collected)
-}
+use crate::web_socket_codegen_error::WebSocketCodegenError;
 
 pub(crate) fn session_console_arguments(
     plan: &SessionPlan,

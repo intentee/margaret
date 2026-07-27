@@ -6,15 +6,16 @@ use margaret_attributes::struct_shape::StructShape;
 use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::construction_error_path::construction_error_path;
 use crate::construction_flow::construction_flow;
 use crate::container_plan::ContainerPlan;
 use crate::direct_construction::DirectConstruction;
 use crate::field_ident::field_ident;
+use crate::field_type::field_type;
 use crate::planned_dependency::PlannedDependency;
 use crate::planned_provider::PlannedProvider;
-use crate::render::field_type;
 use crate::reverse_console_argument_weaver::ReverseConsoleArgumentWeaver;
 
 fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {
@@ -147,7 +148,7 @@ fn flow_statements(flow: &[&PlannedProvider]) -> Vec<TokenStream> {
     statements
 }
 
-fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> TokenStream {
+fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> (proc_macro2::Ident, TokenStream) {
     let flow = construction_flow(plan, &[root]);
     let provider = &root.provider;
     let function = format_ident!("construct_{}", provider.field_name);
@@ -163,7 +164,7 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> TokenStream {
             Ok(#root_binding)
     };
 
-    if root.is_async {
+    let tokens = if root.is_async {
         quote! {
             pub(crate) async fn #function(#(#parameters),*) -> ::std::result::Result<#root_type, #error> {
                 #body
@@ -175,7 +176,9 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> TokenStream {
                 #body
             }
         }
-    }
+    };
+
+    (function, tokens)
 }
 
 fn serve_arguments(roots: &[&PlannedProvider]) -> (Vec<ConsoleArgument>, Vec<usize>) {
@@ -202,7 +205,7 @@ pub(crate) fn render_build(
     construction_roots: &[&PlannedProvider],
     retained_roots: &[&PlannedProvider],
     builder_roots: &[&PlannedProvider],
-) -> TokenStream {
+) -> Vec<GeneratedModuleTokens> {
     let root_builders = builder_roots
         .iter()
         .map(|root| root_builder(root, plan))
@@ -232,7 +235,7 @@ pub(crate) fn render_build(
     let serve_body = quote! {
             #(#serve_statements)*
 
-            Ok(super::Container {
+            Ok(super::super::Container {
                 #(#fields)*
             })
     };
@@ -240,7 +243,7 @@ pub(crate) fn render_build(
         quote! {
             pub(crate) async fn serve(
                 #(#serve_parameters),*
-            ) -> ::std::result::Result<super::Container, #error> {
+            ) -> ::std::result::Result<super::super::Container, #error> {
                 #serve_body
             }
         }
@@ -248,15 +251,31 @@ pub(crate) fn render_build(
         quote! {
             pub(crate) fn serve(
             #(#serve_parameters),*
-        ) -> ::std::result::Result<super::Container, #error> {
+        ) -> ::std::result::Result<super::super::Container, #error> {
                 #serve_body
             }
         }
     };
 
-    quote! {
-        #(#root_builders)*
+    let builder_modules = root_builders.iter().map(|(function, _)| {
+        quote! {
+            pub(crate) mod #function;
+            pub(crate) use #function::#function;
+        }
+    });
+    let mut modules = vec![GeneratedModuleTokens::new(
+        "container/build",
+        quote! {
+            #(#builder_modules)*
+            pub(crate) mod serve;
+            pub(crate) use serve::serve;
+        },
+    )];
 
-        #serve
-    }
+    modules.extend(root_builders.into_iter().map(|(function, tokens)| {
+        GeneratedModuleTokens::new(format!("container/build/{function}"), tokens)
+    }));
+    modules.push(GeneratedModuleTokens::new("container/build/serve", serve));
+
+    modules
 }

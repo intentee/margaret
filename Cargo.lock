@@ -2398,10 +2398,12 @@ dependencies = [
 name = "margaret_middleware_codegen"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "margaret_attributes",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_container",
+ "margaret_generated_module",
  "margaret_injection_codegen",
  "margaret_request_binding_codegen",
  "margaret_tag_codegen",
@@ -2453,10 +2455,12 @@ dependencies = [
 name = "margaret_request_binding_codegen"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "margaret_attributes",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_container",
+ "margaret_generated_module",
  "margaret_injection_codegen",
  "margaret_route_parameter_codegen",
  "proc-macro2",

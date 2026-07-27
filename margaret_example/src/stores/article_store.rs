@@ -20,9 +20,9 @@ use crate::models::author::Author;
 use crate::stores::article_store_error::ArticleStoreError;
 use crate::system_clock::SystemClock;
 
-const FIRST_AUTHORED_ID: u64 = 103;
+pub use super::featured_article_id::FEATURED_ARTICLE_ID;
 
-pub const FEATURED_ARTICLE_ID: Uuid = Uuid::from_u128(100);
+const FIRST_AUTHORED_ID: u64 = 103;
 
 fn at_epoch_seconds(seconds: i64) -> DateTime<Utc> {
     DateTime::from_timestamp_nanos(seconds * 1_000_000_000)

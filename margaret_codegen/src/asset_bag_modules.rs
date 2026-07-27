@@ -4,9 +4,9 @@ use margaret_asset_bag_codegen::render_asset_bag::render_asset_bag;
 use margaret_asset_bag_codegen::responder_generation::ResponderGeneration;
 use margaret_container::container_bindings::ContainerBindings;
 
-use crate::asset_responder_path::asset_responder_canonical_path;
+use crate::asset_responder_canonical_path::asset_responder_canonical_path;
+use crate::assets_directory_name::ASSETS_DIRECTORY_NAME;
 use crate::codegen_error::CodegenError;
-use crate::generate::ASSETS_DIRECTORY_NAME;
 use crate::walk_asset_directory::walk_asset_directory;
 
 pub(crate) fn asset_bag_modules(

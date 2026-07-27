@@ -8,9 +8,9 @@ use crate::handler_binding::HandlerBinding;
 use crate::handler_kind::HandlerKind;
 use crate::message_kind::MessageKind;
 use crate::session_plan::SessionPlan;
-use crate::websocket_codegen_error::WebSocketCodegenError;
-use crate::websocket_message::WebSocketMessage;
-use crate::websocket_session::WebSocketSession;
+use crate::web_socket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_message::WebSocketMessage;
+use crate::web_socket_session::WebSocketSession;
 
 fn handler_method<'message>(
     handler_kind: &HandlerKind,

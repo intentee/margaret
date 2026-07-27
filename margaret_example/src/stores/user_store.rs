@@ -6,7 +6,7 @@ use margaret::framework::macros::singleton;
 
 use crate::models::user::User;
 
-pub const MILO_SESSION: Uuid = Uuid::from_u128(900);
+pub use super::milo_session::MILO_SESSION;
 
 fn milo() -> User {
     User {

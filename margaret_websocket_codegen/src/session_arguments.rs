@@ -1,7 +1,7 @@
 use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 
-use crate::websocket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_codegen_error::WebSocketCodegenError;
 
 pub(crate) struct SessionArguments {
     pub(crate) path: String,

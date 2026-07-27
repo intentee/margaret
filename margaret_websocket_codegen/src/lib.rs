@@ -1,26 +1,28 @@
 pub mod render_websocket;
-pub mod websocket_artifacts;
-pub mod websocket_codegen_error;
-pub mod websocket_plan;
+pub mod web_socket_artifacts;
+pub mod web_socket_codegen_error;
+pub mod web_socket_plan;
 
 mod build_for_session_method;
 mod build_websocket_plan;
 mod discovered_handler;
 mod handler_binding;
+mod handler_console_arguments;
 mod handler_kind;
 mod message_cardinality;
 mod message_kind;
 mod render_messages;
 mod render_server_routes;
 mod render_sessions;
+mod server_console_arguments;
 mod session_arguments;
 mod session_console_arguments;
 mod session_handler_plan;
 mod session_plan;
+mod web_socket_message;
+mod web_socket_session;
 mod websocket_handlers;
-mod websocket_message;
 mod websocket_messages;
-mod websocket_session;
 mod websocket_sessions;
 
 #[cfg(test)]
@@ -43,20 +45,20 @@ mod tests {
     use quote::format_ident;
 
     use crate::handler_binding::HandlerBinding;
-    use crate::render_server_routes::server_console_arguments;
+    use crate::server_console_arguments::server_console_arguments;
     use crate::session_console_arguments::session_console_arguments;
     use crate::session_plan::SessionPlan;
-    use crate::websocket_codegen_error::WebSocketCodegenError;
+    use crate::web_socket_codegen_error::WebSocketCodegenError;
+    use crate::web_socket_plan::WebSocketPlan;
+    use crate::web_socket_session::WebSocketSession;
     use crate::websocket_handlers::websocket_handlers;
-    use crate::websocket_plan::WebSocketPlan;
-    use crate::websocket_session::WebSocketSession;
 
     fn render_websocket(
         index: &AttributeIndex,
         bindings: &ContainerBindings,
         middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
         registries: &BindingRegistries,
-    ) -> Result<crate::websocket_artifacts::WebSocketArtifacts, WebSocketCodegenError> {
+    ) -> Result<crate::web_socket_artifacts::WebSocketArtifacts, WebSocketCodegenError> {
         WebSocketPlan::build(index, bindings, middleware_plans, registries)
             .map(|plan| crate::render_websocket::render_websocket(plan, bindings))
     }
@@ -274,7 +276,7 @@ impl RespondsToWebSocketMessage for Chatter {
 
         assert!(source.contains("container.chatter()"));
         assert!(source.contains("dispatch_table(container).await"));
-        assert!(source.contains("public_routes(container:&super::container::Container,"));
+        assert!(source.contains("public_routes(container:&super::super::container::Container,"));
         assert!(source.contains("upgrade_entry(container"));
         assert!(!source.contains("console_argument_"));
     }
@@ -615,14 +617,18 @@ impl Room {
     fn names_the_dispatch_container_unused_when_a_session_has_no_handlers() {
         let source = generated(INJECTED_ONLY_SESSION);
 
-        assert!(source.contains("dispatch_table(_container:&super::super::container::Container"));
+        assert!(
+            source.contains("dispatch_table(_container:&super::super::super::container::Container")
+        );
     }
 
     #[test]
     fn names_the_dispatch_container_when_a_session_has_handlers() {
         let source = generated(FULL_SESSION);
 
-        assert!(source.contains("dispatch_table(container:&super::super::container::Container"));
+        assert!(
+            source.contains("dispatch_table(container:&super::super::super::container::Container")
+        );
     }
 
     #[test]
@@ -631,7 +637,7 @@ impl Room {
 
         assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::web_socket("));
         assert!(source.contains(
-            "middleware.push(std::sync::Arc::new(super::middleware::Guard{inner:container.guard()"
+            "middleware.push(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard()"
         ));
         assert!(!source.contains("GatedWebSocketUpgrade"));
     }
@@ -666,7 +672,7 @@ impl Guard {
     fn reads_a_preconstructed_session_middleware() {
         let source = generated(SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE);
 
-        assert!(source.contains("public_routes(container:&super::container::Container,"));
+        assert!(source.contains("public_routes(container:&super::super::container::Container,"));
         assert!(source.contains("container.guard()"));
         assert!(!source.contains("console_argument_"));
     }
@@ -686,12 +692,10 @@ impl Guard {
     fn weaves_routes_when_only_a_middleware_injects_them() {
         let source = generated(SESSION_WITH_ROUTES_MIDDLEWARE);
 
-        assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
-        assert!(
-            source.contains(
-                "super::middleware::Tracer{inner:container.tracer(),routes:routes.clone()"
-            )
-        );
+        assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
+        assert!(source.contains(
+            "super::super::middleware::Tracer{inner:container.tracer(),routes:routes.clone()"
+        ));
         assert!(source.contains("upgrade_entry(container)"));
     }
 
@@ -1067,10 +1071,10 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(AUTHENTICATED_HANDSHAKE);
 
         assert!(source.contains(
-            "structFactory{session_user_provider:::std::sync::Arc<super::super::authenticated_users::SessionUserProvider,>,}"
+            "structFactory{session_user_provider:::std::sync::Arc<super::super::super::authenticated_users::SessionUserProvider,>,}"
         ));
         assert!(source.contains(
-            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(),}),}"
+            "Factory{session_user_provider:::std::sync::Arc::new(super::super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(),}),}"
         ));
     }
 
@@ -1197,11 +1201,9 @@ impl RespondsToWebSocketMessage for Chatter {
         );
 
         assert!(source.contains("session:::std::sync::Arc<crate::SystemClock>,"));
-        assert!(
-            source.contains(
-                "session_2:::std::sync::Arc<super::super::authenticated_users::Session>,"
-            )
-        );
+        assert!(source.contains(
+            "session_2:::std::sync::Arc<super::super::super::authenticated_users::Session>,"
+        ));
         assert!(source.contains("self.session_2.as_ref()"));
     }
 
@@ -1247,17 +1249,13 @@ impl RespondsToWebSocketMessage for Chatter {
     fn threads_the_console_arguments_of_an_authenticated_user_provider_through_the_handshake() {
         let source = generated(CONSOLE_ARGUMENT_PROVIDER);
 
-        assert!(
-            source.contains(
-                "pubasyncfnupgrade_entry(container:&super::super::container::Container,)"
-            )
-        );
+        assert!(source.contains(
+            "pubasyncfnupgrade_entry(container:&super::super::super::container::Container,)"
+        ));
         assert!(source.contains("inner:container.session_user_provider(),"));
-        assert!(
-            source.contains(
-                "pubasyncfnpublic_routes(container:&super::container::Container,_routes:"
-            )
-        );
+        assert!(source.contains(
+            "pubasyncfnpublic_routes(container:&super::super::container::Container,_routes:"
+        ));
         assert!(source.contains("upgrade_entry(container).await"));
     }
 
@@ -1455,7 +1453,7 @@ impl RespondsToWebSocketMessage for Poster {
         assert!(source.contains("self.routes.as_ref()"));
         assert!(source.contains("routes:&::std::sync::Arc<super::super::routes::Routes>"));
         assert!(source.contains("upgrade_entry(container,routes)"));
-        assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
+        assert!(source.contains("routes:&::std::sync::Arc<super::super::super::routes::Routes>"));
         assert!(!source.contains("views"));
     }
 

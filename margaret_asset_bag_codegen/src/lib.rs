@@ -1,5 +1,5 @@
 pub mod asset_bag_codegen_error;
-pub mod asset_responder_identity;
+pub mod asset_responder_canonical_suffix;
 pub mod render_asset_bag;
 pub mod responder_generation;
 

@@ -79,7 +79,9 @@ mod tests {
             .expect("the middleware plans are collected");
 
         render_middleware_wrappers(&plans)
-            .to_string()
+            .into_iter()
+            .map(|module| module.to_source())
+            .collect::<String>()
             .split_whitespace()
             .collect()
     }
@@ -143,7 +145,7 @@ impl Guard {
         );
 
         assert!(source.contains(
-            "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubroutes:std::sync::Arc<super::routes::Routes>,}"
+            "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubroutes:std::sync::Arc<super::super::routes::Routes>,}"
         ));
         assert!(source.contains("self.inner.process(request,next,&self.routes).await"));
     }
@@ -513,7 +515,7 @@ impl Tracer {
         );
 
         assert!(source.contains(
-            "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubviews:std::sync::Arc<super::views::Views>,}"
+            "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubviews:std::sync::Arc<super::super::views::Views>,}"
         ));
         assert!(source.contains("self.inner.process(next,&self.views).await"));
     }

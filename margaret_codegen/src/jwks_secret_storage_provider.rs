@@ -4,7 +4,7 @@ use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 
-use crate::jwks_secret_storage_path::jwks_secret_storage_canonical_path;
+use crate::jwks_secret_storage_canonical_path::jwks_secret_storage_canonical_path;
 
 fn canonical_path(segments: &[&str]) -> CanonicalPath {
     CanonicalPath::new(
@@ -44,7 +44,7 @@ pub(crate) fn jwks_secret_storage_provider() -> FrameworkProvider {
 mod tests {
     use super::canonical_path;
     use super::jwks_secret_storage_provider;
-    use crate::jwks_secret_storage_path::jwks_secret_storage_canonical_path;
+    use crate::jwks_secret_storage_canonical_path::jwks_secret_storage_canonical_path;
     use margaret_container::framework_construction::FrameworkConstruction;
 
     #[test]

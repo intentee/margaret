@@ -9,8 +9,8 @@ use margaret::framework::websocket::notification_envelope::NotificationEnvelope;
 use margaret::framework::websocket::responds_to_web_socket_notification::RespondsToWebSocketNotification;
 use margaret::framework::websocket::web_socket::WebSocket;
 
-use crate::routes::public::sessions::storyboard::StoryboardSession;
 use crate::routes::public::sessions::storyboard::messages::typing::Typing;
+use crate::routes::public::sessions::storyboard::storyboard_session::StoryboardSession;
 
 #[singleton]
 pub struct TypingIndicator;

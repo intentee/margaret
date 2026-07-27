@@ -11,9 +11,9 @@ use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use crate::message_kind::MessageKind;
 use crate::session_handler_plan::SessionHandlerPlan;
 use crate::session_plan::SessionPlan;
-use crate::websocket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_codegen_error::WebSocketCodegenError;
+use crate::web_socket_message::WebSocketMessage;
 use crate::websocket_handlers::websocket_handlers;
-use crate::websocket_message::WebSocketMessage;
 use crate::websocket_messages::websocket_messages;
 use crate::websocket_sessions::websocket_sessions;
 

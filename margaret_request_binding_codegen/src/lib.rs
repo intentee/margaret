@@ -536,7 +536,9 @@ impl SessionUserProvider {
     fn renders_a_wrapper_that_infers_through_the_declared_method() {
         let registries = registries_for(SESSION_PROVIDER);
         let source: String = render_authenticated_user_wrappers(&registries.providers())
-            .to_string()
+            .into_iter()
+            .map(|module| module.to_source())
+            .collect::<String>()
             .split_whitespace()
             .collect();
 
@@ -553,12 +555,14 @@ impl SessionUserProvider {
             "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, routes: &crate::margaret::routes::Routes, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         );
         let source: String = render_authenticated_user_wrappers(&registries.providers())
-            .to_string()
+            .into_iter()
+            .map(|module| module.to_source())
+            .collect::<String>()
             .split_whitespace()
             .collect();
 
-        assert!(source.contains("pubroutes:std::sync::Arc<super::routes::Routes>,"));
-        assert!(source.contains("pubviews:std::sync::Arc<super::views::Views>,"));
+        assert!(source.contains("pubroutes:std::sync::Arc<super::super::routes::Routes>,"));
+        assert!(source.contains("pubviews:std::sync::Arc<super::super::views::Views>,"));
         assert!(source.contains("self.inner.infer(&self.routes,&self.views).await"));
     }
 
@@ -568,7 +572,9 @@ impl SessionUserProvider {
             "struct Cookie;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, #[form_request(from = Cookie)] cookie: Cookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         );
         let source: String = render_authenticated_user_wrappers(&registries.providers())
-            .to_string()
+            .into_iter()
+            .map(|module| module.to_source())
+            .collect::<String>()
             .split_whitespace()
             .collect();
 

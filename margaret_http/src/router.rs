@@ -6,7 +6,10 @@ use matchit::InsertError;
 use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
 use crate::method_handler::MethodHandler;
+use crate::request_route::RequestRoute;
 use crate::route_entry::RouteEntry;
+use crate::route_resolution::RouteResolution;
+use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
 enum RouteTarget {
@@ -15,26 +18,6 @@ enum RouteTarget {
         middleware: Vec<Arc<dyn HttpMiddleware>>,
         upgrade: Arc<dyn WebSocketUpgrade>,
     },
-}
-
-pub(crate) enum RequestRoute {
-    Handler {
-        handler: Arc<dyn Handler>,
-        path_params: HashMap<String, String>,
-    },
-    MethodNotAllowed,
-    NotFound,
-}
-
-pub(crate) struct UpgradeRoute {
-    pub(crate) middleware: Vec<Arc<dyn HttpMiddleware>>,
-    pub(crate) path_params: HashMap<String, String>,
-    pub(crate) upgrade: Arc<dyn WebSocketUpgrade>,
-}
-
-pub(crate) enum RouteResolution {
-    Request(RequestRoute),
-    Upgrade(UpgradeRoute),
 }
 
 pub struct Router {

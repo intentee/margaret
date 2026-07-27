@@ -1,4 +1,4 @@
-use margaret_asset_bag_codegen::asset_responder_identity::asset_responder_canonical_suffix;
+use margaret_asset_bag_codegen::asset_responder_canonical_suffix::asset_responder_canonical_suffix;
 use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
