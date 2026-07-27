@@ -12,8 +12,8 @@ fn moves_a_copy_console_argument_shared_by_dependencies() {
         .split_whitespace()
         .collect();
 
-    assert!(source.contains(
-        "crate::Parent::create(console_argument_0,self.child(console_argument_0).await?,)"
-    ));
+    assert!(source.contains("crate::Parent::create("));
+    assert!(source.contains("console_argument_0"));
+    assert!(source.contains("::std::sync::Arc::clone(&child)"));
     assert!(!source.contains("console_argument_0.clone()"));
 }

@@ -21,13 +21,12 @@ pub struct GetGreeting {
 
 impl GetGreeting {
     #[constructor]
-    #[must_use]
-    pub fn create(greeter: Arc<EnglishGreeter>) -> Self {
-        Self { greeter }
+    pub fn create(greeter: Arc<EnglishGreeter>) -> anyhow::Result<Self> {
+        Ok(Self { greeter })
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
-        Response::text(200, self.greeter.greet())
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok(Response::text(200, self.greeter.greet()))
     }
 }

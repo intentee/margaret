@@ -13,9 +13,9 @@ impl Configured {
         #[console_argument(from = "verbose")] verbose: bool,
         #[console_argument(from = "optional-retries")] optional_retries: Option<u16>,
         #[console_argument(from = "note")] note: Option<String>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
     }
 
     #[process]
-    fn respond(&self) -> Response {}
+    fn respond(&self) -> anyhow::Result<Response> {}
 }

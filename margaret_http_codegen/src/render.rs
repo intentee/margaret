@@ -5,14 +5,11 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
-use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_container::accessor_error_path::accessor_error_path;
-use margaret_container::accessor_failure::AccessorFailure;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_middleware_codegen::fold_layers::fold_layers;
@@ -27,6 +24,7 @@ use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::injects_routes::injects_routes;
 use margaret_request_binding_codegen::injects_views::injects_views;
+use margaret_request_binding_codegen::render_bound_request_extractions::render_bound_request_extractions;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
@@ -34,10 +32,6 @@ use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::route_group::RouteGroup;
-
-fn console_weave(path: &CanonicalPath, bindings: &ContainerBindings) -> Vec<TokenStream> {
-    bindings.console_weaves(bindings.console_arguments(path))
-}
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
     injects_routes(&route.arguments)
@@ -83,12 +77,9 @@ fn handler_binding(route: &HttpRoute) -> Ident {
 
 fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let responder_type = path_tokens(&route.responder_path);
-    let responder_woven = console_weave(&route.responder_path, bindings);
     let responder_access = bindings.accessor_invocation(
         &format_ident!("container"),
         &route.responder_field.to_string(),
-        &responder_woven,
-        &AccessorFailure::Propagate,
     );
     let mut allocator = NameAllocator::new();
 
@@ -119,6 +110,20 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let views_local = format_ident!("{}", allocator.allocate("views").field());
     let captured = CapturedProviders::capture(&route.arguments, &mut allocator);
 
+    let bound_bindings = render_bound_request_extractions(
+        &route.arguments,
+        &captured,
+        &TokenStream::new(),
+        &request_binding,
+        &quote! { return ::std::result::Result::Err(error.into()) },
+        &quote! {
+            return ::std::result::Result::Ok(
+                margaret::framework::http::response_continuation::ResponseContinuation::from(
+                    margaret::framework::http::response::Response::not_found(),
+                ),
+            )
+        },
+    );
     let bindings_tokens = route
         .arguments
         .iter()
@@ -131,8 +136,11 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let method_name = &route.method_name;
     let respond_call = quote! { #responder_binding.#method_name(#(#argument_values),*).await };
     let body = quote! {
+        #bound_bindings
         #(#bindings_tokens)*
-        margaret::framework::http::response_continuation::ResponseContinuation::from(#respond_call)
+        #respond_call
+            .map(margaret::framework::http::response_continuation::ResponseContinuation::from)
+            .map_err(margaret::framework::http::handler_error::HandlerError::consumer)
     };
 
     let captures_routes = responder_injects_routes(route);
@@ -141,7 +149,10 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         std::pin::Pin<
             std::boxed::Box<
                 dyn std::future::Future<
-                    Output = margaret::framework::http::response_continuation::ResponseContinuation,
+                    Output = ::std::result::Result<
+                        margaret::framework::http::response_continuation::ResponseContinuation,
+                        margaret::framework::http::handler_error::HandlerError,
+                    >,
                 > + Send
                 + '_,
             >,
@@ -234,13 +245,7 @@ fn capture_binding(
     match kind {
         CapturedProviderKind::AuthenticatedUser { application } => {
             let wrapper = &application.wrapper;
-            let woven = console_weave(&application.concrete, bindings);
-            let inner_access = bindings.accessor_invocation(
-                &container,
-                kind.accessor(),
-                &woven,
-                &AccessorFailure::Propagate,
-            );
+            let inner_access = bindings.accessor_invocation(&container, kind.accessor());
             let routes_init = application
                 .injects_routes
                 .then(|| quote! { routes: routes.clone(), });
@@ -258,14 +263,8 @@ fn capture_binding(
                 );
             }
         }
-        CapturedProviderKind::Binder { provider, .. } => {
-            let woven = console_weave(provider, bindings);
-            let binder_access = bindings.accessor_invocation(
-                &container,
-                kind.accessor(),
-                &woven,
-                &AccessorFailure::Propagate,
-            );
+        CapturedProviderKind::Binder { .. } => {
+            let binder_access = bindings.accessor_invocation(&container, kind.accessor());
 
             quote! { let #local = #binder_access; }
         }
@@ -283,10 +282,19 @@ fn argument_binding(
         &argument.binding,
         &argument.holder,
         &ExtractionContext {
-            continuation_return: &quote! { return response },
+            continuation_return: &quote! {
+                return ::std::result::Result::Ok(response)
+            },
+            error_return: &quote! {
+                return ::std::result::Result::Err(
+                    margaret::framework::http::handler_error::HandlerError::consumer(error),
+                )
+            },
             provider_access: &provider_access,
             request_local: request,
-            response_return: &quote! { return response.into() },
+            response_return: &quote! {
+                return ::std::result::Result::Ok(response.into())
+            },
         },
     )
 }
@@ -349,8 +357,6 @@ fn server_module(
     has_views: bool,
     has_websocket_routes: bool,
     bindings: &ContainerBindings,
-    server_arguments: &[ConsoleArgument],
-    websocket_arguments: &[ConsoleArgument],
 ) -> TokenStream {
     let function_name = server.function_name();
     let server_routes: Vec<&HttpRoute> = table
@@ -373,8 +379,6 @@ fn server_module(
             #views_param: &::std::sync::Arc<super::super::views::Views>,
         }
     });
-    let console_parameters = bindings.console_parameters(server_arguments);
-
     let handler_bindings = server_routes
         .iter()
         .filter(|route| route.name.is_some())
@@ -417,24 +421,16 @@ fn server_module(
         })
     });
     let named_handlers = vec_literal_tokens(named_handlers);
-    let has_fallible = bindings.has_accessors();
     let router = if has_websocket_routes {
         let websocket_routes = format_ident!("{}_routes", server.name());
-        let websocket_forward = bindings.console_forwards(websocket_arguments);
         let websocket_call = quote! {
-            super::super::websocket::#websocket_routes(container, #(#websocket_forward)* #routes_param).await
+            super::super::websocket::#websocket_routes(container, #routes_param).await
         };
-        let websocket_extend = if has_fallible {
-            quote! { route_entries.extend(#websocket_call?); }
-        } else {
-            quote! { route_entries.extend(#websocket_call); }
-        };
-
         quote! {
             {
                 let mut route_entries = #route_entries;
 
-                #websocket_extend
+                route_entries.extend(#websocket_call);
 
                 margaret::framework::http::router::Router::build(route_entries)
             }
@@ -443,7 +439,7 @@ fn server_module(
         quote! { margaret::framework::http::router::Router::build(#route_entries) }
     };
 
-    let parameter_count = 2 + console_parameters.len() + usize::from(views_parameter.is_some());
+    let parameter_count = 2 + usize::from(views_parameter.is_some());
     let too_many_arguments = too_many_arguments_expect(parameter_count);
     let inner_return = quote! {
         ::std::result::Result<
@@ -456,28 +452,16 @@ fn server_module(
             margaret::framework::http::server_routes::ServerRoutes::new(router, #named_handlers)
         })
     };
-    let (return_type, body) = if has_fallible {
-        let error = accessor_error_path();
-
-        (
-            quote! { ::std::result::Result<#inner_return, #error> },
-            quote! { Ok(#body_value) },
-        )
-    } else {
-        (inner_return, body_value)
-    };
-
     quote! {
         #too_many_arguments
         pub async fn #function_name(
             container: &super::super::container::Container,
-            #(#console_parameters)*
             #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
             #views_parameter
-        ) -> #return_type {
+        ) -> #inner_return {
             #(#handler_bindings)*
 
-            #body
+            #body_value
         }
     }
 }
@@ -488,8 +472,6 @@ pub(crate) fn render(
     has_views: bool,
     websocket_servers: &[String],
     bindings: &ContainerBindings,
-    server_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
-    websocket_server_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
 ) -> Vec<GeneratedModuleTokens> {
     let server_declarations = servers.iter().map(|server| {
         let function_name = server.function_name();
@@ -505,28 +487,13 @@ pub(crate) fn render(
     };
 
     let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];
-    let empty: Vec<ConsoleArgument> = Vec::new();
-
     for server in servers {
         let has_websocket_routes = websocket_servers
             .iter()
             .any(|websocket_server| websocket_server == server.name());
-        let server_union = server_arguments.get(server.name()).unwrap_or(&empty);
-        let websocket_union = websocket_server_arguments
-            .get(server.name())
-            .unwrap_or(&empty);
-
         modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
-            server_module(
-                table,
-                server,
-                has_views,
-                has_websocket_routes,
-                bindings,
-                server_union,
-                websocket_union,
-            ),
+            server_module(table, server, has_views, has_websocket_routes, bindings),
         ));
     }
 

@@ -8,5 +8,8 @@ use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
 pub trait InfersAuthenticatedUser: Send + Sync {
     type User;
 
-    async fn infer(&self, request: &Request) -> AuthenticatedUserOutcome<Self::User>;
+    async fn infer(
+        &self,
+        request: &Request,
+    ) -> anyhow::Result<AuthenticatedUserOutcome<Self::User>>;
 }

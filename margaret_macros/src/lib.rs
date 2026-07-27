@@ -18,7 +18,11 @@ pub fn singleton(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 pub fn constructor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     strip_parameter_markers(
         item,
-        &["console_argument", "jwks_secret_store", "spiffe_http_client"],
+        &[
+            "console_argument",
+            "jwks_secret_store",
+            "spiffe_http_client",
+        ],
     )
 }
 

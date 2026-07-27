@@ -66,9 +66,6 @@ pub enum WebSocketCodegenError {
     #[error("session '{session}' has more than one #[build_for_session] method: {methods}")]
     AmbiguousBuildForSession { session: String, methods: String },
 
-    #[error("the #[build_for_session] method of '{session}' must return Self")]
-    BuildForSessionReturnTypeMismatch { session: String },
-
     #[error(
         "session '{session}' attaches the middleware '{middleware}', which renders the views, but a WebSocket upgrade handshake has no views"
     )]

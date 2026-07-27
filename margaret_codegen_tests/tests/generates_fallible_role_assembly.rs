@@ -29,40 +29,48 @@ fn module(generated: &GeneratedCode, name: &str) -> String {
 
 #[test]
 fn reports_a_fallible_service_registration_into_the_command_outcome() {
-    assert!(module(&generated(), "serve").contains(
-        "inner:(matchcontainer.worker_worker().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}})"
-    ));
+    assert!(module(&generated(), "serve").contains("inner:container.worker_worker()"));
 }
 
 #[test]
 fn reports_a_fallible_console_command_into_the_command_outcome() {
-    assert!(module(&generated(), "run").contains(
-        "Some((\"boot\",_matches))=>{(matchcontainer.boot_boot().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}})"
+    let source = module(&generated(), "run");
+
+    assert!(source.contains(
+        "matchsuper::container::build::construct_boot_boot().await{Ok(value)=>value,Err(error)=>"
+    ));
+    assert!(source.contains("margaret::framework::console::report_failure::report_failure(error"));
+    assert!(source.contains(
+        "margaret::framework::console::command_outcome::CommandOutcome::from_user_result("
     ));
 }
 
 #[test]
-fn threads_construction_errors_through_the_views_builder() {
-    assert!(module(&generated(), "views/build").contains(
-        "->::std::result::Result<super::Views,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
-    ));
+fn views_builder_reads_only_completed_dependencies() {
+    let source = module(&generated(), "views/build");
+
+    assert!(source.contains("->super::Views"));
+    assert!(source.contains("container.home_view_home_view()"));
+    assert!(!source.contains("ConstructionError"));
 }
 
 #[test]
-fn threads_construction_errors_through_the_http_server_assembly() {
+fn http_server_assembly_reads_only_completed_dependencies() {
     let source = module(&generated(), "http/server_public");
 
-    assert!(source.contains("container.get_home_get_home().await?"));
-    assert!(source.contains("super::super::websocket::public_routes(container,routes).await?"));
+    assert!(source.contains("container.get_home_get_home()"));
+    assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
     assert!(source.contains(
-        "->::std::result::Result<::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>,std::sync::Arc<margaret::framework::container_error::construction_error::ConstructionError,>,>"
+        "->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>"
     ));
+    assert!(!source.contains("ConstructionError"));
 }
 
 #[test]
-fn threads_construction_errors_through_the_websocket_dispatch() {
+fn websocket_dispatch_reads_only_completed_dependencies() {
     let source = module(&generated(), "websocket/chat_chat_session");
 
-    assert!(source.contains("handler:container.chat_chat_responder().await?"));
-    assert!(source.contains("dispatch_table(container).await?"));
+    assert!(source.contains("handler:container.chat_chat_responder()"));
+    assert!(source.contains("dispatch_table(container).await"));
+    assert!(!source.contains("ConstructionError"));
 }

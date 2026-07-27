@@ -3,7 +3,7 @@ struct Config;
 
 impl Config {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 
     #[inline]
     fn helper(&self) {}
@@ -14,7 +14,7 @@ struct EnglishGreeter;
 
 impl EnglishGreeter {
     #[constructor]
-    fn new(config: Arc<Config>) -> Self {}
+    fn new(config: Arc<Config>) -> anyhow::Result<Self> {}
 }
 
 struct Unprovided;
@@ -24,5 +24,5 @@ struct App;
 
 impl App {
     #[constructor]
-    fn new(english_greeter: Arc<EnglishGreeter>, _: Arc<Config>) -> Self {}
+    fn new(english_greeter: Arc<EnglishGreeter>, _: Arc<Config>) -> anyhow::Result<Self> {}
 }

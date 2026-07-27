@@ -1,5 +1,6 @@
 use futures_util::SinkExt;
 use futures_util::StreamExt;
+use margaret_websocket_tests::failing_session_factory::FailingSessionFactory;
 use margaret_websocket_tests::raw_http_exchange::raw_http_exchange;
 use margaret_websocket_tests::redirecting_session_factory::RedirectingSessionFactory;
 use margaret_websocket_tests::rejecting_session_factory::RejectingSessionFactory;
@@ -68,6 +69,23 @@ async fn rejects_the_upgrade_when_the_session_factory_rejects() {
     .await;
 
     assert!(response.contains(" 403 "));
+
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn reports_a_session_factory_failure_as_a_generic_server_error() {
+    let server = RunningWebSocketServer::start_with(FailingSessionFactory).await;
+
+    let response = raw_http_exchange(
+        server.address(),
+        b"GET /ws HTTP/1.1\r\nHost: test\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nConnection: close\r\n\r\n",
+    )
+    .await;
+
+    assert!(response.contains(" 500 "));
+    assert!(response.contains("Internal Server Error"));
+    assert!(!response.contains("secret database endpoint"));
 
     server.stop().await;
 }

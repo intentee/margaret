@@ -57,7 +57,7 @@ struct SystemClock;
 
 impl SystemClock {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -65,7 +65,7 @@ struct Config;
 
 impl Config {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -73,7 +73,7 @@ struct LogPlugin;
 
 impl LogPlugin {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 #[websocket_session(path = "/chat/{room}", server = "public")]
@@ -86,7 +86,7 @@ impl ChatSession {
         config: Arc<Config>,
         plugin: Arc<LogPlugin>,
         #[route_parameter(from = "room")] room: String,
-    ) -> Self {}
+    ) -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "say", response = stream)]
@@ -196,7 +196,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "chat", response = single)]
@@ -207,7 +207,7 @@ struct Chatter;
 
 impl Chatter {
     #[constructor]
-    fn create(#[console_argument(from = "greeting")] greeting: String) -> Self {}
+    fn create(#[console_argument(from = "greeting")] greeting: String) -> anyhow::Result<Self> {}
 }
 
 impl RespondsToWebSocketMessage for Chatter {
@@ -217,16 +217,14 @@ impl RespondsToWebSocketMessage for Chatter {
 "#;
 
     #[test]
-    fn weaves_a_console_argument_through_the_websocket_dispatch_chain() {
+    fn reads_a_preconstructed_websocket_handler_through_the_dispatch_chain() {
         let source = generated(CONSOLE_ARGUMENT_HANDLER);
 
-        assert!(source.contains("console_argument_0:&str"));
-        assert!(source.contains("container.chatter(console_argument_0.to_owned()).await"));
-        assert!(source.contains("dispatch_table(container,console_argument_0).await"));
-        assert!(source.contains(
-            "public_routes(container:&super::container::Container,console_argument_0:&str,"
-        ));
-        assert!(source.contains("upgrade_entry(container,console_argument_0"));
+        assert!(source.contains("container.chatter()"));
+        assert!(source.contains("dispatch_table(container).await"));
+        assert!(source.contains("public_routes(container:&super::container::Container,"));
+        assert!(source.contains("upgrade_entry(container"));
+        assert!(!source.contains("console_argument_"));
     }
 
     const NON_STRUCT_HANDLER: &str = r#"
@@ -270,7 +268,7 @@ mod a {
 
         impl Handler {
             #[constructor]
-            fn new() -> Self {}
+            fn new() -> anyhow::Result<Self> {}
         }
     }
 }
@@ -305,7 +303,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "say_hi", response = single)]
@@ -349,7 +347,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[handles_middleware_attribute(attribute = guard)]
@@ -357,7 +355,7 @@ struct Guard;
 
 impl Guard {
     #[process]
-    fn process(&self, request: &Request, next: Next) -> ResponseContinuation {}
+    fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 "#;
 
@@ -372,7 +370,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[handles_middleware_attribute(attribute = traced)]
@@ -380,7 +378,7 @@ struct Tracer;
 
 impl Tracer {
     #[process]
-    fn process(&self, request: &Request, next: Next, routes: &Routes) -> ResponseContinuation {}
+    fn process(&self, request: &Request, next: Next, routes: &Routes) -> anyhow::Result<ResponseContinuation> {}
 }
 "#;
 
@@ -392,7 +390,7 @@ struct SystemClock;
 
 impl SystemClock {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -400,7 +398,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build_for_session(clock: Arc<SystemClock>) -> Self {}
+    fn build_for_session(clock: Arc<SystemClock>) -> anyhow::Result<Self> {}
 }
 "#;
 
@@ -438,7 +436,7 @@ impl Room {
 
         assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::web_socket("));
         assert!(source.contains(
-            "middleware.push(std::sync::Arc::new(super::middleware::Guard{inner:container.guard().await"
+            "middleware.push(std::sync::Arc::new(super::middleware::Guard{inner:container.guard()"
         ));
         assert!(!source.contains("GatedWebSocketUpgrade"));
     }
@@ -453,7 +451,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -462,28 +460,27 @@ struct Guard;
 
 impl Guard {
     #[constructor]
-    fn create(#[console_argument(from = "token")] token: String) -> Self {}
+    fn create(#[console_argument(from = "token")] token: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn process(&self, request: &Request, next: Next) -> ResponseContinuation {}
+    fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 "#;
 
     #[test]
-    fn weaves_a_console_argument_into_a_session_middleware() {
+    fn reads_a_preconstructed_session_middleware() {
         let source = generated(SESSION_WITH_CONSOLE_ARGUMENT_MIDDLEWARE);
 
-        assert!(source.contains(
-            "public_routes(container:&super::container::Container,console_argument_0:&str,"
-        ));
-        assert!(source.contains("container.guard(console_argument_0.to_owned()).await"));
+        assert!(source.contains("public_routes(container:&super::container::Container,"));
+        assert!(source.contains("container.guard()"));
+        assert!(!source.contains("console_argument_"));
     }
 
     #[test]
     fn rejects_a_session_with_an_unknown_middleware_tag() {
         assert!(
             error(
-                "#[websocket_session(path = \"/room\", server = \"public\")]\n#[middleware(missing)]\nstruct Room;\n\nimpl Room {\n    #[build_for_session]\n    fn build() -> Self {}\n}\n"
+                "#[websocket_session(path = \"/room\", server = \"public\")]\n#[middleware(missing)]\nstruct Room;\n\nimpl Room {\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {}\n}\n"
             )
             .to_string()
             .contains("no #[handles_middleware_attribute] handles it")
@@ -495,9 +492,11 @@ impl Guard {
         let source = generated(SESSION_WITH_ROUTES_MIDDLEWARE);
 
         assert!(source.contains("routes:&::std::sync::Arc<super::routes::Routes>"));
-        assert!(source.contains(
-            "super::middleware::Tracer{inner:container.tracer().await?,routes:routes.clone()"
-        ));
+        assert!(
+            source.contains(
+                "super::middleware::Tracer{inner:container.tracer(),routes:routes.clone()"
+            )
+        );
         assert!(source.contains("upgrade_entry(container)"));
     }
 
@@ -533,9 +532,9 @@ impl Guard {
         assert!(source.contains("clock:::std::sync::Arc<crate::SystemClock>"));
         assert!(source.contains("config:::std::sync::Arc<crate::Config>"));
         assert!(source.contains("plugin:::std::sync::Arc<crate::LogPlugin>"));
-        assert!(source.contains("container.system_clock().await"));
-        assert!(source.contains("container.config().await"));
-        assert!(source.contains("container.log_plugin().await"));
+        assert!(source.contains("container.system_clock()"));
+        assert!(source.contains("container.config()"));
+        assert!(source.contains("container.log_plugin()"));
     }
 
     #[test]
@@ -558,7 +557,7 @@ impl Guard {
         assert!(source.contains("dispatch_notification::dispatch_notification"));
         assert!(source.contains("requests.insert(\"say\""));
         assert!(source.contains("notifications.insert(\"typing\""));
-        assert!(source.contains("container.speaker().await"));
+        assert!(source.contains("container.speaker()"));
     }
 
     #[test]
@@ -740,34 +739,15 @@ struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn first() -> Self {}
+    fn first() -> anyhow::Result<Self> {}
 
     #[build_for_session]
-    fn second() -> Self {}
+    fn second() -> anyhow::Result<Self> {}
 }
 "#
             )
             .to_string()
             .contains("more than one #[build_for_session] method")
-        );
-    }
-
-    #[test]
-    fn rejects_a_build_for_session_that_does_not_return_self() {
-        assert!(
-            error(
-                r#"
-#[websocket_session(path = "/x", server = "public")]
-struct Bad;
-
-impl Bad {
-    #[build_for_session]
-    fn build() {}
-}
-"#
-            )
-            .to_string()
-            .contains("must return Self")
         );
     }
 
@@ -781,7 +761,7 @@ struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[route_parameter] id: String) -> Self {}
+    fn build(#[route_parameter] id: String) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -800,7 +780,7 @@ struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[route_parameter(from = "id")] id: String) -> Self {}
+    fn build(#[route_parameter(from = "id")] id: String) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -819,7 +799,7 @@ struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(value: String) -> Self {}
+    fn build(value: String) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -840,7 +820,7 @@ struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(missing: Arc<Unknown>) -> Self {}
+    fn build(missing: Arc<Unknown>) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -864,7 +844,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -872,7 +852,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn assemble(#[authenticated_user] viewer: Option<User>) -> Self {}
+    fn assemble(#[authenticated_user] viewer: Option<User>) -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "chat", response = single)]
@@ -895,7 +875,7 @@ impl RespondsToWebSocketMessage for Chatter {
             "structFactory{session_user_provider:::std::sync::Arc<super::super::authenticated_users::SessionUserProvider,>,}"
         ));
         assert!(source.contains(
-            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider().await?,}),}"
+            "Factory{session_user_provider:::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(),}),}"
         ));
     }
 
@@ -904,9 +884,14 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(AUTHENTICATED_HANDSHAKE);
 
         assert!(source.contains(
-            "margaret::framework::identity::optional_authenticated_user::optional_authenticated_user(margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await,)"
+            "margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(self.session_user_provider.as_ref(),handshake,).await"
         ));
-        assert!(source.contains("Err(response)=>return::std::result::Result::Err(response)"));
+        assert!(source.contains("::std::result::Result::Ok(outcome)"));
+        assert!(source.contains(
+            "margaret::framework::identity::optional_authenticated_user::optional_authenticated_user(outcome,)"
+        ));
+        assert!(source.contains("WebSocketSessionCreationOutcome::Interrupted(response,)"));
+        assert!(source.contains("WebSocketSessionCreationError::consumer(error,)"));
     }
 
     #[test]
@@ -918,8 +903,12 @@ impl RespondsToWebSocketMessage for Chatter {
     fn interrupts_the_handshake_with_a_continuation() {
         let source = generated(AUTHENTICATED_HANDSHAKE);
 
+        assert!(source.contains("->::std::result::Result<"));
         assert!(source.contains(
-            "->::std::result::Result<::std::sync::Arc<Self::Session>,margaret::framework::http::response_continuation::ResponseContinuation,>"
+            "margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome<Self::Session,>"
+        ));
+        assert!(source.contains(
+            "margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError"
         ));
     }
 
@@ -938,7 +927,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, routes: &crate::margaret::routes::Routes) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self, routes: &crate::margaret::routes::Routes) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -946,7 +935,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(#[authenticated_user] viewer: User) -> Self {}
+    fn build(#[authenticated_user] viewer: User) -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "chat", response = single)]
@@ -977,7 +966,7 @@ struct SystemClock;
 
 impl SystemClock {
     #[constructor]
-    fn create() -> Self {}
+    fn create() -> anyhow::Result<Self> {}
 }
 
 struct User;
@@ -988,7 +977,7 @@ struct Session;
 
 impl Session {
     #[infer_from_request]
-    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -996,7 +985,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(session: std::sync::Arc<SystemClock>, #[authenticated_user] viewer: User) -> Self {}
+    fn build(session: std::sync::Arc<SystemClock>, #[authenticated_user] viewer: User) -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "chat", response = single)]
@@ -1033,10 +1022,10 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[constructor]
-    fn create(#[console_argument(from = "realm")] realm: String) -> Self {}
+    fn create(#[console_argument(from = "realm")] realm: String) -> anyhow::Result<Self> {}
 
     #[infer_from_request]
-    fn infer(&self) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1044,7 +1033,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(#[authenticated_user] viewer: User) -> Self {}
+    fn build(#[authenticated_user] viewer: User) -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "chat", response = single)]
@@ -1063,14 +1052,18 @@ impl RespondsToWebSocketMessage for Chatter {
     fn threads_the_console_arguments_of_an_authenticated_user_provider_through_the_handshake() {
         let source = generated(CONSOLE_ARGUMENT_PROVIDER);
 
-        assert!(source.contains("pubasyncfnupgrade_entry(container:&super::super::container::Container,console_argument_0:&str,)"));
-        assert!(source.contains(
-            "inner:container.session_user_provider(console_argument_0.to_owned()).await?,"
-        ));
-        assert!(source.contains(
-            "pubasyncfnpublic_routes(container:&super::container::Container,console_argument_0:&str,_routes:"
-        ));
-        assert!(source.contains("upgrade_entry(container,console_argument_0).await"));
+        assert!(
+            source.contains(
+                "pubasyncfnupgrade_entry(container:&super::super::container::Container,)"
+            )
+        );
+        assert!(source.contains("inner:container.session_user_provider(),"));
+        assert!(
+            source.contains(
+                "pubasyncfnpublic_routes(container:&super::container::Container,_routes:"
+            )
+        );
+        assert!(source.contains("upgrade_entry(container).await"));
     }
 
     #[test]
@@ -1086,7 +1079,7 @@ struct Decorator;
 
 impl Decorator {
     #[process]
-    fn process(&self, views: &crate::margaret::views::Views, next: Next) -> ResponseContinuation {}
+    fn process(&self, views: &crate::margaret::views::Views, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1095,7 +1088,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1119,7 +1112,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, views: &crate::margaret::views::Views) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1127,7 +1120,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(#[authenticated_user] viewer: User) -> Self {}
+    fn build(#[authenticated_user] viewer: User) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1146,7 +1139,7 @@ struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(views: &crate::margaret::views::Views) -> Self {}
+    fn build(views: &crate::margaret::views::Views) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1172,7 +1165,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> AuthenticatedUserOutcome<User> {}
+    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1180,7 +1173,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build(#[authenticated_user] viewer: User) -> Self {}
+    fn build(#[authenticated_user] viewer: User) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1198,7 +1191,7 @@ struct Greeter;
 
 impl Greeter {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 struct Article;
@@ -1209,7 +1202,7 @@ struct ArticleStore;
 
 impl ArticleStore {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 impl margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder for ArticleStore {
@@ -1235,7 +1228,7 @@ impl BoardSession {
         peer: &spiffe::spiffe_id::SpiffeId,
         routes: &crate::margaret::routes::Routes,
         assets: margaret::framework::asset_bag::asset_bag::AssetBag,
-    ) -> Self {}
+    ) -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "post", response = single)]
@@ -1246,7 +1239,7 @@ struct Poster;
 
 impl Poster {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 impl RespondsToWebSocketMessage for Poster {
@@ -1283,7 +1276,7 @@ struct Form;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[form_request(from = Form)] form: Form) -> Self {}
+    fn build(#[form_request(from = Form)] form: Form) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1304,7 +1297,7 @@ struct Payload;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[form_request(from = Json)] payload: Payload) -> Self {}
+    fn build(#[form_request(from = Json)] payload: Payload) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1323,7 +1316,7 @@ struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(forward: crate::margaret::forwarders::public::Forwarder) -> Self {}
+    fn build(forward: crate::margaret::forwarders::public::Forwarder) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1344,7 +1337,7 @@ struct Widget;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[route_parameter(from = "item")] item: Widget) -> Self {}
+    fn build(#[route_parameter(from = "item")] item: Widget) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1366,7 +1359,7 @@ struct Room;
 
 impl Room {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1409,7 +1402,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_whose_message_is_not_a_message() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\nstruct NotAMessage;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = NotAMessage;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\nstruct NotAMessage;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = NotAMessage;\n}}\n"
         );
 
         assert!(
@@ -1422,7 +1415,7 @@ impl Room {
     #[test]
     fn rejects_a_handler_whose_message_is_a_response() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(response, method = \"r\")]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(response, method = \"r\")]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
         );
 
         assert!(
@@ -1435,7 +1428,7 @@ impl Room {
     #[test]
     fn rejects_a_request_handler_bound_to_a_notification() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(notification, method = \"n\")]\nstruct N;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = N;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(notification, method = \"n\")]\nstruct N;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n    type Message = N;\n}}\n"
         );
 
         assert!(
@@ -1448,7 +1441,7 @@ impl Room {
     #[test]
     fn rejects_a_notification_handler_bound_to_a_request() {
         let source = format!(
-            "{NOTIFICATION_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(request, method = \"r\", response = single)]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketNotification for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
+            "{NOTIFICATION_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"r\", response = single)]\nstruct R;\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketNotification for Handler {{\n    type Session = S;\n    type Message = R;\n}}\n"
         );
 
         assert!(
@@ -1464,7 +1457,7 @@ struct FirstSession;
 
 impl FirstSession {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_session(path = "/second", server = "public")]
@@ -1472,7 +1465,7 @@ struct SecondSession;
 
 impl SecondSession {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_message(request, method = "shared_request", response = single)]
@@ -1548,7 +1541,7 @@ mod second_notification {
     #[test]
     fn rejects_two_handlers_for_the_same_message() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n\n#[singleton]\nstruct First;\n\nimpl RespondsToWebSocketMessage for First {{\n    type Session = S;\n    type Message = M;\n}}\n\n#[singleton]\nstruct Second;\n\nimpl RespondsToWebSocketMessage for Second {{\n    type Session = S;\n    type Message = M;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct M;\n\n#[singleton]\nstruct First;\n\nimpl RespondsToWebSocketMessage for First {{\n    type Session = S;\n    type Message = M;\n}}\n\n#[singleton]\nstruct Second;\n\nimpl RespondsToWebSocketMessage for Second {{\n    type Session = S;\n    type Message = M;\n}}\n"
         );
 
         assert!(
@@ -1587,7 +1580,7 @@ struct AlphaSession;
 
 impl AlphaSession {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 
 #[websocket_session(path = "/b", server = "public")]
@@ -1595,32 +1588,13 @@ struct BetaSession;
 
 impl BetaSession {
     #[build_for_session]
-    fn build() -> Self {}
+    fn build() -> anyhow::Result<Self> {}
 }
 "#,
         );
 
         assert!(source.contains("pubmodalpha_session"));
         assert!(source.contains("pubmodbeta_session"));
-    }
-
-    #[test]
-    fn rejects_a_build_for_session_that_returns_a_non_self_type() {
-        assert!(
-            error(
-                r#"
-#[websocket_session(path = "/x", server = "public")]
-struct Bad;
-
-impl Bad {
-    #[build_for_session]
-    fn build() -> u8 {}
-}
-"#
-            )
-            .to_string()
-            .contains("must return Self")
-        );
     }
 
     #[test]
@@ -1714,7 +1688,7 @@ struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[route_parameter(= 5)] id: String) -> Self {}
+    fn build(#[route_parameter(= 5)] id: String) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1733,7 +1707,7 @@ struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[route_parameter(from = 5)] id: String) -> Self {}
+    fn build(#[route_parameter(from = 5)] id: String) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1745,7 +1719,7 @@ impl Bad {
     #[test]
     fn rejects_a_handler_missing_the_message_associated_type() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\nstruct Handler;\n\nimpl RespondsToWebSocketMessage for Handler {{\n    type Session = S;\n}}\n"
         );
 
         assert!(error(&source).to_string().contains("associated type"));
@@ -1759,7 +1733,7 @@ impl Bad {
     #[test]
     fn rejects_two_methods_that_collide_in_a_session() {
         let source = format!(
-            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> Self {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct First;\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct Second;\n\n#[singleton]\nstruct HandlerOne;\n\nimpl RespondsToWebSocketMessage for HandlerOne {{\n    type Session = S;\n    type Message = First;\n}}\n\n#[singleton]\nstruct HandlerTwo;\n\nimpl RespondsToWebSocketMessage for HandlerTwo {{\n    type Session = S;\n    type Message = Second;\n}}\n"
+            "{REQUEST_TRAIT}\n#[websocket_session(path = \"/x\", server = \"public\")]\nstruct S;\n\nimpl S {{\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {{}}\n}}\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct First;\n\n#[websocket_message(request, method = \"m\", response = single)]\nstruct Second;\n\n#[singleton]\nstruct HandlerOne;\n\nimpl RespondsToWebSocketMessage for HandlerOne {{\n    type Session = S;\n    type Message = First;\n}}\n\n#[singleton]\nstruct HandlerTwo;\n\nimpl RespondsToWebSocketMessage for HandlerTwo {{\n    type Session = S;\n    type Message = Second;\n}}\n"
         );
 
         assert!(error(&source).to_string().contains("more than once"));

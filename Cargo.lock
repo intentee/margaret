@@ -1136,12 +1136,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glob"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
-
-[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1788,11 +1782,11 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 name = "margaret"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "margaret_access_token_minter",
  "margaret_asset_bag",
  "margaret_codegen",
  "margaret_console",
- "margaret_container_error",
  "margaret_http",
  "margaret_http_validation",
  "margaret_identity",
@@ -1818,6 +1812,7 @@ dependencies = [
  "margaret_validation",
  "margaret_views",
  "margaret_websocket",
+ "thiserror",
 ]
 
 [[package]]
@@ -1892,7 +1887,7 @@ dependencies = [
  "quote",
  "tempfile",
  "thiserror",
- "toml 0.8.23",
+ "toml",
 ]
 
 [[package]]
@@ -1927,19 +1922,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_codegen_reusable_websocket_protocol_fixture"
+name = "margaret_codegen_linear_construction_future_fixture"
 version = "0.1.0"
 dependencies = [
- "async-trait",
- "clap",
+ "anyhow",
  "margaret",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-util",
- "trzcina",
- "validator",
 ]
 
 [[package]]
@@ -1948,6 +1935,8 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "margaret_codegen",
+ "margaret_codegen_fallible_roles_fixture",
+ "margaret_codegen_linear_construction_future_fixture",
  "margaret_console_argument_codegen",
 ]
 
@@ -1965,6 +1954,7 @@ dependencies = [
 name = "margaret_codegen_websocket_fixture"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "clap",
  "margaret",
@@ -1982,6 +1972,7 @@ dependencies = [
 name = "margaret_console"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap",
 ]
 
@@ -2030,16 +2021,6 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "thiserror",
-]
-
-[[package]]
-name = "margaret_container_error"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "thiserror",
- "tokio",
- "trybuild",
 ]
 
 [[package]]
@@ -2094,6 +2075,7 @@ dependencies = [
 name = "margaret_http"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "bytes",
  "cookie",
@@ -2172,6 +2154,7 @@ dependencies = [
 name = "margaret_identity"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "margaret_http",
 ]
@@ -2180,6 +2163,7 @@ dependencies = [
 name = "margaret_identity_session"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "cookie",
  "serde",
@@ -2225,6 +2209,7 @@ dependencies = [
 name = "margaret_jwks_client_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "margaret_http",
@@ -2258,6 +2243,7 @@ dependencies = [
 name = "margaret_jwks_endpoint"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "thiserror",
  "tokio",
@@ -2268,6 +2254,7 @@ dependencies = [
 name = "margaret_jwks_file_secret_storage"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "serde_json",
@@ -2321,6 +2308,7 @@ dependencies = [
 name = "margaret_jwks_roller"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "margaret_jwks_keygen",
  "thiserror",
 ]
@@ -2747,6 +2735,7 @@ dependencies = [
 name = "margaret_token_signer"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "futures-util",
  "margaret_identity_session",
@@ -2786,6 +2775,7 @@ dependencies = [
 name = "margaret_views"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "maud",
 ]
 
@@ -2808,6 +2798,7 @@ dependencies = [
 name = "margaret_websocket"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "futures-util",
  "hyper",
@@ -2847,6 +2838,7 @@ dependencies = [
 name = "margaret_websocket_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "futures-util",
  "margaret_http",
@@ -4021,15 +4013,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_spanned"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
-dependencies = [
- "serde_core",
-]
-
-[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4526,12 +4509,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "target-triple"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3a6bfce3d99adfa72d24750a61f782f3036a81e7f86d8841ee1326deaebd171"
-
-[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4542,15 +4519,6 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "termcolor"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
-dependencies = [
- "winapi-util",
 ]
 
 [[package]]
@@ -4761,24 +4729,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc1beb996b9d83529a9e75c17a1686767d148d70663143c7854d8b4a09ced362"
 dependencies = [
  "serde",
- "serde_spanned 0.6.9",
- "toml_datetime 0.6.11",
+ "serde_spanned",
+ "toml_datetime",
  "toml_edit",
-]
-
-[[package]]
-name = "toml"
-version = "1.1.3+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53c96ecdfa941c8fc4fcaed14f99ada8ebed502eef533015095a07e3301d4c3c"
-dependencies = [
- "indexmap 2.14.0",
- "serde_core",
- "serde_spanned 1.1.1",
- "toml_datetime 1.1.1+spec-1.1.0",
- "toml_parser",
- "toml_writer",
- "winnow 1.0.4",
 ]
 
 [[package]]
@@ -4791,15 +4744,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "toml_datetime"
-version = "1.1.1+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3165f65f62e28e0115a00b2ebdd37eb6f3b641855f9d636d3cd4103767159ad7"
-dependencies = [
- "serde_core",
-]
-
-[[package]]
 name = "toml_edit"
 version = "0.22.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4807,19 +4751,10 @@ checksum = "41fe8c660ae4257887cf66394862d21dbca4a6ddd26f04a3560410406a2f819a"
 dependencies = [
  "indexmap 2.14.0",
  "serde",
- "serde_spanned 0.6.9",
- "toml_datetime 0.6.11",
+ "serde_spanned",
+ "toml_datetime",
  "toml_write",
- "winnow 0.7.15",
-]
-
-[[package]]
-name = "toml_parser"
-version = "1.1.2+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2abe9b86193656635d2411dc43050282ca48aa31c2451210f4202550afb7526"
-dependencies = [
- "winnow 1.0.4",
+ "winnow",
 ]
 
 [[package]]
@@ -4827,12 +4762,6 @@ name = "toml_write"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
-
-[[package]]
-name = "toml_writer"
-version = "1.1.2+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 
 [[package]]
 name = "tonic"
@@ -4988,21 +4917,6 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
-
-[[package]]
-name = "trybuild"
-version = "1.0.118"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06649c6f63d86604ba0c8950d5a1829fc9a17afd70fc6629f481d75b6a624c78"
-dependencies = [
- "glob",
- "serde",
- "serde_derive",
- "serde_json",
- "target-triple",
- "termcolor",
- "toml 1.1.3+spec-1.1.0",
-]
 
 [[package]]
 name = "trzcina"
@@ -5322,15 +5236,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 
 [[package]]
-name = "winapi-util"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
-dependencies = [
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5496,12 +5401,6 @@ checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
 dependencies = [
  "memchr",
 ]
-
-[[package]]
-name = "winnow"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 
 [[package]]
 name = "wit-bindgen"

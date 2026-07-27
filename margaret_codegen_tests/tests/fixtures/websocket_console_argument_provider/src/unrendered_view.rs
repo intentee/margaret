@@ -17,9 +17,11 @@ pub struct UnrenderedView;
 impl RendersView for UnrenderedView {
     type Props<'props> = UnrenderedViewProps;
 
-    fn render(&self, UnrenderedViewProps { label }: Self::Props<'_>) -> Markup {
-        let _ = asset!("resources/ts/app.ts");
+    fn render(&self, UnrenderedViewProps { label }: Self::Props<'_>) -> anyhow::Result<Markup> {
+        Ok({
+            let _ = asset!("resources/ts/app.ts");
 
-        html! { span { (label) } }
+            html! { span { (label) } }
+        })
     }
 }

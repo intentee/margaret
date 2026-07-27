@@ -2,16 +2,14 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use quote::ToTokens;
-use syn::Attribute;
-use syn::Signature;
 use syn::Type;
 
-use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
-use margaret_attributes::marker::marker;
+use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::injectable_resolution::InjectableResolution;
 use margaret_container::resolve_injectable::resolve_injectable;
 use margaret_injection_codegen::optional_parameter::OptionalParameter;
@@ -240,15 +238,15 @@ fn classify_context_specific(
 fn classify_form_request(
     index: &AttributeIndex,
     item: &IndexedItem,
-    attribute: &Attribute,
+    attribute: &IndexedAttribute,
     declared: &Type,
     context: &BindingContext,
     position: usize,
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
-    let arguments = AttributeArgs::from_attribute(attribute)?;
+    let arguments = attribute.args()?;
     let FormRequestArguments { source } =
-        FormRequestArguments::parse(&arguments, subject, position)?;
+        FormRequestArguments::parse(arguments, subject, position)?;
 
     if let BindingContext::Handshake { .. } = context {
         let unavailable = |written: &str| RequestBindingError::FormRequestBodyUnavailable {
@@ -277,32 +275,47 @@ fn classify_form_request(
 }
 
 fn classify_route_parameter(
-    index: &AttributeIndex,
-    item: &IndexedItem,
     context: &BindingContext,
-    attribute: &Attribute,
+    attribute: &IndexedAttribute,
     declared: &Type,
+    resolved: Option<&CanonicalPath>,
     position: usize,
     binders: &HashMap<CanonicalPath, RouteParameterBinder>,
+    bound_route_parameters: &mut HashSet<String>,
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
 
-    match context {
+    let route_path = match context {
         BindingContext::AuthenticatedUserProvider { .. } | BindingContext::Middleware { .. } => {
             return Err(RequestBindingError::RouteParameterUnavailable {
                 subject: subject.to_string(),
                 parameter: position.to_string(),
             });
         }
-        BindingContext::Handshake { .. } | BindingContext::Responder { .. } => {}
+        BindingContext::Handshake { route_path, .. }
+        | BindingContext::Responder { route_path, .. } => route_path,
+    };
+
+    let arguments = attribute.args()?;
+    let RouteParameterArguments { from } =
+        RouteParameterArguments::parse(arguments, subject, position)?;
+
+    if !route_path.parameters().any(|name| name == from) {
+        return Err(RequestBindingError::RouteParameterNotInPath {
+            subject: subject.to_string(),
+            parameter: from,
+            path: route_path.pattern().to_string(),
+        });
     }
 
-    let arguments = AttributeArgs::from_attribute(attribute)?;
-    let RouteParameterArguments { from } =
-        RouteParameterArguments::parse(&arguments, subject, position)?;
-    let resolved = index.resolve_item_type(item, declared);
+    if !bound_route_parameters.insert(from.clone()) {
+        return Err(RequestBindingError::MultipleRouteParameterBindings {
+            subject: subject.to_string(),
+            parameter: from,
+        });
+    }
 
-    if resolved.as_ref() == Some(&string_path()) {
+    if resolved == Some(&string_path()) {
         return Ok(RequestBinding::Raw { path_key: from });
     }
 
@@ -314,7 +327,7 @@ fn classify_route_parameter(
     })?;
     let binder =
         binders
-            .get(&model)
+            .get(model)
             .ok_or_else(|| RequestBindingError::MissingRouteParameterBinder {
                 subject: subject.to_string(),
                 parameter: from.clone(),
@@ -351,7 +364,7 @@ fn verify_single_inference(
 pub fn classify_parameters(
     index: &AttributeIndex,
     item: &IndexedItem,
-    signature: &Signature,
+    method: &IndexedMethod,
     context: &BindingContext,
     registries: &BindingRegistries,
 ) -> Result<Vec<BoundParameter>, RequestBindingError> {
@@ -360,17 +373,24 @@ pub fn classify_parameters(
     let route_parameter_selector = AttributeSelector::from_marker("route_parameter");
     let form_request_selector = AttributeSelector::from_marker("form_request");
     let mut bound = Vec::new();
+    let mut bound_route_parameters = HashSet::new();
 
     for ParameterView {
         attributes,
         declared,
         holder,
         position,
-    } in parameters(signature)
+    } in parameters(method)
     {
-        let authenticated_user = marker(attributes, &authenticated_user_selector);
-        let route_parameter = marker(attributes, &route_parameter_selector);
-        let form_request = marker(attributes, &form_request_selector);
+        let authenticated_user = attributes
+            .iter()
+            .find(|attribute| authenticated_user_selector.matches(attribute.path()));
+        let route_parameter = attributes
+            .iter()
+            .find(|attribute| route_parameter_selector.matches(attribute.path()));
+        let form_request = attributes
+            .iter()
+            .find(|attribute| form_request_selector.matches(attribute.path()));
         let resolved = index.resolve_item_type(item, declared);
         let is_reference = matches!(declared, Type::Reference(_));
         let is_asset_bag = RequestInjectable::AssetBag.matches(resolved.as_ref(), is_reference);
@@ -418,13 +438,13 @@ pub fn classify_parameters(
             classify_form_request(index, item, attribute, declared, context, position)?
         } else if let Some(attribute) = route_parameter {
             classify_route_parameter(
-                index,
-                item,
                 context,
                 attribute,
                 declared,
+                resolved.as_ref(),
                 position,
                 &registries.route_parameters,
+                &mut bound_route_parameters,
             )?
         } else if is_next {
             match context {
@@ -486,24 +506,6 @@ pub fn classify_parameters(
     }
 
     verify_single_inference(&bound, subject)?;
-
-    match context {
-        BindingContext::Handshake { route_path, .. }
-        | BindingContext::Responder { route_path, .. } => {
-            for parameter in &bound {
-                if let Some(path_key) = parameter.binding.path_key()
-                    && !route_path.parameters().any(|name| name == path_key)
-                {
-                    return Err(RequestBindingError::RouteParameterNotInPath {
-                        subject: subject.to_string(),
-                        parameter: path_key.to_string(),
-                        path: route_path.pattern().to_string(),
-                    });
-                }
-            }
-        }
-        BindingContext::AuthenticatedUserProvider { .. } | BindingContext::Middleware { .. } => {}
-    }
 
     Ok(bound)
 }

@@ -11,5 +11,5 @@ struct Consumer {
 
 impl Consumer {
     #[constructor]
-    fn create(storage: std::sync::Arc<dyn TestStorage>) -> Self {}
+    fn create(storage: std::sync::Arc<dyn TestStorage>) -> anyhow::Result<Self> {}
 }

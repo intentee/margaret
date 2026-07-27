@@ -1,12 +1,5 @@
 use std::collections::HashMap;
 
-use quote::ToTokens;
-use quote::format_ident;
-use syn::GenericArgument;
-use syn::PathArguments;
-use syn::ReturnType;
-use syn::Type;
-
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
@@ -15,6 +8,7 @@ use margaret_attributes::format_path::format_path;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::is_singleton::is_singleton;
+use quote::format_ident;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
@@ -25,39 +19,6 @@ use crate::infers_authenticated_user_arguments::InfersAuthenticatedUserArguments
 use crate::injects_routes::injects_routes;
 use crate::injects_views::injects_views;
 use crate::request_binding_error::RequestBindingError;
-
-fn authenticated_user_outcome_path() -> CanonicalPath {
-    CanonicalPath::new(vec![
-        "margaret".to_string(),
-        "framework".to_string(),
-        "identity".to_string(),
-        "authenticated_user_outcome".to_string(),
-        "AuthenticatedUserOutcome".to_string(),
-    ])
-}
-
-fn written(declared: &Type) -> String {
-    declared.to_token_stream().to_string()
-}
-
-fn generic_type(declared: &Type, position: usize) -> Option<&Type> {
-    let Type::Path(type_path) = declared else {
-        return None;
-    };
-    let Some(PathArguments::AngleBracketed(arguments)) = type_path
-        .path
-        .segments
-        .last()
-        .map(|segment| &segment.arguments)
-    else {
-        return None;
-    };
-
-    match arguments.args.iter().nth(position) {
-        Some(GenericArgument::Type(inner)) => Some(inner),
-        _ => None,
-    }
-}
 
 fn infer_from_request_method<'index>(
     item: &'index IndexedItem,
@@ -91,33 +52,6 @@ fn infer_from_request_method<'index>(
         .ok_or_else(|| RequestBindingError::MissingInferFromRequest {
             provider: provider.to_string(),
         })
-}
-
-fn verify_outcome(
-    index: &AttributeIndex,
-    item: &IndexedItem,
-    provider: &str,
-    model: &CanonicalPath,
-    outcome: &Type,
-) -> Result<(), RequestBindingError> {
-    if index.resolve_item_type(item, outcome).as_ref() != Some(&authenticated_user_outcome_path()) {
-        return Err(RequestBindingError::InferenceReturnTypeMismatch {
-            provider: provider.to_string(),
-            written: written(outcome),
-        });
-    }
-
-    let inferred = generic_type(outcome, 0).and_then(|inner| index.resolve_item_type(item, inner));
-
-    if inferred.as_ref() == Some(model) {
-        Ok(())
-    } else {
-        Err(RequestBindingError::InferredUserModelMismatch {
-            provider: provider.to_string(),
-            model: model.to_string(),
-            written: written(outcome),
-        })
-    }
 }
 
 pub fn authenticated_user_providers(
@@ -159,21 +93,12 @@ pub fn authenticated_user_providers(
             )?;
 
         let method = infer_from_request_method(item, &provider)?;
-        let signature = method.signature();
-        let ReturnType::Type(_, outcome) = &signature.output else {
-            return Err(RequestBindingError::InferenceReturnTypeMismatch {
-                provider,
-                written: signature.output.to_token_stream().to_string(),
-            });
-        };
-
-        verify_outcome(index, item, &provider, &model, outcome)?;
 
         let subject = format!("authenticated user provider '{provider}'");
         let parameters = classify_parameters(
             index,
             item,
-            signature,
+            method,
             &BindingContext::AuthenticatedUserProvider { subject: &subject },
             registries,
         )?;

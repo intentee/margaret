@@ -3,7 +3,7 @@ struct EnglishGreeter;
 
 impl EnglishGreeter {
     #[constructor]
-    fn create() -> Self {}
+    fn create() -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -17,6 +17,6 @@ impl Greet {
         #[console_argument(positional)] name: String,
         #[console_argument(from = "salutation")] salutation: Option<String>,
         #[console_argument(from = "loud")] loud: bool,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
     }
 }

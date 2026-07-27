@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use failures as errors;
 use margaret::framework::macros::build_for_session;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::singleton;
@@ -9,7 +10,6 @@ use margaret::framework::macros::websocket_session;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret::framework::websocket::web_socket::WebSocket;
-use margaret::framework::websocket::web_socket_error::WebSocketError;
 use serde::Deserialize;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
@@ -35,9 +35,8 @@ pub struct ChatSession;
 
 impl ChatSession {
     #[build_for_session]
-    #[must_use]
-    pub fn assemble() -> Self {
-        Self
+    pub fn assemble() -> errors::Result<Self> {
+        Ok(Self)
     }
 }
 
@@ -48,9 +47,8 @@ pub struct ChatResponder {
 
 impl ChatResponder {
     #[constructor]
-    #[must_use]
-    pub fn create(secrets: Arc<Secrets>) -> Self {
-        Self { secrets }
+    pub fn create(secrets: Arc<Secrets>) -> errors::Result<Self> {
+        Ok(Self { secrets })
     }
 }
 
@@ -65,13 +63,15 @@ impl RespondsToWebSocketMessage for ChatResponder {
         _session: Arc<ChatSession>,
         message: StreamingRequestEnvelope<ChatSay>,
         socket: WebSocket,
-    ) -> Result<(), WebSocketError> {
+    ) -> errors::Result<()> {
         let _ = self.secrets.token();
 
         socket
             .send(message.fin(ChatEcho {
                 text: message.message().text.clone(),
             }))
-            .await
+            .await?;
+
+        Ok(())
     }
 }

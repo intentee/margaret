@@ -3,5 +3,5 @@ struct Service;
 
 impl Service {
     #[constructor]
-    fn new(&self) -> Self {}
+    fn new(&self) -> anyhow::Result<Self> {}
 }

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = { workspace = true }
 chrono = { workspace = true }
 futures-util = { workspace = true }
 margaret_identity_session = { path = "../margaret_identity_session" }

@@ -22,19 +22,23 @@ pub struct HomeView {
 
 impl HomeView {
     #[constructor]
-    #[must_use]
-    pub fn create(secrets: Arc<Secrets>) -> Self {
-        Self { secrets }
+    pub fn create(secrets: Arc<Secrets>) -> failures::Result<Self> {
+        Ok(Self { secrets })
     }
 }
 
 impl RendersView for HomeView {
     type Props<'props> = HomeViewProps;
 
-    fn render(&self, HomeViewProps { heading }: Self::Props<'_>) -> Markup {
-        let _ = self.secrets.token();
-        let _ = asset!("resources/ts/app.ts");
+    fn render(
+        &self,
+        HomeViewProps { heading }: Self::Props<'_>,
+    ) -> std::result::Result<Markup, failures::Error> {
+        Ok({
+            let _ = self.secrets.token();
+            let _ = asset!("resources/ts/app.ts");
 
-        html! { h1 { (heading) } }
+            html! { h1 { (heading) } }
+        })
     }
 }

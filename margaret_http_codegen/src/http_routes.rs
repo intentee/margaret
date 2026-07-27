@@ -58,7 +58,7 @@ pub(crate) fn http_routes(
         let arguments = classify_parameters(
             index,
             item,
-            handler_method.signature(),
+            handler_method,
             &BindingContext::Responder {
                 route_path: &route_path,
                 server: &server,

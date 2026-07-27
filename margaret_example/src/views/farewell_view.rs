@@ -24,19 +24,23 @@ pub struct FarewellView {
 
 impl FarewellView {
     #[constructor]
-    #[must_use]
-    pub fn create(card_layout: Arc<CardLayout>) -> Self {
-        Self { card_layout }
+    pub fn create(card_layout: Arc<CardLayout>) -> anyhow::Result<Self> {
+        Ok(Self { card_layout })
     }
 }
 
 impl RendersView for FarewellView {
     type Props<'props> = FarewellViewProps<'props>;
 
-    fn render(&self, FarewellViewProps { name, routes }: Self::Props<'_>) -> Markup {
-        self.card_layout.render(CardLayoutProps {
-            body: html! { "goodbye, " (name) },
-            home_url: routes.public.get_greeting.url(),
+    fn render(
+        &self,
+        FarewellViewProps { name, routes }: Self::Props<'_>,
+    ) -> anyhow::Result<Markup> {
+        Ok({
+            self.card_layout.render(CardLayoutProps {
+                body: html! { "goodbye, " (name) },
+                home_url: routes.public.get_greeting.url(),
+            })?
         })
     }
 }
@@ -59,10 +63,12 @@ mod tests {
         };
         let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
 
-        let markup = view.render(FarewellViewProps {
-            name: "Ada".to_string(),
-            routes: &routes,
-        });
+        let markup = view
+            .render(FarewellViewProps {
+                name: "Ada".to_string(),
+                routes: &routes,
+            })
+            .expect("the farewell view renders");
 
         assert_eq!(
             markup.into_string(),

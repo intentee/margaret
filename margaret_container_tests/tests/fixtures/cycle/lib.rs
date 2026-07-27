@@ -3,7 +3,7 @@ struct Alpha;
 
 impl Alpha {
     #[constructor]
-    fn new(beta: Arc<Beta>) -> Self {}
+    fn new(beta: Arc<Beta>) -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -11,5 +11,5 @@ struct Beta;
 
 impl Beta {
     #[constructor]
-    fn new(alpha: Arc<Alpha>) -> Self {}
+    fn new(alpha: Arc<Alpha>) -> anyhow::Result<Self> {}
 }

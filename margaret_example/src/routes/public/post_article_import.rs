@@ -18,31 +18,35 @@ pub struct PostArticleImport {
 
 impl PostArticleImport {
     #[constructor]
-    pub fn create(articles: Arc<ArticleStore>) -> Self {
-        Self { articles }
+    pub fn create(articles: Arc<ArticleStore>) -> anyhow::Result<Self> {
+        Ok(Self { articles })
     }
 
     #[process]
     pub async fn respond(
         &self,
         #[form_request(from = Json)] form: ValidationResult<PostArticleForm>,
-    ) -> Response {
-        let PostArticleForm {
-            title,
-            body,
-            author_id,
-        } = match form {
-            ValidationResult::Valid(form) => form,
-            ValidationResult::Invalid(errors) => return Response::text(422, errors.to_string()),
-            ValidationResult::Malformed(malformation) => {
-                return Response::text(400, malformation.to_string());
-            }
-        };
+    ) -> anyhow::Result<Response> {
+        Ok({
+            let PostArticleForm {
+                title,
+                body,
+                author_id,
+            } = match form {
+                ValidationResult::Valid(form) => form,
+                ValidationResult::Invalid(errors) => {
+                    return Ok(Response::text(422, errors.to_string()));
+                }
+                ValidationResult::Malformed(malformation) => {
+                    return Ok(Response::text(400, malformation.to_string()));
+                }
+            };
 
-        match self.articles.insert(title, body, author_id) {
-            Ok(article) => Response::text(201, format!("imported \"{}\"", article.title)),
-            Err(error) => Response::text(500, error.to_string()),
-        }
+            match self.articles.insert(title, body, author_id) {
+                Ok(article) => Response::text(201, format!("imported \"{}\"", article.title)),
+                Err(error) => Response::text(500, error.to_string()),
+            }
+        })
     }
 }
 
@@ -61,15 +65,24 @@ mod tests {
 
     #[tokio::test]
     async fn responds_with_500_when_the_author_is_unknown() {
-        let responder = PostArticleImport::create(Arc::new(ArticleStore::create(Arc::new(
-            SystemClock::create(),
-        ))));
+        let clock = SystemClock::create().expect("the clock is constructed");
+        let store =
+            ArticleStore::create(Arc::new(clock)).expect("the article store is constructed");
+        let responder =
+            PostArticleImport::create(Arc::new(store)).expect("the responder is constructed");
         let form = ValidationResult::Valid(PostArticleForm {
             title: "Title".to_string(),
             body: "Body".to_string(),
             author_id: Uuid::from_u128(999),
         });
 
-        assert_eq!(responder.respond(form).await.status(), 500);
+        assert_eq!(
+            responder
+                .respond(form)
+                .await
+                .expect("the responder succeeds")
+                .status(),
+            500
+        );
     }
 }

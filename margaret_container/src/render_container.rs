@@ -1,34 +1,17 @@
-use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
-use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-
-use crate::build_plan::build_plan;
-use crate::console_closures::ConsoleClosures;
-use crate::container_bindings::ContainerBindings;
 use crate::container_error::ContainerError;
 use crate::framework_provider::FrameworkProvider;
-use crate::render::render;
-use crate::render_build::render_build;
+use crate::plan_container::plan_container;
 use crate::rendered_container::RenderedContainer;
-use crate::topological_order::topological_order;
+use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
 
 pub fn render_container(
     index: &AttributeIndex,
     registry: &ConsoleArgumentRegistry,
     framework_providers: &[FrameworkProvider],
 ) -> Result<RenderedContainer, ContainerError> {
-    let plan = build_plan(index, registry, framework_providers)?;
+    let planned = plan_container(index, registry, framework_providers)?;
+    let roots = planned.roots();
 
-    topological_order(&plan.providers)?;
-
-    let closures = ConsoleClosures::from_plan(&plan)?;
-    let bindings = ContainerBindings::from_plan(&plan, &closures);
-
-    Ok(RenderedContainer {
-        bindings,
-        modules: vec![
-            GeneratedModuleTokens::new("container", render(&plan, &closures)),
-            GeneratedModuleTokens::new("container/build", render_build(&plan)),
-        ],
-    })
+    Ok(planned.render(&roots))
 }

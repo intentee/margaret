@@ -16,21 +16,23 @@ pub struct AssetShowcase;
 impl RendersView for AssetShowcase {
     type Props<'props> = AssetShowcaseProps;
 
-    fn render(&self, AssetShowcaseProps { asset_bag }: Self::Props<'_>) -> Markup {
-        asset_bag.add(asset!("resources/ts/app.ts"));
+    fn render(&self, AssetShowcaseProps { asset_bag }: Self::Props<'_>) -> anyhow::Result<Markup> {
+        Ok({
+            asset_bag.add(asset!("resources/ts/app.ts"));
 
-        let logo = asset_bag.image(asset!("resources/media/logo.png"));
-        let favicon = asset_bag.image(asset!("resources/media/favicon.svg"));
-        let font = asset_bag.file(asset!("resources/fonts/inter.woff2"));
+            let logo = asset_bag.image(asset!("resources/media/logo.png"));
+            let favicon = asset_bag.image(asset!("resources/media/favicon.svg"));
+            let font = asset_bag.file(asset!("resources/fonts/inter.woff2"));
 
-        html! {
-            main {
-                img src=(logo) alt="logo";
-                img src=(favicon) alt="favicon";
-                link rel="preload" href=(font) as="font" crossorigin;
-                p { "Assets demo" }
+            html! {
+                main {
+                    img src=(logo) alt="logo";
+                    img src=(favicon) alt="favicon";
+                    link rel="preload" href=(font) as="font" crossorigin;
+                    p { "Assets demo" }
+                }
             }
-        }
+        })
     }
 }
 
@@ -51,6 +53,7 @@ mod tests {
             .render(AssetShowcaseProps {
                 asset_bag: asset_bag.clone(),
             })
+            .expect("the asset showcase renders")
             .into_string();
 
         assert_eq!(

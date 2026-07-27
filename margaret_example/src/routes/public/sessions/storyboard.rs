@@ -25,7 +25,6 @@ pub struct StoryboardSession {
 
 impl StoryboardSession {
     #[build_for_session]
-    #[must_use]
     pub fn build_for_session(
         greeter: Arc<EnglishGreeter>,
         #[route_parameter(from = "topic")] topic: String,
@@ -33,21 +32,23 @@ impl StoryboardSession {
         #[form_request(from = Query)] filters: GetArticlesForm,
         #[authenticated_user] viewer: Option<User>,
         routes: &Routes,
-    ) -> Self {
-        let board_url = routes.public.get_feed.url();
-        let article_title = match filters.author {
-            Some(author) => format!("{} by {author}", article.title),
-            None => article.title,
-        };
+    ) -> anyhow::Result<Self> {
+        Ok({
+            let board_url = routes.public.get_feed.url();
+            let article_title = match filters.author {
+                Some(author) => format!("{} by {author}", article.title),
+                None => article.title,
+            };
 
-        Self {
-            article_title,
-            board_url,
-            greeter,
-            topic,
-            turns: Mutex::new(Vec::new()),
-            viewer,
-        }
+            Self {
+                article_title,
+                board_url,
+                greeter,
+                topic,
+                turns: Mutex::new(Vec::new()),
+                viewer,
+            }
+        })
     }
 
     #[must_use]

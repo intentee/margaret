@@ -11,7 +11,6 @@ COVERAGE_PACKAGES := \
 	-p margaret_console_argument_codegen \
 	-p margaret_console_codegen \
 	-p margaret_container \
-	-p margaret_container_error \
 	-p margaret_container_tests \
 	-p margaret_jwks_endpoint \
 	-p margaret_generated_module \
@@ -93,7 +92,7 @@ clippy:
 .PHONY: coverage
 coverage: node_modules postgres-image
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) --no-report
+	cargo llvm-cov nextest $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) --test-threads 4 --no-report
 	cargo llvm-cov report --json --output-path target/llvm-cov.json
 	cargo llvm-cov report --lcov --output-path target/lcov.info
 	cargo llvm-cov report
@@ -111,7 +110,6 @@ coverage: node_modules postgres-image
 		--gated margaret_console_argument_codegen=100 \
 		--gated margaret_console_codegen=100 \
 		--gated margaret_container=100 \
-		--gated margaret_container_error=100 \
 		--gated margaret_container_tests=100 \
 		--gated margaret_jwks_endpoint=100 \
 		--gated margaret_generated_module=100 \

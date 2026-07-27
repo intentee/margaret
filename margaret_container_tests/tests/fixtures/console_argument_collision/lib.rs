@@ -3,7 +3,7 @@ struct Config;
 
 impl Config {
     #[constructor]
-    fn create(#[console_argument(from = "name")] name: String) -> Self {}
+    fn create(#[console_argument(from = "name")] name: String) -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -15,6 +15,6 @@ impl Greet {
     fn create(
         config: std::sync::Arc<Config>,
         #[console_argument(positional)] name: String,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
     }
 }

@@ -7,6 +7,7 @@ pub mod service_codegen_error;
 
 mod service_kind;
 mod service_unit;
+mod service_unit_origin;
 mod service_units;
 mod spiffe_activation;
 mod tick_timer_arguments;
@@ -83,9 +84,7 @@ mod tests {
     fn render_source(lib_source: &str, servers: &[HttpServer], has_views: bool) -> String {
         let index = index_for(lib_source);
         let bindings = bindings(&index);
-        let serve_arguments = bindings
-            .serve_arguments(&serve_roots(&index), &[])
-            .expect("the serve arguments unify");
+        let serve_arguments = bindings.serve_arguments(&serve_roots(&index), &[]);
 
         render_services(
             &index,
@@ -141,10 +140,10 @@ mod tests {
         )]
     }
 
-    const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
-    const STATELESS_RESPONDER: &str = "#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> Response {}\n}\n";
-    const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n";
-    const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> Self {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n";
+    const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
+    const STATELESS_RESPONDER: &str = "#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
+    const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n";
+    const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
 
     #[test]
     fn invokes_server_and_views_helpers_directly_when_the_container_has_no_accessors() {
@@ -156,7 +155,7 @@ mod tests {
         assert!(source.contains(
             "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
         ));
-        assert!(!source.contains("report_failure"));
+        assert!(source.contains("super::container::build::serve("));
     }
 
     #[test]
@@ -171,8 +170,10 @@ mod tests {
         let source = rendered(SERVICE, &[]);
 
         assert!(source.contains("structPump{"));
-        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
-        assert!(source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+        ));
+        assert!(source.contains("manager.register_service(Pump{inner:container.pump()})"));
     }
 
     #[test]
@@ -188,7 +189,60 @@ mod tests {
             "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
         ));
         assert!(source.contains("_tick_context:trzcina::TickContext"));
-        assert!(source.contains("self.inner.run().await.map_err(anyhow::Error::from)"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+        ));
+    }
+
+    #[test]
+    fn canonicalizes_imported_ticker_paths_before_rendering() {
+        let source = rendered(
+            r#"
+mod schedule {}
+
+use crate::schedule as cadence;
+use tokio::time::MissedTickBehavior as Behavior;
+
+#[scheduled_with_tick_timer(
+    interval = cadence::PERIOD,
+    behavior = Behavior::Delay
+)]
+struct Flusher;
+
+impl Flusher {
+    #[process]
+    fn run(&self) -> anyhow::Result<()> {}
+}
+"#,
+            &[],
+        );
+
+        assert!(
+            source.contains("fntick_interval(&self)->std::time::Duration{crate::schedule::PERIOD}")
+        );
+        assert!(source.contains(
+            "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
+        ));
+    }
+
+    #[test]
+    fn rejects_an_unresolvable_ticker_interval_path() {
+        let message = error_for(
+            "#[scheduled_with_tick_timer(interval = PERIOD)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+        );
+
+        assert!(message.contains("'interval' path 'PERIOD'"));
+        assert!(message.contains("cannot be resolved"));
+    }
+
+    #[test]
+    fn rejects_an_unresolvable_ticker_behavior_path() {
+        let message = error_for(
+            "#[scheduled_with_tick_timer(interval = crate::PERIOD, behavior = Delay)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+        );
+
+        assert!(message.contains("'behavior' path 'Delay'"));
+        assert!(message.contains("cannot be resolved"));
     }
 
     fn canonical(segments: &[&str]) -> CanonicalPath {
@@ -265,33 +319,36 @@ mod tests {
             "fntick_interval(&self)->std::time::Duration{margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL}"
         ));
         assert!(source.contains(
-            "manager.register_service(JwksRoller{inner:(matchcontainer.framework_jwks_roller_server_jwks_roller_jwks_roller().await"
+            "manager.register_service(JwksRoller{inner:container.framework_jwks_roller_server_jwks_roller_jwks_roller(),});"
         ));
         assert!(source.contains("impltrzcina::ServiceforJwksClient"));
-        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
+        assert!(
+            source.contains(
+                "self.inner.run(cancellation_token).await?;::std::result::Result::Ok(())"
+            )
+        );
         assert!(source.contains(
-            "manager.register_service(JwksClient{inner:(matchcontainer.framework_jwks_client_jwks_client_jwks_client().await"
+            "manager.register_service(JwksClient{inner:container.framework_jwks_client_jwks_client_jwks_client(),});"
         ));
     }
 
     #[test]
     fn renders_a_ticker_that_passes_the_token() {
         let source = rendered(
-            "use tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
-        assert!(
-            source
-                .contains("self.inner.run(cancellation_token).await.map_err(anyhow::Error::from)")
-        );
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+        ));
         assert!(!source.contains("_cancellation_token"));
     }
 
     #[test]
     fn renders_a_ticker_without_a_behavior() {
         let source = rendered(
-            "#[scheduled_with_tick_timer(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = crate::PERIOD)]\nstruct T;\n\nimpl T {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
@@ -303,12 +360,14 @@ mod tests {
     #[test]
     fn renders_a_service_without_a_token() {
         let source = rendered(
-            "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
             &[],
         );
 
         assert!(source.contains("_cancellation_token:tokio_util::sync::CancellationToken"));
-        assert!(source.contains("self.inner.run().await?;Ok(())"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+        ));
     }
 
     #[test]
@@ -317,7 +376,7 @@ mod tests {
 
         assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:matchsuper::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
@@ -328,7 +387,8 @@ mod tests {
         assert!(source.contains(
             "forserver_serviceinserver_services{manager.register_service(server_service);}"
         ));
-        assert!(source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"));
+        assert!(source.contains("manager.register_service(Pump{"));
+        assert!(source.contains("inner:container.pump()"));
         assert!(!source.contains("bundle_services"));
         assert!(!source.contains("resolved_services"));
         assert!(source.contains("letmutmanager=trzcina::ServiceManager::default();"));
@@ -339,7 +399,8 @@ mod tests {
         let source = rendered(SERVICE, &[]);
 
         assert!(source.contains("letmutmanager=trzcina::ServiceManager::default();"));
-        assert!(source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"));
+        assert!(source.contains("manager.register_service(Pump{"));
+        assert!(source.contains("inner:container.pump()"));
         assert!(!source.contains("serve_application"));
     }
 
@@ -348,11 +409,11 @@ mod tests {
         let source = rendered_with_views("#[singleton]\nstruct Store;\n", &public());
 
         assert!(source.contains(
-            "letviews=::std::sync::Arc::new(matchsuper::views::build::build(container).await{Ok(views)=>views,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}},);"
+            "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
         ));
         assert!(
             source.contains(
-                "super::http::server_public::server_public(container,&routes,&views,).await"
+                "super::http::server_public::server_public(container,&routes,&views).await"
             )
         );
     }
@@ -390,11 +451,12 @@ mod tests {
         assert!(source.contains(
             r#"Some("spiffe_mtls")=>{margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
         ));
-        assert!(
-            source.contains(
-                "_=>margaret::framework::http::transport_config::TransportConfig::Plain,"
-            )
-        );
+        assert!(source.contains(
+            r#"Some("plain")=>{margaret::framework::http::transport_config::TransportConfig::Plain}"#
+        ));
+        assert!(source.contains(
+            "Some(_)|None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}"
+        ));
         assert!(source.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
@@ -422,7 +484,7 @@ mod tests {
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(source.contains(
-            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:(matchcontainer.worker(console_argument_0.clone()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),},),);"
+            "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:container.worker(),},),);"
         ));
         assert!(source.contains(
             "margaret::framework::service::run::run(manager,cancellation_token,trzcina::ServiceShutdownOptions::default(),).await"
@@ -496,13 +558,13 @@ mod tests {
         );
 
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:matchsuper::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:matchsuper::http::server_internal::server_internal(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#
@@ -524,7 +586,7 @@ mod tests {
     #[test]
     fn rejects_a_non_path_interval() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -533,7 +595,7 @@ mod tests {
     #[test]
     fn rejects_a_non_path_behavior() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));
@@ -555,7 +617,7 @@ mod tests {
     #[test]
     fn rejects_conflicting_roles() {
         let message = error_for(
-            "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("mutually exclusive"));
@@ -569,7 +631,7 @@ mod tests {
     #[test]
     fn rejects_an_ambiguous_runner() {
         let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> Result<(), Infallible> {}\n    #[process]\n    fn b(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> anyhow::Result<()> {}\n    #[process]\n    fn b(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("more than one #[process]"));
@@ -578,7 +640,7 @@ mod tests {
     #[test]
     fn rejects_a_ticker_without_an_interval() {
         let message = error_for(
-            "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("missing the 'interval'"));
@@ -587,7 +649,7 @@ mod tests {
     #[test]
     fn rejects_an_unmarked_runner_parameter() {
         let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> Result<(), Infallible> {}\n}\n",
+            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("takes parameter 'value'"));
@@ -597,7 +659,7 @@ mod tests {
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
         let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("carries #[authenticated_user]"));
@@ -607,7 +669,7 @@ mod tests {
     #[test]
     fn rejects_a_cancellation_token_passed_by_reference() {
         let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> Result<(), Infallible> {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("takes parameter 'token'"));
@@ -626,10 +688,10 @@ struct Roller {
 
 impl Roller {
     #[constructor]
-    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> Self {}
+    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 "#,
             &[],
@@ -637,11 +699,11 @@ impl Roller {
 
         assert!(source.contains("structRoller{inner:std::sync::Arc<crate::Roller>,}"));
         assert!(source.contains("impltrzcina::TickerforRoller"));
-        assert!(source.contains("self.inner.run().await.map_err(anyhow::Error::from)"));
-        assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains(
-            "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
         ));
+        assert!(!source.contains("impltrzcina::Servicefor"));
+        assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
         assert!(source.contains(
             r#"letconsole_argument_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
         ));
@@ -660,23 +722,20 @@ struct Roller {
 
 impl Roller {
     #[constructor]
-    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> Self {}
+    fn create(#[console_argument(from = "secret-path")] secret_path: PathBuf) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}
+    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}
 }
 "#,
             &[],
         );
 
-        assert!(
-            source
-                .contains("self.inner.run(cancellation_token).await.map_err(anyhow::Error::from)")
-        );
-        assert!(!source.contains("_cancellation_token"));
         assert!(source.contains(
-            "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
         ));
+        assert!(!source.contains("_cancellation_token"));
+        assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
     }
 
     #[test]
@@ -691,19 +750,19 @@ struct Worker {
 
 impl Worker {
     #[constructor]
-    fn create(#[console_argument(from = "label")] label: String) -> Self {}
+    fn create(#[console_argument(from = "label")] label: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self, token: CancellationToken) -> Result<(), Infallible> {}
+    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}
 }
 "#,
             &[],
         );
 
-        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
         assert!(source.contains(
-            "manager.register_service(Worker{inner:(matchcontainer.worker(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
         ));
+        assert!(source.contains("manager.register_service(Worker{inner:container.worker(),});"));
     }
 
     #[test]
@@ -716,20 +775,20 @@ struct Worker {
 
 impl Worker {
     #[constructor]
-    fn create(#[console_argument(from = "label")] label: String) -> Self {}
+    fn create(#[console_argument(from = "label")] label: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 "#,
             &[],
         );
 
         assert!(source.contains("structWorker{inner:std::sync::Arc<crate::Worker>,}"));
-        assert!(source.contains("self.inner.run().await?;Ok(())"));
         assert!(source.contains(
-            "manager.register_service(Worker{inner:(matchcontainer.worker(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
         ));
+        assert!(source.contains("manager.register_service(Worker{inner:container.worker(),});"));
         assert!(source.contains(
             r#"letconsole_argument_0=matchmatches.get_one::<std::string::String>("label")"#
         ));
@@ -745,18 +804,16 @@ struct Watcher {
 
 impl Watcher {
     #[constructor]
-    fn create(#[console_argument(from = "verbose")] verbose: bool) -> Self {}
+    fn create(#[console_argument(from = "verbose")] verbose: bool) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 "#,
             &[],
         );
 
-        assert!(source.contains(
-            "manager.register_service(Watcher{inner:(matchcontainer.watcher(console_argument_0).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
+        assert!(source.contains("manager.register_service(Watcher{inner:container.watcher(),});"));
         assert!(source.contains(r#"letconsole_argument_0=matches.get_flag("verbose")"#));
     }
 
@@ -770,10 +827,10 @@ struct First {
 
 impl First {
     #[constructor]
-    fn create(#[console_argument(from = "shared")] a: String) -> Self {}
+    fn create(#[console_argument(from = "shared")] a: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 
 #[service]
@@ -783,28 +840,25 @@ struct Second {
 
 impl Second {
     #[constructor]
-    fn create(#[console_argument(from = "shared")] b: String) -> Self {}
+    fn create(#[console_argument(from = "shared")] b: String) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> Result<(), Infallible> {}
+    fn run(&self) -> anyhow::Result<()> {}
 }
 "#,
             &[],
         );
 
-        assert!(source.contains(
-            "manager.register_service(First{inner:(matchcontainer.first(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
-        assert!(source.contains(
-            "manager.register_service(Second{inner:(matchcontainer.second(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
-        ));
+        assert!(source.contains("structFirst"));
+        assert!(source.contains("structSecond"));
+        assert_eq!(source.matches("manager.register_service(").count(), 2);
         assert_eq!(source.matches("letconsole_argument_0=").count(), 1);
     }
 
     #[test]
     fn propagates_malformed_ticker_arguments() {
         let message = error_for(
-            "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Infallible> {}\n}\n",
+            "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
         assert!(message.contains("failed to index"));

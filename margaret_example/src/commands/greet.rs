@@ -19,31 +19,34 @@ pub struct Greet {
 
 impl Greet {
     #[constructor]
-    #[must_use]
     pub fn create(
         greeter: Arc<EnglishGreeter>,
         #[console_argument(positional)] name: String,
         #[console_argument(from = "salutation")] salutation: Option<String>,
         #[console_argument(from = "loud")] loud: bool,
-    ) -> Self {
-        Self {
-            greeter,
-            name,
-            salutation,
-            loud,
-        }
+    ) -> anyhow::Result<Self> {
+        Ok({
+            Self {
+                greeter,
+                name,
+                salutation,
+                loud,
+            }
+        })
     }
 
     #[process]
-    pub async fn run(&self) -> CommandOutcome {
-        println!(
-            "{}, {} (salutation: {:?}, loud: {})",
-            self.greeter.greet(),
-            self.name,
-            self.salutation,
-            self.loud
-        );
+    pub async fn run(&self) -> anyhow::Result<CommandOutcome> {
+        Ok({
+            println!(
+                "{}, {} (salutation: {:?}, loud: {})",
+                self.greeter.greet(),
+                self.name,
+                self.salutation,
+                self.loud
+            );
 
-        CommandOutcome::Succeeded
+            CommandOutcome::Succeeded
+        })
     }
 }

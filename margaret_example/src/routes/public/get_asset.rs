@@ -16,16 +16,15 @@ pub struct GetAsset {
 
 impl GetAsset {
     #[constructor]
-    #[must_use]
-    pub fn create(asset_responder: Arc<AssetResponder>) -> Self {
-        Self { asset_responder }
+    pub fn create(asset_responder: Arc<AssetResponder>) -> anyhow::Result<Self> {
+        Ok(Self { asset_responder })
     }
 
     #[process]
     pub async fn respond(
         &self,
         #[route_parameter(from = "asset_path")] asset_path: String,
-    ) -> Response {
-        self.asset_responder.respond(&asset_path)
+    ) -> anyhow::Result<Response> {
+        Ok(self.asset_responder.respond(&asset_path))
     }
 }

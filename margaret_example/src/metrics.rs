@@ -15,12 +15,13 @@ pub struct Metrics {
 
 impl Metrics {
     #[constructor]
-    #[must_use]
-    pub fn create() -> Self {
-        Self {
-            signal: Arc::new(Notify::new()),
-            sweeps: Arc::new(AtomicUsize::new(0)),
-        }
+    pub fn create() -> anyhow::Result<Self> {
+        Ok({
+            Self {
+                signal: Arc::new(Notify::new()),
+                sweeps: Arc::new(AtomicUsize::new(0)),
+            }
+        })
     }
 
     pub fn record_sweep(&self) {

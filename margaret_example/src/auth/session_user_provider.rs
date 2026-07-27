@@ -22,28 +22,29 @@ pub struct SessionUserProvider {
 
 impl SessionUserProvider {
     #[constructor]
-    #[must_use]
-    pub fn create(users: Arc<UserStore>) -> Self {
-        Self { users }
+    pub fn create(users: Arc<UserStore>) -> anyhow::Result<Self> {
+        Ok(Self { users })
     }
 
     #[infer_from_request]
     pub async fn infer_session_user(
         &self,
         #[form_request(from = Cookie)] cookie: SessionCookie,
-    ) -> AuthenticatedUserOutcome<User> {
-        let Some(session) = cookie.session else {
-            return AuthenticatedUserOutcome::Anonymous;
-        };
-        let Ok(session) = Uuid::parse_str(&session) else {
-            return AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(
-                Response::text(400, "Malformed session cookie"),
-            ));
-        };
+    ) -> anyhow::Result<AuthenticatedUserOutcome<User>> {
+        Ok({
+            let Some(session) = cookie.session else {
+                return Ok(AuthenticatedUserOutcome::Anonymous);
+            };
+            let Ok(session) = Uuid::parse_str(&session) else {
+                return Ok(AuthenticatedUserOutcome::Interrupted(
+                    ResponseContinuation::from(Response::text(400, "Malformed session cookie")),
+                ));
+            };
 
-        match self.users.find_user_by_session(session) {
-            Some(user) => AuthenticatedUserOutcome::Authenticated(user),
-            None => AuthenticatedUserOutcome::Anonymous,
-        }
+            match self.users.find_user_by_session(session) {
+                Some(user) => AuthenticatedUserOutcome::Authenticated(user),
+                None => AuthenticatedUserOutcome::Anonymous,
+            }
+        })
     }
 }

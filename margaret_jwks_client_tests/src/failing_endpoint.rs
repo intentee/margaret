@@ -8,9 +8,10 @@ pub struct FailingEndpoint;
 
 #[async_trait]
 impl ProvidesEndpoint for FailingEndpoint {
-    async fn provide(&self) -> Result<Url, EndpointError> {
+    async fn provide(&self) -> anyhow::Result<Url> {
         Err(EndpointError::Resolution {
             source: "the issuer endpoint could not be discovered".into(),
-        })
+        }
+        .into())
     }
 }

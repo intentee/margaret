@@ -9,7 +9,7 @@ fn collapsed(source: &str) -> String {
 }
 
 #[test]
-fn emits_expectations_for_every_bootstrap_function_over_the_threshold() {
+fn eliminates_oversized_bootstrap_signatures_at_feature_boundaries() {
     let generated =
         generate_fixture("too_many_bootstrap_arguments").expect("the fixture generates");
     let http = generated_module_source(&generated, "http/server_public")
@@ -21,10 +21,10 @@ fn emits_expectations_for_every_bootstrap_function_over_the_threshold() {
     let session = generated_module_source(&generated, "websocket/room")
         .expect("the WebSocket session module is generated");
 
-    assert!(collapsed(http).contains(EXPECT));
-    assert!(collapsed(views).contains(EXPECT));
-    assert!(collapsed(websocket).contains(EXPECT));
-    assert_eq!(collapsed(session).matches(EXPECT).count(), 2);
+    assert!(!collapsed(http).contains(EXPECT));
+    assert!(!collapsed(views).contains(EXPECT));
+    assert!(!collapsed(websocket).contains(EXPECT));
+    assert!(!collapsed(session).contains(EXPECT));
 }
 
 #[test]

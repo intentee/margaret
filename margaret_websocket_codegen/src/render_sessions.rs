@@ -5,10 +5,6 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
-use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_container::accessor_error_path::accessor_error_path;
-use margaret_container::accessor_failure::AccessorFailure;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
@@ -17,12 +13,11 @@ use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
 use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::render_bound_request_extractions::render_bound_request_extractions;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::handler_binding::HandlerBinding;
-use crate::session_console_arguments::dispatch_table_console_arguments;
-use crate::session_console_arguments::session_console_arguments;
 use crate::session_plan::SessionPlan;
 use crate::websocket_session::WebSocketSession;
 
@@ -36,14 +31,7 @@ fn injected_field_value(
     dependency: &InjectedDependency,
     bindings: &ContainerBindings,
 ) -> TokenStream {
-    let arguments = bindings.console_weaves(&bindings.injected_console_arguments(dependency));
-
-    bindings.accessor_invocation(
-        &format_ident!("container"),
-        &dependency.field,
-        &arguments,
-        &AccessorFailure::Propagate,
-    )
+    bindings.accessor_invocation(&format_ident!("container"), &dependency.field)
 }
 
 fn captured_providers(session: &WebSocketSession) -> CapturedProviders {
@@ -121,14 +109,7 @@ fn factory_initializers(
         .map(|CapturedProvider { kind, local }| match kind {
             CapturedProviderKind::AuthenticatedUser { application } => {
                 let wrapper = &application.wrapper;
-                let arguments =
-                    bindings.console_weaves(bindings.console_arguments(&application.concrete));
-                let inner = bindings.accessor_invocation(
-                    &container,
-                    kind.accessor(),
-                    &arguments,
-                    &AccessorFailure::Propagate,
-                );
+                let inner = bindings.accessor_invocation(&container, kind.accessor());
                 let routes_init = application
                     .injects_routes
                     .then(|| quote! { routes: routes.clone(), });
@@ -142,14 +123,8 @@ fn factory_initializers(
                     ),
                 }
             }
-            CapturedProviderKind::Binder { provider, .. } => {
-                let arguments = bindings.console_weaves(bindings.console_arguments(provider));
-                let access = bindings.accessor_invocation(
-                    &container,
-                    kind.accessor(),
-                    &arguments,
-                    &AccessorFailure::Propagate,
-                );
+            CapturedProviderKind::Binder { .. } => {
+                let access = bindings.accessor_invocation(&container, kind.accessor());
 
                 quote! { #local: #access, }
             }
@@ -163,9 +138,44 @@ fn create_extractions(
     handshake: &Ident,
     captured: &CapturedProviders,
 ) -> TokenStream {
-    let continuation_return = quote! { return ::std::result::Result::Err(response) };
-    let response_return = quote! { return ::std::result::Result::Err(response.into()) };
+    let continuation_return = quote! {
+        return ::std::result::Result::Ok(
+            margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
+                response,
+            ),
+        )
+    };
+    let response_return = quote! {
+        return ::std::result::Result::Ok(
+            margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
+                response.into(),
+            ),
+        )
+    };
+    let error_return = quote! {
+        return ::std::result::Result::Err(
+            margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError::consumer(
+                error,
+            ),
+        )
+    };
     let owner = quote! { self. };
+    let bound = render_bound_request_extractions(
+        &session.parameters,
+        captured,
+        &owner,
+        handshake,
+        &quote! { return ::std::result::Result::Err(error.into()) },
+        &quote! {
+            return ::std::result::Result::Ok(
+                margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
+                    margaret::framework::http::response_continuation::ResponseContinuation::from(
+                        margaret::framework::http::response::Response::not_found(),
+                    ),
+                ),
+            )
+        },
+    );
     let extractions = session.parameters.iter().map(|parameter| {
         let provider_access = captured.access(&parameter.binding, &owner);
 
@@ -174,6 +184,7 @@ fn create_extractions(
             &parameter.holder,
             &ExtractionContext {
                 continuation_return: &continuation_return,
+                error_return: &error_return,
                 provider_access: &provider_access,
                 request_local: handshake,
                 response_return: &response_return,
@@ -181,7 +192,10 @@ fn create_extractions(
         )
     });
 
-    quote! { #(#extractions)* }
+    quote! {
+        #bound
+        #(#extractions)*
+    }
 }
 
 fn build_arguments(session: &WebSocketSession) -> TokenStream {
@@ -227,14 +241,17 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
                 &self,
                 #handshake: &margaret::framework::http::request::Request,
             ) -> ::std::result::Result<
-                ::std::sync::Arc<Self::Session>,
-                margaret::framework::http::response_continuation::ResponseContinuation,
+                margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome<Self::Session>,
+                margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError,
             > {
                 #extractions
 
-                ::std::result::Result::Ok(::std::sync::Arc::new(
-                    #session_path::#method_name(#arguments),
-                ))
+                #session_path::#method_name(#arguments)
+                    .map(::std::sync::Arc::new)
+                    .map(margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created)
+                    .map_err(
+                        margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
+                    )
             }
         }
     }
@@ -323,13 +340,7 @@ fn dispatch_insert(
 ) -> TokenStream {
     let dispatch = dispatch_struct_ident(binding);
     let method = &binding.method;
-    let arguments = bindings.console_weaves(bindings.console_arguments(&binding.handler_path));
-    let handler = bindings.accessor_invocation(
-        container,
-        &binding.handler_field,
-        &arguments,
-        &AccessorFailure::Propagate,
-    );
+    let handler = bindings.accessor_invocation(container, &binding.handler_field);
 
     quote! {
         #map.insert(
@@ -352,7 +363,6 @@ fn mutability(has_inserts: bool) -> TokenStream {
 fn render_dispatch_table(
     plan: &SessionPlan,
     session_path: &TokenStream,
-    dispatch_arguments: &[ConsoleArgument],
     bindings: &ContainerBindings,
 ) -> TokenStream {
     let requests = format_ident!("requests");
@@ -362,7 +372,6 @@ fn render_dispatch_table(
     } else {
         format_ident!("container")
     };
-    let parameters = bindings.console_parameters(dispatch_arguments);
     let request_inserts = plan
         .request_handlers
         .iter()
@@ -374,8 +383,6 @@ fn render_dispatch_table(
 
     let requests_mutability = mutability(!plan.request_handlers.is_empty());
     let notifications_mutability = mutability(!plan.notification_handlers.is_empty());
-    let parameter_count = 1 + parameters.len();
-    let too_many_arguments = too_many_arguments_expect(parameter_count);
     let table_type = quote! {
         ::std::sync::Arc<
             margaret::framework::websocket::web_socket_dispatch_table::WebSocketDispatchTable<#session_path>,
@@ -389,23 +396,10 @@ fn render_dispatch_table(
             ),
         )
     };
-    let (return_type, table) = if bindings.has_accessors() {
-        let error = accessor_error_path();
-
-        (
-            quote! { ::std::result::Result<#table_type, #error> },
-            quote! { Ok(#table_value) },
-        )
-    } else {
-        (table_type, table_value)
-    };
-
     quote! {
-        #too_many_arguments
         async fn dispatch_table(
             #container: &super::super::container::Container,
-            #(#parameters)*
-        ) -> #return_type {
+        ) -> #table_type {
             let #requests_mutability #requests: ::std::collections::HashMap<
                 ::std::string::String,
                 ::std::sync::Arc<
@@ -426,7 +420,7 @@ fn render_dispatch_table(
             > = ::std::collections::HashMap::new();
             #(#notification_inserts)*
 
-            #table
+            #table_value
         }
     }
 }
@@ -436,10 +430,6 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
     let captured = captured_providers(&plan.session);
     let factory = render_factory(&plan.session, &captured);
     let initializers = factory_initializers(&plan.session, bindings, &captured);
-    let session_arguments = session_console_arguments(plan, bindings);
-    let dispatch_arguments = dispatch_table_console_arguments(plan, bindings);
-    let upgrade_parameters = bindings.console_parameters(&session_arguments);
-    let dispatch_forward = bindings.console_forwards(&dispatch_arguments);
     let routes_parameter = plan.session.injects_routes().then(|| {
         quote! { routes: &::std::sync::Arc<super::super::routes::Routes>, }
     });
@@ -451,16 +441,8 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
         .notification_handlers
         .iter()
         .map(|binding| render_notification_dispatch(binding, &session_path));
-    let dispatch_table = render_dispatch_table(plan, &session_path, &dispatch_arguments, bindings);
-    let parameter_count = 1 + upgrade_parameters.len() + usize::from(routes_parameter.is_some());
-    let too_many_arguments = too_many_arguments_expect(parameter_count);
-    let has_fallible = bindings.has_accessors();
-    let dispatch_call = quote! { dispatch_table(container, #(#dispatch_forward)*).await };
-    let dispatch_value = if has_fallible {
-        quote! { #dispatch_call? }
-    } else {
-        dispatch_call
-    };
+    let dispatch_table = render_dispatch_table(plan, &session_path, bindings);
+    let dispatch_call = quote! { dispatch_table(container).await };
     let upgrade_type = quote! {
         ::std::sync::Arc<dyn margaret::framework::http::web_socket_upgrade::WebSocketUpgrade>
     };
@@ -470,21 +452,10 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
                 Factory {
                     #initializers
                 },
-                #dispatch_value,
+                #dispatch_call,
             ),
         )
     };
-    let (upgrade_return, upgrade_body) = if has_fallible {
-        let error = accessor_error_path();
-
-        (
-            quote! { ::std::result::Result<#upgrade_type, #error> },
-            quote! { Ok(#upgrade_value) },
-        )
-    } else {
-        (upgrade_type, upgrade_value)
-    };
-
     quote! {
         #factory
 
@@ -493,13 +464,11 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
 
         #dispatch_table
 
-        #too_many_arguments
         pub async fn upgrade_entry(
             container: &super::super::container::Container,
-            #(#upgrade_parameters)*
             #routes_parameter
-        ) -> #upgrade_return {
-            #upgrade_body
+        ) -> #upgrade_type {
+            #upgrade_value
         }
     }
 }

@@ -74,8 +74,15 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
         format_ident!("_next")
     };
 
-    let continuation_return = quote! { return response };
-    let response_return = quote! { return response.into() };
+    let continuation_return = quote! { return ::std::result::Result::Ok(response) };
+    let response_return = quote! {
+        return ::std::result::Result::Ok(response.into())
+    };
+    let error_return = quote! {
+        return ::std::result::Result::Err(
+            margaret::framework::http::handler_error::HandlerError::consumer(error),
+        )
+    };
     let provider_access = TokenStream::new();
     let extractions = parameters.iter().map(|parameter| {
         render_request_extraction(
@@ -83,6 +90,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
             &parameter.holder,
             &ExtractionContext {
                 continuation_return: &continuation_return,
+                error_return: &error_return,
                 provider_access: &provider_access,
                 request_local: &request_binding,
                 response_return: &response_return,
@@ -106,9 +114,15 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
                 &self,
                 #request_binding: &margaret::framework::http::request::Request,
                 #next_binding: margaret::framework::http::next::Next,
-            ) -> margaret::framework::http::response_continuation::ResponseContinuation {
+            ) -> ::std::result::Result<
+                margaret::framework::http::response_continuation::ResponseContinuation,
+                margaret::framework::http::handler_error::HandlerError,
+            > {
                 #(#extractions)*
-                self.inner.process(#(#call_arguments),*).await
+                self.inner
+                    .process(#(#call_arguments),*)
+                    .await
+                    .map_err(margaret::framework::http::handler_error::HandlerError::consumer)
             }
         }
     }

@@ -28,9 +28,8 @@ pub struct ReaderRealm {
 
 impl ReaderRealm {
     #[constructor]
-    #[must_use]
-    pub fn create(#[console_argument(from = "realm")] realm: String) -> Self {
-        Self { realm }
+    pub fn create(#[console_argument(from = "realm")] realm: String) -> anyhow::Result<Self> {
+        Ok(Self { realm })
     }
 
     #[must_use]
@@ -47,9 +46,8 @@ pub struct SessionReaderProvider {
 
 impl SessionReaderProvider {
     #[constructor]
-    #[must_use]
-    pub fn create(realm: Arc<ReaderRealm>) -> Self {
-        Self { realm }
+    pub fn create(realm: Arc<ReaderRealm>) -> anyhow::Result<Self> {
+        Ok(Self { realm })
     }
 
     #[infer_from_request]
@@ -57,17 +55,21 @@ impl SessionReaderProvider {
         &self,
         request: &Request,
         #[form_request(from = Cookie)] cookie: ReaderCookie,
-    ) -> AuthenticatedUserOutcome<Reader> {
-        let _ = request.inputs.server.path();
+    ) -> anyhow::Result<AuthenticatedUserOutcome<Reader>> {
+        Ok({
+            let _ = request.inputs.server.path();
 
-        let Some(reader) = cookie.reader else {
-            return AuthenticatedUserOutcome::Anonymous;
-        };
+            let Some(reader) = cookie.reader else {
+                return Ok(AuthenticatedUserOutcome::Anonymous);
+            };
 
-        if self.realm.admits(&reader) {
-            AuthenticatedUserOutcome::Authenticated(Reader { name: reader })
-        } else {
-            AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(Response::forbidden()))
-        }
+            if self.realm.admits(&reader) {
+                AuthenticatedUserOutcome::Authenticated(Reader { name: reader })
+            } else {
+                AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(
+                    Response::forbidden(),
+                ))
+            }
+        })
     }
 }

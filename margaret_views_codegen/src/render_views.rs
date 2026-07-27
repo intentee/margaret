@@ -26,15 +26,17 @@ pub fn render_views(
 ) -> Result<ViewsArtifacts, ViewsCodegenError> {
     let views = views(index)?;
     let console_arguments = views_console_arguments(&views, bindings);
+    let construction_roots = views
+        .iter()
+        .map(|view| view.concrete_path.clone())
+        .collect();
 
     Ok(ViewsArtifacts {
         modules: vec![
             GeneratedModuleTokens::new("views", render(&views)),
-            GeneratedModuleTokens::new(
-                "views/build",
-                render_build(&views, &console_arguments, bindings),
-            ),
+            GeneratedModuleTokens::new("views/build", render_build(&views, bindings)),
         ],
         console_arguments,
+        construction_roots,
     })
 }

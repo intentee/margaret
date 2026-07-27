@@ -7,21 +7,14 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_codegen_tokens::console_argument_argument::console_argument_argument;
-use margaret_codegen_tokens::console_argument_borrow::console_argument_borrow;
 use margaret_codegen_tokens::console_argument_clone::console_argument_clone;
-use margaret_codegen_tokens::console_argument_deref::console_argument_deref;
 use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
-use margaret_codegen_tokens::console_argument_parameter::console_argument_parameter;
 use margaret_codegen_tokens::console_argument_to_owned::console_argument_to_owned;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
-use margaret_console_argument_codegen::unify_by_key::unify_by_key;
 use margaret_console_argument_codegen::weaving_kind::WeavingKind;
 
-use crate::accessor_failure::AccessorFailure;
 use crate::console_closures::ConsoleClosures;
-use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::injected_dependency::InjectedDependency;
 use crate::provider_binding::ProviderBinding;
@@ -30,15 +23,15 @@ pub struct ContainerBindings {
     accessor_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
     console_arguments: BTreeMap<CanonicalPath, Vec<ConsoleArgument>>,
     console_slots: BTreeMap<ServeInputKey, usize>,
-    has_accessors: bool,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
 }
 
 impl ContainerBindings {
     pub(crate) fn from_plan(plan: &ContainerPlan, closures: &ConsoleClosures) -> Self {
         let providers = plan
-            .providers
+            .injectable
             .iter()
+            .map(|provider_key| (provider_key, plan.entry(provider_key)))
             .map(|(provider_key, provider)| {
                 (
                     provider_key.clone(),
@@ -49,19 +42,16 @@ impl ContainerBindings {
                 )
             })
             .collect();
-        let has_accessors = plan.providers.len() + plan.constructions.len() > 0;
         let console_arguments = plan
-            .providers
+            .entries
             .iter()
-            .chain(plan.constructions.iter())
             .map(|(entry_key, entry)| {
                 (entry.concrete_path.clone(), closures.of(entry_key).to_vec())
             })
             .collect();
         let accessor_console_arguments = plan
-            .providers
+            .entries
             .iter()
-            .chain(plan.constructions.iter())
             .map(|(entry_key, entry)| (entry.field_name.clone(), closures.of(entry_key).to_vec()))
             .collect();
         let console_slots = closures.slots().clone();
@@ -70,31 +60,15 @@ impl ContainerBindings {
             accessor_console_arguments,
             console_arguments,
             console_slots,
-            has_accessors,
             providers,
         }
     }
 
     #[must_use]
-    pub fn accessor_invocation(
-        &self,
-        container: &Ident,
-        field_name: &str,
-        woven: &[TokenStream],
-        failure: &AccessorFailure,
-    ) -> TokenStream {
+    pub fn accessor_invocation(&self, container: &Ident, field_name: &str) -> TokenStream {
         let accessor = format_ident!("{field_name}");
-        let call = quote! { #container.#accessor(#(#woven),*).await };
 
-        match failure {
-            AccessorFailure::Propagate => quote! { #call? },
-            AccessorFailure::Report(on_failure) => quote! {
-                (match #call {
-                    Ok(value) => value,
-                    Err(error) => #on_failure,
-                })
-            },
-        }
+        quote! { #container.#accessor() }
     }
 
     #[must_use]
@@ -103,35 +77,6 @@ impl ContainerBindings {
             Some(arguments) => arguments,
             None => &[],
         }
-    }
-
-    #[must_use]
-    pub fn console_borrows(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
-        arguments
-            .iter()
-            .map(|argument| console_argument_borrow(self.console_slot(&argument.slot_key())))
-            .collect()
-    }
-
-    #[must_use]
-    pub fn console_forwards(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
-        arguments
-            .iter()
-            .map(|argument| console_argument_argument(self.console_slot(&argument.slot_key())))
-            .collect()
-    }
-
-    #[must_use]
-    pub fn console_parameters(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
-        arguments
-            .iter()
-            .map(|argument| {
-                console_argument_parameter(
-                    self.console_slot(&argument.slot_key()),
-                    &argument.parameter_referent(),
-                )
-            })
-            .collect()
     }
 
     #[must_use]
@@ -156,24 +101,22 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn console_weaves(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
-        arguments
-            .iter()
-            .map(|argument| self.materialize(argument, false))
-            .collect()
-    }
-
-    #[must_use]
     pub fn console_weaves_owned(&self, arguments: &[ConsoleArgument]) -> Vec<TokenStream> {
         arguments
             .iter()
-            .map(|argument| self.materialize(argument, true))
+            .map(|argument| self.materialize(argument))
             .collect()
     }
 
     #[must_use]
-    pub fn has_accessors(&self) -> bool {
-        self.has_accessors
+    pub fn construction_invocation(
+        &self,
+        field_name: &str,
+        arguments: &[TokenStream],
+    ) -> TokenStream {
+        let function = format_ident!("construct_{field_name}");
+
+        quote! { super::container::build::#function(#(#arguments),*).await }
     }
 
     #[must_use]
@@ -194,11 +137,12 @@ impl ContainerBindings {
         self.providers.contains_key(provider_key)
     }
 
+    #[must_use]
     pub fn serve_arguments(
         &self,
         roots: &[CanonicalPath],
         woven: &[ConsoleArgument],
-    ) -> Result<Vec<ConsoleArgument>, ContainerError> {
+    ) -> Vec<ConsoleArgument> {
         let mut collected: Vec<ConsoleArgument> = Vec::new();
 
         for root in roots {
@@ -207,25 +151,21 @@ impl ContainerBindings {
 
         collected.extend_from_slice(woven);
 
-        Ok(unify_by_key(&collected)?)
+        self.console_union(&collected)
     }
 
     fn accessor_console_arguments(&self, field: &str) -> &[ConsoleArgument] {
         &self.accessor_console_arguments[field]
     }
 
-    fn materialize(&self, argument: &ConsoleArgument, owned_source: bool) -> TokenStream {
+    fn materialize(&self, argument: &ConsoleArgument) -> TokenStream {
         let slot = self.console_slot(&argument.slot_key());
 
         match argument.weaving() {
             WeavingKind::Copy => {
-                if owned_source {
-                    let ident = console_argument_ident(slot);
+                let ident = console_argument_ident(slot);
 
-                    quote! { #ident }
-                } else {
-                    console_argument_deref(slot)
-                }
+                quote! { #ident }
             }
             WeavingKind::BorrowedStr | WeavingKind::BorrowedPath => console_argument_to_owned(slot),
             WeavingKind::Cloned => console_argument_clone(slot),

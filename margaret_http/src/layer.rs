@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::handler::Handler;
+use crate::handler_error::HandlerError;
 use crate::http_middleware::HttpMiddleware;
 use crate::next::Next;
 use crate::request::Request;
@@ -18,7 +19,7 @@ impl<Middleware> Handler for LayeredHandler<Middleware>
 where
     Middleware: HttpMiddleware + Send + Sync + ?Sized + 'static,
 {
-    async fn handle(&self, request: &Request) -> ResponseContinuation {
+    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
         self.middleware
             .process(request, Next::new(self.inner.clone()))
             .await
@@ -42,6 +43,7 @@ mod tests {
     use super::layer;
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
+    use crate::handler_error::HandlerError;
     use crate::http_middleware::HttpMiddleware;
     use crate::next::Next;
     use crate::request::Request;
@@ -53,8 +55,8 @@ mod tests {
 
     #[async_trait]
     impl Handler for Inner {
-        async fn handle(&self, _request: &Request) -> ResponseContinuation {
-            ResponseContinuation::Done(Response::text(200, "inner"))
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::Done(Response::text(200, "inner")))
         }
     }
 
@@ -62,7 +64,11 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for PassThrough {
-        async fn process(&self, request: &Request, next: Next) -> ResponseContinuation {
+        async fn process(
+            &self,
+            request: &Request,
+            next: Next,
+        ) -> Result<ResponseContinuation, HandlerError> {
             next.run(request).await
         }
     }
@@ -71,8 +77,12 @@ mod tests {
 
     #[async_trait]
     impl HttpMiddleware for ShortCircuit {
-        async fn process(&self, _request: &Request, _next: Next) -> ResponseContinuation {
-            ResponseContinuation::Done(Response::text(403, "blocked"))
+        async fn process(
+            &self,
+            _request: &Request,
+            _next: Next,
+        ) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::Done(Response::text(403, "blocked")))
         }
     }
 

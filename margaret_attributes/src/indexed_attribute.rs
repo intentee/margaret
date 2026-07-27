@@ -1,22 +1,50 @@
-use std::cell::OnceCell;
-
 use syn::Attribute;
+use syn::Meta;
 use syn::Path;
 
 use crate::attribute_args::AttributeArgs;
+use crate::attribute_args_parse_error::AttributeArgsParseError;
 use crate::attribute_error::AttributeError;
 
+enum IndexedAttributeArgs {
+    DuplicateNamedArgument {
+        attribute_path: String,
+        key: String,
+    },
+    Malformed {
+        attribute_path: String,
+        message: String,
+    },
+    Parsed(AttributeArgs),
+}
+
 pub struct IndexedAttribute {
-    args_cache: OnceCell<AttributeArgs>,
+    args: IndexedAttributeArgs,
     attribute: Attribute,
 }
 
 impl IndexedAttribute {
-    pub(crate) fn new(attribute: Attribute) -> Self {
-        Self {
-            args_cache: OnceCell::new(),
-            attribute,
-        }
+    #[must_use]
+    pub fn new(attribute: Attribute) -> Self {
+        let args = match AttributeArgs::from_attribute(&attribute) {
+            Ok(args) => IndexedAttributeArgs::Parsed(args),
+            Err(AttributeArgsParseError::Malformed {
+                attribute_path,
+                source,
+            }) => IndexedAttributeArgs::Malformed {
+                attribute_path,
+                message: source.to_string(),
+            },
+            Err(AttributeArgsParseError::DuplicateNamedArgument {
+                attribute_path,
+                key,
+            }) => IndexedAttributeArgs::DuplicateNamedArgument {
+                attribute_path,
+                key,
+            },
+        };
+
+        Self { args, attribute }
     }
 
     #[must_use]
@@ -25,12 +53,65 @@ impl IndexedAttribute {
     }
 
     pub fn args(&self) -> Result<&AttributeArgs, AttributeError> {
-        if let Some(cached) = self.args_cache.get() {
-            return Ok(cached);
+        match &self.args {
+            IndexedAttributeArgs::DuplicateNamedArgument {
+                attribute_path,
+                key,
+            } => Err(AttributeError::DuplicateNamedArgument {
+                attribute_path: attribute_path.clone(),
+                key: key.clone(),
+            }),
+            IndexedAttributeArgs::Malformed {
+                attribute_path,
+                message,
+            } => Err(AttributeError::AttributeArguments {
+                attribute_path: attribute_path.clone(),
+                source: syn::Error::new(proc_macro2::Span::call_site(), message),
+            }),
+            IndexedAttributeArgs::Parsed(args) => Ok(args),
         }
+    }
 
-        let parsed = AttributeArgs::from_attribute(&self.attribute)?;
+    #[must_use]
+    pub fn is_bare(&self) -> bool {
+        matches!(self.attribute.meta, Meta::Path(_))
+    }
+}
 
-        Ok(self.args_cache.get_or_init(|| parsed))
+#[cfg(test)]
+mod tests {
+    use syn::parse_quote;
+
+    use super::IndexedAttribute;
+
+    #[test]
+    fn preserves_a_malformed_argument_error_until_the_attribute_is_consumed() {
+        let attribute = IndexedAttribute::new(parse_quote!(#[bad_args(= 5)]));
+        let message = attribute
+            .args()
+            .expect_err("the malformed arguments must be rejected")
+            .to_string();
+
+        assert!(message.contains("expected an expression"));
+    }
+
+    #[test]
+    fn preserves_a_duplicate_argument_error_until_the_attribute_is_consumed() {
+        let attribute = IndexedAttribute::new(parse_quote!(#[tag(value = 1, value = 2)]));
+        let message = attribute
+            .args()
+            .expect_err("the duplicate must be rejected")
+            .to_string();
+
+        assert!(message.contains("provided more than once"));
+    }
+
+    #[test]
+    fn distinguishes_bare_attributes_from_argument_lists() {
+        let bare = IndexedAttribute::new(parse_quote!(#[tag]));
+        let listed = IndexedAttribute::new(parse_quote!(#[tag()]));
+
+        assert!(bare.is_bare());
+        assert!(!listed.is_bare());
     }
 }

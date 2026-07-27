@@ -49,8 +49,14 @@ impl WebSocket {
         &self,
         frame: &WireFrame,
     ) -> Result<(), WebSocketError> {
-        let text = serde_json::to_string(frame)
-            .map_err(|source| WebSocketError::SerializeResponse { source })?;
+        self.send_serialization(serde_json::to_string(frame)).await
+    }
+
+    async fn send_serialization(
+        &self,
+        serialized: Result<String, serde_json::Error>,
+    ) -> Result<(), WebSocketError> {
+        let text = serialized.map_err(|source| WebSocketError::SerializeResponse { source })?;
 
         self.sender
             .send(Message::text(text))

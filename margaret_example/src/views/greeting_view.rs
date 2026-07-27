@@ -24,19 +24,23 @@ pub struct GreetingView {
 
 impl GreetingView {
     #[constructor]
-    #[must_use]
-    pub fn create(card_layout: Arc<CardLayout>) -> Self {
-        Self { card_layout }
+    pub fn create(card_layout: Arc<CardLayout>) -> anyhow::Result<Self> {
+        Ok(Self { card_layout })
     }
 }
 
 impl RendersView for GreetingView {
     type Props<'props> = GreetingViewProps<'props>;
 
-    fn render(&self, GreetingViewProps { greeting, routes }: Self::Props<'_>) -> Markup {
-        self.card_layout.render(CardLayoutProps {
-            body: html! { (greeting) },
-            home_url: routes.public.get_greeting.url(),
+    fn render(
+        &self,
+        GreetingViewProps { greeting, routes }: Self::Props<'_>,
+    ) -> anyhow::Result<Markup> {
+        Ok({
+            self.card_layout.render(CardLayoutProps {
+                body: html! { (greeting) },
+                home_url: routes.public.get_greeting.url(),
+            })?
         })
     }
 }
@@ -59,10 +63,12 @@ mod tests {
         };
         let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
 
-        let markup = view.render(GreetingViewProps {
-            greeting: "Hello, World".to_string(),
-            routes: &routes,
-        });
+        let markup = view
+            .render(GreetingViewProps {
+                greeting: "Hello, World".to_string(),
+                routes: &routes,
+            })
+            .expect("the greeting view renders");
 
         assert_eq!(
             markup.into_string(),

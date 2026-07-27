@@ -4,6 +4,7 @@ pub mod driver_harness;
 pub mod failing_chunk;
 pub mod failing_dispatch;
 pub mod failing_handler;
+pub mod failing_session_factory;
 pub mod flood_dispatch;
 pub mod flood_handler;
 pub mod passing_middleware;

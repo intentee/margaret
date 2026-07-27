@@ -3,16 +3,22 @@ use margaret_attributes::struct_shape::StructShape;
 
 use crate::dependency_kind::DependencyKind;
 
+#[derive(Clone)]
 pub(crate) enum DirectConstruction {
     Constructor {
         dependencies: Vec<DependencyKind>,
-        fallible: bool,
         is_async: bool,
         method: String,
     },
     Fieldless {
         shape: StructShape,
     },
+    FrameworkConstructor {
+        dependencies: Vec<DependencyKind>,
+        is_async: bool,
+        method: String,
+    },
+    FrameworkUnit,
     FrameworkAccessor {
         accessor: String,
         dependencies: Vec<DependencyKind>,
@@ -27,9 +33,10 @@ impl DirectConstruction {
     pub(crate) fn dependencies(&self) -> &[DependencyKind] {
         match self {
             DirectConstruction::Constructor { dependencies, .. }
+            | DirectConstruction::FrameworkConstructor { dependencies, .. }
             | DirectConstruction::FrameworkAccessor { dependencies, .. }
             | DirectConstruction::Resolved { dependencies, .. } => dependencies,
-            DirectConstruction::Fieldless { .. } => &[],
+            DirectConstruction::Fieldless { .. } | DirectConstruction::FrameworkUnit => &[],
         }
     }
 }

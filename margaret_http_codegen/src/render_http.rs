@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
@@ -16,6 +17,46 @@ use crate::render::server_console_arguments;
 use crate::render_forwarders::render_forwarders;
 use crate::render_routes::render_routes;
 use crate::server_transport_policy::ServerTransportPolicy;
+use margaret_request_binding_codegen::request_binding::RequestBinding;
+
+fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
+    match binding {
+        RequestBinding::AuthenticatedUser { application, .. } => Some(&application.concrete),
+        RequestBinding::Bound {
+            binder_provider, ..
+        } => Some(binder_provider),
+        RequestBinding::Injectable { dependency } => Some(&dependency.concrete),
+        RequestBinding::AssetBag
+        | RequestBinding::CurrentRequest
+        | RequestBinding::FormRequest { .. }
+        | RequestBinding::Forwarder
+        | RequestBinding::Next
+        | RequestBinding::PeerSpiffeId
+        | RequestBinding::Raw { .. }
+        | RequestBinding::Routes
+        | RequestBinding::Views => None,
+    }
+}
+
+fn construction_roots(table: &crate::http_route_table::HttpRouteTable) -> Vec<CanonicalPath> {
+    let mut roots = std::collections::BTreeSet::new();
+
+    for route in table.routes() {
+        roots.insert(route.responder_path.clone());
+
+        for layer in &route.layers {
+            roots.insert(layer.concrete.clone());
+        }
+
+        for parameter in &route.arguments {
+            if let Some(root) = binding_root(&parameter.binding) {
+                roots.insert(root.clone());
+            }
+        }
+    }
+
+    roots.into_iter().collect()
+}
 
 fn merge_websocket_servers(
     mut servers: Vec<HttpServer>,
@@ -51,18 +92,37 @@ pub fn render_http(
     let servers = merge_websocket_servers(active_servers(&table), websocket_servers);
     let server_arguments =
         server_console_arguments(&table, &servers, bindings, websocket_server_arguments);
-    let mut modules = render(
-        &table,
-        &servers,
-        has_views,
-        websocket_servers,
-        bindings,
-        &server_arguments,
-        websocket_server_arguments,
-    );
+    let mut modules = render(&table, &servers, has_views, websocket_servers, bindings);
 
     modules.extend(render_routes(&table, &servers));
     modules.extend(render_forwarders(&table, &servers));
 
-    Ok(HttpArtifacts::new(modules, servers, server_arguments))
+    Ok(HttpArtifacts::new(
+        modules,
+        servers,
+        server_arguments,
+        construction_roots(&table),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use margaret_attributes::canonical_path::CanonicalPath;
+    use margaret_container::injected_dependency::InjectedDependency;
+    use margaret_request_binding_codegen::request_binding::RequestBinding;
+
+    use super::binding_root;
+
+    #[test]
+    fn selects_the_concrete_root_of_a_handshake_injection() {
+        let concrete = CanonicalPath::new(vec!["crate".to_string(), "Dependency".to_string()]);
+        let binding = RequestBinding::Injectable {
+            dependency: InjectedDependency {
+                concrete: concrete.clone(),
+                field: "dependency".to_string(),
+            },
+        };
+
+        assert_eq!(binding_root(&binding), Some(&concrete));
+    }
 }

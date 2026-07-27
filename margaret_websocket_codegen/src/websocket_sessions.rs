@@ -1,10 +1,5 @@
-use quote::format_ident;
-use syn::ReturnType;
-use syn::Type;
-
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
-use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_middleware_codegen::resolve_layers::resolve_layers;
@@ -12,19 +7,12 @@ use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
 use margaret_route_parameter_codegen::route_path::RoutePath;
+use quote::format_ident;
 
 use crate::build_for_session_method::build_for_session_method;
 use crate::session_arguments::SessionArguments;
 use crate::websocket_codegen_error::WebSocketCodegenError;
 use crate::websocket_session::WebSocketSession;
-
-fn returns_self(method: &IndexedMethod) -> bool {
-    let ReturnType::Type(_, return_type) = &method.signature().output else {
-        return false;
-    };
-
-    matches!(return_type.as_ref(), Type::Path(type_path) if type_path.path.is_ident("Self"))
-}
 
 pub(crate) fn websocket_sessions(
     index: &AttributeIndex,
@@ -46,16 +34,12 @@ pub(crate) fn websocket_sessions(
         let SessionArguments { path, server } = SessionArguments::parse(matched.args()?, &session)?;
         let method = build_for_session_method(item, &session)?;
 
-        if !returns_self(method) {
-            return Err(WebSocketCodegenError::BuildForSessionReturnTypeMismatch { session });
-        }
-
         let route_path = RoutePath::parse(&path);
         let subject = format!("session '{session}'");
         let parameters = classify_parameters(
             index,
             item,
-            method.signature(),
+            method,
             &BindingContext::Handshake {
                 container_bindings: bindings,
                 route_path: &route_path,

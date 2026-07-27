@@ -53,6 +53,11 @@ pub enum RequestBindingError {
     },
 
     #[error(
+        "{subject} requests route parameter '{parameter}' more than once; a route parameter is bound exactly once"
+    )]
+    MultipleRouteParameterBindings { subject: String, parameter: String },
+
+    #[error(
         "argument #{parameter} of {subject} carries #[route_parameter], but {subject} has no route path to bind from"
     )]
     RouteParameterUnavailable { subject: String, parameter: String },
@@ -154,20 +159,6 @@ pub enum RequestBindingError {
         "#[infers_authenticated_user] '{provider}' has more than one #[infer_from_request] method: {methods}"
     )]
     AmbiguousInferFromRequest { provider: String, methods: String },
-
-    #[error(
-        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>"
-    )]
-    InferenceReturnTypeMismatch { provider: String, written: String },
-
-    #[error(
-        "the #[infer_from_request] method of '{provider}' infers '{written}', but the provider declares the user model '{model}'"
-    )]
-    InferredUserModelMismatch {
-        provider: String,
-        model: String,
-        written: String,
-    },
 
     #[error(
         "user model '{model}' has more than one authenticated user provider: '{first}' and '{second}'"

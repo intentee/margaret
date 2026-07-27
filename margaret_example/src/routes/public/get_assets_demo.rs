@@ -19,14 +19,16 @@ pub struct GetAssetsDemo {
 
 impl GetAssetsDemo {
     #[constructor]
-    #[must_use]
-    pub fn create(asset_page: Arc<AssetPage>) -> Self {
-        Self { asset_page }
+    pub fn create(asset_page: Arc<AssetPage>) -> anyhow::Result<Self> {
+        Ok(Self { asset_page })
     }
 
     #[process]
-    pub async fn respond(&self, asset_bag: AssetBag) -> Response {
-        Response::html(200, self.asset_page.render(AssetPageProps { asset_bag }))
+    pub async fn respond(&self, asset_bag: AssetBag) -> anyhow::Result<Response> {
+        Ok(Response::html(
+            200,
+            self.asset_page.render(AssetPageProps { asset_bag })?,
+        ))
     }
 }
 
@@ -42,8 +44,18 @@ mod tests {
 
     #[tokio::test]
     async fn responds_with_the_rendered_asset_page() {
-        let responder = GetAssetsDemo::create(Arc::new(AssetPage::create(Arc::new(AssetShowcase))));
+        let page =
+            AssetPage::create(Arc::new(AssetShowcase)).expect("the asset page is constructed");
+        let responder =
+            GetAssetsDemo::create(Arc::new(page)).expect("the responder is constructed");
 
-        assert_eq!(responder.respond(AssetBag::new()).await.status(), 200);
+        assert_eq!(
+            responder
+                .respond(AssetBag::new())
+                .await
+                .expect("the responder succeeds")
+                .status(),
+            200
+        );
     }
 }

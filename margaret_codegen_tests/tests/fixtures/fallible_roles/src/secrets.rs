@@ -1,6 +1,8 @@
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::singleton;
 
+use super::result::AppResult;
+
 #[singleton]
 pub struct Secrets {
     token: String,
@@ -8,7 +10,7 @@ pub struct Secrets {
 
 impl Secrets {
     #[constructor]
-    pub fn create() -> anyhow::Result<Self> {
+    pub fn create() -> AppResult<Self> {
         Ok(Self {
             token: "sealed".to_string(),
         })

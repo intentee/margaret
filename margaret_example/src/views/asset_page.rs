@@ -22,31 +22,32 @@ pub struct AssetPage {
 
 impl AssetPage {
     #[constructor]
-    #[must_use]
-    pub fn create(showcase: Arc<AssetShowcase>) -> Self {
-        Self { showcase }
+    pub fn create(showcase: Arc<AssetShowcase>) -> anyhow::Result<Self> {
+        Ok(Self { showcase })
     }
 }
 
 impl RendersView for AssetPage {
     type Props<'props> = AssetPageProps;
 
-    fn render(&self, AssetPageProps { asset_bag }: Self::Props<'_>) -> Markup {
-        let body = self.showcase.render(AssetShowcaseProps {
-            asset_bag: asset_bag.clone(),
-        });
+    fn render(&self, AssetPageProps { asset_bag }: Self::Props<'_>) -> anyhow::Result<Markup> {
+        Ok({
+            let body = self.showcase.render(AssetShowcaseProps {
+                asset_bag: asset_bag.clone(),
+            })?;
 
-        html! {
-            (DOCTYPE)
-            html {
-                head {
-                    (asset_bag.head())
-                }
-                body {
-                    (body)
+            html! {
+                (DOCTYPE)
+                html {
+                    head {
+                        (asset_bag.head())
+                    }
+                    body {
+                        (body)
+                    }
                 }
             }
-        }
+        })
     }
 }
 
@@ -71,6 +72,7 @@ mod tests {
             .render(AssetPageProps {
                 asset_bag: AssetBag::new(),
             })
+            .expect("the asset page renders")
             .into_string();
 
         let head_end = markup.find("</head>").expect("the head is closed");

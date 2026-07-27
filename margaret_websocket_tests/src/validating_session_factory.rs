@@ -3,9 +3,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use margaret_http::request::Request;
-use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http_validation::request_input::RequestInput;
 use margaret_http_validation::require_input::require_input;
+use margaret_websocket::web_socket_session_creation_error::WebSocketSessionCreationError;
+use margaret_websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome;
 use margaret_websocket::web_socket_session_factory::WebSocketSessionFactory;
 
 use crate::test_session::TestSession;
@@ -17,9 +18,18 @@ pub struct ValidatingSessionFactory;
 impl WebSocketSessionFactory for ValidatingSessionFactory {
     type Session = TestSession;
 
-    async fn create(&self, handshake: &Request) -> Result<Arc<TestSession>, ResponseContinuation> {
-        require_input::<UpgradeQuery>(handshake, RequestInput::Query)?;
+    async fn create(
+        &self,
+        handshake: &Request,
+    ) -> Result<WebSocketSessionCreationOutcome<TestSession>, WebSocketSessionCreationError> {
+        if let Err(response) = require_input::<UpgradeQuery>(handshake, RequestInput::Query) {
+            return Ok(WebSocketSessionCreationOutcome::Interrupted(
+                response.into(),
+            ));
+        }
 
-        Ok(Arc::new(TestSession::default()))
+        Ok(WebSocketSessionCreationOutcome::Created(Arc::new(
+            TestSession::default(),
+        )))
     }
 }

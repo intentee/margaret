@@ -31,10 +31,7 @@ pub fn unify_by_key(
         }
     }
 
-    Ok(order
-        .into_iter()
-        .map(|key| unified[&key].clone())
-        .collect())
+    Ok(order.into_iter().map(|key| unified[&key].clone()).collect())
 }
 
 #[cfg(test)]
@@ -110,8 +107,11 @@ mod tests {
 
     #[test]
     fn keeps_a_console_argument_named_after_the_spiffe_http_client_alongside_the_injection() {
-        let unified = unify_by_key(&[named("spiffe_http_client"), ConsoleArgument::SpiffeHttpClient])
-            .expect("the framework binding lives in a separate namespace from console arguments");
+        let unified = unify_by_key(&[
+            named("spiffe_http_client"),
+            ConsoleArgument::SpiffeHttpClient,
+        ])
+        .expect("the framework binding lives in a separate namespace from console arguments");
 
         assert_eq!(unified.len(), 2);
         assert_eq!(unified[0].name(), "spiffe_http_client");

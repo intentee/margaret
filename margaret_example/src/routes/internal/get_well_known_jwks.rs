@@ -16,15 +16,16 @@ pub struct GetWellKnownJwks {
 
 impl GetWellKnownJwks {
     #[constructor]
-    #[must_use]
-    pub fn create(public_jwks_handler: Arc<PublicJwksHandler>) -> Self {
-        Self {
-            public_jwks_handler,
-        }
+    pub fn create(public_jwks_handler: Arc<PublicJwksHandler>) -> anyhow::Result<Self> {
+        Ok({
+            Self {
+                public_jwks_handler,
+            }
+        })
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
-        self.public_jwks_handler.respond()
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok(self.public_jwks_handler.respond())
     }
 }

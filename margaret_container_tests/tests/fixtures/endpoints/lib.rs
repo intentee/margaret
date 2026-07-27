@@ -7,7 +7,7 @@ struct DnsResolver;
 
 impl DnsResolver {
     #[constructor]
-    fn new() -> Self {}
+    fn new() -> anyhow::Result<Self> {}
 }
 
 #[provides_jwks_endpoint(jwks)]
@@ -19,7 +19,7 @@ impl JwksEndpoint {
     fn new(
         resolver: Arc<DnsResolver>,
         #[console_argument(from = "issuer")] issuer: String,
-    ) -> Self {}
+    ) -> anyhow::Result<Self> {}
 }
 
 impl ProvidesEndpoint for JwksEndpoint {}

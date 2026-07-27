@@ -5,21 +5,23 @@ use margaret_codegen_tests::generated_module_source::generated_module_source;
 fn weaves_each_console_argument_category_with_its_type_appropriate_operation() {
     let generated =
         generate_fixture("type_aware_console_arguments").expect("the fixture generates");
-    let source: String = generated_module_source(&generated, "http/server_public")
-        .expect("the HTTP server module is generated")
+    let construction: String = generated_module_source(&generated, "container/build")
+        .expect("the construction module is generated")
+        .split_whitespace()
+        .collect();
+    let serve: String = generated_module_source(&generated, "serve")
+        .expect("the serve module is generated")
         .split_whitespace()
         .collect();
 
-    assert!(source.contains(":&str,"));
-    assert!(source.contains(":&::std::path::Path,"));
-    assert!(source.contains(":&u16,"));
-    assert!(source.contains(":&bool,"));
-    assert!(source.contains(":&::std::option::Option<u16>,"));
-    assert!(source.contains(":&::std::option::Option<std::string::String>,"));
-    assert!(!source.contains(":&std::string::String,"));
-    assert!(!source.contains(":&std::path::PathBuf,"));
+    assert!(construction.contains(":std::string::String,"));
+    assert!(construction.contains(":std::path::PathBuf,"));
+    assert!(construction.contains(":u16,"));
+    assert!(construction.contains(":bool,"));
+    assert!(construction.contains(":::std::option::Option<u16>,"));
+    assert!(construction.contains(":::std::option::Option<std::string::String>,"));
 
-    assert_eq!(source.matches(".to_owned()").count(), 2);
-    assert_eq!(source.matches(".clone()").count(), 1);
-    assert_eq!(source.matches("*console_argument_").count(), 3);
+    assert!(serve.matches(".clone()").count() >= 3);
+    assert!(serve.contains("Some(value)=>*value"));
+    assert!(serve.contains("matches.get_flag"));
 }

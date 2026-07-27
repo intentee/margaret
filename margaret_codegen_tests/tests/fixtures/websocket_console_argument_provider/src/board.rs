@@ -9,7 +9,6 @@ use margaret::framework::macros::websocket_session;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret::framework::websocket::web_socket::WebSocket;
-use margaret::framework::websocket::web_socket_error::WebSocketError;
 use serde::Deserialize;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
@@ -38,12 +37,11 @@ pub struct BoardSession {
 
 impl BoardSession {
     #[build_for_session]
-    #[must_use]
     pub fn assemble(
         #[route_parameter(from = "topic")] topic: String,
         #[authenticated_user] reader: Option<Reader>,
-    ) -> Self {
-        Self { reader, topic }
+    ) -> anyhow::Result<Self> {
+        Ok(Self { reader, topic })
     }
 
     #[must_use]
@@ -62,9 +60,8 @@ pub struct BoardResponder;
 
 impl BoardResponder {
     #[constructor]
-    #[must_use]
-    pub fn create() -> Self {
-        Self
+    pub fn create() -> anyhow::Result<Self> {
+        Ok(Self)
     }
 }
 
@@ -79,7 +76,7 @@ impl RespondsToWebSocketMessage for BoardResponder {
         session: Arc<BoardSession>,
         message: StreamingRequestEnvelope<BoardPrompt>,
         socket: WebSocket,
-    ) -> Result<(), WebSocketError> {
+    ) -> anyhow::Result<()> {
         socket
             .send(message.fin(BoardChunk {
                 text: format!(
@@ -89,6 +86,8 @@ impl RespondsToWebSocketMessage for BoardResponder {
                     message.message().prompt,
                 ),
             }))
-            .await
+            .await?;
+
+        Ok(())
     }
 }

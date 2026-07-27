@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::handler::Handler;
+use crate::handler_error::HandlerError;
 use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;
 
@@ -13,7 +14,7 @@ impl Next {
         Self { inner }
     }
 
-    pub async fn run(self, request: &Request) -> ResponseContinuation {
+    pub async fn run(self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
         self.inner.handle(request).await
     }
 }

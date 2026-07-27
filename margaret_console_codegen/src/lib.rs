@@ -33,7 +33,7 @@ struct EnglishGreeter;
 
 impl EnglishGreeter {
     #[constructor]
-    fn create() -> Self {}
+    fn create() -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -52,10 +52,10 @@ impl Demo {
         #[console_argument(positional)] name: String,
         #[console_argument(from = "salutation")] salutation: Option<String>,
         #[console_argument(from = "loud")] loud: bool,
-    ) -> Self {}
+    ) -> anyhow::Result<Self> {}
 
     #[process]
-    fn run(&self) -> CommandOutcome {}
+    fn run(&self) -> anyhow::Result<CommandOutcome> {}
 }
 
 #[singleton]
@@ -64,7 +64,7 @@ struct Farewell;
 
 impl Farewell {
     #[process]
-    fn run(&self) -> CommandOutcome {}
+    fn run(&self) -> anyhow::Result<CommandOutcome> {}
 }
 "#;
 
@@ -128,7 +128,7 @@ impl Farewell {
         let source = source_for(COMMANDS, false);
 
         assert!(source.contains("pubasyncfnrun"));
-        assert!(source.contains("run<Arguments,Argument>(container:&super::container::Container,"));
+        assert!(source.contains("run<Arguments,Argument>(args:Arguments,)"));
         assert!(source.contains(r#"clap::Command::new("demo").about("Demonstratesarguments")"#));
 
         assert!(source.contains(r#"clap::Arg::new("name").required(true)"#));
@@ -142,7 +142,7 @@ impl Farewell {
         );
         assert!(source.contains("clap::value_parser!(std::string::String)"));
 
-        assert!(source.contains("container.demo("));
+        assert!(source.contains("super::container::build::construct_demo("));
         assert!(source.contains(r#"matches.get_one::<std::string::String>("name")"#));
         assert!(
             source.contains(r#"matches.get_one::<std::string::String>("salutation").cloned()"#)
@@ -150,9 +150,9 @@ impl Farewell {
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 
         assert!(source.contains(r#"("farewell",_matches)"#));
-        assert!(source.contains(
-            "(matchcontainer.farewell().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}).run().await"
-        ));
+        assert!(source.contains("super::container::build::construct_farewell().await"));
+        assert!(source.contains("report_failure::report_failure(error"));
+        assert!(source.contains(".run().await"));
     }
 
     #[test]
@@ -174,7 +174,7 @@ impl Farewell {
             r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(false).requires("public-uploads")"#
         ));
         assert!(source.contains(
-            "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|super::serve::serve(container,matches,cancellation_token,),)"
+            "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|super::serve::serve(matches,cancellation_token,),)"
         ));
     }
 
@@ -286,9 +286,7 @@ impl Farewell {
         assert!(source.contains(r#"Some(("schema",_matches))=>{"#));
         assert!(source.contains("render_postgres(&super::schema::schema())"));
         assert!(source.contains("CommandOutcome::Succeeded"));
-        assert!(
-            source.contains("run<Arguments,Argument>(_container:&super::container::Container,")
-        );
+        assert!(source.contains("run<Arguments,Argument>(args:Arguments,)"));
     }
 
     #[test]
@@ -309,7 +307,7 @@ impl Farewell {
     #[test]
     fn injects_the_cancellation_token_into_a_command_runner() {
         let source = source_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch {\n    target: String,\n}\n\nimpl Watch {\n    #[constructor]\n    fn create(#[console_argument(positional)] target: String) -> Self {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> CommandOutcome {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch {\n    target: String,\n}\n\nimpl Watch {\n    #[constructor]\n    fn create(#[console_argument(positional)] target: String) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
@@ -322,13 +320,14 @@ impl Farewell {
     #[test]
     fn renders_a_command_that_takes_only_a_flag() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged {\n    loud: bool,\n}\n\nimpl Flagged {\n    #[constructor]\n    fn create(#[console_argument(from = \"loud\")] loud: bool) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"flagged\")]\nstruct Flagged {\n    loud: bool,\n}\n\nimpl Flagged {\n    #[constructor]\n    fn create(#[console_argument(from = \"loud\")] loud: bool) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
-        assert!(
-            source.contains(r#"(matchcontainer.flagged(matches.get_flag("loud")).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}).run().await"#)
-        );
+        assert!(source.contains("super::container::build::construct_flagged("));
+        assert!(source.contains(r#"matches.get_flag("loud")"#));
+        assert!(source.contains("report_failure::report_failure(error"));
+        assert!(source.contains(".run().await"));
     }
 
     #[test]
@@ -348,7 +347,7 @@ impl Farewell {
     #[test]
     fn rejects_two_commands_registering_the_same_name() {
         let message = error_for(
-            "#[console_command(name = \"greet\")]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n\n#[console_command(name = \"greet\")]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            "#[console_command(name = \"greet\")]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[console_command(name = \"greet\")]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
 
         assert!(message.contains("already registered"));
@@ -357,7 +356,7 @@ impl Farewell {
     #[test]
     fn rejects_a_console_command_that_injects_the_spiffe_http_client() {
         let message = error_for(
-            "use reqwest::Client;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> Self {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            "use reqwest::Client;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
 
         assert!(message.contains("injects the #[spiffe_http_client]"));
@@ -387,14 +386,14 @@ impl Farewell {
     #[test]
     fn dispatches_a_fieldless_command_without_a_constructor() {
         let source = source_for(
-            "#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            "#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
         assert!(source.contains(r#"("bare",_matches)"#));
-        assert!(source.contains(
-            "(matchcontainer.bare().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}).run().await"
-        ));
+        assert!(source.contains("super::container::build::construct_bare().await"));
+        assert!(source.contains("report_failure::report_failure(error"));
+        assert!(source.contains(".run().await"));
     }
 
     #[test]
@@ -407,7 +406,7 @@ impl Farewell {
     #[test]
     fn rejects_a_non_token_runner_parameter() {
         let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> CommandOutcome {}\n}\n",
+            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
 
         assert!(message.contains("may only take &self and an optional CancellationToken"));
@@ -416,7 +415,7 @@ impl Farewell {
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
         let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = Query)] token: CancellationToken) -> CommandOutcome {}\n}\n",
+            "use tokio_util::sync::CancellationToken;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = Query)] token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
 
         assert!(message.contains("carries #[form_request]"));
@@ -426,7 +425,7 @@ impl Farewell {
     #[test]
     fn binds_a_destructured_positional_console_argument() {
         let source = source_for(
-            "struct Point {\n    x: i32,\n    y: i32,\n}\n\n#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> Self {}\n\n    #[process]\n    fn run(&self) -> CommandOutcome {}\n}\n",
+            "struct Point {\n    x: i32,\n    y: i32,\n}\n\n#[singleton]\n#[console_command(name = \"plot\")]\nstruct Plot {\n    point: Point,\n}\n\nimpl Plot {\n    #[constructor]\n    fn create(#[console_argument(positional)] Point { x, y }: Point) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 

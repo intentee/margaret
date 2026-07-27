@@ -13,7 +13,6 @@ pub struct Configured;
 
 impl Configured {
     #[constructor]
-    #[must_use]
     pub fn create(
         #[console_argument(from = "label")] label: String,
         #[console_argument(from = "root")] root: PathBuf,
@@ -21,16 +20,20 @@ impl Configured {
         #[console_argument(from = "verbose")] verbose: bool,
         #[console_argument(from = "optional-retries")] optional_retries: Option<u16>,
         #[console_argument(from = "note")] note: Option<String>,
-    ) -> Self {
-        let _ = (label, root, retries, verbose, optional_retries, note);
+    ) -> anyhow::Result<Self> {
+        Ok({
+            let _ = (label, root, retries, verbose, optional_retries, note);
 
-        Self
+            Self
+        })
     }
 
     #[process]
-    pub async fn respond(&self) -> Response {
-        let _ = asset!("resources/ts/app.ts");
+    pub async fn respond(&self) -> anyhow::Result<Response> {
+        Ok({
+            let _ = asset!("resources/ts/app.ts");
 
-        Response::text(200, "configured")
+            Response::text(200, "configured")
+        })
     }
 }

@@ -3,12 +3,10 @@ use maud::Markup;
 pub trait RendersView {
     type Props<'props>;
 
-    #[must_use]
-    fn render(&self, props: Self::Props<'_>) -> Markup;
+    fn render(&self, props: Self::Props<'_>) -> anyhow::Result<Markup>;
 
-    #[must_use]
-    fn render_to_string(&self, props: Self::Props<'_>) -> String {
-        self.render(props).into_string()
+    fn render_to_string(&self, props: Self::Props<'_>) -> anyhow::Result<String> {
+        Ok(self.render(props)?.into_string())
     }
 }
 
@@ -23,6 +21,8 @@ mod tests {
 
     struct Link;
 
+    struct FailingView;
+
     struct LinkProps<'href> {
         href: &'href str,
     }
@@ -30,23 +30,33 @@ mod tests {
     impl RendersView for Greeting {
         type Props<'props> = String;
 
-        fn render(&self, name: Self::Props<'_>) -> Markup {
-            html! { p { "hi " (name) } }
+        fn render(&self, name: Self::Props<'_>) -> anyhow::Result<Markup> {
+            Ok(html! { p { "hi " (name) } })
         }
     }
 
     impl RendersView for Link {
         type Props<'props> = LinkProps<'props>;
 
-        fn render(&self, LinkProps { href }: Self::Props<'_>) -> Markup {
-            html! { a href=(href) { "go" } }
+        fn render(&self, LinkProps { href }: Self::Props<'_>) -> anyhow::Result<Markup> {
+            Ok(html! { a href=(href) { "go" } })
+        }
+    }
+
+    impl RendersView for FailingView {
+        type Props<'props> = ();
+
+        fn render(&self, (): Self::Props<'_>) -> anyhow::Result<Markup> {
+            Err(anyhow::anyhow!("template dependency unavailable"))
         }
     }
 
     #[test]
     fn renders_a_view_directly_to_a_string() {
         assert_eq!(
-            Greeting.render_to_string("ada".to_string()),
+            Greeting
+                .render_to_string("ada".to_string())
+                .expect("the view renders"),
             "<p>hi ada</p>"
         );
     }
@@ -56,8 +66,19 @@ mod tests {
         let href = String::from("/home");
 
         assert_eq!(
-            Link.render(LinkProps { href: &href }).into_string(),
+            Link.render(LinkProps { href: &href })
+                .expect("the view renders")
+                .into_string(),
             "<a href=\"/home\">go</a>"
         );
+    }
+
+    #[test]
+    fn propagates_a_view_rendering_failure() {
+        let error = FailingView
+            .render_to_string(())
+            .expect_err("the view failure is propagated");
+
+        assert_eq!(error.to_string(), "template dependency unavailable");
     }
 }

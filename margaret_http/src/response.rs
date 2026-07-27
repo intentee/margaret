@@ -45,9 +45,17 @@ impl Response {
     }
 
     pub fn json<Value: Serialize>(status: u16, value: &Value) -> Self {
-        match serde_json::to_string(value) {
+        Self::json_from_serialization(status, serde_json::to_string(value))
+    }
+
+    fn json_from_serialization(status: u16, serialized: Result<String, serde_json::Error>) -> Self {
+        match serialized {
             Ok(body) => Self::bytes(status, "application/json", body),
-            Err(error) => Self::text(500, error.to_string()),
+            Err(error) => {
+                eprintln!("margaret_http: response serialization failed: {error}");
+
+                Self::text(500, "Internal Server Error")
+            }
         }
     }
 
@@ -199,11 +207,19 @@ mod tests {
         );
     }
 
-    #[test]
-    fn serves_an_error_when_the_value_cannot_be_serialized() {
-        let response = Response::json(200, &Unserializable);
+    #[tokio::test]
+    async fn serves_an_error_when_the_value_cannot_be_serialized() {
+        let response = Response::json(200, &Unserializable).into_http();
+        let status = response.status().as_u16();
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("the response body collects")
+            .to_bytes();
 
-        assert_eq!(response.status(), 500);
+        assert_eq!(status, 500);
+        assert_eq!(body, "Internal Server Error");
     }
 
     #[test]

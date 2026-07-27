@@ -10,6 +10,7 @@ use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::handler::Handler;
+use margaret_http::handler_error::HandlerError;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;
 use margaret_http::require_peer_spiffe_id::require_peer_spiffe_id;
@@ -26,14 +27,14 @@ struct EchoPeer;
 
 #[async_trait]
 impl Handler for EchoPeer {
-    async fn handle(&self, request: &Request) -> ResponseContinuation {
-        match require_peer_spiffe_id(request) {
+    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        Ok(match require_peer_spiffe_id(request) {
             Ok(spiffe_id) => ResponseContinuation::Done(Response::text(
                 200,
                 format!("{}{}", spiffe_id.trust_domain(), spiffe_id.path()),
             )),
             Err(response) => ResponseContinuation::Done(response),
-        }
+        })
     }
 }
 

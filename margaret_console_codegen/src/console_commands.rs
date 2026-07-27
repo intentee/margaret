@@ -18,7 +18,7 @@ use crate::console_command::ConsoleCommand;
 use crate::console_command_arguments::ConsoleCommandArguments;
 
 fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, runner: &IndexedMethod) -> bool {
-    parameters(runner.signature())
+    parameters(runner)
         .iter()
         .any(|view| is_cancellation_token(index, item, view.declared))
 }
@@ -29,7 +29,7 @@ fn validate_runner(
     runner: &IndexedMethod,
     command: &str,
 ) -> Result<(), ConsoleCodegenError> {
-    for view in parameters(runner.signature()) {
+    for view in parameters(runner) {
         if let Some(name) = request_binding_marker(view.attributes) {
             return Err(ConsoleCodegenError::ConsoleCommandRunnerRequestBinding {
                 command: command.to_string(),

@@ -8,5 +8,5 @@ struct Consumer {
 
 impl Consumer {
     #[constructor]
-    fn create(widget: std::sync::Arc<crate::Widget>) -> Self {}
+    fn create(widget: std::sync::Arc<crate::Widget>) -> anyhow::Result<Self> {}
 }

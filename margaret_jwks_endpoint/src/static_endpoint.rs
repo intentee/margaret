@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use url::Url;
 
-use crate::endpoint_error::EndpointError;
 use crate::provides_endpoint::ProvidesEndpoint;
 
 pub struct StaticEndpoint {
@@ -17,7 +16,7 @@ impl StaticEndpoint {
 
 #[async_trait]
 impl ProvidesEndpoint for StaticEndpoint {
-    async fn provide(&self) -> Result<Url, EndpointError> {
+    async fn provide(&self) -> anyhow::Result<Url> {
         Ok(self.url.clone())
     }
 }

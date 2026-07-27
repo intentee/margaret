@@ -65,15 +65,20 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     };
 
     let continuation_return = quote! {
-        return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
-            response,
+        return ::std::result::Result::Ok(
+            margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
+                response,
+            ),
         )
     };
     let response_return = quote! {
-        return margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
-            response.into(),
+        return ::std::result::Result::Ok(
+            margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(
+                response.into(),
+            ),
         )
     };
+    let error_return = quote! { return ::std::result::Result::Err(error) };
     let provider_access = TokenStream::new();
     let extractions = parameters.iter().map(|parameter| {
         render_request_extraction(
@@ -81,6 +86,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
             &parameter.holder,
             &ExtractionContext {
                 continuation_return: &continuation_return,
+                error_return: &error_return,
                 provider_access: &provider_access,
                 request_local: &request_binding,
                 response_return: &response_return,
@@ -103,7 +109,9 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
             async fn infer(
                 &self,
                 #request_binding: &margaret::framework::http::request::Request,
-            ) -> margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User> {
+            ) -> margaret::framework::anyhow::Result<
+                margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>,
+            > {
                 #(#extractions)*
                 self.inner.#method_name(#(#call_arguments),*).await
             }

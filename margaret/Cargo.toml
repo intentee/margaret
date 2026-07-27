@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = { workspace = true, optional = true }
 margaret_access_token_minter = { path = "../margaret_access_token_minter", optional = true }
 margaret_asset_bag = { path = "../margaret_asset_bag", optional = true }
 margaret_codegen = { path = "../margaret_codegen", optional = true }
 margaret_console = { path = "../margaret_console", optional = true }
-margaret_container_error = { path = "../margaret_container_error", optional = true }
 margaret_http = { path = "../margaret_http", optional = true }
 margaret_http_validation = { path = "../margaret_http_validation", optional = true }
 margaret_identity = { path = "../margaret_identity", optional = true }
@@ -34,15 +34,16 @@ margaret_token_signer = { path = "../margaret_token_signer", optional = true }
 margaret_validation = { path = "../margaret_validation", optional = true }
 margaret_views = { path = "../margaret_views", optional = true }
 margaret_websocket = { path = "../margaret_websocket", optional = true }
+thiserror = { workspace = true, optional = true }
 
 [features]
 default = ["runtime"]
 codegen = ["dep:margaret_codegen"]
 runtime = [
+    "dep:anyhow",
     "dep:margaret_access_token_minter",
     "dep:margaret_asset_bag",
     "dep:margaret_console",
-    "dep:margaret_container_error",
     "dep:margaret_http",
     "dep:margaret_http_validation",
     "dep:margaret_identity",
@@ -68,6 +69,7 @@ runtime = [
     "dep:margaret_validation",
     "dep:margaret_views",
     "dep:margaret_websocket",
+    "dep:thiserror",
 ]
 
 [lints]

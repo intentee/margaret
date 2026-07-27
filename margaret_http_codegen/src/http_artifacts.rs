@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
 
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::http_server::HttpServer;
 
 pub struct HttpArtifacts {
+    construction_roots: Vec<CanonicalPath>,
     modules: Vec<GeneratedModuleTokens>,
     server_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
     servers: Vec<HttpServer>,
@@ -16,12 +18,19 @@ impl HttpArtifacts {
         modules: Vec<GeneratedModuleTokens>,
         servers: Vec<HttpServer>,
         server_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
+        construction_roots: Vec<CanonicalPath>,
     ) -> Self {
         Self {
+            construction_roots,
             modules,
             server_console_arguments,
             servers,
         }
+    }
+
+    #[must_use]
+    pub fn construction_roots(&self) -> &[CanonicalPath] {
+        &self.construction_roots
     }
 
     #[must_use]

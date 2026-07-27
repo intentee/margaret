@@ -3,7 +3,7 @@ struct Config;
 
 impl Config {
     #[constructor]
-    fn create(#[console_argument(from = "shared")] shared: String) -> Self {}
+    fn create(#[console_argument(from = "shared")] shared: String) -> anyhow::Result<Self> {}
 }
 
 #[singleton]
@@ -15,7 +15,7 @@ impl Sub {
     fn create(
         config: std::sync::Arc<Config>,
         #[console_argument(positional)] shared: String,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
     }
 }
 
@@ -24,5 +24,5 @@ struct Parent;
 
 impl Parent {
     #[constructor]
-    fn create(sub: std::sync::Arc<Sub>) -> Self {}
+    fn create(sub: std::sync::Arc<Sub>) -> anyhow::Result<Self> {}
 }

@@ -17,17 +17,19 @@ pub struct DeleteArticle {
 
 impl DeleteArticle {
     #[constructor]
-    pub fn create(articles: Arc<ArticleStore>) -> Self {
-        Self { articles }
+    pub fn create(articles: Arc<ArticleStore>) -> anyhow::Result<Self> {
+        Ok(Self { articles })
     }
 
     #[process]
     pub async fn respond(
         &self,
         #[route_parameter(from = "article")] Article { id, title, .. }: Article,
-    ) -> Response {
-        self.articles.remove(id);
+    ) -> anyhow::Result<Response> {
+        Ok({
+            self.articles.remove(id);
 
-        Response::text(200, format!("deleted \"{title}\""))
+            Response::text(200, format!("deleted \"{title}\""))
+        })
     }
 }

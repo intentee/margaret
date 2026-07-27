@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::sync::Arc;
 
 use margaret::framework::macros::constructor;
@@ -17,13 +16,12 @@ pub struct Sweeper {
 
 impl Sweeper {
     #[constructor]
-    #[must_use]
-    pub fn create(metrics: Arc<Metrics>) -> Self {
-        Self { metrics }
+    pub fn create(metrics: Arc<Metrics>) -> anyhow::Result<Self> {
+        Ok(Self { metrics })
     }
 
     #[process]
-    pub async fn run(&self) -> Result<(), Infallible> {
+    pub async fn run(&self) -> anyhow::Result<()> {
         self.metrics.record_sweep();
 
         Ok(())

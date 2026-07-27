@@ -5,12 +5,10 @@ edition = "2024"
 autotests = false
 
 [dependencies]
+anyhow = { workspace = true }
 margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
 thiserror = { workspace = true }
-
-[dev-dependencies]
-anyhow = { workspace = true }
 
 [[test]]
 name = "main"

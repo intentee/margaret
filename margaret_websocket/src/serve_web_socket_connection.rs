@@ -21,6 +21,12 @@ use crate::web_socket_dispatch_table::WebSocketDispatchTable;
 
 const OUTBOUND_BUFFER_CAPACITY: usize = 1;
 
+fn report_close_failure(outcome: Result<(), tokio_tungstenite::tungstenite::Error>) {
+    if let Err(error) = outcome {
+        eprintln!("margaret_websocket: unable to close a websocket connection: {error}");
+    }
+}
+
 async fn drain_outbound<Io>(
     mut sink: SplitSink<WebSocketStream<Io>, Message>,
     mut outbound: Receiver<Message>,
@@ -33,7 +39,7 @@ async fn drain_outbound<Io>(
         }
     }
 
-    drop(sink.send(Message::Close(None)).await);
+    report_close_failure(sink.send(Message::Close(None)).await);
 }
 
 async fn dispatch_frame<Session>(
@@ -140,4 +146,21 @@ pub async fn serve_web_socket_connection<Io, Session>(
         ),
         drain_outbound(sink, outbound_receiver),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio_tungstenite::tungstenite::Error;
+
+    use super::report_close_failure;
+
+    #[test]
+    fn accepts_a_successful_websocket_close() {
+        report_close_failure(Ok(()));
+    }
+
+    #[test]
+    fn reports_a_failed_websocket_close() {
+        report_close_failure(Err(Error::ConnectionClosed));
+    }
 }

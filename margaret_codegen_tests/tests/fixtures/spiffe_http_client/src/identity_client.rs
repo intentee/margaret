@@ -10,9 +10,8 @@ pub struct IdentityClient {
 
 impl IdentityClient {
     #[constructor]
-    #[must_use]
-    pub fn create(#[spiffe_http_client] http_client: Client) -> Self {
-        Self { http_client }
+    pub fn create(#[spiffe_http_client] http_client: Client) -> anyhow::Result<Self> {
+        Ok(Self { http_client })
     }
 
     #[must_use]

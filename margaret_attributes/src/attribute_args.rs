@@ -4,12 +4,13 @@ use syn::Meta;
 use syn::Token;
 use syn::punctuated::Punctuated;
 
+use crate::attribute_args_parse_error::AttributeArgsParseError;
 use crate::attribute_arguments_reader::AttributeArgumentsReader;
 use crate::attribute_error::AttributeError;
 use crate::format_path::format_path;
 use crate::named_argument::NamedArgument;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AttributeArgs {
     attribute_path: String,
     named: Vec<NamedArgument>,
@@ -17,7 +18,7 @@ pub struct AttributeArgs {
 }
 
 impl AttributeArgs {
-    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeError> {
+    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgsParseError> {
         let attribute_path = format_path(attribute.path());
 
         match &attribute.meta {
@@ -39,7 +40,7 @@ impl AttributeArgs {
                 let expressions = match meta_list.parse_args_with(parser) {
                     Ok(expressions) => expressions,
                     Err(source) => {
-                        return Err(AttributeError::AttributeArguments {
+                        return Err(AttributeArgsParseError::Malformed {
                             attribute_path,
                             source,
                         });
@@ -53,7 +54,7 @@ impl AttributeArgs {
                     match NamedArgument::from_expression(&expression) {
                         Some(found) => {
                             if named.iter().any(|existing| existing.name == found.name) {
-                                return Err(AttributeError::DuplicateNamedArgument {
+                                return Err(AttributeArgsParseError::DuplicateNamedArgument {
                                     attribute_path,
                                     key: found.name,
                                 });
@@ -105,9 +106,10 @@ mod tests {
     use syn::parse_quote;
 
     use crate::attribute_args::AttributeArgs;
+    use crate::attribute_args_parse_error::AttributeArgsParseError;
     use crate::attribute_error::AttributeError;
 
-    fn parse(attribute: Attribute) -> Result<AttributeArgs, AttributeError> {
+    fn parse(attribute: Attribute) -> Result<AttributeArgs, AttributeArgsParseError> {
         AttributeArgs::from_attribute(&attribute)
     }
 
@@ -279,7 +281,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            AttributeError::DuplicateNamedArgument { attribute_path, key }
+            AttributeArgsParseError::DuplicateNamedArgument { attribute_path, key }
                 if attribute_path == "index" && key == "name"
         ));
     }
@@ -292,7 +294,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            AttributeError::AttributeArguments { attribute_path, .. }
+            AttributeArgsParseError::Malformed { attribute_path, .. }
                 if attribute_path == "index"
         ));
     }

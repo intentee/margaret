@@ -46,4 +46,13 @@ pub enum ServiceCodegenError {
 
     #[error("#[scheduled_with_tick_timer] '{ticker}' is missing the 'interval' argument")]
     TickerMissingInterval { ticker: String },
+
+    #[error(
+        "the '{argument}' path '{path}' of #[scheduled_with_tick_timer] '{ticker}' cannot be resolved; use an explicit module path or import"
+    )]
+    UnresolvedTickerPath {
+        argument: &'static str,
+        path: String,
+        ticker: String,
+    },
 }

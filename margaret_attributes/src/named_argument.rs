@@ -1,6 +1,6 @@
 use syn::Expr;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct NamedArgument {
     pub(crate) name: String,
     pub(crate) value: Expr,

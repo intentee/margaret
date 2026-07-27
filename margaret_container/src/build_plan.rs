@@ -2,10 +2,6 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use syn::Attribute;
-use syn::FnArg;
-use syn::Meta;
-use syn::Pat;
 use syn::Path;
 
 use margaret_attributes::attribute_args::AttributeArgs;
@@ -14,12 +10,11 @@ use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_base::field_base;
+use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
-use margaret_attributes::marker::marker;
 use margaret_attributes::matched_attribute::MatchedAttribute;
-use margaret_attributes::struct_shape::StructShape;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
 use margaret_console_argument_codegen::weaving_kind::WeavingKind;
@@ -27,7 +22,6 @@ use margaret_tag_codegen::jwks_secret_store_target::JwksSecretStoreTarget;
 use margaret_tag_codegen::read_jwks_secret_store_target::read_jwks_secret_store_target;
 
 use crate::construction_source::ConstructionSource;
-use crate::constructor_return::ConstructorReturnShape;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::dependency_kind::DependencyKind;
@@ -43,6 +37,7 @@ use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provides_endpoint_path::provides_endpoint_path;
 use crate::resolve_construction::resolve_construction;
+use crate::topological_order::topological_order;
 use crate::type_text::type_text;
 
 fn concrete_role_selectors() -> [AttributeSelector; 4] {
@@ -252,15 +247,6 @@ fn resolve_direct(
 ) -> Result<DirectConstruction, ContainerError> {
     match source {
         ConstructionSource::Constructor(constructor) => {
-            let fallible = match ConstructorReturnShape::of(constructor.signature()) {
-                ConstructorReturnShape::SelfValue => false,
-                ConstructorReturnShape::GenericOverSelf => true,
-                ConstructorReturnShape::Unsupported => {
-                    return Err(ContainerError::ConstructorReturnTypeMismatch {
-                        singleton: concrete_path.to_string(),
-                    });
-                }
-            };
             let dependencies = resolve_dependencies(
                 index,
                 item,
@@ -273,7 +259,6 @@ fn resolve_direct(
 
             Ok(DirectConstruction::Constructor {
                 dependencies,
-                fallible,
                 is_async: constructor.signature().asyncness.is_some(),
                 method: constructor.identifier().to_string(),
             })
@@ -293,20 +278,20 @@ fn resolve_dependencies(
 ) -> Result<Vec<DependencyKind>, ContainerError> {
     let mut dependencies = Vec::new();
 
-    for (position, input) in constructor.signature().inputs.iter().enumerate() {
-        let FnArg::Typed(pattern_type) = input else {
-            return Err(ContainerError::UnsupportedParameterShape {
-                singleton: concrete_path.to_string(),
-                parameter: "self".to_string(),
-                written: "self".to_string(),
-            });
-        };
+    if constructor.has_receiver() {
+        return Err(ContainerError::UnsupportedParameterShape {
+            singleton: concrete_path.to_string(),
+            parameter: "self".to_string(),
+            written: "self".to_string(),
+        });
+    }
 
-        let parameter = parameter_name(&pattern_type.pat, position);
-        let console_argument = registry.argument(concrete_path, position);
-        let jwks_marker = marker(&pattern_type.attrs, &jwks_secret_store_selector());
+    for indexed_parameter in constructor.parameters() {
+        let parameter = indexed_parameter.diagnostic_name().to_string();
+        let console_argument = registry.argument(concrete_path, indexed_parameter.position());
+        let jwks_marker = indexed_parameter.attribute(&jwks_secret_store_selector());
 
-        if let Some(attribute) = marker(&pattern_type.attrs, &spiffe_http_client_selector()) {
+        if let Some(attribute) = indexed_parameter.attribute(&spiffe_http_client_selector()) {
             if console_argument.is_some() || jwks_marker.is_some() {
                 return Err(ContainerError::AmbiguousSpiffeHttpClientInjection {
                     parameter,
@@ -314,7 +299,7 @@ fn resolve_dependencies(
                 });
             }
 
-            if !matches!(attribute.meta, Meta::Path(_)) {
+            if !attribute.is_bare() {
                 return Err(ContainerError::SpiffeHttpClientTakesNoArguments {
                     parameter,
                     singleton: concrete_path.to_string(),
@@ -349,11 +334,11 @@ fn resolve_dependencies(
             continue;
         }
 
-        let Some(written) = peel_target(&pattern_type.ty) else {
+        let Some(written) = peel_target(indexed_parameter.declared()) else {
             return Err(ContainerError::UnsupportedParameterShape {
                 singleton: concrete_path.to_string(),
                 parameter,
-                written: type_text(&pattern_type.ty),
+                written: type_text(indexed_parameter.declared()),
             });
         };
 
@@ -373,12 +358,12 @@ fn resolve_dependencies(
 fn resolve_jwks_secret_store(
     concrete_path: &CanonicalPath,
     parameter: &str,
-    attribute: &Attribute,
+    attribute: &IndexedAttribute,
     framework_providers: &[FrameworkProvider],
 ) -> Result<CanonicalPath, ContainerError> {
     let site = format!("parameter '{parameter}' of singleton '{concrete_path}'");
-    let args = AttributeArgs::from_attribute(attribute)?;
-    let target = read_jwks_secret_store_target(&args, &site)?;
+    let args = attribute.args()?;
+    let target = read_jwks_secret_store_target(args, &site)?;
 
     framework_providers
         .iter()
@@ -433,13 +418,6 @@ fn missing_provider(
         singleton: concrete_path.to_string(),
         parameter: parameter.to_string(),
         written: path_text(written),
-    }
-}
-
-fn parameter_name(pattern: &Pat, position: usize) -> String {
-    match pattern {
-        Pat::Ident(pattern_ident) => pattern_ident.ident.to_string(),
-        _ => position.to_string(),
     }
 }
 
@@ -544,6 +522,8 @@ fn framework_provided_type(construction: &DirectConstruction, path: CanonicalPat
         DirectConstruction::Resolved { .. } => ProvidedType::UriSelected(path),
         DirectConstruction::Constructor { .. }
         | DirectConstruction::Fieldless { .. }
+        | DirectConstruction::FrameworkConstructor { .. }
+        | DirectConstruction::FrameworkUnit
         | DirectConstruction::FrameworkAccessor { .. } => ProvidedType::Concrete(path),
     }
 }
@@ -610,9 +590,8 @@ fn resolve_framework_construction(construction: &FrameworkConstruction) -> Direc
                 resolved.push(DependencyKind::Single { provider_key });
             }
 
-            DirectConstruction::Constructor {
+            DirectConstruction::FrameworkConstructor {
                 dependencies: resolved,
-                fallible: false,
                 is_async: *is_async,
                 method: method.clone(),
             }
@@ -632,9 +611,7 @@ fn resolve_framework_construction(construction: &FrameworkConstruction) -> Direc
             }],
             resolver: resolver.clone(),
         },
-        FrameworkConstruction::Unit => DirectConstruction::Fieldless {
-            shape: StructShape::Unit,
-        },
+        FrameworkConstruction::Unit => DirectConstruction::FrameworkUnit,
     }
 }
 
@@ -741,37 +718,28 @@ fn is_framework_role_referenced(drafts: &[Draft], role: &FrameworkInjectionRole)
 }
 
 fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &CanonicalPath) -> bool {
-    let ConstructionSource::Constructor(constructor) = &draft.construction
-    else {
+    let ConstructionSource::Constructor(constructor) = &draft.construction else {
         return false;
     };
 
-    constructor.signature().inputs.iter().any(|input| {
-        let FnArg::Typed(pattern_type) = input else {
-            return false;
-        };
-
+    constructor.parameters().iter().any(|parameter| {
         matches!(
-            peel_target(&pattern_type.ty),
+            peel_target(parameter.declared()),
             Some(written) if index.resolve_item_path(draft.item, &written).as_ref() == Some(path)
         )
     })
 }
 
 fn draft_references_role(draft: &Draft, role: &FrameworkInjectionRole) -> bool {
-    let ConstructionSource::Constructor(constructor) = &draft.construction
-    else {
+    let ConstructionSource::Constructor(constructor) = &draft.construction else {
         return false;
     };
 
-    constructor.signature().inputs.iter().any(|input| {
-        let FnArg::Typed(pattern_type) = input else {
-            return false;
-        };
-
-        marker(&pattern_type.attrs, &jwks_secret_store_selector())
-            .and_then(|attribute| AttributeArgs::from_attribute(attribute).ok())
-            .and_then(|args| read_jwks_secret_store_target(&args, "").ok())
+    constructor.parameters().iter().any(|parameter| {
+        parameter
+            .attribute(&jwks_secret_store_selector())
+            .and_then(|attribute| attribute.args().ok())
+            .and_then(|args| read_jwks_secret_store_target(args, "").ok())
             .is_some_and(|target| injection_matches_target(role, &target))
     })
 }
@@ -868,8 +836,13 @@ pub(crate) fn build_plan(
         providers.insert(provider.provided.key().clone(), provider);
     }
 
+    let injectable = providers.keys().cloned().collect();
+    let entries = providers.into_iter().chain(constructions).collect();
+    let dependency_order = topological_order(&entries)?;
+
     Ok(ContainerPlan {
-        constructions,
-        providers,
+        dependency_order,
+        entries,
+        injectable,
     })
 }

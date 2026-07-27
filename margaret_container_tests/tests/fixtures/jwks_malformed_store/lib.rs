@@ -5,5 +5,5 @@ struct Consumer;
 
 impl Consumer {
     #[constructor]
-    fn new(#[jwks_secret_store] store: Arc<ServerCapability>) -> Self {}
+    fn new(#[jwks_secret_store] store: Arc<ServerCapability>) -> anyhow::Result<Self> {}
 }

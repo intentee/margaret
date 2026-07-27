@@ -1,5 +1,7 @@
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
+use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::format_path::format_path;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::matched_attribute::MatchedAttribute;
@@ -11,6 +13,7 @@ use margaret_injection_codegen::request_binding_marker::request_binding_marker;
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
+use crate::service_unit_origin::ServiceUnitOrigin;
 use crate::tick_timer_arguments::TickTimerArguments;
 
 #[derive(Clone, Copy)]
@@ -19,13 +22,28 @@ enum Role {
     Ticker,
 }
 
+fn canonical_attribute_path(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    written: &syn::Path,
+    argument: &'static str,
+) -> Result<CanonicalPath, ServiceCodegenError> {
+    index.resolve_item_path(item, written).ok_or_else(|| {
+        ServiceCodegenError::UnresolvedTickerPath {
+            argument,
+            path: format_path(written),
+            ticker: item.canonical_path().to_string(),
+        }
+    })
+}
+
 fn validate_runner(
     index: &AttributeIndex,
     item: &IndexedItem,
     runner: &IndexedMethod,
     path: &str,
 ) -> Result<(), ServiceCodegenError> {
-    for view in parameters(runner.signature()) {
+    for view in parameters(runner) {
         if let Some(name) = request_binding_marker(view.attributes) {
             return Err(ServiceCodegenError::RunnerRequestBinding {
                 path: path.to_string(),
@@ -74,6 +92,11 @@ fn build_unit(
         Role::Ticker => {
             let TickTimerArguments { behavior, interval } =
                 TickTimerArguments::parse(matched.args()?, &path)?;
+            let behavior = behavior
+                .as_ref()
+                .map(|written| canonical_attribute_path(index, item, written, "behavior"))
+                .transpose()?;
+            let interval = canonical_attribute_path(index, item, &interval, "interval")?;
 
             ServiceKind::Ticker { behavior, interval }
         }
@@ -83,6 +106,7 @@ fn build_unit(
         concrete_path: item.canonical_path().clone(),
         field_name: identifier.field().to_string(),
         kind,
+        origin: ServiceUnitOrigin::User,
         runner: runner.identifier().to_string(),
         takes_token,
         type_name: identifier.type_name().to_string(),
@@ -101,7 +125,7 @@ fn has_conflicting_roles(item: &IndexedItem, role: Role) -> bool {
 }
 
 fn runner_takes_token(index: &AttributeIndex, item: &IndexedItem, method: &IndexedMethod) -> bool {
-    parameters(method.signature())
+    parameters(method)
         .iter()
         .any(|view| is_cancellation_token(index, item, view.declared))
 }

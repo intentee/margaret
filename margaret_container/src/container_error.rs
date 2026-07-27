@@ -78,11 +78,6 @@ pub enum ContainerError {
     AmbiguousConstructor { singleton: String, methods: String },
 
     #[error(
-        "the #[constructor] of singleton '{singleton}' must return Self or anyhow::Result<Self>"
-    )]
-    ConstructorReturnTypeMismatch { singleton: String },
-
-    #[error(
         "the framework-provided injectable '{path}' collides with a singleton declared at the same path"
     )]
     AmbiguousFrameworkProvider { path: String },

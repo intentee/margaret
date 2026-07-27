@@ -34,13 +34,3 @@ pub enum RequestBinding {
     Routes,
     Views,
 }
-
-impl RequestBinding {
-    #[must_use]
-    pub fn path_key(&self) -> Option<&str> {
-        match self {
-            Self::Raw { path_key } | Self::Bound { path_key, .. } => Some(path_key),
-            _ => None,
-        }
-    }
-}

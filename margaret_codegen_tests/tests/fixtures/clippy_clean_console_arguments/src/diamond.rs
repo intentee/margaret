@@ -6,11 +6,14 @@ pub struct MicroservicesMap;
 
 impl MicroservicesMap {
     #[constructor]
-    #[must_use]
-    pub fn create(#[console_argument(from = "microservices-map")] mapper: Option<String>) -> Self {
-        let _ = mapper;
+    pub fn create(
+        #[console_argument(from = "microservices-map")] mapper: Option<String>,
+    ) -> anyhow::Result<Self> {
+        Ok({
+            let _ = mapper;
 
-        Self
+            Self
+        })
     }
 }
 
@@ -19,11 +22,12 @@ pub struct MicroservicesMapProvider;
 
 impl MicroservicesMapProvider {
     #[constructor]
-    #[must_use]
-    pub fn create(map: std::sync::Arc<MicroservicesMap>) -> Self {
-        let _ = map;
+    pub fn create(map: std::sync::Arc<MicroservicesMap>) -> anyhow::Result<Self> {
+        Ok({
+            let _ = map;
 
-        Self
+            Self
+        })
     }
 }
 
@@ -32,11 +36,12 @@ pub struct ServiceIdentitySupervisor;
 
 impl ServiceIdentitySupervisor {
     #[constructor]
-    #[must_use]
-    pub fn create(map: std::sync::Arc<MicroservicesMap>) -> Self {
-        let _ = map;
+    pub fn create(map: std::sync::Arc<MicroservicesMap>) -> anyhow::Result<Self> {
+        Ok({
+            let _ = map;
 
-        Self
+            Self
+        })
     }
 }
 
@@ -45,14 +50,15 @@ pub struct SessionValidator;
 
 impl SessionValidator {
     #[constructor]
-    #[must_use]
     pub fn create(
         provider: std::sync::Arc<MicroservicesMapProvider>,
         supervisor: std::sync::Arc<ServiceIdentitySupervisor>,
-    ) -> Self {
-        let _ = (provider, supervisor);
+    ) -> anyhow::Result<Self> {
+        Ok({
+            let _ = (provider, supervisor);
 
-        Self
+            Self
+        })
     }
 }
 
@@ -61,11 +67,12 @@ pub struct RetryChild;
 
 impl RetryChild {
     #[constructor]
-    #[must_use]
-    pub fn create(#[console_argument(from = "retries")] retries: u16) -> Self {
-        let _ = retries;
+    pub fn create(#[console_argument(from = "retries")] retries: u16) -> anyhow::Result<Self> {
+        Ok({
+            let _ = retries;
 
-        Self
+            Self
+        })
     }
 }
 
@@ -74,13 +81,14 @@ pub struct RetrySupervisor;
 
 impl RetrySupervisor {
     #[constructor]
-    #[must_use]
     pub fn create(
         #[console_argument(from = "retries")] retries: u16,
         child: std::sync::Arc<RetryChild>,
-    ) -> Self {
-        let _ = (retries, child);
+    ) -> anyhow::Result<Self> {
+        Ok({
+            let _ = (retries, child);
 
-        Self
+            Self
+        })
     }
 }
