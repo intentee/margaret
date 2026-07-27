@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use failures::Result as Outcome;
 use margaret::framework::http::response::Response;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
@@ -19,12 +20,12 @@ pub struct GetHome {
 
 impl GetHome {
     #[constructor]
-    pub fn create(secrets: Arc<Secrets>) -> anyhow::Result<Self> {
+    pub fn create(secrets: Arc<Secrets>) -> Outcome<Self> {
         Ok(Self { secrets })
     }
 
     #[process]
-    pub async fn respond(&self, views: &Views) -> anyhow::Result<Response> {
+    pub async fn respond(&self, views: &Views) -> Outcome<Response> {
         Ok({
             let _ = self.secrets.token();
 

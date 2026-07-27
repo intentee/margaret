@@ -26,8 +26,6 @@ mod rejects_non_struct_singleton;
 mod rejects_singleton_arguments;
 mod reports_a_framework_provider_colliding_with_a_user_singleton;
 mod reports_ambiguous_constructor;
-mod reports_constructor_return_type_mismatch;
-mod reports_constructor_without_return_type;
 mod reports_dependency_cycle;
 mod reports_endpoint_errors;
 mod reports_missing_provider;

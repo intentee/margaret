@@ -1,4 +1,6 @@
 #[cfg(feature = "runtime")]
+pub use anyhow;
+#[cfg(feature = "runtime")]
 pub use margaret_access_token_minter as access_token_minter;
 #[cfg(feature = "runtime")]
 pub use margaret_asset_bag as asset_bag;

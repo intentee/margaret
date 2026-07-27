@@ -7,6 +7,7 @@ pub mod service_codegen_error;
 
 mod service_kind;
 mod service_unit;
+mod service_unit_origin;
 mod service_units;
 mod spiffe_activation;
 mod tick_timer_arguments;
@@ -171,7 +172,9 @@ mod tests {
         let source = rendered(SERVICE, &[]);
 
         assert!(source.contains("structPump{"));
-        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+        ));
         assert!(
             source.contains("manager.register_service(Pump{inner:(matchcontainer.pump().await")
         );
@@ -190,7 +193,9 @@ mod tests {
             "fnmissed_tick_behavior(&self)->tokio::time::MissedTickBehavior{tokio::time::MissedTickBehavior::Delay}"
         ));
         assert!(source.contains("_tick_context:trzcina::TickContext"));
-        assert!(source.contains("self.inner.run().await?;Ok(())"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+        ));
     }
 
     fn canonical(segments: &[&str]) -> CanonicalPath {
@@ -270,7 +275,11 @@ mod tests {
             "manager.register_service(JwksRoller{inner:(matchcontainer.framework_jwks_roller_server_jwks_roller_jwks_roller().await"
         ));
         assert!(source.contains("impltrzcina::ServiceforJwksClient"));
-        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
+        assert!(
+            source.contains(
+                "self.inner.run(cancellation_token).await?;::std::result::Result::Ok(())"
+            )
+        );
         assert!(source.contains(
             "manager.register_service(JwksClient{inner:(matchcontainer.framework_jwks_client_jwks_client_jwks_client().await"
         ));
@@ -283,7 +292,9 @@ mod tests {
             &[],
         );
 
-        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+        ));
         assert!(!source.contains("_cancellation_token"));
     }
 
@@ -307,7 +318,9 @@ mod tests {
         );
 
         assert!(source.contains("_cancellation_token:tokio_util::sync::CancellationToken"));
-        assert!(source.contains("self.inner.run().await?;Ok(())"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+        ));
     }
 
     #[test]
@@ -573,33 +586,6 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_runner_without_a_return_type() {
-        let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) {}\n}\n",
-        );
-
-        assert!(message.contains("must return anyhow::Result<()>"));
-    }
-
-    #[test]
-    fn rejects_a_runner_returning_another_result_type() {
-        let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<(), Failure> {}\n}\n",
-        );
-
-        assert!(message.contains("must return anyhow::Result<()>"));
-    }
-
-    #[test]
-    fn rejects_a_runner_returning_a_non_unit_outcome() {
-        let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<bool> {}\n}\n",
-        );
-
-        assert!(message.contains("must return anyhow::Result<()>"));
-    }
-
-    #[test]
     fn rejects_a_ticker_without_an_interval() {
         let message = error_for(
             "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
@@ -661,7 +647,9 @@ impl Roller {
 
         assert!(source.contains("structRoller{inner:std::sync::Arc<crate::Roller>,}"));
         assert!(source.contains("impltrzcina::TickerforRoller"));
-        assert!(source.contains("self.inner.run().await?;Ok(())"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+        ));
         assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains(
             "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
@@ -693,7 +681,9 @@ impl Roller {
             &[],
         );
 
-        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+        ));
         assert!(!source.contains("_cancellation_token"));
         assert!(source.contains(
             "manager.register_service(Roller{inner:(matchcontainer.roller(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
@@ -721,7 +711,9 @@ impl Worker {
             &[],
         );
 
-        assert!(source.contains("self.inner.run(cancellation_token).await?;Ok(())"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+        ));
         assert!(source.contains(
             "manager.register_service(Worker{inner:(matchcontainer.worker(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
         ));
@@ -747,7 +739,9 @@ impl Worker {
         );
 
         assert!(source.contains("structWorker{inner:std::sync::Arc<crate::Worker>,}"));
-        assert!(source.contains("self.inner.run().await?;Ok(())"));
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+        ));
         assert!(source.contains(
             "manager.register_service(Worker{inner:(matchcontainer.worker(console_argument_0.to_owned()).await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}),});"
         ));

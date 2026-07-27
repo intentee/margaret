@@ -76,21 +76,17 @@ fn command_arm(
                     }
                 };
 
-                match #accessor_access.run(cancellation_token).await {
-                    ::std::result::Result::Ok(outcome) => outcome,
-                    ::std::result::Result::Err(error) => {
-                        margaret::framework::console::report_failure::report_failure(error)
-                    }
-                }
+                margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
+                    #accessor_access.run(cancellation_token).await,
+                )
             }
         }
     } else {
         quote! {
-            Some((#name, #matches_binding)) => match #accessor_access.run().await {
-                ::std::result::Result::Ok(outcome) => outcome,
-                ::std::result::Result::Err(error) => {
-                    margaret::framework::console::report_failure::report_failure(error)
-                }
+            Some((#name, #matches_binding)) => {
+                margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
+                    #accessor_access.run().await,
+                )
             },
         }
     }

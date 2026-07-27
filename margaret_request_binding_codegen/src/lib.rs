@@ -226,84 +226,6 @@ impl SessionUserProvider {
     }
 
     #[test]
-    fn rejects_an_inference_method_that_does_not_infer_an_outcome() {
-        assert!(
-            rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<User> {}\n}\n"
-            )
-            .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
-            )
-        );
-    }
-
-    #[test]
-    fn rejects_an_inference_method_that_does_not_return_anyhow_result() {
-        assert!(
-            rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> AuthenticatedUserOutcome<User> {}\n}\n"
-            )
-            .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
-            )
-        );
-    }
-
-    #[test]
-    fn rejects_an_inference_method_without_a_return_type() {
-        assert!(
-            rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) {}\n}\n"
-            )
-            .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
-            )
-        );
-    }
-
-    #[test]
-    fn rejects_an_inference_method_that_returns_a_type_that_is_not_a_path() {
-        assert!(
-            rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<(u8, u8)> {}\n}\n"
-            )
-            .contains(
-                "it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome"
-            )
-        );
-    }
-
-    #[test]
-    fn rejects_an_inference_method_that_infers_a_borrowed_outcome() {
-        assert!(
-            rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<&AuthenticatedUserOutcome<User>> {}\n}\n"
-            )
-            .contains("but the provider declares the user model 'crate::User'")
-        );
-    }
-
-    #[test]
-    fn rejects_an_inference_method_whose_outcome_carries_no_user_model() {
-        assert!(
-            rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<'static>> {}\n}\n"
-            )
-            .contains("but the provider declares the user model 'crate::User'")
-        );
-    }
-
-    #[test]
-    fn rejects_an_inference_method_whose_outcome_omits_its_generics() {
-        assert!(
-            rejection_for(
-                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome> {}\n}\n"
-            )
-            .contains("but the provider declares the user model 'crate::User'")
-        );
-    }
-
-    #[test]
     fn orders_the_providers_by_the_struct_that_declares_them() {
         let registries = registries_for(
             "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct SecondProvider;\n\nimpl SecondProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct FirstProvider;\n\nimpl FirstProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
@@ -319,16 +241,6 @@ impl SessionUserProvider {
                 "crate::FirstProvider".to_string(),
                 "crate::SecondProvider".to_string()
             ]
-        );
-    }
-
-    #[test]
-    fn rejects_an_inference_method_that_infers_another_user_model() {
-        assert!(
-            rejection_for(
-                "struct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {}\n}\n"
-            )
-            .contains("but the provider declares the user model 'crate::User'")
         );
     }
 

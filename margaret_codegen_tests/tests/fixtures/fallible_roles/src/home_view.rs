@@ -22,7 +22,7 @@ pub struct HomeView {
 
 impl HomeView {
     #[constructor]
-    pub fn create(secrets: Arc<Secrets>) -> anyhow::Result<Self> {
+    pub fn create(secrets: Arc<Secrets>) -> failures::Result<Self> {
         Ok(Self { secrets })
     }
 }
@@ -30,7 +30,10 @@ impl HomeView {
 impl RendersView for HomeView {
     type Props<'props> = HomeViewProps;
 
-    fn render(&self, HomeViewProps { heading }: Self::Props<'_>) -> anyhow::Result<Markup> {
+    fn render(
+        &self,
+        HomeViewProps { heading }: Self::Props<'_>,
+    ) -> std::result::Result<Markup, failures::Error> {
         Ok({
             let _ = self.secrets.token();
             let _ = asset!("resources/ts/app.ts");

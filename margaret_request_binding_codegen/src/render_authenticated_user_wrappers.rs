@@ -109,7 +109,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
             async fn infer(
                 &self,
                 #request_binding: &margaret::framework::http::request::Request,
-            ) -> ::anyhow::Result<
+            ) -> margaret::framework::anyhow::Result<
                 margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>,
             > {
                 #(#extractions)*

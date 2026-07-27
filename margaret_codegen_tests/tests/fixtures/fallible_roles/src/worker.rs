@@ -7,6 +7,9 @@ use tokio_util::sync::CancellationToken;
 
 use super::secrets::Secrets;
 
+type WorkerResult<T> = failures::Result<T>;
+type ChainedWorkerResult<T> = WorkerResult<T>;
+
 #[service]
 pub struct Worker {
     secrets: Arc<Secrets>,
@@ -14,12 +17,12 @@ pub struct Worker {
 
 impl Worker {
     #[constructor]
-    pub fn create(secrets: Arc<Secrets>) -> anyhow::Result<Self> {
+    pub fn create(secrets: Arc<Secrets>) -> WorkerResult<Self> {
         Ok(Self { secrets })
     }
 
     #[process]
-    pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
+    pub async fn run(&self, cancellation_token: CancellationToken) -> ChainedWorkerResult<()> {
         let _ = self.secrets.token();
 
         cancellation_token.cancelled().await;

@@ -1,4 +1,3 @@
-use margaret_attributes::anyhow_result_ok_type::anyhow_result_ok_type;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_selector::AttributeSelector;
 use margaret_attributes::indexed_item::IndexedItem;
@@ -12,36 +11,13 @@ use margaret_injection_codegen::request_binding_marker::request_binding_marker;
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
+use crate::service_unit_origin::ServiceUnitOrigin;
 use crate::tick_timer_arguments::TickTimerArguments;
 
 #[derive(Clone, Copy)]
 enum Role {
     Service,
     Ticker,
-}
-
-fn require_anyhow_unit_result(
-    runner: &IndexedMethod,
-    path: &str,
-) -> Result<(), ServiceCodegenError> {
-    let syn::ReturnType::Type(_, return_type) = &runner.signature().output else {
-        return Err(ServiceCodegenError::RunnerReturnType {
-            path: path.to_string(),
-        });
-    };
-    let Some(ok_type) = anyhow_result_ok_type(return_type) else {
-        return Err(ServiceCodegenError::RunnerReturnType {
-            path: path.to_string(),
-        });
-    };
-
-    if !matches!(ok_type, syn::Type::Tuple(tuple) if tuple.elems.is_empty()) {
-        return Err(ServiceCodegenError::RunnerReturnType {
-            path: path.to_string(),
-        });
-    }
-
-    Ok(())
 }
 
 fn validate_runner(
@@ -91,7 +67,6 @@ fn build_unit(
 
     let runner = process_method(item)?;
 
-    require_anyhow_unit_result(runner, &path)?;
     validate_runner(index, item, runner, &path)?;
 
     let takes_token = runner_takes_token(index, item, runner);
@@ -109,6 +84,7 @@ fn build_unit(
         concrete_path: item.canonical_path().clone(),
         field_name: identifier.field().to_string(),
         kind,
+        origin: ServiceUnitOrigin::User,
         runner: runner.identifier().to_string(),
         takes_token,
         type_name: identifier.type_name().to_string(),

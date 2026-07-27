@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = { workspace = true, optional = true }
 margaret_access_token_minter = { path = "../margaret_access_token_minter", optional = true }
 margaret_asset_bag = { path = "../margaret_asset_bag", optional = true }
 margaret_codegen = { path = "../margaret_codegen", optional = true }
@@ -39,6 +40,7 @@ margaret_websocket = { path = "../margaret_websocket", optional = true }
 default = ["runtime"]
 codegen = ["dep:margaret_codegen"]
 runtime = [
+    "dep:anyhow",
     "dep:margaret_access_token_minter",
     "dep:margaret_asset_bag",
     "dep:margaret_console",

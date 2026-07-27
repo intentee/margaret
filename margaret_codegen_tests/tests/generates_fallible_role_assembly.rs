@@ -42,7 +42,7 @@ fn reports_a_fallible_console_command_into_the_command_outcome() {
         "matchcontainer.boot_boot().await{Ok(value)=>value,Err(error)=>{returnmargaret::framework::console::report_failure::report_failure(error,);}}"
     ));
     assert!(source.contains(
-        "::std::result::Result::Err(error)=>{margaret::framework::console::report_failure::report_failure(error,)}"
+        "margaret::framework::console::command_outcome::CommandOutcome::from_user_result("
     ));
 }
 

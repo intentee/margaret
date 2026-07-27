@@ -124,24 +124,6 @@ impl Farewell {
     }
 
     #[test]
-    fn rejects_a_console_runner_without_a_return_type() {
-        let error = error_for(
-            "#[singleton]\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) {}\n}\n",
-        );
-
-        assert!(error.contains("must return anyhow::Result"));
-    }
-
-    #[test]
-    fn rejects_a_console_runner_returning_another_result_type() {
-        let error = error_for(
-            "#[singleton]\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> Result<CommandOutcome, Failure> {}\n}\n",
-        );
-
-        assert!(error.contains("must return anyhow::Result"));
-    }
-
-    #[test]
     fn generates_a_dispatcher_for_each_argument_kind() {
         let source = source_for(COMMANDS, false);
 

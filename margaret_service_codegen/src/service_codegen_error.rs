@@ -31,9 +31,6 @@ pub enum ServiceCodegenError {
         path: String,
     },
 
-    #[error("the #[process] runner of '{path}' must return anyhow::Result<()>")]
-    RunnerReturnType { path: String },
-
     #[error("#[service] is only supported on structs, but '{path}' is not a struct")]
     ServiceNotAStruct { path: String },
 

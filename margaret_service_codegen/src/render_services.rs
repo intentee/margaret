@@ -27,6 +27,7 @@ use crate::serve_console_arguments::ServeConsoleArguments;
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
+use crate::service_unit_origin::ServiceUnitOrigin;
 use crate::service_units::service_units;
 use crate::spiffe_activation::SpiffeActivation;
 
@@ -294,6 +295,21 @@ fn adapter(unit: &ServiceUnit) -> TokenStream {
     }
 }
 
+fn runner_outcome(unit: &ServiceUnit, call: &TokenStream) -> TokenStream {
+    match unit.origin {
+        ServiceUnitOrigin::Framework => quote! {
+            #call?;
+
+            ::std::result::Result::Ok(())
+        },
+        ServiceUnitOrigin::User => quote! {
+            let outcome: margaret::framework::anyhow::Result<()> = #call;
+
+            outcome
+        },
+    }
+}
+
 fn ticker_adapter(unit: &ServiceUnit, behavior: &Option<Path>, interval: &Path) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
@@ -310,6 +326,7 @@ fn ticker_adapter(unit: &ServiceUnit, behavior: &Option<Path>, interval: &Path) 
             quote! { self.inner.#runner().await },
         )
     };
+    let outcome = runner_outcome(unit, &call);
 
     quote! {
         struct #name {
@@ -328,10 +345,8 @@ fn ticker_adapter(unit: &ServiceUnit, behavior: &Option<Path>, interval: &Path) 
                 &mut self,
                 #token_binding: tokio_util::sync::CancellationToken,
                 _tick_context: trzcina::TickContext,
-            ) -> anyhow::Result<()> {
-                #call?;
-
-                Ok(())
+            ) -> margaret::framework::anyhow::Result<()> {
+                #outcome
             }
         }
     }
@@ -344,14 +359,15 @@ fn service_adapter(unit: &ServiceUnit) -> TokenStream {
     let (token_binding, call) = if unit.takes_token {
         (
             quote! { cancellation_token },
-            quote! { self.inner.#runner(cancellation_token).await? },
+            quote! { self.inner.#runner(cancellation_token).await },
         )
     } else {
         (
             quote! { _cancellation_token },
-            quote! { self.inner.#runner().await? },
+            quote! { self.inner.#runner().await },
         )
     };
+    let outcome = runner_outcome(unit, &call);
 
     quote! {
         struct #name {
@@ -363,10 +379,8 @@ fn service_adapter(unit: &ServiceUnit) -> TokenStream {
             async fn run(
                 self: Box<Self>,
                 #token_binding: tokio_util::sync::CancellationToken,
-            ) -> anyhow::Result<()> {
-                #call;
-
-                Ok(())
+            ) -> margaret::framework::anyhow::Result<()> {
+                #outcome
             }
         }
     }

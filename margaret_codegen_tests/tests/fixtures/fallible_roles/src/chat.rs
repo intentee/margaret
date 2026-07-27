@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use failures as errors;
 use margaret::framework::macros::build_for_session;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::singleton;
@@ -34,7 +35,7 @@ pub struct ChatSession;
 
 impl ChatSession {
     #[build_for_session]
-    pub fn assemble() -> anyhow::Result<Self> {
+    pub fn assemble() -> errors::Result<Self> {
         Ok(Self)
     }
 }
@@ -46,7 +47,7 @@ pub struct ChatResponder {
 
 impl ChatResponder {
     #[constructor]
-    pub fn create(secrets: Arc<Secrets>) -> anyhow::Result<Self> {
+    pub fn create(secrets: Arc<Secrets>) -> errors::Result<Self> {
         Ok(Self { secrets })
     }
 }
@@ -62,7 +63,7 @@ impl RespondsToWebSocketMessage for ChatResponder {
         _session: Arc<ChatSession>,
         message: StreamingRequestEnvelope<ChatSay>,
         socket: WebSocket,
-    ) -> anyhow::Result<()> {
+    ) -> errors::Result<()> {
         let _ = self.secrets.token();
 
         socket

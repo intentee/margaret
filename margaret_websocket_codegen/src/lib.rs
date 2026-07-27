@@ -753,25 +753,6 @@ impl Bad {
     }
 
     #[test]
-    fn rejects_a_build_for_session_that_does_not_return_self() {
-        assert!(
-            error(
-                r#"
-#[websocket_session(path = "/x", server = "public")]
-struct Bad;
-
-impl Bad {
-    #[build_for_session]
-    fn build() {}
-}
-"#
-            )
-            .to_string()
-            .contains("must return anyhow::Result<Self>")
-        );
-    }
-
-    #[test]
     fn rejects_a_route_parameter_without_a_from() {
         assert!(
             error(
@@ -1611,25 +1592,6 @@ impl BetaSession {
 
         assert!(source.contains("pubmodalpha_session"));
         assert!(source.contains("pubmodbeta_session"));
-    }
-
-    #[test]
-    fn rejects_a_build_for_session_that_returns_a_non_self_type() {
-        assert!(
-            error(
-                r#"
-#[websocket_session(path = "/x", server = "public")]
-struct Bad;
-
-impl Bad {
-    #[build_for_session]
-    fn build() -> u8 {}
-}
-"#
-            )
-            .to_string()
-            .contains("must return anyhow::Result<Self>")
-        );
     }
 
     #[test]

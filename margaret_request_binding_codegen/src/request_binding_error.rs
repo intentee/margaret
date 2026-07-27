@@ -161,20 +161,6 @@ pub enum RequestBindingError {
     AmbiguousInferFromRequest { provider: String, methods: String },
 
     #[error(
-        "the #[infer_from_request] method of '{provider}' returns '{written}'; it must return anyhow::Result<margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Model>>"
-    )]
-    InferenceReturnTypeMismatch { provider: String, written: String },
-
-    #[error(
-        "the #[infer_from_request] method of '{provider}' infers '{written}', but the provider declares the user model '{model}'"
-    )]
-    InferredUserModelMismatch {
-        provider: String,
-        model: String,
-        written: String,
-    },
-
-    #[error(
         "user model '{model}' has more than one authenticated user provider: '{first}' and '{second}'"
     )]
     AmbiguousAuthenticatedUserProvider {

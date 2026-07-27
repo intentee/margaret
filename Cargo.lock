@@ -1788,6 +1788,7 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 name = "margaret"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "margaret_access_token_minter",
  "margaret_asset_bag",
  "margaret_codegen",
@@ -1949,6 +1950,7 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "margaret_codegen",
+ "margaret_codegen_fallible_roles_fixture",
  "margaret_console_argument_codegen",
 ]
 
@@ -1986,6 +1988,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "trybuild",
 ]
 
 [[package]]

@@ -8,7 +8,6 @@ use syn::Meta;
 use syn::Pat;
 use syn::Path;
 
-use margaret_attributes::anyhow_result_ok_type::anyhow_result_ok_type;
 use margaret_attributes::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
@@ -251,20 +250,6 @@ fn resolve_direct(
 ) -> Result<DirectConstruction, ContainerError> {
     match source {
         ConstructionSource::Constructor(constructor) => {
-            let syn::ReturnType::Type(_, return_type) = &constructor.signature().output else {
-                return Err(ContainerError::ConstructorReturnTypeMismatch {
-                    singleton: concrete_path.to_string(),
-                });
-            };
-
-            if !anyhow_result_ok_type(return_type).is_some_and(
-                |ok_type| matches!(ok_type, syn::Type::Path(path) if path.path.is_ident("Self")),
-            ) {
-                return Err(ContainerError::ConstructorReturnTypeMismatch {
-                    singleton: concrete_path.to_string(),
-                });
-            }
-
             let dependencies = resolve_dependencies(
                 index,
                 item,
