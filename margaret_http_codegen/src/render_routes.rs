@@ -94,6 +94,18 @@ fn segments_tokens(named: &NamedRoute<'_>) -> TokenStream {
                 )
             }
         }
+        UrlSegment::WildcardParameter(name) => {
+            let value = format_ident!("{}", name);
+
+            quote! {
+                margaret::framework::http::url_segment::UrlSegment::WildcardParameter(
+                    margaret::framework::http::url_parameter::UrlParameter {
+                        name: #name,
+                        value: #value,
+                    },
+                )
+            }
+        }
     });
 
     quote! { ::std::vec::Vec::from([#(#segments),*]) }

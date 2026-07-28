@@ -18,7 +18,9 @@ impl RoutePath {
     pub fn parameters(&self) -> impl Iterator<Item = &str> {
         self.segments.iter().filter_map(|segment| match segment {
             UrlSegment::Literal(_) => None,
-            UrlSegment::Parameter(name) => Some(name.as_str()),
+            UrlSegment::Parameter(name) | UrlSegment::WildcardParameter(name) => {
+                Some(name.as_str())
+            }
         })
     }
 

@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use http::header::SEC_WEBSOCKET_KEY;
+use http::header::SEC_WEBSOCKET_VERSION;
 use hyper::upgrade::OnUpgrade;
 use hyper_util::rt::TokioIo;
 use tokio_tungstenite::WebSocketStream;
@@ -18,6 +20,8 @@ use crate::serve_web_socket_connection::serve_web_socket_connection;
 use crate::web_socket_dispatch_table::WebSocketDispatchTable;
 use crate::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome;
 use crate::web_socket_session_factory::WebSocketSessionFactory;
+
+const SUPPORTED_WEB_SOCKET_VERSION: &str = "13";
 
 async fn drive_web_socket_upgrade<Session>(
     on_upgrade: OnUpgrade,
@@ -71,15 +75,15 @@ where
         cancellation_token: CancellationToken,
         driver_sender: WebSocketDriverSender,
     ) -> ResponseContinuation {
-        let Ok(Some(key)) = handshake.inputs.server.header("sec-websocket-key") else {
+        let Some(key) = handshake.inputs.server.header(&SEC_WEBSOCKET_KEY) else {
             return ResponseContinuation::from(Response::text(
                 400,
                 "the websocket handshake is missing the Sec-WebSocket-Key header",
             ));
         };
 
-        match handshake.inputs.server.header("sec-websocket-version") {
-            Ok(Some("13")) => {}
+        match handshake.inputs.server.header(&SEC_WEBSOCKET_VERSION) {
+            Some(SUPPORTED_WEB_SOCKET_VERSION) => {}
             _ => {
                 return ResponseContinuation::from(Response::text(
                     400,
