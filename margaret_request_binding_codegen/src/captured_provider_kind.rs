@@ -33,7 +33,7 @@ impl CapturedProviderKind {
             ) => application.concrete == bound.concrete,
             (
                 Self::Binder { provider, .. },
-                RequestBinding::Bound {
+                RequestBinding::BoundRouteParameter {
                     binder_provider, ..
                 },
             ) => provider == binder_provider,

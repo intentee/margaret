@@ -70,13 +70,28 @@ pub enum RequestBindingError {
     RouteParameterUnavailable { subject: String, parameter: String },
 
     #[error(
-        "route parameter '{parameter}' of {subject} has type '{written}', which has no #[provides_route_parameter]"
+        "route parameter '{parameter}' of {subject} has type '{written}', which is neither declared as a #[route_parameter_value] nor provided by a #[provides_route_parameter]"
     )]
-    MissingRouteParameterBinder {
+    MissingRouteParameterResolution {
         subject: String,
         parameter: String,
         written: String,
     },
+
+    #[error(
+        "route parameter '{parameter}' of {subject} is taken by reference; it must be taken by value so the framework can convert the path segment into it"
+    )]
+    RouteParameterByReference { subject: String, parameter: String },
+
+    #[error(
+        "#[route_parameter_value] is only supported on structs and enums, but '{value_type}' is neither"
+    )]
+    RouteParameterValueNotAStructOrEnum { value_type: String },
+
+    #[error(
+        "'{value_type}' is both a #[route_parameter_value] and the model of the route parameter binder '{binder}'; a route parameter type is resolved exactly one way"
+    )]
+    ConflictingRouteParameterResolution { value_type: String, binder: String },
 
     #[error(
         "form request argument #{parameter} of {subject} is missing `from = <source>`; it must name the request input source it validates"

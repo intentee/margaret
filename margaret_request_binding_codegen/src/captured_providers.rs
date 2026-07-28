@@ -17,7 +17,7 @@ fn provider_kind(binding: &RequestBinding) -> Option<CapturedProviderKind> {
                 application: application.clone(),
             })
         }
-        RequestBinding::Bound {
+        RequestBinding::BoundRouteParameter {
             binder_field,
             binder_provider,
             ..
@@ -32,7 +32,7 @@ fn provider_kind(binding: &RequestBinding) -> Option<CapturedProviderKind> {
         | RequestBinding::Injectable { .. }
         | RequestBinding::Next
         | RequestBinding::PeerSpiffeId
-        | RequestBinding::Raw { .. }
+        | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
         | RequestBinding::Views => None,
     }

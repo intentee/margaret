@@ -47,7 +47,7 @@ pub fn render_request_extraction(
                 };
             }
         }
-        RequestBinding::Raw { path_key } => quote! {
+        RequestBinding::RouteParameterValue { path_key } => quote! {
             let #holder = match margaret::framework::http::require_route_parameter::require_route_parameter(
                 #request_local,
                 #path_key,
@@ -56,7 +56,7 @@ pub fn render_request_extraction(
                 Err(response) => #error_return,
             };
         },
-        RequestBinding::Bound { .. } => TokenStream::new(),
+        RequestBinding::BoundRouteParameter { .. } => TokenStream::new(),
         RequestBinding::FormRequest { source, extraction } => {
             let variant = source.variant();
 

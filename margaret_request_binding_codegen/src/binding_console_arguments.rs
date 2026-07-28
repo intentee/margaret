@@ -12,7 +12,7 @@ pub fn binding_console_arguments(
         RequestBinding::AuthenticatedUser { application, .. } => {
             bindings.console_arguments(&application.concrete)?.to_vec()
         }
-        RequestBinding::Bound {
+        RequestBinding::BoundRouteParameter {
             binder_provider, ..
         } => bindings.console_arguments(binder_provider)?.to_vec(),
         RequestBinding::Injectable { dependency } => {
@@ -24,7 +24,7 @@ pub fn binding_console_arguments(
         | RequestBinding::Forwarder
         | RequestBinding::Next
         | RequestBinding::PeerSpiffeId
-        | RequestBinding::Raw { .. }
+        | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
         | RequestBinding::Views => Vec::new(),
     })

@@ -29,7 +29,7 @@ use crate::request_binding_error::RequestBindingError;
 use crate::request_injectable::RequestInjectable;
 use crate::request_input_source::RequestInputSource;
 use crate::route_parameter_arguments::RouteParameterArguments;
-use crate::route_parameter_binder::RouteParameterBinder;
+use crate::route_parameter_resolution::RouteParameterResolution;
 use crate::views_availability::ViewsAvailability;
 
 fn forwarder_path(server: &str) -> CanonicalPath {
@@ -44,14 +44,6 @@ fn forwarder_path(server: &str) -> CanonicalPath {
 
 fn is_forwarder(resolved: Option<&CanonicalPath>, is_reference: bool, server: &str) -> bool {
     resolved == Some(&forwarder_path(server)) && !is_reference
-}
-
-fn string_path() -> CanonicalPath {
-    CanonicalPath::new(vec![
-        "std".to_string(),
-        "string".to_string(),
-        "String".to_string(),
-    ])
 }
 
 fn body_backed_source(provider: &AuthenticatedUserProvider) -> Option<String> {
@@ -280,7 +272,7 @@ fn classify_route_parameter(
     declared: &Type,
     resolved: Option<&CanonicalPath>,
     position: usize,
-    binders: &HashMap<CanonicalPath, RouteParameterBinder>,
+    resolutions: &HashMap<CanonicalPath, RouteParameterResolution>,
     bound_route_parameters: &mut HashSet<String>,
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
@@ -315,30 +307,30 @@ fn classify_route_parameter(
         });
     }
 
-    if resolved == Some(&string_path()) {
-        return Ok(RequestBinding::Raw { path_key: from });
+    if matches!(declared, Type::Reference(_)) {
+        return Err(RequestBindingError::RouteParameterByReference {
+            subject: subject.to_string(),
+            parameter: from,
+        });
     }
 
-    let written = declared.to_token_stream().to_string();
-    let model = resolved.ok_or_else(|| RequestBindingError::MissingRouteParameterBinder {
+    let missing = || RequestBindingError::MissingRouteParameterResolution {
         subject: subject.to_string(),
         parameter: from.clone(),
-        written: written.clone(),
-    })?;
-    let binder =
-        binders
-            .get(model)
-            .ok_or_else(|| RequestBindingError::MissingRouteParameterBinder {
-                subject: subject.to_string(),
-                parameter: from.clone(),
-                written,
-            })?;
+        written: declared.to_token_stream().to_string(),
+    };
 
-    Ok(RequestBinding::Bound {
-        binder_field: binder.field.clone(),
-        binder_provider: binder.provider.clone(),
-        path_key: from,
-    })
+    match resolved.and_then(|value_type| resolutions.get(value_type)) {
+        Some(RouteParameterResolution::Value) => {
+            Ok(RequestBinding::RouteParameterValue { path_key: from })
+        }
+        Some(RouteParameterResolution::Binder(binder)) => Ok(RequestBinding::BoundRouteParameter {
+            binder_field: binder.field.clone(),
+            binder_provider: binder.provider.clone(),
+            path_key: from,
+        }),
+        None => Err(missing()),
+    }
 }
 
 fn verify_single_inference(
