@@ -479,6 +479,36 @@ mod tests {
         }
     }
 
+    struct EchoAssetPath;
+
+    #[async_trait]
+    impl Handler for EchoAssetPath {
+        async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::Done(Response::text(
+                200,
+                request
+                    .path_param("asset_path")
+                    .expect("the catch-all asset parameter is bound")
+                    .to_string(),
+            )))
+        }
+    }
+
+    fn registry_with_assets() -> Arc<ServerRegistry> {
+        Arc::new(ServerRegistry::new(vec![Server::new(
+            "test",
+            "127.0.0.1:0".to_string(),
+            TransportConfig::Plain,
+            UploadConfig::Disabled,
+            BodyLimit::default(),
+            Router::build(vec![RouteEntry::new(
+                "/assets/{*asset_path}",
+                vec![MethodHandler::new("GET", Arc::new(EchoAssetPath))],
+            )])
+            .expect("the catch-all asset route registers cleanly"),
+        )]))
+    }
+
     fn registry_with_one() -> Arc<ServerRegistry> {
         Arc::new(ServerRegistry::new(vec![Server::new(
             "test",
@@ -663,6 +693,48 @@ mod tests {
         assert!(unmatched.contains(" 404 "));
         assert!(unsupported.contains(" 405 "));
         assert!(truncated.contains(" 400 "));
+
+        cancellation_token.cancel();
+
+        serving.await.expect("the server task finishes cleanly");
+    }
+
+    #[tokio::test]
+    async fn hands_a_traversal_path_to_the_responder_without_resolving_it() {
+        let bound = BoundServer::bind(
+            registry_with_assets(),
+            empty_forward_targets(),
+            Arc::from("test"),
+        )
+        .await
+        .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let (traversing, encoded, above_the_prefix) = tokio::join!(
+            exchange(
+                address,
+                b"GET /assets/../../etc/passwd HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+            exchange(
+                address,
+                b"GET /assets/%2e%2e%2fsecret HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+            exchange(
+                address,
+                b"GET /../etc/passwd HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+        );
+
+        assert!(traversing.ends_with("../../etc/passwd"));
+        assert!(encoded.ends_with("%2e%2e%2fsecret"));
+        assert!(above_the_prefix.contains(" 404 "));
 
         cancellation_token.cancel();
 
