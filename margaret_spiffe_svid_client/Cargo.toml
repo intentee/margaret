@@ -9,6 +9,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 log = { workspace = true }
 margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
+spiffe = { workspace = true, features = ["spiffe-types"] }
 margaret_sync_holder = { path = "../margaret_sync_holder" }
 reqwest = { workspace = true }
 rustls = { workspace = true }

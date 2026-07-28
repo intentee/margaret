@@ -28,6 +28,11 @@ pub enum JwksKeyError {
         source: base64ct::Error,
     },
 
+    #[error(
+        "the jwk public key coordinate decodes to {found} bytes but the curve requires exactly {expected}"
+    )]
+    CoordinateLength { expected: usize, found: usize },
+
     #[error("the token header segment is not valid base64url: {source}")]
     HeaderBase64 {
         #[source]

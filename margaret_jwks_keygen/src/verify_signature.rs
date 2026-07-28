@@ -5,17 +5,26 @@ use p256::ecdsa::signature::Verifier;
 use crate::curve::Curve;
 use crate::jwks_key_error::JwksKeyError;
 
-fn sec1_point(x: &str, y: &str) -> Result<Vec<u8>, JwksKeyError> {
+fn coordinate_bytes(coordinate: &str, crv: Curve) -> Result<Vec<u8>, JwksKeyError> {
+    let bytes = Base64UrlUnpadded::decode_vec(coordinate)
+        .map_err(|source| JwksKeyError::CoordinateBase64 { source })?;
+    let expected = crv.coordinate_bytes();
+
+    if bytes.len() != expected {
+        return Err(JwksKeyError::CoordinateLength {
+            expected,
+            found: bytes.len(),
+        });
+    }
+
+    Ok(bytes)
+}
+
+fn sec1_point(x: &str, y: &str, crv: Curve) -> Result<Vec<u8>, JwksKeyError> {
     let mut sec1 = vec![0x04u8];
 
-    sec1.extend_from_slice(
-        &Base64UrlUnpadded::decode_vec(x)
-            .map_err(|source| JwksKeyError::CoordinateBase64 { source })?,
-    );
-    sec1.extend_from_slice(
-        &Base64UrlUnpadded::decode_vec(y)
-            .map_err(|source| JwksKeyError::CoordinateBase64 { source })?,
-    );
+    sec1.extend_from_slice(&coordinate_bytes(x, crv)?);
+    sec1.extend_from_slice(&coordinate_bytes(y, crv)?);
 
     Ok(sec1)
 }
@@ -27,7 +36,7 @@ pub(crate) fn verify_signature(
     y: &str,
     crv: Curve,
 ) -> Result<bool, JwksKeyError> {
-    let sec1 = sec1_point(x, y)?;
+    let sec1 = sec1_point(x, y, crv)?;
 
     match crv {
         Curve::P256 => {

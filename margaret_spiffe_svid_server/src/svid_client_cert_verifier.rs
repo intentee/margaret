@@ -13,6 +13,7 @@ use rustls::pki_types::UnixTime;
 use rustls::server::WebPkiClientVerifier;
 use rustls::server::danger::ClientCertVerified;
 use rustls::server::danger::ClientCertVerifier;
+use spiffe::spiffe_id::TrustDomain;
 
 use margaret_spiffe_svid::extract_spiffe_trust_domain::extract_spiffe_trust_domain;
 use margaret_spiffe_svid::reject_tls12_signature::reject_tls12_signature;
@@ -22,11 +23,13 @@ use crate::svid_error::SvidError;
 #[derive(Debug)]
 pub struct SvidClientCertVerifier {
     inner_verifier: Arc<dyn ClientCertVerifier>,
-    spiffe_trust_domain: String,
+    spiffe_trust_domain: TrustDomain,
 }
 
 impl SvidClientCertVerifier {
     pub fn new(root_store: RootCertStore, spiffe_trust_domain: String) -> Result<Self, SvidError> {
+        let spiffe_trust_domain = TrustDomain::new(&spiffe_trust_domain)
+            .map_err(|source| SvidError::TrustDomain { source })?;
         let inner_verifier = WebPkiClientVerifier::builder(Arc::new(root_store))
             .build()
             .map_err(|source| SvidError::ClientVerifier { source })?;

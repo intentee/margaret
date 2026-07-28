@@ -57,6 +57,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_spiffe_svid_server \
 	-p margaret_spiffe_svid_server_tests \
 	-p margaret_spiffe_svid_tests \
+	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
 	-p margaret_tag_codegen \
 	-p margaret_token_signer \
@@ -119,6 +120,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_spiffe_svid_bundle \
 	-p margaret_spiffe_svid_client \
 	-p margaret_spiffe_svid_server \
+	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
 	-p margaret_tag_codegen \
 	-p margaret_token_signer \
@@ -226,6 +228,7 @@ coverage: node_modules postgres-image
 		--gated margaret_spiffe_svid_server=100 \
 		--gated margaret_spiffe_svid_server_tests=100 \
 		--gated margaret_spiffe_svid_tests=100 \
+		--gated margaret_syn_type_peeling=100 \
 		--gated margaret_sync_holder=100 \
 		--gated margaret_tag_codegen=100 \
 		--gated margaret_token_signer=100 \
