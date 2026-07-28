@@ -28,7 +28,7 @@ async fn verify_rejects_wrong_key_signature() -> Result<()> {
     let result = other_keypair.public.verify::<TestClaims>(&token)?;
 
     assert!(matches!(result, TokenVerification::SignatureMismatch));
-    assert!(result.must().is_err());
+    assert!(result.verified().is_none());
 
     Ok(())
 }

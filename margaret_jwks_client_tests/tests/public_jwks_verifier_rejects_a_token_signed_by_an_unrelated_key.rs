@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use margaret_jwks_client::jwks_client_error::JwksClientError;
+use margaret_jwks_client::access_token_verification::AccessTokenVerification;
 use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
 use margaret_jwks_client_tests::test_claims::TestClaims;
@@ -9,6 +9,7 @@ use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_keygen::signs_claims::SignsClaims as _;
+use margaret_jwks_keygen::token_malformation::TokenMalformation;
 
 #[tokio::test]
 async fn public_jwks_verifier_rejects_a_token_signed_by_an_unrelated_key() {
@@ -29,11 +30,12 @@ async fn public_jwks_verifier_rejects_a_token_signed_by_an_unrelated_key() {
 
     holder.set(Some(Arc::new(PublicJwks::from(published))));
 
-    let Err(error) =
-        PublicJwksVerifier::new(holder).verify::<TestClaims>(&token, test_instant(1_700_000_000))
-    else {
-        panic!("a token from an unpublished key never verifies");
-    };
+    let verification = PublicJwksVerifier::new(holder)
+        .verify::<TestClaims>(&token, test_instant(1_700_000_000))
+        .expect("the published jwks is usable");
 
-    assert!(matches!(error, JwksClientError::TokenVerification(_)));
+    assert!(matches!(
+        verification,
+        AccessTokenVerification::Malformed(TokenMalformation::UnknownKeyId { .. })
+    ));
 }

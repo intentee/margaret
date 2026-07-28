@@ -3,9 +3,10 @@ use anyhow::Result;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
-use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
+use margaret_jwks_keygen::token_malformation::TokenMalformation;
+use margaret_jwks_keygen::token_verification::TokenVerification;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
 use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
@@ -31,7 +32,12 @@ async fn public_set_reports_unknown_key_id() -> Result<()> {
     };
     let result = set.verify::<TestClaims>(&token);
 
-    assert!(matches!(result, Err(JwksKeyError::UnknownKeyId { .. })));
+    assert!(matches!(
+        result,
+        Ok(TokenVerification::Malformed(
+            TokenMalformation::UnknownKeyId { .. }
+        ))
+    ));
 
     Ok(())
 }

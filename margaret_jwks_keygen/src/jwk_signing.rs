@@ -38,8 +38,8 @@ impl SignsClaims for JwkSigning {
         &self,
         claims: &TClaims,
     ) -> Result<String, JwksKeyError> {
-        let claims_json =
-            serde_json::to_vec(claims).map_err(|source| JwksKeyError::ClaimsJson { source })?;
+        let claims_json = serde_json::to_vec(claims)
+            .map_err(|source| JwksKeyError::ClaimsSerialization { source })?;
         let signing_input = format!(
             "{}.{}",
             Base64UrlUnpadded::encode_string(self.header_json().as_bytes()),
