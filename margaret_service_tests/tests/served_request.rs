@@ -13,6 +13,7 @@ use margaret_http::handler::Handler;
 use margaret_http::handler_error::HandlerError;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;
+use margaret_http::request_cancellation_cooperation::RequestCancellationCooperation;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::route_entry::RouteEntry;
@@ -40,11 +41,19 @@ async fn exchange(
     let router = Router::build(vec![
         RouteEntry::new(
             "/submit",
-            vec![MethodHandler::new("POST", Arc::new(Accepts))],
+            vec![MethodHandler::new(
+                "POST",
+                Arc::new(Accepts),
+                RequestCancellationCooperation::Immediate,
+            )],
         ),
         RouteEntry::new(
             "/search",
-            vec![MethodHandler::new("QUERY", Arc::new(Accepts))],
+            vec![MethodHandler::new(
+                "QUERY",
+                Arc::new(Accepts),
+                RequestCancellationCooperation::Immediate,
+            )],
         ),
     ])
     .expect("the route entries register cleanly");

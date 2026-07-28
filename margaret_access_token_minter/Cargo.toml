@@ -17,6 +17,7 @@ http = { workspace = true }
 margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 tokio = { workspace = true, features = ["macros", "rt"] }
+tokio-util = { workspace = true }
 
 [lints]
 workspace = true

@@ -27,6 +27,7 @@ mod tests {
 
     use http::Method;
     use serde_json::json;
+    use tokio_util::sync::CancellationToken;
 
     use margaret_http::request::Request;
     use margaret_validation::validation_result::ValidationResult;
@@ -48,7 +49,7 @@ mod tests {
     }
 
     fn request() -> Request {
-        Request::new(Method::GET, "/".to_string())
+        Request::new(Method::GET, "/".to_string(), CancellationToken::new())
     }
 
     #[test]

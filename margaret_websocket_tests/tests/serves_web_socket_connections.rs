@@ -240,3 +240,35 @@ async fn stops_when_the_client_disconnects_mid_stream() {
         .await
         .expect("the driver finishes after the client disconnects");
 }
+
+#[tokio::test]
+async fn lets_an_in_flight_handler_clean_up_when_the_client_disconnects() {
+    let mut harness = DriverHarness::spawn(test_dispatch_table()).await;
+
+    harness
+        .send(r#"{"id":9,"method":"cleanup","params":{"prompt":"unfinished"}}"#)
+        .await;
+
+    let _started = harness.recv().await;
+
+    let DriverHarness {
+        client,
+        driver,
+        session,
+        ..
+    } = harness;
+
+    drop(client);
+    driver
+        .await
+        .expect("the driver finishes after the client disconnects");
+
+    assert_eq!(
+        session
+            .cleanups
+            .lock()
+            .expect("the test session records cleanups")
+            .as_slice(),
+        ["unfinished".to_string()]
+    );
+}

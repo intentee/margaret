@@ -28,6 +28,7 @@ mod tests {
 
     use async_trait::async_trait;
     use http::Method;
+    use tokio_util::sync::CancellationToken;
 
     use super::require_bound_route_parameter;
     use crate::http_route_parameter_binder::HttpRouteParameterBinder;
@@ -61,8 +62,12 @@ mod tests {
     }
 
     fn request_with_parameter(value: &str) -> Request {
-        Request::new(Method::GET, "/numbers".to_string())
-            .with_path_params(HashMap::from([("number".to_string(), value.to_string())]))
+        Request::new(
+            Method::GET,
+            "/numbers".to_string(),
+            CancellationToken::new(),
+        )
+        .with_path_params(HashMap::from([("number".to_string(), value.to_string())]))
     }
 
     async fn bound_number(request: &Request) -> Option<u32> {
@@ -91,7 +96,11 @@ mod tests {
 
     #[tokio::test]
     async fn reports_not_found_when_the_route_parameter_is_absent() {
-        let request = Request::new(Method::GET, "/numbers".to_string());
+        let request = Request::new(
+            Method::GET,
+            "/numbers".to_string(),
+            CancellationToken::new(),
+        );
 
         assert_eq!(bound_number(&request).await, None);
     }

@@ -1,33 +1,29 @@
 use std::sync::Arc;
 
 use hyper::upgrade::OnUpgrade;
-use tokio_util::sync::CancellationToken;
 
 use async_trait::async_trait;
 
+use crate::connection_driver_sender::ConnectionDriverSender;
 use crate::handler_error::HandlerError;
 use crate::one_shot_handler::OneShotHandler;
 use crate::request::Request;
 use crate::response_continuation::ResponseContinuation;
-use crate::web_socket_driver_sender::WebSocketDriverSender;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
 pub(crate) struct WebSocketUpgradeTerminal {
-    cancellation_token: CancellationToken,
     on_upgrade: OnUpgrade,
     upgrade: Arc<dyn WebSocketUpgrade>,
-    driver_sender: WebSocketDriverSender,
+    driver_sender: ConnectionDriverSender,
 }
 
 impl WebSocketUpgradeTerminal {
     pub(crate) fn new(
         upgrade: Arc<dyn WebSocketUpgrade>,
         on_upgrade: OnUpgrade,
-        cancellation_token: CancellationToken,
-        driver_sender: WebSocketDriverSender,
+        driver_sender: ConnectionDriverSender,
     ) -> Self {
         Self {
-            cancellation_token,
             on_upgrade,
             upgrade,
             driver_sender,
@@ -42,15 +38,12 @@ impl OneShotHandler for WebSocketUpgradeTerminal {
         request: &Request,
     ) -> Result<ResponseContinuation, HandlerError> {
         let Self {
-            cancellation_token,
             driver_sender,
             on_upgrade,
             upgrade,
         } = *self;
 
-        Ok(upgrade
-            .upgrade(request, on_upgrade, cancellation_token, driver_sender)
-            .await)
+        Ok(upgrade.upgrade(request, on_upgrade, driver_sender).await)
     }
 }
 
@@ -64,14 +57,14 @@ mod tests {
     use tokio_util::sync::CancellationToken;
 
     use super::WebSocketUpgradeTerminal;
+    use crate::connection_driver_channel::ConnectionDriverChannel;
+    use crate::connection_driver_sender::ConnectionDriverSender;
     use crate::forward_targets::ForwardTargets;
     use crate::one_shot_handler::OneShotHandler;
     use crate::request::Request;
     use crate::resolve_continuation::resolve_continuation;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
-    use crate::web_socket_driver_channel::web_socket_driver_channel;
-    use crate::web_socket_driver_sender::WebSocketDriverSender;
     use crate::web_socket_upgrade::WebSocketUpgrade;
 
     struct AcceptingUpgrade;
@@ -82,8 +75,7 @@ mod tests {
             self: Arc<Self>,
             _handshake: &Request,
             _on_upgrade: OnUpgrade,
-            _cancellation_token: CancellationToken,
-            _driver_sender: WebSocketDriverSender,
+            _driver_sender: ConnectionDriverSender,
         ) -> ResponseContinuation {
             ResponseContinuation::from(Response::text(101, ""))
         }
@@ -94,7 +86,7 @@ mod tests {
 
         resolve_continuation(
             &forward_targets,
-            Request::new(Method::GET, "/chat".to_string()),
+            Request::new(Method::GET, "/chat".to_string(), CancellationToken::new()),
             outcome,
         )
         .await
@@ -111,10 +103,9 @@ mod tests {
         let terminal = Box::new(WebSocketUpgradeTerminal::new(
             Arc::new(AcceptingUpgrade),
             on_upgrade,
-            CancellationToken::new(),
-            web_socket_driver_channel().0,
+            ConnectionDriverChannel::new().sender,
         ));
-        let handshake = Request::new(Method::GET, "/chat".to_string());
+        let handshake = Request::new(Method::GET, "/chat".to_string(), CancellationToken::new());
 
         assert_eq!(
             status_of(

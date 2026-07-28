@@ -29,6 +29,7 @@ pub fn resolve_layers(
             injects_peer_spiffe_id: plan.injects_peer_spiffe_id(),
             injects_routes: plan.injects_routes(),
             injects_views: plan.injects_views(),
+            observes_cancellation: plan.observes_cancellation(),
             wrapper: plan.wrapper.clone(),
         });
     }

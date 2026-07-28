@@ -39,6 +39,7 @@ mod tests {
 
     use async_trait::async_trait;
     use http::Method;
+    use tokio_util::sync::CancellationToken;
 
     use super::layer;
     use crate::forward_targets::ForwardTargets;
@@ -94,7 +95,7 @@ mod tests {
 
         respond_recursively(
             &forward_targets,
-            Request::new(Method::GET, "/".to_string()),
+            Request::new(Method::GET, "/".to_string(), CancellationToken::new()),
             layer(Arc::new(middleware), Arc::new(Inner)),
         )
         .await

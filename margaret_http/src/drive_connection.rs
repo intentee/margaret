@@ -2,18 +2,18 @@ use std::future::Future;
 
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::UnboundedReceiver;
 
-use crate::web_socket_driver::WebSocketDriver;
+use crate::connection_driver::ConnectionDriver;
 
 pub(crate) async fn drive_connection<Connection, Error>(
     connection: Connection,
-    mut driver_receiver: Receiver<WebSocketDriver>,
+    mut driver_receiver: UnboundedReceiver<ConnectionDriver>,
 ) -> Result<(), Error>
 where
     Connection: Future<Output = Result<(), Error>>,
 {
-    tokio::pin!(connection);
+    let mut connection = Box::pin(connection);
     let mut drivers = FuturesUnordered::new();
 
     let outcome = loop {
@@ -24,6 +24,8 @@ where
             Some(()) = drivers.next(), if !drivers.is_empty() => {}
         }
     };
+
+    drop(connection);
     driver_receiver.close();
 
     while let Ok(driver) = driver_receiver.try_recv() {
@@ -37,19 +39,52 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::future::Future;
     use std::io;
+    use std::pin::Pin;
     use std::sync::Arc;
     use std::sync::atomic::AtomicBool;
     use std::sync::atomic::Ordering;
+    use std::task::Context;
+    use std::task::Poll;
 
     use tokio::sync::oneshot;
 
     use super::drive_connection;
-    use crate::web_socket_driver_channel::web_socket_driver_channel;
+    use crate::connection_driver::ConnectionDriver;
+    use crate::connection_driver_channel::ConnectionDriverChannel;
+    use crate::connection_driver_sender::ConnectionDriverSender;
+
+    struct HandingOffConnection {
+        driver_sender: ConnectionDriverSender,
+        handed_off: Arc<AtomicBool>,
+    }
+
+    impl Future for HandingOffConnection {
+        type Output = Result<(), io::Error>;
+
+        fn poll(self: Pin<&mut Self>, _context: &mut Context<'_>) -> Poll<Self::Output> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl Drop for HandingOffConnection {
+        fn drop(&mut self) {
+            let handed_off = Arc::clone(&self.handed_off);
+            let driver: ConnectionDriver = Box::pin(async move {
+                handed_off.store(true, Ordering::SeqCst);
+            });
+
+            assert!(
+                self.driver_sender.send(driver).is_ok(),
+                "the connection is dropped while its driver channel is still open"
+            );
+        }
+    }
 
     #[tokio::test]
     async fn polls_a_received_driver_while_the_connection_is_open() {
-        let (sender, receiver) = web_socket_driver_channel();
+        let ConnectionDriverChannel { receiver, sender } = ConnectionDriverChannel::new();
         let (driver_done, observed_driver) = oneshot::channel();
         assert!(
             sender
@@ -58,7 +93,6 @@ mod tests {
                         .send(())
                         .expect("the test observes the driver completion");
                 }))
-                .await
                 .is_ok()
         );
         let (finish_connection, connection_finished) = oneshot::channel();
@@ -87,7 +121,7 @@ mod tests {
 
     #[tokio::test]
     async fn drains_a_queued_driver_after_the_connection_finishes() {
-        let (sender, receiver) = web_socket_driver_channel();
+        let ConnectionDriverChannel { receiver, sender } = ConnectionDriverChannel::new();
         let completed = Arc::new(AtomicBool::new(false));
         let completed_by_driver = Arc::clone(&completed);
         assert!(
@@ -95,7 +129,6 @@ mod tests {
                 .send(Box::pin(async move {
                     completed_by_driver.store(true, Ordering::SeqCst);
                 }))
-                .await
                 .is_ok()
         );
 
@@ -104,5 +137,23 @@ mod tests {
             .expect("the connection succeeds");
 
         assert!(completed.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn drops_the_connection_before_draining_so_a_late_handoff_still_runs() {
+        let ConnectionDriverChannel { receiver, sender } = ConnectionDriverChannel::new();
+        let handed_off = Arc::new(AtomicBool::new(false));
+
+        drive_connection(
+            HandingOffConnection {
+                driver_sender: sender,
+                handed_off: Arc::clone(&handed_off),
+            },
+            receiver,
+        )
+        .await
+        .expect("the connection succeeds");
+
+        assert!(handed_off.load(Ordering::SeqCst));
     }
 }

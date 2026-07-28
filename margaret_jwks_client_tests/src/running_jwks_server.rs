@@ -10,6 +10,7 @@ use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::handler::Handler;
 use margaret_http::method_handler::MethodHandler;
+use margaret_http::request_cancellation_cooperation::RequestCancellationCooperation;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::router::Router;
 use margaret_http::server::Server;
@@ -34,7 +35,11 @@ impl RunningJwksServer {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 WELL_KNOWN_JWKS_PATH,
-                vec![MethodHandler::new("GET", handler)],
+                vec![MethodHandler::new(
+                    "GET",
+                    handler,
+                    RequestCancellationCooperation::Immediate,
+                )],
             )])
             .expect("the well known jwks route registers cleanly"),
         );

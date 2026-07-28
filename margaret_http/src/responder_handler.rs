@@ -50,6 +50,7 @@ mod tests {
 
     use http::Method;
     use http_body_util::BodyExt;
+    use tokio_util::sync::CancellationToken;
 
     use super::responder_handler;
     use crate::forward_targets::ForwardTargets;
@@ -90,7 +91,7 @@ mod tests {
                 })
             },
         );
-        let request = Request::new(Method::GET, "/echo/7".to_string())
+        let request = Request::new(Method::GET, "/echo/7".to_string(), CancellationToken::new())
             .with_path_params(HashMap::from([("id".to_string(), "7".to_string())]));
         let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
 

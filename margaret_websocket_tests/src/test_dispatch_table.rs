@@ -5,6 +5,8 @@ use margaret_websocket::web_socket_dispatch_table::WebSocketDispatchTable;
 use margaret_websocket::web_socket_message_dispatch::WebSocketMessageDispatch;
 use margaret_websocket::web_socket_notification_dispatch::WebSocketNotificationDispatch;
 
+use crate::cleanup_dispatch::CleanupDispatch;
+use crate::cleanup_handler::CleanupHandler;
 use crate::failing_dispatch::FailingDispatch;
 use crate::failing_handler::FailingHandler;
 use crate::flood_dispatch::FloodDispatch;
@@ -44,6 +46,12 @@ pub fn test_dispatch_table() -> Arc<WebSocketDispatchTable<TestSession>> {
         "flood".to_string(),
         Arc::new(FloodDispatch {
             handler: Arc::new(FloodHandler),
+        }),
+    );
+    requests.insert(
+        "cleanup".to_string(),
+        Arc::new(CleanupDispatch {
+            handler: Arc::new(CleanupHandler),
         }),
     );
 

@@ -977,6 +977,142 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains("responder.respond(super::super::forwarders::public::Forwarder)"));
     }
 
+    const COOPERATIVE_RESPONDER: &str = r#"
+use tokio_util::sync::CancellationToken;
+
+#[singleton]
+#[responds_to_http(method = "get", name = "slow", path = "/slow", server = "public")]
+struct Slow;
+
+impl Slow {
+    #[process]
+    fn respond(&self, cancellation: &CancellationToken) -> anyhow::Result<Response> {}
+}
+"#;
+
+    #[test]
+    fn injects_the_request_cancellation_token_into_a_responder_by_type() {
+        let source = source_for(COOPERATIVE_RESPONDER);
+
+        assert!(source.contains(
+            "letcancellation=margaret::framework::http::request::Request::cancellation_token("
+        ));
+        assert!(source.contains("responder.respond(cancellation)"));
+    }
+
+    #[test]
+    fn marks_a_route_that_observes_cancellation_as_cooperative() {
+        let source = source_for(COOPERATIVE_RESPONDER);
+
+        assert!(source.contains(
+            "margaret::framework::http::request_cancellation_cooperation::RequestCancellationCooperation::Cooperative"
+        ));
+        assert!(!source.contains("RequestCancellationCooperation::Immediate"));
+    }
+
+    #[test]
+    fn marks_a_route_that_ignores_cancellation_as_immediate() {
+        let source = source_for(
+            "#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert!(source.contains(
+            "margaret::framework::http::request_cancellation_cooperation::RequestCancellationCooperation::Immediate"
+        ));
+        assert!(!source.contains("RequestCancellationCooperation::Cooperative"));
+    }
+
+    #[test]
+    fn marks_a_route_whose_middleware_observes_cancellation_as_cooperative() {
+        let source = source_for(
+            r#"
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
+use tokio_util::sync::CancellationToken;
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/guarded", server = "public")]
+#[middleware(deadline)]
+struct Guarded;
+
+impl Guarded {
+    #[process]
+    fn respond(&self) -> anyhow::Result<Response> {}
+}
+
+#[handles_middleware_attribute(attribute = deadline)]
+struct Deadline;
+
+impl Deadline {
+    #[process]
+    fn process(&self, cancellation: &CancellationToken, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
+}
+"#,
+        );
+
+        assert!(source.contains("RequestCancellationCooperation::Cooperative"));
+        assert!(!source.contains("RequestCancellationCooperation::Immediate"));
+    }
+
+    #[test]
+    fn marks_a_forwarding_route_as_cooperative_when_a_forward_target_observes_cancellation() {
+        let source = source_for(&format!(
+            "use crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/welcome\", server = \"public\")]\nstruct GetWelcome;\nimpl GetWelcome {{\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {{}}\n}}\n{COOPERATIVE_RESPONDER}"
+        ));
+
+        assert!(source.contains("RequestCancellationCooperation::Cooperative"));
+        assert!(!source.contains("RequestCancellationCooperation::Immediate"));
+    }
+
+    #[test]
+    fn keeps_a_forwarding_route_immediate_when_no_forward_target_observes_cancellation() {
+        let source = source_for(
+            r#"
+use crate::margaret::forwarders::public::Forwarder;
+use tokio_util::sync::CancellationToken;
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/welcome", server = "public")]
+struct GetWelcome;
+
+impl GetWelcome {
+    #[process]
+    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "post", path = "/submit", server = "public")]
+struct Submit;
+
+impl Submit {
+    #[process]
+    fn respond(&self, cancellation: &CancellationToken) -> anyhow::Result<Response> {}
+}
+"#,
+        );
+
+        assert!(source.contains("RequestCancellationCooperation::Cooperative"));
+        assert!(source.contains("RequestCancellationCooperation::Immediate"));
+    }
+
+    #[test]
+    fn rejects_more_than_one_cancellation_token_parameter() {
+        let message = error_for(
+            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, first: &CancellationToken, second: &CancellationToken) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert!(message.contains("more than one cancellation token parameter"));
+    }
+
+    #[test]
+    fn rejects_a_cancellation_token_parameter_that_also_carries_a_marker() {
+        let message = error_for(
+            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] cancellation: &CancellationToken) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert!(message.contains("must not also carry"));
+    }
+
     #[test]
     fn rejects_a_user_type_named_routes_that_shadows_the_injectable() {
         let message = error_for(

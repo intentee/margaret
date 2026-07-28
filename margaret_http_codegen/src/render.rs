@@ -202,6 +202,21 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     )
 }
 
+fn cancellation_cooperation(
+    route: &HttpRoute,
+    forward_target_observes_cancellation: bool,
+) -> TokenStream {
+    if route.observes_cancellation() || (route.forwards() && forward_target_observes_cancellation) {
+        quote! {
+            margaret::framework::http::request_cancellation_cooperation::RequestCancellationCooperation::Cooperative
+        }
+    } else {
+        quote! {
+            margaret::framework::http::request_cancellation_cooperation::RequestCancellationCooperation::Immediate
+        }
+    }
+}
+
 fn argument_value(
     argument: &BoundParameter,
     routes_binding: &Ident,
@@ -359,6 +374,9 @@ fn server_module(
         .map(|handler| &handler.tokens)
         .collect::<Vec<_>>();
     let mut rendered_handler_entries = rendered_handlers.iter();
+    let forward_target_observes_cancellation = server_routes
+        .iter()
+        .any(|route| route.is_forwardable() && route.observes_cancellation());
     let views_argument = has_views.then(|| quote! { #views_param, });
     let mut handler_bindings = Vec::new();
     let mut named_handlers = Vec::new();
@@ -391,8 +409,15 @@ fn server_module(
                     handler_call
                 };
 
+                let cooperation =
+                    cancellation_cooperation(route, forward_target_observes_cancellation);
+
                 quote! {
-                    margaret::framework::http::method_handler::MethodHandler::new(#method, #handler)
+                    margaret::framework::http::method_handler::MethodHandler::new(
+                        #method,
+                        #handler,
+                        #cooperation,
+                    )
                 }
             });
         let method_handlers = vec_literal_tokens(method_handlers);

@@ -8,10 +8,10 @@ use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
 use tokio_tungstenite::tungstenite::protocol::Role;
 use tokio_util::sync::CancellationToken;
 
+use margaret_http::connection_driver_sender::ConnectionDriverSender;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
-use margaret_http::web_socket_driver_sender::WebSocketDriverSender;
 use margaret_http::web_socket_upgrade::WebSocketUpgrade;
 
 use crate::serve_web_socket_connection::serve_web_socket_connection;
@@ -68,8 +68,7 @@ where
         self: Arc<Self>,
         handshake: &Request,
         on_upgrade: OnUpgrade,
-        cancellation_token: CancellationToken,
-        driver_sender: WebSocketDriverSender,
+        driver_sender: ConnectionDriverSender,
     ) -> ResponseContinuation {
         let Ok(Some(key)) = handshake.inputs.server.header("sec-websocket-key") else {
             return ResponseContinuation::from(Response::text(
@@ -101,11 +100,11 @@ where
 
         let driver = Box::pin(drive_web_socket_upgrade(
             on_upgrade,
-            cancellation_token,
+            handshake.cancellation_token().clone(),
             session,
             self.dispatch_table.clone(),
         ));
-        if driver_sender.send(driver).await.is_err() {
+        if driver_sender.send(driver).is_err() {
             return ResponseContinuation::from(Response::text(500, "Internal Server Error"));
         }
 

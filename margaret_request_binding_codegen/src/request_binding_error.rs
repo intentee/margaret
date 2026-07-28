@@ -18,12 +18,12 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "parameter '{parameter}' of {subject} must be a route parameter, a form request, the current request, the peer SPIFFE id, the forwarder, or the routes"
+        "parameter '{parameter}' of {subject} must be a route parameter, a form request, the current request, the request cancellation token, the peer SPIFFE id, the forwarder, or the routes"
     )]
     UnmarkedParameter { subject: String, parameter: String },
 
     #[error(
-        "parameter '{parameter}' of {subject} must be the current request, the next handler, a form request, the peer SPIFFE id, the views, an asset bag, or the routes"
+        "parameter '{parameter}' of {subject} must be the current request, the next handler, a form request, the request cancellation token, the peer SPIFFE id, the views, an asset bag, or the routes"
     )]
     UnmarkedMiddlewareParameter { subject: String, parameter: String },
 
@@ -115,6 +115,21 @@ pub enum RequestBindingError {
         "{subject} declares more than one peer SPIFFE id parameter; a request has exactly one peer identity"
     )]
     MultiplePeerSpiffeIdParameters { subject: String },
+
+    #[error(
+        "argument #{parameter} of {subject} is the request cancellation token and must not also carry #[authenticated_user], #[route_parameter], or #[form_request]"
+    )]
+    MarkedCancellationTokenParameter { subject: String, parameter: String },
+
+    #[error(
+        "{subject} declares more than one cancellation token parameter; a request has exactly one cancellation token"
+    )]
+    MultipleCancellationTokenParameters { subject: String },
+
+    #[error(
+        "argument #{parameter} of {subject} requests the request cancellation token, but user inference must resolve a user from the request without awaiting cancellable work"
+    )]
+    CancellationTokenUnavailableInUserInference { subject: String, parameter: String },
 
     #[error(
         "argument #{parameter} of {subject} requests the forwarder, but a WebSocket session builder cannot forward a request"

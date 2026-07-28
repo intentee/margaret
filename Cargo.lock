@@ -1830,6 +1830,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -2150,6 +2151,7 @@ dependencies = [
  "margaret_validation",
  "serde",
  "serde_json",
+ "tokio-util",
  "validator",
 ]
 

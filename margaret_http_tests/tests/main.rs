@@ -1,3 +1,5 @@
+mod drops_a_non_cooperative_responder_when_a_client_disconnects;
 mod forbids_a_peer_without_a_spiffe_id;
 mod rejects_a_plaintext_connection_to_an_mtls_server;
+mod runs_responder_cleanup_after_a_client_disconnects;
 mod serves_a_request_over_spiffe_mtls;

@@ -75,6 +75,7 @@ fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
         } => Some(binder_provider),
         RequestBinding::Injectable { dependency } => Some(&dependency.concrete),
         RequestBinding::AssetBag
+        | RequestBinding::CancellationToken
         | RequestBinding::CurrentRequest
         | RequestBinding::FormRequest { .. }
         | RequestBinding::Forwarder

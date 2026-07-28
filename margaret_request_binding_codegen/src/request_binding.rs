@@ -17,6 +17,7 @@ pub enum RequestBinding {
         binder_provider: CanonicalPath,
         path_key: String,
     },
+    CancellationToken,
     CurrentRequest,
     FormRequest {
         source: RequestInputSource,

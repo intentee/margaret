@@ -18,6 +18,7 @@ mod tests {
 
     use http::Method;
     use spiffe::spiffe_id::SpiffeId;
+    use tokio_util::sync::CancellationToken;
 
     use margaret_peer_identity::peer_identity::PeerIdentity;
 
@@ -25,7 +26,8 @@ mod tests {
     use crate::request::Request;
 
     fn request_with_peer_identity(peer_identity: PeerIdentity) -> Request {
-        Request::new(Method::GET, "/".to_string()).with_peer_identity(Arc::new(peer_identity))
+        Request::new(Method::GET, "/".to_string(), CancellationToken::new())
+            .with_peer_identity(Arc::new(peer_identity))
     }
 
     #[test]

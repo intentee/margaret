@@ -86,6 +86,9 @@ pub fn render_request_extraction(
                 Err(response) => #error_return,
             };
         },
+        RequestBinding::CancellationToken => quote! {
+            let #holder = margaret::framework::http::request::Request::cancellation_token(#request_local);
+        },
         RequestBinding::CurrentRequest => {
             if holder == request_local {
                 TokenStream::new()

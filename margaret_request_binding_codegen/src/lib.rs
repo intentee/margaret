@@ -18,6 +18,7 @@ pub mod form_request_extraction;
 mod infers_authenticated_user_arguments;
 pub mod injects_routes;
 pub mod injects_views;
+pub mod observes_cancellation;
 pub mod render_authenticated_user_wrappers;
 pub mod render_bound_request_extractions;
 pub mod render_request_extraction;
@@ -284,6 +285,16 @@ impl SessionUserProvider {
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[authenticated_user] user: User) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
             )
             .contains("only available in an HTTP responder")
+        );
+    }
+
+    #[test]
+    fn rejects_the_request_cancellation_token_in_an_inference_method() {
+        assert!(
+            rejection_for(
+                "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, cancellation: &CancellationToken) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+            )
+            .contains("without awaiting cancellable work")
         );
     }
 

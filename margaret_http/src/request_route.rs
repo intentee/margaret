@@ -1,12 +1,11 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
-use crate::handler::Handler;
+use crate::route_handler::RouteHandler;
 
 pub(crate) enum RequestRoute {
     Handler {
-        handler: Arc<dyn Handler>,
         path_params: HashMap<String, String>,
+        route_handler: RouteHandler,
     },
     MethodNotAllowed,
     NotFound,

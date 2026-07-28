@@ -391,6 +391,8 @@ pub fn classify_parameters(
         let resolved = index.resolve_item_type(item, declared);
         let is_reference = matches!(declared, Type::Reference(_));
         let is_asset_bag = RequestInjectable::AssetBag.matches(resolved.as_ref(), is_reference);
+        let is_cancellation_token =
+            RequestInjectable::CancellationToken.matches(resolved.as_ref(), is_reference);
         let is_current_request =
             RequestInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference);
         let is_next = RequestInjectable::Next.matches(resolved.as_ref(), is_reference);
@@ -417,6 +419,15 @@ pub fn classify_parameters(
             && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
         {
             return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
+                subject: subject.to_string(),
+                parameter: position.to_string(),
+            });
+        }
+
+        if is_cancellation_token
+            && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
+        {
+            return Err(RequestBindingError::MarkedCancellationTokenParameter {
                 subject: subject.to_string(),
                 parameter: position.to_string(),
             });
@@ -453,6 +464,20 @@ pub fn classify_parameters(
                         subject: subject.to_string(),
                         parameter: position.to_string(),
                     });
+                }
+            }
+        } else if is_cancellation_token {
+            match context {
+                BindingContext::Handshake { .. }
+                | BindingContext::Middleware { .. }
+                | BindingContext::Responder { .. } => RequestBinding::CancellationToken,
+                BindingContext::AuthenticatedUserProvider { .. } => {
+                    return Err(
+                        RequestBindingError::CancellationTokenUnavailableInUserInference {
+                            subject: subject.to_string(),
+                            parameter: position.to_string(),
+                        },
+                    );
                 }
             }
         } else if is_peer_spiffe_id {
@@ -498,6 +523,17 @@ pub fn classify_parameters(
 
     if peer_spiffe_id_count > 1 {
         return Err(RequestBindingError::MultiplePeerSpiffeIdParameters {
+            subject: subject.to_string(),
+        });
+    }
+
+    let cancellation_token_count = bound
+        .iter()
+        .filter(|parameter| matches!(parameter.binding, RequestBinding::CancellationToken))
+        .count();
+
+    if cancellation_token_count > 1 {
+        return Err(RequestBindingError::MultipleCancellationTokenParameters {
             subject: subject.to_string(),
         });
     }

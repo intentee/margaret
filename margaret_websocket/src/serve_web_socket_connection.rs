@@ -142,6 +142,10 @@ async fn run_source<Io, Session>(
             },
         }
     }
+
+    cancellation_token.cancel();
+
+    while pending.next().await.is_some() {}
 }
 
 pub async fn serve_web_socket_connection<Io, Session>(

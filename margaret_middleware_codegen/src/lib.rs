@@ -151,6 +151,18 @@ impl Guard {
     }
 
     #[test]
+    fn injects_the_request_cancellation_token_into_the_wrapper() {
+        let source = wrappers_for(
+            "use margaret::framework::http::next::Next;\nuse margaret::framework::http::request::Request;\nuse tokio_util::sync::CancellationToken;\n\n#[handles_middleware_attribute(attribute = deadline)]\nstruct Deadline;\nimpl Deadline {\n    #[process]\n    fn process(&self, request: &Request, next: Next, cancellation: &CancellationToken) -> anyhow::Result<ResponseContinuation> {}\n}\n",
+        );
+
+        assert!(source.contains(
+            "letcancellation=margaret::framework::http::request::Request::cancellation_token("
+        ));
+        assert!(source.contains("self.inner.process(request,next,cancellation).await"));
+    }
+
+    #[test]
     fn omits_the_request_from_a_wrapper_that_only_delegates() {
         let source = wrappers_for(
             "use margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\nimpl Tracer {\n    #[process]\n    fn process(&self, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n",
@@ -294,6 +306,7 @@ impl Guard {
             injects_peer_spiffe_id: false,
             injects_routes: false,
             injects_views: false,
+            observes_cancellation: false,
             wrapper: format_ident!("{wrapper}"),
         }
     }
@@ -342,6 +355,7 @@ impl Guard {
             injects_peer_spiffe_id: false,
             injects_routes: true,
             injects_views: false,
+            observes_cancellation: false,
             wrapper: format_ident!("Tracer"),
         };
         let vector = middleware_vec_tokens(

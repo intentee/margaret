@@ -25,11 +25,15 @@ use tokio_util::sync::CancellationToken;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::body_limit::BodyLimit;
+use crate::connection_driver_channel::ConnectionDriverChannel;
+use crate::connection_driver_sender::ConnectionDriverSender;
+use crate::cooperative_request::CooperativeRequest;
 use crate::drive_connection::drive_connection;
 use crate::forward_targets::ForwardTargets;
 use crate::one_shot_handler::OneShotHandler;
 use crate::one_shot_layer::one_shot_layer;
 use crate::request::Request;
+use crate::request_cancellation_cooperation::RequestCancellationCooperation;
 use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
 use crate::request_route::RequestRoute;
@@ -42,14 +46,21 @@ use crate::server_registry::ServerRegistry;
 use crate::transport_config::TransportConfig;
 use crate::upgrade_route::UpgradeRoute;
 use crate::upload_config::UploadConfig;
-use crate::web_socket_driver_channel::web_socket_driver_channel;
-use crate::web_socket_driver_sender::WebSocketDriverSender;
 use crate::web_socket_upgrade_terminal::WebSocketUpgradeTerminal;
 
 #[derive(Clone)]
 enum BoundTransport {
     Plain,
     MutualTls { acceptor: TlsAcceptor },
+}
+
+struct RequestContext {
+    body_limit: BodyLimit,
+    cancellation_token: CancellationToken,
+    forward_targets: Arc<ForwardTargets>,
+    peer_identity: Arc<PeerIdentity>,
+    remote_addr: SocketAddr,
+    upload_config: Arc<UploadConfig>,
 }
 
 #[derive(Clone)]
@@ -61,6 +72,19 @@ struct ConnectionContext {
     remote_addr: SocketAddr,
     router: Arc<Router>,
     upload_config: Arc<UploadConfig>,
+}
+
+impl ConnectionContext {
+    fn request_context(&self) -> RequestContext {
+        RequestContext {
+            body_limit: self.body_limit,
+            cancellation_token: self.cancellation_token.child_token(),
+            forward_targets: self.forward_targets.clone(),
+            peer_identity: self.peer_identity.clone(),
+            remote_addr: self.remote_addr,
+            upload_config: self.upload_config.clone(),
+        }
+    }
 }
 
 pub struct BoundServer {
@@ -271,14 +295,22 @@ async fn serve_connection<Io>(
 ) where
     Io: hyper::rt::Read + hyper::rt::Write + Unpin + Send + 'static,
 {
-    let (driver_sender, driver_receiver) = web_socket_driver_channel();
+    let ConnectionDriverChannel {
+        receiver: driver_receiver,
+        sender: driver_sender,
+    } = ConnectionDriverChannel::new();
     let service = TowerToHyperService::new(tower::service_fn(
         move |request: http::Request<Incoming>| {
-            let connection_context = connection_context.clone();
+            let request_context = connection_context.request_context();
+            let resolution = connection_context
+                .router
+                .resolve(request.method().as_str(), request.uri().path());
             let driver_sender = driver_sender.clone();
 
             async move {
-                Ok::<_, Infallible>(dispatch(connection_context, driver_sender, request).await)
+                Ok::<_, Infallible>(
+                    serve_request(request_context, driver_sender, resolution, request).await,
+                )
             }
         },
     ));
@@ -293,6 +325,7 @@ async fn parse_request(
     request: http::Request<Incoming>,
     remote_addr: SocketAddr,
     peer_identity: Arc<PeerIdentity>,
+    cancellation_token: CancellationToken,
     body_limit: &BodyLimit,
     upload_config: &UploadConfig,
 ) -> Result<Request, RequestError> {
@@ -315,7 +348,7 @@ async fn parse_request(
     )
     .await?;
 
-    Ok(Request::from_inputs(inputs).with_peer_identity(peer_identity))
+    Ok(Request::from_inputs(inputs, cancellation_token).with_peer_identity(peer_identity))
 }
 
 async fn complete_request(
@@ -325,12 +358,12 @@ async fn complete_request(
 ) -> http::Response<Full<Bytes>> {
     match route {
         RequestRoute::Handler {
-            handler,
             path_params,
+            route_handler,
         } => respond_recursively(
             forward_targets,
             request.with_path_params(path_params),
-            handler,
+            route_handler.handler,
         )
         .await
         .into_http(),
@@ -350,7 +383,7 @@ async fn dispatch_web_socket(
         upgrade,
     }: UpgradeRoute,
     forward_targets: &Arc<ForwardTargets>,
-    driver_sender: WebSocketDriverSender,
+    driver_sender: ConnectionDriverSender,
 ) -> http::Response<Full<Bytes>> {
     let on_upgrade = hyper::upgrade::on(&mut request);
     let (parts, _incoming) = request.into_parts();
@@ -363,14 +396,13 @@ async fn dispatch_web_socket(
 
     match RequestInputs::from_handshake(method, &uri, headers, remote_addr) {
         Ok(inputs) => {
-            let handshake = Request::from_inputs(inputs)
+            let handshake = Request::from_inputs(inputs, cancellation_token)
                 .with_peer_identity(peer_identity)
                 .with_path_params(path_params);
 
             let mut onion: Box<dyn OneShotHandler> = Box::new(WebSocketUpgradeTerminal::new(
                 upgrade,
                 on_upgrade,
-                cancellation_token,
                 driver_sender,
             ));
 
@@ -387,25 +419,25 @@ async fn dispatch_web_socket(
 }
 
 async fn dispatch(
-    ConnectionContext {
+    RequestContext {
         body_limit,
         cancellation_token,
         forward_targets,
         peer_identity,
         remote_addr,
-        router,
         upload_config,
-    }: ConnectionContext,
-    driver_sender: WebSocketDriverSender,
+    }: RequestContext,
+    driver_sender: ConnectionDriverSender,
+    resolution: RouteResolution,
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
-    match router.resolve(request.method().as_str(), request.uri().path()) {
+    match resolution {
         RouteResolution::Upgrade(upgrade_route) => {
             dispatch_web_socket(
                 request,
                 remote_addr,
                 peer_identity,
-                cancellation_token.child_token(),
+                cancellation_token,
                 upgrade_route,
                 &forward_targets,
                 driver_sender,
@@ -417,6 +449,7 @@ async fn dispatch(
                 request,
                 remote_addr,
                 peer_identity,
+                cancellation_token,
                 &body_limit,
                 &upload_config,
             )
@@ -425,6 +458,29 @@ async fn dispatch(
                 Ok(request) => complete_request(route, request, &forward_targets).await,
                 Err(error) => error_response(error).into_http(),
             }
+        }
+    }
+}
+
+async fn serve_request(
+    request_context: RequestContext,
+    driver_sender: ConnectionDriverSender,
+    resolution: RouteResolution,
+    request: http::Request<Incoming>,
+) -> http::Response<Full<Bytes>> {
+    match resolution.cancellation_cooperation() {
+        RequestCancellationCooperation::Immediate => {
+            dispatch(request_context, driver_sender, resolution, request).await
+        }
+        RequestCancellationCooperation::Cooperative => {
+            let cancellation_token = request_context.cancellation_token.clone();
+
+            CooperativeRequest::new(
+                dispatch(request_context, driver_sender.clone(), resolution, request),
+                cancellation_token,
+                driver_sender,
+            )
+            .await
         }
     }
 }
@@ -448,6 +504,7 @@ mod tests {
     use super::error_response;
     use super::report_connection_task_outcome;
     use crate::body_limit::BodyLimit;
+    use crate::connection_driver_sender::ConnectionDriverSender;
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
@@ -458,6 +515,7 @@ mod tests {
     use crate::next::Next;
     use crate::redirect::Redirect;
     use crate::request::Request;
+    use crate::request_cancellation_cooperation::RequestCancellationCooperation;
     use crate::request_error::RequestError;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
@@ -467,7 +525,6 @@ mod tests {
     use crate::server_registry::ServerRegistry;
     use crate::transport_config::TransportConfig;
     use crate::upload_config::UploadConfig;
-    use crate::web_socket_driver_sender::WebSocketDriverSender;
     use crate::web_socket_upgrade::WebSocketUpgrade;
 
     struct PlainOk;
@@ -488,7 +545,11 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::new(
+                    "GET",
+                    Arc::new(PlainOk),
+                    RequestCancellationCooperation::Immediate,
+                )],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -532,11 +593,19 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/items/{id}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::new(
+                    "GET",
+                    Arc::new(PlainOk),
+                    RequestCancellationCooperation::Immediate,
+                )],
             ),
             RouteEntry::new(
                 "/items/{name}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::new(
+                    "GET",
+                    Arc::new(PlainOk),
+                    RequestCancellationCooperation::Immediate,
+                )],
             ),
         ]);
 
@@ -548,7 +617,11 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/x/{id}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::new(
+                    "GET",
+                    Arc::new(PlainOk),
+                    RequestCancellationCooperation::Immediate,
+                )],
             ),
             RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade), Vec::new()),
         ]);
@@ -677,8 +750,7 @@ mod tests {
             self: Arc<Self>,
             handshake: &Request,
             _on_upgrade: OnUpgrade,
-            _cancellation_token: CancellationToken,
-            _driver_sender: WebSocketDriverSender,
+            _driver_sender: ConnectionDriverSender,
         ) -> ResponseContinuation {
             ResponseContinuation::from(Response::text(
                 200,

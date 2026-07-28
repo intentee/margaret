@@ -19,6 +19,7 @@ pub fn binding_console_arguments(
             bindings.injected_console_arguments(dependency)?
         }
         RequestBinding::AssetBag
+        | RequestBinding::CancellationToken
         | RequestBinding::CurrentRequest
         | RequestBinding::FormRequest { .. }
         | RequestBinding::Forwarder

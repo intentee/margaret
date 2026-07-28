@@ -24,6 +24,7 @@ mod tests {
     use async_trait::async_trait;
     use http::Method;
     use http_body_util::BodyExt;
+    use tokio_util::sync::CancellationToken;
 
     use super::respond_recursively;
     use crate::forward::Forward;
@@ -149,7 +150,7 @@ mod tests {
     async fn status_of(forward_targets: Arc<ForwardTargets>, first: Arc<dyn Handler>) -> u16 {
         respond_recursively(
             &forward_targets,
-            Request::new(Method::GET, "/".to_string()),
+            Request::new(Method::GET, "/".to_string(), CancellationToken::new()),
             first,
         )
         .await
@@ -192,7 +193,7 @@ mod tests {
     async fn reports_a_consumer_failure_as_a_generic_server_error() {
         let response = respond_recursively(
             &forward_targets_with(Vec::new()),
-            Request::new(Method::GET, "/".to_string()),
+            Request::new(Method::GET, "/".to_string(), CancellationToken::new()),
             Arc::new(FailingResponder),
         )
         .await
@@ -226,7 +227,7 @@ mod tests {
     async fn returns_a_redirect_response() {
         let response = respond_recursively(
             &forward_targets_with(Vec::new()),
-            Request::new(Method::GET, "/".to_string()),
+            Request::new(Method::GET, "/".to_string(), CancellationToken::new()),
             Arc::new(RedirectingResponder),
         )
         .await
@@ -248,7 +249,7 @@ mod tests {
             forward_targets_with(vec![NamedHandler::new("article", Arc::new(EchoArticle))]);
         let response = respond_recursively(
             &forward_targets,
-            Request::new(Method::GET, "/".to_string()),
+            Request::new(Method::GET, "/".to_string(), CancellationToken::new()),
             Arc::new(ForwardToArticle),
         )
         .await

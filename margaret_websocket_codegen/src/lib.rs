@@ -376,6 +376,7 @@ impl RespondsToWebSocketNotification for Typist {
             injects_peer_spiffe_id: false,
             injects_routes: false,
             injects_views: false,
+            observes_cancellation: false,
             wrapper: format_ident!("Missing"),
         });
 

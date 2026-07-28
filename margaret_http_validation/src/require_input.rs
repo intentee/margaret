@@ -26,6 +26,7 @@ mod tests {
     use std::collections::HashMap;
 
     use http::Method;
+    use tokio_util::sync::CancellationToken;
 
     use margaret_http::request::Request;
 
@@ -39,7 +40,7 @@ mod tests {
     }
 
     fn request_with_form(form: HashMap<String, String>) -> Request {
-        let mut request = Request::new(Method::POST, "/".to_string());
+        let mut request = Request::new(Method::POST, "/".to_string(), CancellationToken::new());
         request.inputs.form = form;
         request
     }

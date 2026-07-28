@@ -71,6 +71,7 @@ mod tests {
 
     use http::Method;
     use serde_json::json;
+    use tokio_util::sync::CancellationToken;
 
     use margaret_http::request::Request;
     use margaret_jwks_keygen::jwks_secret::JwksSecret;
@@ -92,7 +93,7 @@ mod tests {
     }
 
     fn request_with_body(body: serde_json::Value) -> Request {
-        let mut request = Request::new(Method::POST, "/mint".to_string());
+        let mut request = Request::new(Method::POST, "/mint".to_string(), CancellationToken::new());
 
         request.inputs.json = Some(body);
 
@@ -125,7 +126,7 @@ mod tests {
 
         let response = handler
             .respond(
-                &Request::new(Method::POST, "/mint".to_string()),
+                &Request::new(Method::POST, "/mint".to_string(), CancellationToken::new()),
                 unix_time(500),
             )
             .await;

@@ -26,6 +26,7 @@ fn provider_kind(binding: &RequestBinding) -> Option<CapturedProviderKind> {
             provider: binder_provider.clone(),
         }),
         RequestBinding::AssetBag
+        | RequestBinding::CancellationToken
         | RequestBinding::CurrentRequest
         | RequestBinding::FormRequest { .. }
         | RequestBinding::Forwarder

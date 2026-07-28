@@ -1,7 +1,9 @@
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_injection_codegen::cancellation_token_path::cancellation_token_path;
 
 pub enum RequestInjectable {
     AssetBag,
+    CancellationToken,
     CurrentRequest,
     Next,
     PeerSpiffeId,
@@ -13,6 +15,7 @@ pub enum RequestInjectable {
 impl RequestInjectable {
     pub(crate) fn canonical_path(&self) -> CanonicalPath {
         match self {
+            Self::CancellationToken => cancellation_token_path(),
             Self::AssetBag => CanonicalPath::new(vec![
                 "margaret".to_string(),
                 "framework".to_string(),
@@ -68,7 +71,11 @@ impl RequestInjectable {
 
     fn requires_reference(&self) -> bool {
         match self {
-            Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes | Self::Views => true,
+            Self::CancellationToken
+            | Self::CurrentRequest
+            | Self::PeerSpiffeId
+            | Self::Routes
+            | Self::Views => true,
             Self::AssetBag | Self::Next | Self::ValidationResult => false,
         }
     }
@@ -145,6 +152,14 @@ mod tests {
         assert!(!RequestInjectable::CurrentRequest.matches(Some(&request), false));
         assert!(RequestInjectable::PeerSpiffeId.matches(Some(&peer), true));
         assert!(!RequestInjectable::PeerSpiffeId.matches(Some(&peer), false));
+    }
+
+    #[test]
+    fn matches_the_cancellation_token_injectable_only_when_written_as_a_reference() {
+        let cancellation_token = path(&["tokio_util", "sync", "CancellationToken"]);
+
+        assert!(RequestInjectable::CancellationToken.matches(Some(&cancellation_token), true));
+        assert!(!RequestInjectable::CancellationToken.matches(Some(&cancellation_token), false));
     }
 
     #[test]
