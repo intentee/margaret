@@ -77,23 +77,32 @@ fn server_layouts<'server>(
         .collect()
 }
 
+fn parameter_tokens(name: &str, variant: TokenStream) -> TokenStream {
+    let value = format_ident!("{}", name);
+
+    quote! {
+        #variant(
+            margaret::framework::http::url_parameter::UrlParameter {
+                name: #name,
+                value: #value,
+            },
+        )
+    }
+}
+
 fn segments_tokens(named: &NamedRoute<'_>) -> TokenStream {
     let segments = named.path.segments().iter().map(|segment| match segment {
+        UrlSegment::CatchAllParameter(name) => parameter_tokens(
+            name,
+            quote! { margaret::framework::http::url_segment::UrlSegment::CatchAllParameter },
+        ),
         UrlSegment::Literal(text) => {
             quote! { margaret::framework::http::url_segment::UrlSegment::Literal(#text) }
         }
-        UrlSegment::Parameter(name) => {
-            let value = format_ident!("{}", name);
-
-            quote! {
-                margaret::framework::http::url_segment::UrlSegment::Parameter(
-                    margaret::framework::http::url_parameter::UrlParameter {
-                        name: #name,
-                        value: #value,
-                    },
-                )
-            }
-        }
+        UrlSegment::SegmentParameter(name) => parameter_tokens(
+            name,
+            quote! { margaret::framework::http::url_segment::UrlSegment::SegmentParameter },
+        ),
     });
 
     quote! { ::std::vec::Vec::from([#(#segments),*]) }

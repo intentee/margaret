@@ -3,11 +3,13 @@ use std::sync::Arc;
 
 use matchit::InsertError;
 
+use crate::decode_url_path_parameter::decode_url_path_parameter;
 use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
 use crate::method_handler::MethodHandler;
 use crate::request_route::RequestRoute;
 use crate::route_entry::RouteEntry;
+use crate::route_parameter_decoding_outcome::RouteParameterDecodingOutcome;
 use crate::route_resolution::RouteResolution;
 use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
@@ -67,11 +69,18 @@ impl Router {
                 return RouteResolution::Request(RequestRoute::NotFound);
             }
         };
-        let path_params = matched
-            .params
-            .iter()
-            .map(|(name, value)| (name.to_string(), value.to_string()))
-            .collect();
+        let mut path_params: HashMap<String, String> = HashMap::new();
+
+        for (name, value) in matched.params.iter() {
+            match decode_url_path_parameter(value) {
+                RouteParameterDecodingOutcome::Decoded(decoded) => {
+                    path_params.insert(name.to_string(), decoded);
+                }
+                RouteParameterDecodingOutcome::NotUtf8 => {
+                    return RouteResolution::Request(RequestRoute::NotFound);
+                }
+            }
+        }
 
         match matched.value {
             RouteTarget::Http(handlers) => match handlers.get(method) {

@@ -49,7 +49,7 @@ mod tests {
             Arc::from("http://localhost"),
             vec![
                 UrlSegment::Literal("/articles/"),
-                UrlSegment::Parameter(UrlParameter {
+                UrlSegment::SegmentParameter(UrlParameter {
                     name: "article",
                     value: "rust".to_string(),
                 }),

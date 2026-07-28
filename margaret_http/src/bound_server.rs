@@ -494,6 +494,21 @@ mod tests {
         }
     }
 
+    struct EchoArticle;
+
+    #[async_trait]
+    impl Handler for EchoArticle {
+        async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+            Ok(ResponseContinuation::Done(Response::text(
+                200,
+                request
+                    .path_param("article")
+                    .expect("the article parameter is bound")
+                    .to_string(),
+            )))
+        }
+    }
+
     fn registry_with_assets() -> Arc<ServerRegistry> {
         Arc::new(ServerRegistry::new(vec![Server::new(
             "test",
@@ -501,11 +516,21 @@ mod tests {
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
-            Router::build(vec![RouteEntry::new(
-                "/assets/{*asset_path}",
-                vec![MethodHandler::new("GET", Arc::new(EchoAssetPath))],
-            )])
-            .expect("the catch-all asset route registers cleanly"),
+            Router::build(vec![
+                RouteEntry::new(
+                    "/assets/{*asset_path}",
+                    vec![MethodHandler::new("GET", Arc::new(EchoAssetPath))],
+                ),
+                RouteEntry::new(
+                    "/articles/{article}",
+                    vec![MethodHandler::new("GET", Arc::new(EchoArticle))],
+                ),
+                RouteEntry::new(
+                    "/articles/rust/comments",
+                    vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                ),
+            ])
+            .expect("the asset and article routes register cleanly"),
         )]))
     }
 
@@ -700,7 +725,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hands_a_traversal_path_to_the_responder_without_resolving_it() {
+    async fn hands_a_decoded_traversal_path_to_the_responder_without_resolving_it() {
         let bound = BoundServer::bind(
             registry_with_assets(),
             empty_forward_targets(),
@@ -714,7 +739,7 @@ mod tests {
         let cancellation_token = CancellationToken::new();
         let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 
-        let (traversing, encoded, above_the_prefix) = tokio::join!(
+        let (traversing, encoded, above_the_prefix, not_utf8) = tokio::join!(
             exchange(
                 address,
                 b"GET /assets/../../etc/passwd HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
@@ -730,11 +755,53 @@ mod tests {
                 b"GET /../etc/passwd HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
                 false,
             ),
+            exchange(
+                address,
+                b"GET /assets/%FF HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
         );
 
         assert!(traversing.ends_with("../../etc/passwd"));
-        assert!(encoded.ends_with("%2e%2e%2fsecret"));
+        assert!(encoded.ends_with("../secret"));
         assert!(above_the_prefix.contains(" 404 "));
+        assert!(not_utf8.contains(" 404 "));
+
+        cancellation_token.cancel();
+
+        serving.await.expect("the server task finishes cleanly");
+    }
+
+    #[tokio::test]
+    async fn decodes_a_path_parameter_without_letting_it_open_a_new_segment() {
+        let bound = BoundServer::bind(
+            registry_with_assets(),
+            empty_forward_targets(),
+            Arc::from("test"),
+        )
+        .await
+        .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let (encoded_separator, real_separator) = tokio::join!(
+            exchange(
+                address,
+                b"GET /articles/rust%2Fcomments HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+            exchange(
+                address,
+                b"GET /articles/rust/comments HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+        );
+
+        assert!(encoded_separator.ends_with("rust/comments"));
+        assert!(real_separator.ends_with("ok"));
 
         cancellation_token.cancel();
 
