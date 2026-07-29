@@ -114,12 +114,14 @@ pub fn authenticated_user_providers(
             model: model.clone(),
             wrapper: format_ident!("{}", identifier.type_name()),
         };
+        let is_async = method.signature().asyncness.is_some();
         let method_name = format_ident!("{}", method.identifier());
 
         registry.insert(
             model,
             AuthenticatedUserProvider {
                 application,
+                is_async,
                 method_name,
                 parameters,
             },

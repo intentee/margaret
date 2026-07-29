@@ -21,7 +21,7 @@ impl GetMetrics {
     }
 
     #[process]
-    pub async fn respond(&self) -> anyhow::Result<Response> {
+    pub fn respond(&self) -> anyhow::Result<Response> {
         Ok(Response::text(
             200,
             format!("sweeps={}", self.metrics.sweeps()),

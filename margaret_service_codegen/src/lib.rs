@@ -136,9 +136,10 @@ mod tests {
                 "routes:super::http::server_public::server_public(container,&routes,&views"
             )
         );
-        assert!(source.contains(
-            "letviews=::std::sync::Arc::new(super::views::build::build(container));"
-        ));
+        assert!(
+            source
+                .contains("letviews=::std::sync::Arc::new(super::views::build::build(container));")
+        );
         assert!(source.contains("super::container::build::serve("));
     }
 
@@ -148,7 +149,7 @@ mod tests {
 
         assert!(source.contains("structPump{"));
         assert!(source.contains(
-            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token);outcome"
         ));
         assert!(source.contains("manager.register_service(Pump{inner:container.pump()})"));
     }
@@ -167,7 +168,7 @@ mod tests {
         ));
         assert!(source.contains("_tick_context:trzcina::TickContext"));
         assert!(source.contains(
-            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run();outcome"
         ));
     }
 
@@ -244,6 +245,7 @@ impl Flusher {
                     "JwksRoller",
                 ]),
                 field_name: "framework_jwks_roller_server_jwks_roller_jwks_roller".to_string(),
+                is_async: false,
                 kind: FrameworkServiceKind::Ticker {
                     interval: canonical(&[
                         "margaret",
@@ -266,6 +268,7 @@ impl Flusher {
                     "JwksClient",
                 ]),
                 field_name: "framework_jwks_client_jwks_client_jwks_client".to_string(),
+                is_async: true,
                 kind: FrameworkServiceKind::Service,
                 runner: "run".to_string(),
                 takes_token: true,
@@ -308,7 +311,7 @@ impl Flusher {
         );
 
         assert!(source.contains(
-            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token);outcome"
         ));
         assert!(!source.contains("_cancellation_token"));
     }
@@ -334,7 +337,31 @@ impl Flusher {
 
         assert!(source.contains("_cancellation_token:tokio_util::sync::CancellationToken"));
         assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run();outcome"
+        ));
+    }
+
+    #[test]
+    fn awaits_a_service_that_declares_an_asynchronous_runner() {
+        let source = rendered(
+            "#[service]\nstruct Idle;\n\nimpl Idle {\n    #[process]\n    async fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            &[],
+        );
+
+        assert!(source.contains(
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+        ));
+    }
+
+    #[test]
+    fn awaits_a_ticker_that_declares_an_asynchronous_runner() {
+        let source = rendered(
+            "use tokio_util::sync::CancellationToken;\n\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Beat;\n\nimpl Beat {\n    #[process]\n    async fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
+            &[],
+        );
+
+        assert!(source.contains(
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
         ));
     }
 
@@ -673,7 +700,7 @@ impl Roller {
         assert!(source.contains("structRoller{inner:std::sync::Arc<crate::Roller>,}"));
         assert!(source.contains("impltrzcina::TickerforRoller"));
         assert!(source.contains(
-            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run();outcome"
         ));
         assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
@@ -705,7 +732,7 @@ impl Roller {
         );
 
         assert!(source.contains(
-            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token);outcome"
         ));
         assert!(!source.contains("_cancellation_token"));
         assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
@@ -733,7 +760,7 @@ impl Worker {
         );
 
         assert!(source.contains(
-            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token).await;outcome"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run(cancellation_token);outcome"
         ));
         assert!(source.contains("manager.register_service(Worker{inner:container.worker(),});"));
     }
@@ -759,7 +786,7 @@ impl Worker {
 
         assert!(source.contains("structWorker{inner:std::sync::Arc<crate::Worker>,}"));
         assert!(source.contains(
-            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run().await;outcome"
+            "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run();outcome"
         ));
         assert!(source.contains("manager.register_service(Worker{inner:container.worker(),});"));
         assert!(source.contains(

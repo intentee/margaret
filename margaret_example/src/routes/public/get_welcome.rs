@@ -11,7 +11,7 @@ pub struct GetWelcome;
 
 impl GetWelcome {
     #[process]
-    pub async fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {
+    pub fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {
         Ok(forward.get_greeting())
     }
 }

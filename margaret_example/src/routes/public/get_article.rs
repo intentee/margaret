@@ -16,7 +16,7 @@ pub struct GetArticle;
 
 impl GetArticle {
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         #[route_parameter(from = "article")] Article {
             title,

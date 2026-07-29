@@ -23,7 +23,7 @@ impl PostArticleImport {
     }
 
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         #[form_request(from = Json)] form: ValidationResult<PostArticleForm>,
     ) -> anyhow::Result<Response> {
@@ -79,7 +79,6 @@ mod tests {
         assert_eq!(
             responder
                 .respond(form)
-                .await
                 .expect("the responder succeeds")
                 .status(),
             500

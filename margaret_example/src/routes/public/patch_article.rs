@@ -23,7 +23,7 @@ impl PatchArticle {
     }
 
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         #[route_parameter(from = "article")] Article {
             id,

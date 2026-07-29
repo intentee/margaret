@@ -11,12 +11,12 @@ pub(crate) struct LevelOne;
 impl LevelOne {
     #[constructor]
     pub(crate) async fn create() -> anyhow::Result<Self> {
-        super::record::record(0);
+        super::record::record(0).await;
         Ok(Self)
     }
 
     #[process]
-    pub(crate) async fn run(&self) -> anyhow::Result<CommandOutcome> {
+    pub(crate) fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok(CommandOutcome::Succeeded)
     }
 }

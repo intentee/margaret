@@ -281,16 +281,15 @@ fn ticker_adapter(
     let interval = path_tokens(interval);
     let runner = format_ident!("{}", unit.runner);
     let missed_tick_behavior_method = missed_tick_behavior_method(behavior);
-    let (token_binding, call) = if unit.takes_token {
-        (
-            quote! { cancellation_token },
-            quote! { self.inner.#runner(cancellation_token).await },
-        )
+    let (token_binding, arguments) = if unit.takes_token {
+        (quote! { cancellation_token }, quote! { cancellation_token })
     } else {
-        (
-            quote! { _cancellation_token },
-            quote! { self.inner.#runner().await },
-        )
+        (quote! { _cancellation_token }, quote! {})
+    };
+    let call = if unit.is_async {
+        quote! { self.inner.#runner(#arguments).await }
+    } else {
+        quote! { self.inner.#runner(#arguments) }
     };
     let outcome = runner_outcome(unit, &call);
 
@@ -322,16 +321,15 @@ fn service_adapter(unit: &ServiceUnit) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
     let runner = format_ident!("{}", unit.runner);
-    let (token_binding, call) = if unit.takes_token {
-        (
-            quote! { cancellation_token },
-            quote! { self.inner.#runner(cancellation_token).await },
-        )
+    let (token_binding, arguments) = if unit.takes_token {
+        (quote! { cancellation_token }, quote! { cancellation_token })
     } else {
-        (
-            quote! { _cancellation_token },
-            quote! { self.inner.#runner().await },
-        )
+        (quote! { _cancellation_token }, quote! {})
+    };
+    let call = if unit.is_async {
+        quote! { self.inner.#runner(#arguments).await }
+    } else {
+        quote! { self.inner.#runner(#arguments) }
     };
     let outcome = runner_outcome(unit, &call);
 

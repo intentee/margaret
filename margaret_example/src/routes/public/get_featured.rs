@@ -12,7 +12,7 @@ pub struct GetFeatured;
 
 impl GetFeatured {
     #[process]
-    pub async fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {
+    pub fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {
         Ok(forward.get_article(FEATURED_ARTICLE_ID.to_string()))
     }
 }

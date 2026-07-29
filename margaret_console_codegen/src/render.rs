@@ -61,13 +61,19 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
     };
 
     if command.takes_token {
+        let run_call = if command.is_async {
+            quote! { #accessor_access.run(cancellation_token).await }
+        } else {
+            quote! { #accessor_access.run(cancellation_token) }
+        };
+
         quote! {
             Some((#name, #matches_binding)) => {
                 margaret::framework::service::dispatch_serve::dispatch_serve(
                     margaret::framework::service::install::install,
                     |cancellation_token| async move {
                         margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
-                            #accessor_access.run(cancellation_token).await,
+                            #run_call,
                         )
                     },
                 )
@@ -75,10 +81,16 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
             }
         }
     } else {
+        let run_call = if command.is_async {
+            quote! { #accessor_access.run().await }
+        } else {
+            quote! { #accessor_access.run() }
+        };
+
         quote! {
             Some((#name, #matches_binding)) => {
                 margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
-                    #accessor_access.run().await,
+                    #run_call,
                 )
             },
         }
@@ -93,7 +105,12 @@ pub(crate) fn render(
     serve_arguments: &[ConsoleArgument],
     bindings: &ContainerBindings,
 ) -> TokenStream {
-    let dispatches_asynchronously = !commands.is_empty() || serves;
+    let dispatches_asynchronously = serves
+        || commands.iter().any(|command| {
+            command.takes_token
+                || command.is_async
+                || bindings.construction_is_async(&command.accessor.to_string())
+        });
     let run_asyncness = if dispatches_asynchronously {
         quote! { async }
     } else {

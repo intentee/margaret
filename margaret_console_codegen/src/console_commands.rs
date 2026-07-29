@@ -89,6 +89,7 @@ pub(crate) fn console_commands(
                 command_path: command.clone(),
                 construction_root: item.canonical_path().clone(),
                 description,
+                is_async: runner.signature().asyncness.is_some(),
                 name: name.clone(),
                 takes_token: runner_takes_token(index, item, runner),
             },

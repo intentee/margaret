@@ -17,14 +17,14 @@ pub(crate) struct LevelFive {
 impl LevelFive {
     #[constructor]
     pub(crate) async fn create(dependency: Arc<LevelFour>) -> anyhow::Result<Self> {
-        super::record::record(4);
+        super::record::record(4).await;
         Ok(Self {
             _dependency: dependency,
         })
     }
 
     #[process]
-    pub(crate) async fn run(&self) -> anyhow::Result<CommandOutcome> {
+    pub(crate) fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok(CommandOutcome::Succeeded)
     }
 }

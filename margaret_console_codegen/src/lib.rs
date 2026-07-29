@@ -164,7 +164,7 @@ impl Farewell {
     fn generates_a_dispatcher_for_each_argument_kind() {
         let source = source_for(COMMANDS, false);
 
-        assert!(source.contains("pubasyncfnrun"));
+        assert!(source.contains("pubfnrun"));
         assert!(source.contains("run<Arguments,Argument>(args:Arguments,)"));
         assert!(source.contains(r#"clap::Command::new("demo").about("Demonstratesarguments")"#));
 
@@ -190,7 +190,7 @@ impl Farewell {
         assert!(source.contains("super::container::build::construct_farewell()"));
         assert!(!source.contains("super::container::build::construct_farewell().await"));
         assert!(source.contains("report_failure::report_failure(error"));
-        assert!(source.contains(".run().await"));
+        assert!(source.contains(".run()"));
     }
 
     #[test]
@@ -360,7 +360,30 @@ impl Farewell {
         assert!(source.contains(
             "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|asyncmove"
         ));
-        assert!(source.contains(".run(cancellation_token).await"));
+        assert!(source.contains(".run(cancellation_token)"));
+    }
+
+    #[test]
+    fn awaits_a_command_that_declares_an_asynchronous_runner() {
+        let source = source_for(
+            "#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    async fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains("pubasyncfnrun"));
+        assert!(source.contains(".run().await"));
+    }
+
+    #[test]
+    fn awaits_a_command_whose_construction_is_asynchronous() {
+        let source = source_for(
+            "#[singleton]\nstruct Slow;\n\nimpl Slow {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare {\n    slow: Arc<Slow>,\n}\n\nimpl Bare {\n    #[constructor]\n    fn create(slow: Arc<Slow>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains("pubasyncfnrun"));
+        assert!(source.contains("super::container::build::construct_bare().await"));
+        assert!(source.contains(".run()"));
     }
 
     #[test]
@@ -373,7 +396,7 @@ impl Farewell {
         assert!(source.contains("super::container::build::construct_flagged("));
         assert!(source.contains(r#"matches.get_flag("loud")"#));
         assert!(source.contains("report_failure::report_failure(error"));
-        assert!(source.contains(".run().await"));
+        assert!(source.contains(".run()"));
     }
 
     #[test]
@@ -440,7 +463,7 @@ impl Farewell {
         assert!(source.contains("super::container::build::construct_bare()"));
         assert!(!source.contains("super::container::build::construct_bare().await"));
         assert!(source.contains("report_failure::report_failure(error"));
-        assert!(source.contains(".run().await"));
+        assert!(source.contains(".run()"));
     }
 
     #[test]

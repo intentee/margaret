@@ -11,7 +11,7 @@ pub struct GetIdentity;
 
 impl GetIdentity {
     #[process]
-    pub async fn respond(&self, peer: &SpiffeId) -> anyhow::Result<Response> {
+    pub fn respond(&self, peer: &SpiffeId) -> anyhow::Result<Response> {
         Ok({
             Response::text(
                 200,

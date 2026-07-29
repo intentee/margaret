@@ -11,7 +11,7 @@ pub struct GetHome;
 
 impl GetHome {
     #[process]
-    pub async fn respond(&self, routes: &Routes) -> anyhow::Result<Redirect> {
+    pub fn respond(&self, routes: &Routes) -> anyhow::Result<Redirect> {
         Ok(routes.public.get_greeting.see_other())
     }
 }

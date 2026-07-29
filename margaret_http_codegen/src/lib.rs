@@ -334,7 +334,7 @@ impl GetProfile {
             .split_whitespace()
             .collect();
 
-        assert!(source.contains("responder.present(user).await"));
+        assert!(source.contains("responder.present(user)"));
     }
 
     #[test]
@@ -787,9 +787,7 @@ impl Health {
         let source = websocket_http_source(HEALTH_RESPONDER, &["realtime".to_string()]);
 
         assert!(source.contains("pub(crate)fnserver_realtime"));
-        assert!(
-            source.contains("super::super::websocket::realtime_routes(container,routes)")
-        );
+        assert!(source.contains("super::super::websocket::realtime_routes(container,routes)"));
     }
 
     #[test]
@@ -936,7 +934,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 
         assert!(source.contains("&::std::sync::Arc<super::super::routes::Routes>"));
         assert!(source.contains("letroutes=routes.clone();"));
-        assert!(source.contains("responder.respond(routes.as_ref()).await"));
+        assert!(source.contains("responder.respond(routes.as_ref())"));
     }
 
     #[test]
@@ -952,7 +950,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains(
             "letasset_bag=::margaret::framework::asset_bag::asset_bag::AssetBag::new();"
         ));
-        assert!(source.contains("responder.respond(asset_bag).await"));
+        assert!(source.contains("responder.respond(asset_bag)"));
     }
 
     #[test]
@@ -1086,7 +1084,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains(
             "|responder:std::sync::Arc<crate::Open>,_request:&margaret::framework::http::request::Request"
         ));
-        assert!(source.contains("responder.respond().await"));
+        assert!(source.contains("responder.respond()"));
         assert!(source.contains(
             "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard(),}),margaret::framework::http::responder_handler::responder_handler(container.resource()"
         ));
@@ -1128,7 +1126,16 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         ));
         assert!(source.contains("Ok(value)=>value"));
         assert!(source.contains("::std::result::Result::Ok(response.into())"));
-        assert!(source.contains("responder.respond(id).await"));
+        assert!(source.contains("responder.respond(id)"));
+    }
+
+    #[test]
+    fn awaits_a_responder_that_declares_an_asynchronous_process_method() {
+        let source = source_for(
+            "#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    async fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert!(source.contains("responder.respond().await"));
     }
 
     #[test]
@@ -1141,7 +1148,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains(
             r#"letid=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"id""#
         ));
-        assert!(source.contains("responder.respond(request,id).await"));
+        assert!(source.contains("responder.respond(request,id)"));
     }
 
     #[test]
@@ -1152,7 +1159,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(source.contains("letincoming=request;"));
-        assert!(source.contains("responder.respond(incoming).await"));
+        assert!(source.contains("responder.respond(incoming)"));
     }
 
     #[test]
@@ -1166,7 +1173,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains(
             r#"letrequest=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request_2,"request""#
         ));
-        assert!(source.contains("responder.respond(request).await"));
+        assert!(source.contains("responder.respond(request)"));
     }
 
     #[test]
@@ -1180,7 +1187,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains(
             r#"letresponder=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"responder""#
         ));
-        assert!(source.contains("responder_2.respond(responder).await"));
+        assert!(source.contains("responder_2.respond(responder)"));
     }
 
     #[test]
@@ -1190,7 +1197,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains(
             r#"margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,"id",user_binder.as_ref()"#
         ));
-        assert!(source.contains("responder.respond(argument_1).await"));
+        assert!(source.contains("responder.respond(argument_1)"));
     }
 
     #[test]
@@ -1202,7 +1209,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             r#"margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,"user",user_binder.as_ref()"#
         ));
         assert!(!source.contains("http_route_parameter_binder::HttpRouteParameterBinder"));
-        assert!(source.contains("responder.respond(user).await"));
+        assert!(source.contains("responder.respond(user)"));
         assert!(!source.contains("forbidden"));
     }
 
@@ -1644,7 +1651,7 @@ impl GetGreeting {
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(source.contains("responder.respond().await"));
+        assert!(source.contains("responder.respond()"));
         assert!(source.contains(
             "margaret::framework::http::response_continuation::ResponseContinuation::from"
         ));
@@ -1720,7 +1727,7 @@ impl GetMetrics {
                 "margaret::framework::http_validation::request_input::RequestInput::Form"
             )
         );
-        assert!(source.contains("responder.respond(data).await"));
+        assert!(source.contains("responder.respond(data)"));
     }
 
     #[test]
@@ -1832,7 +1839,7 @@ impl GetMetrics {
         );
         assert!(source.contains("Ok(model)=>model"));
         assert!(source.contains("::std::result::Result::Ok(response.into())"));
-        assert!(source.contains("responder.respond(data).await"));
+        assert!(source.contains("responder.respond(data)"));
     }
 
     #[test]

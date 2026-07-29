@@ -12,7 +12,7 @@ pub struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    pub async fn infer(&self) -> InferenceResult<AuthenticatedUserOutcome<User>> {
+    pub fn infer(&self) -> InferenceResult<AuthenticatedUserOutcome<User>> {
         Ok(AuthenticatedUserOutcome::Anonymous)
     }
 }

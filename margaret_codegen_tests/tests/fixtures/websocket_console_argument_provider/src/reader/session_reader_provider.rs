@@ -22,7 +22,7 @@ impl SessionReaderProvider {
     }
 
     #[infer_from_request]
-    pub async fn infer_reader(
+    pub fn infer_reader(
         &self,
         request: &Request,
         #[form_request(from = Cookie)] cookie: crate::reader::reader_cookie::ReaderCookie,

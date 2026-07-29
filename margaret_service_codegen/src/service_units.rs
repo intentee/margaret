@@ -105,6 +105,7 @@ fn build_unit(
     Ok(ServiceUnit {
         concrete_path: item.canonical_path().clone(),
         field_name: identifier.field().to_string(),
+        is_async: runner.signature().asyncness.is_some(),
         kind,
         origin: ServiceUnitOrigin::User,
         runner: runner.identifier().to_string(),

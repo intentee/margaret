@@ -9,7 +9,7 @@ pub struct GetLogo;
 
 impl GetLogo {
     #[process]
-    pub async fn respond(&self) -> anyhow::Result<Response> {
+    pub fn respond(&self) -> anyhow::Result<Response> {
         Ok({
             Response::bytes(
                 200,

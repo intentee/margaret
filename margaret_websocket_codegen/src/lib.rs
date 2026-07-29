@@ -1249,13 +1249,17 @@ impl RespondsToWebSocketMessage for Chatter {
     fn threads_the_console_arguments_of_an_authenticated_user_provider_through_the_handshake() {
         let source = generated(CONSOLE_ARGUMENT_PROVIDER);
 
-        assert!(source.contains(
-            "pubfnupgrade_entry(container:&super::super::super::container::Container,)"
-        ));
+        assert!(
+            source.contains(
+                "pubfnupgrade_entry(container:&super::super::super::container::Container,)"
+            )
+        );
         assert!(source.contains("inner:container.session_user_provider(),"));
-        assert!(source.contains(
-            "pubfnpublic_routes(container:&super::super::container::Container,_routes:"
-        ));
+        assert!(
+            source.contains(
+                "pubfnpublic_routes(container:&super::super::container::Container,_routes:"
+            )
+        );
         assert!(source.contains("upgrade_entry(container)"));
     }
 

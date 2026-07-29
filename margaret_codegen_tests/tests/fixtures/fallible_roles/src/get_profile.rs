@@ -12,7 +12,7 @@ pub struct GetProfile;
 
 impl GetProfile {
     #[process]
-    pub async fn respond(&self, #[authenticated_user] user: User) -> AppResult<Response> {
+    pub fn respond(&self, #[authenticated_user] user: User) -> AppResult<Response> {
         Ok(Response::text(200, user.name))
     }
 }

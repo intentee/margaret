@@ -12,7 +12,7 @@ async fn convert_x509_context_errors_when_bundle_lacks_trust_domain() {
 
     let context = X509Context::new(vec![build_workload_svid()], X509BundleSet::new());
 
-    let result = service.convert_x509_context(context).await;
+    let result = service.convert_x509_context(context);
 
     assert!(result.is_err());
 }

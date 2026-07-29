@@ -62,7 +62,7 @@ mod tests {
     struct Echo;
 
     impl Echo {
-        async fn respond(&self, id: String) -> Response {
+        fn respond(&self, id: String) -> Response {
             Response::text(200, id)
         }
     }
@@ -78,14 +78,12 @@ mod tests {
             > {
                 Box::pin(async move {
                     Ok(ResponseContinuation::from(
-                        responder
-                            .respond(
-                                request
-                                    .path_param("id")
-                                    .expect("the test request carries the id parameter")
-                                    .to_string(),
-                            )
-                            .await,
+                        responder.respond(
+                            request
+                                .path_param("id")
+                                .expect("the test request carries the id parameter")
+                                .to_string(),
+                        ),
                     ))
                 })
             },

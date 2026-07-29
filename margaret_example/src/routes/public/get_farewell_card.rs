@@ -25,7 +25,7 @@ impl GetFarewellCard {
     }
 
     #[process]
-    pub async fn respond(&self, routes: &Routes, views: &Views) -> anyhow::Result<Response> {
+    pub fn respond(&self, routes: &Routes, views: &Views) -> anyhow::Result<Response> {
         Ok({
             Response::html(
                 200,
@@ -71,7 +71,6 @@ mod tests {
         assert_eq!(
             responder
                 .respond(&routes, &views)
-                .await
                 .expect("the responder succeeds")
                 .status(),
             200

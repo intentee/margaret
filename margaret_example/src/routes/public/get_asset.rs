@@ -21,7 +21,7 @@ impl GetAsset {
     }
 
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         #[route_parameter(from = "asset_path")] asset_path: String,
     ) -> anyhow::Result<Response> {

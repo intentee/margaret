@@ -47,6 +47,7 @@ pub fn middleware_plans(
         plans.push(MiddlewarePlan {
             concrete: item.canonical_path().clone(),
             field: format_ident!("{}", identifier.field()),
+            is_async: method.signature().asyncness.is_some(),
             parameters,
             tag,
             wrapper: format_ident!("{}", identifier.type_name()),

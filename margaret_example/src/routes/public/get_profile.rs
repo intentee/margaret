@@ -16,7 +16,7 @@ pub struct GetProfile;
 
 impl GetProfile {
     #[process]
-    pub async fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {
+    pub fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {
         Ok(Response::text(
             200,
             format!("signed in as {} ({})", user.name, user.id),

@@ -9,6 +9,7 @@ pub(crate) struct ConsoleCommand {
     pub(crate) command_path: String,
     pub(crate) construction_root: CanonicalPath,
     pub(crate) description: Option<String>,
+    pub(crate) is_async: bool,
     pub(crate) name: String,
     pub(crate) takes_token: bool,
 }

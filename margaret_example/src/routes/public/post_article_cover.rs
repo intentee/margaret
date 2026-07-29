@@ -12,7 +12,7 @@ pub struct PostArticleCover;
 
 impl PostArticleCover {
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         request: &Request,
         #[route_parameter(from = "article")] Article { title, .. }: Article,

@@ -21,7 +21,7 @@ impl Sweeper {
     }
 
     #[process]
-    pub async fn run(&self) -> anyhow::Result<()> {
+    pub fn run(&self) -> anyhow::Result<()> {
         self.metrics.record_sweep();
 
         Ok(())

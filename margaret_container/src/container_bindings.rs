@@ -138,6 +138,11 @@ impl ContainerBindings {
     }
 
     #[must_use]
+    pub fn construction_is_async(&self, field_name: &str) -> bool {
+        self.asynchronous_constructions.contains(field_name)
+    }
+
+    #[must_use]
     pub fn serve_invocation(&self, arguments: &[TokenStream]) -> TokenStream {
         let invocation = quote! { super::container::build::serve(#(#arguments),*) };
 

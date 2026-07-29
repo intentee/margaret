@@ -88,6 +88,7 @@ pub(crate) fn http_routes(
         table.insert(
             route_path,
             HttpRoute {
+                is_async: handler_method.signature().asyncness.is_some(),
                 layers,
                 method,
                 method_name: format_ident!("{}", handler_method.identifier()),

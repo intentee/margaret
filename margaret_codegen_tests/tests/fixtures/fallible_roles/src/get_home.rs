@@ -25,7 +25,7 @@ impl GetHome {
     }
 
     #[process]
-    pub async fn respond(&self, views: &Views) -> Outcome<Response> {
+    pub fn respond(&self, views: &Views) -> Outcome<Response> {
         Ok({
             let _ = self.secrets.token();
 

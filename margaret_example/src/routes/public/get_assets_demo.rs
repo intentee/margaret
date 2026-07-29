@@ -24,7 +24,7 @@ impl GetAssetsDemo {
     }
 
     #[process]
-    pub async fn respond(&self, asset_bag: AssetBag) -> anyhow::Result<Response> {
+    pub fn respond(&self, asset_bag: AssetBag) -> anyhow::Result<Response> {
         Ok(Response::html(
             200,
             self.asset_page.render(AssetPageProps { asset_bag })?,
@@ -52,7 +52,6 @@ mod tests {
         assert_eq!(
             responder
                 .respond(AssetBag::new())
-                .await
                 .expect("the responder succeeds")
                 .status(),
             200

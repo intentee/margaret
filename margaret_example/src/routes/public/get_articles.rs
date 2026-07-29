@@ -23,7 +23,7 @@ impl GetArticles {
     }
 
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         routes: &Routes,
         #[form_request(from = Query)] GetArticlesForm { author }: GetArticlesForm,

@@ -11,7 +11,7 @@ pub struct GetPreferences;
 
 impl GetPreferences {
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         #[form_request(from = Cookie)] ReaderPreferencesCookie { theme }: ReaderPreferencesCookie,
     ) -> anyhow::Result<Response> {

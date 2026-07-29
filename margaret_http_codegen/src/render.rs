@@ -129,7 +129,11 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
         .iter()
         .map(|argument| argument_value(argument, &routes_local, &views_local, &server));
     let method_name = &route.method_name;
-    let respond_call = quote! { #responder_binding.#method_name(#(#argument_values),*).await };
+    let respond_call = if route.is_async {
+        quote! { #responder_binding.#method_name(#(#argument_values),*).await }
+    } else {
+        quote! { #responder_binding.#method_name(#(#argument_values),*) }
+    };
     let body = quote! {
         #bound_bindings
         #(#bindings_tokens)*

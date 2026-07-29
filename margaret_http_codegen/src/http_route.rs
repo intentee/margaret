@@ -6,6 +6,7 @@ use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 
 pub(crate) struct HttpRoute {
     pub(crate) arguments: Vec<BoundParameter>,
+    pub(crate) is_async: bool,
     pub(crate) layers: Vec<LayerApplication>,
     pub(crate) method: String,
     pub(crate) method_name: Ident,

@@ -12,11 +12,13 @@ fn framework_service(
     bindings: &ContainerBindings,
     path: CanonicalPath,
     kind: FrameworkServiceKind,
+    is_async: bool,
     takes_token: bool,
 ) -> Option<FrameworkService> {
     bindings.provider(&path).map(|binding| FrameworkService {
         concrete_path: path,
         field_name: binding.field_name.clone(),
+        is_async,
         kind,
         runner: "run".to_string(),
         takes_token,
@@ -37,6 +39,7 @@ pub(crate) fn jwks_framework_services(
             interval: jwks_roll_interval_path(),
         },
         false,
+        false,
     ));
 
     for binding in client_bindings {
@@ -44,6 +47,7 @@ pub(crate) fn jwks_framework_services(
             bindings,
             jwks_client_canonical_path(&binding.module_segment),
             FrameworkServiceKind::Service,
+            true,
             true,
         ));
     }

@@ -135,6 +135,26 @@ impl Guard {
             source
                 .contains("implmargaret::framework::http::http_middleware::HttpMiddlewareforGuard")
         );
+        assert!(source.contains("self.inner.process(request,next)"));
+    }
+
+    #[test]
+    fn awaits_a_middleware_that_declares_an_asynchronous_process_method() {
+        let source = wrappers_for(
+            r#"
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
+
+#[handles_middleware_attribute(attribute = guard)]
+struct Guard;
+
+impl Guard {
+    #[process]
+    async fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
+}
+"#,
+        );
+
         assert!(source.contains("self.inner.process(request,next).await"));
     }
 
@@ -147,7 +167,7 @@ impl Guard {
         assert!(source.contains(
             "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubroutes:std::sync::Arc<super::super::routes::Routes>,}"
         ));
-        assert!(source.contains("self.inner.process(request,next,&self.routes).await"));
+        assert!(source.contains("self.inner.process(request,next,&self.routes)"));
     }
 
     #[test]
@@ -159,7 +179,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,_request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(next).await"));
+        assert!(source.contains("self.inner.process(next)"));
     }
 
     #[test]
@@ -171,7 +191,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(request).await"));
+        assert!(source.contains("self.inner.process(request)"));
     }
 
     #[test]
@@ -437,7 +457,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(data,next).await"));
+        assert!(source.contains("self.inner.process(data,next)"));
     }
 
     #[test]
@@ -467,7 +487,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(data).await"));
+        assert!(source.contains("self.inner.process(data)"));
     }
 
     #[test]
@@ -495,7 +515,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(request,filters,next).await"));
+        assert!(source.contains("self.inner.process(request,filters,next)"));
     }
 
     #[test]
@@ -517,7 +537,7 @@ impl Tracer {
         assert!(source.contains(
             "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubviews:std::sync::Arc<super::super::views::Views>,}"
         ));
-        assert!(source.contains("self.inner.process(next,&self.views).await"));
+        assert!(source.contains("self.inner.process(next,&self.views)"));
     }
 
     #[test]
@@ -544,7 +564,7 @@ impl Guard {
         assert!(source.contains(
             "margaret::framework::http_validation::require_input::require_input(request_2,"
         ));
-        assert!(source.contains("self.inner.process(next,request,next_2).await"));
+        assert!(source.contains("self.inner.process(next,request,next_2)"));
     }
 
     #[test]

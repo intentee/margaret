@@ -546,6 +546,21 @@ impl SessionUserProvider {
             "pubstructSessionUserProvider{pubinner:std::sync::Arc<crate::SessionUserProvider>,}"
         ));
         assert!(source.contains("typeUser=crate::User;"));
+        assert!(source.contains("self.inner.infer(request)"));
+    }
+
+    #[test]
+    fn awaits_a_provider_that_declares_an_asynchronous_inference_method() {
+        let registries = registries_for(
+            "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    async fn infer(&self, request: &Request) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+        );
+        let source: String = render_authenticated_user_wrappers(&registries.providers())
+            .into_iter()
+            .map(|module| module.to_source())
+            .collect::<String>()
+            .split_whitespace()
+            .collect();
+
         assert!(source.contains("self.inner.infer(request).await"));
     }
 
@@ -563,7 +578,7 @@ impl SessionUserProvider {
 
         assert!(source.contains("pubroutes:std::sync::Arc<super::super::routes::Routes>,"));
         assert!(source.contains("pubviews:std::sync::Arc<super::super::views::Views>,"));
-        assert!(source.contains("self.inner.infer(&self.routes,&self.views).await"));
+        assert!(source.contains("self.inner.infer(&self.routes,&self.views)"));
     }
 
     #[test]

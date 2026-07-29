@@ -6,7 +6,7 @@ pub struct Pulse;
 
 impl Pulse {
     #[process]
-    pub async fn run(&self) -> core::result::Result<(), failures::Error> {
+    pub fn run(&self) -> core::result::Result<(), failures::Error> {
         Ok(())
     }
 }

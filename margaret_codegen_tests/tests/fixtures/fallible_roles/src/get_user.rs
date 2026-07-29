@@ -14,7 +14,7 @@ pub struct GetUser;
 
 impl GetUser {
     #[process]
-    pub async fn respond(&self, #[route_parameter(from = "user")] user: User) -> Result<Response> {
+    pub fn respond(&self, #[route_parameter(from = "user")] user: User) -> Result<Response> {
         Ok(Response::text(200, user.name))
     }
 }

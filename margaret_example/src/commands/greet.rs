@@ -36,7 +36,7 @@ impl Greet {
     }
 
     #[process]
-    pub async fn run(&self) -> anyhow::Result<CommandOutcome> {
+    pub fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok({
             println!(
                 "{}, {} (salutation: {:?}, loud: {})",
