@@ -801,7 +801,7 @@ impl CallRoute {
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(serve.contains(
-            "letserver_services=matchmargaret::framework::service::serve_application::serve_application(matches,servers,){Ok(server_services)=>server_services,Err(outcome)=>returnoutcome,};"
+            "letserver_services=margaret::framework::service::serve_application::serve_application(matches,servers,)?;"
         ));
         assert!(serve.contains(
             "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"
@@ -863,7 +863,7 @@ impl GetIdentity {
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(serve.contains(
-            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
+            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:::std::sync::Arc::clone(spiffe_server_config),}"
         ));
         assert!(serve.contains(
             "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"

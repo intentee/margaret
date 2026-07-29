@@ -377,7 +377,7 @@ impl Flusher {
             r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            "letserver_services=matchmargaret::framework::service::serve_application::serve_application(matches,servers,){Ok(server_services)=>server_services,Err(outcome)=>returnoutcome,};"
+            "letserver_services=margaret::framework::service::serve_application::serve_application(matches,servers,)?;"
         ));
         assert!(source.contains(
             "forserver_serviceinserver_services{manager.register_service(server_service);}"
@@ -443,25 +443,25 @@ impl Flusher {
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
         ));
         assert!(source.contains(
-            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
+            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:::std::sync::Arc::clone(spiffe_server_config),}"
         ));
         assert!(source.contains(
             r#"transport:matchmatches.get_one::<String>("public-transport").map(String::as_str)"#
         ));
         assert!(source.contains(
-            r#"Some("spiffe_mtls")=>{margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}}"#
+            r#"Some("spiffe_mtls")=>{margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:::std::sync::Arc::clone(spiffe_server_config),}}"#
         ));
         assert!(source.contains(
             r#"Some("plain")=>{margaret::framework::http::transport_config::TransportConfig::Plain}"#
         ));
         assert!(source.contains(
-            "Some(_)|None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}"
+            "Some(_)|None=>{return::std::result::Result::Err(margaret::framework::console::command_outcome::CommandOutcome::Failed,);}"
         ));
         assert!(source.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(source.contains(
-            "letserver_services=matchmargaret::framework::service::serve_application::serve_application(matches,servers,){Ok(server_services)=>server_services,Err(outcome)=>returnoutcome,};"
+            "letserver_services=margaret::framework::service::serve_application::serve_application(matches,servers,)?;"
         ));
         assert!(source.contains(
             "forserver_serviceinserver_services{manager.register_service(server_service);}"
@@ -538,7 +538,7 @@ impl Flusher {
         );
 
         assert!(source.contains(
-            r#"letorigin_public:::std::sync::Arc<str>=matchmatches.get_one::<String>("public-url"){Some(value)=>value.clone().into(),None=>{returnmargaret::framework::console::command_outcome::CommandOutcome::Failed;}};"#
+            r#"letorigin_public:::std::sync::Arc<str>=matchmatches.get_one::<String>("public-url"){Some(value)=>value.clone().into(),None=>{return::std::result::Result::Err(margaret::framework::console::command_outcome::CommandOutcome::Failed,);}};"#
         ));
         assert!(source.contains(
             "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(origin_internal.clone(),origin_public.clone(),),);"

@@ -19,6 +19,18 @@ use crate::service_unit::ServiceUnit;
 use crate::service_unit_origin::ServiceUnitOrigin;
 use crate::spiffe_activation::SpiffeActivation;
 
+fn failed_outcome() -> TokenStream {
+    quote! { return margaret::framework::console::command_outcome::CommandOutcome::Failed }
+}
+
+fn failed_registration() -> TokenStream {
+    quote! {
+        return ::std::result::Result::Err(
+            margaret::framework::console::command_outcome::CommandOutcome::Failed,
+        )
+    }
+}
+
 fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
     if !spiffe_secured {
         return quote! { margaret::framework::http::transport_config::TransportConfig::Plain };
@@ -27,7 +39,7 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
     match server.transport_policy() {
         ServerTransportPolicy::PinnedSpiffeMtls => quote! {
             margaret::framework::http::transport_config::TransportConfig::MutualTls {
-                server_config: spiffe_server_config.clone(),
+                server_config: ::std::sync::Arc::clone(spiffe_server_config),
             }
         },
         ServerTransportPolicy::Negotiable => {
@@ -37,10 +49,12 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
                 match matches.get_one::<String>(#transport_argument).map(String::as_str) {
                     Some("plain") => margaret::framework::http::transport_config::TransportConfig::Plain,
                     Some("spiffe_mtls") => margaret::framework::http::transport_config::TransportConfig::MutualTls {
-                        server_config: spiffe_server_config.clone(),
+                        server_config: ::std::sync::Arc::clone(spiffe_server_config),
                     },
                     Some(_) | None => {
-                        return margaret::framework::console::command_outcome::CommandOutcome::Failed;
+                        return ::std::result::Result::Err(
+                            margaret::framework::console::command_outcome::CommandOutcome::Failed,
+                        );
                     }
                 }
             }
@@ -62,11 +76,13 @@ fn svid_identity_prelude(
         &quote! { String },
         "spiffe-trust-domain",
         &quote! { value.clone() },
+        &failed_outcome(),
     );
     let spire_agent_addr = required_flag_read(
         &quote! { String },
         "spire-agent-addr",
         &quote! { value.clone() },
+        &failed_outcome(),
     );
 
     let bundle_constructor = if server_active && client_active {
@@ -165,6 +181,7 @@ fn server_registration(
             &quote! { String },
             &server.url_argument(),
             &quote! { value.clone().into() },
+            &failed_registration(),
         );
 
         quote! {
@@ -220,17 +237,16 @@ fn server_registration(
         #views_setup
         let servers = #assemblies;
 
-        let server_services = match margaret::framework::service::serve_application::serve_application(
+        let server_services = margaret::framework::service::serve_application::serve_application(
             matches,
             servers,
-        ) {
-            Ok(server_services) => server_services,
-            Err(outcome) => return outcome,
-        };
+        )?;
 
         for server_service in server_services {
             #register_server
         }
+
+        ::std::result::Result::Ok(())
     }
 }
 
@@ -388,7 +404,54 @@ pub fn render_services(
         .map(|unit| registration(unit, bindings, activation.client_active));
     let identity_prelude = svid_identity_prelude(activation);
     let bundle_registration = bundle_registration(activation);
-    let server_registration = server_registration(servers, has_views, activation);
+    let server_registration_body = server_registration(servers, has_views, activation);
+    let spiffe_server_parameter = activation
+        .server_active
+        .then(|| quote! { spiffe_server_config: &::std::sync::Arc<margaret::framework::spiffe_svid::rustls::ServerConfig>, });
+    let spiffe_client_parameter = activation.client_active.then(|| {
+        quote! {
+            spiffe_client_readiness: &margaret::framework::spiffe_svid_client::svid_client_readiness::SvidClientReadiness,
+        }
+    });
+    let spiffe_server_argument = activation
+        .server_active
+        .then(|| quote! { &spiffe_server_config, });
+    let spiffe_client_argument = activation
+        .client_active
+        .then(|| quote! { &spiffe_client_readiness, });
+    let register_servers = if servers.is_empty() {
+        TokenStream::new()
+    } else {
+        quote! {
+                fn register_servers(
+                    manager: &mut trzcina::ServiceManager,
+                    matches: &clap::ArgMatches,
+                    container: &super::container::Container,
+                    #spiffe_server_parameter
+                    #spiffe_client_parameter
+                ) -> ::std::result::Result<
+                    (),
+                    margaret::framework::console::command_outcome::CommandOutcome,
+                > {
+                    #server_registration_body
+                }
+        }
+    };
+    let server_registration = if servers.is_empty() {
+        TokenStream::new()
+    } else {
+        quote! {
+            if let Err(outcome) = register_servers(
+                &mut manager,
+                matches,
+                container,
+                #spiffe_server_argument
+                #spiffe_client_argument
+            ) {
+                return outcome;
+            }
+        }
+    };
     let construction_invocation = bindings.serve_invocation(&plan.construction_arguments);
     let construction = quote! {
         let container = match #construction_invocation {
@@ -408,6 +471,8 @@ pub fn render_services(
 
     let tokens = quote! {
         #(#adapters)*
+
+        #register_servers
 
         pub async fn serve(
             #matches_binding: &clap::ArgMatches,
