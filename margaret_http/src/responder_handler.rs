@@ -59,18 +59,22 @@ mod tests {
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
 
-    struct Echo;
+    struct Echo {
+        prefix: String,
+    }
 
     impl Echo {
         fn respond(&self, id: String) -> Response {
-            Response::text(200, id)
+            Response::text(200, format!("{}{id}", self.prefix))
         }
     }
 
     #[tokio::test]
     async fn injects_request_values_into_the_responder() {
         let handler = responder_handler(
-            Arc::new(Echo),
+            Arc::new(Echo {
+                prefix: "echo-".to_string(),
+            }),
             |responder: Arc<Echo>,
              request: &Request|
              -> Pin<
@@ -104,7 +108,7 @@ mod tests {
                 .await
                 .expect("the response body collects")
                 .to_bytes(),
-            "7"
+            "echo-7"
         );
     }
 }

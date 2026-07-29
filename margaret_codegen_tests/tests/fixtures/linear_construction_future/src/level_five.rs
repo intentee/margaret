@@ -10,13 +10,13 @@ use super::level_four::LevelFour;
 
 #[singleton]
 #[console_command(name = "level-five")]
-pub(crate) struct LevelFive {
+pub struct LevelFive {
     _dependency: Arc<LevelFour>,
 }
 
 impl LevelFive {
     #[constructor]
-    pub(crate) async fn create(dependency: Arc<LevelFour>) -> anyhow::Result<Self> {
+    pub async fn create(dependency: Arc<LevelFour>) -> anyhow::Result<Self> {
         super::record::record(4).await;
         Ok(Self {
             _dependency: dependency,
@@ -24,7 +24,7 @@ impl LevelFive {
     }
 
     #[process]
-    pub(crate) fn run(&self) -> anyhow::Result<CommandOutcome> {
+    pub fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok(CommandOutcome::Succeeded)
     }
 }

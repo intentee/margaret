@@ -2,6 +2,6 @@
 #[path = "../margaret/mod.rs"]
 pub mod margaret;
 
-mod collision;
-mod configured;
-mod diamond;
+pub mod collision;
+pub mod configured;
+pub mod diamond;

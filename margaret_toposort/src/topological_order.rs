@@ -104,30 +104,33 @@ mod tests {
         topological_order(&graph(edges)).ok()
     }
 
-    fn names(names: &[&str]) -> Option<Vec<String>> {
-        Some(names.iter().map(|name| (*name).to_string()).collect())
+    fn names(names: &[&str]) -> Vec<String> {
+        names.iter().map(|name| (*name).to_string()).collect()
     }
 
     #[test]
     fn orders_an_empty_graph_as_empty() {
-        assert_eq!(order(&[]), names(&[]));
+        assert_eq!(order(&[]), Some(names(&[])));
     }
 
     #[test]
     fn orders_a_single_node() {
-        assert_eq!(order(&[("a", &[])]), names(&["a"]));
+        assert_eq!(order(&[("a", &[])]), Some(names(&["a"])));
     }
 
     #[test]
     fn orders_dependencies_before_dependents() {
-        assert_eq!(order(&[("a", &["b"]), ("b", &[])]), names(&["b", "a"]));
+        assert_eq!(
+            order(&[("a", &["b"]), ("b", &[])]),
+            Some(names(&["b", "a"]))
+        );
     }
 
     #[test]
     fn orders_independent_nodes_in_sorted_order() {
         assert_eq!(
             order(&[("zebra", &[]), ("apple", &[])]),
-            names(&["apple", "zebra"])
+            Some(names(&["apple", "zebra"]))
         );
     }
 
@@ -135,13 +138,13 @@ mod tests {
     fn orders_a_diamond_with_a_shared_dependency_first() {
         assert_eq!(
             order(&[("a", &["b", "c"]), ("b", &["d"]), ("c", &["d"]), ("d", &[])]),
-            names(&["d", "b", "c", "a"])
+            Some(names(&["d", "b", "c", "a"]))
         );
     }
 
     #[test]
     fn includes_targets_that_are_not_declared_as_nodes() {
-        assert_eq!(order(&[("a", &["b"])]), names(&["b", "a"]));
+        assert_eq!(order(&[("a", &["b"])]), Some(names(&["b", "a"])));
     }
 
     #[test]
