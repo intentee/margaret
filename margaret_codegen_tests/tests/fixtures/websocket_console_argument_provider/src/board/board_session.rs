@@ -13,10 +13,13 @@ impl BoardSession {
     /// Returns an error propagated from the work it performs.
     #[build_for_session]
     pub fn assemble(
-        #[route_parameter(from = "topic")] topic: String,
+        #[route_parameter(from = "topic")] topic: &str,
         #[authenticated_user] reader: Option<crate::reader::Reader>,
     ) -> anyhow::Result<Self> {
-        Ok(Self { reader, topic })
+        Ok(Self {
+            reader,
+            topic: topic.to_string(),
+        })
     }
 
     #[must_use]
