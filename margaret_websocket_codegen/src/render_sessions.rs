@@ -397,7 +397,7 @@ fn render_dispatch_table(
         )
     };
     quote! {
-        async fn dispatch_table(
+        fn dispatch_table(
             #container: &super::super::super::container::Container,
         ) -> #table_type {
             let #requests_mutability #requests: ::std::collections::HashMap<
@@ -442,7 +442,7 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
         .iter()
         .map(|binding| render_notification_dispatch(binding, &session_path));
     let dispatch_table = render_dispatch_table(plan, &session_path, bindings);
-    let dispatch_call = quote! { dispatch_table(container).await };
+    let dispatch_call = quote! { dispatch_table(container) };
     let upgrade_type = quote! {
         ::std::sync::Arc<dyn margaret::framework::http::web_socket_upgrade::WebSocketUpgrade>
     };
@@ -464,7 +464,8 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
 
         #dispatch_table
 
-        pub async fn upgrade_entry(
+        #[must_use]
+        pub fn upgrade_entry(
             container: &super::super::super::container::Container,
             #routes_parameter
         ) -> #upgrade_type {

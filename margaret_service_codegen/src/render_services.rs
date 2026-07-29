@@ -186,14 +186,8 @@ fn server_registration(
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
         let transport = transport_expression(server, activation.server_active);
-        let routes = if server.routes_are_async() {
-            quote! {
-                super::http::#function_name::#function_name(container, &routes #views_argument).await
-            }
-        } else {
-            quote! {
-                super::http::#function_name::#function_name(container, &routes #views_argument)
-            }
+        let routes = quote! {
+            super::http::#function_name::#function_name(container, &routes #views_argument)
         };
 
         quote! {
@@ -210,10 +204,8 @@ fn server_registration(
     let assemblies = vec_literal_tokens(assemblies);
 
     let views_setup = has_views.then(|| {
-        let built = quote! { super::views::build::build(container).await };
-
         quote! {
-            let views = ::std::sync::Arc::new(#built);
+            let views = ::std::sync::Arc::new(super::views::build::build(container));
         }
     });
 

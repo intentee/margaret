@@ -779,16 +779,16 @@ impl Health {
     fn splices_websocket_routes_into_a_server_with_http_routes() {
         let source = websocket_http_source(HEALTH_RESPONDER, &["public".to_string()]);
 
-        assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
+        assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
     }
 
     #[test]
     fn generates_a_server_module_for_a_websocket_only_server() {
         let source = websocket_http_source(HEALTH_RESPONDER, &["realtime".to_string()]);
 
-        assert!(source.contains("pub(crate)asyncfnserver_realtime"));
+        assert!(source.contains("pub(crate)fnserver_realtime"));
         assert!(
-            source.contains("super::super::websocket::realtime_routes(container,routes).await")
+            source.contains("super::super::websocket::realtime_routes(container,routes)")
         );
     }
 
@@ -797,7 +797,7 @@ impl Health {
         let source =
             websocket_http_source_with_views(HEALTH_RESPONDER, &["public".to_string()], true);
 
-        assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
+        assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
         assert!(source.contains("_views:&::std::sync::Arc<super::super::views::Views>"));
     }
 

@@ -107,7 +107,7 @@ struct CardLayout;
 
         assert!(source.contains("pub struct Views"));
         assert!(source.contains("pub the_card: ::std::sync::Arc<crate::CardLayout>"));
-        assert!(source.contains("pub async fn build("));
+        assert!(source.contains("pub fn build("));
         assert!(source.contains("the_card: container.card_layout()"));
     }
 
@@ -209,7 +209,7 @@ impl Banner {
 
         assert!(source.contains("pub struct Views {}"));
         assert!(source.contains(
-            "pub async fn build(container: &super::super::container::Container) -> super::Views {"
+            "pub fn build(container: &super::super::container::Container) -> super::Views {"
         ));
     }
 

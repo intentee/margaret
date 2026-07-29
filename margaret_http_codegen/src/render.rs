@@ -405,7 +405,7 @@ fn server_module(
     let router = if has_websocket_routes {
         let websocket_routes = format_ident!("{}_routes", server.name());
         let websocket_call = quote! {
-            super::super::websocket::#websocket_routes(container, #routes_param).await
+            super::super::websocket::#websocket_routes(container, #routes_param)
         };
         quote! {
             {
@@ -436,29 +436,15 @@ fn server_module(
 
             #body_value
     };
-    if server.routes_are_async() {
-        quote! {
-            #(#handler_helpers)*
+    quote! {
+        #(#handler_helpers)*
 
-            pub(crate) async fn #function_name(
-                container: &super::super::container::Container,
-                #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
-                #views_parameter
-            ) -> #inner_return {
-                #body
-            }
-        }
-    } else {
-        quote! {
-            #(#handler_helpers)*
-
-            pub(crate) fn #function_name(
-                container: &super::super::container::Container,
-                #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
-                #views_parameter
-            ) -> #inner_return {
-                #body
-            }
+        pub(crate) fn #function_name(
+            container: &super::super::container::Container,
+            #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
+            #views_parameter
+        ) -> #inner_return {
+            #body
         }
     }
 }

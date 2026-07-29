@@ -275,7 +275,7 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(CONSOLE_ARGUMENT_HANDLER);
 
         assert!(source.contains("container.chatter()"));
-        assert!(source.contains("dispatch_table(container).await"));
+        assert!(source.contains("dispatch_table(container)"));
         assert!(source.contains("public_routes(container:&super::super::container::Container,"));
         assert!(source.contains("upgrade_entry(container"));
         assert!(!source.contains("console_argument_"));
@@ -314,7 +314,7 @@ impl RespondsToWebSocketNotification for Typist {
         let source = generated(CONSOLE_ARGUMENT_NOTIFICATION_HANDLER);
 
         assert!(source.contains("container.typist()"));
-        assert!(source.contains("dispatch_table(container).await"));
+        assert!(source.contains("dispatch_table(container)"));
         assert!(!source.contains("console_argument_"));
     }
 
@@ -763,18 +763,18 @@ impl Guard {
     fn generates_a_public_upgrade_entry() {
         let source = generated(FULL_SESSION);
 
-        assert!(source.contains("pubasyncfnupgrade_entry"));
+        assert!(source.contains("pubfnupgrade_entry"));
         assert!(source.contains("web_socket_upgrade_entry::WebSocketUpgradeEntry::new"));
-        assert!(source.contains("dispatch_table(container).await"));
+        assert!(source.contains("dispatch_table(container)"));
     }
 
     #[test]
     fn generates_a_route_registration_function_per_server() {
         let source = generated(FULL_SESSION);
 
-        assert!(source.contains("pubasyncfnpublic_routes"));
+        assert!(source.contains("pubfnpublic_routes"));
         assert!(source.contains("route_entry::RouteEntry::web_socket(\"/chat/{room}\""));
-        assert!(source.contains("chat_session::upgrade_entry(container).await"));
+        assert!(source.contains("chat_session::upgrade_entry(container)"));
     }
 
     #[test]
@@ -1250,13 +1250,13 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(CONSOLE_ARGUMENT_PROVIDER);
 
         assert!(source.contains(
-            "pubasyncfnupgrade_entry(container:&super::super::super::container::Container,)"
+            "pubfnupgrade_entry(container:&super::super::super::container::Container,)"
         ));
         assert!(source.contains("inner:container.session_user_provider(),"));
         assert!(source.contains(
-            "pubasyncfnpublic_routes(container:&super::super::container::Container,_routes:"
+            "pubfnpublic_routes(container:&super::super::container::Container,_routes:"
         ));
-        assert!(source.contains("upgrade_entry(container).await"));
+        assert!(source.contains("upgrade_entry(container)"));
     }
 
     #[test]

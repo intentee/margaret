@@ -1519,7 +1519,7 @@ impl GetCard {
         assert!(module(&code, "mod").contains("pub mod views;"));
         assert!(module(&code, "views").contains("pub struct Views"));
         assert!(module(&code, "views").contains("card"));
-        assert!(module(&code, "views/build").contains("pub async fn build"));
+        assert!(module(&code, "views/build").contains("pub fn build"));
         assert!(concatenated(&code).contains("super::views::build::build(container)"));
     }
 

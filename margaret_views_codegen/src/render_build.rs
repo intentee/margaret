@@ -16,7 +16,8 @@ pub(crate) fn render_build(views: &[View], bindings: &ContainerBindings) -> Toke
     });
 
     quote! {
-        pub async fn build(
+        #[must_use]
+        pub fn build(
             container: &super::super::container::Container,
         ) -> super::Views {
             super::Views {

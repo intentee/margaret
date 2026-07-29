@@ -59,7 +59,7 @@ fn http_server_assembly_reads_only_completed_dependencies() {
     let source = module(&generated(), "http/server_public");
 
     assert!(source.contains("container.get_home_get_home()"));
-    assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
+    assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
     assert!(source.contains(
         "->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>"
     ));
@@ -74,6 +74,6 @@ fn websocket_dispatch_reads_only_completed_dependencies() {
     );
 
     assert!(source.contains("handler:container.chat_chat_responder_chat_responder()"));
-    assert!(source.contains("dispatch_table(container).await"));
+    assert!(source.contains("dispatch_table(container)"));
     assert!(!source.contains("ConstructionError"));
 }

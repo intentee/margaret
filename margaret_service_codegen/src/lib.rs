@@ -137,7 +137,7 @@ mod tests {
             )
         );
         assert!(source.contains(
-            "letviews=::std::sync::Arc::new(super::views::build::build(container).await);"
+            "letviews=::std::sync::Arc::new(super::views::build::build(container));"
         ));
         assert!(source.contains("super::container::build::serve("));
     }
