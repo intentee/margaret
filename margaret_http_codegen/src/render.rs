@@ -401,6 +401,126 @@ fn server_router(
     }
 }
 
+struct RouteEntries {
+    calls: Vec<TokenStream>,
+    functions: Vec<TokenStream>,
+}
+
+struct RouteEntryNames<'names> {
+    routes_param: &'names Ident,
+    views_argument: &'names Option<TokenStream>,
+    views_param: &'names Ident,
+}
+
+#[derive(Default)]
+struct RouteEntryAccumulator {
+    handler_bindings: Vec<TokenStream>,
+    named_handlers: Vec<TokenStream>,
+}
+
+fn route_entries<'handler>(
+    table: &HttpRouteTable,
+    server: &HttpServer,
+    has_views: bool,
+    RouteEntryNames {
+        routes_param,
+        views_argument,
+        views_param,
+    }: &RouteEntryNames<'_>,
+    rendered_handler_entries: &mut impl Iterator<Item = &'handler RenderedHandler>,
+    accumulator: &mut RouteEntryAccumulator,
+) -> RouteEntries {
+    let mut route_entry_functions = Vec::new();
+    let mut route_entry_calls = Vec::new();
+
+    for (position, group) in table.route_groups(server.name()).enumerate() {
+        let path = group.path().pattern();
+        let mut named_parameters = Vec::new();
+        let mut named_arguments = Vec::new();
+        let mut constructs_handler = false;
+        let method_handlers = group
+            .method_routes()
+            .zip(rendered_handler_entries.by_ref())
+            .map(|(route, rendered_handler)| {
+                let function = &rendered_handler.function;
+                let method = &route.method;
+                let handler_call = quote! {
+                    #function(container, #routes_param, #views_argument)
+                };
+                let handler = if let Some(name) = &route.name {
+                    let binding = handler_binding(route);
+
+                    accumulator.handler_bindings.push(quote! {
+                        let #binding = #handler_call;
+                    });
+                    accumulator.named_handlers.push(quote! {
+                        margaret::framework::http::named_handler::NamedHandler::new(
+                            #name,
+                            #binding.clone(),
+                        )
+                    });
+                    named_parameters.push(quote! {
+                        #binding: &::std::sync::Arc<
+                            dyn margaret::framework::http::handler::Handler,
+                        >,
+                    });
+                    named_arguments.push(quote! { &#binding, });
+
+                    quote! { ::std::sync::Arc::clone(#binding) }
+                } else {
+                    constructs_handler = true;
+
+                    handler_call
+                };
+
+                quote! {
+                    margaret::framework::http::method_handler::MethodHandler::new(#method, #handler)
+                }
+            })
+            .collect::<Vec<TokenStream>>();
+        let method_handlers = vec_literal_tokens(method_handlers);
+        let entry_function = format_ident!("route_entry_{position}");
+        let entry_container = if constructs_handler {
+            format_ident!("container")
+        } else {
+            format_ident!("_container")
+        };
+        let entry_routes = if constructs_handler {
+            (*routes_param).clone()
+        } else {
+            format_ident!("_routes")
+        };
+        let entry_views = has_views.then(|| {
+            let name = if constructs_handler {
+                (*views_param).clone()
+            } else {
+                format_ident!("_views")
+            };
+
+            quote! { #name: &::std::sync::Arc<super::super::views::Views>, }
+        });
+
+        route_entry_functions.push(quote! {
+            fn #entry_function(
+                #entry_container: &super::super::container::Container,
+                #entry_routes: &::std::sync::Arc<super::super::routes::Routes>,
+                #entry_views
+                #(#named_parameters)*
+            ) -> margaret::framework::http::route_entry::RouteEntry {
+                margaret::framework::http::route_entry::RouteEntry::new(#path, #method_handlers)
+            }
+        });
+        route_entry_calls.push(quote! {
+            #entry_function(container, #routes_param, #views_argument #(#named_arguments)*)
+        });
+    }
+
+    RouteEntries {
+        calls: route_entry_calls,
+        functions: route_entry_functions,
+    }
+}
+
 fn server_module(
     table: &HttpRouteTable,
     server: &HttpServer,
@@ -435,47 +555,26 @@ fn server_module(
         .collect::<Vec<_>>();
     let mut rendered_handler_entries = rendered_handlers.iter();
     let views_argument = has_views.then(|| quote! { #views_param, });
-    let mut handler_bindings = Vec::new();
-    let mut named_handlers = Vec::new();
-    let route_entries = table.route_groups(server.name()).map(|group| {
-        let path = group.path().pattern();
-        let method_handlers = group
-            .method_routes()
-            .zip(rendered_handler_entries.by_ref())
-            .map(|(route, rendered_handler)| {
-                let function = &rendered_handler.function;
-                let method = &route.method;
-                let handler_call = quote! {
-                    #function(container, #routes_param, #views_argument)
-                };
-                let handler = if let Some(name) = &route.name {
-                    let binding = handler_binding(route);
+    let mut accumulator = RouteEntryAccumulator::default();
+    let RouteEntries {
+        calls: route_entry_calls,
+        functions: route_entry_functions,
+    } = route_entries(
+        table,
+        server,
+        has_views,
+        &RouteEntryNames {
+            routes_param: &routes_param,
+            views_argument: &views_argument,
+            views_param: &views_param,
+        },
+        &mut rendered_handler_entries,
+        &mut accumulator,
+    );
+    let handler_bindings = accumulator.handler_bindings;
+    let named_handlers = accumulator.named_handlers;
 
-                    handler_bindings.push(quote! {
-                        let #binding = #handler_call;
-                    });
-                    named_handlers.push(quote! {
-                        margaret::framework::http::named_handler::NamedHandler::new(
-                            #name,
-                            #binding.clone(),
-                        )
-                    });
-
-                    quote! { #binding.clone() }
-                } else {
-                    handler_call
-                };
-
-                quote! {
-                    margaret::framework::http::method_handler::MethodHandler::new(#method, #handler)
-                }
-            });
-        let method_handlers = vec_literal_tokens(method_handlers);
-
-        quote! {
-            margaret::framework::http::route_entry::RouteEntry::new(#path, #method_handlers)
-        }
-    });
+    let route_entries = route_entry_calls.into_iter();
     let route_entries = vec_literal_tokens(route_entries);
     let named_handlers = vec_literal_tokens(named_handlers);
     let router = server_router(has_websocket_routes, server, &routes_param, &route_entries);
@@ -498,6 +597,7 @@ fn server_module(
     };
     quote! {
         #(#handler_helpers)*
+        #(#route_entry_functions)*
 
         pub(crate) fn #function_name(
             container: &super::super::container::Container,
