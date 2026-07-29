@@ -64,7 +64,7 @@ mod tests {
     }
 
     impl Echo {
-        fn respond(&self, id: String) -> Response {
+        fn respond(&self, id: &str) -> Response {
             Response::text(200, format!("{}{id}", self.prefix))
         }
     }
@@ -85,8 +85,7 @@ mod tests {
                         responder.respond(
                             request
                                 .path_param("id")
-                                .expect("the test request carries the id parameter")
-                                .to_string(),
+                                .expect("the test request carries the id parameter"),
                         ),
                     ))
                 })

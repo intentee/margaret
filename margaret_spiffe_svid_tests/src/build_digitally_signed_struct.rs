@@ -9,7 +9,7 @@ use rustls::internal::msgs::codec::Reader;
 /// Panics when the fixture it builds cannot be prepared.
 pub fn build_digitally_signed_struct(
     scheme: SignatureScheme,
-    signature: Vec<u8>,
+    signature: &[u8],
 ) -> DigitallySignedStruct {
     let mut bytes = Vec::new();
 
