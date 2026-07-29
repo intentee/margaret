@@ -182,10 +182,42 @@ fn command_arm(
     }
 }
 
+struct SchemaTokens {
+    arm: TokenStream,
+    registration: TokenStream,
+}
+
 pub(crate) struct RenderedConsole {
     pub(crate) command: TokenStream,
     pub(crate) dispatches: Vec<RenderedCommand>,
     pub(crate) run: TokenStream,
+}
+
+fn schema_tokens(has_models: bool) -> SchemaTokens {
+    let registration = if has_models {
+        quote! {
+            .subcommand(clap::Command::new("schema"))
+        }
+    } else {
+        quote! {}
+    };
+
+    let arm = if has_models {
+        quote! {
+            Some(("schema", _matches)) => {
+                println!(
+                    "{}",
+                    margaret::framework::model::render_postgres::render_postgres(&super::schema::schema())
+                );
+
+                margaret::framework::console::command_outcome::CommandOutcome::Succeeded
+            }
+        }
+    } else {
+        quote! {}
+    };
+
+    SchemaTokens { arm, registration }
 }
 
 pub(crate) fn render(
@@ -228,28 +260,10 @@ pub(crate) fn render(
         .collect();
     let arms = rendered_commands.iter().map(|rendered| &rendered.arm);
 
-    let schema_registration = if has_models {
-        quote! {
-            .subcommand(clap::Command::new("schema"))
-        }
-    } else {
-        quote! {}
-    };
-
-    let schema_arm = if has_models {
-        quote! {
-            Some(("schema", _matches)) => {
-                println!(
-                    "{}",
-                    margaret::framework::model::render_postgres::render_postgres(&super::schema::schema())
-                );
-
-                margaret::framework::console::command_outcome::CommandOutcome::Succeeded
-            }
-        }
-    } else {
-        quote! {}
-    };
+    let SchemaTokens {
+        arm: schema_arm,
+        registration: schema_registration,
+    } = schema_tokens(has_models);
 
     let serve_registration = if serves {
         serve_registration(http_servers, serve_arguments)
