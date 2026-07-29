@@ -35,7 +35,7 @@ async fn public_jwks_from_fixture_verifies_real_token() -> Result<()> {
     });
 
     let set: PublicJwks = from_value(fixture)?;
-    let verified: TestClaims = set.verify(&token)?.must()?;
+    let verified: TestClaims = set.verify(&token)?.verified().expect("the token verifies");
 
     assert_eq!(verified, claims);
 

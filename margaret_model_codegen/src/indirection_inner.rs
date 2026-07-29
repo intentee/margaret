@@ -1,6 +1,6 @@
 use syn::Type;
 
-use crate::single_generic_argument::single_generic_argument;
+use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
 
 pub(crate) fn indirection_inner(ty: &Type) -> Option<&Type> {
     let Type::Path(type_path) = ty else {

@@ -860,9 +860,9 @@ struct PatchArticle;
 impl PatchArticle { #[process] fn respond(&self, #[route_parameter(from = "article")] article: String) -> anyhow::Result<Response> {} }
 
 #[singleton]
-#[responds_to_http(method = "get", name = "get_file", path = "/files/{*file_path}", server = "public")]
+#[responds_to_http(method = "get", name = "get_file", path = "/files/{*rest}", server = "public")]
 struct GetFile;
-impl GetFile { #[process] fn respond(&self, #[route_parameter(from = "file_path")] file_path: String) -> anyhow::Result<Response> {} }
+impl GetFile { #[process] fn respond(&self, #[route_parameter(from = "rest")] rest: String) -> anyhow::Result<Response> {} }
 
 #[singleton]
 #[responds_to_http(method = "get", path = "/health", server = "internal")]
@@ -890,17 +890,17 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             "pubfnget_article(&self,article:String,)->margaret::framework::http::forwardable_route::ForwardableRoute"
         ));
         assert!(source.contains(
-            "margaret::framework::http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/articles/\",),margaret::framework::http::url_segment::UrlSegment::SegmentParameter(margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
+            "margaret::framework::http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/articles/\",),margaret::framework::http::url_segment::UrlSegment::Parameter(margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
         ));
         assert!(!source.contains("Params"));
     }
 
     #[test]
-    fn generates_a_catch_all_url_segment_for_a_wildcard_route() {
+    fn generates_a_catch_all_segment_for_a_named_wildcard_get() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter(margaret::framework::http::url_parameter::UrlParameter{name:\"file_path\",value:file_path,}),"
+            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter(margaret::framework::http::url_parameter::UrlParameter{name:\"rest\",value:rest,})"
         ));
     }
 

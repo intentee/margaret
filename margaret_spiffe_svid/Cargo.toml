@@ -9,6 +9,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 futures-util = { workspace = true }
 log = { workspace = true }
+margaret_peer_identity = { path = "../margaret_peer_identity" }
 margaret_sync_holder = { path = "../margaret_sync_holder" }
 rustls = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types", "workload-api"] }

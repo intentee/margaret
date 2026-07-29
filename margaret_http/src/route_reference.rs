@@ -44,7 +44,7 @@ mod tests {
             Arc::from("http://localhost"),
             vec![
                 UrlSegment::Literal("/articles/"),
-                UrlSegment::SegmentParameter(UrlParameter {
+                UrlSegment::Parameter(UrlParameter {
                     name: "article",
                     value: "rust".to_string(),
                 }),

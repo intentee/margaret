@@ -17,7 +17,7 @@ impl RoutePath {
 
     pub fn parameters(&self) -> impl Iterator<Item = &str> {
         self.segments.iter().filter_map(|segment| match segment {
-            UrlSegment::CatchAllParameter(name) | UrlSegment::SegmentParameter(name) => {
+            UrlSegment::CatchAllParameter(name) | UrlSegment::Parameter(name) => {
                 Some(name.as_str())
             }
             UrlSegment::Literal(_) => None,
@@ -40,12 +40,12 @@ mod tests {
     use super::RoutePath;
 
     #[test]
-    fn lists_parameter_names_of_both_arities() {
-        let route_path = RoutePath::parse("/files/{name}/{*rest}");
+    fn lists_named_and_catch_all_parameters_and_skips_literals() {
+        let route_path = RoutePath::parse("/files/{bucket}/{*rest}");
 
         assert_eq!(
-            route_path.parameters().collect::<Vec<&str>>(),
-            vec!["name", "rest"]
+            route_path.parameters().collect::<Vec<_>>(),
+            vec!["bucket", "rest"]
         );
     }
 }
