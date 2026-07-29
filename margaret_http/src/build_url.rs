@@ -1,27 +1,6 @@
-use percent_encoding::AsciiSet;
-use percent_encoding::CONTROLS;
-use percent_encoding::utf8_percent_encode;
-
+use crate::encode_url_catch_all::encode_url_catch_all;
+use crate::encode_url_path_segment::encode_url_path_segment;
 use crate::url_segment::UrlSegment;
-
-const CATCH_ALL_PARAMETER: &AsciiSet = &CONTROLS
-    .add(b' ')
-    .add(b'"')
-    .add(b'#')
-    .add(b'%')
-    .add(b'<')
-    .add(b'>')
-    .add(b'?')
-    .add(b'[')
-    .add(b'\\')
-    .add(b']')
-    .add(b'^')
-    .add(b'`')
-    .add(b'{')
-    .add(b'|')
-    .add(b'}');
-
-const PARAMETER: &AsciiSet = &CATCH_ALL_PARAMETER.add(b'/');
 
 #[must_use]
 pub fn build_url(origin: &str, segments: &[UrlSegment]) -> String {
@@ -30,11 +9,11 @@ pub fn build_url(origin: &str, segments: &[UrlSegment]) -> String {
     for segment in segments {
         match segment {
             UrlSegment::CatchAllParameter(parameter) => {
-                url.extend(utf8_percent_encode(&parameter.value, CATCH_ALL_PARAMETER));
+                url.push_str(&encode_url_catch_all(&parameter.value));
             }
             UrlSegment::Literal(text) => url.push_str(text),
             UrlSegment::Parameter(parameter) => {
-                url.extend(utf8_percent_encode(&parameter.value, PARAMETER));
+                url.push_str(&encode_url_path_segment(&parameter.value));
             }
         }
     }
@@ -138,5 +117,54 @@ mod tests {
         );
 
         assert_eq!(url, "http://localhost/articles/rust/comments/42");
+    }
+
+    #[test]
+    fn keeps_a_parameter_from_escaping_its_segment_with_a_dot_segment() {
+        let url = build_url(
+            "http://localhost",
+            &[
+                UrlSegment::Literal("/articles/"),
+                UrlSegment::Parameter(UrlParameter {
+                    name: "article",
+                    value: "..".to_string(),
+                }),
+                UrlSegment::Literal("/edit"),
+            ],
+        );
+
+        assert_eq!(url, "http://localhost/articles/%2E./edit");
+    }
+
+    #[test]
+    fn keeps_a_catch_all_component_from_becoming_a_dot_segment() {
+        let url = build_url(
+            "http://localhost",
+            &[
+                UrlSegment::Literal("/files/"),
+                UrlSegment::CatchAllParameter(UrlParameter {
+                    name: "rest",
+                    value: "nested/../secret".to_string(),
+                }),
+            ],
+        );
+
+        assert_eq!(url, "http://localhost/files/nested/%2E./secret");
+    }
+
+    #[test]
+    fn does_not_build_a_protocol_relative_url_from_a_leading_slash_parameter() {
+        let url = build_url(
+            "http://localhost",
+            &[
+                UrlSegment::Literal("/"),
+                UrlSegment::Parameter(UrlParameter {
+                    name: "page",
+                    value: "/evil.example.com".to_string(),
+                }),
+            ],
+        );
+
+        assert_eq!(url, "http://localhost/%2Fevil.example.com");
     }
 }

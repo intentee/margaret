@@ -302,6 +302,8 @@ mod tests {
 
     const MULTIPART: &[u8] = b"--X\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nhello\r\n--X\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"face.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n--X\r\nContent-Disposition: form-data; name=\"raw\"; filename=\"raw.bin\"\r\n\r\nDATA\r\n--X--\r\n";
 
+    const TRAVERSING_UPLOAD: &[u8] = b"--X\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"../../escape.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n--X--\r\n";
+
     fn upload_in(directory: &TempDir) -> UploadConfig {
         UploadConfig::enabled(directory.path().to_path_buf())
     }
@@ -751,6 +753,34 @@ mod tests {
         assert_eq!(
             std::fs::read(raw.path()).expect("the temp file is readable"),
             b"DATA"
+        );
+    }
+
+    #[tokio::test]
+    async fn stores_an_uploaded_file_under_a_generated_name_inside_the_upload_directory() {
+        let directory = tempdir().expect("a temporary directory");
+        let inputs = parsed(
+            Some("multipart/form-data; boundary=X"),
+            "/upload",
+            TRAVERSING_UPLOAD,
+            &upload_in(&directory),
+        )
+        .await;
+
+        let avatar = inputs
+            .files
+            .get("avatar")
+            .expect("the avatar file is present");
+
+        assert_eq!(avatar.file_name(), "../../escape.png");
+        assert_eq!(avatar.path().parent(), Some(directory.path()));
+        assert_ne!(
+            avatar.path().file_name(),
+            Some(std::ffi::OsStr::new("escape.png"))
+        );
+        assert_eq!(
+            std::fs::read(avatar.path()).expect("the temp file is readable"),
+            b"PNG"
         );
     }
 
