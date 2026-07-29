@@ -12,7 +12,7 @@ pub fn render_console(
     plan: &ConsolePlan,
     serves: bool,
     has_models: bool,
-    servers: &[HttpServer],
+    http_servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
     bindings: &ContainerBindings,
 ) -> ConsoleArtifacts {
@@ -23,7 +23,7 @@ pub fn render_console(
                 &plan.commands,
                 serves,
                 has_models,
-                servers,
+                http_servers,
                 serve_arguments,
                 bindings,
             ),

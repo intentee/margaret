@@ -110,7 +110,7 @@ pub(crate) fn render(
     commands: &[ConsoleCommand],
     serves: bool,
     has_models: bool,
-    servers: &[HttpServer],
+    http_servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
     bindings: &ContainerBindings,
 ) -> TokenStream {
@@ -154,10 +154,10 @@ pub(crate) fn render(
     };
 
     let serve_registration = if serves {
-        let spiffe_secured = serves_spiffe(servers);
+        let spiffe_secured = serves_spiffe(http_servers);
         let svid_active = spiffe_secured || has_spiffe_http_client(serve_arguments);
         let service_arguments = serve_arguments.iter().map(argument_registration);
-        let server_arguments = servers.iter().map(|server| {
+        let http_server_arguments = http_servers.iter().map(|server| {
             let address_argument = server.address_argument();
             let url_argument = server.url_argument();
             let uploads_argument = server.uploads_argument();
@@ -181,7 +181,7 @@ pub(crate) fn render(
         });
 
         quote! {
-            .subcommand(clap::Command::new("serve")#(#server_arguments)*#spiffe_arguments #(#service_arguments)*)
+            .subcommand(clap::Command::new("serve")#(#http_server_arguments)*#spiffe_arguments #(#service_arguments)*)
         }
     } else {
         quote! {}

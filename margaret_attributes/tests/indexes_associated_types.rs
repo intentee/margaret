@@ -24,31 +24,31 @@ fn indexes_associated_types() {
 
     assert_eq!(trait_impls.len(), 1);
 
-    let produces = &trait_impls[0];
+    let produced_impl = &trait_impls[0];
 
-    assert_eq!(produces.module_path().join("::"), "associated_types");
+    assert_eq!(produced_impl.module_path().join("::"), "associated_types");
     assert_eq!(
         index
-            .resolve_module_path(produces.module_path(), produces.trait_path())
+            .resolve_module_path(produced_impl.module_path(), produced_impl.trait_path())
             .expect("the trait path resolves at the impl site")
             .to_string(),
         "associated_types::Produces"
     );
 
-    let names: Vec<&str> = produces
+    let names: Vec<&str> = produced_impl
         .associated_types()
         .iter()
         .map(margaret_attributes::indexed_associated_type::IndexedAssociatedType::name)
         .collect();
 
     assert_eq!(names, ["Extra", "Output"]);
-    assert!(produces.associated_type("Missing").is_none());
+    assert!(produced_impl.associated_type("Missing").is_none());
 
-    let output = produces
+    let output = produced_impl
         .associated_type("Output")
         .expect("the Output associated type is indexed");
     let model = index
-        .resolve_module_type(produces.module_path(), output.ty())
+        .resolve_module_type(produced_impl.module_path(), output.ty())
         .expect("the associated type resolves at the impl site");
 
     assert_eq!(model.to_string(), "associated_types::Model");

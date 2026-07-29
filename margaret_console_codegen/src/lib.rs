@@ -102,7 +102,7 @@ impl Farewell {
         index: &AttributeIndex,
         serves: bool,
         has_models: bool,
-        servers: &[HttpServer],
+        http_servers: &[HttpServer],
         serve_arguments: &[margaret_console_argument_codegen::console_argument::ConsoleArgument],
         bindings: &ContainerBindings,
     ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
@@ -112,7 +112,7 @@ impl Farewell {
             &plan,
             serves,
             has_models,
-            servers,
+            http_servers,
             serve_arguments,
             bindings,
         ))
@@ -120,7 +120,7 @@ impl Farewell {
 
     fn source_for(lib_source: &str, has_http: bool) -> String {
         let index = index_for(lib_source);
-        let servers = if has_http {
+        let http_servers = if has_http {
             vec![HttpServer::new(
                 "public".to_string(),
                 ServerTransportPolicy::Negotiable,
@@ -132,7 +132,7 @@ impl Farewell {
         let bindings = bindings(&index);
         let plan = ConsolePlan::build(&index, &bindings).expect("the console is planned");
 
-        render_console(&plan, has_http, false, &servers, &[], &bindings)
+        render_console(&plan, has_http, false, &http_servers, &[], &bindings)
             .module
             .format()
             .expect("the module formats")

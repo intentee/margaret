@@ -85,15 +85,17 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
             .await
     });
 
-    let verified = loop {
-        if let Ok(verified) = verifier.verify::<TestClaims>(&token, test_instant(1_700_000_000)) {
-            break verified;
+    let verified_claims = loop {
+        if let Ok(verified_claims) =
+            verifier.verify::<TestClaims>(&token, test_instant(1_700_000_000))
+        {
+            break verified_claims;
         }
 
         yield_now().await;
     };
 
-    assert_eq!(verified, claims);
+    assert_eq!(verified_claims, claims);
 
     cancellation_token.cancel();
     roll_task
