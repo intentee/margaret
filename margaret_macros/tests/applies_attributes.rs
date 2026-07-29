@@ -32,7 +32,7 @@ impl Subject {
     }
 
     #[process]
-    fn respond(&self, #[route_parameter] id: String) -> String {
+    fn respond(&self, #[route_parameter] id: &str) -> String {
         format!("{}/{id}", self.name)
     }
 
@@ -51,7 +51,7 @@ struct Binder {
 struct JwksEndpoint;
 
 impl Binder {
-    fn bind(&self, value: String) -> String {
+    fn bind(&self, value: &str) -> String {
         format!("{}{value}", self.prefix)
     }
 }
@@ -89,13 +89,13 @@ struct Message {
 fn attribute_macros_leave_runtime_behavior_untouched() {
     let subject = Subject::create("typed-name".to_string());
 
-    assert_eq!(subject.respond("path-id".to_string()), "typed-name/path-id");
+    assert_eq!(subject.respond("path-id"), "typed-name/path-id");
     assert_eq!(subject.run(), "typed-name");
     assert_eq!(
         Binder {
             prefix: "bind-".to_string(),
         }
-        .bind("bound".to_string()),
+        .bind("bound"),
         "bind-bound"
     );
 

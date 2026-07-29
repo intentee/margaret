@@ -756,7 +756,7 @@ mod tests {
                 .expect("the delegated test handler succeeds");
 
             Ok(ResponseContinuation::Done(
-                Response::forbidden().set_cookie(Cookie::new("session", "rotated")),
+                Response::forbidden().set_cookie(&Cookie::new("session", "rotated")),
             ))
         }
     }

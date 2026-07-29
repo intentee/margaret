@@ -30,7 +30,7 @@ impl SvidConverterService {
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
-    pub fn convert_x509_context(&self, x509_context: X509Context) -> Result<()> {
+    pub fn convert_x509_context(&self, x509_context: &X509Context) -> Result<()> {
         let default_svid: &X509Svid = x509_context
             .default_svid()
             .ok_or(SvidError::MissingDefaultSvid)?;
@@ -56,7 +56,7 @@ impl Service for SvidConverterService {
                         Ok(x509_context) => {
                             info!("Received x509 SVID context");
 
-                            if let Err(err) = self.convert_x509_context(x509_context) {
+                            if let Err(err) = self.convert_x509_context(&x509_context) {
                                 error!("Unable to process SVID context: {err:#?}");
                             }
                         }

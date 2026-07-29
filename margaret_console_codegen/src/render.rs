@@ -222,7 +222,7 @@ pub(crate) fn render(
                     _ => margaret::framework::console::print_help::print_help(&mut command),
                 },
                 Err(error) => {
-                    margaret::framework::console::outcome_for_clap_error::outcome_for_clap_error(error)
+                    margaret::framework::console::outcome_for_clap_error::outcome_for_clap_error(&error)
                 }
             }
         }

@@ -74,7 +74,7 @@ impl Response {
     }
 
     #[must_use]
-    pub fn set_cookie(self, cookie: Cookie<'static>) -> Self {
+    pub fn set_cookie(self, cookie: &Cookie<'_>) -> Self {
         self.header("set-cookie", cookie.to_string())
     }
 
@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn attaches_a_set_cookie_header() {
         let response = Response::text(200, "")
-            .set_cookie(Cookie::new("session", "abc"))
+            .set_cookie(&Cookie::new("session", "abc"))
             .into_http();
 
         assert!(

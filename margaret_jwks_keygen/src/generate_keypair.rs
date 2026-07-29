@@ -19,8 +19,8 @@ fn build_jwk_pair(
     crv: Curve,
     kid: String,
     pem: Result<String, p256::pkcs8::Error>,
-    x: Option<Vec<u8>>,
-    y: Option<Vec<u8>>,
+    x: Option<&[u8]>,
+    y: Option<&[u8]>,
 ) -> Result<JwkPair, JwksKeyError> {
     let pem = pem?;
 
@@ -68,8 +68,8 @@ pub fn generate_keypair(
                 secret_key
                     .to_pkcs8_pem(LineEnding::LF)
                     .map(|pem| pem.to_string()),
-                point.x().map(|coordinate| coordinate.to_vec()),
-                point.y().map(|coordinate| coordinate.to_vec()),
+                point.x().map(|coordinate| coordinate.as_slice()),
+                point.y().map(|coordinate| coordinate.as_slice()),
             )
         }
         Curve::P384 => {
@@ -82,8 +82,8 @@ pub fn generate_keypair(
                 secret_key
                     .to_pkcs8_pem(LineEnding::LF)
                     .map(|pem| pem.to_string()),
-                point.x().map(|coordinate| coordinate.to_vec()),
-                point.y().map(|coordinate| coordinate.to_vec()),
+                point.x().map(|coordinate| coordinate.as_slice()),
+                point.y().map(|coordinate| coordinate.as_slice()),
             )
         }
     }
@@ -104,8 +104,8 @@ mod tests {
             Err(p256::SecretKey::from_pkcs8_pem("not a valid pem")
                 .err()
                 .unwrap()),
-            Some(vec![1]),
-            Some(vec![2]),
+            Some(&[1]),
+            Some(&[2]),
         )
         .err()
         .unwrap();
@@ -126,7 +126,7 @@ mod tests {
             "kid".to_string(),
             Ok("pem".to_string()),
             None,
-            Some(vec![2]),
+            Some(&[2]),
         )
         .err()
         .unwrap();
@@ -143,7 +143,7 @@ mod tests {
             Curve::P256,
             "kid".to_string(),
             Ok("pem".to_string()),
-            Some(vec![1]),
+            Some(&[1]),
             None,
         )
         .err()

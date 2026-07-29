@@ -93,7 +93,7 @@ mod tests {
     }
 
     fn resolved(
-        written: syn::Path,
+        written: &syn::Path,
         module: &[&str],
         imports: &ModuleImports,
         items: &ItemPaths,
@@ -103,7 +103,7 @@ mod tests {
             .map(std::string::ToString::to_string)
             .collect();
 
-        resolve_path(&written, &module_path, imports, items).map(|resolved| resolved.to_string())
+        resolve_path(written, &module_path, imports, items).map(|resolved| resolved.to_string())
     }
 
     #[test]
@@ -116,7 +116,7 @@ mod tests {
 
         assert_eq!(
             resolved(
-                parse_quote!(Greeter),
+                &parse_quote!(Greeter),
                 &["crate"],
                 &imports,
                 &ItemPaths::default()
@@ -129,7 +129,7 @@ mod tests {
     fn resolves_a_multi_segment_path_as_written() {
         assert_eq!(
             resolved(
-                parse_quote!(margaret_http::request::Request),
+                &parse_quote!(margaret_http::request::Request),
                 &["crate"],
                 &ModuleImports::default(),
                 &ItemPaths::default(),
@@ -152,7 +152,7 @@ mod tests {
 
         assert_eq!(
             resolved(
-                parse_quote!(ValidationResult<Form>),
+                &parse_quote!(ValidationResult<Form>),
                 &["crate"],
                 &imports,
                 &ItemPaths::default()
@@ -167,7 +167,7 @@ mod tests {
 
         assert_eq!(
             resolved(
-                parse_quote!(User),
+                &parse_quote!(User),
                 &["crate", "models"],
                 &ModuleImports::default(),
                 &items
@@ -182,7 +182,7 @@ mod tests {
 
         assert_eq!(
             resolved(
-                parse_quote!(String),
+                &parse_quote!(String),
                 &["crate"],
                 &ModuleImports::default(),
                 &items
@@ -195,7 +195,7 @@ mod tests {
     fn resolves_a_bare_string_to_the_prelude() {
         assert_eq!(
             resolved(
-                parse_quote!(String),
+                &parse_quote!(String),
                 &["crate"],
                 &ModuleImports::default(),
                 &ItemPaths::default()
@@ -208,7 +208,7 @@ mod tests {
     fn resolves_a_bare_copy_primitive_to_the_prelude() {
         assert_eq!(
             resolved(
-                parse_quote!(u16),
+                &parse_quote!(u16),
                 &["crate"],
                 &ModuleImports::default(),
                 &ItemPaths::default()
@@ -221,7 +221,7 @@ mod tests {
     fn returns_none_for_an_unresolvable_leaf() {
         assert_eq!(
             resolved(
-                parse_quote!(Unknown),
+                &parse_quote!(Unknown),
                 &["crate"],
                 &ModuleImports::default(),
                 &ItemPaths::default()
@@ -239,7 +239,7 @@ mod tests {
 
         assert_eq!(
             resolved(
-                empty,
+                &empty,
                 &["crate"],
                 &ModuleImports::default(),
                 &ItemPaths::default()
@@ -252,7 +252,7 @@ mod tests {
     fn resolves_a_crate_rooted_multi_segment_path_as_written() {
         assert_eq!(
             resolved(
-                parse_quote!(crate::greeter::Greeter),
+                &parse_quote!(crate::greeter::Greeter),
                 &["crate", "routes"],
                 &ModuleImports::default(),
                 &ItemPaths::default()
@@ -267,13 +267,13 @@ mod tests {
         imports.insert("greeter".to_string(), path(&["crate", "greeter"]));
 
         let direct = resolved(
-            parse_quote!(crate::greeter::Greeter),
+            &parse_quote!(crate::greeter::Greeter),
             &["crate"],
             &ModuleImports::default(),
             &ItemPaths::default(),
         );
         let aliased = resolved(
-            parse_quote!(greeter::Greeter),
+            &parse_quote!(greeter::Greeter),
             &["crate"],
             &imports,
             &ItemPaths::default(),
@@ -290,7 +290,7 @@ mod tests {
 
         assert_eq!(
             resolved(
-                parse_quote!(g::Greeter),
+                &parse_quote!(g::Greeter),
                 &["crate"],
                 &imports,
                 &ItemPaths::default()
@@ -303,7 +303,7 @@ mod tests {
     fn resolves_a_self_prefixed_path_against_the_current_module() {
         assert_eq!(
             resolved(
-                parse_quote!(self::User),
+                &parse_quote!(self::User),
                 &["crate", "models"],
                 &ModuleImports::default(),
                 &ItemPaths::default()
@@ -316,7 +316,7 @@ mod tests {
     fn resolves_a_super_prefixed_path_against_the_parent_module() {
         assert_eq!(
             resolved(
-                parse_quote!(super::Shared),
+                &parse_quote!(super::Shared),
                 &["crate", "models", "user"],
                 &ModuleImports::default(),
                 &ItemPaths::default()
@@ -331,7 +331,7 @@ mod tests {
 
         assert_eq!(
             resolved(
-                parse_quote!(user::User),
+                &parse_quote!(user::User),
                 &["crate", "models"],
                 &ModuleImports::default(),
                 &items

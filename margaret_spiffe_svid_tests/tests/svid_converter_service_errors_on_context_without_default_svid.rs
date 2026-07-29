@@ -9,7 +9,7 @@ fn errors_on_context_without_default_svid() {
     let (ca_bundle_tx, _ca_bundle_rx) = broadcast::channel(1);
     let service = build_converter_service(ca_bundle_tx);
 
-    let result = service.convert_x509_context(X509Context::new(vec![], X509BundleSet::new()));
+    let result = service.convert_x509_context(&X509Context::new(vec![], X509BundleSet::new()));
 
     assert!(result.is_err());
 }

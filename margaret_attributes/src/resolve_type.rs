@@ -41,8 +41,12 @@ mod tests {
         )
     }
 
-    fn resolved(declared: syn::Type, imports: &ModuleImports, items: &ItemPaths) -> Option<String> {
-        resolve_type(&declared, &["crate".to_string()], imports, items).map(|path| path.to_string())
+    fn resolved(
+        declared: &syn::Type,
+        imports: &ModuleImports,
+        items: &ItemPaths,
+    ) -> Option<String> {
+        resolve_type(declared, &["crate".to_string()], imports, items).map(|path| path.to_string())
     }
 
     #[test]
@@ -54,7 +58,7 @@ mod tests {
         );
 
         assert_eq!(
-            resolved(parse_quote!(&Routes), &imports, &ItemPaths::default()),
+            resolved(&parse_quote!(&Routes), &imports, &ItemPaths::default()),
             Some("crate::margaret::routes::Routes".to_string())
         );
     }
@@ -65,7 +69,7 @@ mod tests {
         imports.insert("Routes".to_string(), path(&["crate", "routes", "Routes"]));
 
         assert_eq!(
-            resolved(parse_quote!(&mut Routes), &imports, &ItemPaths::default()),
+            resolved(&parse_quote!(&mut Routes), &imports, &ItemPaths::default()),
             Some("crate::routes::Routes".to_string())
         );
     }
@@ -74,7 +78,7 @@ mod tests {
     fn returns_none_for_a_non_path_type() {
         assert_eq!(
             resolved(
-                parse_quote!((u8, u8)),
+                &parse_quote!((u8, u8)),
                 &ModuleImports::default(),
                 &ItemPaths::default()
             ),
