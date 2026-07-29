@@ -107,7 +107,7 @@ fn route_type_tokens(named: &NamedRoute<'_>) -> TokenStream {
     }
 }
 
-fn route_constructor(named: &NamedRoute<'_>, origin: TokenStream) -> TokenStream {
+fn route_constructor(named: &NamedRoute<'_>, origin: &TokenStream) -> TokenStream {
     let segments = segments_tokens(named);
 
     if is_get(named) {
@@ -130,7 +130,7 @@ fn route_method(named: &NamedRoute<'_>, origin: &Ident) -> TokenStream {
 
         quote! { #parameter: String }
     });
-    let constructor = route_constructor(named, quote! { self.#origin.clone() });
+    let constructor = route_constructor(named, &quote! { self.#origin.clone() });
 
     quote! {
         #[must_use]
@@ -175,7 +175,7 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
     };
     let paramless_inits = paramless.iter().map(|named| {
         let field = route_field_ident(named);
-        let route_construction = route_constructor(named, quote! { #origin.clone() });
+        let route_construction = route_constructor(named, &quote! { #origin.clone() });
 
         quote! { #field: #route_construction, }
     });

@@ -39,14 +39,14 @@ mod tests {
     use crate::jwks_secret_store_target::JwksSecretStoreTarget;
     use crate::read_jwks_secret_store_target::read_jwks_secret_store_target;
 
-    fn args(attribute: Attribute) -> AttributeArgs {
-        AttributeArgs::from_attribute(&attribute).expect("the arguments parse")
+    fn args(attribute: &Attribute) -> AttributeArgs {
+        AttributeArgs::from_attribute(attribute).expect("the arguments parse")
     }
 
     #[test]
     fn reads_the_server_target() {
         let target = read_jwks_secret_store_target(
-            &args(parse_quote!(#[jwks_secret_store(server)])),
+            &args(&parse_quote!(#[jwks_secret_store(server)])),
             "site",
         )
         .expect("the server target is read");
@@ -57,7 +57,7 @@ mod tests {
     #[test]
     fn reads_a_client_target_tag() {
         let target = read_jwks_secret_store_target(
-            &args(parse_quote!(#[jwks_secret_store(client = auth)])),
+            &args(&parse_quote!(#[jwks_secret_store(client = auth)])),
             "site",
         )
         .expect("the client target is read");
@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn rejects_an_empty_target() {
         assert!(
-            read_jwks_secret_store_target(&args(parse_quote!(#[jwks_secret_store])), "site")
+            read_jwks_secret_store_target(&args(&parse_quote!(#[jwks_secret_store])), "site")
                 .is_err()
         );
     }
@@ -77,7 +77,7 @@ mod tests {
     fn rejects_both_the_server_and_a_client() {
         assert!(
             read_jwks_secret_store_target(
-                &args(parse_quote!(#[jwks_secret_store(server, client = auth)])),
+                &args(&parse_quote!(#[jwks_secret_store(server, client = auth)])),
                 "site",
             )
             .is_err()
@@ -88,7 +88,7 @@ mod tests {
     fn rejects_a_client_target_that_is_not_a_plain_name() {
         assert!(
             read_jwks_secret_store_target(
-                &args(parse_quote!(#[jwks_secret_store(client = auth::inner)])),
+                &args(&parse_quote!(#[jwks_secret_store(client = auth::inner)])),
                 "site",
             )
             .is_err()
@@ -99,7 +99,7 @@ mod tests {
     fn rejects_a_client_target_that_is_not_a_path() {
         assert!(
             read_jwks_secret_store_target(
-                &args(parse_quote!(#[jwks_secret_store(client = "auth")])),
+                &args(&parse_quote!(#[jwks_secret_store(client = "auth")])),
                 "site",
             )
             .is_err()
@@ -110,7 +110,7 @@ mod tests {
     fn rejects_an_unrecognized_argument() {
         assert!(
             read_jwks_secret_store_target(
-                &args(parse_quote!(#[jwks_secret_store(server, extra)])),
+                &args(&parse_quote!(#[jwks_secret_store(server, extra)])),
                 "site",
             )
             .is_err()

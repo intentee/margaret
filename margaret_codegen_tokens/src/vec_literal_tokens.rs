@@ -23,14 +23,14 @@ mod tests {
 
     use super::vec_literal_tokens;
 
-    fn collapsed(tokens: TokenStream) -> String {
+    fn collapsed(tokens: &TokenStream) -> String {
         tokens.to_string().split_whitespace().collect()
     }
 
     #[test]
     fn builds_an_empty_vec_without_an_array() {
         assert_eq!(
-            collapsed(vec_literal_tokens(Vec::<TokenStream>::new())),
+            collapsed(&vec_literal_tokens(Vec::<TokenStream>::new())),
             "::std::vec::Vec::new()"
         );
     }
@@ -38,7 +38,7 @@ mod tests {
     #[test]
     fn builds_a_vec_from_an_array_of_elements() {
         assert_eq!(
-            collapsed(vec_literal_tokens(vec![
+            collapsed(&vec_literal_tokens(vec![
                 quote! { first },
                 quote! { second }
             ])),

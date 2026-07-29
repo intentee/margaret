@@ -115,12 +115,12 @@ mod tests {
     use crate::attribute_args_parse_error::AttributeArgsParseError;
     use crate::attribute_error::AttributeError;
 
-    fn parse(attribute: Attribute) -> Result<AttributeArgs, AttributeArgsParseError> {
-        AttributeArgs::from_attribute(&attribute)
+    fn parse(attribute: &Attribute) -> Result<AttributeArgs, AttributeArgsParseError> {
+        AttributeArgs::from_attribute(attribute)
     }
 
     fn parsed(attribute: Attribute) -> AttributeArgs {
-        parse(attribute).expect("the arguments parse")
+        parse(&attribute).expect("the arguments parse")
     }
 
     #[test]
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn from_attribute_rejects_a_duplicated_named_argument() {
-        let error = parse(parse_quote!(#[index(name = "a", name = "b")]))
+        let error = parse(&parse_quote!(#[index(name = "a", name = "b")]))
             .map(|_| ())
             .expect_err("duplicates fail");
 
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn from_attribute_rejects_a_malformed_argument_list() {
-        let error = parse(parse_quote!(#[index(= 5)]))
+        let error = parse(&parse_quote!(#[index(= 5)]))
             .map(|_| ())
             .expect_err("malformed lists fail");
 

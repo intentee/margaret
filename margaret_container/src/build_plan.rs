@@ -275,7 +275,7 @@ impl DependencyResolver<'_> {
     fn resolve_direct(
         &self,
         item: &IndexedItem,
-        source: ConstructionSource,
+        source: &ConstructionSource,
         jwks_targets: &BTreeMap<usize, JwksSecretStoreTarget>,
         concrete_path: &CanonicalPath,
     ) -> Result<DirectConstruction, ContainerError> {
@@ -290,7 +290,9 @@ impl DependencyResolver<'_> {
                     method: constructor.identifier().to_string(),
                 })
             }
-            ConstructionSource::Fieldless(shape) => Ok(DirectConstruction::Fieldless { shape }),
+            ConstructionSource::Fieldless(shape) => {
+                Ok(DirectConstruction::Fieldless { shape: *shape })
+            }
         }
     }
 
@@ -776,7 +778,7 @@ pub(crate) fn build_plan(
         let provider_key = provided.key().clone();
 
         let construction =
-            resolver.resolve_direct(item, construction, &jwks_targets, &concrete_path)?;
+            resolver.resolve_direct(item, &construction, &jwks_targets, &concrete_path)?;
 
         providers.insert(
             provider_key,
@@ -802,7 +804,7 @@ pub(crate) fn build_plan(
         } = draft;
 
         let construction =
-            resolver.resolve_direct(item, construction, &jwks_targets, &concrete_path)?;
+            resolver.resolve_direct(item, &construction, &jwks_targets, &concrete_path)?;
 
         constructions.insert(
             concrete_path.clone(),

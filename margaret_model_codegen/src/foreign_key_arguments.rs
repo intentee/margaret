@@ -56,14 +56,14 @@ mod tests {
     use crate::foreign_key_arguments::ForeignKeyArguments;
     use crate::model_codegen_error::ModelCodegenError;
 
-    fn parse(attribute: Attribute) -> Result<ForeignKeyArguments, ModelCodegenError> {
-        let arguments = AttributeArgs::from_attribute(&attribute).expect("the arguments parse");
+    fn parse(attribute: &Attribute) -> Result<ForeignKeyArguments, ModelCodegenError> {
+        let arguments = AttributeArgs::from_attribute(attribute).expect("the arguments parse");
 
         ForeignKeyArguments::parse(&arguments, "crate::Model", "author")
     }
 
     fn on_delete(attribute: Attribute) -> String {
-        parse(attribute)
+        parse(&attribute)
             .expect("the foreign key arguments resolve")
             .on_delete
             .to_string()
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn rejects_no_action_as_an_explicit_value() {
-        let message = parse(parse_quote!(#[foreign_key(on_delete = no_action)]))
+        let message = parse(&parse_quote!(#[foreign_key(on_delete = no_action)]))
             .err()
             .unwrap()
             .to_string();
@@ -121,6 +121,6 @@ mod tests {
 
     #[test]
     fn rejects_a_string_valued_action() {
-        assert!(parse(parse_quote!(#[foreign_key(on_delete = "cascade")])).is_err());
+        assert!(parse(&parse_quote!(#[foreign_key(on_delete = "cascade")])).is_err());
     }
 }

@@ -114,7 +114,7 @@ mod tests {
         )
     }
 
-    fn collapsed(tokens: proc_macro2::TokenStream) -> String {
+    fn collapsed(tokens: &proc_macro2::TokenStream) -> String {
         tokens.to_string().split_whitespace().collect()
     }
 
@@ -124,7 +124,7 @@ mod tests {
             name: "loud".to_string(),
         };
 
-        assert_eq!(collapsed(flag.field_type()), "bool");
+        assert_eq!(collapsed(&flag.field_type()), "bool");
         assert_eq!(flag.name(), "loud");
     }
 
@@ -137,7 +137,7 @@ mod tests {
             value_type: path(&["std", "path", "PathBuf"]),
         };
 
-        assert_eq!(collapsed(named.field_type()), "std::path::PathBuf");
+        assert_eq!(collapsed(&named.field_type()), "std::path::PathBuf");
         assert_eq!(named.name(), "config");
     }
 
@@ -151,7 +151,7 @@ mod tests {
         };
 
         assert_eq!(
-            collapsed(named.field_type()),
+            collapsed(&named.field_type()),
             "::std::option::Option<std::string::String>"
         );
     }
@@ -165,7 +165,10 @@ mod tests {
             value_type: path(&["crate", "geometry", "Point"]),
         };
 
-        assert_eq!(collapsed(positional.field_type()), "crate::geometry::Point");
+        assert_eq!(
+            collapsed(&positional.field_type()),
+            "crate::geometry::Point"
+        );
         assert_eq!(positional.name(), "point");
     }
 
@@ -176,7 +179,7 @@ mod tests {
         };
 
         assert_eq!(flag.weaving(), WeavingKind::Copy);
-        assert_eq!(collapsed(flag.parameter_referent()), "bool");
+        assert_eq!(collapsed(&flag.parameter_referent()), "bool");
     }
 
     #[test]
@@ -200,7 +203,7 @@ mod tests {
             value_type: path(&["std", "string", "String"]),
         };
 
-        assert_eq!(collapsed(named.parameter_referent()), "str");
+        assert_eq!(collapsed(&named.parameter_referent()), "str");
     }
 
     #[test]
@@ -212,7 +215,7 @@ mod tests {
             value_type: path(&["std", "path", "PathBuf"]),
         };
 
-        assert_eq!(collapsed(named.parameter_referent()), "::std::path::Path");
+        assert_eq!(collapsed(&named.parameter_referent()), "::std::path::Path");
     }
 
     #[test]
@@ -261,7 +264,7 @@ mod tests {
     fn a_spiffe_http_client_field_is_a_reqwest_client() {
         let client = ConsoleArgument::SpiffeHttpClient;
 
-        assert_eq!(collapsed(client.field_type()), "reqwest::Client");
+        assert_eq!(collapsed(&client.field_type()), "reqwest::Client");
         assert_eq!(client.name(), "spiffe_http_client");
     }
 
@@ -270,6 +273,6 @@ mod tests {
         let client = ConsoleArgument::SpiffeHttpClient;
 
         assert_eq!(client.weaving(), WeavingKind::Cloned);
-        assert_eq!(collapsed(client.parameter_referent()), "reqwest::Client");
+        assert_eq!(collapsed(&client.parameter_referent()), "reqwest::Client");
     }
 }

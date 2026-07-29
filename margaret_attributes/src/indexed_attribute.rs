@@ -38,10 +38,10 @@ impl IndexedAttribute {
                 .collect(),
         );
 
-        Self::from_canonical(attribute, canonical_path)
+        Self::from_canonical(&attribute, canonical_path)
     }
 
-    pub(crate) fn from_canonical(attribute: Attribute, canonical_path: CanonicalPath) -> Self {
+    pub(crate) fn from_canonical(attribute: &Attribute, canonical_path: CanonicalPath) -> Self {
         let args = match AttributeArgs::from_attribute(&attribute) {
             Ok(args) => IndexedAttributeArgs::Parsed(args),
             Err(AttributeArgsParseError::Malformed {
@@ -64,7 +64,7 @@ impl IndexedAttribute {
 
         Self {
             args,
-            attribute,
+            attribute: attribute.clone(),
             framework_attribute,
         }
     }

@@ -109,7 +109,7 @@ impl Farewell {
         let plan = ConsolePlan::build(index, bindings)?;
 
         Ok(render_console(
-            plan,
+            &plan,
             serves,
             has_models,
             servers,
@@ -132,7 +132,7 @@ impl Farewell {
         let bindings = bindings(&index);
         let plan = ConsolePlan::build(&index, &bindings).expect("the console is planned");
 
-        render_console(plan, has_http, false, &servers, &[], &bindings)
+        render_console(&plan, has_http, false, &servers, &[], &bindings)
             .module
             .format()
             .expect("the module formats")

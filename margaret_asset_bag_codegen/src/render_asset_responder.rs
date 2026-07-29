@@ -79,7 +79,7 @@ mod tests {
     use super::render_asset_responder;
     use crate::cache_policy::CachePolicy;
 
-    fn rendered(served: BTreeMap<String, CachePolicy>) -> String {
+    fn rendered(served: &BTreeMap<String, CachePolicy>) -> String {
         render_asset_responder(&served, "assets", "..", "AssetResponder").to_string()
     }
 
@@ -89,7 +89,7 @@ mod tests {
         served.insert("app_A1B2C3D4.js".to_string(), CachePolicy::Immutable);
         served.insert("service_worker.js".to_string(), CachePolicy::Revalidate);
 
-        let source = rendered(served);
+        let source = rendered(&served);
 
         assert!(source.contains("pub struct AssetResponder"));
         assert!(source.contains("static_bytes"));
@@ -112,7 +112,7 @@ mod tests {
         served.insert("app_A1B2C3D4.js".to_string(), CachePolicy::Immutable);
         served.insert("app_A1B2C3D4.js.map".to_string(), CachePolicy::Immutable);
 
-        let source = rendered(served);
+        let source = rendered(&served);
 
         assert!(source.contains("\"app_A1B2C3D4.js\" =>"));
         assert!(!source.contains(".map"));
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn renders_only_the_fallback_for_an_empty_served_set() {
-        let source = rendered(BTreeMap::new());
+        let source = rendered(&BTreeMap::new());
 
         assert!(source.contains("pub struct AssetResponder"));
         assert!(source.contains("not_found"));

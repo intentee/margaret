@@ -9,7 +9,7 @@ use crate::render::render;
 
 #[must_use]
 pub fn render_console(
-    plan: ConsolePlan,
+    plan: &ConsolePlan,
     serves: bool,
     has_models: bool,
     servers: &[HttpServer],

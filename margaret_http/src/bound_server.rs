@@ -262,7 +262,7 @@ fn report_connection_task_outcome(outcome: Result<(), JoinError>) {
     }
 }
 
-fn error_response(error: RequestError) -> Response {
+fn error_response(error: &RequestError) -> Response {
     match error {
         RequestError::PayloadTooLarge { .. } => Response::text(413, "Payload Too Large"),
         _ => Response::text(400, "Bad Request"),
@@ -388,7 +388,7 @@ async fn dispatch_web_socket(
                 .await
                 .into_http()
         }
-        Err(error) => error_response(error).into_http(),
+        Err(error) => error_response(&error).into_http(),
     }
 }
 
@@ -429,7 +429,7 @@ async fn dispatch(
             .await
             {
                 Ok(request) => complete_request(route, request, &forward_targets).await,
-                Err(error) => error_response(error).into_http(),
+                Err(error) => error_response(&error).into_http(),
             }
         }
     }
@@ -507,14 +507,14 @@ mod tests {
     #[test]
     fn maps_request_errors_to_status_codes() {
         assert_eq!(
-            error_response(RequestError::PayloadTooLarge { limit: 8 })
+            error_response(&RequestError::PayloadTooLarge { limit: 8 })
                 .into_http()
                 .status()
                 .as_u16(),
             413
         );
         assert_eq!(
-            error_response(RequestError::MissingMultipartBoundary)
+            error_response(&RequestError::MissingMultipartBoundary)
                 .into_http()
                 .status()
                 .as_u16(),

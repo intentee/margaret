@@ -167,7 +167,7 @@ pub fn build(
     let console_roots = if features.has_console {
         let plan = margaret_console_codegen::console_plan::ConsolePlan::build(&index, bindings)?;
         let console = margaret_console_codegen::render_console::render_console(
-            plan,
+            &plan,
             features.serves,
             features.has_models,
             &servers,

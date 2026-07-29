@@ -34,7 +34,7 @@ mod tests {
 
     use super::ReverseConsoleArgumentWeaver;
 
-    fn collapsed(tokens: TokenStream) -> String {
+    fn collapsed(tokens: &TokenStream) -> String {
         tokens.to_string().split_whitespace().collect()
     }
 
@@ -61,20 +61,26 @@ mod tests {
     fn moves_the_first_non_copy_slot_encountered_from_the_end() {
         let mut weaver = ReverseConsoleArgumentWeaver::new();
 
-        assert_eq!(collapsed(weaver.weave(&cloned(), 0)), "arguments.argument0");
+        assert_eq!(
+            collapsed(&weaver.weave(&cloned(), 0)),
+            "arguments.argument0"
+        );
     }
 
     #[test]
     fn clones_earlier_non_copy_uses_after_the_last_use_has_been_seen() {
         let mut weaver = ReverseConsoleArgumentWeaver::new();
 
-        assert_eq!(collapsed(weaver.weave(&cloned(), 0)), "arguments.argument0");
         assert_eq!(
-            collapsed(weaver.weave(&cloned(), 0)),
+            collapsed(&weaver.weave(&cloned(), 0)),
+            "arguments.argument0"
+        );
+        assert_eq!(
+            collapsed(&weaver.weave(&cloned(), 0)),
             "arguments.argument0.clone()"
         );
         assert_eq!(
-            collapsed(weaver.weave(&cloned(), 0)),
+            collapsed(&weaver.weave(&cloned(), 0)),
             "arguments.argument0.clone()"
         );
     }
@@ -83,18 +89,24 @@ mod tests {
     fn copy_slots_never_clone() {
         let mut weaver = ReverseConsoleArgumentWeaver::new();
 
-        assert_eq!(collapsed(weaver.weave(&flag(), 1)), "arguments.argument1");
-        assert_eq!(collapsed(weaver.weave(&flag(), 1)), "arguments.argument1");
+        assert_eq!(collapsed(&weaver.weave(&flag(), 1)), "arguments.argument1");
+        assert_eq!(collapsed(&weaver.weave(&flag(), 1)), "arguments.argument1");
     }
 
     #[test]
     fn slots_are_decided_independently() {
         let mut weaver = ReverseConsoleArgumentWeaver::new();
 
-        assert_eq!(collapsed(weaver.weave(&cloned(), 0)), "arguments.argument0");
-        assert_eq!(collapsed(weaver.weave(&cloned(), 1)), "arguments.argument1");
         assert_eq!(
-            collapsed(weaver.weave(&cloned(), 0)),
+            collapsed(&weaver.weave(&cloned(), 0)),
+            "arguments.argument0"
+        );
+        assert_eq!(
+            collapsed(&weaver.weave(&cloned(), 1)),
+            "arguments.argument1"
+        );
+        assert_eq!(
+            collapsed(&weaver.weave(&cloned(), 0)),
             "arguments.argument0.clone()"
         );
     }

@@ -21,7 +21,7 @@ impl ScannedAttribute {
             .map(|attribute| {
                 let canonical_path = resolve(attribute.attribute.path());
 
-                IndexedAttribute::from_canonical(attribute.attribute, canonical_path)
+                IndexedAttribute::from_canonical(&attribute.attribute, canonical_path)
             })
             .collect()
     }
