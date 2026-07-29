@@ -1,3 +1,4 @@
+mod command_builder;
 pub mod console_artifacts;
 pub mod console_codegen_error;
 mod console_command;
@@ -6,6 +7,7 @@ mod console_commands;
 pub mod console_plan;
 mod render;
 pub mod render_console;
+mod run_entry_point;
 
 #[cfg(test)]
 mod tests {
@@ -198,6 +200,20 @@ impl Farewell {
         assert!(!source.contains("super::container::build::construct_farewell().await"));
         assert!(source.contains("report_failure::report_failure(error"));
         assert!(source.contains(".run()"));
+    }
+
+    #[test]
+    fn keeps_a_command_named_after_the_entry_point_from_colliding_with_it() {
+        let source = source_for(
+            "#[singleton]\n#[console_command(name = \"run\")]\nstruct Run;\n\nimpl Run {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"command\")]\nstruct Command;\n\nimpl Command {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains("pubfnrun<Arguments,Argument>"));
+        assert!(source.contains(r#"Some(("run",matches))=>run_2(matches)"#));
+        assert!(source.contains(r#"Some(("command",matches))=>command_2(matches)"#));
+        assert!(source.contains("fnrun_2(_matches:&clap::ArgMatches,)"));
+        assert!(source.contains("fncommand_2(_matches:&clap::ArgMatches,)"));
     }
 
     #[test]

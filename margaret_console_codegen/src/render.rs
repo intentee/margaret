@@ -1,7 +1,9 @@
+use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use margaret_attributes::name_allocator::NameAllocator;
 use margaret_console_argument_codegen::argument_registration::argument_registration;
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
@@ -12,7 +14,9 @@ use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
+use crate::command_builder::COMMAND_BUILDER;
 use crate::console_command::ConsoleCommand;
+use crate::run_entry_point::RUN_ENTRY_POINT;
 
 fn transport_argument_registration(server: &HttpServer) -> TokenStream {
     let transport_argument = server.transport_argument();
@@ -84,7 +88,11 @@ pub(crate) struct RenderedCommand {
     pub(crate) dispatch: TokenStream,
 }
 
-fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> RenderedCommand {
+fn command_arm(
+    command: &ConsoleCommand,
+    module: &Ident,
+    bindings: &ContainerBindings,
+) -> RenderedCommand {
     let name = &command.name;
     let dispatch_parameter = if command.arguments.is_empty() {
         quote! { _matches }
@@ -103,7 +111,6 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> Render
         .collect();
     let construction = bindings.construction_invocation(&command.accessor.to_string(), &values);
     let construction_is_async = bindings.construction_is_async(&command.accessor.to_string());
-    let module = format_ident!("{}", command.accessor);
     let accessor_access = quote! {
         (match #construction {
             Ok(value) => value,
@@ -201,9 +208,23 @@ pub(crate) fn render(
         quote! {}
     };
     let subcommands = commands.iter().map(subcommand_registration);
+    let mut dispatch_names = NameAllocator::new();
+
+    dispatch_names.reserve(RUN_ENTRY_POINT);
+    dispatch_names.reserve(COMMAND_BUILDER);
+
     let rendered_commands: Vec<RenderedCommand> = commands
         .iter()
-        .map(|command| command_arm(command, bindings))
+        .map(|command| {
+            let module = format_ident!(
+                "{}",
+                dispatch_names
+                    .allocate(&command.accessor.to_string())
+                    .field()
+            );
+
+            command_arm(command, &module, bindings)
+        })
         .collect();
     let arms = rendered_commands.iter().map(|rendered| &rendered.arm);
 
