@@ -2828,6 +2828,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures-util",
+ "http",
  "hyper",
  "hyper-util",
  "margaret_http",

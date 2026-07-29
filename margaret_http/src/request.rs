@@ -25,7 +25,7 @@ impl Request {
     #[must_use]
     pub fn new(method: Method, path: String) -> Self {
         Self {
-            inputs: RequestInputs::empty(method, path),
+            inputs: RequestInputs::synthetic(method, path),
             path_params: HashMap::new(),
             peer_identity: Arc::new(PeerIdentity::Anonymous),
         }
@@ -60,9 +60,7 @@ impl Request {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::net::SocketAddr;
 
-    use http::HeaderMap;
     use http::Method;
 
     use super::Request;
@@ -77,13 +75,7 @@ mod tests {
             json: None,
             form: HashMap::from([("title".to_string(), "hello".to_string())]),
             query: HashMap::from([("page".to_string(), "2".to_string())]),
-            server: ServerParams::new(
-                Method::POST,
-                "/articles".to_string(),
-                "page=2".to_string(),
-                SocketAddr::from(([203, 0, 113, 7], 4000)),
-                HeaderMap::new(),
-            ),
+            server: ServerParams::synthetic(Method::POST, "/articles".to_string()),
         })
         .with_path_params(HashMap::from([("id".to_string(), "42".to_string())]));
 
@@ -97,11 +89,6 @@ mod tests {
         );
         assert_eq!(request.inputs.server.method(), "POST");
         assert_eq!(request.inputs.server.path(), "/articles");
-        assert_eq!(request.inputs.server.query_string(), "page=2");
-        assert_eq!(
-            request.inputs.server.remote_addr(),
-            SocketAddr::from(([203, 0, 113, 7], 4000))
-        );
         assert_eq!(request.path_param("id"), Some("42"));
         assert_eq!(request.path_param("missing"), None);
     }

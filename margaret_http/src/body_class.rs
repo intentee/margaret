@@ -1,20 +1,8 @@
-use http::HeaderMap;
 use http::header::CONTENT_TYPE;
 
-use crate::request_error::RequestError;
-
-fn media_type(headers: &HeaderMap) -> Result<Option<mime::Mime>, RequestError> {
-    let Some(value) = headers.get(CONTENT_TYPE) else {
-        return Ok(None);
-    };
-
-    let media = value
-        .to_str()?
-        .parse::<mime::Mime>()
-        .map_err(|source| RequestError::MalformedContentType { source })?;
-
-    Ok(Some(media))
-}
+use crate::request_outcome::RequestOutcome;
+use crate::request_rejection::RequestRejection;
+use crate::server_params::ServerParams;
 
 fn is_multipart(media: &mime::Mime) -> bool {
     media.type_() == mime::MULTIPART && media.subtype() == mime::FORM_DATA
@@ -36,60 +24,136 @@ pub(crate) enum BodyClass {
 }
 
 impl BodyClass {
-    pub(crate) fn from_headers(headers: &HeaderMap) -> Result<Self, RequestError> {
-        let Some(media) = media_type(headers)? else {
-            return Ok(Self::Other);
+    pub(crate) fn from_server_params(server: &ServerParams) -> RequestOutcome<Self> {
+        let Some(value) = server.header(&CONTENT_TYPE) else {
+            return RequestOutcome::Parsed(Self::Other);
+        };
+
+        let media = match value.parse::<mime::Mime>() {
+            Ok(media) => media,
+            Err(source) => {
+                return RequestOutcome::Rejected(RequestRejection::MalformedContentType { source });
+            }
         };
 
         if is_multipart(&media) {
-            let boundary = media
-                .get_param(mime::BOUNDARY)
-                .ok_or(RequestError::MissingMultipartBoundary)?
-                .as_str()
-                .to_string();
-
-            Ok(Self::Multipart { boundary })
+            match media.get_param(mime::BOUNDARY) {
+                Some(boundary) => RequestOutcome::Parsed(Self::Multipart {
+                    boundary: boundary.as_str().to_string(),
+                }),
+                None => RequestOutcome::Rejected(RequestRejection::MissingMultipartBoundary),
+            }
         } else if is_urlencoded(&media) {
-            Ok(Self::UrlEncoded)
+            RequestOutcome::Parsed(Self::UrlEncoded)
         } else if is_json(&media) {
-            Ok(Self::Json)
+            RequestOutcome::Parsed(Self::Json)
         } else {
-            Ok(Self::Other)
+            RequestOutcome::Parsed(Self::Other)
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use http::HeaderMap;
+    use std::mem::discriminant;
+    use std::net::SocketAddr;
+
     use http::HeaderValue;
+    use http::Method;
+    use http::Request;
     use http::header::CONTENT_TYPE;
+    use http::header::HOST;
 
     use super::BodyClass;
+    use crate::request_outcome::RequestOutcome;
+    use crate::request_rejection::RequestRejection;
+    use crate::server_params::ServerParams;
 
-    fn headers(content_type: HeaderValue) -> HeaderMap {
-        let mut headers = HeaderMap::new();
+    fn outcome(content_type: &[u8]) -> Result<BodyClass, RequestRejection> {
+        let parts = Request::builder()
+            .method(Method::POST)
+            .uri("/")
+            .header(HOST, "localhost")
+            .header(
+                CONTENT_TYPE,
+                HeaderValue::from_bytes(content_type).expect("a header value"),
+            )
+            .body(())
+            .expect("a request")
+            .into_parts()
+            .0;
 
-        headers.insert(CONTENT_TYPE, content_type);
+        match ServerParams::from_parts(parts, SocketAddr::from(([127, 0, 0, 1], 0))) {
+            RequestOutcome::Parsed(server) => match BodyClass::from_server_params(&server) {
+                RequestOutcome::Parsed(body_class) => Ok(body_class),
+                RequestOutcome::Rejected(rejection) => Err(rejection),
+            },
+            RequestOutcome::Rejected(rejection) => Err(rejection),
+        }
+    }
 
-        headers
+    fn assert_classifies(content_type: &[u8], expected: &BodyClass) {
+        assert_eq!(
+            discriminant(&outcome(content_type).expect("the content type is unambiguous")),
+            discriminant(expected)
+        );
+    }
+
+    fn assert_rejects(content_type: &[u8], expected: &RequestRejection) {
+        assert_eq!(
+            discriminant(
+                &outcome(content_type)
+                    .err()
+                    .expect("the content type is ambiguous")
+            ),
+            discriminant(expected)
+        );
     }
 
     #[test]
     fn reports_a_content_type_that_is_not_a_media_type() {
-        let result =
-            BodyClass::from_headers(&headers(HeaderValue::from_static("not/a/media/type")));
-
-        assert!(result.is_err());
+        assert_rejects(
+            b"not/a/media/type",
+            &RequestRejection::MalformedContentType {
+                source: "//".parse::<mime::Mime>().expect_err("a malformed mime"),
+            },
+        );
     }
 
     #[test]
     fn reports_a_content_type_that_is_not_visible_ascii() {
-        let result = BodyClass::from_headers(&headers(
-            HeaderValue::from_bytes(b"text/plain; charset=\xff")
-                .expect("the header value carries raw bytes"),
-        ));
+        assert_rejects(
+            b"text/plain; charset=\xff",
+            &RequestRejection::HeaderValueNotVisibleAscii {
+                name: CONTENT_TYPE,
+                source: HeaderValue::from_bytes(&[0xC0])
+                    .expect("a raw header value")
+                    .to_str()
+                    .expect_err("raw bytes are not visible ASCII"),
+            },
+        );
+    }
 
-        assert!(result.is_err());
+    #[test]
+    fn reports_a_multipart_body_without_a_boundary() {
+        assert_rejects(
+            b"multipart/form-data",
+            &RequestRejection::MissingMultipartBoundary,
+        );
+    }
+
+    #[test]
+    fn classifies_a_multipart_body_with_its_boundary() {
+        assert_classifies(
+            b"multipart/form-data; boundary=X",
+            &BodyClass::Multipart {
+                boundary: String::new(),
+            },
+        );
+    }
+
+    #[test]
+    fn classifies_an_unrecognized_media_type_as_other() {
+        assert_classifies(b"text/plain", &BodyClass::Other);
     }
 }

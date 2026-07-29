@@ -6,7 +6,6 @@ use matchit::InsertError;
 use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
 use crate::method_handler::MethodHandler;
-use crate::path_params_decoding::PathParamsDecoding;
 use crate::request_route::RequestRoute;
 use crate::route_entry::RouteEntry;
 use crate::route_resolution::RouteResolution;
@@ -68,15 +67,11 @@ impl Router {
                 return RouteResolution::Request(RequestRoute::NotFound);
             }
         };
-        let path_params = match PathParamsDecoding::from_params(&matched.params) {
-            PathParamsDecoding::Decoded(path_params) => path_params,
-            PathParamsDecoding::NotValidUtf8 { parameter, source } => {
-                return RouteResolution::Request(RequestRoute::PathParameterNotValidUtf8 {
-                    parameter,
-                    source,
-                });
-            }
-        };
+        let path_params = matched
+            .params
+            .iter()
+            .map(|(name, value)| (name.to_string(), value.to_string()))
+            .collect();
 
         match matched.value {
             RouteTarget::Http(handlers) => match handlers.get(method) {
