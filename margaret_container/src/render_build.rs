@@ -6,6 +6,7 @@ use quote::quote;
 use margaret_attributes::struct_shape::StructShape;
 use margaret_codegen_tokens::console_argument_field_ident::console_argument_field_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
@@ -205,14 +206,17 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
             Ok(#root_binding)
     };
 
+    let too_many_lines = too_many_lines_allow();
     let tokens = if root.is_async {
         quote! {
+            #too_many_lines
             pub(crate) async fn #function(#parameters) -> ::std::result::Result<#root_type, #error> {
                 #body
             }
         }
     } else {
         quote! {
+            #too_many_lines
             pub(crate) fn #function(#parameters) -> ::std::result::Result<#root_type, #error> {
                 #body
             }
@@ -282,8 +286,10 @@ pub(crate) fn render_build(
                 #(#fields)*
             })
     };
+    let serve_too_many_lines = too_many_lines_allow();
     let serve = if construction_roots.iter().any(|entry| entry.is_async) {
         quote! {
+            #serve_too_many_lines
             pub(crate) async fn serve(
                 #serve_parameters
             ) -> ::std::result::Result<super::super::Container, #error> {
@@ -292,6 +298,7 @@ pub(crate) fn render_build(
         }
     } else {
         quote! {
+            #serve_too_many_lines
             pub(crate) fn serve(
                 #serve_parameters
             ) -> ::std::result::Result<super::super::Container, #error> {

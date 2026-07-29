@@ -11,7 +11,7 @@ pub(crate) fn handler_console_arguments(
     let mut collected = Vec::new();
 
     for handler in handlers {
-        collected.extend_from_slice(bindings.console_arguments(&handler.handler_path)?);
+        collected.extend_from_slice(&bindings.console_arguments(&handler.handler_path)?.arguments);
     }
 
     Ok(collected)

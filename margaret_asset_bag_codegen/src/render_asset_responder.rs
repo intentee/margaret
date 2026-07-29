@@ -6,6 +6,8 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
+
 use crate::cache_policy::CachePolicy;
 use crate::content_type::content_type;
 
@@ -57,11 +59,14 @@ pub(crate) fn render_asset_responder(
         ));
     }
 
+    let too_many_lines = too_many_lines_allow();
+
     quote! {
         pub struct #type_identifier;
 
         impl #type_identifier {
             #[must_use]
+            #too_many_lines
             pub fn respond(&self, asset_path: &str) -> ::margaret::framework::http::response::Response {
                 match asset_path {
                     #(#arms)*

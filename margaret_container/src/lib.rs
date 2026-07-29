@@ -33,6 +33,7 @@ mod planned_provider;
 mod provided_type;
 mod provider;
 mod provider_binding;
+pub mod provider_console_arguments;
 mod provides_endpoint_path;
 mod render;
 mod render_build;

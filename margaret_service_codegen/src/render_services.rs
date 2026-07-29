@@ -1,6 +1,7 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_container::container_bindings::ContainerBindings;
@@ -171,10 +172,6 @@ fn server_registration(
     has_views: bool,
     activation: SpiffeActivation,
 ) -> TokenStream {
-    if servers.is_empty() {
-        return quote! {};
-    }
-
     let origins = servers.iter().map(|server| {
         let origin_variable = format_ident!("origin_{}", server.name());
         let origin_read = required_flag_read(
@@ -386,6 +383,68 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
 }
 
 #[must_use]
+fn register_servers_definition(
+    servers: &[HttpServer],
+    has_views: bool,
+    activation: SpiffeActivation,
+) -> TokenStream {
+    if servers.is_empty() {
+        return TokenStream::new();
+    }
+
+    let body = server_registration(servers, has_views, activation);
+    let spiffe_server_parameter = activation
+        .server_active
+        .then(|| quote! { spiffe_server_config: &::std::sync::Arc<margaret::framework::spiffe_svid::rustls::ServerConfig>, });
+    let spiffe_client_parameter = activation.client_active.then(|| {
+        quote! {
+            spiffe_client_readiness: &margaret::framework::spiffe_svid_client::svid_client_readiness::SvidClientReadiness,
+        }
+    });
+    let too_many_lines = too_many_lines_allow();
+
+    quote! {
+        #too_many_lines
+        fn register_servers(
+            manager: &mut trzcina::ServiceManager,
+            matches: &clap::ArgMatches,
+            container: &super::container::Container,
+            #spiffe_server_parameter
+            #spiffe_client_parameter
+        ) -> ::std::result::Result<
+            (),
+            margaret::framework::console::command_outcome::CommandOutcome,
+        > {
+            #body
+        }
+    }
+}
+
+fn register_servers_invocation(servers: &[HttpServer], activation: SpiffeActivation) -> TokenStream {
+    if servers.is_empty() {
+        return TokenStream::new();
+    }
+
+    let spiffe_server_argument = activation
+        .server_active
+        .then(|| quote! { &spiffe_server_config, });
+    let spiffe_client_argument = activation
+        .client_active
+        .then(|| quote! { &spiffe_client_readiness, });
+
+    quote! {
+        if let Err(outcome) = register_servers(
+            &mut manager,
+            matches,
+            container,
+            #spiffe_server_argument
+            #spiffe_client_argument
+        ) {
+            return outcome;
+        }
+    }
+}
+
 pub fn render_services(
     plan: &ServicePlan,
     servers: &[HttpServer],
@@ -404,54 +463,8 @@ pub fn render_services(
         .map(|unit| registration(unit, bindings, activation.client_active));
     let identity_prelude = svid_identity_prelude(activation);
     let bundle_registration = bundle_registration(activation);
-    let server_registration_body = server_registration(servers, has_views, activation);
-    let spiffe_server_parameter = activation
-        .server_active
-        .then(|| quote! { spiffe_server_config: &::std::sync::Arc<margaret::framework::spiffe_svid::rustls::ServerConfig>, });
-    let spiffe_client_parameter = activation.client_active.then(|| {
-        quote! {
-            spiffe_client_readiness: &margaret::framework::spiffe_svid_client::svid_client_readiness::SvidClientReadiness,
-        }
-    });
-    let spiffe_server_argument = activation
-        .server_active
-        .then(|| quote! { &spiffe_server_config, });
-    let spiffe_client_argument = activation
-        .client_active
-        .then(|| quote! { &spiffe_client_readiness, });
-    let register_servers = if servers.is_empty() {
-        TokenStream::new()
-    } else {
-        quote! {
-                fn register_servers(
-                    manager: &mut trzcina::ServiceManager,
-                    matches: &clap::ArgMatches,
-                    container: &super::container::Container,
-                    #spiffe_server_parameter
-                    #spiffe_client_parameter
-                ) -> ::std::result::Result<
-                    (),
-                    margaret::framework::console::command_outcome::CommandOutcome,
-                > {
-                    #server_registration_body
-                }
-        }
-    };
-    let server_registration = if servers.is_empty() {
-        TokenStream::new()
-    } else {
-        quote! {
-            if let Err(outcome) = register_servers(
-                &mut manager,
-                matches,
-                container,
-                #spiffe_server_argument
-                #spiffe_client_argument
-            ) {
-                return outcome;
-            }
-        }
-    };
+    let register_servers = register_servers_definition(servers, has_views, activation);
+    let server_registration = register_servers_invocation(servers, activation);
     let construction_invocation = bindings.serve_invocation(&plan.construction_arguments);
     let construction = quote! {
         let container = match #construction_invocation {
@@ -468,12 +481,14 @@ pub fn render_services(
         quote! { matches }
     };
     let prelude = &plan.prelude;
+    let serve_too_many_lines = too_many_lines_allow();
 
     let tokens = quote! {
         #(#adapters)*
 
         #register_servers
 
+        #serve_too_many_lines
         pub async fn serve(
             #matches_binding: &clap::ArgMatches,
             cancellation_token: tokio_util::sync::CancellationToken,

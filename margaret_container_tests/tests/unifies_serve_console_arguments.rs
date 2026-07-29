@@ -36,6 +36,7 @@ fn unifies_serve_console_arguments_across_roots() {
         bindings
             .console_arguments(&path("Config"))
             .expect("Config has a planned console closure")
+            .arguments
             .len(),
         1
     );

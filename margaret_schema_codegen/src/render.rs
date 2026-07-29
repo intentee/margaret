@@ -2,6 +2,7 @@ use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_model_codegen::model::Model;
 use margaret_model_codegen::resolved_column::ResolvedColumn;
 use margaret_model_codegen::resolved_foreign_key::ResolvedForeignKey;
@@ -96,9 +97,11 @@ fn render_table(model: &Model) -> TokenStream {
 
 pub(crate) fn render(models: &[Model]) -> TokenStream {
     let tables = models.iter().map(render_table);
+    let too_many_lines = too_many_lines_allow();
 
     quote! {
         #[must_use]
+        #too_many_lines
         pub fn schema() -> margaret::framework::model::schema::Schema {
             margaret::framework::model::schema::Schema {
                 tables: vec![#(#tables),*],

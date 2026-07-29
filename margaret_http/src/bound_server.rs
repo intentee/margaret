@@ -571,6 +571,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn hands_the_peer_address_of_an_accepted_connection_to_the_acceptor() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("the listener binds");
+        let listening_on = listener
+            .local_addr()
+            .expect("the listener reports its address");
+        let client = TcpStream::connect(listening_on)
+            .await
+            .expect("the client connects");
+        let client_addr = client.local_addr().expect("the client reports its address");
+        let mut accepted_from = None;
+
+        accept_outcome(listener.accept().await, |connection| {
+            accepted_from = Some(connection.remote_addr);
+        });
+
+        assert_eq!(accepted_from, Some(client_addr));
+    }
+
+    #[tokio::test]
     async fn fails_to_bind_an_unregistered_server() {
         assert!(
             BoundServer::bind(

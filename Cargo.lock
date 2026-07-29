@@ -1845,6 +1845,7 @@ name = "margaret_asset_bag_codegen"
 version = "0.1.0"
 dependencies = [
  "esbuild-metafile",
+ "margaret_codegen_tokens",
  "margaret_generated_module",
  "proc-macro2",
  "quote",
@@ -1998,6 +1999,7 @@ name = "margaret_console_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
@@ -2489,6 +2491,7 @@ name = "margaret_schema_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_codegen_tokens",
  "margaret_generated_module",
  "margaret_model_codegen",
  "proc-macro2",

@@ -204,6 +204,17 @@ impl GetUser {
 }
 "#;
 
+    const BORROWED_ROUTE_PARAMETER: &str = r#"
+#[singleton]
+#[responds_to_http(method = "get", path = "/users/{id}", server = "public")]
+struct GetUser;
+
+impl GetUser {
+    #[process]
+    fn respond(&self, #[route_parameter(from = "id")] id: &str) -> anyhow::Result<Response> {}
+}
+"#;
+
     #[test]
     fn rejects_a_responder_absent_from_the_container_plan() {
         assert!(error_with_container_source(ROUTE_PARAMETER, "").contains("crate::GetUser"));
@@ -1129,6 +1140,13 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     }
 
     #[test]
+    fn borrows_a_route_parameter_the_responder_declared_by_reference() {
+        let source = source_for(BORROWED_ROUTE_PARAMETER);
+
+        assert!(source.contains("responder.respond(&id)"));
+    }
+
+    #[test]
     fn awaits_a_responder_that_declares_an_asynchronous_process_method() {
         let source = source_for(
             "#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    async fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
@@ -1691,10 +1709,10 @@ impl GetMetrics {
         let source = source_for(MULTIPLE_SERVERS);
 
         assert!(source.contains(
-            "server_public(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::server_routes::ServerRoutes::build(::std::vec::Vec::from([route_entry_0(container,routes)"
+            "server_public(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::server_routes::ServerRoutes::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/\","
         ));
         assert!(source.contains(
-            "server_internal(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::server_routes::ServerRoutes::build(::std::vec::Vec::from([route_entry_0(container,routes)"
+            "server_internal(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::server_routes::ServerRoutes::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/metrics\","
         ));
     }
 

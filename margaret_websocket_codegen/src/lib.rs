@@ -599,6 +599,23 @@ impl Room {
 }
 "#;
 
+    const BORROWED_ROUTE_PARAMETER_SESSION: &str = r#"
+#[websocket_session(path = "/room/{topic}", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build_for_session(#[route_parameter(from = "topic")] topic: &str) -> anyhow::Result<Self> {}
+}
+"#;
+
+    #[test]
+    fn borrows_a_route_parameter_the_session_declared_by_reference() {
+        let source = generated(BORROWED_ROUTE_PARAMETER_SESSION);
+
+        assert!(source.contains("crate::Room::build_for_session(&topic)"));
+    }
+
     #[test]
     fn names_the_factory_handshake_unused_when_no_binding_reads_the_request() {
         let source = generated(INJECTED_ONLY_SESSION);

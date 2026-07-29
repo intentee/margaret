@@ -88,3 +88,29 @@ impl IndexedMethod {
         self.signature.receiver().is_some()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use syn::parse_quote;
+
+    use super::IndexedMethod;
+    use crate::framework_attribute::FrameworkAttribute;
+
+    #[test]
+    fn indexes_the_declared_attributes_and_skips_the_receiver() {
+        let method = IndexedMethod::new(
+            "run".to_string(),
+            parse_quote!(#[process]),
+            parse_quote!(fn run(&self, #[route_parameter(from = "id")] id: String)),
+        );
+
+        assert!(method.has_framework_attribute(FrameworkAttribute::Process));
+        assert!(method.has_receiver());
+        assert_eq!(method.parameters().len(), 1);
+        assert!(
+            method.parameters()[0]
+                .framework_attribute(FrameworkAttribute::RouteParameter)
+                .is_some()
+        );
+    }
+}

@@ -21,6 +21,7 @@ use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::injected_dependency::InjectedDependency;
 use crate::provider_binding::ProviderBinding;
+use crate::provider_console_arguments::ProviderConsoleArguments;
 
 fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
     let module = bootstrap_arguments_module(function);
@@ -32,7 +33,7 @@ fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
 pub struct ContainerBindings {
     arguments: Arc<[ConsoleArgument]>,
     asynchronous_constructions: BTreeSet<String>,
-    concrete_providers: BTreeMap<CanonicalPath, Arc<[ConsoleArgument]>>,
+    concrete_providers: BTreeMap<CanonicalPath, ProviderConsoleArguments>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
     slots: Arc<BTreeMap<ServeInputKey, usize>>,
 }
@@ -59,7 +60,10 @@ impl ContainerBindings {
             }
             concrete_providers.insert(
                 entry.provider.concrete_path.clone(),
-                Arc::clone(&entry.console_arguments),
+                ProviderConsoleArguments {
+                    arguments: Arc::clone(&entry.console_arguments),
+                    slots: Arc::clone(&entry.console_slots),
+                },
             );
         }
 
@@ -85,13 +89,12 @@ impl ContainerBindings {
     pub fn console_arguments(
         &self,
         concrete_path: &CanonicalPath,
-    ) -> Result<&[ConsoleArgument], ContainerError> {
-        self.concrete_providers
-            .get(concrete_path)
-            .map(AsRef::as_ref)
-            .ok_or_else(|| ContainerError::MissingConsoleClosure {
+    ) -> Result<&ProviderConsoleArguments, ContainerError> {
+        self.concrete_providers.get(concrete_path).ok_or_else(|| {
+            ContainerError::MissingConsoleClosure {
                 path: concrete_path.to_string(),
-            })
+            }
+        })
     }
 
     /// # Errors
@@ -186,7 +189,7 @@ impl ContainerBindings {
         &self,
         dependency: &InjectedDependency,
     ) -> Result<Vec<ConsoleArgument>, ContainerError> {
-        Ok(self.console_arguments(&dependency.concrete)?.to_vec())
+        Ok(self.console_arguments(&dependency.concrete)?.arguments.to_vec())
     }
 
     #[must_use]
@@ -210,7 +213,7 @@ impl ContainerBindings {
         let mut collected: Vec<ConsoleArgument> = Vec::new();
 
         for root in roots {
-            collected.extend_from_slice(self.console_arguments(root)?);
+            collected.extend_from_slice(&self.console_arguments(root)?.arguments);
         }
 
         collected.extend_from_slice(woven);

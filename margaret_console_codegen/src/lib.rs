@@ -1,4 +1,3 @@
-mod command_builder;
 pub mod console_artifacts;
 pub mod console_codegen_error;
 mod console_command;
@@ -7,7 +6,6 @@ mod console_commands;
 pub mod console_plan;
 mod render;
 pub mod render_console;
-mod run_entry_point;
 
 #[cfg(test)]
 mod tests {
@@ -194,8 +192,7 @@ impl Farewell {
         );
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 
-        assert!(source.contains(r#"Some(("farewell",matches))=>farewell(matches)"#));
-        assert!(source.contains("fnfarewell(_matches:&clap::ArgMatches,)"));
+        assert!(source.contains(r#"Some(("farewell",_matches))=>{"#));
         assert!(source.contains("super::container::build::construct_farewell()"));
         assert!(!source.contains("super::container::build::construct_farewell().await"));
         assert!(source.contains("report_failure::report_failure(error"));
@@ -203,17 +200,17 @@ impl Farewell {
     }
 
     #[test]
-    fn keeps_a_command_named_after_the_entry_point_from_colliding_with_it() {
+    fn accepts_commands_named_after_the_generated_entry_point() {
         let source = source_for(
             "#[singleton]\n#[console_command(name = \"run\")]\nstruct Run;\n\nimpl Run {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"command\")]\nstruct Command;\n\nimpl Command {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
             false,
         );
 
         assert!(source.contains("pubfnrun<Arguments,Argument>"));
-        assert!(source.contains(r#"Some(("run",matches))=>run_2(matches)"#));
-        assert!(source.contains(r#"Some(("command",matches))=>command_2(matches)"#));
-        assert!(source.contains("fnrun_2(_matches:&clap::ArgMatches,)"));
-        assert!(source.contains("fncommand_2(_matches:&clap::ArgMatches,)"));
+        assert!(source.contains(r#"Some(("run",_matches))=>{"#));
+        assert!(source.contains(r#"Some(("command",_matches))=>{"#));
+        assert!(source.contains("super::container::build::construct_run()"));
+        assert!(source.contains("super::container::build::construct_command()"));
     }
 
     #[test]
@@ -417,6 +414,16 @@ impl Farewell {
     }
 
     #[test]
+    fn awaits_an_asynchronous_command_runner_that_takes_the_cancellation_token() {
+        let source = source_for(
+            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[process]\n    async fn run(&self, token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains(".run(cancellation_token).await"));
+    }
+
+    #[test]
     fn awaits_a_command_that_declares_an_asynchronous_runner() {
         let source = source_for(
             "#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    async fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
@@ -512,8 +519,7 @@ impl Farewell {
             false,
         );
 
-        assert!(source.contains(r#"Some(("bare",matches))=>bare(matches)"#));
-        assert!(source.contains("fnbare(_matches:&clap::ArgMatches,)"));
+        assert!(source.contains(r#"Some(("bare",_matches))=>{"#));
         assert!(source.contains("super::container::build::construct_bare()"));
         assert!(!source.contains("super::container::build::construct_bare().await"));
         assert!(source.contains("report_failure::report_failure(error"));
