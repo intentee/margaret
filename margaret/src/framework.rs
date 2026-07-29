@@ -1,4 +1,6 @@
 #[cfg(feature = "runtime")]
+pub use crate::construct_singleton;
+#[cfg(feature = "runtime")]
 pub use crate::construction_error;
 #[cfg(feature = "runtime")]
 pub use anyhow;

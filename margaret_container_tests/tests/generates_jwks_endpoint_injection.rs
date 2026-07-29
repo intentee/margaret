@@ -74,6 +74,6 @@ fn constructs_the_endpoint_wrapped_in_an_arc() {
 
     assert!(source.contains("::std::sync::Arc::new("));
     assert!(
-        source.contains("ConstructionError::wrap(\"crate::JwksEndpoint\",crate::JwksEndpoint::new")
+        source.contains("construct_singleton(\"crate::JwksEndpoint\",crate::JwksEndpoint::new")
     );
 }

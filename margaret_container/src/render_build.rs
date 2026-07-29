@@ -11,6 +11,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
+use crate::construct_singleton_path::construct_singleton_path;
 use crate::construction_error_path::construction_error_path;
 use crate::construction_flow::construction_flow;
 use crate::container_field_ident::container_field_ident;
@@ -72,7 +73,7 @@ fn direct_value(
         } => {
             let constructor = format_ident!("{method}");
             let arguments = dependency_expressions(dependencies, weaver);
-            let construction_error = construction_error_path();
+            let construct_singleton = construct_singleton_path();
             let singleton = provider.concrete_path.to_string();
             let call = if *is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
@@ -80,7 +81,7 @@ fn direct_value(
                 quote! { #concrete::#constructor(#(#arguments),*) }
             };
 
-            quote! { #construction_error::wrap(#singleton, #call)? }
+            quote! { #construct_singleton(#singleton, #call)? }
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
         DirectConstruction::FrameworkConstructor {
@@ -117,9 +118,10 @@ fn statement(planned: &PlannedProvider, weaver: &mut ReverseConsoleArgumentWeave
     let value_type = field_type(provider);
     let value = direct_value(planned, weaver);
     let constructed = match &provider.construction {
-        DirectConstruction::FrameworkAccessor { .. } | DirectConstruction::Resolved { .. } => value,
         DirectConstruction::Constructor { .. }
-        | DirectConstruction::Fieldless { .. }
+        | DirectConstruction::FrameworkAccessor { .. }
+        | DirectConstruction::Resolved { .. } => value,
+        DirectConstruction::Fieldless { .. }
         | DirectConstruction::FrameworkConstructor { .. }
         | DirectConstruction::FrameworkUnit => quote! { ::std::sync::Arc::new(#value) },
     };
