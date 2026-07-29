@@ -8,7 +8,9 @@ anyhow = { workspace = true }
 margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
+zeroize = { workspace = true }
 
 [lints]
 workspace = true

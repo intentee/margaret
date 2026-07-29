@@ -30,7 +30,10 @@ async fn sign_errors_on_unserializable_claims() -> Result<()> {
 
     let result = keypair.signing.sign(&UnserializableClaims).await;
 
-    assert!(matches!(result, Err(JwksKeyError::ClaimsJson { .. })));
+    assert!(matches!(
+        result,
+        Err(JwksKeyError::ClaimsSerialization { .. })
+    ));
 
     Ok(())
 }

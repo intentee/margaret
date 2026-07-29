@@ -25,6 +25,7 @@ pub mod named_handler;
 pub mod next;
 pub(crate) mod one_shot_handler;
 pub(crate) mod one_shot_layer;
+pub(crate) mod path_params_decoding;
 pub mod redirect;
 pub mod request;
 pub mod request_binding_error;

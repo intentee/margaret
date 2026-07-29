@@ -7,6 +7,7 @@ edition = "2024"
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_schema_identifier_naming = { path = "../margaret_schema_identifier_naming" }
 margaret_toposort = { path = "../margaret_toposort" }
+margaret_syn_type_peeling = { path = "../margaret_syn_type_peeling" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

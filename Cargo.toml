@@ -66,6 +66,7 @@ members = [
     "margaret_spiffe_svid_server",
     "margaret_spiffe_svid_server_tests",
     "margaret_spiffe_svid_tests",
+    "margaret_syn_type_peeling",
     "margaret_sync_holder",
     "margaret_tag_codegen",
     "margaret_token_signer",
@@ -104,8 +105,9 @@ matchit = "0.8"
 maud = "0.27"
 mime = "0.3"
 multer = "3.1"
-p256 = "0.13"
-p384 = "0.13"
+p256 = { version = "0.13", features = ["jwk"] }
+p384 = { version = "0.13", features = ["jwk"] }
+percent-encoding = "2.3"
 prettyplease = "0.2"
 proc-macro2 = "1.0"
 quote = "1.0"
