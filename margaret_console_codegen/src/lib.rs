@@ -133,10 +133,16 @@ impl Farewell {
         let plan = ConsolePlan::build(&index, &bindings).expect("the console is planned");
 
         render_console(&plan, has_http, false, &http_servers, &[], &bindings)
-            .module
-            .format()
-            .expect("the module formats")
-            .source()
+            .modules
+            .into_iter()
+            .map(|module| {
+                module
+                    .format()
+                    .expect("the module formats")
+                    .source()
+                    .to_string()
+            })
+            .collect::<String>()
             .split_whitespace()
             .collect()
     }
@@ -186,7 +192,8 @@ impl Farewell {
         );
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 
-        assert!(source.contains(r#"("farewell",_matches)"#));
+        assert!(source.contains(r#"Some(("farewell",matches))=>farewell(matches)"#));
+        assert!(source.contains("fnfarewell(_matches:&clap::ArgMatches,)"));
         assert!(source.contains("super::container::build::construct_farewell()"));
         assert!(!source.contains("super::container::build::construct_farewell().await"));
         assert!(source.contains("report_failure::report_failure(error"));
@@ -234,10 +241,16 @@ impl Farewell {
             &bindings(&index),
         )
         .expect("the console source is generated")
-        .module
-        .format()
-        .expect("the module formats")
-        .source()
+        .modules
+        .into_iter()
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .to_string()
+        })
+        .collect::<String>()
         .split_whitespace()
         .collect();
 
@@ -278,10 +291,16 @@ impl Farewell {
             &bindings(&index),
         )
         .expect("the console source is generated")
-        .module
-        .format()
-        .expect("the module formats")
-        .source()
+        .modules
+        .into_iter()
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .to_string()
+        })
+        .collect::<String>()
         .split_whitespace()
         .collect();
 
@@ -301,10 +320,16 @@ impl Farewell {
         let source: String =
             render_planned_console(&index, true, false, &[], &[], &bindings(&index))
                 .expect("the console source is generated")
-                .module
-                .format()
-                .expect("the module formats")
-                .source()
+                .modules
+                .into_iter()
+                .map(|module| {
+                    module
+                        .format()
+                        .expect("the module formats")
+                        .source()
+                        .to_string()
+                })
+                .collect::<String>()
                 .split_whitespace()
                 .collect();
 
@@ -319,10 +344,16 @@ impl Farewell {
         let source: String =
             render_planned_console(&index, false, true, &[], &[], &bindings(&index))
                 .expect("the console source is generated")
-                .module
-                .format()
-                .expect("the module formats")
-                .source()
+                .modules
+                .into_iter()
+                .map(|module| {
+                    module
+                        .format()
+                        .expect("the module formats")
+                        .source()
+                        .to_string()
+                })
+                .collect::<String>()
                 .split_whitespace()
                 .collect();
 
@@ -339,10 +370,16 @@ impl Farewell {
         let source: String =
             render_planned_console(&index, false, true, &[], &[], &bindings(&index))
                 .expect("the console source is generated")
-                .module
-                .format()
-                .expect("the module formats")
-                .source()
+                .modules
+                .into_iter()
+                .map(|module| {
+                    module
+                        .format()
+                        .expect("the module formats")
+                        .source()
+                        .to_string()
+                })
+                .collect::<String>()
                 .split_whitespace()
                 .collect();
 
@@ -459,7 +496,8 @@ impl Farewell {
             false,
         );
 
-        assert!(source.contains(r#"("bare",_matches)"#));
+        assert!(source.contains(r#"Some(("bare",matches))=>bare(matches)"#));
+        assert!(source.contains("fnbare(_matches:&clap::ArgMatches,)"));
         assert!(source.contains("super::container::build::construct_bare()"));
         assert!(!source.contains("super::container::build::construct_bare().await"));
         assert!(source.contains("report_failure::report_failure(error"));

@@ -356,6 +356,7 @@ impl RespondsToWebSocketNotification for Typist {
                 binder_provider: missing_path(),
                 path_key: "room".to_string(),
             },
+            declared_by_reference: false,
             holder: format_ident!("room"),
         });
 

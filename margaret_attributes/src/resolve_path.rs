@@ -12,6 +12,7 @@ fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
             "string".to_string(),
             "String".to_string(),
         ])),
+        "str" => Some(CanonicalPath::new(vec!["str".to_string()])),
         primitive if is_copy_primitive(primitive) => {
             Some(CanonicalPath::new(vec![leaf.to_string()]))
         }

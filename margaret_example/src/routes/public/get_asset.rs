@@ -29,8 +29,8 @@ impl GetAsset {
     #[process]
     pub fn respond(
         &self,
-        #[route_parameter(from = "asset_path")] asset_path: String,
+        #[route_parameter(from = "asset_path")] asset_path: &str,
     ) -> anyhow::Result<Response> {
-        Ok(self.asset_responder.respond(&asset_path))
+        Ok(self.asset_responder.respond(asset_path))
     }
 }

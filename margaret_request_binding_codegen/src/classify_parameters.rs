@@ -46,6 +46,10 @@ fn is_forwarder(resolved: Option<&CanonicalPath>, is_reference: bool, server: &s
     resolved == Some(&forwarder_path(server)) && !is_reference
 }
 
+fn borrowed_string_path() -> CanonicalPath {
+    CanonicalPath::new(vec!["str".to_string()])
+}
+
 fn string_path() -> CanonicalPath {
     CanonicalPath::new(vec![
         "std".to_string(),
@@ -315,7 +319,7 @@ fn classify_route_parameter(
         });
     }
 
-    if resolved == Some(&string_path()) {
+    if resolved == Some(&string_path()) || resolved == Some(&borrowed_string_path()) {
         return Ok(RequestBinding::Raw { path_key: from });
     }
 
@@ -542,7 +546,11 @@ pub fn classify_parameters(
             )?
         };
 
-        bound.push(BoundParameter { binding, holder });
+        bound.push(BoundParameter {
+            binding,
+            declared_by_reference: is_reference,
+            holder,
+        });
     }
 
     reject_repeated_bindings(&bound, subject)?;

@@ -1,4 +1,5 @@
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
 
 use margaret_console_argument_codegen::argument_registration::argument_registration;
@@ -78,13 +79,19 @@ fn serve_registration(
     }
 }
 
-fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenStream {
+pub(crate) struct RenderedCommand {
+    pub(crate) arm: TokenStream,
+    pub(crate) dispatch: TokenStream,
+}
+
+fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> RenderedCommand {
     let name = &command.name;
-    let matches_binding = if command.arguments.is_empty() {
+    let dispatch_parameter = if command.arguments.is_empty() {
         quote! { _matches }
     } else {
         quote! { matches }
     };
+    let matches_binding = quote! { matches };
     let values: Vec<ConsoleArgumentBinding> = command
         .arguments
         .iter()
@@ -95,6 +102,8 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
         })
         .collect();
     let construction = bindings.construction_invocation(&command.accessor.to_string(), &values);
+    let construction_is_async = bindings.construction_is_async(&command.accessor.to_string());
+    let module = format_ident!("{}", command.accessor);
     let accessor_access = quote! {
         (match #construction {
             Ok(value) => value,
@@ -111,18 +120,25 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
             quote! { #accessor_access.run(cancellation_token) }
         };
 
-        quote! {
-            Some((#name, #matches_binding)) => {
-                margaret::framework::service::dispatch_serve::dispatch_serve(
-                    margaret::framework::service::install::install,
-                    |cancellation_token| async move {
-                        margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
-                            #run_call,
-                        )
-                    },
-                )
-                .await
-            }
+        RenderedCommand {
+            arm: quote! {
+                Some((#name, #matches_binding)) => #module(#matches_binding).await,
+            },
+            dispatch: quote! {
+                async fn #module(
+                    #dispatch_parameter: &clap::ArgMatches,
+                ) -> margaret::framework::console::command_outcome::CommandOutcome {
+                    margaret::framework::service::dispatch_serve::dispatch_serve(
+                        margaret::framework::service::install::install,
+                        |cancellation_token| async move {
+                            margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
+                                #run_call,
+                            )
+                        },
+                    )
+                    .await
+                }
+            },
         }
     } else {
         let run_call = if command.is_async {
@@ -131,14 +147,38 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
             quote! { #accessor_access.run() }
         };
 
-        quote! {
-            Some((#name, #matches_binding)) => {
-                margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
-                    #run_call,
-                )
+        let dispatch_asyncness = if command.is_async || construction_is_async {
+            quote! { async }
+        } else {
+            quote! {}
+        };
+        let dispatch_call = if command.is_async || construction_is_async {
+            quote! { #module(#matches_binding).await }
+        } else {
+            quote! { #module(#matches_binding) }
+        };
+
+        RenderedCommand {
+            arm: quote! {
+                Some((#name, #matches_binding)) => #dispatch_call,
+            },
+            dispatch: quote! {
+                #dispatch_asyncness fn #module(
+                    #dispatch_parameter: &clap::ArgMatches,
+                ) -> margaret::framework::console::command_outcome::CommandOutcome {
+                    margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
+                        #run_call,
+                    )
+                }
             },
         }
     }
+}
+
+pub(crate) struct RenderedConsole {
+    pub(crate) command: TokenStream,
+    pub(crate) dispatches: Vec<RenderedCommand>,
+    pub(crate) run: TokenStream,
 }
 
 pub(crate) fn render(
@@ -148,7 +188,7 @@ pub(crate) fn render(
     http_servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
     bindings: &ContainerBindings,
-) -> TokenStream {
+) -> RenderedConsole {
     let dispatches_asynchronously = serves
         || commands.iter().any(|command| {
             command.takes_token
@@ -161,9 +201,11 @@ pub(crate) fn render(
         quote! {}
     };
     let subcommands = commands.iter().map(subcommand_registration);
-    let arms = commands
+    let rendered_commands: Vec<RenderedCommand> = commands
         .iter()
-        .map(|command| command_arm(command, bindings));
+        .map(|command| command_arm(command, bindings))
+        .collect();
+    let arms = rendered_commands.iter().map(|rendered| &rendered.arm);
 
     let schema_registration = if has_models {
         quote! {
@@ -208,7 +250,16 @@ pub(crate) fn render(
         quote! {}
     };
 
-    quote! {
+    let command = quote! {
+        #[must_use]
+        pub(crate) fn command() -> clap::Command {
+            clap::Command::new(env!("CARGO_PKG_NAME"))
+                #(#subcommands)*
+                #serve_registration
+                #schema_registration
+        }
+    };
+    let run = quote! {
         pub #run_asyncness fn run<Arguments, Argument>(
             args: Arguments,
         ) -> margaret::framework::console::command_outcome::CommandOutcome
@@ -216,10 +267,7 @@ pub(crate) fn render(
             Arguments: IntoIterator<Item = Argument>,
             Argument: Into<std::ffi::OsString> + Clone,
         {
-            let mut command = clap::Command::new(env!("CARGO_PKG_NAME"))
-                #(#subcommands)*
-                #serve_registration
-                #schema_registration;
+            let mut command = super::run::command::command();
 
             match command.try_get_matches_from_mut(args) {
                 Ok(matches) => match matches.subcommand() {
@@ -233,5 +281,11 @@ pub(crate) fn render(
                 }
             }
         }
+    };
+
+    RenderedConsole {
+        command,
+        dispatches: rendered_commands,
+        run,
     }
 }

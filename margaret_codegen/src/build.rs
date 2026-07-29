@@ -176,7 +176,7 @@ fn render_role_modules(
             &serve_arguments,
             bindings,
         );
-        modules.push(console.module);
+        modules.extend(console.modules);
 
         console.construction_roots
     } else {
@@ -475,7 +475,7 @@ struct Room;
         assert!(!concatenated(&code).contains("async fn server"));
         assert!(module(&code, "routes").contains("pub struct Routes"));
         assert!(module(&code, "container").contains("struct Container"));
-        assert!(module(&code, "run").contains("\"serve\""));
+        assert!(module(&code, "run/command").contains("\"serve\""));
     }
 
     #[test]
@@ -485,7 +485,7 @@ struct Room;
         assert!(module(&code, "mod").contains("pub mod run;"));
         assert!(!module(&code, "mod").contains("pub mod http;"));
         assert!(!has_module(&code, "http"));
-        assert!(module(&code, "run").contains("\"greet\""));
+        assert!(module(&code, "run/command").contains("\"greet\""));
     }
 
     #[test]
@@ -751,7 +751,7 @@ impl Worker {
             .collect();
         assert!(construction.contains("pub(crate)argument0:reqwest::Client,"));
 
-        let run: String = module(&code, "run").split_whitespace().collect();
+        let run: String = module(&code, "run/command").split_whitespace().collect();
         assert!(run.contains(
             r#"clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true)"#
         ));
@@ -916,7 +916,7 @@ impl GetIdentity {
         )
         .expect("the framework binding and a console argument of the same name coexist");
 
-        let run: String = module(&code, "run").split_whitespace().collect();
+        let run: String = module(&code, "run/command").split_whitespace().collect();
         assert!(run.contains(r#"clap::Arg::new("spiffe_http_client").long("spiffe_http_client")"#));
     }
 
@@ -1055,7 +1055,7 @@ impl GetVerify {
             construction.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
         );
 
-        let run = module(&code, "run");
+        let run = module(&code, "run/command");
         assert!(run.contains(r#"clap::Arg::new("issuer-url")"#));
     }
 
@@ -1715,7 +1715,7 @@ impl Metrics {
         assert!(serve.contains(r#"address_argument:"public-addr""#));
         assert!(serve.contains(r#"address_argument:"internal-addr""#));
 
-        let run = module(&code, "run");
+        let run = module(&code, "run/command");
         assert!(run.contains(r#"clap::Arg::new("public-addr")"#));
         assert!(run.contains(r#"clap::Arg::new("internal-addr")"#));
     }
@@ -1815,11 +1815,12 @@ impl New {
         assert!(module(&code, "schema").contains("\"widgets\""));
         assert!(module(&code, "schema").contains("ColumnType::Uuid"));
 
+        let command: String = module(&code, "run/command").split_whitespace().collect();
         let run: String = module(&code, "run").split_whitespace().collect();
 
         assert!(run.contains("pubfnrun"));
         assert!(!run.contains("pubasyncfnrun"));
-        assert!(run.contains("\"schema\""));
+        assert!(command.contains("\"schema\""));
         assert!(run.contains("super::schema::schema()"));
     }
 
@@ -1863,7 +1864,7 @@ impl Page {
         assert!(serve.contains("server_public(container,&routes"));
         assert!(!serve.contains("server_public(container,&console_argument_0"));
 
-        let run = module(&code, "run");
+        let run = module(&code, "run/command");
         assert!(run.contains(r#"clap::Arg::new("greeting")"#));
     }
 
