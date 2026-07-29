@@ -15,9 +15,9 @@ use margaret_spiffe_svid_client::svid_error::SvidError;
 use margaret_spiffe_svid_server::SvidServerSide;
 
 pub struct SvidBundle {
-    svid_client_side: SvidClientSide,
-    svid_server_side: SvidServerSide,
-    svid_service: SvidService,
+    client_side: SvidClientSide,
+    server_side: SvidServerSide,
+    service: SvidService,
 }
 
 impl SvidBundle {
@@ -28,52 +28,52 @@ impl SvidBundle {
             spire_agent_addr,
         }: SvidServiceBundleParams,
     ) -> Self {
-        let svid_service = SvidService::new(spire_agent_addr);
-        let svid_client_side = SvidClientSide::new(SvidSideParams {
-            root_cert_store_holder: svid_service.root_cert_store_holder(),
+        let service = SvidService::new(spire_agent_addr);
+        let client_side = SvidClientSide::new(SvidSideParams {
+            root_cert_store_holder: service.root_cert_store_holder(),
             spiffe_trust_domain: spiffe_trust_domain.clone(),
-            svid_certified_key_holder: svid_service.svid_certified_key_holder(),
+            svid_certified_key_holder: service.svid_certified_key_holder(),
         });
-        let svid_server_side = SvidServerSide::new(SvidSideParams {
-            root_cert_store_holder: svid_service.root_cert_store_holder(),
+        let server_side = SvidServerSide::new(SvidSideParams {
+            root_cert_store_holder: service.root_cert_store_holder(),
             spiffe_trust_domain,
-            svid_certified_key_holder: svid_service.svid_certified_key_holder(),
+            svid_certified_key_holder: service.svid_certified_key_holder(),
         });
 
         Self {
-            svid_client_side,
-            svid_server_side,
-            svid_service,
+            client_side,
+            server_side,
+            service,
         }
     }
 
     #[must_use]
     pub fn client_config(&self) -> ClientConfig {
-        self.svid_client_side.client_config()
+        self.client_side.client_config()
     }
 
     #[must_use]
     pub fn client_readiness(&self) -> SvidClientReadiness {
-        self.svid_client_side.client_readiness()
+        self.client_side.client_readiness()
     }
 
     pub fn reqwest_client(&self) -> Result<Client, SvidError> {
-        self.svid_client_side.reqwest_client()
+        self.client_side.reqwest_client()
     }
 
     #[must_use]
     pub fn server_config(&self) -> ServerConfig {
-        self.svid_server_side.server_config()
+        self.server_side.server_config()
     }
 }
 
 #[async_trait]
 impl ServiceBundle for SvidBundle {
     async fn services(self) -> Result<Vec<Box<dyn Service>>> {
-        let mut services = self.svid_service.into_common_services();
+        let mut services = self.service.into_common_services();
 
-        services.push(Box::new(self.svid_server_side.into_verifier_service()));
-        services.push(Box::new(self.svid_client_side.into_verifier_service()));
+        services.push(Box::new(self.server_side.into_verifier_service()));
+        services.push(Box::new(self.client_side.into_verifier_service()));
 
         Ok(services)
     }

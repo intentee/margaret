@@ -10,6 +10,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::construction_error_path::construction_error_path;
 use crate::construction_flow::construction_flow;
+use crate::container_field_ident::container_field_ident;
 use crate::container_plan::ContainerPlan;
 use crate::direct_construction::DirectConstruction;
 use crate::field_ident::field_ident;
@@ -218,16 +219,12 @@ pub(crate) fn render_build(
         retained_roots.iter().map(|entry| &entry.key).collect();
     let fields = construction_roots
         .iter()
-        .map(|planned| {
-            let provider = &planned.provider;
-            let binding = field_ident(provider);
-            if retained.contains(&planned.key) {
-                quote! { #binding, }
-            } else {
-                let hidden = format_ident!("_{binding}");
+        .enumerate()
+        .map(|(position, planned)| {
+            let binding = field_ident(&planned.provider);
+            let field = container_field_ident(position, retained.contains(&planned.key));
 
-                quote! { #hidden: #binding, }
-            }
+            quote! { #field: #binding, }
         })
         .collect::<Vec<_>>();
     let error = construction_error_path();

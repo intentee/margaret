@@ -5,6 +5,7 @@ mod construction_flow;
 mod construction_source;
 pub mod container_bindings;
 pub mod container_error;
+mod container_field_ident;
 mod container_plan;
 mod dependency_kind;
 mod direct_construction;
