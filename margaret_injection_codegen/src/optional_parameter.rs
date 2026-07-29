@@ -1,26 +1,6 @@
-use syn::GenericArgument;
-use syn::PathArguments;
 use syn::Type;
 
-fn option_inner(declared: &Type) -> Option<&Type> {
-    let Type::Path(type_path) = declared else {
-        return None;
-    };
-    let segment = type_path
-        .path
-        .segments
-        .last()
-        .filter(|segment| segment.ident == "Option")?;
-
-    let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
-        return None;
-    };
-
-    match arguments.args.first() {
-        Some(GenericArgument::Type(inner)) => Some(inner),
-        _ => None,
-    }
-}
+use margaret_syn_type_peeling::option_inner::option_inner;
 
 pub struct OptionalParameter {
     pub required: bool,

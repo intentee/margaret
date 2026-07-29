@@ -803,6 +803,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6043086bf7973472e0c7dff2142ea0b680d30e18d9cc40f267efbf222bd47"
 dependencies = [
  "base16ct",
+ "base64ct",
  "crypto-bigint",
  "digest 0.10.7",
  "ff",
@@ -813,6 +814,8 @@ dependencies = [
  "pkcs8",
  "rand_core 0.6.4",
  "sec1",
+ "serde_json",
+ "serdect",
  "subtle",
  "zeroize",
 ]
@@ -2018,6 +2021,7 @@ dependencies = [
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_generated_module",
+ "margaret_syn_type_peeling",
  "margaret_tag_codegen",
  "margaret_toposort",
  "proc-macro2",
@@ -2094,6 +2098,7 @@ dependencies = [
  "maud",
  "mime",
  "multer",
+ "percent-encoding",
  "rustls",
  "serde",
  "serde_json",
@@ -2110,7 +2115,6 @@ dependencies = [
 name = "margaret_http_codegen"
 version = "0.1.0"
 dependencies = [
- "heck",
  "http",
  "margaret_attributes",
  "margaret_codegen_tokens",
@@ -2181,6 +2185,7 @@ name = "margaret_injection_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_syn_type_peeling",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2263,7 +2268,9 @@ dependencies = [
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "serde_json",
+ "tempfile",
  "thiserror",
+ "zeroize",
 ]
 
 [[package]]
@@ -2426,6 +2433,7 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "margaret_schema_identifier_naming",
+ "margaret_syn_type_peeling",
  "margaret_toposort",
  "proc-macro2",
  "quote",
@@ -2534,7 +2542,6 @@ dependencies = [
 name = "margaret_service_codegen"
 version = "0.1.0"
 dependencies = [
- "heck",
  "margaret_attributes",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
@@ -2586,6 +2593,7 @@ dependencies = [
  "async-trait",
  "futures-util",
  "log",
+ "margaret_peer_identity",
  "margaret_sync_holder",
  "rustls",
  "spiffe",
@@ -2636,6 +2644,7 @@ dependencies = [
  "reqwest",
  "rustls",
  "rustls-webpki",
+ "spiffe",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -2648,6 +2657,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "margaret_peer_identity",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_client",
  "margaret_spiffe_svid_tests",
@@ -2683,6 +2693,7 @@ dependencies = [
  "margaret_spiffe_svid",
  "margaret_sync_holder",
  "rustls",
+ "spiffe",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -2693,6 +2704,7 @@ dependencies = [
 name = "margaret_spiffe_svid_server_tests"
 version = "0.1.0"
 dependencies = [
+ "margaret_peer_identity",
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_server",
  "margaret_spiffe_svid_tests",
@@ -2709,6 +2721,7 @@ dependencies = [
  "anyhow",
  "futures-util",
  "libc",
+ "margaret_peer_identity",
  "margaret_spiffe_svid",
  "margaret_sync_holder",
  "rustls",
@@ -2719,6 +2732,14 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trzcina",
+]
+
+[[package]]
+name = "margaret_syn_type_peeling"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -3924,6 +3945,7 @@ dependencies = [
  "der",
  "generic-array",
  "pkcs8",
+ "serdect",
  "subtle",
  "zeroize",
 ]
@@ -4062,6 +4084,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "serdect"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
+dependencies = [
+ "base16ct",
+ "serde",
 ]
 
 [[package]]

@@ -860,6 +860,11 @@ struct PatchArticle;
 impl PatchArticle { #[process] fn respond(&self, #[route_parameter(from = "article")] article: String) -> anyhow::Result<Response> {} }
 
 #[singleton]
+#[responds_to_http(method = "get", name = "get_file", path = "/files/{*rest}", server = "public")]
+struct GetFile;
+impl GetFile { #[process] fn respond(&self, #[route_parameter(from = "rest")] rest: String) -> anyhow::Result<Response> {} }
+
+#[singleton]
 #[responds_to_http(method = "get", path = "/health", server = "internal")]
 struct GetHealth;
 impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
@@ -888,6 +893,15 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             "margaret::framework::http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/articles/\",),margaret::framework::http::url_segment::UrlSegment::Parameter(margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
         ));
         assert!(!source.contains("Params"));
+    }
+
+    #[test]
+    fn generates_a_catch_all_segment_for_a_named_wildcard_get() {
+        let source = routes_source_for(ROUTES_FIXTURE);
+
+        assert!(source.contains(
+            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter(margaret::framework::http::url_parameter::UrlParameter{name:\"rest\",value:rest,})"
+        ));
     }
 
     #[test]

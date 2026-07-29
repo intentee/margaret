@@ -6,6 +6,7 @@ autotests = false
 
 [dev-dependencies]
 margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
+margaret_peer_identity = { path = "../margaret_peer_identity" }
 margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server" }
 margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests" }
 rustls = { workspace = true }

@@ -20,6 +20,7 @@ matchit = { workspace = true }
 maud = { workspace = true }
 mime = { workspace = true }
 multer = { workspace = true }
+percent-encoding = { workspace = true }
 serde = { workspace = true }
 rustls = { workspace = true }
 serde_json = { workspace = true }

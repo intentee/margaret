@@ -20,7 +20,11 @@ async fn verify_accepts_expired_token_signature() -> Result<()> {
     };
 
     let token = keypair.signing.sign(&claims).await?;
-    let verified: TestClaims = keypair.public.verify::<TestClaims>(&token)?.must()?;
+    let verified: TestClaims = keypair
+        .public
+        .verify::<TestClaims>(&token)?
+        .verified()
+        .expect("the token verifies");
 
     assert_eq!(verified, claims);
 

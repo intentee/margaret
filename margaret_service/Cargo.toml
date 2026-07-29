@@ -7,12 +7,14 @@ edition = "2024"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
-libc = { workspace = true }
 margaret_console = { path = "../margaret_console" }
 margaret_http = { path = "../margaret_http" }
 tokio = { workspace = true, features = ["macros", "rt", "signal"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
+
+[dev-dependencies]
+libc = { workspace = true }
 
 [lints]
 workspace = true

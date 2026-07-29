@@ -13,7 +13,11 @@ impl RouteResolution {
             Self::Request(RequestRoute::Handler { route_handler, .. }) => {
                 route_handler.cancellation_cooperation
             }
-            Self::Request(RequestRoute::MethodNotAllowed | RequestRoute::NotFound)
+            Self::Request(
+                RequestRoute::MethodNotAllowed
+                | RequestRoute::NotFound
+                | RequestRoute::PathParameterNotValidUtf8 { .. },
+            )
             | Self::Upgrade(_) => RequestCancellationCooperation::Immediate,
         }
     }

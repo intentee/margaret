@@ -22,9 +22,7 @@ mod index_redundancy;
 mod indirection_inner;
 mod infer_column_type;
 mod model_arguments;
-mod option_inner;
 mod positioned_field;
-mod single_generic_argument;
 
 #[cfg(test)]
 mod tests {

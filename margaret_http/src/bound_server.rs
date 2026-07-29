@@ -404,6 +404,13 @@ async fn complete_request(
         .into_http(),
         RequestRoute::MethodNotAllowed => Response::text(405, "Method Not Allowed").into_http(),
         RequestRoute::NotFound => Response::not_found().into_http(),
+        RequestRoute::PathParameterNotValidUtf8 { parameter, source } => {
+            eprintln!(
+                "margaret_http: the `{parameter}` route parameter is not valid percent-encoded utf-8: {source}"
+            );
+
+            Response::text(400, "Bad Request").into_http()
+        }
     }
 }
 
@@ -592,6 +599,26 @@ mod tests {
         )]))
     }
 
+    fn registry_with_a_route_parameter() -> Arc<ServerRegistry> {
+        Arc::new(ServerRegistry::new(vec![Server::new(
+            "test",
+            "127.0.0.1:0".to_string(),
+            TransportConfig::Plain,
+            UploadConfig::Disabled,
+            BodyLimit::default(),
+            RequestTimeout::default(),
+            Router::build(vec![RouteEntry::new(
+                "/articles/{article}",
+                vec![MethodHandler::new(
+                    "GET",
+                    Arc::new(PlainOk),
+                    RequestCancellationCooperation::Immediate,
+                )],
+            )])
+            .expect("the route paths do not conflict"),
+        )]))
+    }
+
     fn empty_forward_targets() -> Arc<ForwardTargets> {
         Arc::new(ForwardTargets::new(Vec::new()))
     }
@@ -774,6 +801,42 @@ mod tests {
         assert!(unmatched.contains(" 404 "));
         assert!(unsupported.contains(" 405 "));
         assert!(truncated.contains(" 400 "));
+
+        cancellation_token.cancel();
+
+        serving.await.expect("the server task finishes cleanly");
+    }
+
+    #[tokio::test]
+    async fn rejects_a_route_parameter_that_is_not_valid_percent_encoded_utf8() {
+        let bound = BoundServer::bind(
+            registry_with_a_route_parameter(),
+            empty_forward_targets(),
+            Arc::from("test"),
+        )
+        .await
+        .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        let (decodable, undecodable) = tokio::join!(
+            exchange(
+                address,
+                b"GET /articles/rust%20lang HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+            exchange(
+                address,
+                b"GET /articles/%FF HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            ),
+        );
+
+        assert!(decodable.contains(" 200 "));
+        assert!(undecodable.contains(" 400 "));
 
         cancellation_token.cancel();
 
