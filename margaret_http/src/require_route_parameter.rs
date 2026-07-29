@@ -13,7 +13,7 @@ pub fn require_route_parameter(request: &Request, name: &str) -> Result<String, 
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     use http::Method;
 
@@ -23,7 +23,7 @@ mod tests {
     #[test]
     fn returns_a_present_route_parameter() {
         let request = Request::new(Method::GET, "/articles/42".to_string())
-            .with_path_params(HashMap::from([("article".to_string(), "42".to_string())]));
+            .with_path_params(BTreeMap::from([("article".to_string(), "42".to_string())]));
 
         assert_eq!(
             require_route_parameter(&request, "article").ok(),

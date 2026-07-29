@@ -15,7 +15,7 @@ pub fn build_digitally_signed_struct(
 
     scheme.encode(&mut bytes);
     (u16::try_from(signature.len()).unwrap()).encode(&mut bytes);
-    bytes.extend_from_slice(&signature);
+    bytes.extend_from_slice(signature);
 
     let mut reader = Reader::init(&bytes);
 

@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::handler::Handler;
 use crate::named_handler::NamedHandler;
 
 pub struct ForwardTargets {
-    by_name: HashMap<&'static str, Arc<dyn Handler>>,
+    by_name: BTreeMap<&'static str, Arc<dyn Handler>>,
 }
 
 impl ForwardTargets {

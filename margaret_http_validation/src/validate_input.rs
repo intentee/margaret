@@ -23,7 +23,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     use http::Method;
     use serde_json::json;
@@ -54,7 +54,7 @@ mod tests {
     #[test]
     fn validates_the_form_source() {
         let mut request = request();
-        request.inputs.form = HashMap::from([("value".to_string(), "formed".to_string())]);
+        request.inputs.form = BTreeMap::from([("value".to_string(), "formed".to_string())]);
 
         assert_eq!(
             value(validate_input(&request, RequestInput::Form)),
@@ -65,7 +65,7 @@ mod tests {
     #[test]
     fn validates_the_query_source() {
         let mut request = request();
-        request.inputs.query = HashMap::from([("value".to_string(), "queried".to_string())]);
+        request.inputs.query = BTreeMap::from([("value".to_string(), "queried".to_string())]);
 
         assert_eq!(
             value(validate_input(&request, RequestInput::Query)),
@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn validates_the_cookie_source() {
         let mut request = request();
-        request.inputs.cookies = HashMap::from([("value".to_string(), "baked".to_string())]);
+        request.inputs.cookies = BTreeMap::from([("value".to_string(), "baked".to_string())]);
 
         assert_eq!(
             value(validate_input(&request, RequestInput::Cookie)),
@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn reports_invalid_source_data() {
         let mut request = request();
-        request.inputs.form = HashMap::from([("value".to_string(), String::new())]);
+        request.inputs.form = BTreeMap::from([("value".to_string(), String::new())]);
 
         assert_eq!(value(validate_input(&request, RequestInput::Form)), None);
     }

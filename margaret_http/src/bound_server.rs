@@ -437,7 +437,7 @@ async fn dispatch(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     use std::net::SocketAddr;
     use std::sync::Arc;
 
@@ -772,7 +772,7 @@ mod tests {
         ) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::from(Forward::new(
                 "target",
-                HashMap::new(),
+                BTreeMap::new(),
             )))
         }
     }

@@ -1,9 +1,8 @@
-use std::collections::HashSet;
-
 use syn::Path;
 
 use crate::canonical_path::CanonicalPath;
 use crate::is_copy_primitive::is_copy_primitive;
+use crate::item_paths::ItemPaths;
 use crate::module_imports::ModuleImports;
 
 fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
@@ -33,7 +32,7 @@ pub fn resolve_path(
     path: &Path,
     module_path: &[String],
     imports: &ModuleImports,
-    item_paths: &HashSet<CanonicalPath>,
+    item_paths: &ItemPaths,
 ) -> Option<CanonicalPath> {
     let segments: Vec<String> = path
         .segments
@@ -75,11 +74,11 @@ pub fn resolve_path(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
 
     use syn::parse_quote;
 
     use crate::canonical_path::CanonicalPath;
+    use crate::item_paths::ItemPaths;
     use crate::module_imports::ModuleImports;
 
     use super::resolve_path;
@@ -97,7 +96,7 @@ mod tests {
         written: syn::Path,
         module: &[&str],
         imports: &ModuleImports,
-        items: &HashSet<CanonicalPath>,
+        items: &ItemPaths,
     ) -> Option<String> {
         let module_path: Vec<String> = module
             .iter()
@@ -116,7 +115,12 @@ mod tests {
         );
 
         assert_eq!(
-            resolved(parse_quote!(Greeter), &["crate"], &imports, &HashSet::new()),
+            resolved(
+                parse_quote!(Greeter),
+                &["crate"],
+                &imports,
+                &ItemPaths::default()
+            ),
             Some("crate::greeter::Greeter".to_string())
         );
     }
@@ -128,7 +132,7 @@ mod tests {
                 parse_quote!(margaret_http::request::Request),
                 &["crate"],
                 &ModuleImports::default(),
-                &HashSet::new(),
+                &ItemPaths::default(),
             ),
             Some("margaret_http::request::Request".to_string())
         );
@@ -151,7 +155,7 @@ mod tests {
                 parse_quote!(ValidationResult<Form>),
                 &["crate"],
                 &imports,
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             Some("margaret_validation::validation_result::ValidationResult".to_string())
         );
@@ -159,7 +163,7 @@ mod tests {
 
     #[test]
     fn resolves_a_same_module_defined_leaf() {
-        let items = HashSet::from([path(&["crate", "models", "User"])]);
+        let items = ItemPaths::from_iter([path(&["crate", "models", "User"])]);
 
         assert_eq!(
             resolved(
@@ -174,7 +178,7 @@ mod tests {
 
     #[test]
     fn a_local_definition_shadows_the_prelude() {
-        let items = HashSet::from([path(&["crate", "String"])]);
+        let items = ItemPaths::from_iter([path(&["crate", "String"])]);
 
         assert_eq!(
             resolved(
@@ -194,7 +198,7 @@ mod tests {
                 parse_quote!(String),
                 &["crate"],
                 &ModuleImports::default(),
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             Some("std::string::String".to_string())
         );
@@ -207,7 +211,7 @@ mod tests {
                 parse_quote!(u16),
                 &["crate"],
                 &ModuleImports::default(),
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             Some("u16".to_string())
         );
@@ -220,7 +224,7 @@ mod tests {
                 parse_quote!(Unknown),
                 &["crate"],
                 &ModuleImports::default(),
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             None
         );
@@ -238,7 +242,7 @@ mod tests {
                 empty,
                 &["crate"],
                 &ModuleImports::default(),
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             None
         );
@@ -251,7 +255,7 @@ mod tests {
                 parse_quote!(crate::greeter::Greeter),
                 &["crate", "routes"],
                 &ModuleImports::default(),
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             Some("crate::greeter::Greeter".to_string())
         );
@@ -266,13 +270,13 @@ mod tests {
             parse_quote!(crate::greeter::Greeter),
             &["crate"],
             &ModuleImports::default(),
-            &HashSet::new(),
+            &ItemPaths::default(),
         );
         let aliased = resolved(
             parse_quote!(greeter::Greeter),
             &["crate"],
             &imports,
-            &HashSet::new(),
+            &ItemPaths::default(),
         );
 
         assert_eq!(aliased, direct);
@@ -289,7 +293,7 @@ mod tests {
                 parse_quote!(g::Greeter),
                 &["crate"],
                 &imports,
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             Some("crate::greeter::Greeter".to_string())
         );
@@ -302,7 +306,7 @@ mod tests {
                 parse_quote!(self::User),
                 &["crate", "models"],
                 &ModuleImports::default(),
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             Some("crate::models::User".to_string())
         );
@@ -315,7 +319,7 @@ mod tests {
                 parse_quote!(super::Shared),
                 &["crate", "models", "user"],
                 &ModuleImports::default(),
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             Some("crate::models::Shared".to_string())
         );
@@ -323,7 +327,7 @@ mod tests {
 
     #[test]
     fn resolves_a_relative_submodule_path_against_the_current_module() {
-        let items = HashSet::from([path(&["crate", "models", "user", "User"])]);
+        let items = ItemPaths::from_iter([path(&["crate", "models", "user", "User"])]);
 
         assert_eq!(
             resolved(

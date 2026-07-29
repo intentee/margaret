@@ -8,12 +8,14 @@ use crate::request_error::RequestError;
 
 pub(crate) async fn collect_limited(
     body: RequestBody,
-    max_size: u64,
+    max_size: usize,
 ) -> Result<Bytes, RequestError> {
-    match Limited::new(body, max_size as usize).collect().await {
+    match Limited::new(body, max_size).collect().await {
         Ok(collected) => Ok(collected.to_bytes()),
         Err(source) => match source.downcast::<LengthLimitError>() {
-            Ok(_) => Err(RequestError::PayloadTooLarge { limit: max_size }),
+            Ok(_) => Err(RequestError::PayloadTooLarge {
+                limit: max_size as u64,
+            }),
             Err(source) => Err(RequestError::BodyRead { source }),
         },
     }

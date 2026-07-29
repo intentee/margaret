@@ -24,6 +24,7 @@ use crate::indexed_associated_type::IndexedAssociatedType;
 use crate::indexed_trait_impl::IndexedTraitImpl;
 use crate::indexed_variant::IndexedVariant;
 use crate::item_kind::ItemKind;
+use crate::item_paths::ItemPaths;
 use crate::module_imports::ModuleImports;
 use crate::resolve_type::resolve_type;
 use crate::scanned_field::ScannedField;
@@ -176,7 +177,7 @@ impl ModuleWalker {
             seen_paths: _,
         } = self;
 
-        let item_paths: HashSet<CanonicalPath> = items
+        let item_paths: ItemPaths = items
             .iter()
             .map(|item| item.canonical_path().clone())
             .collect();

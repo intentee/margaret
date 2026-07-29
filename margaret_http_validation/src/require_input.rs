@@ -26,7 +26,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     use http::Method;
 
@@ -41,7 +41,7 @@ mod tests {
         value: String,
     }
 
-    fn request_with_form(form: HashMap<String, String>) -> Request {
+    fn request_with_form(form: BTreeMap<String, String>) -> Request {
         let mut request = Request::new(Method::POST, "/".to_string());
         request.inputs.form = form;
         request
@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn returns_the_model_when_valid() {
-        let request = request_with_form(HashMap::from([("value".to_string(), "ok".to_string())]));
+        let request = request_with_form(BTreeMap::from([("value".to_string(), "ok".to_string())]));
 
         assert_eq!(
             require_input::<Sample>(&request, RequestInput::Form)
@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn responds_with_422_when_invalid() {
-        let request = request_with_form(HashMap::from([("value".to_string(), String::new())]));
+        let request = request_with_form(BTreeMap::from([("value".to_string(), String::new())]));
 
         assert_eq!(
             require_input::<Sample>(&request, RequestInput::Form)
@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn responds_with_400_when_malformed() {
-        let request = request_with_form(HashMap::new());
+        let request = request_with_form(BTreeMap::new());
 
         assert_eq!(
             require_input::<Sample>(&request, RequestInput::Form)

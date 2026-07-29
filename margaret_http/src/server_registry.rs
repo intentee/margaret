@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::server::Server;
 
 pub struct ServerRegistry {
-    by_name: HashMap<Arc<str>, Server>,
+    by_name: BTreeMap<Arc<str>, Server>,
 }
 
 impl ServerRegistry {

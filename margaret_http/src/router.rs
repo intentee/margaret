@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use matchit::InsertError;
@@ -13,7 +13,7 @@ use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
 enum RouteTarget {
-    Http(HashMap<&'static str, Arc<dyn Handler>>),
+    Http(BTreeMap<&'static str, Arc<dyn Handler>>),
     WebSocket {
         middleware: Vec<Arc<dyn HttpMiddleware>>,
         upgrade: Arc<dyn WebSocketUpgrade>,

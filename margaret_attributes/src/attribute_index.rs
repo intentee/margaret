@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use syn::Path;
 use syn::Type;
@@ -9,6 +8,7 @@ use crate::field_base::field_base;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::identifier::Identifier;
 use crate::indexed_item::IndexedItem;
+use crate::item_paths::ItemPaths;
 use crate::matched_attribute::MatchedAttribute;
 use crate::module_imports::ModuleImports;
 use crate::name_allocator::NameAllocator;
@@ -19,7 +19,7 @@ pub struct AttributeIndex {
     empty_imports: ModuleImports,
     identifiers: HashMap<CanonicalPath, Identifier>,
     imports: HashMap<CanonicalPath, ModuleImports>,
-    item_paths: HashSet<CanonicalPath>,
+    item_paths: ItemPaths,
     items: Vec<IndexedItem>,
 }
 
@@ -52,7 +52,7 @@ impl AttributeIndex {
         items: Vec<IndexedItem>,
         imports: HashMap<CanonicalPath, ModuleImports>,
     ) -> Self {
-        let mut item_paths = HashSet::new();
+        let mut item_paths = ItemPaths::default();
         for item in &items {
             item_paths.insert(item.canonical_path().clone());
         }

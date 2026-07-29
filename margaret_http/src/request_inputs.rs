@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::net::SocketAddr;
 
 use cookie::Cookie;
@@ -23,8 +23,8 @@ fn unspecified_addr() -> SocketAddr {
     SocketAddr::from(([0, 0, 0, 0], 0))
 }
 
-fn parse_cookies(headers: &HeaderMap) -> Result<HashMap<String, String>, RequestError> {
-    let mut cookies = HashMap::new();
+fn parse_cookies(headers: &HeaderMap) -> Result<BTreeMap<String, String>, RequestError> {
+    let mut cookies = BTreeMap::new();
     let Some(raw) = headers.get(COOKIE) else {
         return Ok(cookies);
     };
@@ -40,8 +40,8 @@ fn parse_cookies(headers: &HeaderMap) -> Result<HashMap<String, String>, Request
     Ok(cookies)
 }
 
-fn index_fields(fields: Vec<FormField>) -> HashMap<String, String> {
-    let mut indexed = HashMap::new();
+fn index_fields(fields: Vec<FormField>) -> BTreeMap<String, String> {
+    let mut indexed = BTreeMap::new();
 
     for FormField { name, value } in fields {
         indexed.entry(name).or_insert(value);
@@ -50,8 +50,8 @@ fn index_fields(fields: Vec<FormField>) -> HashMap<String, String> {
     indexed
 }
 
-fn index_files(files: Vec<UploadedFile>) -> HashMap<String, UploadedFile> {
-    let mut indexed = HashMap::new();
+fn index_files(files: Vec<UploadedFile>) -> BTreeMap<String, UploadedFile> {
+    let mut indexed = BTreeMap::new();
 
     for file in files {
         let field_name = file.field_name().to_string();
@@ -63,7 +63,7 @@ fn index_files(files: Vec<UploadedFile>) -> HashMap<String, UploadedFile> {
 }
 
 struct ParsedQuery {
-    fields: HashMap<String, String>,
+    fields: BTreeMap<String, String>,
     raw: String,
 }
 
@@ -74,29 +74,29 @@ fn parse_query(uri: &Uri) -> ParsedQuery {
             raw: raw.to_string(),
         },
         None => ParsedQuery {
-            fields: HashMap::new(),
+            fields: BTreeMap::new(),
             raw: String::new(),
         },
     }
 }
 
 pub struct RequestInputs {
-    pub cookies: HashMap<String, String>,
-    pub files: HashMap<String, UploadedFile>,
+    pub cookies: BTreeMap<String, String>,
+    pub files: BTreeMap<String, UploadedFile>,
     pub json: Option<serde_json::Value>,
-    pub form: HashMap<String, String>,
-    pub query: HashMap<String, String>,
+    pub form: BTreeMap<String, String>,
+    pub query: BTreeMap<String, String>,
     pub server: ServerParams,
 }
 
 impl RequestInputs {
     pub(crate) fn empty(method: Method, path: String) -> Self {
         Self {
-            cookies: HashMap::new(),
-            files: HashMap::new(),
+            cookies: BTreeMap::new(),
+            files: BTreeMap::new(),
             json: None,
-            form: HashMap::new(),
-            query: HashMap::new(),
+            form: BTreeMap::new(),
+            query: BTreeMap::new(),
             server: ServerParams::new(
                 method,
                 path,
@@ -128,9 +128,9 @@ impl RequestInputs {
 
         Ok(Self {
             cookies,
-            files: HashMap::new(),
+            files: BTreeMap::new(),
             json: None,
-            form: HashMap::new(),
+            form: BTreeMap::new(),
             query,
             server,
         })
@@ -150,9 +150,9 @@ impl RequestInputs {
             fields: query,
             raw: raw_query,
         } = parse_query(uri);
-        let mut files = HashMap::new();
+        let mut files = BTreeMap::new();
         let mut json: Option<serde_json::Value> = None;
-        let mut form = HashMap::new();
+        let mut form = BTreeMap::new();
 
         match BodyClass::from_headers(&headers)? {
             BodyClass::Multipart { boundary } => {

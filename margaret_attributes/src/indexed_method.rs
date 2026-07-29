@@ -14,6 +14,7 @@ pub struct IndexedMethod {
 }
 
 impl IndexedMethod {
+    #[must_use]
     pub fn new(identifier: String, attributes: Vec<Attribute>, signature: Signature) -> Self {
         let parameters = signature
             .inputs
