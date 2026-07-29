@@ -185,6 +185,7 @@ fn server_registration(
         let address_argument = server.address_argument();
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
+        let request_timeout_argument = server.request_timeout_argument();
         let transport = transport_expression(server, activation.server_active);
         let routes = if server.routes_are_async() {
             quote! {
@@ -200,6 +201,7 @@ fn server_registration(
             margaret::framework::service::server_assembly::ServerAssembly {
                 address_argument: #address_argument,
                 name: #name,
+                request_timeout_argument: #request_timeout_argument,
                 routes: #routes,
                 transport: #transport,
                 upload_dir_argument: #upload_dir_argument,

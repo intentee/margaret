@@ -4,12 +4,14 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use futures_util::FutureExt;
 use http::request::Parts;
 use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper_util::rt::TokioExecutor;
 use hyper_util::rt::TokioIo;
+use hyper_util::rt::TokioTimer;
 use hyper_util::server::conn::auto::Builder;
 use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::server::graceful::Watcher;
@@ -18,6 +20,8 @@ use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::task::JoinError;
 use tokio::task::JoinSet;
+use tokio::time::error::Elapsed;
+use tokio::time::timeout;
 use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 use tokio_util::sync::CancellationToken;
@@ -37,6 +41,7 @@ use crate::request_cancellation_cooperation::RequestCancellationCooperation;
 use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
 use crate::request_route::RequestRoute;
+use crate::request_timeout::RequestTimeout;
 use crate::respond_once::respond_once;
 use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
@@ -70,6 +75,7 @@ struct ConnectionContext {
     forward_targets: Arc<ForwardTargets>,
     peer_identity: Arc<PeerIdentity>,
     remote_addr: SocketAddr,
+    request_timeout: RequestTimeout,
     router: Arc<Router>,
     upload_config: Arc<UploadConfig>,
 }
@@ -91,6 +97,7 @@ pub struct BoundServer {
     body_limit: BodyLimit,
     forward_targets: Arc<ForwardTargets>,
     listener: TcpListener,
+    request_timeout: RequestTimeout,
     router: Arc<Router>,
     transport: BoundTransport,
     upload_config: Arc<UploadConfig>,
@@ -117,12 +124,14 @@ impl BoundServer {
             },
         };
         let upload_config = server.upload_config().clone();
+        let request_timeout = server.request_timeout();
         let listener = TcpListener::bind(server.address()).await?;
 
         Ok(Self {
             body_limit,
             forward_targets,
             listener,
+            request_timeout,
             router,
             transport,
             upload_config,
@@ -134,7 +143,12 @@ impl BoundServer {
     }
 
     pub async fn serve(self, cancellation_token: CancellationToken) {
-        let builder = Arc::new(Builder::new(TokioExecutor::new()));
+        let mut builder = Builder::new(TokioExecutor::new());
+
+        builder.http1().timer(TokioTimer::new());
+        builder.http2().timer(TokioTimer::new());
+
+        let builder = Arc::new(builder);
         let graceful = GracefulShutdown::new();
         let mut connections = JoinSet::new();
 
@@ -184,6 +198,7 @@ impl BoundServer {
         let upload_config = self.upload_config.clone();
         let forward_targets = self.forward_targets.clone();
         let body_limit = self.body_limit;
+        let request_timeout = self.request_timeout;
         let cancellation_token = cancellation_token.clone();
 
         drop(connections.spawn(async move {
@@ -199,6 +214,7 @@ impl BoundServer {
                             forward_targets,
                             peer_identity: Arc::new(PeerIdentity::from_peer_certificate(None)),
                             remote_addr,
+                            request_timeout,
                             router,
                             upload_config,
                         },
@@ -226,6 +242,7 @@ impl BoundServer {
                             forward_targets,
                             peer_identity,
                             remote_addr,
+                            request_timeout,
                             router,
                             upload_config,
                         },
@@ -280,6 +297,15 @@ fn report_connection_task_outcome(outcome: Result<(), JoinError>) {
     }
 }
 
+fn timed_out_response(
+    outcome: Result<http::Response<Full<Bytes>>, Elapsed>,
+) -> http::Response<Full<Bytes>> {
+    match outcome {
+        Ok(response) => response,
+        Err(_elapsed) => Response::text(503, "Service Unavailable").into_http(),
+    }
+}
+
 fn error_response(error: RequestError) -> Response {
     match error {
         RequestError::PayloadTooLarge { .. } => Response::text(413, "Payload Too Large"),
@@ -307,9 +333,18 @@ async fn serve_connection<Io>(
                 .resolve(request.method().as_str(), request.uri().path());
             let driver_sender = driver_sender.clone();
 
+            let request_timeout = connection_context.request_timeout;
+
             async move {
                 Ok::<_, Infallible>(
-                    serve_request(request_context, driver_sender, resolution, request).await,
+                    serve_request(
+                        request_timeout,
+                        request_context,
+                        driver_sender,
+                        resolution,
+                        request,
+                    )
+                    .await,
                 )
             }
         },
@@ -463,24 +498,24 @@ async fn dispatch(
 }
 
 async fn serve_request(
+    request_timeout: RequestTimeout,
     request_context: RequestContext,
     driver_sender: ConnectionDriverSender,
     resolution: RouteResolution,
     request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
-    match resolution.cancellation_cooperation() {
-        RequestCancellationCooperation::Immediate => {
-            dispatch(request_context, driver_sender, resolution, request).await
-        }
-        RequestCancellationCooperation::Cooperative => {
-            let cancellation_token = request_context.cancellation_token.clone();
+    let cancellation_cooperation = resolution.cancellation_cooperation();
+    let cancellation_token = request_context.cancellation_token.clone();
+    let deadline = timeout(
+        request_timeout.duration(),
+        dispatch(request_context, driver_sender.clone(), resolution, request),
+    )
+    .map(timed_out_response);
 
-            CooperativeRequest::new(
-                dispatch(request_context, driver_sender.clone(), resolution, request),
-                cancellation_token,
-                driver_sender,
-            )
-            .await
+    match cancellation_cooperation {
+        RequestCancellationCooperation::Immediate => deadline.await,
+        RequestCancellationCooperation::Cooperative => {
+            CooperativeRequest::new(deadline, cancellation_token, driver_sender).await
         }
     }
 }
@@ -517,6 +552,7 @@ mod tests {
     use crate::request::Request;
     use crate::request_cancellation_cooperation::RequestCancellationCooperation;
     use crate::request_error::RequestError;
+    use crate::request_timeout::RequestTimeout;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
     use crate::route_entry::RouteEntry;
@@ -543,6 +579,7 @@ mod tests {
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
+            RequestTimeout::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
                 vec![MethodHandler::new(
@@ -658,6 +695,7 @@ mod tests {
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
+            RequestTimeout::default(),
             Router::build(Vec::new()).expect("an empty router builds"),
         )]));
 
@@ -852,6 +890,7 @@ mod tests {
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
+            RequestTimeout::default(),
             Router::build(vec![RouteEntry::web_socket(
                 "/room/{id}",
                 Arc::new(TestUpgrade),

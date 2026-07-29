@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use clap::ArgMatches;
 
@@ -7,6 +8,7 @@ use margaret_console::command_outcome::CommandOutcome;
 use margaret_console::report_failure::report_failure;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::forward_targets::ForwardTargets;
+use margaret_http::request_timeout::RequestTimeout;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
 use margaret_http::upload_config::UploadConfig;
@@ -24,6 +26,7 @@ pub fn serve_application(
     for ServerAssembly {
         address_argument,
         name,
+        request_timeout_argument,
         routes,
         transport,
         upload_dir_argument,
@@ -47,6 +50,11 @@ pub fn serve_application(
         } else {
             UploadConfig::Disabled
         };
+        let request_timeout = matches
+            .get_one::<u64>(request_timeout_argument)
+            .map_or_else(RequestTimeout::default, |seconds| {
+                RequestTimeout::new(Duration::from_secs(*seconds))
+            });
 
         server_forward_targets.push((
             Arc::new(ForwardTargets::new(server_routes.named_handlers)),
@@ -58,6 +66,7 @@ pub fn serve_application(
             transport,
             upload_config,
             BodyLimit::default(),
+            request_timeout,
             server_routes.router,
         ));
     }
@@ -101,6 +110,11 @@ mod tests {
                     .action(ArgAction::SetTrue),
             )
             .arg(Arg::new("public-upload-dir").long("public-upload-dir"))
+            .arg(
+                Arg::new("public-request-timeout-seconds")
+                    .long("public-request-timeout-seconds")
+                    .value_parser(clap::value_parser!(u64)),
+            )
             .try_get_matches_from(std::iter::once("test").chain(arguments.iter().copied()))
             .expect("the test arguments parse")
     }
@@ -111,6 +125,7 @@ mod tests {
         ServerAssembly {
             address_argument: "public-addr",
             name: "public",
+            request_timeout_argument: "public-request-timeout-seconds",
             routes,
             transport: TransportConfig::Plain,
             upload_dir_argument: "public-upload-dir",
@@ -156,6 +171,31 @@ mod tests {
     fn enables_uploads_into_the_temporary_directory_by_default() {
         let outcome = serve_application(
             &matches(&["--public-addr", "127.0.0.1:0", "--public-uploads"]),
+            vec![public_assembly(Ok(empty_routes()))],
+        );
+
+        assert!(outcome.is_ok());
+    }
+
+    #[test]
+    fn accepts_a_configured_request_timeout() {
+        let outcome = serve_application(
+            &matches(&[
+                "--public-addr",
+                "127.0.0.1:0",
+                "--public-request-timeout-seconds",
+                "30",
+            ]),
+            vec![public_assembly(Ok(empty_routes()))],
+        );
+
+        assert!(outcome.is_ok());
+    }
+
+    #[test]
+    fn falls_back_to_the_framework_request_timeout() {
+        let outcome = serve_application(
+            &matches(&["--public-addr", "127.0.0.1:0"]),
             vec![public_assembly(Ok(empty_routes()))],
         );
 

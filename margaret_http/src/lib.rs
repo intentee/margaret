@@ -37,6 +37,7 @@ pub mod request_cancellation_cooperation;
 pub mod request_error;
 pub(crate) mod request_inputs;
 mod request_route;
+pub mod request_timeout;
 pub mod require_bound_route_parameter;
 pub mod require_peer_spiffe_id;
 pub mod require_route_parameter;

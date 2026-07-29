@@ -14,6 +14,7 @@ use margaret_http::handler_error::HandlerError;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;
 use margaret_http::request_cancellation_cooperation::RequestCancellationCooperation;
+use margaret_http::request_timeout::RequestTimeout;
 use margaret_http::require_peer_spiffe_id::require_peer_spiffe_id;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
@@ -53,6 +54,7 @@ impl RunningMtlsServer {
             TransportConfig::MutualTls { server_config },
             UploadConfig::Disabled,
             BodyLimit::default(),
+            RequestTimeout::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
                 vec![MethodHandler::new(

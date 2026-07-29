@@ -26,7 +26,7 @@ serde_json = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types"] }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "rt"] }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "rt", "time"] }
 tokio-rustls = { workspace = true }
 tokio-util = { workspace = true }
 tower = { workspace = true, features = ["util"] }

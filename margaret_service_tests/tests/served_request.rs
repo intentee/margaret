@@ -14,6 +14,7 @@ use margaret_http::handler_error::HandlerError;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;
 use margaret_http::request_cancellation_cooperation::RequestCancellationCooperation;
+use margaret_http::request_timeout::RequestTimeout;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::route_entry::RouteEntry;
@@ -63,6 +64,7 @@ async fn exchange(
         TransportConfig::Plain,
         upload_config,
         body_limit,
+        RequestTimeout::default(),
         router,
     )]));
     let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));

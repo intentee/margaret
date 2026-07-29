@@ -42,6 +42,11 @@ impl HttpServer {
     }
 
     #[must_use]
+    pub fn request_timeout_argument(&self) -> String {
+        format!("{}-request-timeout-seconds", self.name)
+    }
+
+    #[must_use]
     pub fn routes_are_async(&self) -> bool {
         self.routes_are_async
     }

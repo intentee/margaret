@@ -136,6 +136,7 @@ pub(crate) fn render(
             let url_argument = server.url_argument();
             let uploads_argument = server.uploads_argument();
             let upload_dir_argument = server.upload_dir_argument();
+            let request_timeout_argument = server.request_timeout_argument();
             let transport_argument =
                 spiffe_secured.then(|| transport_argument_registration(server));
 
@@ -144,6 +145,7 @@ pub(crate) fn render(
                 .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
                 .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
                 .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
+                .arg(clap::Arg::new(#request_timeout_argument).long(#request_timeout_argument).required(false).value_parser(clap::value_parser!(u64)))
                 #transport_argument
             }
         });

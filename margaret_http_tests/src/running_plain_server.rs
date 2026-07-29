@@ -10,6 +10,7 @@ use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::handler::Handler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request_cancellation_cooperation::RequestCancellationCooperation;
+use margaret_http::request_timeout::RequestTimeout;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::router::Router;
 use margaret_http::server::Server;
@@ -27,6 +28,7 @@ impl RunningPlainServer {
     pub async fn start(
         handler: Arc<dyn Handler>,
         cancellation_cooperation: RequestCancellationCooperation,
+        request_timeout: RequestTimeout,
     ) -> Self {
         let server = Server::new(
             "plain",
@@ -34,6 +36,7 @@ impl RunningPlainServer {
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
+            request_timeout,
             Router::build(vec![RouteEntry::new(
                 "/",
                 vec![MethodHandler::new("GET", handler, cancellation_cooperation)],

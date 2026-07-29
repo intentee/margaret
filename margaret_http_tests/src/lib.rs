@@ -1,7 +1,11 @@
+pub mod brief_request_timeout;
 pub mod cancellation_recording_responder;
+pub mod drop_reporter;
 pub mod mtls_client_request;
 pub mod mtls_fixture;
 pub mod open_plain_request;
+pub mod plain_client_request;
 pub mod responder_outcome;
 pub mod running_mtls_server;
 pub mod running_plain_server;
+pub mod uncooperative_responder;

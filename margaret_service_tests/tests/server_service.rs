@@ -5,6 +5,7 @@ use trzcina::Service;
 
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::forward_targets::ForwardTargets;
+use margaret_http::request_timeout::RequestTimeout;
 use margaret_http::router::Router;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
@@ -24,6 +25,7 @@ async fn binds_and_drains_on_cancellation() {
         TransportConfig::Plain,
         UploadConfig::Disabled,
         BodyLimit::default(),
+        RequestTimeout::default(),
         Router::build(Vec::new()).expect("an empty router builds"),
     )]));
     let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));

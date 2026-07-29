@@ -11,6 +11,7 @@ use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::handler::Handler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request_cancellation_cooperation::RequestCancellationCooperation;
+use margaret_http::request_timeout::RequestTimeout;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::router::Router;
 use margaret_http::server::Server;
@@ -33,6 +34,7 @@ impl RunningJwksServer {
             TransportConfig::MutualTls { server_config },
             UploadConfig::Disabled,
             BodyLimit::default(),
+            RequestTimeout::default(),
             Router::build(vec![RouteEntry::new(
                 WELL_KNOWN_JWKS_PATH,
                 vec![MethodHandler::new(

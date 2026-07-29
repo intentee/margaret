@@ -212,6 +212,9 @@ impl Farewell {
             r#"clap::Arg::new("public-upload-dir").long("public-upload-dir").required(false).requires("public-uploads")"#
         ));
         assert!(source.contains(
+            r#"clap::Arg::new("public-request-timeout-seconds").long("public-request-timeout-seconds").required(false).value_parser(clap::value_parser!(u64))"#
+        ));
+        assert!(source.contains(
             "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|super::serve::serve(matches,cancellation_token,),)"
         ));
     }

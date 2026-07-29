@@ -28,6 +28,7 @@ impl ServerRegistry {
 mod tests {
     use super::ServerRegistry;
     use crate::body_limit::BodyLimit;
+    use crate::request_timeout::RequestTimeout;
     use crate::router::Router;
     use crate::server::Server;
     use crate::transport_config::TransportConfig;
@@ -40,6 +41,7 @@ mod tests {
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
+            RequestTimeout::default(),
             Router::build(Vec::new()).expect("an empty router builds"),
         )])
     }

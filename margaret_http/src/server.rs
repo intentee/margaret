@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::body_limit::BodyLimit;
+use crate::request_timeout::RequestTimeout;
 use crate::router::Router;
 use crate::transport_config::TransportConfig;
 use crate::upload_config::UploadConfig;
@@ -9,6 +10,7 @@ pub struct Server {
     address: String,
     body_limit: BodyLimit,
     name: Arc<str>,
+    request_timeout: RequestTimeout,
     router: Arc<Router>,
     transport: Arc<TransportConfig>,
     upload_config: Arc<UploadConfig>,
@@ -21,12 +23,14 @@ impl Server {
         transport: TransportConfig,
         upload_config: UploadConfig,
         body_limit: BodyLimit,
+        request_timeout: RequestTimeout,
         router: Router,
     ) -> Self {
         Self {
             address,
             body_limit,
             name: name.into(),
+            request_timeout,
             router: Arc::new(router),
             transport: Arc::new(transport),
             upload_config: Arc::new(upload_config),
@@ -44,6 +48,10 @@ impl Server {
 
     pub(crate) fn name(&self) -> &Arc<str> {
         &self.name
+    }
+
+    pub(crate) fn request_timeout(&self) -> RequestTimeout {
+        self.request_timeout
     }
 
     pub(crate) fn router(&self) -> &Arc<Router> {

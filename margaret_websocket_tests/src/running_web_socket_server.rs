@@ -8,6 +8,7 @@ use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::http_middleware::HttpMiddleware;
+use margaret_http::request_timeout::RequestTimeout;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::router::Router;
 use margaret_http::server::Server;
@@ -65,6 +66,7 @@ impl RunningWebSocketServer {
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
+            RequestTimeout::default(),
             Router::build(vec![RouteEntry::web_socket("/ws", upgrade, middleware)])
                 .expect("the route entries register cleanly"),
         );
