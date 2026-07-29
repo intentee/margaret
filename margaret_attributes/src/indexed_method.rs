@@ -31,7 +31,10 @@ impl IndexedMethod {
             .collect();
 
         Self {
-            attributes: attributes.into_iter().map(IndexedAttribute::new).collect(),
+            attributes: attributes
+                .into_iter()
+                .map(|attribute| IndexedAttribute::new(&attribute))
+                .collect(),
             identifier,
             parameters,
             signature: Box::new(signature),

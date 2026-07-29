@@ -80,7 +80,7 @@ mod tests {
     use crate::cache_policy::CachePolicy;
 
     fn rendered(served: &BTreeMap<String, CachePolicy>) -> String {
-        render_asset_responder(&served, "assets", "..", "AssetResponder").to_string()
+        render_asset_responder(served, "assets", "..", "AssetResponder").to_string()
     }
 
     #[test]

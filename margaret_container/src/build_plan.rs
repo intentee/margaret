@@ -117,13 +117,12 @@ fn build_provider_draft<'index>(
     index: &AttributeIndex,
 ) -> Result<Draft<'index>, ContainerError> {
     let item = matched.item();
-    let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
-        (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
-        _ => {
-            return Err(ContainerError::NotASingletonStruct {
-                path: item.canonical_path().to_string(),
-            });
-        }
+    let (Some(identifier), ItemKind::Struct(shape)) =
+        (index.struct_identifier(item.canonical_path()), item.kind())
+    else {
+        return Err(ContainerError::NotASingletonStruct {
+            path: item.canonical_path().to_string(),
+        });
     };
 
     let concrete_path = item.canonical_path().clone();
@@ -150,13 +149,12 @@ fn build_endpoint_draft<'index>(
     index: &AttributeIndex,
 ) -> Result<Draft<'index>, ContainerError> {
     let item = matched.item();
-    let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
-        (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
-        _ => {
-            return Err(ContainerError::NotAnEndpointStruct {
-                path: item.canonical_path().to_string(),
-            });
-        }
+    let (Some(identifier), ItemKind::Struct(shape)) =
+        (index.struct_identifier(item.canonical_path()), item.kind())
+    else {
+        return Err(ContainerError::NotAnEndpointStruct {
+            path: item.canonical_path().to_string(),
+        });
     };
 
     let concrete_path = item.canonical_path().clone();
@@ -200,13 +198,12 @@ fn build_construction_draft<'index>(
     item: &'index IndexedItem,
     index: &AttributeIndex,
 ) -> Result<Draft<'index>, ContainerError> {
-    let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
-        (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
-        _ => {
-            return Err(ContainerError::RoleNotAStruct {
-                path: item.canonical_path().to_string(),
-            });
-        }
+    let (Some(identifier), ItemKind::Struct(shape)) =
+        (index.struct_identifier(item.canonical_path()), item.kind())
+    else {
+        return Err(ContainerError::RoleNotAStruct {
+            path: item.canonical_path().to_string(),
+        });
     };
 
     let concrete_path = item.canonical_path().clone();

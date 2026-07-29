@@ -26,7 +26,7 @@ mod tests {
 
     #[test]
     fn finds_the_authenticated_user_marker() {
-        let attributes = vec![IndexedAttribute::new(parse_quote!(#[authenticated_user]))];
+        let attributes = vec![IndexedAttribute::new(&parse_quote!(#[authenticated_user]))];
 
         assert_eq!(
             request_binding_marker(&attributes),
@@ -37,7 +37,7 @@ mod tests {
     #[test]
     fn finds_the_form_request_marker() {
         let attributes = vec![IndexedAttribute::new(
-            parse_quote!(#[form_request(from = Query)]),
+            &parse_quote!(#[form_request(from = Query)]),
         )];
 
         assert_eq!(
@@ -49,7 +49,7 @@ mod tests {
     #[test]
     fn finds_the_route_parameter_marker() {
         let attributes = vec![IndexedAttribute::new(
-            parse_quote!(#[route_parameter(from = "id")]),
+            &parse_quote!(#[route_parameter(from = "id")]),
         )];
 
         assert_eq!(
@@ -60,7 +60,7 @@ mod tests {
 
     #[test]
     fn reports_no_marker_on_an_unmarked_parameter() {
-        let attributes = vec![IndexedAttribute::new(parse_quote!(#[console_argument]))];
+        let attributes = vec![IndexedAttribute::new(&parse_quote!(#[console_argument]))];
 
         assert_eq!(request_binding_marker(&attributes), None);
     }

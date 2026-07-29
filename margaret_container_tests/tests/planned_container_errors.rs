@@ -25,9 +25,8 @@ fn missing_path() -> CanonicalPath {
 #[test]
 fn reports_an_unplanned_construction_root() {
     let planned = planned_container();
-    let error = match planned.render(&[missing_path()], &[], &[]) {
-        Ok(_) => panic!("an unplanned construction root must not be rendered"),
-        Err(error) => error,
+    let Err(error) = planned.render(&[missing_path()], &[], &[]) else {
+        panic!("an unplanned construction root must not be rendered");
     };
 
     assert!(error.to_string().contains("crate::Missing"));
@@ -37,9 +36,8 @@ fn reports_an_unplanned_construction_root() {
 fn reports_an_unplanned_retained_root() {
     let planned = planned_container();
     let roots = planned.roots();
-    let error = match planned.render(&roots, &[missing_path()], &[]) {
-        Ok(_) => panic!("an unplanned retained root must not be rendered"),
-        Err(error) => error,
+    let Err(error) = planned.render(&roots, &[missing_path()], &[]) else {
+        panic!("an unplanned retained root must not be rendered");
     };
 
     assert!(error.to_string().contains("crate::Missing"));
@@ -49,9 +47,8 @@ fn reports_an_unplanned_retained_root() {
 fn reports_an_unplanned_builder_root() {
     let planned = planned_container();
     let roots = planned.roots();
-    let error = match planned.render(&roots, &roots, &[missing_path()]) {
-        Ok(_) => panic!("an unplanned builder root must not be rendered"),
-        Err(error) => error,
+    let Err(error) = planned.render(&roots, &roots, &[missing_path()]) else {
+        panic!("an unplanned builder root must not be rendered");
     };
 
     assert!(error.to_string().contains("crate::Missing"));

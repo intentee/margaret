@@ -16,7 +16,10 @@ impl IndexedField {
     #[cfg(test)]
     pub(crate) fn new(identifier: FieldIdentifier, ty: Type, attributes: Vec<Attribute>) -> Self {
         Self {
-            attributes: attributes.into_iter().map(IndexedAttribute::new).collect(),
+            attributes: attributes
+                .into_iter()
+                .map(|attribute| IndexedAttribute::new(&attribute))
+                .collect(),
             identifier,
             ty,
         }
