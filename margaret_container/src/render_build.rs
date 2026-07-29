@@ -115,7 +115,11 @@ fn direct_value(
 fn statement(planned: &PlannedProvider, weaver: &mut ReverseConsoleArgumentWeaver) -> TokenStream {
     let provider = &planned.provider;
     let binding = field_ident(provider);
-    let value_type = field_type(provider);
+    let declared_type = provider.provided.is_trait_object().then(|| {
+        let value_type = field_type(provider);
+
+        quote! { : #value_type }
+    });
     let value = direct_value(planned, weaver);
     let constructed = match &provider.construction {
         DirectConstruction::Constructor { .. }
@@ -126,7 +130,7 @@ fn statement(planned: &PlannedProvider, weaver: &mut ReverseConsoleArgumentWeave
         | DirectConstruction::FrameworkUnit => quote! { ::std::sync::Arc::new(#value) },
     };
 
-    quote! { let #binding: #value_type = #constructed; }
+    quote! { let #binding #declared_type = #constructed; }
 }
 
 struct RootBuilder {

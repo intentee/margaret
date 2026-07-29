@@ -9,8 +9,8 @@ fn generates_linear_async_construction() {
         .expect("the async fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("pool:::std::sync::Arc<crate::Pool>"));
-    assert!(source.contains("config:::std::sync::Arc<crate::Config>"));
+    assert!(source.contains("::std::sync::Arc<crate::Pool>"));
+    assert!(source.contains("::std::sync::Arc<crate::Config>"));
     assert!(source.contains("pub(crate)asyncfnconstruct_pool"));
     assert!(source.contains("crate::Pool::new(::std::sync::Arc::clone(&config)).await"));
     assert!(source.contains("crate::Config::new()"));

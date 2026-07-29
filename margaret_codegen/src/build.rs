@@ -1086,11 +1086,10 @@ impl GetJwks {
         let code = generate(JWKS_NAME_COLLISION_CRATE)
             .expect("a user component named JwksRoller coexists");
 
-        let construction: String = module(&code, "container/build/serve")
-            .split_whitespace()
-            .collect();
-        assert!(construction.contains("std::sync::Arc<crate::JwksRoller>"));
-        assert!(construction.contains("std::sync::Arc<crate::margaret::jwks::JwksRoller>"));
+        let container: String = module(&code, "container").split_whitespace().collect();
+
+        assert!(container.contains("std::sync::Arc<crate::JwksRoller>"));
+        assert!(container.contains("std::sync::Arc<crate::margaret::jwks::JwksRoller>"));
     }
 
     const JWKS_FIELD_COLLISION_CRATE: &str = "\
@@ -1122,11 +1121,12 @@ impl GetJwks {
         let code = generate(JWKS_FIELD_COLLISION_CRATE)
             .expect("a user component flattening to a framework field coexists");
 
+        let container: String = module(&code, "container").split_whitespace().collect();
         let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
 
-        assert!(construction.contains("std::sync::Arc<crate::margaret_jwks::JwksRoller>"));
+        assert!(container.contains("std::sync::Arc<crate::margaret_jwks::JwksRoller>"));
         assert!(construction.contains("margaret_jwks_jwks_roller_2"));
     }
 
@@ -1789,10 +1789,12 @@ impl New {
         let routes: String = module(&code, "routes").split_whitespace().collect();
         let http: String = concatenated(&code).split_whitespace().collect();
 
+        let container: String = module(&code, "container").split_whitespace().collect();
+
         assert!(build.contains("pub(crate)fnserve("));
-        assert!(build.contains("std::sync::Arc<crate::Build>"));
-        assert!(build.contains("std::sync::Arc<crate::Container>"));
-        assert!(build.contains("std::sync::Arc<crate::Routes>"));
+        assert!(container.contains("std::sync::Arc<crate::Build>"));
+        assert!(container.contains("std::sync::Arc<crate::Container>"));
+        assert!(container.contains("std::sync::Arc<crate::Routes>"));
         assert!(!build.contains("build_2"));
         assert!(!build.contains("container_2"));
         assert!(!build.contains("routes_2"));
