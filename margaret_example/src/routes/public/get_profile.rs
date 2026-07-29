@@ -20,9 +20,8 @@ impl GetProfile {
     /// Returns an error propagated from the work it performs.
     #[process]
     pub fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {
-        Ok(Response::text(
-            200,
-            format!("signed in as {} ({})", user.name, user.id),
-        ))
+        let User { id, name, .. } = user;
+
+        Ok(Response::text(200, format!("signed in as {name} ({id})")))
     }
 }

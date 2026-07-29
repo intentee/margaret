@@ -62,7 +62,7 @@ pub fn build(
     let application_roots = planned_container.roots();
     features.enable_if(GeneratedFeature::AssetBag, metafile_contents.is_some());
     let mut module_tokens = asset_bag_modules(
-        metafile_contents.as_deref(),
+        metafile_contents,
         bindings,
         assets_directory,
         embed_relative,
