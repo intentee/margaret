@@ -55,6 +55,9 @@ enum Mark {
     InProgress,
 }
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub fn topological_order<NodeId>(
     dependencies: &BTreeMap<NodeId, BTreeSet<NodeId>>,
 ) -> Result<Vec<NodeId>, Cycle<NodeId>>

@@ -14,6 +14,9 @@ use margaret_http::upload_config::UploadConfig;
 use crate::server_assembly::ServerAssembly;
 use crate::server_service::ServerService;
 
+/// # Errors
+///
+/// Returns `CommandOutcome::Failed`.
 pub fn serve_application(
     matches: &ArgMatches,
     servers: Vec<ServerAssembly>,

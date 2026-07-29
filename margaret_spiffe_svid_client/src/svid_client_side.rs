@@ -63,6 +63,9 @@ impl SvidClientSide {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `SvidError` propagated from the work it performs.
     pub fn reqwest_client(&self) -> Result<Client, SvidError> {
         build_reqwest_client(
             Client::builder()

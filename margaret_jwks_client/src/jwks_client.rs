@@ -26,11 +26,17 @@ impl JwksClient {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn run(&self, cancellation_token: CancellationToken) -> Result<()> {
         self.run_with_client_builder(Client::builder(), cancellation_token)
             .await
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn run_with_client_builder(
         &self,
         client_builder: ClientBuilder,

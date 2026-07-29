@@ -4,6 +4,9 @@ use margaret_attributes::indexed_method::IndexedMethod;
 
 use crate::injection_error::InjectionError;
 
+/// # Errors
+///
+/// Returns `InjectionError::AmbiguousProcessMethod` or `InjectionError::MissingProcessMethod`.
 pub fn process_method(item: &IndexedItem) -> Result<&IndexedMethod, InjectionError> {
     let mut found: Vec<&IndexedMethod> = item
         .methods()

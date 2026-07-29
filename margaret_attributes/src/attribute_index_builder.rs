@@ -35,6 +35,9 @@ impl AttributeIndexBuilder {
         self
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeError` propagated from the work it performs.
     pub fn index_crate(mut self, crate_root: &CrateRoot) -> Result<Self, AttributeError> {
         let WalkOutput { imports, items } = ModuleWalker::walk_crate(
             &crate_root.name,

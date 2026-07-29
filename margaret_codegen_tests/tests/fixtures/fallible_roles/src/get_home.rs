@@ -20,11 +20,17 @@ pub struct GetHome {
 
 impl GetHome {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(secrets: Arc<Secrets>) -> Outcome<Self> {
         Ok(Self { secrets })
     }
 
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn respond(&self, views: &Views) -> Outcome<Response> {
         Ok({
             let _ = self.secrets.token();

@@ -37,6 +37,9 @@ impl SpireTestClusterLayout {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn obtain_join_token(&self, server_binary_path: &Path) -> Result<String> {
         let output = run_spire_command(
             server_binary_path,
@@ -55,6 +58,9 @@ impl SpireTestClusterLayout {
         parse_join_token(&output)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn obtain_trust_bundle(&self, server_binary_path: &Path) -> Result<Vec<u8>> {
         let trust_bundle = run_spire_command(
             server_binary_path,
@@ -68,6 +74,9 @@ impl SpireTestClusterLayout {
         Ok(trust_bundle)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn prepare_data_dirs(&self) -> Result<()> {
         tokio::fs::create_dir_all(&self.server_data_dir).await?;
         tokio::fs::create_dir_all(&self.agent_data_dir).await?;
@@ -75,6 +84,9 @@ impl SpireTestClusterLayout {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn register_workload_entry(&self, server_binary_path: &Path) -> Result<()> {
         let uid = unsafe { libc::geteuid() };
 

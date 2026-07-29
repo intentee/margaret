@@ -1,6 +1,9 @@
 use crate::max_identifier_bytes::MAX_IDENTIFIER_BYTES;
 use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
+/// # Errors
+///
+/// Returns `SchemaIdentifierNamingError::IdentifierTooLong`.
 pub fn validate_identifier_length(identifier: &str) -> Result<(), SchemaIdentifierNamingError> {
     let length = identifier.len();
 

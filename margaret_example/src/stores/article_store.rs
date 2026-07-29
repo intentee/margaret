@@ -98,6 +98,9 @@ pub struct ArticleStore {
 
 impl ArticleStore {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(clock: Arc<SystemClock>) -> anyhow::Result<Self> {
         Ok({
             let articles = DashMap::new();
@@ -133,6 +136,9 @@ impl ArticleStore {
             .map(|article| article.value().clone())
     }
 
+    /// # Errors
+    ///
+    /// Returns `ArticleStoreError::AuthorNotFound`.
     pub fn insert(
         &self,
         title: String,

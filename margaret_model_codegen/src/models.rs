@@ -823,6 +823,9 @@ fn order_by_dependencies(resolved: Vec<Model>) -> Result<Vec<Model>, ModelCodege
         .collect())
 }
 
+/// # Errors
+///
+/// Returns `ModelCodegenError` propagated from the work it performs.
 pub fn models(attribute_index: &AttributeIndex) -> Result<Vec<Model>, ModelCodegenError> {
     let mut targets: HashMap<CanonicalPath, ForeignKeyTarget> = HashMap::new();
     let mut seen_table_names: HashMap<String, String> = HashMap::new();

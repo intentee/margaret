@@ -4,6 +4,9 @@ use rustls::internal::msgs::codec::Codec as _;
 use rustls::internal::msgs::codec::Reader;
 
 #[must_use]
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub fn build_digitally_signed_struct(
     scheme: SignatureScheme,
     signature: Vec<u8>,

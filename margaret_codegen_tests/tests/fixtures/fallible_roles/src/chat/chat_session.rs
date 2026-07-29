@@ -7,6 +7,9 @@ pub struct ChatSession;
 
 impl ChatSession {
     #[build_for_session]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn assemble() -> errors::Result<Self> {
         Ok(Self)
     }

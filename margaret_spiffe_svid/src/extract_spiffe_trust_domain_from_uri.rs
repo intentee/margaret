@@ -3,6 +3,9 @@ use rustls::CertificateError;
 use rustls::Error;
 use url::Url;
 
+/// # Errors
+///
+/// Returns `Error::InvalidCertificate`.
 pub fn extract_spiffe_trust_domain_from_uri(uri: &str) -> Result<Option<String>, Error> {
     let parsed = match Url::parse(uri) {
         Ok(parsed) => parsed,

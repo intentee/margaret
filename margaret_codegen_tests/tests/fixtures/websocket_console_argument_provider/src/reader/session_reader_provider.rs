@@ -17,11 +17,17 @@ pub struct SessionReaderProvider {
 
 impl SessionReaderProvider {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(realm: Arc<crate::reader::reader_realm::ReaderRealm>) -> anyhow::Result<Self> {
         Ok(Self { realm })
     }
 
     #[infer_from_request]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn infer_reader(
         &self,
         request: &Request,

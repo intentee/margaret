@@ -27,6 +27,9 @@ pub struct SvidConverterService {
 }
 
 impl SvidConverterService {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn convert_x509_context(&self, x509_context: X509Context) -> Result<()> {
         let default_svid: &X509Svid = x509_context
             .default_svid()

@@ -17,6 +17,9 @@ impl GeneratedModuleTokens {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `GeneratedModuleError::InvalidGeneratedFile`.
     pub fn format(self) -> Result<GeneratedModule, GeneratedModuleError> {
         let file = syn::parse2::<syn::File>(self.tokens).map_err(|source| {
             GeneratedModuleError::InvalidGeneratedFile {

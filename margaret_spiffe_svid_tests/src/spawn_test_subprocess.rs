@@ -5,6 +5,9 @@ use anyhow::Result;
 use tokio::process::Child;
 use tokio::process::Command;
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub async fn spawn_test_subprocess(binary: &Path, args: &[&OsStr]) -> Result<Child> {
     let child = Command::new(binary)
         .args(args)

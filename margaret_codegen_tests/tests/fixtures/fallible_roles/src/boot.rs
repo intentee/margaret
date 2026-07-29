@@ -12,11 +12,17 @@ pub struct Boot;
 
 impl Boot {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create() -> Result<Self> {
         Ok(Self)
     }
 
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn run(&self) -> Result<CommandOutcome> {
         Ok(CommandOutcome::Succeeded)
     }

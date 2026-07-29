@@ -21,6 +21,9 @@ pub struct Configured {
 
 impl Configured {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(
         #[console_argument(from = "label")] label: String,
         #[console_argument(from = "root")] root: PathBuf,
@@ -42,6 +45,9 @@ impl Configured {
     }
 
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn respond(&self) -> anyhow::Result<Response> {
         tokio::task::yield_now().await;
 

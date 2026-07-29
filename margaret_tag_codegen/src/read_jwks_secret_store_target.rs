@@ -4,6 +4,9 @@ use margaret_attributes::tag::Tag;
 use crate::jwks_secret_store_target::JwksSecretStoreTarget;
 use crate::tag_error::TagError;
 
+/// # Errors
+///
+/// Returns `TagError::MalformedJwksSecretStore`.
 pub fn read_jwks_secret_store_target(
     args: &AttributeArgs,
     site: &str,

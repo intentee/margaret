@@ -7,6 +7,9 @@ use crate::container_error::ContainerError;
 use crate::framework_provider::FrameworkProvider;
 use crate::planned_container::PlannedContainer;
 
+/// # Errors
+///
+/// Returns `ContainerError` propagated from the work it performs.
 pub fn plan_container(
     index: &AttributeIndex,
     registry: &ConsoleArgumentRegistry,

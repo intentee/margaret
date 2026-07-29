@@ -4,6 +4,9 @@ use margaret_container::container_error::ContainerError;
 
 use crate::request_binding::RequestBinding;
 
+/// # Errors
+///
+/// Returns `ContainerError` propagated from the work it performs.
 pub fn binding_console_arguments(
     binding: &RequestBinding,
     bindings: &ContainerBindings,

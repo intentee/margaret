@@ -41,6 +41,9 @@ impl SpireTestCluster {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn start(
         data_dir: tempfile::TempDir,
         SpireTestClusterParams {

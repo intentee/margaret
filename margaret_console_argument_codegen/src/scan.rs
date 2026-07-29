@@ -61,6 +61,9 @@ fn validate_named_type_consistency(
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns `ConsoleArgumentCodegenError::PositionalOutsideCommand`.
 pub fn scan(
     index: &AttributeIndex,
 ) -> Result<ConsoleArgumentRegistry, ConsoleArgumentCodegenError> {

@@ -9,6 +9,9 @@ use x509_parser::prelude::X509Certificate;
 
 use crate::extract_spiffe_trust_domain_from_uri::extract_spiffe_trust_domain_from_uri;
 
+/// # Errors
+///
+/// Returns `Error::InvalidCertificate`.
 pub fn extract_spiffe_trust_domain(cert_der: &[u8]) -> Result<String, Error> {
     let (_, cert) = X509Certificate::from_der(cert_der).map_err(|err| {
         warn!("Unable to parse der certificate: {err:#?}");

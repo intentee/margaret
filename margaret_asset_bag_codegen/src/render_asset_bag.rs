@@ -96,6 +96,9 @@ fn validate_outputs_served(
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns `AssetBagCodegenError::EmptyMetafile`.
 pub fn render_asset_bag(
     metafile_contents: &str,
     responder: ResponderGeneration,

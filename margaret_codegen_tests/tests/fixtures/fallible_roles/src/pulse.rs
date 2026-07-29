@@ -6,6 +6,9 @@ pub struct Pulse;
 
 impl Pulse {
     #[process]
+    /// # Errors
+    ///
+    /// Returns `Error` propagated from the work it performs.
     pub fn run(&self) -> core::result::Result<(), failures::Error> {
         Ok(())
     }

@@ -4,6 +4,9 @@ use rcgen::KeyUsagePurpose;
 use rcgen::SanType;
 
 #[must_use]
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub fn self_signed_certificate_der(subject_alt_names: Vec<SanType>) -> Vec<u8> {
     let mut certificate_params = CertificateParams::default();
 

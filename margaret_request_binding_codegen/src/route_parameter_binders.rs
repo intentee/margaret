@@ -21,6 +21,9 @@ fn associated_model(index: &AttributeIndex, item: &IndexedItem) -> Option<Canoni
     })
 }
 
+/// # Errors
+///
+/// Returns `RequestBindingError::RouteParameterBinderNotAStruct` or `RequestBindingError::RouteParameterBinderRequiresSingleton` or `RequestBindingError::RouteParameterBinderModel`.
 pub fn route_parameter_binders(
     index: &AttributeIndex,
 ) -> Result<HashMap<CanonicalPath, RouteParameterBinder>, RequestBindingError> {

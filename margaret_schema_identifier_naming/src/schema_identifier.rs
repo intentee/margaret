@@ -1,6 +1,9 @@
 use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 use crate::validate_identifier_length::validate_identifier_length;
 
+/// # Errors
+///
+/// Returns `SchemaIdentifierNamingError` propagated from the work it performs.
 pub fn schema_identifier(segments: &[&str]) -> Result<String, SchemaIdentifierNamingError> {
     let identifier = segments.join("_");
 

@@ -19,6 +19,9 @@ pub struct Greet {
 
 impl Greet {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(
         greeter: Arc<EnglishGreeter>,
         #[console_argument(positional)] name: String,
@@ -36,6 +39,9 @@ impl Greet {
     }
 
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok({
             println!(

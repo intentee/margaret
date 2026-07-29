@@ -10,6 +10,9 @@ pub struct Guard;
 
 impl Guard {
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn process(
         &self,
         request: &Request,

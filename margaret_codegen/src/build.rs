@@ -21,6 +21,9 @@ use crate::serve_arguments::serve_arguments;
 use crate::umbrella::umbrella;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
+/// # Errors
+///
+/// Returns `CodegenError` propagated from the work it performs.
 pub fn build(
     crate_root: &CrateRoot,
     metafile_contents: Option<String>,

@@ -38,6 +38,9 @@ impl AttributeArgumentsReader {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeError` propagated from the work it performs.
     pub fn take_path(&mut self, key: &str) -> Result<Option<Path>, AttributeError> {
         match self.take_named(key) {
             None => Ok(None),
@@ -59,6 +62,9 @@ impl AttributeArgumentsReader {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeError` propagated from the work it performs.
     pub fn take_string(&mut self, key: &str) -> Result<Option<String>, AttributeError> {
         match self.take_named(key) {
             None => Ok(None),

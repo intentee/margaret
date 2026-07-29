@@ -8,6 +8,9 @@ use x509_parser::prelude::X509Certificate;
 
 use crate::peer_identity_error::PeerIdentityError;
 
+/// # Errors
+///
+/// Returns `PeerIdentityError::CertificateEncoding` or `PeerIdentityError::MissingUri` or `PeerIdentityError::SpiffeId`.
 pub fn spiffe_id_from_cert(certificate_der: &[u8]) -> Result<SpiffeId, PeerIdentityError> {
     let (_remaining, certificate) =
         X509Certificate::from_der(certificate_der).map_err(|error| {

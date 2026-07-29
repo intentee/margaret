@@ -79,6 +79,9 @@ impl IndexedAttribute {
         self.framework_attribute
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeError::DuplicateNamedArgument` or `AttributeError::AttributeArguments`.
     pub fn args(&self) -> Result<&AttributeArgs, AttributeError> {
         match &self.args {
             IndexedAttributeArgs::DuplicateNamedArgument {

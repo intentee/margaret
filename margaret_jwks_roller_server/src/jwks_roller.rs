@@ -33,6 +33,9 @@ impl JwksRoller {
         self.public_jwks_handler.clone()
     }
 
+    /// # Errors
+    ///
+    /// Returns `JwksRollerServerError` propagated from the work it performs.
     pub fn run(&self) -> Result<(), JwksRollerServerError> {
         self.bundle.roll_and_publish()
     }

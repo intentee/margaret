@@ -17,6 +17,9 @@ pub struct TypingIndicator;
 
 impl TypingIndicator {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create() -> anyhow::Result<Self> {
         Ok(Self)
     }

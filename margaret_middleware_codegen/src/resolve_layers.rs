@@ -7,6 +7,9 @@ use crate::layer_application::LayerApplication;
 use crate::middleware_codegen_error::MiddlewareCodegenError;
 use crate::middleware_plan::MiddlewarePlan;
 
+/// # Errors
+///
+/// Returns `MiddlewareCodegenError::UnknownMiddleware`.
 pub fn resolve_layers(
     item: &IndexedItem,
     plans: &[MiddlewarePlan],

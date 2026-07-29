@@ -35,6 +35,9 @@ pub struct SvidServerCertVerifier {
 }
 
 impl SvidServerCertVerifier {
+    /// # Errors
+    ///
+    /// Returns `SvidError::CryptoProviderNotInstalled` or `SvidError::ServerVerifier`.
     pub fn new(root_store: RootCertStore, spiffe_trust_domain: String) -> Result<Self, SvidError> {
         let default_crypto_provider =
             CryptoProvider::get_default().ok_or(SvidError::CryptoProviderNotInstalled)?;

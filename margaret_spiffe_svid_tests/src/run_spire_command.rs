@@ -4,6 +4,9 @@ use anyhow::Result;
 use anyhow::anyhow;
 use tokio::process::Command;
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub async fn run_spire_command(
     binary: &Path,
     socket_path: &Path,

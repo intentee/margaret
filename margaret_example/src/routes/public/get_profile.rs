@@ -16,6 +16,9 @@ pub struct GetProfile;
 
 impl GetProfile {
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {
         Ok(Response::text(
             200,

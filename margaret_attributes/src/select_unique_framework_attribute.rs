@@ -3,6 +3,9 @@ use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::select_framework_attributes::select_framework_attributes;
 
+/// # Errors
+///
+/// Returns `AttributeError::RepeatedAttribute`.
 pub fn select_unique_framework_attribute(
     attributes: &[IndexedAttribute],
     framework_attribute: FrameworkAttribute,

@@ -3,8 +3,14 @@ use maud::Markup;
 pub trait RendersView {
     type Props<'props>;
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     fn render(&self, props: Self::Props<'_>) -> anyhow::Result<Markup>;
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     fn render_to_string(&self, props: Self::Props<'_>) -> anyhow::Result<String> {
         Ok(self.render(props)?.into_string())
     }

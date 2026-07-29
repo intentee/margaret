@@ -8,6 +8,9 @@ use margaret_spiffe_svid_client::svid_server_cert_verifier::SvidServerCertVerifi
 use margaret_spiffe_svid_tests::build_root_cert_store_with_ca::build_root_cert_store_with_ca;
 
 #[must_use]
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub fn build_mtls_client_config(
     leaf_der: &[u8],
     leaf_key_der: &[u8],

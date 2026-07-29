@@ -11,6 +11,9 @@ pub struct GetHome;
 
 impl GetHome {
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn respond(&self, routes: &Routes) -> anyhow::Result<Redirect> {
         Ok(routes.public.get_greeting.see_other())
     }

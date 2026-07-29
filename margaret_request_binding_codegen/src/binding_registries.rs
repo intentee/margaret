@@ -17,6 +17,9 @@ pub struct BindingRegistries {
 }
 
 impl BindingRegistries {
+    /// # Errors
+    ///
+    /// Returns `RequestBindingError` propagated from the work it performs.
     pub fn collect(
         index: &AttributeIndex,
         views: ViewsAvailability,

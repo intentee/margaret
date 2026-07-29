@@ -10,6 +10,9 @@ pub struct Secrets {
 
 impl Secrets {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create() -> AppResult<Self> {
         Ok(Self {
             token: "sealed".to_string(),

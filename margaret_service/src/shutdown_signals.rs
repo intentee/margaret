@@ -32,6 +32,9 @@ impl ShutdownSignals {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `Error` propagated from the work it performs.
     pub async fn wait(mut self) -> Result<(), Error> {
         wait_for_shutdown(self.interrupt.recv(), self.terminate.recv()).await
     }

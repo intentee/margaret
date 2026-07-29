@@ -7,6 +7,9 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::render_container::render_container;
 
 #[must_use]
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub fn bindings_for_fixture(crate_name: &str, source_directory: &Path) -> ContainerBindings {
     let index = AttributeIndexBuilder::new()
         .index_crate(&CrateRoot::new(crate_name, source_directory))

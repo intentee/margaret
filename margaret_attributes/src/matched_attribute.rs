@@ -14,6 +14,9 @@ impl<'index> MatchedAttribute<'index> {
         Self { attribute, item }
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeError` propagated from the work it performs.
     pub fn args(&self) -> Result<&'index AttributeArgs, AttributeError> {
         self.attribute.args()
     }

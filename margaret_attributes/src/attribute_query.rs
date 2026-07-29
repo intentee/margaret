@@ -15,6 +15,9 @@ impl<'index> AttributeQuery<'index> {
         Self { item }
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeError` propagated from the work it performs.
     pub fn find_framework(
         &self,
         framework_attribute: FrameworkAttribute,

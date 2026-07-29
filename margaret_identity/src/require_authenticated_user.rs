@@ -3,6 +3,9 @@ use margaret_http::response_continuation::ResponseContinuation;
 
 use crate::authenticated_user_outcome::AuthenticatedUserOutcome;
 
+/// # Errors
+///
+/// Returns `ResponseContinuation` propagated from the work it performs.
 pub fn require_authenticated_user<User>(
     outcome: AuthenticatedUserOutcome<User>,
 ) -> Result<User, ResponseContinuation> {

@@ -11,6 +11,9 @@ pub struct GetPreferences;
 
 impl GetPreferences {
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn respond(
         &self,
         #[form_request(from = Cookie)] ReaderPreferencesCookie { theme }: ReaderPreferencesCookie,

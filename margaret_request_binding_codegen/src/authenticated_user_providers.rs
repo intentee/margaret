@@ -48,6 +48,9 @@ fn infer_from_request_method<'index>(
         })
 }
 
+/// # Errors
+///
+/// Returns `RequestBindingError::AuthenticatedUserProviderNotAStruct` or `RequestBindingError::AuthenticatedUserProviderRequiresSingleton` or `RequestBindingError::AuthenticatedUserProviderUnknownUserModel`.
 pub fn authenticated_user_providers(
     index: &AttributeIndex,
     registries: &BindingRegistries,

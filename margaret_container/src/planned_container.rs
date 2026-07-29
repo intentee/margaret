@@ -23,6 +23,9 @@ impl PlannedContainer {
         &self.bindings
     }
 
+    /// # Errors
+    ///
+    /// Returns `ContainerError` propagated from the work it performs.
     pub fn render(
         self,
         construction_roots: &[CanonicalPath],

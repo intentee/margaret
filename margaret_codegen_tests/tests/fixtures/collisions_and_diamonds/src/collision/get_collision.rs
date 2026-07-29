@@ -10,6 +10,9 @@ pub struct GetCollision;
 
 impl GetCollision {
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn respond(
         &self,
         collision_session: &Request,

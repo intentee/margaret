@@ -19,11 +19,17 @@ pub struct GetAssetsDemo {
 
 impl GetAssetsDemo {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(asset_page: Arc<AssetPage>) -> anyhow::Result<Self> {
         Ok(Self { asset_page })
     }
 
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn respond(&self, asset_bag: AssetBag) -> anyhow::Result<Response> {
         Ok(Response::html(
             200,

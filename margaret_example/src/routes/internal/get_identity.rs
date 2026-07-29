@@ -11,6 +11,9 @@ pub struct GetIdentity;
 
 impl GetIdentity {
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn respond(&self, peer: &SpiffeId) -> anyhow::Result<Response> {
         Ok({
             Response::text(

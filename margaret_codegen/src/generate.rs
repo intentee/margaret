@@ -55,6 +55,9 @@ fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns `CodegenError::ManifestDirectory`.
 pub fn generate() -> Result<(), CodegenError> {
     let manifest_directory = env::var("CARGO_MANIFEST_DIR")
         .map_err(|source| CodegenError::ManifestDirectory { source })?;

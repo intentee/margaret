@@ -45,6 +45,9 @@ pub struct RunningMtlsServer {
 }
 
 impl RunningMtlsServer {
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
     pub async fn start(server_config: Arc<ServerConfig>) -> Self {
         let server = Server::new(
             "mtls",
@@ -81,6 +84,9 @@ impl RunningMtlsServer {
         self.address
     }
 
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
     pub async fn stop(self) {
         self.cancellation_token.cancel();
         self.join_handle

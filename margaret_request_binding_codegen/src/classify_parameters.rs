@@ -361,6 +361,9 @@ fn verify_single_inference(
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns `RequestBindingError::ConflictingArgumentMarkers` or `RequestBindingError::ConflictingAuthenticatedUserMarkers` or `RequestBindingError::MarkedPeerSpiffeIdParameter`.
 pub fn classify_parameters(
     index: &AttributeIndex,
     item: &IndexedItem,

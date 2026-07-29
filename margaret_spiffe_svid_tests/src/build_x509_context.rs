@@ -5,6 +5,9 @@ use spiffe::X509BundleSet;
 use spiffe::X509Context;
 use spiffe::X509Svid;
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub fn build_x509_context(
     cert_chain_der: &[u8],
     private_key_der: &[u8],

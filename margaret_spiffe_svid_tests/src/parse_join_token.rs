@@ -2,6 +2,9 @@ use anyhow::Result;
 
 use crate::join_token_output::JoinTokenOutput;
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub fn parse_join_token(output: &[u8]) -> Result<String> {
     let JoinTokenOutput { value } = serde_json::from_slice(output)?;
 

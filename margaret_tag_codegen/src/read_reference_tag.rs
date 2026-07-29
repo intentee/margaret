@@ -3,6 +3,9 @@ use margaret_attributes::tag::Tag;
 
 use crate::tag_error::TagError;
 
+/// # Errors
+///
+/// Returns `TagError::MalformedReference`.
 pub fn read_reference_tag(args: &AttributeArgs, site: &str) -> Result<Tag, TagError> {
     let path = args
         .interpret(|reader| Ok::<_, TagError>(reader.take_positional_path()))?

@@ -26,6 +26,9 @@ impl GeneratedModule {
         &self.source
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn write_if_changed(&self, path: &Path) -> IoResult<bool> {
         if self.matches_existing(path)? {
             return Ok(false);

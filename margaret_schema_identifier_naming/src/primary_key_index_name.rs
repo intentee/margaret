@@ -1,6 +1,9 @@
 use crate::schema_identifier::schema_identifier;
 use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
+/// # Errors
+///
+/// Returns `SchemaIdentifierNamingError` propagated from the work it performs.
 pub fn primary_key_index_name(table: &str) -> Result<String, SchemaIdentifierNamingError> {
     schema_identifier(&[table, "pkey"])
 }

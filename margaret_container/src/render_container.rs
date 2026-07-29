@@ -5,6 +5,9 @@ use crate::rendered_container::RenderedContainer;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
 
+/// # Errors
+///
+/// Returns `ContainerError` propagated from the work it performs.
 pub fn render_container(
     index: &AttributeIndex,
     registry: &ConsoleArgumentRegistry,

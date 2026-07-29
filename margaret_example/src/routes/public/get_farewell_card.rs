@@ -20,11 +20,17 @@ pub struct GetFarewellCard {
 
 impl GetFarewellCard {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(app_name: Arc<AppName>) -> anyhow::Result<Self> {
         Ok(Self { app_name })
     }
 
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn respond(&self, routes: &Routes, views: &Views) -> anyhow::Result<Response> {
         Ok({
             Response::html(

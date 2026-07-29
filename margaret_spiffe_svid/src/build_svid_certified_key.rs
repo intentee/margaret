@@ -8,6 +8,9 @@ use rustls::sign::CertifiedKey;
 use crate::svid_certified_key::SvidCertifiedKey;
 use crate::svid_error::SvidError;
 
+/// # Errors
+///
+/// Returns `SvidError::UnsupportedPrivateKey` or `SvidError::SigningKeyRejected`.
 pub fn build_svid_certified_key(
     cert_chain: Vec<CertificateDer<'static>>,
     private_key_bytes: &[u8],

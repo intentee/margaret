@@ -8,6 +8,9 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub async fn mtls_client_request(
     client_config: Arc<ClientConfig>,
     server_name: &str,

@@ -24,6 +24,9 @@ pub struct ServicePlan {
 }
 
 impl ServicePlan {
+    /// # Errors
+    ///
+    /// Returns `ServiceCodegenError` propagated from the work it performs.
     pub fn build(
         index: &AttributeIndex,
         framework_services: &[FrameworkService],

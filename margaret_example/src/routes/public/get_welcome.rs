@@ -11,6 +11,9 @@ pub struct GetWelcome;
 
 impl GetWelcome {
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {
         Ok(forward.get_greeting())
     }

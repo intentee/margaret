@@ -10,11 +10,17 @@ pub struct Session;
 
 impl Session {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create() -> anyhow::Result<Self> {
         Ok(Self)
     }
 
     #[infer_from_request]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn infer_reader(
         &self,
     ) -> anyhow::Result<AuthenticatedUserOutcome<crate::collision::reader::Reader>> {

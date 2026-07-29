@@ -91,6 +91,9 @@ impl RunningWebSocketServer {
         self.address
     }
 
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
     pub async fn stop(self) {
         self.cancellation_token.cancel();
         self.join_handle

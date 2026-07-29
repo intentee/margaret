@@ -16,6 +16,9 @@ async fn workload_api_responds(addr: &str) -> bool {
     client.stream_x509_contexts().await.is_ok()
 }
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub async fn wait_until_workload_api_ready(
     agent_socket_path: &Path,
     timeout: Duration,

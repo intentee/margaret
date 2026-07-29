@@ -26,6 +26,9 @@ pub struct HttpPlan {
 }
 
 impl HttpPlan {
+    /// # Errors
+    ///
+    /// Returns `HttpCodegenError` propagated from the work it performs.
     pub fn build(
         index: &AttributeIndex,
         has_views: bool,

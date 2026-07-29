@@ -9,6 +9,9 @@ pub struct GetLogo;
 
 impl GetLogo {
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn respond(&self) -> anyhow::Result<Response> {
         Ok({
             Response::bytes(

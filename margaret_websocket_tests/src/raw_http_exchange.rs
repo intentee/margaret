@@ -4,6 +4,9 @@ use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub async fn raw_http_exchange(address: SocketAddr, request: &[u8]) -> String {
     let mut stream = TcpStream::connect(address)
         .await

@@ -43,6 +43,9 @@ impl DriverHarness {
         }
     }
 
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
     pub async fn recv(&mut self) -> String {
         self.client
             .next()
@@ -54,6 +57,9 @@ impl DriverHarness {
             .to_owned()
     }
 
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
     pub async fn send(&mut self, text: &str) {
         self.client
             .send(Message::text(text.to_owned()))
@@ -61,6 +67,9 @@ impl DriverHarness {
             .expect("the client sends a frame");
     }
 
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
     pub async fn send_raw(&mut self, message: Message) {
         self.client
             .send(message)

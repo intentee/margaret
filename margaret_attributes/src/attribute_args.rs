@@ -18,6 +18,9 @@ pub struct AttributeArgs {
 }
 
 impl AttributeArgs {
+    /// # Errors
+    ///
+    /// Returns `AttributeArgsParseError::Malformed` or `AttributeArgsParseError::DuplicateNamedArgument`.
     pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgsParseError> {
         let attribute_path = format_path(attribute.path());
 
@@ -75,6 +78,9 @@ impl AttributeArgs {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn interpret<Interpreted, InterpretError>(
         &self,
         interpret: impl FnOnce(&mut AttributeArgumentsReader) -> Result<Interpreted, InterpretError>,

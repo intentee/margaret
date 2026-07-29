@@ -73,6 +73,9 @@ pub struct BoundServer {
 }
 
 impl BoundServer {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn bind(
         server_registry: Arc<ServerRegistry>,
         forward_targets: Arc<ForwardTargets>,
@@ -105,6 +108,9 @@ impl BoundServer {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
         self.listener.local_addr()
     }

@@ -9,6 +9,9 @@ pub struct CaBundle<'bundle> {
 }
 
 impl CaBundle<'_> {
+    /// # Errors
+    ///
+    /// Returns `SvidError::RootStoreRejectedCaCert`.
     pub fn to_root_cert_store(&self) -> Result<RootCertStore, SvidError> {
         let mut root_store = RootCertStore::empty();
 

@@ -20,6 +20,9 @@ impl WebSocket {
         Self { sender }
     }
 
+    /// # Errors
+    ///
+    /// Returns `WebSocketError` propagated from the work it performs.
     pub async fn send<Payload: Serialize>(
         &self,
         response: OutboundResponse<Payload>,

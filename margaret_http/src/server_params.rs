@@ -30,6 +30,9 @@ impl ServerParams {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `RequestError` propagated from the work it performs.
     pub fn header(&self, name: &str) -> Result<Option<&str>, RequestError> {
         match self.headers.get(name) {
             Some(value) => Ok(Some(value.to_str()?)),

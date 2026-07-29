@@ -12,6 +12,9 @@ use crate::middleware_attribute_arguments::MiddlewareAttributeArguments;
 use crate::middleware_codegen_error::MiddlewareCodegenError;
 use crate::middleware_plan::MiddlewarePlan;
 
+/// # Errors
+///
+/// Returns `MiddlewareCodegenError::MiddlewareHandlerNotOnStruct` or `MiddlewareCodegenError::MalformedMiddlewareTag`.
 pub fn middleware_plans(
     index: &AttributeIndex,
     registries: &BindingRegistries,

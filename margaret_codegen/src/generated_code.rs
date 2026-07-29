@@ -50,6 +50,9 @@ impl GeneratedCode {
         &self.modules
     }
 
+    /// # Errors
+    ///
+    /// Returns `CodegenError::CreateDirectory` or `CodegenError::WriteSource`.
     pub fn write_to(&self, directory: &Path) -> Result<(), CodegenError> {
         let mut written = BTreeSet::new();
 

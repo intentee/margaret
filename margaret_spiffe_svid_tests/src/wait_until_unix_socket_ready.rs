@@ -8,6 +8,9 @@ use tokio::time::Instant;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub async fn wait_until_unix_socket_ready(socket_path: &Path, timeout: Duration) -> Result<()> {
     let deadline = Instant::now() + timeout;
 

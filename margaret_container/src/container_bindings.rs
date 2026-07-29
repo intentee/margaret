@@ -79,6 +79,9 @@ impl ContainerBindings {
         quote! { #container.#accessor() }
     }
 
+    /// # Errors
+    ///
+    /// Returns `ContainerError::MissingConsoleClosure`.
     pub fn console_arguments(
         &self,
         concrete_path: &CanonicalPath,
@@ -91,6 +94,9 @@ impl ContainerBindings {
             })
     }
 
+    /// # Errors
+    ///
+    /// Returns `ContainerError::MissingConsoleSlot`.
     pub fn console_slot(&self, key: &ServeInputKey) -> Result<usize, ContainerError> {
         self.slots
             .get(key)
@@ -100,6 +106,9 @@ impl ContainerBindings {
             })
     }
 
+    /// # Errors
+    ///
+    /// Returns `ContainerError` propagated from the work it performs.
     pub fn console_union(
         &self,
         arguments: &[ConsoleArgument],
@@ -120,6 +129,9 @@ impl ContainerBindings {
         Ok(unified.into_iter().map(|(_, argument)| argument).collect())
     }
 
+    /// # Errors
+    ///
+    /// Returns `ContainerError` propagated from the work it performs.
     pub fn console_weaves_owned(
         &self,
         arguments: &[ConsoleArgument],
@@ -167,6 +179,9 @@ impl ContainerBindings {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `ContainerError` propagated from the work it performs.
     pub fn injected_console_arguments(
         &self,
         dependency: &InjectedDependency,
@@ -184,6 +199,9 @@ impl ContainerBindings {
         self.providers.contains_key(provider_key)
     }
 
+    /// # Errors
+    ///
+    /// Returns `ContainerError` propagated from the work it performs.
     pub fn serve_arguments(
         &self,
         roots: &[CanonicalPath],

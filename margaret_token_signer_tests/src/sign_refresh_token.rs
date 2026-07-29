@@ -2,6 +2,9 @@ use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
 use margaret_jwks_keygen::jwk_signing::JwkSigning;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub async fn sign_refresh_token(signing: &JwkSigning, claims: &RefreshTokenClaims) -> String {
     signing
         .sign(claims)

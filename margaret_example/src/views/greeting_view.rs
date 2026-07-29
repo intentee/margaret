@@ -24,6 +24,9 @@ pub struct GreetingView {
 
 impl GreetingView {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(card_layout: Arc<CardLayout>) -> anyhow::Result<Self> {
         Ok(Self { card_layout })
     }

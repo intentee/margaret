@@ -19,6 +19,9 @@ pub struct PostMintAccessToken {
 
 impl PostMintAccessToken {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(
         clock: Arc<SystemClock>,
         mint_access_token_handler: Arc<MintAccessTokenHandler>,
@@ -32,6 +35,9 @@ impl PostMintAccessToken {
     }
 
     #[process]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn respond(&self, request: &Request) -> anyhow::Result<Response> {
         Ok({
             self.mint_access_token_handler

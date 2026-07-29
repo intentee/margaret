@@ -51,6 +51,9 @@ fn encode_coordinate(
     }
 }
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub fn generate_keypair(
     GenerateKeypairParams { crv, kid }: GenerateKeypairParams,
 ) -> Result<JwkPair, JwksKeyError> {

@@ -5,6 +5,12 @@ use crate::handshake_error::HandshakeError;
 
 const ROUNDS_BEFORE_THE_HANDSHAKE_IS_CONSIDERED_STUCK: usize = 100;
 
+/// # Errors
+///
+/// Returns `HandshakeError::ExceededMaxRounds`.
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub fn pump_tls_handshake(
     server_connection: &mut ServerConnection,
     client_connection: &mut ClientConnection,

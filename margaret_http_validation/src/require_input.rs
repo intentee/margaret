@@ -8,6 +8,9 @@ use margaret_validation::validation_result::ValidationResult;
 use crate::request_input::RequestInput;
 use crate::validate_input::validate_input;
 
+/// # Errors
+///
+/// Returns `Response` propagated from the work it performs.
 pub fn require_input<Model>(request: &Request, source: RequestInput) -> Result<Model, Response>
 where
     Model: DeserializeOwned + Validate,

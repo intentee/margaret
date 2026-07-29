@@ -11,6 +11,9 @@ pub struct SessionValidator {
 
 impl SessionValidator {
     #[constructor]
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn create(
         provider: Arc<crate::diamond::microservices_map_provider::MicroservicesMapProvider>,
         supervisor: Arc<crate::diamond::service_identity_supervisor::ServiceIdentitySupervisor>,

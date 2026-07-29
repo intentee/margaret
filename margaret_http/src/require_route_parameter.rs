@@ -1,6 +1,9 @@
 use crate::request::Request;
 use crate::response::Response;
 
+/// # Errors
+///
+/// Returns `Response` propagated from the work it performs.
 pub fn require_route_parameter(request: &Request, name: &str) -> Result<String, Response> {
     match request.path_param(name) {
         Some(value) => Ok(value.to_string()),
