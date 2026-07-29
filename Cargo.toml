@@ -17,6 +17,7 @@ members = [
     "margaret_console",
     "margaret_console_argument_codegen",
     "margaret_console_codegen",
+    "margaret_construction",
     "margaret_container",
     "margaret_container_tests",
     "margaret_jwks_endpoint",

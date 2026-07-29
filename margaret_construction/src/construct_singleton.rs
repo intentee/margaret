@@ -2,6 +2,9 @@ use std::sync::Arc;
 
 use crate::construction_error::ConstructionError;
 
+/// # Errors
+///
+/// Returns [`ConstructionError`] naming `singleton` when its constructor fails.
 pub fn construct_singleton<Constructed>(
     singleton: &'static str,
     outcome: anyhow::Result<Constructed>,

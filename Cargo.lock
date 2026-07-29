@@ -1787,6 +1787,7 @@ dependencies = [
  "margaret_asset_bag",
  "margaret_codegen",
  "margaret_console",
+ "margaret_construction",
  "margaret_http",
  "margaret_http_validation",
  "margaret_identity",
@@ -1812,7 +1813,6 @@ dependencies = [
  "margaret_validation",
  "margaret_views",
  "margaret_websocket",
- "thiserror",
 ]
 
 [[package]]
@@ -2007,6 +2007,14 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "margaret_construction"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "thiserror",
 ]
 
