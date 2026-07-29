@@ -19,8 +19,8 @@ fn build_jwk_pair(
     crv: Curve,
     kid: String,
     pem: Result<String, p256::pkcs8::Error>,
-    x: Option<&[u8]>,
-    y: Option<&[u8]>,
+    x: Option<Vec<u8>>,
+    y: Option<Vec<u8>>,
 ) -> Result<JwkPair, JwksKeyError> {
     let pem = pem?;
 
@@ -42,11 +42,11 @@ fn build_jwk_pair(
 }
 
 fn encode_coordinate(
-    coordinate: Option<&[u8]>,
+    coordinate: Option<Vec<u8>>,
     name: &'static str,
 ) -> Result<String, JwksKeyError> {
     match coordinate {
-        Some(bytes) => Ok(Base64UrlUnpadded::encode_string(bytes)),
+        Some(bytes) => Ok(Base64UrlUnpadded::encode_string(&bytes)),
         None => Err(JwksKeyError::MissingPublicKeyCoordinate { coordinate: name }),
     }
 }
@@ -68,12 +68,8 @@ pub fn generate_keypair(
                 secret_key
                     .to_pkcs8_pem(LineEnding::LF)
                     .map(|pem| pem.to_string()),
-                point
-                    .x()
-                    .map(p256::elliptic_curve::generic_array::GenericArray::as_slice),
-                point
-                    .y()
-                    .map(p256::elliptic_curve::generic_array::GenericArray::as_slice),
+                point.x().map(|coordinate| coordinate.to_vec()),
+                point.y().map(|coordinate| coordinate.to_vec()),
             )
         }
         Curve::P384 => {
@@ -86,12 +82,8 @@ pub fn generate_keypair(
                 secret_key
                     .to_pkcs8_pem(LineEnding::LF)
                     .map(|pem| pem.to_string()),
-                point
-                    .x()
-                    .map(p256::elliptic_curve::generic_array::GenericArray::as_slice),
-                point
-                    .y()
-                    .map(p256::elliptic_curve::generic_array::GenericArray::as_slice),
+                point.x().map(|coordinate| coordinate.to_vec()),
+                point.y().map(|coordinate| coordinate.to_vec()),
             )
         }
     }
@@ -112,8 +104,8 @@ mod tests {
             Err(p256::SecretKey::from_pkcs8_pem("not a valid pem")
                 .err()
                 .unwrap()),
-            Some(&[1]),
-            Some(&[2]),
+            Some(vec![1]),
+            Some(vec![2]),
         )
         .err()
         .unwrap();
@@ -134,7 +126,7 @@ mod tests {
             "kid".to_string(),
             Ok("pem".to_string()),
             None,
-            Some(&[2]),
+            Some(vec![2]),
         )
         .err()
         .unwrap();
@@ -151,7 +143,7 @@ mod tests {
             Curve::P256,
             "kid".to_string(),
             Ok("pem".to_string()),
-            Some(&[1]),
+            Some(vec![1]),
             None,
         )
         .err()
