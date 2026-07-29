@@ -23,6 +23,7 @@ pub enum FrameworkAttribute {
     RendersView,
     RespondsToHttp,
     RouteParameter,
+    RouteParameterValue,
     ScheduledWithTickTimer,
     Service,
     Singleton,
@@ -32,7 +33,7 @@ pub enum FrameworkAttribute {
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 28] = [
         Self::AuthenticatedUser,
         Self::BuildForSession,
         Self::Column,
@@ -54,6 +55,7 @@ impl FrameworkAttribute {
         Self::RendersView,
         Self::RespondsToHttp,
         Self::RouteParameter,
+        Self::RouteParameterValue,
         Self::ScheduledWithTickTimer,
         Self::Service,
         Self::Singleton,
@@ -86,6 +88,7 @@ impl FrameworkAttribute {
             Self::RendersView => "renders_view",
             Self::RespondsToHttp => "responds_to_http",
             Self::RouteParameter => "route_parameter",
+            Self::RouteParameterValue => "route_parameter_value",
             Self::ScheduledWithTickTimer => "scheduled_with_tick_timer",
             Self::Service => "service",
             Self::Singleton => "singleton",
@@ -130,6 +133,7 @@ impl FrameworkAttribute {
             "renders_view" => Some(Self::RendersView),
             "responds_to_http" => Some(Self::RespondsToHttp),
             "route_parameter" => Some(Self::RouteParameter),
+            "route_parameter_value" => Some(Self::RouteParameterValue),
             "scheduled_with_tick_timer" => Some(Self::ScheduledWithTickTimer),
             "service" => Some(Self::Service),
             "singleton" => Some(Self::Singleton),

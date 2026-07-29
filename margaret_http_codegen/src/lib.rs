@@ -1146,6 +1146,49 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     }
 
     #[test]
+    fn injects_distinct_route_parameter_value_types_into_the_responder() {
+        let source = source_for(
+            r#"
+#[route_parameter_value]
+struct ProjectSlug(String);
+
+#[route_parameter_value]
+struct ProjectId(String);
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/projects/{project_slug}/{project_id}", server = "public")]
+struct GetProject;
+
+impl GetProject {
+    #[process]
+    fn respond(
+        &self,
+        #[route_parameter(from = "project_slug")] project_slug: ProjectSlug,
+        #[route_parameter(from = "project_id")] project_id: ProjectId,
+    ) -> anyhow::Result<Response> {}
+}
+"#,
+        );
+
+        assert!(source.contains(
+            r#"letproject_slug=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"project_slug""#
+        ));
+        assert!(source.contains(
+            r#"letproject_id=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"project_id""#
+        ));
+        assert!(source.contains("responder.respond(project_slug,project_id).await"));
+    }
+
+    #[test]
+    fn rejects_a_route_parameter_taken_by_reference() {
+        let message = error_for(
+            "#[route_parameter_value]\nstruct ProjectSlug(String);\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/projects/{slug}\", server = \"public\")]\nstruct GetProject;\nimpl GetProject {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"slug\")] slug: &ProjectSlug) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert!(message.contains("is taken by reference"));
+    }
+
+    #[test]
     fn binds_the_current_request_alongside_a_route_parameter() {
         let source = source_for(CURRENT_REQUEST);
 
@@ -1262,7 +1305,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 #[responds_to_http(method = \"get\", path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"thing\")] thing: Unknown) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("no #[provides_route_parameter]"));
+        assert!(message.contains("neither declared as a #[route_parameter_value] nor provided by a #[provides_route_parameter]"));
     }
 
     #[test]
@@ -1300,7 +1343,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 #[responds_to_http(method = \"get\", path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("no #[provides_route_parameter]"));
+        assert!(message.contains("neither declared as a #[route_parameter_value] nor provided by a #[provides_route_parameter]"));
     }
 
     #[test]

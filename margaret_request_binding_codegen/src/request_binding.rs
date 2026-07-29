@@ -12,7 +12,7 @@ pub enum RequestBinding {
         application: AuthenticatedUserApplication,
         requirement: AuthenticatedUserRequirement,
     },
-    Bound {
+    BoundRouteParameter {
         binder_field: String,
         binder_provider: CanonicalPath,
         path_key: String,
@@ -28,7 +28,7 @@ pub enum RequestBinding {
     },
     Next,
     PeerSpiffeId,
-    Raw {
+    RouteParameterValue {
         path_key: String,
     },
     Routes,

@@ -10,6 +10,7 @@ members = [
     "margaret_codegen_tests/tests/fixtures/clippy_clean_console_arguments",
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
     "margaret_codegen_tests/tests/fixtures/linear_construction_future",
+    "margaret_codegen_tests/tests/fixtures/route_parameter_values",
     "margaret_codegen_tests/tests/fixtures/self_referential_model",
     "margaret_codegen_tests/tests/fixtures/spiffe_http_client",
     "margaret_codegen_tests/tests/fixtures/websocket_console_argument_provider",

@@ -6,8 +6,8 @@ pub fn binding_shadows_request(binding: &RequestBinding) -> bool {
         binding,
         RequestBinding::AssetBag
             | RequestBinding::AuthenticatedUser { .. }
-            | RequestBinding::Raw { .. }
-            | RequestBinding::Bound { .. }
+            | RequestBinding::RouteParameterValue { .. }
+            | RequestBinding::BoundRouteParameter { .. }
             | RequestBinding::FormRequest { .. }
             | RequestBinding::PeerSpiffeId
     )
