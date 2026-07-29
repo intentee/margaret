@@ -70,7 +70,7 @@ impl WebSocketPlan {
 fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
     match binding {
         RequestBinding::AuthenticatedUser { application, .. } => Some(&application.concrete),
-        RequestBinding::Bound {
+        RequestBinding::BoundRouteParameter {
             binder_provider, ..
         } => Some(binder_provider),
         RequestBinding::Injectable { dependency } => Some(&dependency.concrete),
@@ -80,7 +80,7 @@ fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
         | RequestBinding::Forwarder
         | RequestBinding::Next
         | RequestBinding::PeerSpiffeId
-        | RequestBinding::Raw { .. }
+        | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
         | RequestBinding::Views => None,
     }

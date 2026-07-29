@@ -67,6 +67,11 @@ pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> 
 }
 
 #[proc_macro_attribute]
+pub fn route_parameter_value(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
 pub fn infers_authenticated_user(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }

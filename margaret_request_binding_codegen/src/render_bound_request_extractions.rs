@@ -43,7 +43,9 @@ pub fn render_bound_request_extractions(
     let bound: Vec<(&BoundParameter, &str)> = parameters
         .iter()
         .filter_map(|parameter| match &parameter.binding {
-            RequestBinding::Bound { path_key, .. } => Some((parameter, path_key.as_str())),
+            RequestBinding::BoundRouteParameter { path_key, .. } => {
+                Some((parameter, path_key.as_str()))
+            }
             _ => None,
         })
         .collect();

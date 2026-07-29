@@ -4,10 +4,10 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use http::request::Parts;
 use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::body::Incoming;
+use hyper::upgrade::OnUpgrade;
 use hyper_util::rt::TokioExecutor;
 use hyper_util::rt::TokioIo;
 use hyper_util::server::conn::auto::Builder;
@@ -32,12 +32,15 @@ use crate::one_shot_layer::one_shot_layer;
 use crate::request::Request;
 use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
+use crate::request_outcome::RequestOutcome;
+use crate::request_rejection::RequestRejection;
 use crate::request_route::RequestRoute;
 use crate::respond_once::respond_once;
 use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
 use crate::route_resolution::RouteResolution;
 use crate::router::Router;
+use crate::server_params::ServerParams;
 use crate::server_registry::ServerRegistry;
 use crate::transport_config::TransportConfig;
 use crate::upgrade_route::UpgradeRoute;
@@ -256,11 +259,16 @@ fn report_connection_task_outcome(outcome: Result<(), JoinError>) {
     }
 }
 
-fn error_response(error: RequestError) -> Response {
-    match error {
-        RequestError::PayloadTooLarge { .. } => Response::text(413, "Payload Too Large"),
-        _ => Response::text(400, "Bad Request"),
-    }
+fn error_response(error: &RequestError) -> Response {
+    eprintln!("margaret_http: the request could not be received: {error}");
+
+    Response::text(500, "Internal Server Error")
+}
+
+fn rejection_response(rejection: RequestRejection) -> Response {
+    eprintln!("margaret_http: the request was rejected: {rejection}");
+
+    rejection.into_response()
 }
 
 async fn serve_connection<Io>(
@@ -289,35 +297,6 @@ async fn serve_connection<Io>(
     report_connection_outcome(outcome);
 }
 
-async fn parse_request(
-    request: http::Request<Incoming>,
-    remote_addr: SocketAddr,
-    peer_identity: Arc<PeerIdentity>,
-    body_limit: &BodyLimit,
-    upload_config: &UploadConfig,
-) -> Result<Request, RequestError> {
-    let (parts, incoming) = request.into_parts();
-    let Parts {
-        method,
-        headers,
-        uri,
-        ..
-    } = parts;
-    let body = incoming.map_err(std::io::Error::other).boxed_unsync();
-    let inputs = RequestInputs::parse(
-        method,
-        &uri,
-        headers,
-        remote_addr,
-        body,
-        body_limit,
-        upload_config,
-    )
-    .await?;
-
-    Ok(Request::from_inputs(inputs).with_peer_identity(peer_identity))
-}
-
 async fn complete_request(
     route: RequestRoute,
     request: Request,
@@ -336,19 +315,12 @@ async fn complete_request(
         .into_http(),
         RequestRoute::MethodNotAllowed => Response::text(405, "Method Not Allowed").into_http(),
         RequestRoute::NotFound => Response::not_found().into_http(),
-        RequestRoute::PathParameterNotValidUtf8 { parameter, source } => {
-            eprintln!(
-                "margaret_http: the `{parameter}` route parameter is not valid percent-encoded utf-8: {source}"
-            );
-
-            Response::text(400, "Bad Request").into_http()
-        }
     }
 }
 
 async fn dispatch_web_socket(
-    mut request: http::Request<Incoming>,
-    remote_addr: SocketAddr,
+    server: ServerParams,
+    on_upgrade: OnUpgrade,
     peer_identity: Arc<PeerIdentity>,
     cancellation_token: CancellationToken,
     UpgradeRoute {
@@ -359,17 +331,8 @@ async fn dispatch_web_socket(
     forward_targets: &Arc<ForwardTargets>,
     driver_sender: WebSocketDriverSender,
 ) -> http::Response<Full<Bytes>> {
-    let on_upgrade = hyper::upgrade::on(&mut request);
-    let (parts, _incoming) = request.into_parts();
-    let Parts {
-        method,
-        headers,
-        uri,
-        ..
-    } = parts;
-
-    match RequestInputs::from_handshake(method, &uri, headers, remote_addr) {
-        Ok(inputs) => {
+    match RequestInputs::from_handshake(server) {
+        RequestOutcome::Parsed(inputs) => {
             let handshake = Request::from_inputs(inputs)
                 .with_peer_identity(peer_identity)
                 .with_path_params(path_params);
@@ -389,7 +352,7 @@ async fn dispatch_web_socket(
                 .await
                 .into_http()
         }
-        Err(error) => error_response(error).into_http(),
+        RequestOutcome::Rejected(rejection) => rejection_response(rejection).into_http(),
     }
 }
 
@@ -404,13 +367,20 @@ async fn dispatch(
         upload_config,
     }: ConnectionContext,
     driver_sender: WebSocketDriverSender,
-    request: http::Request<Incoming>,
+    mut request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
-    match router.resolve(request.method().as_str(), request.uri().path()) {
+    let on_upgrade = hyper::upgrade::on(&mut request);
+    let (parts, incoming) = request.into_parts();
+    let server = match ServerParams::from_parts(parts, remote_addr) {
+        RequestOutcome::Parsed(server) => server,
+        RequestOutcome::Rejected(rejection) => return rejection_response(rejection).into_http(),
+    };
+
+    match router.resolve(server.method(), server.path()) {
         RouteResolution::Upgrade(upgrade_route) => {
             dispatch_web_socket(
-                request,
-                remote_addr,
+                server,
+                on_upgrade,
                 peer_identity,
                 cancellation_token.child_token(),
                 upgrade_route,
@@ -420,17 +390,21 @@ async fn dispatch(
             .await
         }
         RouteResolution::Request(route) => {
-            match parse_request(
-                request,
-                remote_addr,
-                peer_identity,
-                &body_limit,
-                &upload_config,
-            )
-            .await
-            {
-                Ok(request) => complete_request(route, request, &forward_targets).await,
-                Err(error) => error_response(error).into_http(),
+            let body = incoming.map_err(std::io::Error::other).boxed_unsync();
+
+            match RequestInputs::parse(server, body, &body_limit, &upload_config).await {
+                Ok(RequestOutcome::Parsed(inputs)) => {
+                    complete_request(
+                        route,
+                        Request::from_inputs(inputs).with_peer_identity(peer_identity),
+                        &forward_targets,
+                    )
+                    .await
+                }
+                Ok(RequestOutcome::Rejected(rejection)) => {
+                    rejection_response(rejection).into_http()
+                }
+                Err(error) => error_response(&error).into_http(),
             }
         }
     }
@@ -486,58 +460,45 @@ mod tests {
         }
     }
 
-    struct EchoAssetPath;
+    struct EchoesTheNameParameter;
 
     #[async_trait]
-    impl Handler for EchoAssetPath {
+    impl Handler for EchoesTheNameParameter {
         async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::Done(Response::text(
                 200,
-                request
-                    .path_param("asset_path")
-                    .expect("the catch-all asset parameter is bound")
-                    .to_string(),
+                request.path_param("name").unwrap_or("absent").to_string(),
             )))
         }
     }
 
-    struct EchoArticle;
-
-    #[async_trait]
-    impl Handler for EchoArticle {
-        async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
-            Ok(ResponseContinuation::Done(Response::text(
-                200,
-                request
-                    .path_param("article")
-                    .expect("the article parameter is bound")
-                    .to_string(),
-            )))
-        }
+    fn registry_with_an_unusable_upload_directory() -> Arc<ServerRegistry> {
+        Arc::new(ServerRegistry::new(vec![Server::new(
+            "test",
+            "127.0.0.1:0".to_string(),
+            TransportConfig::Plain,
+            UploadConfig::enabled("/margaret-nonexistent-upload-directory".into()),
+            BodyLimit::default(),
+            Router::build(vec![RouteEntry::new(
+                "/upload",
+                vec![MethodHandler::new("POST", Arc::new(PlainOk))],
+            )])
+            .expect("the route entries register cleanly"),
+        )]))
     }
 
-    fn registry_with_assets() -> Arc<ServerRegistry> {
+    fn registry_with_a_name_parameter() -> Arc<ServerRegistry> {
         Arc::new(ServerRegistry::new(vec![Server::new(
             "test",
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
-            Router::build(vec![
-                RouteEntry::new(
-                    "/assets/{*asset_path}",
-                    vec![MethodHandler::new("GET", Arc::new(EchoAssetPath))],
-                ),
-                RouteEntry::new(
-                    "/articles/{article}",
-                    vec![MethodHandler::new("GET", Arc::new(EchoArticle))],
-                ),
-                RouteEntry::new(
-                    "/articles/rust/comments",
-                    vec![MethodHandler::new("GET", Arc::new(PlainOk))],
-                ),
-            ])
-            .expect("the asset and article routes register cleanly"),
+            Router::build(vec![RouteEntry::new(
+                "/files/{name}",
+                vec![MethodHandler::new("GET", Arc::new(EchoesTheNameParameter))],
+            )])
+            .expect("the route entries register cleanly"),
         )]))
     }
 
@@ -576,20 +537,13 @@ mod tests {
     }
 
     #[test]
-    fn maps_request_errors_to_status_codes() {
+    fn answers_a_system_failure_with_internal_server_error() {
         assert_eq!(
-            error_response(RequestError::PayloadTooLarge { limit: 8 })
-                .into_http()
-                .status()
-                .as_u16(),
-            413
-        );
-        assert_eq!(
-            error_response(RequestError::MissingMultipartBoundary)
-                .into_http()
-                .status()
-                .as_u16(),
-            400
+            error_response(&RequestError::UploadTempFile {
+                source: std::io::Error::other("the upload directory is unusable"),
+            })
+            .status(),
+            500
         );
     }
 
@@ -696,6 +650,148 @@ mod tests {
         String::from_utf8_lossy(&response).into_owned()
     }
 
+    async fn serve_registry<Exchange, Assertions>(
+        server_registry: Arc<ServerRegistry>,
+        exchanges: Exchange,
+    ) where
+        Exchange: FnOnce(SocketAddr) -> Assertions,
+        Assertions: Future<Output = ()>,
+    {
+        let bound = BoundServer::bind(server_registry, empty_forward_targets(), Arc::from("test"))
+            .await
+            .expect("the server binds to an ephemeral port");
+        let address = bound
+            .local_addr()
+            .expect("the bound listener reports its address");
+        let cancellation_token = CancellationToken::new();
+        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
+
+        exchanges(address).await;
+
+        cancellation_token.cancel();
+        serving.await.expect("the server task finishes cleanly");
+    }
+
+    #[tokio::test]
+    async fn rejects_ambiguous_request_targets() {
+        serve_registry(registry_with_one(), |address| async move {
+            const AMBIGUOUS_TARGETS: [&[u8]; 7] = [
+                b"/a/../b", b"/a%2Fb", b"/a//b", b"/a%00b", b"/%FF", b"/a%zz", b"*",
+            ];
+
+            let mut rejected = Vec::new();
+
+            for target in AMBIGUOUS_TARGETS {
+                let mut request = Vec::from(b"GET ".as_slice());
+                request.extend_from_slice(target);
+                request.extend_from_slice(b" HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n");
+
+                rejected.push(exchange(address, &request, false).await.contains(" 400 "));
+            }
+
+            assert_eq!(rejected, vec![true; AMBIGUOUS_TARGETS.len()]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn rejects_ambiguous_request_headers() {
+        serve_registry(registry_with_one(), |address| async move {
+            const AMBIGUOUS_REQUESTS: [&[u8]; 6] = [
+                b"GET / HTTP/1.1\r\nHost: test\r\nCookie: a=1\r\nCookie: b=2\r\nConnection: close\r\n\r\n",
+                b"GET / HTTP/1.1\r\nHost: test\r\nHost: elsewhere\r\nConnection: close\r\n\r\n",
+                b"GET / HTTP/1.1\r\nHost: test\r\nContent-Type: text/plain\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n",
+                b"GET / HTTP/1.1\r\nConnection: close\r\n\r\n",
+                b"GET http://elsewhere.example/ HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                b"GET /?id=1&id=2 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+            ];
+
+            let mut rejected = Vec::new();
+
+            for request in AMBIGUOUS_REQUESTS {
+                rejected.push(exchange(address, request, false).await.contains(" 400 "));
+            }
+
+            assert_eq!(rejected, vec![true; AMBIGUOUS_REQUESTS.len()]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn combines_a_repeated_list_valued_request_header() {
+        serve_registry(registry_with_one(), |address| async move {
+            let response = exchange(
+                address,
+                b"GET / HTTP/1.1\r\nHost: test\r\nAccept-Encoding: gzip\r\nAccept-Encoding: br\r\nConnection: close\r\n\r\n",
+                false,
+            )
+            .await;
+
+            assert!(response.contains(" 200 "));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn hands_a_decoded_route_parameter_to_the_handler() {
+        serve_registry(registry_with_a_name_parameter(), |address| async move {
+            let response = exchange(
+                address,
+                b"GET /files/a%20b HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            )
+            .await;
+
+            assert!(response.contains(" 200 "));
+            assert!(response.ends_with("a b"));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn decodes_a_route_parameter_exactly_once() {
+        serve_registry(registry_with_a_name_parameter(), |address| async move {
+            let response = exchange(
+                address,
+                b"GET /files/%2520 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+                false,
+            )
+            .await;
+
+            assert!(response.contains(" 200 "));
+            assert!(response.ends_with("%20"));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn answers_an_unusable_upload_directory_with_internal_server_error() {
+        serve_registry(
+            registry_with_an_unusable_upload_directory(),
+            |address| async move {
+                let response = exchange(
+                    address,
+                    b"POST /upload HTTP/1.1\r\nHost: test\r\nContent-Type: multipart/form-data; boundary=X\r\nContent-Length: 74\r\nConnection: close\r\n\r\n--X\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a\"\r\n\r\nDATA\r\n--X--\r\n",
+                    false,
+                )
+                .await;
+
+                assert!(response.contains(" 500 "));
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn serves_an_http_10_request_without_a_host() {
+        serve_registry(registry_with_one(), |address| async move {
+            let response = exchange(address, b"GET / HTTP/1.0\r\n\r\n", false).await;
+
+            assert!(response.contains(" 200 "));
+        })
+        .await;
+    }
+
     #[tokio::test]
     async fn serves_connections_until_cancellation() {
         let bound = BoundServer::bind(
@@ -776,84 +872,6 @@ mod tests {
 
         assert!(decodable.contains(" 200 "));
         assert!(undecodable.contains(" 400 "));
-
-        cancellation_token.cancel();
-
-        serving.await.expect("the server task finishes cleanly");
-    }
-
-    #[tokio::test]
-    async fn hands_a_decoded_traversal_path_to_the_responder_without_resolving_it() {
-        let bound = BoundServer::bind(
-            registry_with_assets(),
-            empty_forward_targets(),
-            Arc::from("test"),
-        )
-        .await
-        .expect("the server binds to an ephemeral port");
-        let address = bound
-            .local_addr()
-            .expect("the bound listener reports its address");
-        let cancellation_token = CancellationToken::new();
-        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
-
-        let (traversing, encoded, above_the_prefix) = tokio::join!(
-            exchange(
-                address,
-                b"GET /assets/../../etc/passwd HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-                false,
-            ),
-            exchange(
-                address,
-                b"GET /assets/%2e%2e%2fsecret HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-                false,
-            ),
-            exchange(
-                address,
-                b"GET /../etc/passwd HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-                false,
-            ),
-        );
-
-        assert!(traversing.ends_with("../../etc/passwd"));
-        assert!(encoded.ends_with("../secret"));
-        assert!(above_the_prefix.contains(" 404 "));
-
-        cancellation_token.cancel();
-
-        serving.await.expect("the server task finishes cleanly");
-    }
-
-    #[tokio::test]
-    async fn decodes_a_path_parameter_without_letting_it_open_a_new_segment() {
-        let bound = BoundServer::bind(
-            registry_with_assets(),
-            empty_forward_targets(),
-            Arc::from("test"),
-        )
-        .await
-        .expect("the server binds to an ephemeral port");
-        let address = bound
-            .local_addr()
-            .expect("the bound listener reports its address");
-        let cancellation_token = CancellationToken::new();
-        let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
-
-        let (encoded_separator, real_separator) = tokio::join!(
-            exchange(
-                address,
-                b"GET /articles/rust%2Fcomments HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-                false,
-            ),
-            exchange(
-                address,
-                b"GET /articles/rust/comments HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-                false,
-            ),
-        );
-
-        assert!(encoded_separator.ends_with("rust/comments"));
-        assert!(real_separator.ends_with("ok"));
 
         cancellation_token.cancel();
 

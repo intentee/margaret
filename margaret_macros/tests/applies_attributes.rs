@@ -9,6 +9,7 @@ use margaret_macros::provides_jwks_endpoint;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::renders_view;
 use margaret_macros::responds_to_http;
+use margaret_macros::route_parameter_value;
 use margaret_macros::scheduled_with_tick_timer;
 use margaret_macros::service;
 use margaret_macros::singleton;
@@ -44,6 +45,9 @@ impl Subject {
 
 #[provides_route_parameter]
 struct Binder;
+
+#[route_parameter_value]
+struct Topic(String);
 
 #[provides_jwks_endpoint]
 struct JwksEndpoint;
@@ -90,6 +94,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(subject.respond("path-id".to_string()), "path-id");
     assert_eq!(subject.run(), "typed-name");
     assert_eq!(Binder.bind("bound".to_string()), "bound");
+    assert_eq!(Topic("weather".to_string()).0, "weather");
 
     let _jwks_endpoint = JwksEndpoint;
     let _worker = Worker;

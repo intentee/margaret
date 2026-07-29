@@ -1934,6 +1934,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_codegen_route_parameter_values_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "margaret",
+ "maud",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "validator",
+]
+
+[[package]]
 name = "margaret_codegen_tests"
 version = "0.1.0"
 dependencies = [
@@ -2828,6 +2846,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures-util",
+ "http",
  "hyper",
  "hyper-util",
  "margaret_http",

@@ -74,6 +74,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_clippy_fixture \
 	--exclude-from-report margaret_codegen_fallible_roles_fixture \
 	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
+	--exclude-from-report margaret_codegen_route_parameter_values_fixture \
 	--exclude-from-report margaret_codegen_websocket_fixture \
 	--exclude-from-report margaret_self_referential_model_fixture \
 	--exclude-from-report margaret_spiffe_http_client_fixture

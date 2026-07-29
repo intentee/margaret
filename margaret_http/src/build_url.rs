@@ -83,6 +83,22 @@ mod tests {
     }
 
     #[test]
+    fn percent_encodes_a_line_break_that_a_parameter_would_introduce() {
+        let url = build_url(
+            "http://localhost",
+            &[
+                UrlSegment::Literal("/articles/"),
+                UrlSegment::Parameter(UrlParameter {
+                    name: "article",
+                    value: "a\r\nX-Injected: 1".to_string(),
+                }),
+            ],
+        );
+
+        assert_eq!(url, "http://localhost/articles/a%0D%0AX-Injected:%201");
+    }
+
+    #[test]
     fn substitutes_parameter_values_in_segment_order() {
         let url = build_url(
             "http://localhost",
