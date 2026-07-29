@@ -1939,6 +1939,7 @@ dependencies = [
  "margaret_codegen_fallible_roles_fixture",
  "margaret_codegen_linear_construction_future_fixture",
  "margaret_console_argument_codegen",
+ "margaret_generated_module",
  "tokio",
 ]
 

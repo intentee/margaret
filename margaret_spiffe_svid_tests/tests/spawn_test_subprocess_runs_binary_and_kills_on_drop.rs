@@ -24,9 +24,11 @@ async fn runs_binary_and_kills_on_drop() {
 
     drop(child_again);
 
+    let child_pid =
+        libc::pid_t::try_from(pid).expect("the child process id fits in a process identifier");
     let started = std::time::Instant::now();
     loop {
-        let status = unsafe { libc::kill(pid as libc::pid_t, 0) };
+        let status = unsafe { libc::kill(child_pid, 0) };
         if status == -1 {
             break;
         }

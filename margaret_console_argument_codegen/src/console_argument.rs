@@ -57,8 +57,7 @@ impl ConsoleArgument {
     #[must_use]
     pub fn name(&self) -> &str {
         match self {
-            ConsoleArgument::Flag { name } => name,
-            ConsoleArgument::Named { name, .. } => name,
+            ConsoleArgument::Flag { name } | ConsoleArgument::Named { name, .. } => name,
             ConsoleArgument::Positional { id, .. } => id,
             ConsoleArgument::SpiffeHttpClient => "spiffe_http_client",
         }

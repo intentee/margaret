@@ -31,6 +31,7 @@ impl Response {
         Self::text(403, "Forbidden")
     }
 
+    #[must_use]
     pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.headers.push(Header {
             name: name.into(),
@@ -72,6 +73,7 @@ impl Response {
         Self::text(404, "Not Found")
     }
 
+    #[must_use]
     pub fn set_cookie(self, cookie: Cookie<'static>) -> Self {
         self.header("set-cookie", cookie.to_string())
     }

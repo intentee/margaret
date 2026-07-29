@@ -99,8 +99,8 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
         "bind-bound"
     );
 
-    let _jwks_endpoint = JwksEndpoint;
-    let _worker = Worker;
+    assert_eq!(size_of::<JwksEndpoint>(), 0);
+    assert_eq!(size_of::<Worker>(), 0);
 
     let record = Record {
         id: "the-id".to_string(),

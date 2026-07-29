@@ -17,9 +17,9 @@ impl SvidService {
     #[must_use]
     pub fn new(spire_agent_addr: String) -> Self {
         Self {
-            root_cert_store_holder: Default::default(),
+            root_cert_store_holder: RootCertStoreHolder::default(),
             spire_agent_addr,
-            svid_certified_key_holder: Default::default(),
+            svid_certified_key_holder: SvidCertifiedKeyHolder::default(),
         }
     }
 

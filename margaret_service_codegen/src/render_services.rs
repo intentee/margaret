@@ -234,7 +234,7 @@ fn server_registration(
     }
 }
 
-fn missed_tick_behavior_method(behavior: &Option<CanonicalPath>) -> TokenStream {
+fn missed_tick_behavior_method(behavior: Option<&CanonicalPath>) -> TokenStream {
     match behavior {
         Some(behavior) => {
             let behavior = path_tokens(behavior);
@@ -252,7 +252,9 @@ fn missed_tick_behavior_method(behavior: &Option<CanonicalPath>) -> TokenStream 
 fn adapter(unit: &ServiceUnit) -> TokenStream {
     match &unit.kind {
         ServiceKind::Service => service_adapter(unit),
-        ServiceKind::Ticker { behavior, interval } => ticker_adapter(unit, behavior, interval),
+        ServiceKind::Ticker { behavior, interval } => {
+            ticker_adapter(unit, behavior.as_ref(), interval)
+        }
     }
 }
 
@@ -273,7 +275,7 @@ fn runner_outcome(unit: &ServiceUnit, call: &TokenStream) -> TokenStream {
 
 fn ticker_adapter(
     unit: &ServiceUnit,
-    behavior: &Option<CanonicalPath>,
+    behavior: Option<&CanonicalPath>,
     interval: &CanonicalPath,
 ) -> TokenStream {
     let name = adapter_ident(unit);
