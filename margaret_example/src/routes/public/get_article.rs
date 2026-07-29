@@ -15,10 +15,10 @@ use crate::models::article::Article;
 pub struct GetArticle;
 
 impl GetArticle {
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(
         &self,
         #[route_parameter(from = "article")] Article {

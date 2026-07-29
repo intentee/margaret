@@ -16,18 +16,18 @@ pub struct Worker {
 }
 
 impl Worker {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(secrets: Arc<Secrets>) -> WorkerResult<Self> {
         Ok(Self { secrets })
     }
 
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub async fn run(&self, cancellation_token: CancellationToken) -> ChainedWorkerResult<()> {
         let _ = self.secrets.token();
 

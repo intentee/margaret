@@ -20,20 +20,20 @@ pub struct TokenIssuer {
 }
 
 impl TokenIssuer {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(
         #[jwks_secret_store(server)] secret_store: Arc<JwksSecretStore>,
     ) -> anyhow::Result<Self> {
         Ok(Self { secret_store })
     }
 
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         match self
             .secret_store

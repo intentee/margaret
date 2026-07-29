@@ -8,10 +8,10 @@ use margaret::framework::macros::singleton;
 pub struct SystemClock;
 
 impl SystemClock {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create() -> anyhow::Result<Self> {
         Ok(Self)
     }

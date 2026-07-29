@@ -49,10 +49,10 @@ pub struct MtlsFixture {
 }
 
 impl MtlsFixture {
-    #[must_use]
     /// # Panics
     ///
     /// Panics when the fixture it builds cannot be prepared.
+    #[must_use]
     pub fn new() -> Self {
         let _already_installed = rustls::crypto::aws_lc_rs::default_provider().install_default();
 

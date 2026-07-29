@@ -9,10 +9,10 @@ pub struct ServiceIdentitySupervisor {
 }
 
 impl ServiceIdentitySupervisor {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(
         map: Arc<crate::diamond::microservices_map::MicroservicesMap>,
     ) -> anyhow::Result<Self> {

@@ -15,18 +15,18 @@ pub struct GetMetrics {
 }
 
 impl GetMetrics {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(metrics: Arc<Metrics>) -> anyhow::Result<Self> {
         Ok(Self { metrics })
     }
 
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(&self) -> anyhow::Result<Response> {
         Ok(Response::text(
             200,

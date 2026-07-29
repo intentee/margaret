@@ -10,10 +10,10 @@ use crate::margaret::routes::Routes;
 pub struct GetGreetingPermanentRedirect;
 
 impl GetGreetingPermanentRedirect {
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(&self, routes: &Routes) -> anyhow::Result<Redirect> {
         Ok(routes.public.get_greeting.permanent_redirect())
     }

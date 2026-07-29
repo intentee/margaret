@@ -6,10 +6,10 @@ use margaret::framework::macros::websocket_session;
 pub struct ChatSession;
 
 impl ChatSession {
-    #[build_for_session]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[build_for_session]
     pub fn assemble() -> errors::Result<Self> {
         Ok(Self)
     }

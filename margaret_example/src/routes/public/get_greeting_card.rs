@@ -19,18 +19,18 @@ pub struct GetGreetingCard {
 }
 
 impl GetGreetingCard {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(greeter: Arc<EnglishGreeter>) -> anyhow::Result<Self> {
         Ok(Self { greeter })
     }
 
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(&self, routes: &Routes, views: &Views) -> anyhow::Result<Response> {
         Ok({
             Response::html(

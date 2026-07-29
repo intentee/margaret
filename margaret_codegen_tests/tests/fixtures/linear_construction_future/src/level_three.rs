@@ -15,10 +15,10 @@ pub struct LevelThree {
 }
 
 impl LevelThree {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub async fn create(dependency: Arc<LevelTwo>) -> anyhow::Result<Self> {
         super::record::record(2).await;
         Ok(Self {
@@ -26,10 +26,10 @@ impl LevelThree {
         })
     }
 
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok(CommandOutcome::Succeeded)
     }

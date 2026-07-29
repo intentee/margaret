@@ -15,18 +15,18 @@ pub struct GetAsset {
 }
 
 impl GetAsset {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(asset_responder: Arc<AssetResponder>) -> anyhow::Result<Self> {
         Ok(Self { asset_responder })
     }
 
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(
         &self,
         #[route_parameter(from = "asset_path")] asset_path: String,

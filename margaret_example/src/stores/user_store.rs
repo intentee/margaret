@@ -21,10 +21,10 @@ pub struct UserStore {
 }
 
 impl UserStore {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create() -> anyhow::Result<Self> {
         Ok({
             let sessions = DashMap::new();

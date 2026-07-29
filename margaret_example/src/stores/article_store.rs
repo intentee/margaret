@@ -97,10 +97,10 @@ pub struct ArticleStore {
 }
 
 impl ArticleStore {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(clock: Arc<SystemClock>) -> anyhow::Result<Self> {
         Ok({
             let articles = DashMap::new();

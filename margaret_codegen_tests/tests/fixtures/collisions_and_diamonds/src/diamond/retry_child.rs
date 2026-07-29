@@ -7,10 +7,10 @@ pub struct RetryChild {
 }
 
 impl RetryChild {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(#[console_argument(from = "retries")] retries: u16) -> anyhow::Result<Self> {
         Ok(Self { _retries: retries })
     }

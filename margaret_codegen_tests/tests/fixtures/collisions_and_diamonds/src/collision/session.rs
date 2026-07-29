@@ -9,18 +9,18 @@ use margaret::framework::macros::singleton;
 pub struct Session;
 
 impl Session {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create() -> anyhow::Result<Self> {
         Ok(Self)
     }
 
-    #[infer_from_request]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[infer_from_request]
     pub async fn infer_reader(
         &self,
     ) -> anyhow::Result<AuthenticatedUserOutcome<crate::collision::reader::Reader>> {

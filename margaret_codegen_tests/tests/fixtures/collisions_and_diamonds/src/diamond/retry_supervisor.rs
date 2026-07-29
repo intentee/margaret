@@ -10,10 +10,10 @@ pub struct RetrySupervisor {
 }
 
 impl RetrySupervisor {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(
         #[console_argument(from = "retries")] retries: u16,
         child: Arc<crate::diamond::retry_child::RetryChild>,

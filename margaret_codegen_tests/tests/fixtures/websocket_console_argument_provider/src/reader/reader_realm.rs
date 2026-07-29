@@ -7,10 +7,10 @@ pub struct ReaderRealm {
 }
 
 impl ReaderRealm {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(#[console_argument(from = "realm")] realm: String) -> anyhow::Result<Self> {
         Ok(Self { realm })
     }

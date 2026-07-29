@@ -15,10 +15,10 @@ pub struct GetWellKnownJwks {
 }
 
 impl GetWellKnownJwks {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(public_jwks_handler: Arc<PublicJwksHandler>) -> anyhow::Result<Self> {
         Ok({
             Self {
@@ -27,10 +27,10 @@ impl GetWellKnownJwks {
         })
     }
 
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(&self) -> anyhow::Result<Response> {
         Ok(self.public_jwks_handler.respond())
     }

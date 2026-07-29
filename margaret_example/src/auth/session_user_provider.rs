@@ -21,18 +21,18 @@ pub struct SessionUserProvider {
 }
 
 impl SessionUserProvider {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(users: Arc<UserStore>) -> anyhow::Result<Self> {
         Ok(Self { users })
     }
 
-    #[infer_from_request]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[infer_from_request]
     pub fn infer_session_user(
         &self,
         #[form_request(from = Cookie)] cookie: SessionCookie,

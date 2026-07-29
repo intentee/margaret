@@ -21,10 +21,10 @@ pub struct StoryboardSession {
 }
 
 impl StoryboardSession {
-    #[build_for_session]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[build_for_session]
     pub fn build_for_session(
         greeter: Arc<EnglishGreeter>,
         #[route_parameter(from = "topic")] topic: String,

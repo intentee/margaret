@@ -11,10 +11,10 @@ use crate::stores::article_store::FEATURED_ARTICLE_ID;
 pub struct GetFeatured;
 
 impl GetFeatured {
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {
         Ok(forward.get_article(FEATURED_ARTICLE_ID.to_string()))
     }

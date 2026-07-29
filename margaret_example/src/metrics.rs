@@ -14,10 +14,10 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create() -> anyhow::Result<Self> {
         Ok({
             Self {

@@ -17,18 +17,18 @@ pub struct PostArticleImport {
 }
 
 impl PostArticleImport {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(articles: Arc<ArticleStore>) -> anyhow::Result<Self> {
         Ok(Self { articles })
     }
 
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(
         &self,
         #[form_request(from = Json)] form: ValidationResult<PostArticleForm>,

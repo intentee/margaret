@@ -12,10 +12,10 @@ use tokio_util::sync::CancellationToken;
 pub struct BoardResponder;
 
 impl BoardResponder {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create() -> anyhow::Result<Self> {
         Ok(Self)
     }

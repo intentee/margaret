@@ -11,10 +11,10 @@ use super::user::User;
 pub struct GetProfile;
 
 impl GetProfile {
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(&self, #[authenticated_user] user: User) -> AppResult<Response> {
         Ok(Response::text(200, user.name))
     }

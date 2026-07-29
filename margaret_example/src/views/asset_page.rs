@@ -21,10 +21,10 @@ pub struct AssetPage {
 }
 
 impl AssetPage {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(showcase: Arc<AssetShowcase>) -> anyhow::Result<Self> {
         Ok(Self { showcase })
     }

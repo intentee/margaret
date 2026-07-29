@@ -15,18 +15,18 @@ pub struct GetHealth {
 }
 
 impl GetHealth {
-    #[constructor]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[constructor]
     pub fn create(app_name: Arc<AppName>) -> anyhow::Result<Self> {
         Ok(Self { app_name })
     }
 
-    #[process]
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
+    #[process]
     pub fn respond(&self) -> anyhow::Result<Response> {
         Ok(Response::text(200, self.app_name.as_str()))
     }
