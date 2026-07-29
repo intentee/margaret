@@ -364,6 +364,82 @@ fn verify_single_inference(
 /// # Errors
 ///
 /// Returns `RequestBindingError::ConflictingArgumentMarkers` or `RequestBindingError::ConflictingAuthenticatedUserMarkers` or `RequestBindingError::MarkedPeerSpiffeIdParameter`.
+struct ParameterMarkers<'marker> {
+    authenticated_user: Option<&'marker IndexedAttribute>,
+    form_request: Option<&'marker IndexedAttribute>,
+    is_peer_spiffe_id: bool,
+    position: usize,
+    route_parameter: Option<&'marker IndexedAttribute>,
+    subject: &'marker str,
+}
+
+fn reject_conflicting_markers(
+    ParameterMarkers {
+        authenticated_user,
+        form_request,
+        is_peer_spiffe_id,
+        position,
+        route_parameter,
+        subject,
+    }: &ParameterMarkers<'_>,
+) -> Result<(), RequestBindingError> {
+    let authenticated_user = authenticated_user.is_some();
+    let form_request = form_request.is_some();
+    let route_parameter = route_parameter.is_some();
+
+    if route_parameter && form_request {
+        return Err(RequestBindingError::ConflictingArgumentMarkers {
+            subject: (*subject).to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if authenticated_user && (route_parameter || form_request) {
+        return Err(RequestBindingError::ConflictingAuthenticatedUserMarkers {
+            subject: (*subject).to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if *is_peer_spiffe_id && (authenticated_user || route_parameter || form_request) {
+        return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
+            subject: (*subject).to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+fn reject_repeated_bindings(
+    bound: &[BoundParameter],
+    subject: &str,
+) -> Result<(), RequestBindingError> {
+    let counts = |matcher: fn(&RequestBinding) -> bool| {
+        bound
+            .iter()
+            .filter(|parameter| matcher(&parameter.binding))
+            .count()
+    };
+
+    if counts(|binding| matches!(binding, RequestBinding::Next)) > 1 {
+        return Err(RequestBindingError::MultipleNextParameters {
+            subject: subject.to_string(),
+        });
+    }
+
+    if counts(|binding| matches!(binding, RequestBinding::PeerSpiffeId)) > 1 {
+        return Err(RequestBindingError::MultiplePeerSpiffeIdParameters {
+            subject: subject.to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+/// # Errors
+///
+/// Returns `RequestBindingError` propagated from the work it performs.
 pub fn classify_parameters(
     index: &AttributeIndex,
     item: &IndexedItem,
@@ -402,28 +478,14 @@ pub fn classify_parameters(
         let is_routes = RequestInjectable::Routes.matches(resolved.as_ref(), is_reference);
         let is_views = RequestInjectable::Views.matches(resolved.as_ref(), is_reference);
 
-        if route_parameter.is_some() && form_request.is_some() {
-            return Err(RequestBindingError::ConflictingArgumentMarkers {
-                subject: subject.to_string(),
-                parameter: position.to_string(),
-            });
-        }
-
-        if authenticated_user.is_some() && (route_parameter.is_some() || form_request.is_some()) {
-            return Err(RequestBindingError::ConflictingAuthenticatedUserMarkers {
-                subject: subject.to_string(),
-                parameter: position.to_string(),
-            });
-        }
-
-        if is_peer_spiffe_id
-            && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
-        {
-            return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
-                subject: subject.to_string(),
-                parameter: position.to_string(),
-            });
-        }
+        reject_conflicting_markers(&ParameterMarkers {
+            authenticated_user,
+            form_request,
+            is_peer_spiffe_id,
+            position,
+            route_parameter,
+            subject,
+        })?;
 
         let binding = if authenticated_user.is_some() {
             classify_authenticated_user(
@@ -483,28 +545,7 @@ pub fn classify_parameters(
         bound.push(BoundParameter { binding, holder });
     }
 
-    let next_count = bound
-        .iter()
-        .filter(|parameter| matches!(parameter.binding, RequestBinding::Next))
-        .count();
-
-    if next_count > 1 {
-        return Err(RequestBindingError::MultipleNextParameters {
-            subject: subject.to_string(),
-        });
-    }
-
-    let peer_spiffe_id_count = bound
-        .iter()
-        .filter(|parameter| matches!(parameter.binding, RequestBinding::PeerSpiffeId))
-        .count();
-
-    if peer_spiffe_id_count > 1 {
-        return Err(RequestBindingError::MultiplePeerSpiffeIdParameters {
-            subject: subject.to_string(),
-        });
-    }
-
+    reject_repeated_bindings(&bound, subject)?;
     verify_single_inference(&bound, subject)?;
 
     Ok(bound)

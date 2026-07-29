@@ -390,6 +390,99 @@ fn defer_foreign_key(
     })
 }
 
+struct ModelColumns {
+    deferred_foreign_keys: Vec<DeferredForeignKey>,
+    scalar_columns: Vec<ResolvedColumn>,
+    seen_columns: HashSet<String>,
+}
+
+fn collect_model_columns(
+    attribute_index: &AttributeIndex,
+    item: &IndexedItem,
+    model: &str,
+    validated_enums: &mut HashSet<CanonicalPath>,
+) -> Result<ModelColumns, ModelCodegenError> {
+    let mut scalar_columns: Vec<ResolvedColumn> = Vec::new();
+    let mut deferred_foreign_keys: Vec<DeferredForeignKey> = Vec::new();
+    let mut seen_columns: HashSet<String> = HashSet::new();
+
+    for (position, field) in item.fields().iter().enumerate() {
+        let column_attribute = select_unique_framework_attribute(
+            field.attributes(),
+            FrameworkAttribute::Column,
+            || model.to_string(),
+        )?;
+        let foreign_key_attribute = select_unique_framework_attribute(
+            field.attributes(),
+            FrameworkAttribute::ForeignKey,
+            || model.to_string(),
+        )?;
+        let index_attributes =
+            select_framework_attributes(field.attributes(), FrameworkAttribute::Index);
+
+        if !index_attributes.is_empty() && column_attribute.is_none() {
+            return Err(ModelCodegenError::IndexRequiresColumn {
+                field: field_display(field.identifier()),
+                model: model.to_string(),
+            });
+        }
+
+        let indexes = resolve_index_memberships(&index_attributes, field, model)?;
+
+        match (column_attribute, foreign_key_attribute) {
+            (None, None) => {
+                return Err(ModelCodegenError::UnattributedField {
+                    field: field_display(field.identifier()),
+                    model: model.to_string(),
+                });
+            }
+            (None, Some(_)) => {
+                return Err(ModelCodegenError::ForeignKeyRequiresColumn {
+                    field: field_display(field.identifier()),
+                    model: model.to_string(),
+                });
+            }
+            (Some(column_attribute), foreign_key_attribute) => {
+                let column_arguments = ColumnArguments::parse(column_attribute.args()?)?;
+
+                match foreign_key_attribute {
+                    None => {
+                        scalar_columns.push(resolve_scalar_column(
+                            column_arguments,
+                            indexes,
+                            PositionedField { field, position },
+                            model,
+                            &mut seen_columns,
+                            ColumnTypeContext {
+                                attribute_index,
+                                item,
+                                validated_enums,
+                            },
+                        )?);
+                    }
+                    Some(foreign_key_attribute) => {
+                        deferred_foreign_keys.push(defer_foreign_key(
+                            column_arguments,
+                            indexes,
+                            PositionedField { field, position },
+                            foreign_key_attribute.args()?,
+                            model,
+                            attribute_index,
+                            item,
+                        )?);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(ModelColumns {
+        deferred_foreign_keys,
+        scalar_columns,
+        seen_columns,
+    })
+}
+
 fn collect_models(
     attribute_index: &AttributeIndex,
     targets: &mut HashMap<CanonicalPath, ForeignKeyTarget>,
@@ -423,79 +516,11 @@ fn collect_models(
 
         register_table_name(seen_table_names, table.clone(), &model)?;
 
-        let mut scalar_columns: Vec<ResolvedColumn> = Vec::new();
-        let mut deferred_foreign_keys: Vec<DeferredForeignKey> = Vec::new();
-        let mut seen_columns: HashSet<String> = HashSet::new();
-
-        for (position, field) in item.fields().iter().enumerate() {
-            let column_attribute = select_unique_framework_attribute(
-                field.attributes(),
-                FrameworkAttribute::Column,
-                || model.clone(),
-            )?;
-            let foreign_key_attribute = select_unique_framework_attribute(
-                field.attributes(),
-                FrameworkAttribute::ForeignKey,
-                || model.clone(),
-            )?;
-            let index_attributes =
-                select_framework_attributes(field.attributes(), FrameworkAttribute::Index);
-
-            if !index_attributes.is_empty() && column_attribute.is_none() {
-                return Err(ModelCodegenError::IndexRequiresColumn {
-                    field: field_display(field.identifier()),
-                    model,
-                });
-            }
-
-            let indexes = resolve_index_memberships(&index_attributes, field, &model)?;
-
-            match (column_attribute, foreign_key_attribute) {
-                (None, None) => {
-                    return Err(ModelCodegenError::UnattributedField {
-                        field: field_display(field.identifier()),
-                        model,
-                    });
-                }
-                (None, Some(_)) => {
-                    return Err(ModelCodegenError::ForeignKeyRequiresColumn {
-                        field: field_display(field.identifier()),
-                        model,
-                    });
-                }
-                (Some(column_attribute), foreign_key_attribute) => {
-                    let column_arguments = ColumnArguments::parse(column_attribute.args()?)?;
-
-                    match foreign_key_attribute {
-                        None => {
-                            scalar_columns.push(resolve_scalar_column(
-                                column_arguments,
-                                indexes,
-                                PositionedField { field, position },
-                                &model,
-                                &mut seen_columns,
-                                ColumnTypeContext {
-                                    attribute_index,
-                                    item,
-                                    validated_enums: &mut validated_enums,
-                                },
-                            )?);
-                        }
-                        Some(foreign_key_attribute) => {
-                            deferred_foreign_keys.push(defer_foreign_key(
-                                column_arguments,
-                                indexes,
-                                PositionedField { field, position },
-                                foreign_key_attribute.args()?,
-                                &model,
-                                attribute_index,
-                                item,
-                            )?);
-                        }
-                    }
-                }
-            }
-        }
+        let ModelColumns {
+            deferred_foreign_keys,
+            scalar_columns,
+            seen_columns,
+        } = collect_model_columns(attribute_index, item, &model, &mut validated_enums)?;
 
         let primary_key_columns: Vec<&ResolvedColumn> = scalar_columns
             .iter()
@@ -599,21 +624,23 @@ fn resolve_indexes(
     Ok(indexes)
 }
 
-fn resolve_model(
-    collected: CollectedModel,
-    targets: &HashMap<CanonicalPath, ForeignKeyTarget>,
-) -> Result<Model, ModelCodegenError> {
-    let CollectedModel {
-        deferred_foreign_keys,
-        model,
-        primary_key,
-        scalar_columns: mut columns,
-        mut seen_columns,
-        table,
-    } = collected;
+struct ResolvedForeignKeys {
+    columns: Vec<ResolvedColumn>,
+    foreign_keys: Vec<ResolvedForeignKey>,
+    unique_positions: HashSet<usize>,
+}
 
-    let mut foreign_keys: Vec<ResolvedForeignKey> = Vec::new();
-    let mut unique_column_positions: HashSet<usize> = HashSet::new();
+fn resolve_foreign_keys(
+    deferred_foreign_keys: Vec<DeferredForeignKey>,
+    targets: &HashMap<CanonicalPath, ForeignKeyTarget>,
+    model: &str,
+    seen_columns: &mut HashSet<String>,
+) -> Result<ResolvedForeignKeys, ModelCodegenError> {
+    let mut resolved = ResolvedForeignKeys {
+        columns: Vec::new(),
+        foreign_keys: Vec::new(),
+        unique_positions: HashSet::new(),
+    };
 
     for deferred in deferred_foreign_keys {
         let DeferredForeignKey {
@@ -630,7 +657,7 @@ fn resolve_model(
         let Some(target) = targets.get(&target_path) else {
             return Err(ModelCodegenError::ForeignKeyTargetNotAModel {
                 field: field_name,
-                model,
+                model: model.to_string(),
                 rust_type,
             });
         };
@@ -639,7 +666,7 @@ fn resolve_model(
             [] => {
                 return Err(ModelCodegenError::ForeignKeyTargetWithoutPrimaryKey {
                     field: field_name,
-                    model,
+                    model: model.to_string(),
                     target: target.table.clone(),
                 });
             }
@@ -647,7 +674,7 @@ fn resolve_model(
             _ => {
                 return Err(ModelCodegenError::ForeignKeyTargetHasCompositePrimaryKey {
                     field: field_name,
-                    model,
+                    model: model.to_string(),
                     target: target.table.clone(),
                 });
             }
@@ -659,14 +686,14 @@ fn resolve_model(
             Err(source) => {
                 return Err(ModelCodegenError::ForeignKeyColumnNameTooLong {
                     field: field_name,
-                    model,
+                    model: model.to_string(),
                     source,
                 });
             }
         };
-        let column_name = register_column_name(column_name, &model, &mut seen_columns)?;
+        let column_name = register_column_name(column_name, model, seen_columns)?;
 
-        columns.push(ResolvedColumn {
+        resolved.columns.push(ResolvedColumn {
             indexes,
             inferred: InferredColumn {
                 column_type: referenced.column_type.clone(),
@@ -680,10 +707,10 @@ fn resolve_model(
         });
 
         if unique {
-            unique_column_positions.insert(position);
+            resolved.unique_positions.insert(position);
         }
 
-        foreign_keys.push(ResolvedForeignKey {
+        resolved.foreign_keys.push(ResolvedForeignKey {
             column: column_name,
             on_delete,
             references_column: referenced.name.clone(),
@@ -691,6 +718,30 @@ fn resolve_model(
             unique,
         });
     }
+
+    Ok(resolved)
+}
+
+fn resolve_model(
+    collected: CollectedModel,
+    targets: &HashMap<CanonicalPath, ForeignKeyTarget>,
+) -> Result<Model, ModelCodegenError> {
+    let CollectedModel {
+        deferred_foreign_keys,
+        model,
+        primary_key,
+        scalar_columns: mut columns,
+        mut seen_columns,
+        table,
+    } = collected;
+
+    let ResolvedForeignKeys {
+        columns: foreign_key_columns,
+        foreign_keys,
+        unique_positions: mut unique_column_positions,
+    } = resolve_foreign_keys(deferred_foreign_keys, targets, &model, &mut seen_columns)?;
+
+    columns.extend(foreign_key_columns);
 
     let mut unique_constraints: Vec<ResolvedUniqueConstraint> = Vec::new();
 
