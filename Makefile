@@ -70,7 +70,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_websocket_tests
 COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_example \
-	--exclude-from-report margaret_codegen_clippy_fixture \
+	--exclude-from-report margaret_codegen_collisions_and_diamonds_fixture \
 	--exclude-from-report margaret_codegen_fallible_roles_fixture \
 	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
 	--exclude-from-report margaret_codegen_websocket_fixture \

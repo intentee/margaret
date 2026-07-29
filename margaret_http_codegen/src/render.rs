@@ -5,7 +5,6 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
-use margaret_codegen_tokens::too_many_arguments_expect::too_many_arguments_expect;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
@@ -421,8 +420,6 @@ fn server_module(
         quote! { margaret::framework::http::router::Router::build(#route_entries) }
     };
 
-    let parameter_count = 2 + usize::from(views_parameter.is_some());
-    let too_many_arguments = too_many_arguments_expect(parameter_count);
     let inner_return = quote! {
         ::std::result::Result<
             margaret::framework::http::server_routes::ServerRoutes,
@@ -435,7 +432,6 @@ fn server_module(
         })
     };
     let body = quote! {
-        #too_many_arguments
             #(#handler_bindings)*
 
             #body_value
@@ -444,7 +440,6 @@ fn server_module(
         quote! {
             #(#handler_helpers)*
 
-            #too_many_arguments
             pub(crate) async fn #function_name(
                 container: &super::super::container::Container,
                 #routes_param: &::std::sync::Arc<super::super::routes::Routes>,
@@ -457,7 +452,6 @@ fn server_module(
         quote! {
             #(#handler_helpers)*
 
-            #too_many_arguments
             pub(crate) fn #function_name(
                 container: &super::super::container::Container,
                 #routes_param: &::std::sync::Arc<super::super::routes::Routes>,

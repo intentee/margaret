@@ -1,6 +1,5 @@
 mod canonicalizes_console_argument_types;
 mod compiles_result_aliases;
-mod emits_conditional_too_many_arguments_expectations;
 mod generates_fallible_role_assembly;
 mod keeps_construction_futures_linear;
 mod rejects_invalid_console_argument_types;

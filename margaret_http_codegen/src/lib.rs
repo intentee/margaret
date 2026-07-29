@@ -2087,7 +2087,6 @@ impl Configured {
     fn keeps_the_http_boundary_thin_for_a_configured_responder() {
         let source = source_for(CONSOLE_ARGUMENT_MIXED_CATEGORIES);
 
-        assert!(!source.contains("#[expect("));
         assert!(source.contains("container.configured()"));
         assert!(!source.contains("console_argument_"));
     }
