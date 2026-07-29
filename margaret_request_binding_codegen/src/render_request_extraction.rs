@@ -47,7 +47,7 @@ pub fn render_request_extraction(
                 };
             }
         }
-        RequestBinding::Raw { path_key } => quote! {
+        RequestBinding::RouteParameterValue { path_key } => quote! {
             let #holder = match margaret::framework::http::require_route_parameter::require_route_parameter(
                 #request_local,
                 #path_key,
@@ -97,7 +97,7 @@ pub fn render_request_extraction(
         RequestBinding::AssetBag => quote! {
             let #holder = ::margaret::framework::asset_bag::asset_bag::AssetBag::new();
         },
-        RequestBinding::Bound { .. }
+        RequestBinding::BoundRouteParameter { .. }
         | RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
         | RequestBinding::Next

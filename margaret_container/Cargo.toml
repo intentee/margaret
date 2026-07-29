@@ -11,6 +11,7 @@ margaret_console_argument_codegen = { path = "../margaret_console_argument_codeg
 margaret_generated_module = { path = "../margaret_generated_module" }
 margaret_tag_codegen = { path = "../margaret_tag_codegen" }
 margaret_toposort = { path = "../margaret_toposort" }
+margaret_syn_type_peeling = { path = "../margaret_syn_type_peeling" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

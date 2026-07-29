@@ -6,13 +6,13 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::authenticated_user_providers::authenticated_user_providers;
 use crate::request_binding_error::RequestBindingError;
-use crate::route_parameter_binder::RouteParameterBinder;
-use crate::route_parameter_binders::route_parameter_binders;
+use crate::route_parameter_resolution::RouteParameterResolution;
+use crate::route_parameter_resolutions::route_parameter_resolutions;
 use crate::views_availability::ViewsAvailability;
 
 pub struct BindingRegistries {
     pub authenticated_users: HashMap<CanonicalPath, AuthenticatedUserProvider>,
-    pub route_parameters: HashMap<CanonicalPath, RouteParameterBinder>,
+    pub route_parameters: HashMap<CanonicalPath, RouteParameterResolution>,
     pub views: ViewsAvailability,
 }
 
@@ -26,7 +26,7 @@ impl BindingRegistries {
     ) -> Result<Self, RequestBindingError> {
         let mut registries = Self {
             authenticated_users: HashMap::new(),
-            route_parameters: route_parameter_binders(index)?,
+            route_parameters: route_parameter_resolutions(index)?,
             views,
         };
 

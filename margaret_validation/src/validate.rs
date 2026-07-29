@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::hash::BuildHasher;
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -7,8 +8,9 @@ use validator::Validate;
 use crate::validation_result::ValidationResult;
 
 #[must_use]
-pub fn validate<Model>(data: &BTreeMap<String, String>) -> ValidationResult<Model>
+pub fn validate<Model, FieldHasher>(data: &HashMap<String, String, FieldHasher>) -> ValidationResult<Model>
 where
+    FieldHasher: BuildHasher,
     Model: DeserializeOwned + Validate,
 {
     let value = Value::Object(
@@ -22,7 +24,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
 
     use super::validate;
     use crate::validation_result::ValidationResult;
@@ -35,8 +37,8 @@ mod tests {
         optional: Option<String>,
     }
 
-    fn outcome(data: &BTreeMap<String, String>) -> Result<Sample, &'static str> {
-        match validate::<Sample>(data) {
+    fn outcome(data: &HashMap<String, String>) -> Result<Sample, &'static str> {
+        match validate::<Sample, _>(data) {
             ValidationResult::Valid(sample) => Ok(sample),
             ValidationResult::Invalid(_) => Err("invalid"),
             ValidationResult::Malformed(_) => Err("malformed"),
@@ -45,7 +47,7 @@ mod tests {
 
     #[test]
     fn accepts_valid_fields() {
-        let data = BTreeMap::from([
+        let data = HashMap::from([
             ("required".to_string(), "here".to_string()),
             ("optional".to_string(), "present".to_string()),
         ]);
@@ -57,21 +59,21 @@ mod tests {
 
     #[test]
     fn treats_a_missing_optional_field_as_absent() {
-        let data = BTreeMap::from([("required".to_string(), "here".to_string())]);
+        let data = HashMap::from([("required".to_string(), "here".to_string())]);
 
         assert_eq!(outcome(&data).expect("a valid form").optional, None);
     }
 
     #[test]
     fn reports_a_rule_violation_as_invalid() {
-        let data = BTreeMap::from([("required".to_string(), String::new())]);
+        let data = HashMap::from([("required".to_string(), String::new())]);
 
         assert_eq!(outcome(&data).expect_err("an invalid form"), "invalid");
     }
 
     #[test]
     fn reports_missing_required_data_as_malformed() {
-        let data = BTreeMap::new();
+        let data = HashMap::new();
 
         assert_eq!(outcome(&data).expect_err("a malformed form"), "malformed");
     }

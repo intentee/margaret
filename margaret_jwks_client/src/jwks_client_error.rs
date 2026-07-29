@@ -16,12 +16,6 @@ pub enum JwksClientError {
         source: anyhow::Error,
     },
 
-    #[error("the jwks document has not been fetched from the issuer yet")]
-    NotReady,
-
-    #[error("the token expired before it was verified")]
-    TokenExpired,
-
-    #[error("the token could not be verified against the published jwks: {0}")]
+    #[error("the published jwks could not be used to verify a token: {0}")]
     TokenVerification(#[source] JwksKeyError),
 }

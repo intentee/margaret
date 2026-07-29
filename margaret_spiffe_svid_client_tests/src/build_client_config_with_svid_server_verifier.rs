@@ -13,7 +13,7 @@ pub fn build_client_config_with_svid_server_verifier() -> ClientConfig {
     ClientConfig::builder()
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(
-            SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org".to_string())
+            SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
                 .unwrap(),
         ))
         .with_no_client_auth()

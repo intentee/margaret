@@ -351,12 +351,11 @@ impl RespondsToWebSocketNotification for Typist {
         let index = index_for("#[singleton]\nstruct Known;\n");
         let mut plan = empty_session_plan();
         plan.session.parameters.push(BoundParameter {
-            binding: RequestBinding::Bound {
+            binding: RequestBinding::BoundRouteParameter {
                 binder_field: "missing".to_string(),
                 binder_provider: missing_path(),
                 path_key: "room".to_string(),
             },
-            declared_by_reference: false,
             holder: format_ident!("room"),
         });
 
@@ -599,22 +598,7 @@ impl Room {
 }
 "#;
 
-    const BORROWED_ROUTE_PARAMETER_SESSION: &str = r#"
-#[websocket_session(path = "/room/{topic}", server = "public")]
-struct Room;
 
-impl Room {
-    #[build_for_session]
-    fn build_for_session(#[route_parameter(from = "topic")] topic: &str) -> anyhow::Result<Self> {}
-}
-"#;
-
-    #[test]
-    fn borrows_a_route_parameter_the_session_declared_by_reference() {
-        let source = generated(BORROWED_ROUTE_PARAMETER_SESSION);
-
-        assert!(source.contains("crate::Room::build_for_session(&topic)"));
-    }
 
     #[test]
     fn names_the_factory_handshake_unused_when_no_binding_reads_the_request() {
@@ -1540,6 +1524,28 @@ impl Bad {
     }
 
     #[test]
+    fn extracts_a_route_parameter_value_type_during_the_handshake() {
+        let source = generated(
+            r#"
+#[route_parameter_value]
+struct RoomSlug(String);
+
+#[websocket_session(path = "/rooms/{room_slug}", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build(#[route_parameter(from = "room_slug")] room_slug: RoomSlug) -> anyhow::Result<Self> {}
+}
+"#,
+        );
+
+        assert!(source.contains("require_route_parameter::require_route_parameter"));
+        assert!(source.contains("\"room_slug\""));
+        assert!(source.contains("crate::Room::build(room_slug)"));
+    }
+
+    #[test]
     fn rejects_a_bound_route_parameter_without_a_binder() {
         assert!(
             error(
@@ -1556,7 +1562,7 @@ impl Bad {
 "#
             )
             .to_string()
-            .contains("no #[provides_route_parameter]")
+            .contains("neither declared as a #[route_parameter_value] nor provided by a #[provides_route_parameter]")
         );
     }
 

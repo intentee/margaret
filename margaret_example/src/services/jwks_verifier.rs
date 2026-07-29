@@ -6,6 +6,7 @@ use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 
 use margaret::framework::identity_session::is_expired::IsExpired;
+use margaret::framework::jwks_client::access_token_verification::AccessTokenVerification;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
@@ -51,7 +52,21 @@ impl JwksVerifier {
             .verifier
             .verify::<AccessClaims>("sample.access.token", self.clock.now())
         {
-            Ok(_) => println!("the jwks verifier accepted the sample access token"),
+            Ok(AccessTokenVerification::Verified(_)) => {
+                println!("the jwks verifier accepted the sample access token");
+            }
+            Ok(AccessTokenVerification::Expired) => {
+                println!("the sample access token is expired");
+            }
+            Ok(AccessTokenVerification::Malformed(malformation)) => {
+                println!("the sample access token is malformed: {malformation}");
+            }
+            Ok(AccessTokenVerification::NotReady) => {
+                println!("the jwks document has not been polled yet");
+            }
+            Ok(AccessTokenVerification::SignatureMismatch) => {
+                println!("the sample access token signature does not match a published key");
+            }
             Err(error) => println!("the jwks verifier could not verify the sample token: {error}"),
         }
 

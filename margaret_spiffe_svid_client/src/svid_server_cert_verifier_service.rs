@@ -21,7 +21,7 @@ impl SvidServerCertVerifierService {
     fn update_server_cert_verifier(&self, root_cert_store: Option<RootCertStore>) -> Result<()> {
         if let Some(root_store) = root_cert_store {
             let verifier =
-                SvidServerCertVerifier::new(root_store, self.spiffe_trust_domain.clone())?;
+                SvidServerCertVerifier::new(root_store, &self.spiffe_trust_domain)?;
 
             self.svid_server_cert_verifier_facade
                 .update_internal_verifier(Arc::new(verifier));

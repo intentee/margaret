@@ -200,24 +200,34 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     let root_type = field_type(provider);
     let error = construction_error_path();
 
+    let outcome = if root.is_fallible {
+        quote! { Ok(#root_binding) }
+    } else {
+        quote! { #root_binding }
+    };
     let body = quote! {
             #(#statements)*
 
-            Ok(#root_binding)
+            #outcome
     };
 
     let too_many_lines = too_many_lines_allow();
+    let return_type = if root.is_fallible {
+        quote! { ::std::result::Result<#root_type, #error> }
+    } else {
+        root_type
+    };
     let tokens = if root.is_async {
         quote! {
             #too_many_lines
-            pub(crate) async fn #function(#parameters) -> ::std::result::Result<#root_type, #error> {
+            pub(crate) async fn #function(#parameters) -> #return_type {
                 #body
             }
         }
     } else {
         quote! {
             #too_many_lines
-            pub(crate) fn #function(#parameters) -> ::std::result::Result<#root_type, #error> {
+            pub(crate) fn #function(#parameters) -> #return_type {
                 #body
             }
         }
@@ -279,12 +289,26 @@ pub(crate) fn render_build(
         .collect::<Vec<_>>();
     let error = construction_error_path();
 
+    let serve_is_fallible = construction_roots.iter().any(|entry| entry.is_fallible);
+    let container_literal = quote! {
+        super::super::Container {
+            #(#fields)*
+        }
+    };
+    let serve_outcome = if serve_is_fallible {
+        quote! { Ok(#container_literal) }
+    } else {
+        container_literal
+    };
+    let serve_return = if serve_is_fallible {
+        quote! { ::std::result::Result<super::super::Container, #error> }
+    } else {
+        quote! { super::super::Container }
+    };
     let serve_body = quote! {
             #(#serve_statements)*
 
-            Ok(super::super::Container {
-                #(#fields)*
-            })
+            #serve_outcome
     };
     let serve_too_many_lines = too_many_lines_allow();
     let serve = if construction_roots.iter().any(|entry| entry.is_async) {
@@ -292,7 +316,7 @@ pub(crate) fn render_build(
             #serve_too_many_lines
             pub(crate) async fn serve(
                 #serve_parameters
-            ) -> ::std::result::Result<super::super::Container, #error> {
+            ) -> #serve_return {
                 #serve_body
             }
         }
@@ -301,7 +325,7 @@ pub(crate) fn render_build(
             #serve_too_many_lines
             pub(crate) fn serve(
                 #serve_parameters
-            ) -> ::std::result::Result<super::super::Container, #error> {
+            ) -> #serve_return {
                 #serve_body
             }
         }

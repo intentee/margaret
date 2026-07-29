@@ -58,6 +58,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_spiffe_svid_server \
 	-p margaret_spiffe_svid_server_tests \
 	-p margaret_spiffe_svid_tests \
+	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
 	-p margaret_tag_codegen \
 	-p margaret_token_signer \
@@ -74,6 +75,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_collisions_and_diamonds_fixture \
 	--exclude-from-report margaret_codegen_fallible_roles_fixture \
 	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
+	--exclude-from-report margaret_codegen_route_parameter_values_fixture \
 	--exclude-from-report margaret_codegen_websocket_fixture \
 	--exclude-from-report margaret_self_referential_model_fixture \
 	--exclude-from-report margaret_spiffe_http_client_fixture
@@ -121,6 +123,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_spiffe_svid_bundle \
 	-p margaret_spiffe_svid_client \
 	-p margaret_spiffe_svid_server \
+	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
 	-p margaret_tag_codegen \
 	-p margaret_token_signer \
@@ -229,6 +232,7 @@ coverage: node_modules postgres-image
 		--gated margaret_spiffe_svid_server=100 \
 		--gated margaret_spiffe_svid_server_tests=100 \
 		--gated margaret_spiffe_svid_tests=100 \
+		--gated margaret_syn_type_peeling=100 \
 		--gated margaret_sync_holder=100 \
 		--gated margaret_tag_codegen=100 \
 		--gated margaret_token_signer=100 \

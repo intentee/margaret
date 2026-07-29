@@ -6,6 +6,7 @@ use margaret_identity_session::is_expired::IsExpired;
 use margaret_jwks_keygen::token_verification::TokenVerification;
 use margaret_jwks_keygen::verifies_token::VerifiesToken as _;
 
+use crate::access_token_verification::AccessTokenVerification;
 use crate::jwks_client_error::JwksClientError;
 use crate::public_jwks_holder::PublicJwksHolder;
 
@@ -26,24 +27,31 @@ impl PublicJwksVerifier {
         &self,
         token: &str,
         now: DateTime<Utc>,
-    ) -> Result<TClaims, JwksClientError> {
-        let public_jwks = self
-            .public_jwks_holder
-            .get()
-            .ok_or(JwksClientError::NotReady)?;
+    ) -> Result<AccessTokenVerification<TClaims>, JwksClientError> {
+        let Some(public_jwks) = self.public_jwks_holder.get() else {
+            return Ok(AccessTokenVerification::NotReady);
+        };
 
-        let claims: TClaims = public_jwks
+        let claims: TClaims = match public_jwks
             .verify(token)
-            .and_then(TokenVerification::must)
-            .map_err(JwksClientError::TokenVerification)?;
+            .map_err(JwksClientError::TokenVerification)?
+        {
+            TokenVerification::Malformed(malformation) => {
+                return Ok(AccessTokenVerification::Malformed(malformation));
+            }
+            TokenVerification::SignatureMismatch => {
+                return Ok(AccessTokenVerification::SignatureMismatch);
+            }
+            TokenVerification::Verified(claims) => claims,
+        };
 
         if claims
             .is_expired(now)
             .map_err(|source| JwksClientError::TokenExpiry { source })?
         {
-            return Err(JwksClientError::TokenExpired);
+            return Ok(AccessTokenVerification::Expired);
         }
 
-        Ok(claims)
+        Ok(AccessTokenVerification::Verified(claims))
     }
 }

@@ -18,7 +18,7 @@ pub(crate) async fn respond_recursively(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     use async_trait::async_trait;
@@ -43,7 +43,7 @@ mod tests {
         async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::from(Forward::new(
                 "target",
-                BTreeMap::new(),
+                HashMap::new(),
             )))
         }
     }
@@ -55,7 +55,7 @@ mod tests {
         async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::from(Forward::new(
                 "failing_target",
-                BTreeMap::new(),
+                HashMap::new(),
             )))
         }
     }
@@ -67,7 +67,7 @@ mod tests {
         async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::from(Forward::new(
                 "origin",
-                BTreeMap::new(),
+                HashMap::new(),
             )))
         }
     }
@@ -79,7 +79,7 @@ mod tests {
         async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::from(Forward::new(
                 "unknown",
-                BTreeMap::new(),
+                HashMap::new(),
             )))
         }
     }
@@ -100,7 +100,7 @@ mod tests {
         async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::from(Forward::new(
                 "article",
-                BTreeMap::from([("article".to_string(), "7".to_string())]),
+                HashMap::from([("article".to_string(), "7".to_string())]),
             )))
         }
     }

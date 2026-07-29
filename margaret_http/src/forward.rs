@@ -1,17 +1,17 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 pub struct Forward {
     name: &'static str,
-    path_params: BTreeMap<String, String>,
+    path_params: HashMap<String, String>,
 }
 
 impl Forward {
     #[must_use]
-    pub fn new(name: &'static str, path_params: BTreeMap<String, String>) -> Self {
+    pub fn new(name: &'static str, path_params: HashMap<String, String>) -> Self {
         Self { name, path_params }
     }
 
-    pub(crate) fn into_path_params(self) -> BTreeMap<String, String> {
+    pub(crate) fn into_path_params(self) -> HashMap<String, String> {
         self.path_params
     }
 

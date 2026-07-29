@@ -256,11 +256,6 @@ fn argument_value(
         RequestBinding::Forwarder => {
             quote! { super::super::forwarders::#server::Forwarder }
         }
-        RequestBinding::Raw { .. } if argument.declared_by_reference => {
-            let holder = &argument.holder;
-
-            quote! { &#holder }
-        }
         _ => {
             let holder = &argument.holder;
 

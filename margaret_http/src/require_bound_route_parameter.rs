@@ -27,7 +27,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
 
     use async_trait::async_trait;
     use http::Method;
@@ -65,7 +65,7 @@ mod tests {
 
     fn request_with_parameter(value: &str) -> Request {
         Request::new(Method::GET, "/numbers".to_string())
-            .with_path_params(BTreeMap::from([("number".to_string(), value.to_string())]))
+            .with_path_params(HashMap::from([("number".to_string(), value.to_string())]))
     }
 
     async fn bound_number(request: &Request) -> Option<u32> {

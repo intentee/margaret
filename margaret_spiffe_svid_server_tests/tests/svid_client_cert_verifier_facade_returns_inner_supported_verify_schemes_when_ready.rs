@@ -13,7 +13,7 @@ fn returns_inner_supported_verify_schemes_when_ready() {
 
     let facade = SvidClientCertVerifierFacade::default();
     facade.update_internal_verifier(Arc::new(
-        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org".to_string())
+        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
             .unwrap(),
     ));
 

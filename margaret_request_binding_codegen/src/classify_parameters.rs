@@ -29,7 +29,7 @@ use crate::request_binding_error::RequestBindingError;
 use crate::request_injectable::RequestInjectable;
 use crate::request_input_source::RequestInputSource;
 use crate::route_parameter_arguments::RouteParameterArguments;
-use crate::route_parameter_binder::RouteParameterBinder;
+use crate::route_parameter_resolution::RouteParameterResolution;
 use crate::views_availability::ViewsAvailability;
 
 fn forwarder_path(server: &str) -> CanonicalPath {
@@ -44,18 +44,6 @@ fn forwarder_path(server: &str) -> CanonicalPath {
 
 fn is_forwarder(resolved: Option<&CanonicalPath>, is_reference: bool, server: &str) -> bool {
     resolved == Some(&forwarder_path(server)) && !is_reference
-}
-
-fn borrowed_string_path() -> CanonicalPath {
-    CanonicalPath::new(vec!["str".to_string()])
-}
-
-fn string_path() -> CanonicalPath {
-    CanonicalPath::new(vec![
-        "std".to_string(),
-        "string".to_string(),
-        "String".to_string(),
-    ])
 }
 
 fn body_backed_source(provider: &AuthenticatedUserProvider) -> Option<String> {
@@ -284,7 +272,7 @@ fn classify_route_parameter(
     declared: &Type,
     resolved: Option<&CanonicalPath>,
     position: usize,
-    binders: &HashMap<CanonicalPath, RouteParameterBinder>,
+    resolutions: &HashMap<CanonicalPath, RouteParameterResolution>,
     bound_route_parameters: &mut HashSet<String>,
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
@@ -319,30 +307,30 @@ fn classify_route_parameter(
         });
     }
 
-    if resolved == Some(&string_path()) || resolved == Some(&borrowed_string_path()) {
-        return Ok(RequestBinding::Raw { path_key: from });
+    if matches!(declared, Type::Reference(_)) {
+        return Err(RequestBindingError::RouteParameterByReference {
+            subject: subject.to_string(),
+            parameter: from,
+        });
     }
 
-    let written = declared.to_token_stream().to_string();
-    let model = resolved.ok_or_else(|| RequestBindingError::MissingRouteParameterBinder {
+    let missing = || RequestBindingError::MissingRouteParameterResolution {
         subject: subject.to_string(),
         parameter: from.clone(),
-        written: written.clone(),
-    })?;
-    let binder =
-        binders
-            .get(model)
-            .ok_or_else(|| RequestBindingError::MissingRouteParameterBinder {
-                subject: subject.to_string(),
-                parameter: from.clone(),
-                written,
-            })?;
+        written: declared.to_token_stream().to_string(),
+    };
 
-    Ok(RequestBinding::Bound {
-        binder_field: binder.field.clone(),
-        binder_provider: binder.provider.clone(),
-        path_key: from,
-    })
+    match resolved.and_then(|value_type| resolutions.get(value_type)) {
+        Some(RouteParameterResolution::Value) => {
+            Ok(RequestBinding::RouteParameterValue { path_key: from })
+        }
+        Some(RouteParameterResolution::Binder(binder)) => Ok(RequestBinding::BoundRouteParameter {
+            binder_field: binder.field.clone(),
+            binder_provider: binder.provider.clone(),
+            path_key: from,
+        }),
+        None => Err(missing()),
+    }
 }
 
 fn verify_single_inference(
@@ -365,80 +353,55 @@ fn verify_single_inference(
     Ok(())
 }
 
-/// # Errors
-///
-/// Returns `RequestBindingError::ConflictingArgumentMarkers` or `RequestBindingError::ConflictingAuthenticatedUserMarkers` or `RequestBindingError::MarkedPeerSpiffeIdParameter`.
 struct ParameterMarkers<'marker> {
     authenticated_user: Option<&'marker IndexedAttribute>,
     form_request: Option<&'marker IndexedAttribute>,
-    is_peer_spiffe_id: bool,
-    position: usize,
     route_parameter: Option<&'marker IndexedAttribute>,
-    subject: &'marker str,
 }
 
-fn reject_conflicting_markers(
-    ParameterMarkers {
+fn parameter_markers<'marker>(
+    attributes: &'marker [IndexedAttribute],
+    subject: &str,
+    position: usize,
+    is_peer_spiffe_id: bool,
+) -> Result<ParameterMarkers<'marker>, RequestBindingError> {
+    let marker = |attribute: FrameworkAttribute| {
+        attributes
+            .iter()
+            .find(|candidate| candidate.framework_attribute() == Some(attribute))
+    };
+    let authenticated_user = marker(FrameworkAttribute::AuthenticatedUser);
+    let form_request = marker(FrameworkAttribute::FormRequest);
+    let route_parameter = marker(FrameworkAttribute::RouteParameter);
+
+    if route_parameter.is_some() && form_request.is_some() {
+        return Err(RequestBindingError::ConflictingArgumentMarkers {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if authenticated_user.is_some() && (route_parameter.is_some() || form_request.is_some()) {
+        return Err(RequestBindingError::ConflictingAuthenticatedUserMarkers {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if is_peer_spiffe_id
+        && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
+    {
+        return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    Ok(ParameterMarkers {
         authenticated_user,
         form_request,
-        is_peer_spiffe_id,
-        position,
         route_parameter,
-        subject,
-    }: &ParameterMarkers<'_>,
-) -> Result<(), RequestBindingError> {
-    let authenticated_user = authenticated_user.is_some();
-    let form_request = form_request.is_some();
-    let route_parameter = route_parameter.is_some();
-
-    if route_parameter && form_request {
-        return Err(RequestBindingError::ConflictingArgumentMarkers {
-            subject: (*subject).to_string(),
-            parameter: position.to_string(),
-        });
-    }
-
-    if authenticated_user && (route_parameter || form_request) {
-        return Err(RequestBindingError::ConflictingAuthenticatedUserMarkers {
-            subject: (*subject).to_string(),
-            parameter: position.to_string(),
-        });
-    }
-
-    if *is_peer_spiffe_id && (authenticated_user || route_parameter || form_request) {
-        return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
-            subject: (*subject).to_string(),
-            parameter: position.to_string(),
-        });
-    }
-
-    Ok(())
-}
-
-fn reject_repeated_bindings(
-    bound: &[BoundParameter],
-    subject: &str,
-) -> Result<(), RequestBindingError> {
-    let counts = |matcher: fn(&RequestBinding) -> bool| {
-        bound
-            .iter()
-            .filter(|parameter| matcher(&parameter.binding))
-            .count()
-    };
-
-    if counts(|binding| matches!(binding, RequestBinding::Next)) > 1 {
-        return Err(RequestBindingError::MultipleNextParameters {
-            subject: subject.to_string(),
-        });
-    }
-
-    if counts(|binding| matches!(binding, RequestBinding::PeerSpiffeId)) > 1 {
-        return Err(RequestBindingError::MultiplePeerSpiffeIdParameters {
-            subject: subject.to_string(),
-        });
-    }
-
-    Ok(())
+    })
 }
 
 /// # Errors
@@ -462,34 +425,15 @@ pub fn classify_parameters(
         position,
     } in parameters(method)
     {
-        let authenticated_user = attributes.iter().find(|attribute| {
-            attribute.framework_attribute() == Some(FrameworkAttribute::AuthenticatedUser)
-        });
-        let route_parameter = attributes.iter().find(|attribute| {
-            attribute.framework_attribute() == Some(FrameworkAttribute::RouteParameter)
-        });
-        let form_request = attributes.iter().find(|attribute| {
-            attribute.framework_attribute() == Some(FrameworkAttribute::FormRequest)
-        });
         let resolved = index.resolve_item_type(item, declared);
         let is_reference = matches!(declared, Type::Reference(_));
-        let is_asset_bag = RequestInjectable::AssetBag.matches(resolved.as_ref(), is_reference);
-        let is_current_request =
-            RequestInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference);
-        let is_next = RequestInjectable::Next.matches(resolved.as_ref(), is_reference);
-        let is_peer_spiffe_id =
-            RequestInjectable::PeerSpiffeId.matches(resolved.as_ref(), is_reference);
-        let is_routes = RequestInjectable::Routes.matches(resolved.as_ref(), is_reference);
-        let is_views = RequestInjectable::Views.matches(resolved.as_ref(), is_reference);
-
-        reject_conflicting_markers(&ParameterMarkers {
+        let injectable = RequestInjectable::resolve(resolved.as_ref(), is_reference);
+        let is_peer_spiffe_id = matches!(injectable, Some(RequestInjectable::PeerSpiffeId));
+        let ParameterMarkers {
             authenticated_user,
             form_request,
-            is_peer_spiffe_id,
-            position,
             route_parameter,
-            subject,
-        })?;
+        } = parameter_markers(attributes, subject, position, is_peer_spiffe_id)?;
 
         let binding = if authenticated_user.is_some() {
             classify_authenticated_user(
@@ -512,7 +456,7 @@ pub fn classify_parameters(
                 &registries.route_parameters,
                 &mut bound_route_parameters,
             )?
-        } else if is_next {
+        } else if matches!(injectable, Some(RequestInjectable::Next)) {
             match context {
                 BindingContext::Middleware { .. } => RequestBinding::Next,
                 BindingContext::AuthenticatedUserProvider { .. }
@@ -526,13 +470,13 @@ pub fn classify_parameters(
             }
         } else if is_peer_spiffe_id {
             RequestBinding::PeerSpiffeId
-        } else if is_routes {
+        } else if matches!(injectable, Some(RequestInjectable::Routes)) {
             RequestBinding::Routes
-        } else if is_views {
+        } else if matches!(injectable, Some(RequestInjectable::Views)) {
             classify_views(context, position, registries.views)?
-        } else if is_asset_bag {
+        } else if matches!(injectable, Some(RequestInjectable::AssetBag)) {
             RequestBinding::AssetBag
-        } else if is_current_request {
+        } else if matches!(injectable, Some(RequestInjectable::CurrentRequest)) {
             RequestBinding::CurrentRequest
         } else {
             classify_context_specific(
@@ -546,14 +490,31 @@ pub fn classify_parameters(
             )?
         };
 
-        bound.push(BoundParameter {
-            binding,
-            declared_by_reference: is_reference,
-            holder,
+        bound.push(BoundParameter { binding, holder });
+    }
+
+    let next_count = bound
+        .iter()
+        .filter(|parameter| matches!(parameter.binding, RequestBinding::Next))
+        .count();
+
+    if next_count > 1 {
+        return Err(RequestBindingError::MultipleNextParameters {
+            subject: subject.to_string(),
         });
     }
 
-    reject_repeated_bindings(&bound, subject)?;
+    let peer_spiffe_id_count = bound
+        .iter()
+        .filter(|parameter| matches!(parameter.binding, RequestBinding::PeerSpiffeId))
+        .count();
+
+    if peer_spiffe_id_count > 1 {
+        return Err(RequestBindingError::MultiplePeerSpiffeIdParameters {
+            subject: subject.to_string(),
+        });
+    }
+
     verify_single_inference(&bound, subject)?;
 
     Ok(bound)

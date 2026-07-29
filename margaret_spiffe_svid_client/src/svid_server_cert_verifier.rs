@@ -11,15 +11,12 @@ use rustls::client::danger::HandshakeSignatureValid;
 use rustls::client::danger::ServerCertVerified;
 use rustls::client::danger::ServerCertVerifier;
 use rustls::crypto::CryptoProvider;
+use rustls::crypto::WebPkiSupportedAlgorithms;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::ServerName;
 use rustls::pki_types::UnixTime;
+use spiffe::spiffe_id::TrustDomain;
 use webpki::KeyUsage;
-use webpki::ring::ECDSA_P256_SHA256;
-use webpki::ring::ECDSA_P256_SHA384;
-use webpki::ring::ECDSA_P384_SHA256;
-use webpki::ring::ECDSA_P384_SHA384;
-use webpki::ring::ED25519;
 
 use margaret_spiffe_svid::extract_spiffe_trust_domain::extract_spiffe_trust_domain;
 use margaret_spiffe_svid::reject_tls12_signature::reject_tls12_signature;
@@ -31,17 +28,21 @@ use crate::svid_error::SvidError;
 pub struct SvidServerCertVerifier {
     inner_verifier: Arc<WebPkiServerVerifier>,
     root_store: RootCertStore,
-    spiffe_trust_domain: String,
+    signature_verification_algorithms: WebPkiSupportedAlgorithms,
+    spiffe_trust_domain: TrustDomain,
 }
 
 impl SvidServerCertVerifier {
     /// # Errors
     ///
     /// Returns `SvidError::CryptoProviderNotInstalled` or `SvidError::ServerVerifier`.
-    pub fn new(root_store: RootCertStore, spiffe_trust_domain: String) -> Result<Self, SvidError> {
+    pub fn new(root_store: RootCertStore, spiffe_trust_domain: &str) -> Result<Self, SvidError> {
         let default_crypto_provider =
             CryptoProvider::get_default().ok_or(SvidError::CryptoProviderNotInstalled)?;
-
+        let spiffe_trust_domain = TrustDomain::new(spiffe_trust_domain)
+            .map_err(|source| SvidError::TrustDomain { source })?;
+        let signature_verification_algorithms =
+            default_crypto_provider.signature_verification_algorithms;
         let inner_verifier: Arc<WebPkiServerVerifier> =
             WebPkiServerVerifier::builder_with_provider(
                 Arc::new(root_store.clone()),
@@ -53,6 +54,7 @@ impl SvidServerCertVerifier {
         Ok(Self {
             inner_verifier,
             root_store,
+            signature_verification_algorithms,
             spiffe_trust_domain,
         })
     }
@@ -84,13 +86,7 @@ impl ServerCertVerifier for SvidServerCertVerifier {
 
         end_entity_cert
             .verify_for_usage(
-                &[
-                    ECDSA_P256_SHA256,
-                    ECDSA_P256_SHA384,
-                    ECDSA_P384_SHA256,
-                    ECDSA_P384_SHA384,
-                    ED25519,
-                ],
+                self.signature_verification_algorithms.all,
                 &self.root_store.roots,
                 intermediates,
                 now,

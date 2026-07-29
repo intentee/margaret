@@ -1,5 +1,6 @@
-use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
+use margaret_jwks_keygen::token_malformation::TokenMalformation;
+use margaret_jwks_keygen::token_verification::TokenVerification;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 
@@ -9,5 +10,10 @@ fn public_set_rejects_malformed_token() {
 
     let result = set.verify::<TestClaims>("garbage");
 
-    assert!(matches!(result, Err(JwksKeyError::MalformedCompactJws)));
+    assert!(matches!(
+        result,
+        Ok(TokenVerification::Malformed(
+            TokenMalformation::NotCompactJws
+        ))
+    ));
 }

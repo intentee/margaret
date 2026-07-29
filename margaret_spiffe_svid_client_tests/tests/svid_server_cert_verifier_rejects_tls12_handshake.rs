@@ -26,7 +26,7 @@ fn rejects_tls12_when_used_as_client_server_verifier() {
         .unwrap();
 
     let svid_server_verifier =
-        SvidServerCertVerifier::new(root_store, "example.org".to_string()).unwrap();
+        SvidServerCertVerifier::new(root_store, "example.org").unwrap();
 
     let server_config = ServerConfig::builder_with_protocol_versions(&[&rustls::version::TLS12])
         .with_no_client_auth()

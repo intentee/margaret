@@ -5,8 +5,9 @@ use base64ct::Encoding;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
-use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
+use margaret_jwks_keygen::token_malformation::TokenMalformation;
+use margaret_jwks_keygen::token_verification::TokenVerification;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
 use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
@@ -31,7 +32,12 @@ fn public_set_rejects_kidless_token() -> Result<()> {
     };
     let result = set.verify::<TestClaims>(&kidless);
 
-    assert!(matches!(result, Err(JwksKeyError::HeaderJson { .. })));
+    assert!(matches!(
+        result,
+        Ok(TokenVerification::Malformed(TokenMalformation::HeaderJson(
+            _
+        )))
+    ));
 
     Ok(())
 }

@@ -27,7 +27,8 @@ pub mod request_injectable;
 pub mod request_input_source;
 mod route_parameter_arguments;
 pub mod route_parameter_binder;
-pub mod route_parameter_binders;
+pub mod route_parameter_resolution;
+pub mod route_parameter_resolutions;
 pub mod views_availability;
 
 #[cfg(test)]
@@ -512,7 +513,7 @@ impl SessionUserProvider {
             },
             requirement: AuthenticatedUserRequirement::Required,
         };
-        let bound = RequestBinding::Bound {
+        let bound = RequestBinding::BoundRouteParameter {
             binder_field: "missing".to_string(),
             binder_provider: missing_path(),
             path_key: "id".to_string(),

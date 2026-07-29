@@ -5,7 +5,6 @@ pub mod ca_bundle;
 pub mod extract_ca_bundle;
 pub mod extract_server_credentials;
 pub mod extract_spiffe_trust_domain;
-pub mod extract_spiffe_trust_domain_from_uri;
 pub mod install_default_crypto_provider;
 pub mod reject_tls12_signature;
 pub mod root_cert_store_holder;

@@ -42,12 +42,12 @@ use crate::inferred_column::InferredColumn;
 use crate::model::Model;
 use crate::model_arguments::ModelArguments;
 use crate::model_codegen_error::ModelCodegenError;
-use crate::option_inner::option_inner;
 use crate::positioned_field::PositionedField;
 use crate::resolved_column::ResolvedColumn;
 use crate::resolved_foreign_key::ResolvedForeignKey;
 use crate::resolved_index::ResolvedIndex;
 use crate::resolved_unique_constraint::ResolvedUniqueConstraint;
+use margaret_syn_type_peeling::option_inner::option_inner;
 
 fn field_display(identifier: &FieldIdentifier) -> String {
     match identifier {

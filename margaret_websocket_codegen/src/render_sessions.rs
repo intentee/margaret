@@ -206,9 +206,6 @@ fn build_arguments(session: &WebSocketSession) -> TokenStream {
         match &parameter.binding {
             RequestBinding::Injectable { .. } => quote! { self.#holder.clone() },
             RequestBinding::Routes => quote! { self.#holder.as_ref() },
-            RequestBinding::Raw { .. } if parameter.declared_by_reference => {
-                quote! { &#holder }
-            }
             _ => quote! { #holder },
         }
     });

@@ -43,7 +43,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::Arc;
@@ -92,7 +92,7 @@ mod tests {
             },
         );
         let request = Request::new(Method::GET, "/echo/7".to_string())
-            .with_path_params(BTreeMap::from([("id".to_string(), "7".to_string())]));
+            .with_path_params(HashMap::from([("id".to_string(), "7".to_string())]));
         let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
 
         let response = respond_recursively(&forward_targets, request, handler)

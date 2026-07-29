@@ -18,7 +18,7 @@ fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
         quote! { #parameter: ::std::string::String }
     });
     let path_params = if placeholders.is_empty() {
-        quote! { ::std::collections::BTreeMap::new() }
+        quote! { ::std::collections::HashMap::new() }
     } else {
         let entries = placeholders.iter().map(|placeholder| {
             let parameter = format_ident!("{}", placeholder);
@@ -26,7 +26,7 @@ fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
             quote! { (#placeholder.to_string(), #parameter) }
         });
 
-        quote! { ::std::collections::BTreeMap::from([#(#entries),*]) }
+        quote! { ::std::collections::HashMap::from([#(#entries),*]) }
     };
 
     quote! {

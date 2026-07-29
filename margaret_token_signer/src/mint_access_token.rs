@@ -10,6 +10,7 @@ use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificatio
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen::verifies_any_token::VerifiesAnyToken;
 
+use crate::access_token_minting::AccessTokenMinting;
 use crate::minted_tokens::MintedTokens;
 use crate::token_signer_error::TokenSignerError;
 
@@ -27,21 +28,24 @@ pub async fn mint_access_token(
     secret: &JwksSecret,
     refresh_token: &str,
     now: DateTime<Utc>,
-) -> Result<MintedTokens, TokenSignerError> {
+) -> Result<AccessTokenMinting, TokenSignerError> {
     let verification = secret
         .verify_any::<RefreshTokenClaims>(refresh_token)
-        .map_err(|source| TokenSignerError::UnverifiableRefreshToken { source })?;
+        .map_err(|source| TokenSignerError::RefreshTokenVerification { source })?;
 
     let refresh_claims = match verification {
         JwksSecretVerificationResult::Invalid => {
-            return Err(TokenSignerError::InvalidRefreshToken);
+            return Ok(AccessTokenMinting::UnknownRefreshTokenKey);
+        }
+        JwksSecretVerificationResult::Malformed(malformation) => {
+            return Ok(AccessTokenMinting::MalformedRefreshToken(malformation));
         }
         JwksSecretVerificationResult::SignedWithCurrent(claims)
         | JwksSecretVerificationResult::SignedWithPrevious(claims) => claims,
     };
 
     if refresh_claims.is_expired_at(now) {
-        return Err(TokenSignerError::ExpiredRefreshToken);
+        return Ok(AccessTokenMinting::ExpiredRefreshToken);
     }
 
     let access_claims = refresh_claims.mint_access_token_claims(now);
@@ -52,8 +56,8 @@ pub async fn mint_access_token(
     .await
     .map_err(|source| TokenSignerError::Signing { source })?;
 
-    Ok(MintedTokens {
+    Ok(AccessTokenMinting::Minted(MintedTokens {
         access_token,
         refresh_token,
-    })
+    }))
 }

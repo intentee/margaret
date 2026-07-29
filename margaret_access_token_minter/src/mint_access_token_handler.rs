@@ -6,8 +6,7 @@ use chrono::Utc;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
-use margaret_jwks_secret_store::jwks_secret_store_error::JwksSecretStoreError;
-use margaret_token_signer::token_signer_error::TokenSignerError;
+use margaret_token_signer::access_token_minting::AccessTokenMinting;
 
 use crate::mint_access_token_error::MintAccessTokenError;
 use crate::mint_access_token_request::MintAccessTokenRequest;
@@ -17,15 +16,6 @@ fn error_response(error: &MintAccessTokenError) -> Response {
         MintAccessTokenError::MissingBody | MintAccessTokenError::MalformedRequest { .. } => {
             Response::text(400, "Bad Request")
         }
-        MintAccessTokenError::SecretStore {
-            source:
-                JwksSecretStoreError::Mint {
-                    source:
-                        TokenSignerError::ExpiredRefreshToken
-                        | TokenSignerError::InvalidRefreshToken
-                        | TokenSignerError::UnverifiableRefreshToken { .. },
-                },
-        } => Response::unauthorized(),
         MintAccessTokenError::SecretStore { .. } => Response::text(500, "Internal Server Error"),
     }
 }
@@ -55,13 +45,18 @@ impl MintAccessTokenHandler {
         let MintAccessTokenRequest { refresh_token } =
             MintAccessTokenRequest::from_request(request)?;
 
-        let minted = self
+        let minting = self
             .secret_store
             .mint_access_token(&refresh_token, now)
             .await
             .map_err(|source| MintAccessTokenError::SecretStore { source })?;
 
-        Ok(Response::json(200, &minted))
+        Ok(match minting {
+            AccessTokenMinting::ExpiredRefreshToken
+            | AccessTokenMinting::MalformedRefreshToken(_)
+            | AccessTokenMinting::UnknownRefreshTokenKey => Response::unauthorized(),
+            AccessTokenMinting::Minted(minted) => Response::json(200, &minted),
+        })
     }
 }
 

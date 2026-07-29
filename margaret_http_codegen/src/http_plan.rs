@@ -58,7 +58,7 @@ impl HttpPlan {
 fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
     match binding {
         RequestBinding::AuthenticatedUser { application, .. } => Some(&application.concrete),
-        RequestBinding::Bound {
+        RequestBinding::BoundRouteParameter {
             binder_provider, ..
         } => Some(binder_provider),
         RequestBinding::Injectable { dependency } => Some(&dependency.concrete),
@@ -68,7 +68,7 @@ fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
         | RequestBinding::Forwarder
         | RequestBinding::Next
         | RequestBinding::PeerSpiffeId
-        | RequestBinding::Raw { .. }
+        | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
         | RequestBinding::Views => None,
     }
@@ -127,7 +127,7 @@ mod tests {
     fn identifies_a_route_parameter_binder_as_a_retained_root() {
         let binder_provider =
             CanonicalPath::new(vec!["crate".to_string(), "UserBinder".to_string()]);
-        let binding = RequestBinding::Bound {
+        let binding = RequestBinding::BoundRouteParameter {
             binder_field: "user_binder".to_string(),
             binder_provider: binder_provider.clone(),
             path_key: "user".to_string(),

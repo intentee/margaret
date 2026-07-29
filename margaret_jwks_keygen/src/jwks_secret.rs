@@ -48,6 +48,9 @@ impl VerifiesAnyToken for JwksSecret {
         token: &str,
     ) -> Result<JwksSecretVerificationResult<TClaims>, JwksKeyError> {
         match self.current.public.verify::<TClaims>(token)? {
+            TokenVerification::Malformed(malformation) => {
+                Ok(JwksSecretVerificationResult::Malformed(malformation))
+            }
             TokenVerification::Verified(claims) => {
                 Ok(JwksSecretVerificationResult::SignedWithCurrent(claims))
             }
@@ -56,7 +59,7 @@ impl VerifiesAnyToken for JwksSecret {
                     TokenVerification::Verified(claims) => {
                         Ok(JwksSecretVerificationResult::SignedWithPrevious(claims))
                     }
-                    TokenVerification::SignatureMismatch => {
+                    TokenVerification::Malformed(_) | TokenVerification::SignatureMismatch => {
                         Ok(JwksSecretVerificationResult::Invalid)
                     }
                 }

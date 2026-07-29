@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::handler::Handler;
@@ -6,7 +6,7 @@ use crate::handler::Handler;
 pub(crate) enum RequestRoute {
     Handler {
         handler: Arc<dyn Handler>,
-        path_params: BTreeMap<String, String>,
+        path_params: HashMap<String, String>,
     },
     MethodNotAllowed,
     NotFound,

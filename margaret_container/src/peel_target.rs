@@ -1,28 +1,14 @@
-use syn::GenericArgument;
 use syn::Path;
-use syn::PathArguments;
-use syn::PathSegment;
 use syn::Type;
 use syn::TypeParamBound;
 use syn::TypeTraitObject;
+
+use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
 
 fn peel_arc_inner(inner: &Type) -> Option<Path> {
     match inner {
         Type::Path(type_path) => Some(type_path.path.clone()),
         Type::TraitObject(trait_object) => single_trait_bound(trait_object),
-        _ => None,
-    }
-}
-
-fn single_generic_argument(segment: &PathSegment) -> Option<&Type> {
-    let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
-        return None;
-    };
-
-    let mut arguments = arguments.args.iter();
-
-    match (arguments.next(), arguments.next()) {
-        (Some(GenericArgument::Type(generic_type)), None) => Some(generic_type),
         _ => None,
     }
 }

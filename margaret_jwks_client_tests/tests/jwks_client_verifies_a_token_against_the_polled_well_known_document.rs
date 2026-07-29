@@ -11,6 +11,7 @@ use url::Url;
 
 use margaret_http_tests::mtls_fixture::MtlsFixture;
 use margaret_jwks_client::JwksClient;
+use margaret_jwks_client::access_token_verification::AccessTokenVerification;
 use margaret_jwks_client_tests::running_jwks_server::RunningJwksServer;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
@@ -85,17 +86,17 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
             .await
     });
 
-    let verified_claims = loop {
-        if let Ok(verified_claims) =
+    let verification_outcome = loop {
+        if let Ok(AccessTokenVerification::Verified(verified)) =
             verifier.verify::<TestClaims>(&token, test_instant(1_700_000_000))
         {
-            break verified_claims;
+            break verified;
         }
 
         yield_now().await;
     };
 
-    assert_eq!(verified_claims, claims);
+    assert_eq!(verification_outcome, claims);
 
     cancellation_token.cancel();
     roll_task

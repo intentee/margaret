@@ -204,16 +204,6 @@ impl GetUser {
 }
 "#;
 
-    const BORROWED_ROUTE_PARAMETER: &str = r#"
-#[singleton]
-#[responds_to_http(method = "get", path = "/users/{id}", server = "public")]
-struct GetUser;
-
-impl GetUser {
-    #[process]
-    fn respond(&self, #[route_parameter(from = "id")] id: &str) -> anyhow::Result<Response> {}
-}
-"#;
 
     #[test]
     fn rejects_a_responder_absent_from_the_container_plan() {
@@ -868,6 +858,11 @@ struct PatchArticle;
 impl PatchArticle { #[process] fn respond(&self, #[route_parameter(from = "article")] article: String) -> anyhow::Result<Response> {} }
 
 #[singleton]
+#[responds_to_http(method = "get", name = "get_file", path = "/files/{*rest}", server = "public")]
+struct GetFile;
+impl GetFile { #[process] fn respond(&self, #[route_parameter(from = "rest")] rest: String) -> anyhow::Result<Response> {} }
+
+#[singleton]
 #[responds_to_http(method = "get", path = "/health", server = "internal")]
 struct GetHealth;
 impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
@@ -896,6 +891,15 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             "margaret::framework::http::forwardable_route::ForwardableRoute::new(self.origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/articles/\",),margaret::framework::http::url_segment::UrlSegment::Parameter(margaret::framework::http::url_parameter::UrlParameter{name:\"article\",value:article,}),]),)"
         ));
         assert!(!source.contains("Params"));
+    }
+
+    #[test]
+    fn generates_a_catch_all_segment_for_a_named_wildcard_get() {
+        let source = routes_source_for(ROUTES_FIXTURE);
+
+        assert!(source.contains(
+            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter(margaret::framework::http::url_parameter::UrlParameter{name:\"rest\",value:rest,})"
+        ));
     }
 
     #[test]
@@ -1139,12 +1143,6 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains("responder.respond(id)"));
     }
 
-    #[test]
-    fn borrows_a_route_parameter_the_responder_declared_by_reference() {
-        let source = source_for(BORROWED_ROUTE_PARAMETER);
-
-        assert!(source.contains("responder.respond(&id)"));
-    }
 
     #[test]
     fn awaits_a_responder_that_declares_an_asynchronous_process_method() {
@@ -1153,6 +1151,50 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(source.contains("responder.respond().await"));
+    }
+
+    #[test]
+    fn injects_distinct_route_parameter_value_types_into_the_responder() {
+        let source = source_for(
+            r#"
+#[route_parameter_value]
+struct ProjectSlug(String);
+
+#[route_parameter_value]
+struct ProjectId(String);
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/projects/{project_slug}/{project_id}", server = "public")]
+struct GetProject;
+
+impl GetProject {
+    #[process]
+    fn respond(
+        &self,
+        #[route_parameter(from = "project_slug")] project_slug: ProjectSlug,
+        #[route_parameter(from = "project_id")] project_id: ProjectId,
+    ) -> anyhow::Result<Response> {}
+}
+"#,
+        );
+
+        assert!(source.contains(
+            r#"letproject_slug=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"project_slug""#
+        ));
+        assert!(source.contains(
+            r#"letproject_id=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"project_id""#
+        ));
+        assert!(source.contains("responder.respond(project_slug,project_id)"));
+        assert!(!source.contains("responder.respond(project_slug,project_id).await"));
+    }
+
+    #[test]
+    fn rejects_a_route_parameter_taken_by_reference() {
+        let message = error_for(
+            "#[route_parameter_value]\nstruct ProjectSlug(String);\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/projects/{slug}\", server = \"public\")]\nstruct GetProject;\nimpl GetProject {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"slug\")] slug: &ProjectSlug) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert!(message.contains("is taken by reference"));
     }
 
     #[test]
@@ -1272,7 +1314,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 #[responds_to_http(method = \"get\", path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"thing\")] thing: Unknown) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("no #[provides_route_parameter]"));
+        assert!(message.contains("neither declared as a #[route_parameter_value] nor provided by a #[provides_route_parameter]"));
     }
 
     #[test]
@@ -1310,7 +1352,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 #[responds_to_http(method = \"get\", path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("no #[provides_route_parameter]"));
+        assert!(message.contains("neither declared as a #[route_parameter_value] nor provided by a #[provides_route_parameter]"));
     }
 
     #[test]

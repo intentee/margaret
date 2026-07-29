@@ -36,7 +36,7 @@ fn client_presents_cert_resolved_through_holder() {
     let client_config = ClientConfig::builder()
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(
-            SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org".to_string())
+            SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
                 .unwrap(),
         ))
         .with_client_cert_resolver(Arc::new(holder));

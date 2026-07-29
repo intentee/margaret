@@ -23,8 +23,7 @@ pub fn build_mtls_client_config(
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(
             SvidServerCertVerifier::new(
-                build_root_cert_store_with_ca(),
-                spiffe_trust_domain.to_string(),
+                build_root_cert_store_with_ca(), spiffe_trust_domain,
             )
             .unwrap(),
         ))

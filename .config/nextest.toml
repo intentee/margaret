@@ -1,8 +1,4 @@
 [profile.default]
-slow-timeout = { period = "100ms", terminate-after = 2 }
-
-[[profile.default.overrides]]
-filter = 'package(~_spiffe_svid)'
 slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]

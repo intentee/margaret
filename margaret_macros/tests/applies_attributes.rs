@@ -9,6 +9,7 @@ use margaret_macros::provides_jwks_endpoint;
 use margaret_macros::provides_route_parameter;
 use margaret_macros::renders_view;
 use margaret_macros::responds_to_http;
+use margaret_macros::route_parameter_value;
 use margaret_macros::scheduled_with_tick_timer;
 use margaret_macros::service;
 use margaret_macros::singleton;
@@ -49,6 +50,9 @@ struct Binder {
 
 #[provides_jwks_endpoint]
 struct JwksEndpoint;
+
+#[route_parameter_value]
+struct SubjectId(String);
 
 impl Binder {
     fn bind(&self, value: &str) -> String {
@@ -99,6 +103,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
         "bind-bound"
     );
 
+    assert_eq!(SubjectId("7".to_string()).0, "7");
     assert_eq!(size_of::<JwksEndpoint>(), 0);
     assert_eq!(size_of::<Worker>(), 0);
 

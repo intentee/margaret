@@ -19,6 +19,14 @@ impl Curve {
             Self::P384 => JwsAlgorithm::Es384,
         }
     }
+
+    #[must_use]
+    pub fn coordinate_bytes(self) -> usize {
+        match self {
+            Self::P256 => p256::FieldBytes::default().len(),
+            Self::P384 => p384::FieldBytes::default().len(),
+        }
+    }
 }
 
 #[cfg(test)]
