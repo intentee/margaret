@@ -190,6 +190,9 @@ fn render_role_modules(
     })
 }
 
+/// # Errors
+///
+/// Returns `CodegenError` propagated from the work it performs.
 pub fn build(
     crate_root: &CrateRoot,
     metafile_contents: Option<&str>,
