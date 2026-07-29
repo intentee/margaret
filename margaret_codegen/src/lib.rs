@@ -1,4 +1,3 @@
-mod application_features;
 mod asset_bag_modules;
 mod asset_responder_canonical_path;
 mod assets_directory_name;
@@ -8,6 +7,7 @@ pub mod codegen_error;
 mod format_pass;
 pub mod generate;
 pub mod generated_code;
+mod generated_feature;
 mod generated_features;
 mod jwks_artifacts;
 mod jwks_client_canonical_path;

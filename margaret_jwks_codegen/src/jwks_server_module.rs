@@ -1,6 +1,26 @@
+use std::collections::BTreeSet;
+
+use crate::jwks_server_part::JwksServerPart;
+
+#[derive(Default)]
 pub struct JwksServerModule {
-    pub has_handler: bool,
-    pub has_minter: bool,
-    pub has_roller: bool,
-    pub has_secret_store: bool,
+    present: BTreeSet<JwksServerPart>,
+}
+
+impl JwksServerModule {
+    #[must_use]
+    pub fn contains(&self, part: JwksServerPart) -> bool {
+        self.present.contains(&part)
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.present.is_empty()
+    }
+
+    pub fn enable_if(&mut self, part: JwksServerPart, present: bool) {
+        if present {
+            self.present.insert(part);
+        }
+    }
 }

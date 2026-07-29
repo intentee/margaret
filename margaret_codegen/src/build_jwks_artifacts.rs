@@ -1,6 +1,7 @@
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_jwks_codegen::jwks_client_module::JwksClientModule;
 use margaret_jwks_codegen::jwks_server_module::JwksServerModule;
+use margaret_jwks_codegen::jwks_server_part::JwksServerPart;
 use margaret_jwks_codegen::render_jwks::render_jwks;
 use margaret_tag_codegen::jwks_client_binding::JwksClientBinding;
 
@@ -17,12 +18,24 @@ pub(crate) fn build_jwks_artifacts(
     bindings: &ContainerBindings,
     client_bindings: &[JwksClientBinding],
 ) -> JwksArtifacts {
-    let server = JwksServerModule {
-        has_handler: bindings.provides(&public_jwks_handler_canonical_path()),
-        has_minter: bindings.provides(&mint_access_token_handler_canonical_path()),
-        has_roller: bindings.provides(&jwks_roller_canonical_path()),
-        has_secret_store: bindings.provides(&server_secret_store_canonical_path()),
-    };
+    let mut server = JwksServerModule::default();
+
+    server.enable_if(
+        JwksServerPart::Handler,
+        bindings.provides(&public_jwks_handler_canonical_path()),
+    );
+    server.enable_if(
+        JwksServerPart::Minter,
+        bindings.provides(&mint_access_token_handler_canonical_path()),
+    );
+    server.enable_if(
+        JwksServerPart::Roller,
+        bindings.provides(&jwks_roller_canonical_path()),
+    );
+    server.enable_if(
+        JwksServerPart::SecretStore,
+        bindings.provides(&server_secret_store_canonical_path()),
+    );
 
     let clients: Vec<JwksClientModule> = client_bindings
         .iter()
@@ -35,9 +48,7 @@ pub(crate) fn build_jwks_artifacts(
         })
         .collect();
     let services = jwks_framework_services(bindings, client_bindings);
-    let any_server =
-        server.has_handler || server.has_minter || server.has_roller || server.has_secret_store;
-    let enabled = any_server || !clients.is_empty();
+    let enabled = !server.is_empty() || !clients.is_empty();
     let modules = if enabled {
         render_jwks(&server, &clients)
     } else {

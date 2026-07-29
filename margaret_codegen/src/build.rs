@@ -10,12 +10,12 @@ use margaret_request_binding_codegen::render_authenticated_user_wrappers::render
 use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 use margaret_tag_codegen::tag_pool::TagPool;
 
-use crate::application_features::ApplicationFeatures;
 use crate::asset_bag_modules::asset_bag_modules;
 use crate::build_jwks_artifacts::build_jwks_artifacts;
 use crate::codegen_error::CodegenError;
 use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
+use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
 use crate::serve_arguments::serve_arguments;
 use crate::umbrella::umbrella;
@@ -34,7 +34,7 @@ pub fn build(
         .exclude_root_module(UMBRELLA_MODULE_NAME)
         .index_crate(crate_root)?
         .build();
-    let features = ApplicationFeatures::from_index(&index);
+    let mut features = GeneratedFeatures::from_index(&index);
     let registry = margaret_console_argument_codegen::scan::scan(&index)?;
     let client_bindings = TagPool::collect(&index)
         .map_err(ContainerError::from)?
@@ -60,7 +60,7 @@ pub fn build(
     )?;
     let bindings = planned_container.bindings();
     let application_roots = planned_container.roots();
-    let has_asset_bag = metafile_contents.is_some();
+    features.enable_if(GeneratedFeature::AssetBag, metafile_contents.is_some());
     let mut module_tokens = asset_bag_modules(
         metafile_contents.as_deref(),
         bindings,
@@ -68,21 +68,29 @@ pub fn build(
         embed_relative,
     )?;
     let jwks = build_jwks_artifacts(bindings, &client_bindings);
+
+    features.enable_if(GeneratedFeature::Jwks, jwks.enabled);
     module_tokens.extend(jwks.modules);
 
-    let views_availability = if features.has_views {
+    let views_availability = if features.contains(GeneratedFeature::Views) {
         ViewsAvailability::Available
     } else {
         ViewsAvailability::Unavailable
     };
     let registries = BindingRegistries::collect(&index, views_availability)?;
-    if features.has_authenticated_users && (features.has_http || features.has_websockets) {
+    if features.contains(GeneratedFeature::AuthenticatedUsers)
+        && (features.contains(GeneratedFeature::Http)
+            || features.contains(GeneratedFeature::Websockets))
+    {
         module_tokens.extend(render_authenticated_user_wrappers(&registries.providers()));
     }
 
     let middleware_plans =
         margaret_middleware_codegen::middleware_plans::middleware_plans(&index, &registries)?;
-    if features.has_middleware && (features.has_http || features.has_websockets) {
+    if features.contains(GeneratedFeature::Middleware)
+        && (features.contains(GeneratedFeature::Http)
+            || features.contains(GeneratedFeature::Websockets))
+    {
         module_tokens.extend(
             margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers(
                 &middleware_plans,
@@ -91,7 +99,7 @@ pub fn build(
     }
 
     let (websocket_roots, websocket_servers, websocket_server_arguments) =
-        if features.has_websockets {
+        if features.contains(GeneratedFeature::Websockets) {
             let plan = margaret_websocket_codegen::web_socket_plan::WebSocketPlan::build(
                 &index,
                 bindings,
@@ -111,7 +119,7 @@ pub fn build(
             (Vec::new(), Vec::new(), BTreeMap::new())
         };
 
-    let view_roots = if features.has_views {
+    let view_roots = if features.contains(GeneratedFeature::Views) {
         let plan = margaret_views_codegen::views_plan::ViewsPlan::build(&index, bindings)?;
         let artifacts = margaret_views_codegen::render_views::render_views(plan, bindings);
         module_tokens.extend(artifacts.modules);
@@ -121,10 +129,12 @@ pub fn build(
         Vec::new()
     };
 
-    let (http_roots, servers) = if features.has_http || features.has_websockets {
+    let (http_roots, servers) = if features.contains(GeneratedFeature::Http)
+        || features.contains(GeneratedFeature::Websockets)
+    {
         let plan = margaret_http_codegen::http_plan::HttpPlan::build(
             &index,
-            features.has_views,
+            features.contains(GeneratedFeature::Views),
             &websocket_servers,
             &middleware_plans,
             bindings,
@@ -148,28 +158,28 @@ pub fn build(
     )?;
     let service_roots = service_plan.roots().to_vec();
 
-    if features.serves {
+    if features.contains(GeneratedFeature::Serves) {
         module_tokens.push(margaret_service_codegen::render_services::render_services(
             &service_plan,
             &servers,
-            features.has_views,
+            features.contains(GeneratedFeature::Views),
             bindings,
         ));
     }
 
-    if features.has_models {
+    if features.contains(GeneratedFeature::Models) {
         let models = margaret_model_codegen::models::models(&index)?;
         module_tokens.push(margaret_schema_codegen::render_schema::render_schema(
             &models,
         ));
     }
 
-    let console_roots = if features.has_console {
+    let console_roots = if features.contains(GeneratedFeature::Console) {
         let plan = margaret_console_codegen::console_plan::ConsolePlan::build(&index, bindings)?;
         let console = margaret_console_codegen::render_console::render_console(
             &plan,
-            features.serves,
-            features.has_models,
+            features.contains(GeneratedFeature::Serves),
+            features.contains(GeneratedFeature::Models),
             &servers,
             &serve_arguments,
             bindings,
@@ -195,18 +205,7 @@ pub fn build(
             format_pass(module_tokens)
                 .map_err(CodegenError::from)
                 .map(|mut modules| {
-                    modules.push(umbrella(GeneratedFeatures {
-                        has_asset_bag,
-                        has_authenticated_users: features.has_authenticated_users,
-                        has_console: features.has_console,
-                        has_http: features.has_http,
-                        has_jwks: jwks.enabled,
-                        has_middleware: features.has_middleware,
-                        has_models: features.has_models,
-                        has_views: features.has_views,
-                        has_websockets: features.has_websockets,
-                        serves: features.serves,
-                    }));
+                    modules.push(umbrella(&features));
 
                     GeneratedCode::new(modules)
                 })
