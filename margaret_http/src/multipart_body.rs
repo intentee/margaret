@@ -93,29 +93,25 @@ impl MultipartBody {
                 .content_type()
                 .map(|media| media.essence_str().to_string());
 
-            match file_name {
-                Some(file_name) => {
-                    let directory = match upload_config {
-                        UploadConfig::Enabled { directory, .. } => directory,
-                        UploadConfig::Disabled => return Err(RequestError::UploadsDisabled),
-                    };
-                    let content_type = content_type.unwrap_or_else(|| {
-                        mime::APPLICATION_OCTET_STREAM.essence_str().to_string()
-                    });
+            if let Some(file_name) = file_name {
+                let directory = match upload_config {
+                    UploadConfig::Enabled { directory, .. } => directory,
+                    UploadConfig::Disabled => return Err(RequestError::UploadsDisabled),
+                };
+                let content_type = content_type
+                    .unwrap_or_else(|| mime::APPLICATION_OCTET_STREAM.essence_str().to_string());
 
-                    files.push(
-                        stream_field_to_file(field, field_name, file_name, content_type, directory)
-                            .await?,
-                    );
-                }
-                None => {
-                    let value = field.text().await.map_err(map_multipart_error)?;
+                files.push(
+                    stream_field_to_file(field, field_name, file_name, content_type, directory)
+                        .await?,
+                );
+            } else {
+                let value = field.text().await.map_err(map_multipart_error)?;
 
-                    post.push(FormField {
-                        name: field_name,
-                        value,
-                    });
-                }
+                post.push(FormField {
+                    name: field_name,
+                    value,
+                });
             }
         }
 

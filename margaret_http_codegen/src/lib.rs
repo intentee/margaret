@@ -769,8 +769,7 @@ impl Health {
                 .source()
                 .to_string()
         })
-        .collect::<Vec<String>>()
-        .join("")
+        .collect::<String>()
         .split_whitespace()
         .collect()
     }

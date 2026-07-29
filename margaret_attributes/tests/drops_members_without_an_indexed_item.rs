@@ -21,14 +21,14 @@ fn drops_members_without_an_indexed_item() {
         !index
             .items()
             .iter()
-            .flat_map(|item| item.methods())
+            .flat_map(margaret_attributes::indexed_item::IndexedItem::methods)
             .any(|method| method.identifier() == "orphaned_method")
     );
     assert!(
         !index
             .items()
             .iter()
-            .flat_map(|item| item.methods())
+            .flat_map(margaret_attributes::indexed_item::IndexedItem::methods)
             .any(|method| method.identifier() == "skipped_imported_method")
     );
 }

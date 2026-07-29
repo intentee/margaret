@@ -79,7 +79,7 @@ mod tests {
     fn entries(tree: syn::ItemUse, module_path: &[&str]) -> Vec<(String, String)> {
         let module: Vec<String> = module_path
             .iter()
-            .map(|segment| segment.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
 
         flatten_use_tree(&tree.tree, &module)

@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn canonicalizes_imported_ticker_paths_before_rendering() {
         let source = rendered(
-            r#"
+            r"
 mod schedule {}
 
 use crate::schedule as cadence;
@@ -191,7 +191,7 @@ impl Flusher {
     #[process]
     fn run(&self) -> anyhow::Result<()> {}
 }
-"#,
+",
             &[],
         );
 

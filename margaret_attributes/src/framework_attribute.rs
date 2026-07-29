@@ -148,7 +148,12 @@ mod tests {
     use super::FrameworkAttribute;
 
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
+        CanonicalPath::new(
+            segments
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
+        )
     }
 
     #[test]

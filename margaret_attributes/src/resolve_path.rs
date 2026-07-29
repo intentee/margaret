@@ -85,7 +85,12 @@ mod tests {
     use super::resolve_path;
 
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
+        CanonicalPath::new(
+            segments
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
+        )
     }
 
     fn resolved(
@@ -94,7 +99,10 @@ mod tests {
         imports: &ModuleImports,
         items: &HashSet<CanonicalPath>,
     ) -> Option<String> {
-        let module_path: Vec<String> = module.iter().map(|segment| segment.to_string()).collect();
+        let module_path: Vec<String> = module
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
 
         resolve_path(&written, &module_path, imports, items).map(|resolved| resolved.to_string())
     }

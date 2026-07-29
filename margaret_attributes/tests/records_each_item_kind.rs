@@ -11,7 +11,11 @@ fn records_each_item_kind() {
         .index_crate(&CrateRoot::new("valid_crate", &directory))
         .expect("the valid fixture indexes cleanly")
         .build();
-    let kinds: Vec<ItemKind> = index.items().iter().map(|item| item.kind()).collect();
+    let kinds: Vec<ItemKind> = index
+        .items()
+        .iter()
+        .map(margaret_attributes::indexed_item::IndexedItem::kind)
+        .collect();
 
     assert!(kinds.iter().any(ItemKind::is_struct));
     assert!(kinds.contains(&ItemKind::Enum));

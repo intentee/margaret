@@ -13,7 +13,7 @@ fn skips_trait_impl_methods() {
     let has_trait_method = index
         .items()
         .iter()
-        .flat_map(|item| item.methods())
+        .flat_map(margaret_attributes::indexed_item::IndexedItem::methods)
         .any(|method| method.identifier() == "skipped_trait_method");
 
     assert!(!has_trait_method);

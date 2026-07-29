@@ -48,9 +48,7 @@ fn concrete_roles() -> [FrameworkAttribute; 4] {
     ]
 }
 
-fn build_drafts<'index>(
-    index: &'index AttributeIndex,
-) -> Result<DraftedContainer<'index>, ContainerError> {
+fn build_drafts(index: &AttributeIndex) -> Result<DraftedContainer<'_>, ContainerError> {
     let mut provider_drafts: Vec<Draft> = Vec::new();
 
     for matched in index.select_framework_attribute(FrameworkAttribute::Singleton) {

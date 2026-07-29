@@ -372,7 +372,7 @@ struct Room;
     fn concatenated(code: &GeneratedCode) -> String {
         code.modules()
             .iter()
-            .map(|module| module.source())
+            .map(margaret_generated_module::generated_module::GeneratedModule::source)
             .collect::<Vec<&str>>()
             .join("\n")
     }

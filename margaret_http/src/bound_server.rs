@@ -240,7 +240,7 @@ fn peer_identity_from_tls_stream(tls_stream: &TlsStream<TcpStream>) -> PeerIdent
             .1
             .peer_certificates()
             .and_then(|certificates| certificates.first())
-            .map(|certificate| certificate.as_ref()),
+            .map(std::convert::AsRef::as_ref),
     )
 }
 

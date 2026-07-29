@@ -225,8 +225,7 @@ impl RespondsToWebSocketNotification for Typist {
                     .split_whitespace()
                     .collect::<String>()
             })
-            .collect::<Vec<String>>()
-            .join("")
+            .collect::<String>()
     }
 
     fn error(source: &str) -> WebSocketCodegenError {
@@ -780,7 +779,7 @@ impl Guard {
     #[test]
     fn rejects_a_message_that_is_not_a_struct() {
         assert!(
-            error(r#"#[websocket_message(response)] enum Bad {}"#)
+            error(r"#[websocket_message(response)] enum Bad {}")
                 .to_string()
                 .contains("carries #[websocket_message]")
         );
@@ -803,7 +802,7 @@ impl Guard {
     #[test]
     fn rejects_a_request_without_a_method() {
         assert!(
-            error(r#"#[websocket_message(request, response = single)] struct Bad;"#)
+            error(r"#[websocket_message(request, response = single)] struct Bad;")
                 .to_string()
                 .contains("missing the required 'method'")
         );
@@ -835,7 +834,7 @@ impl Guard {
     #[test]
     fn rejects_a_response_without_a_method() {
         assert!(
-            error(r#"#[websocket_message(response)] struct Bad;"#)
+            error(r"#[websocket_message(response)] struct Bad;")
                 .to_string()
                 .contains("missing the required 'method'")
         );
@@ -1794,7 +1793,7 @@ impl BetaSession {
     #[test]
     fn propagates_a_non_string_request_method() {
         assert!(
-            error(r#"#[websocket_message(request, method = 5, response = single)] struct Bad;"#)
+            error(r"#[websocket_message(request, method = 5, response = single)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );
@@ -1803,7 +1802,7 @@ impl BetaSession {
     #[test]
     fn rejects_a_notification_without_a_method() {
         assert!(
-            error(r#"#[websocket_message(notification)] struct Bad;"#)
+            error(r"#[websocket_message(notification)] struct Bad;")
                 .to_string()
                 .contains("missing the required 'method'")
         );
@@ -1812,7 +1811,7 @@ impl BetaSession {
     #[test]
     fn rejects_a_response_that_declares_a_cardinality() {
         assert!(
-            error(r#"#[websocket_message(response, response = single)] struct Bad;"#)
+            error(r"#[websocket_message(response, response = single)] struct Bad;")
                 .to_string()
                 .contains("declares a response cardinality but is not a request")
         );
@@ -1821,7 +1820,7 @@ impl BetaSession {
     #[test]
     fn propagates_a_non_string_response_method() {
         assert!(
-            error(r#"#[websocket_message(response, method = 5)] struct Bad;"#)
+            error(r"#[websocket_message(response, method = 5)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );
@@ -1830,7 +1829,7 @@ impl BetaSession {
     #[test]
     fn propagates_malformed_message_arguments() {
         assert!(
-            error(r#"#[websocket_message(= 5)] struct Bad;"#)
+            error(r"#[websocket_message(= 5)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );
@@ -1839,7 +1838,7 @@ impl BetaSession {
     #[test]
     fn propagates_malformed_session_arguments() {
         assert!(
-            error(r#"#[websocket_session(= 5)] struct Bad;"#)
+            error(r"#[websocket_session(= 5)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );

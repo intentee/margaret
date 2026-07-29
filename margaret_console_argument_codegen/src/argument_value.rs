@@ -25,12 +25,10 @@ fn value_expression(
         };
 
         required_flag_read(&value_type, id, &present)
+    } else if is_copy {
+        quote! { matches.get_one::<#value_type>(#id).copied() }
     } else {
-        if is_copy {
-            quote! { matches.get_one::<#value_type>(#id).copied() }
-        } else {
-            quote! { matches.get_one::<#value_type>(#id).cloned() }
-        }
+        quote! { matches.get_one::<#value_type>(#id).cloned() }
     }
 }
 
@@ -78,7 +76,12 @@ mod tests {
     use super::argument_value;
 
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
+        CanonicalPath::new(
+            segments
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
+        )
     }
 
     fn collapsed(argument: &ConsoleArgument) -> String {

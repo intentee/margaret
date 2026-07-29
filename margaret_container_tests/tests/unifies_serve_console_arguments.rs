@@ -23,7 +23,10 @@ fn unifies_serve_console_arguments_across_roots() {
     let serve = bindings
         .serve_arguments(&[path("Config"), path("Service")], &[])
         .expect("the service roots have complete console argument plans");
-    let names: Vec<&str> = serve.iter().map(|argument| argument.name()).collect();
+    let names: Vec<&str> = serve
+        .iter()
+        .map(margaret_console_argument_codegen::console_argument::ConsoleArgument::name)
+        .collect();
 
     assert_eq!(serve.len(), 2);
     assert!(names.contains(&"path"));

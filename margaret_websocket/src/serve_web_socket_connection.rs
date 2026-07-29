@@ -137,7 +137,7 @@ async fn run_source<Io, Session>(
                     }
                     Err(_) => break,
                 },
-                Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                Some(Ok(Message::Close(_)) | Err(_)) | None => break,
                 Some(Ok(_)) => {}
             },
         }

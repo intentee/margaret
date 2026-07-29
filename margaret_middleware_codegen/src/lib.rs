@@ -113,7 +113,7 @@ mod tests {
         failure.expect("the layers fail to resolve").to_string()
     }
 
-    const GUARD: &str = r#"
+    const GUARD: &str = r"
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -124,7 +124,7 @@ impl Guard {
     #[process]
     fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
-"#;
+";
 
     #[test]
     fn generates_a_wrapper_that_forwards_to_the_process_method() {
@@ -141,7 +141,7 @@ impl Guard {
     #[test]
     fn awaits_a_middleware_that_declares_an_asynchronous_process_method() {
         let source = wrappers_for(
-            r#"
+            r"
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -152,7 +152,7 @@ impl Guard {
     #[process]
     async fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(source.contains("self.inner.process(request,next).await"));
@@ -432,7 +432,7 @@ struct Site;
     #[test]
     fn extracts_a_validation_result_form_request_in_a_middleware() {
         let source = wrappers_for(
-            r#"
+            r"
 use margaret::framework::http::next::Next;
 use margaret::framework::validation::validation_result::ValidationResult;
 
@@ -443,7 +443,7 @@ impl Guard {
     #[process]
     fn process(&self, #[form_request(from = Json)] data: ValidationResult<Data>, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(source.contains(
@@ -463,7 +463,7 @@ impl Guard {
     #[test]
     fn extracts_a_bare_model_form_request_in_a_middleware() {
         let source = wrappers_for(
-            r#"
+            r"
 #[handles_middleware_attribute(attribute = guard)]
 struct Guard;
 
@@ -471,7 +471,7 @@ impl Guard {
     #[process]
     fn process(&self, #[form_request(from = Form)] data: Data) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(source.contains(
@@ -493,7 +493,7 @@ impl Guard {
     #[test]
     fn extracts_a_form_request_alongside_the_request_and_next_in_a_middleware() {
         let source = wrappers_for(
-            r#"
+            r"
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -504,7 +504,7 @@ impl Guard {
     #[process]
     fn process(&self, request: &Request, #[form_request(from = Query)] filters: Filters, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(
@@ -521,7 +521,7 @@ impl Guard {
     #[test]
     fn injects_the_views_reference_into_the_wrapper() {
         let source = wrappers_for(
-            r#"
+            r"
 use margaret::framework::http::next::Next;
 
 #[handles_middleware_attribute(attribute = traced)]
@@ -531,7 +531,7 @@ impl Tracer {
     #[process]
     fn process(&self, next: Next, views: &crate::margaret::views::Views) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(source.contains(
@@ -543,7 +543,7 @@ impl Tracer {
     #[test]
     fn disambiguates_wrapper_parameters_named_request_and_next() {
         let source = wrappers_for(
-            r#"
+            r"
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -554,7 +554,7 @@ impl Guard {
     #[process]
     fn process(&self, next: &Request, #[form_request(from = Form)] request: Data, following: Next) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(source.contains(

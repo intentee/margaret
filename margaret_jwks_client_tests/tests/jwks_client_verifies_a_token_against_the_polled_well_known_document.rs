@@ -67,7 +67,7 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
         .use_preconfigured_tls(ClientConfig::clone(&fixture.client_config))
         .https_only(true)
         .redirect(Policy::none())
-        .timeout(Duration::from_secs(60));
+        .timeout(Duration::from_mins(1));
     let jwks_url = Url::parse(&format!(
         "https://{}:{}{}",
         fixture.server_name,

@@ -41,8 +41,7 @@ pub fn serve_application(
             UploadConfig::enabled(
                 matches
                     .get_one::<String>(upload_dir_argument)
-                    .map(PathBuf::from)
-                    .unwrap_or_else(std::env::temp_dir),
+                    .map_or_else(std::env::temp_dir, PathBuf::from),
             )
         } else {
             UploadConfig::Disabled

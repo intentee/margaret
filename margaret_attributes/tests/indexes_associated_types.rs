@@ -38,7 +38,7 @@ fn indexes_associated_types() {
     let names: Vec<&str> = produces
         .associated_types()
         .iter()
-        .map(|associated_type| associated_type.name())
+        .map(margaret_attributes::indexed_associated_type::IndexedAssociatedType::name)
         .collect();
 
     assert_eq!(names, ["Extra", "Output"]);
