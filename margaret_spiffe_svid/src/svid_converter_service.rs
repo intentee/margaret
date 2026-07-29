@@ -38,7 +38,7 @@ impl SvidConverterService {
         self.svid_certified_key_holder
             .set(Some(Arc::new(extract_server_credentials(default_svid)?)));
         self.ca_bundle_tx
-            .send(extract_ca_bundle(default_svid, &x509_context)?.into())?;
+            .send(extract_ca_bundle(default_svid, x509_context)?.into())?;
 
         Ok(())
     }

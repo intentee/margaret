@@ -26,7 +26,7 @@ use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 /// Returns `CodegenError` propagated from the work it performs.
 pub fn build(
     crate_root: &CrateRoot,
-    metafile_contents: Option<String>,
+    metafile_contents: Option<&str>,
     assets_directory: &Path,
     embed_relative: &str,
 ) -> Result<GeneratedCode, CodegenError> {
@@ -412,10 +412,7 @@ struct Room;
 
         let code = build(
             &CrateRoot::new("crate", directory.path().join("src")),
-            Some(
-                r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
-                    .to_string(),
-            ),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &directory.path().join("assets"),
             EMBED_RELATIVE,
         )
@@ -459,10 +456,7 @@ impl AssetRoute {
 
         let code = build(
             &CrateRoot::new("crate", directory.path().join("src")),
-            Some(
-                r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
-                    .to_string(),
-            ),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &assets,
             EMBED_RELATIVE,
         )
@@ -488,10 +482,7 @@ impl AssetRoute {
 
         let message = build(
             &CrateRoot::new("crate", directory.path().join("src")),
-            Some(
-                r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
-                    .to_string(),
-            ),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &directory.path().join("assets"),
             EMBED_RELATIVE,
         )
@@ -524,7 +515,7 @@ impl AssetRoute {
 
         let message = build(
             &CrateRoot::new("crate", directory.path().join("src")),
-            Some(r#"{ "outputs": {} }"#.to_string()),
+            Some(r#"{ "outputs": {} }"#),
             &directory.path().join("assets"),
             EMBED_RELATIVE,
         )

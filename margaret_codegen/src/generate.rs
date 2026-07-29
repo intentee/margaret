@@ -39,7 +39,7 @@ fn generate_into(manifest_directory: &Path) -> Result<(), CodegenError> {
 
     build(
         &crate_root,
-        metafile_contents,
+        metafile_contents.as_deref(),
         &assets_directory,
         location.embed_relative(),
     )?

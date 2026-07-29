@@ -30,8 +30,8 @@ fn build_jwk_pair(
             kid: kid.clone(),
             kty: KeyType::Ec,
             use_: KeyUse::Signature,
-            x: encode_coordinate(x.as_deref(), "x")?,
-            y: encode_coordinate(y.as_deref(), "y")?,
+            x: encode_coordinate(x, "x")?,
+            y: encode_coordinate(y, "y")?,
         },
         signing: JwkSigning {
             crv,
@@ -68,8 +68,12 @@ pub fn generate_keypair(
                 secret_key
                     .to_pkcs8_pem(LineEnding::LF)
                     .map(|pem| pem.to_string()),
-                point.x().map(|coordinate| coordinate.as_slice()),
-                point.y().map(|coordinate| coordinate.as_slice()),
+                point
+                    .x()
+                    .map(p256::elliptic_curve::generic_array::GenericArray::as_slice),
+                point
+                    .y()
+                    .map(p256::elliptic_curve::generic_array::GenericArray::as_slice),
             )
         }
         Curve::P384 => {
@@ -82,8 +86,12 @@ pub fn generate_keypair(
                 secret_key
                     .to_pkcs8_pem(LineEnding::LF)
                     .map(|pem| pem.to_string()),
-                point.x().map(|coordinate| coordinate.as_slice()),
-                point.y().map(|coordinate| coordinate.as_slice()),
+                point
+                    .x()
+                    .map(p256::elliptic_curve::generic_array::GenericArray::as_slice),
+                point
+                    .y()
+                    .map(p256::elliptic_curve::generic_array::GenericArray::as_slice),
             )
         }
     }
