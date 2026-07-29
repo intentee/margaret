@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use proc_macro2::TokenStream;
 
+use margaret_codegen_tokens::console_argument_field::console_argument_field;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::owned_weave::owned_weave;
 
@@ -19,7 +20,7 @@ impl ReverseConsoleArgumentWeaver {
     pub(crate) fn weave(&mut self, argument: &ConsoleArgument, slot: usize) -> TokenStream {
         let is_last_use = self.moved_slots.insert(slot);
 
-        owned_weave(argument, slot, is_last_use)
+        owned_weave(argument, &console_argument_field(slot), is_last_use)
     }
 }
 
@@ -60,21 +61,21 @@ mod tests {
     fn moves_the_first_non_copy_slot_encountered_from_the_end() {
         let mut weaver = ReverseConsoleArgumentWeaver::new();
 
-        assert_eq!(collapsed(weaver.weave(&cloned(), 0)), "console_argument_0");
+        assert_eq!(collapsed(weaver.weave(&cloned(), 0)), "arguments.argument0");
     }
 
     #[test]
     fn clones_earlier_non_copy_uses_after_the_last_use_has_been_seen() {
         let mut weaver = ReverseConsoleArgumentWeaver::new();
 
-        assert_eq!(collapsed(weaver.weave(&cloned(), 0)), "console_argument_0");
+        assert_eq!(collapsed(weaver.weave(&cloned(), 0)), "arguments.argument0");
         assert_eq!(
             collapsed(weaver.weave(&cloned(), 0)),
-            "console_argument_0.clone()"
+            "arguments.argument0.clone()"
         );
         assert_eq!(
             collapsed(weaver.weave(&cloned(), 0)),
-            "console_argument_0.clone()"
+            "arguments.argument0.clone()"
         );
     }
 
@@ -82,19 +83,19 @@ mod tests {
     fn copy_slots_never_clone() {
         let mut weaver = ReverseConsoleArgumentWeaver::new();
 
-        assert_eq!(collapsed(weaver.weave(&flag(), 1)), "console_argument_1");
-        assert_eq!(collapsed(weaver.weave(&flag(), 1)), "console_argument_1");
+        assert_eq!(collapsed(weaver.weave(&flag(), 1)), "arguments.argument1");
+        assert_eq!(collapsed(weaver.weave(&flag(), 1)), "arguments.argument1");
     }
 
     #[test]
     fn slots_are_decided_independently() {
         let mut weaver = ReverseConsoleArgumentWeaver::new();
 
-        assert_eq!(collapsed(weaver.weave(&cloned(), 0)), "console_argument_0");
-        assert_eq!(collapsed(weaver.weave(&cloned(), 1)), "console_argument_1");
+        assert_eq!(collapsed(weaver.weave(&cloned(), 0)), "arguments.argument0");
+        assert_eq!(collapsed(weaver.weave(&cloned(), 1)), "arguments.argument1");
         assert_eq!(
             collapsed(weaver.weave(&cloned(), 0)),
-            "console_argument_0.clone()"
+            "arguments.argument0.clone()"
         );
     }
 }

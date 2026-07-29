@@ -2013,6 +2013,7 @@ dependencies = [
 name = "margaret_container"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "margaret_attributes",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",

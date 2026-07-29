@@ -55,7 +55,7 @@ fn drafts_a_jwks_endpoint_as_the_provides_endpoint_interface() {
 #[test]
 fn injects_the_endpoints_own_dependencies_and_console_argument() {
     assert!(endpoints_container().contains(
-        "crate::JwksEndpoint::new(::std::sync::Arc::clone(&dns_resolver),console_argument_0,)"
+        "crate::JwksEndpoint::new(::std::sync::Arc::clone(&dns_resolver),arguments.argument0,)"
     ));
 }
 

@@ -7,6 +7,7 @@ pub(crate) struct ConsoleCommand {
     pub(crate) accessor: Ident,
     pub(crate) arguments: Vec<ConsoleArgument>,
     pub(crate) command_path: String,
+    pub(crate) console_slots: Vec<usize>,
     pub(crate) construction_root: CanonicalPath,
     pub(crate) description: Option<String>,
     pub(crate) is_async: bool,

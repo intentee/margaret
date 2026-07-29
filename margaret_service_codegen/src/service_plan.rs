@@ -5,6 +5,7 @@ use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
 use margaret_console_argument_codegen::owned_weave::owned_weave;
+use margaret_container::console_argument_binding::ConsoleArgumentBinding;
 use margaret_container::container_bindings::ContainerBindings;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -15,7 +16,7 @@ use crate::service_unit::ServiceUnit;
 use crate::service_units::service_units;
 
 pub struct ServicePlan {
-    pub(crate) construction_arguments: Vec<TokenStream>,
+    pub(crate) construction_arguments: Vec<ConsoleArgumentBinding>,
     pub(crate) has_spiffe_http_client: bool,
     pub(crate) prelude: TokenStream,
     pub(crate) units: Vec<ServiceUnit>,
@@ -55,7 +56,7 @@ impl ServicePlan {
 fn serve_inputs(
     serve_arguments: &[ConsoleArgument],
     bindings: &ContainerBindings,
-) -> Result<(TokenStream, Vec<TokenStream>), ServiceCodegenError> {
+) -> Result<(TokenStream, Vec<ConsoleArgumentBinding>), ServiceCodegenError> {
     let mut resolutions = Vec::with_capacity(serve_arguments.len());
     let mut construction_arguments = Vec::with_capacity(serve_arguments.len());
 
@@ -65,7 +66,10 @@ fn serve_inputs(
         let value = argument_value(argument);
 
         resolutions.push(quote! { let #ident = #value; });
-        construction_arguments.push(owned_weave(argument, slot, true));
+        construction_arguments.push(ConsoleArgumentBinding {
+            slot,
+            value: owned_weave(argument, &quote! { #ident }, true),
+        });
     }
 
     Ok((quote! { #(#resolutions)* }, construction_arguments))

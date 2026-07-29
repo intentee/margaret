@@ -5,6 +5,7 @@ use margaret_console_argument_codegen::argument_registration::argument_registrat
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
+use margaret_container::console_argument_binding::ConsoleArgumentBinding;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
@@ -49,7 +50,15 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
     } else {
         quote! { matches }
     };
-    let values: Vec<TokenStream> = command.arguments.iter().map(argument_value).collect();
+    let values: Vec<ConsoleArgumentBinding> = command
+        .arguments
+        .iter()
+        .zip(&command.console_slots)
+        .map(|(argument, slot)| ConsoleArgumentBinding {
+            slot: *slot,
+            value: argument_value(argument),
+        })
+        .collect();
     let construction = bindings.construction_invocation(&command.accessor.to_string(), &values);
     let accessor_access = quote! {
         (match #construction {

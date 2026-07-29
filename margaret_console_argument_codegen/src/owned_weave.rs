@@ -1,25 +1,26 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use margaret_codegen_tokens::console_argument_clone::console_argument_clone;
-use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
-
 use crate::console_argument::ConsoleArgument;
 use crate::weaving_kind::WeavingKind;
 
 #[must_use]
-pub fn owned_weave(argument: &ConsoleArgument, slot: usize, is_final_use: bool) -> TokenStream {
+pub fn owned_weave(
+    argument: &ConsoleArgument,
+    source: &TokenStream,
+    is_final_use: bool,
+) -> TokenStream {
     if is_final_use || argument.weaving() == WeavingKind::Copy {
-        let ident = console_argument_ident(slot);
-
-        quote! { #ident }
+        quote! { #source }
     } else {
-        console_argument_clone(slot)
+        quote! { #source.clone() }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use quote::quote;
+
     use margaret_attributes::canonical_path::CanonicalPath;
 
     use crate::console_argument::ConsoleArgument;
@@ -31,8 +32,8 @@ mod tests {
         CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
     }
 
-    fn collapsed(argument: &ConsoleArgument, slot: usize, is_final_use: bool) -> String {
-        owned_weave(argument, slot, is_final_use)
+    fn collapsed(argument: &ConsoleArgument, is_final_use: bool) -> String {
+        owned_weave(argument, &quote! { arguments.argument3 }, is_final_use)
             .to_string()
             .split_whitespace()
             .collect()
@@ -53,7 +54,7 @@ mod tests {
             name: "loud".to_string(),
         };
 
-        assert_eq!(collapsed(&flag, 3, false), "console_argument_3");
+        assert_eq!(collapsed(&flag, false), "arguments.argument3");
     }
 
     #[test]
@@ -62,20 +63,20 @@ mod tests {
             name: "loud".to_string(),
         };
 
-        assert_eq!(collapsed(&flag, 3, true), "console_argument_3");
+        assert_eq!(collapsed(&flag, true), "arguments.argument3");
     }
 
     #[test]
     fn a_non_copy_argument_clones_before_its_final_use() {
         assert_eq!(
-            collapsed(&cloned_string(), 3, false),
-            "console_argument_3.clone()"
+            collapsed(&cloned_string(), false),
+            "arguments.argument3.clone()"
         );
     }
 
     #[test]
     fn a_non_copy_argument_moves_on_its_final_use() {
-        assert_eq!(collapsed(&cloned_string(), 3, true), "console_argument_3");
+        assert_eq!(collapsed(&cloned_string(), true), "arguments.argument3");
     }
 
     #[test]
@@ -87,6 +88,6 @@ mod tests {
             value_type: path(&["std", "string", "String"]),
         };
 
-        assert_eq!(collapsed(&named, 2, false), "console_argument_2.clone()");
+        assert_eq!(collapsed(&named, false), "arguments.argument3.clone()");
     }
 }

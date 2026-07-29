@@ -1,9 +1,9 @@
 pub mod console_argument_argument;
 pub mod console_argument_borrow;
-pub mod console_argument_clone;
 pub mod console_argument_deref;
+pub mod console_argument_field;
+pub mod console_argument_field_ident;
 pub mod console_argument_ident;
-pub mod console_argument_parameter;
 pub mod path_tokens;
 pub mod spiffe_http_client_ident;
 pub mod vec_literal_tokens;

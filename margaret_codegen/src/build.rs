@@ -670,10 +670,10 @@ impl Worker {
         assert!(!serve.contains("bundle_services"));
         assert!(!serve.contains("spiffe_server_config"));
 
-        let construction: String = module(&code, "container/build/serve")
+        let construction: String = module(&code, "container/build/serve_arguments")
             .split_whitespace()
             .collect();
-        assert!(construction.contains("console_argument_0:reqwest::Client"));
+        assert!(construction.contains("pub(crate)argument0:reqwest::Client,"));
 
         let run: String = module(&code, "run").split_whitespace().collect();
         assert!(run.contains(
@@ -1781,7 +1781,9 @@ impl Page {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains(
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+        ));
         assert!(serve.contains("server_public(container,&routes"));
         assert!(!serve.contains("server_public(container,&console_argument_0"));
 
@@ -1818,7 +1820,9 @@ impl Page {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains(
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+        ));
         assert!(serve.contains("super::views::build::build(container)"));
     }
 
@@ -1859,7 +1863,9 @@ impl RespondsToWebSocketMessage for Chatter {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains(
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+        ));
         assert!(serve.contains("server_public(container,&routes"));
         assert!(!serve.contains("server_public(container,&console_argument_0"));
     }
@@ -1910,7 +1916,9 @@ impl RespondsToWebSocketMessage for Chatter {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains(
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+        ));
         assert!(serve.contains("server_public(container,&routes"));
         assert!(!serve.contains("server_public(container,&console_argument_0"));
     }

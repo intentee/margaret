@@ -1,4 +1,8 @@
+pub mod bootstrap_arguments_literal;
+pub mod bootstrap_arguments_module;
+pub mod bootstrap_arguments_type;
 mod build_plan;
+pub mod console_argument_binding;
 mod constructed_type;
 pub mod construction_error_path;
 mod construction_flow;

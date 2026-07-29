@@ -11,6 +11,7 @@ use margaret::framework::macros::singleton;
 #[responds_to_http(method = "get", path = "/configured", server = "public")]
 pub struct Configured {
     _label: String,
+    _tenant: String,
     _note: Option<String>,
     _optional_retries: Option<u16>,
     _retries: u16,
@@ -27,12 +28,14 @@ impl Configured {
         #[console_argument(from = "verbose")] verbose: bool,
         #[console_argument(from = "optional-retries")] optional_retries: Option<u16>,
         #[console_argument(from = "note")] note: Option<String>,
+        #[console_argument(from = "tenant")] tenant: String,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             _label: label,
             _note: note,
             _optional_retries: optional_retries,
             _retries: retries,
+            _tenant: tenant,
             _root: root,
             _verbose: verbose,
         })
