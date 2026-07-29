@@ -466,21 +466,14 @@ pub fn render_services(
     let register_servers = register_servers_definition(servers, has_views, activation);
     let server_registration = register_servers_invocation(servers, activation);
     let construction_invocation = bindings.serve_invocation(&plan.construction_arguments);
-    let construction = if bindings.serve_is_fallible() {
-        quote! {
-            let container = match #construction_invocation {
-                Ok(container) => container,
-                Err(error) => {
-                    return margaret::framework::console::report_failure::report_failure(error);
-                }
-            };
-            let container = &container;
-        }
-    } else {
-        quote! {
-            let container = #construction_invocation;
-            let container = &container;
-        }
+    let construction = quote! {
+        let container = match #construction_invocation {
+            Ok(container) => container,
+            Err(error) => {
+                return margaret::framework::console::report_failure::report_failure(error);
+            }
+        };
+        let container = &container;
     };
     let matches_binding = if servers.is_empty() && plan.construction_arguments.is_empty() {
         quote! { _matches }

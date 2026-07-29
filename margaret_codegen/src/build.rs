@@ -749,7 +749,7 @@ impl Worker {
         let construction: String = module(&code, "container/build/serve_arguments")
             .split_whitespace()
             .collect();
-        assert!(construction.contains("pub(crate)argument0:reqwest::Client,"));
+        assert!(construction.contains("pubargument0:reqwest::Client,"));
 
         let run: String = module(&code, "run").split_whitespace().collect();
         assert!(run.contains(
@@ -1791,7 +1791,7 @@ impl New {
 
         let container: String = module(&code, "container").split_whitespace().collect();
 
-        assert!(build.contains("pub(crate)fnserve("));
+        assert!(build.contains("pubfnserve("));
         assert!(container.contains("std::sync::Arc<crate::Build>"));
         assert!(container.contains("std::sync::Arc<crate::Container>"));
         assert!(container.contains("std::sync::Arc<crate::Routes>"));

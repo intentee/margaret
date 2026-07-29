@@ -13,17 +13,17 @@ fn weaves_console_arguments_through_dependencies() {
         .collect();
 
     assert!(
-        source.contains("pub(crate)fnconstruct_config(arguments:super::construct_config_arguments::ConstructConfigArguments,)")
+        source.contains("pubfnconstruct_config(arguments:super::construct_config_arguments::ConstructConfigArguments,)")
     );
     assert!(source.contains("crate::Config::create(arguments.argument1)"));
     assert!(
         source.contains(
-            "pub(crate)fnconstruct_alpha_plugin(arguments:super::construct_alpha_plugin_arguments::ConstructAlphaPluginArguments,)"
+            "pubfnconstruct_alpha_plugin(arguments:super::construct_alpha_plugin_arguments::ConstructAlphaPluginArguments,)"
         )
     );
     assert!(
         source.contains(
-            "pub(crate)fnconstruct_service(arguments:super::construct_service_arguments::ConstructServiceArguments,)"
+            "pubfnconstruct_service(arguments:super::construct_service_arguments::ConstructServiceArguments,)"
         )
     );
     assert!(source.contains(

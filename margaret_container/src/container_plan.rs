@@ -43,7 +43,6 @@ impl ContainerPlan {
             let mut seen_slots = BTreeSet::new();
             let mut dependencies = Vec::new();
             let mut is_async = provider.construction.is_async();
-            let mut is_fallible = provider.construction.is_fallible();
 
             for dependency in provider.dependencies() {
                 match dependency {
@@ -81,7 +80,6 @@ impl ContainerPlan {
                             }
                         }
                         is_async |= dependency.is_async;
-                        is_fallible |= dependency.is_fallible;
                     }
                 }
             }
@@ -92,7 +90,6 @@ impl ContainerPlan {
                 console_slots: collected_slots.into(),
                 dependencies: dependencies.into(),
                 is_async,
-                is_fallible,
                 key,
                 provider,
             });

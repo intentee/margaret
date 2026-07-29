@@ -6,6 +6,7 @@ pub mod console_argument_binding;
 pub mod construct_singleton_path;
 mod constructed_type;
 pub mod construction_error_path;
+mod construction_errors_doc;
 mod construction_flow;
 mod construction_source;
 pub mod container_bindings;

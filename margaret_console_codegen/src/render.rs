@@ -96,17 +96,13 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
         })
         .collect();
     let construction = bindings.construction_invocation(&command.accessor.to_string(), &values);
-    let accessor_access = if bindings.construction_is_fallible(&command.accessor.to_string()) {
-        quote! {
-            (match #construction {
-                Ok(value) => value,
-                Err(error) => {
-                    return margaret::framework::console::report_failure::report_failure(error);
-                }
-            })
-        }
-    } else {
-        quote! { (#construction) }
+    let accessor_access = quote! {
+        (match #construction {
+            Ok(value) => value,
+            Err(error) => {
+                return margaret::framework::console::report_failure::report_failure(error);
+            }
+        })
     };
 
     if command.takes_token {

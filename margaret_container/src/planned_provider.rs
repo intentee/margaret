@@ -11,7 +11,6 @@ pub(crate) struct PlannedProvider {
     pub(crate) console_slots: Arc<[usize]>,
     pub(crate) dependencies: Arc<[PlannedDependency]>,
     pub(crate) is_async: bool,
-    pub(crate) is_fallible: bool,
     pub(crate) key: CanonicalPath,
     pub(crate) provider: Provider,
 }

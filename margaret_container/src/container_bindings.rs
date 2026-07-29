@@ -33,7 +33,6 @@ fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
 pub struct ContainerBindings {
     arguments: Arc<[ConsoleArgument]>,
     asynchronous_constructions: BTreeSet<String>,
-    fallible_constructions: BTreeSet<String>,
     concrete_providers: BTreeMap<CanonicalPath, ProviderConsoleArguments>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
     slots: Arc<BTreeMap<ServeInputKey, usize>>,
@@ -43,16 +42,11 @@ impl ContainerBindings {
     pub(crate) fn from_plan(plan: &ContainerPlan) -> Self {
         let mut providers = BTreeMap::new();
         let mut asynchronous_constructions = BTreeSet::new();
-        let mut fallible_constructions = BTreeSet::new();
         let mut concrete_providers = BTreeMap::new();
 
         for entry in plan.planned_entries() {
             if entry.is_async {
                 asynchronous_constructions.insert(entry.provider.field_name.clone());
-            }
-
-            if entry.is_fallible {
-                fallible_constructions.insert(entry.provider.field_name.clone());
             }
 
             if plan.injectable(&entry.key) {
@@ -77,7 +71,6 @@ impl ContainerBindings {
             arguments: plan.arguments(),
             asynchronous_constructions,
             concrete_providers,
-            fallible_constructions,
             providers,
             slots: plan.slots(),
         }
@@ -174,15 +167,6 @@ impl ContainerBindings {
         self.asynchronous_constructions.contains(field_name)
     }
 
-    #[must_use]
-    pub fn construction_is_fallible(&self, field_name: &str) -> bool {
-        self.fallible_constructions.contains(field_name)
-    }
-
-    #[must_use]
-    pub fn serve_is_fallible(&self) -> bool {
-        !self.fallible_constructions.is_empty()
-    }
 
     #[must_use]
     pub fn serve_invocation(&self, arguments: &[ConsoleArgumentBinding]) -> TokenStream {

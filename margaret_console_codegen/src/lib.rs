@@ -522,7 +522,7 @@ impl Farewell {
         assert!(source.contains(r#"Some(("bare",_matches))=>{"#));
         assert!(source.contains("super::container::build::construct_bare()"));
         assert!(!source.contains("super::container::build::construct_bare().await"));
-        assert!(!source.contains("report_failure::report_failure(error"));
+        assert!(source.contains("report_failure::report_failure(error"));
         assert!(source.contains(".run()"));
     }
 

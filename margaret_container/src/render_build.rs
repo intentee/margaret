@@ -14,6 +14,7 @@ use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
 use crate::construct_singleton_path::construct_singleton_path;
 use crate::construction_error_path::construction_error_path;
+use crate::construction_errors_doc::construction_errors_doc;
 use crate::construction_flow::construction_flow;
 use crate::container_field_ident::container_field_ident;
 use crate::container_plan::ContainerPlan;
@@ -165,13 +166,13 @@ fn arguments_module(
         let field = console_argument_field_ident(*slot);
         let value_type = argument.field_type();
 
-        quote! { pub(crate) #field: #value_type, }
+        quote! { pub #field: #value_type, }
     });
 
     Some(GeneratedModuleTokens::new(
         format!("container/build/{}", bootstrap_arguments_module(function)),
         quote! {
-            pub(crate) struct #arguments_type {
+            pub struct #arguments_type {
                 #(#fields)*
             }
         },
@@ -200,34 +201,28 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     let root_type = field_type(provider);
     let error = construction_error_path();
 
-    let outcome = if root.is_fallible {
-        quote! { Ok(#root_binding) }
-    } else {
-        quote! { #root_binding }
-    };
     let body = quote! {
             #(#statements)*
 
-            #outcome
+            Ok(#root_binding)
     };
 
     let too_many_lines = too_many_lines_allow();
-    let return_type = if root.is_fallible {
-        quote! { ::std::result::Result<#root_type, #error> }
-    } else {
-        root_type
-    };
+    let return_type = quote! { ::std::result::Result<#root_type, #error> };
+    let errors_doc = construction_errors_doc();
     let tokens = if root.is_async {
         quote! {
+            #errors_doc
             #too_many_lines
-            pub(crate) async fn #function(#parameters) -> #return_type {
+            pub async fn #function(#parameters) -> #return_type {
                 #body
             }
         }
     } else {
         quote! {
+            #errors_doc
             #too_many_lines
-            pub(crate) fn #function(#parameters) -> #return_type {
+            pub fn #function(#parameters) -> #return_type {
                 #body
             }
         }
@@ -289,32 +284,21 @@ pub(crate) fn render_build(
         .collect::<Vec<_>>();
     let error = construction_error_path();
 
-    let serve_is_fallible = construction_roots.iter().any(|entry| entry.is_fallible);
-    let container_literal = quote! {
-        super::super::Container {
-            #(#fields)*
-        }
-    };
-    let serve_outcome = if serve_is_fallible {
-        quote! { Ok(#container_literal) }
-    } else {
-        container_literal
-    };
-    let serve_return = if serve_is_fallible {
-        quote! { ::std::result::Result<super::super::Container, #error> }
-    } else {
-        quote! { super::super::Container }
-    };
+    let serve_return = quote! { ::std::result::Result<super::super::Container, #error> };
     let serve_body = quote! {
             #(#serve_statements)*
 
-            #serve_outcome
+            Ok(super::super::Container {
+                #(#fields)*
+            })
     };
     let serve_too_many_lines = too_many_lines_allow();
+    let serve_errors_doc = construction_errors_doc();
     let serve = if construction_roots.iter().any(|entry| entry.is_async) {
         quote! {
+            #serve_errors_doc
             #serve_too_many_lines
-            pub(crate) async fn serve(
+            pub async fn serve(
                 #serve_parameters
             ) -> #serve_return {
                 #serve_body
@@ -322,8 +306,9 @@ pub(crate) fn render_build(
         }
     } else {
         quote! {
+            #serve_errors_doc
             #serve_too_many_lines
-            pub(crate) fn serve(
+            pub fn serve(
                 #serve_parameters
             ) -> #serve_return {
                 #serve_body
@@ -337,25 +322,25 @@ pub(crate) fn render_build(
             .arguments
             .as_ref()
             .map(|_| bootstrap_arguments_module(function))
-            .map(|module| quote! { pub(crate) mod #module; });
+            .map(|module| quote! { pub mod #module; });
 
         quote! {
             #arguments_module
-            pub(crate) mod #function;
-            pub(crate) use #function::#function;
+            pub mod #function;
+            pub use #function::#function;
         }
     });
     let serve_arguments_declaration = serve_arguments_module
         .as_ref()
         .map(|_| bootstrap_arguments_module(&serve_function))
-        .map(|module| quote! { pub(crate) mod #module; });
+        .map(|module| quote! { pub mod #module; });
     let mut modules = vec![GeneratedModuleTokens::new(
         "container/build",
         quote! {
             #(#builder_modules)*
             #serve_arguments_declaration
-            pub(crate) mod serve;
-            pub(crate) use serve::serve;
+            pub mod serve;
+            pub use serve::serve;
         },
     )];
 

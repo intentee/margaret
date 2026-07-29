@@ -9,7 +9,7 @@ fn constructs_services_and_tickers_eagerly() {
         .expect("the services fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("pub(crate)fnconstruct_pulse("));
-    assert!(source.contains("pub(crate)fnconstruct_sweeper("));
-    assert!(source.contains("pub(crate)fnserve("));
+    assert!(source.contains("pubfnconstruct_pulse("));
+    assert!(source.contains("pubfnconstruct_sweeper("));
+    assert!(source.contains("pubfnserve("));
 }

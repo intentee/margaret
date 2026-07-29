@@ -40,10 +40,6 @@ impl DirectConstruction {
         }
     }
 
-    pub(crate) fn is_fallible(&self) -> bool {
-        matches!(self, Self::Constructor { .. })
-    }
-
     pub(crate) fn is_async(&self) -> bool {
         matches!(
             self,

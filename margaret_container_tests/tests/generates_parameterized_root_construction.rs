@@ -12,7 +12,7 @@ fn generates_parameterized_root_construction_for_console_arguments() {
         .collect();
 
     assert!(source.contains(
-        "pub(crate)fnconstruct_greet(arguments:super::construct_greet_arguments::ConstructGreetArguments,)"
+        "pubfnconstruct_greet(arguments:super::construct_greet_arguments::ConstructGreetArguments,)"
     ));
     assert!(source.contains(
         "crate::Greet::create(::std::sync::Arc::clone(&english_greeter),arguments.argument0,arguments.argument1,arguments.argument2,)"

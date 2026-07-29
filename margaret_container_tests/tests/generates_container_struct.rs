@@ -10,6 +10,6 @@ fn generates_container_struct() {
     let source: String = generated.source().split_whitespace().collect();
 
     assert!(source.contains("pubstructContainer"));
-    assert!(source.contains("pub(crate)fnserve("));
+    assert!(source.contains("pubfnserve("));
     assert!(!source.contains("implDefaultforContainer"));
 }
