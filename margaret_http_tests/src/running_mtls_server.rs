@@ -57,7 +57,7 @@ impl RunningMtlsServer {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::new("GET", Arc::new(EchoPeer))],
+                vec![MethodHandler::anonymous("GET", Arc::new(EchoPeer))],
             )])
             .expect("the route entries register cleanly"),
         );

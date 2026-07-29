@@ -1408,7 +1408,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         );
 
         assert!(source.contains(
-            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"QUERY\","
+            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"QUERY\","
         ));
     }
 
@@ -1528,7 +1528,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"GET\","));
     }
 
     const NAMED_ROUTE: &str = r#"
@@ -1553,10 +1553,7 @@ impl GetGreeting {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","));
-        assert!(source.contains(
-            "margaret::framework::http::named_handler::NamedHandler::new(\"get_greeting\","
-        ));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::named(\"GET\",\"get_greeting\","));
     }
 
     #[test]
@@ -1694,10 +1691,10 @@ impl GetMetrics {
         let source = source_for(MULTIPLE_SERVERS);
 
         assert!(source.contains(
-            "server_public(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::router::Router::build(::std::vec::Vec::from([route_entry_0(container,routes)"
+            "server_public(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::server_routes::ServerRoutes::build(::std::vec::Vec::from([route_entry_0(container,routes)"
         ));
         assert!(source.contains(
-            "server_internal(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::router::Router::build(::std::vec::Vec::from([route_entry_0(container,routes)"
+            "server_internal(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::server_routes::ServerRoutes::build(::std::vec::Vec::from([route_entry_0(container,routes)"
         ));
     }
 

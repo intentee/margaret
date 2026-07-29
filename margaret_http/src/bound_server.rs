@@ -494,7 +494,7 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -538,11 +538,11 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/items/{id}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
             ),
             RouteEntry::new(
                 "/items/{name}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
             ),
         ]);
 
@@ -554,7 +554,7 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/x/{id}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
             ),
             RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade), Vec::new()),
         ]);

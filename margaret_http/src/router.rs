@@ -39,7 +39,11 @@ impl Router {
                         RouteTarget::Http(
                             handlers
                                 .into_iter()
-                                .map(|MethodHandler { handler, method }| (method, handler))
+                                .map(
+                                    |MethodHandler {
+                                         handler, method, ..
+                                     }| (method, handler),
+                                )
                                 .collect(),
                         ),
                     )?;

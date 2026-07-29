@@ -37,7 +37,7 @@ impl RunningJwksServer {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 WELL_KNOWN_JWKS_PATH,
-                vec![MethodHandler::new("GET", handler)],
+                vec![MethodHandler::anonymous("GET", handler)],
             )])
             .expect("the well known jwks route registers cleanly"),
         );

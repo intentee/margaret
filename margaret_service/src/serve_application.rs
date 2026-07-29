@@ -121,10 +121,7 @@ mod tests {
     }
 
     fn empty_routes() -> ServerRoutes {
-        ServerRoutes::new(
-            Router::build(Vec::new()).expect("an empty router builds"),
-            Vec::new(),
-        )
+        ServerRoutes::build(Vec::new()).expect("an empty entry list builds server routes")
     }
 
     #[test]
