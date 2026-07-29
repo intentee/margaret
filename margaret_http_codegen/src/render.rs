@@ -70,12 +70,15 @@ fn handler_binding(route: &HttpRoute) -> Ident {
     format_ident!("{}_handler", route.responder_field)
 }
 
-fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
-    let responder_type = path_tokens(&route.responder_path);
-    let responder_access = bindings.accessor_invocation(
-        &format_ident!("container"),
-        &route.responder_field.to_string(),
-    );
+struct HandlerNames {
+    captured: CapturedProviders,
+    request_binding: Ident,
+    responder_binding: Ident,
+    routes_local: Ident,
+    views_local: Ident,
+}
+
+fn allocate_handler_names(route: &HttpRoute) -> HandlerNames {
     let mut allocator = NameAllocator::new();
 
     for argument in &route.arguments {
@@ -105,11 +108,30 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let views_local = format_ident!("{}", allocator.allocate("views").field());
     let captured = CapturedProviders::capture(&route.arguments, &mut allocator);
 
+    HandlerNames {
+        captured,
+        request_binding,
+        responder_binding,
+        routes_local,
+        views_local,
+    }
+}
+
+fn responder_body(
+    route: &HttpRoute,
+    HandlerNames {
+        captured,
+        request_binding,
+        responder_binding,
+        routes_local,
+        views_local,
+    }: &HandlerNames,
+) -> TokenStream {
     let bound_bindings = render_bound_request_extractions(
         &route.arguments,
-        &captured,
+        captured,
         &TokenStream::new(),
-        &request_binding,
+        request_binding,
         &quote! { return ::std::result::Result::Err(error.into()) },
         &quote! {
             return ::std::result::Result::Ok(
@@ -122,12 +144,12 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
     let bindings_tokens = route
         .arguments
         .iter()
-        .map(|argument| argument_binding(argument, &request_binding, &captured));
+        .map(|argument| argument_binding(argument, request_binding, captured));
     let server = format_ident!("{}", route.server);
     let argument_values = route
         .arguments
         .iter()
-        .map(|argument| argument_value(argument, &routes_local, &views_local, &server));
+        .map(|argument| argument_value(argument, routes_local, views_local, &server));
     let method_name = &route.method_name;
     let respond_call = if route.is_async {
         quote! { #responder_binding.#method_name(#(#argument_values),*).await }
@@ -141,6 +163,26 @@ fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
             .map(margaret::framework::http::response_continuation::ResponseContinuation::from)
             .map_err(margaret::framework::http::handler_error::HandlerError::consumer)
     };
+
+    body
+}
+
+fn onion(route: &HttpRoute, bindings: &ContainerBindings) -> TokenStream {
+    let responder_type = path_tokens(&route.responder_path);
+    let responder_access = bindings.accessor_invocation(
+        &format_ident!("container"),
+        &route.responder_field.to_string(),
+    );
+    let names = allocate_handler_names(route);
+    let HandlerNames {
+        captured,
+        request_binding,
+        responder_binding,
+        routes_local,
+        views_local,
+    } = &names;
+
+    let body = responder_body(route, &names);
 
     let captures_routes = responder_injects_routes(route);
     let captures_views = responder_injects_views(route);
@@ -329,6 +371,31 @@ fn render_handler(
     RenderedHandler { function, tokens }
 }
 
+fn server_router(
+    has_websocket_routes: bool,
+    server: &HttpServer,
+    routes_param: &Ident,
+    route_entries: &TokenStream,
+) -> TokenStream {
+    if has_websocket_routes {
+        let websocket_routes = format_ident!("{}_routes", server.name());
+        let websocket_call = quote! {
+            super::super::websocket::#websocket_routes(container, #routes_param)
+        };
+        quote! {
+            {
+                let mut route_entries = #route_entries;
+
+                route_entries.extend(#websocket_call);
+
+                margaret::framework::http::router::Router::build(route_entries)
+            }
+        }
+    } else {
+        quote! { margaret::framework::http::router::Router::build(#route_entries) }
+    }
+}
+
 fn server_module(
     table: &HttpRouteTable,
     server: &HttpServer,
@@ -406,23 +473,7 @@ fn server_module(
     });
     let route_entries = vec_literal_tokens(route_entries);
     let named_handlers = vec_literal_tokens(named_handlers);
-    let router = if has_websocket_routes {
-        let websocket_routes = format_ident!("{}_routes", server.name());
-        let websocket_call = quote! {
-            super::super::websocket::#websocket_routes(container, #routes_param)
-        };
-        quote! {
-            {
-                let mut route_entries = #route_entries;
-
-                route_entries.extend(#websocket_call);
-
-                margaret::framework::http::router::Router::build(route_entries)
-            }
-        }
-    } else {
-        quote! { margaret::framework::http::router::Router::build(#route_entries) }
-    };
+    let router = server_router(has_websocket_routes, server, &routes_param, &route_entries);
 
     let inner_return = quote! {
         ::std::result::Result<

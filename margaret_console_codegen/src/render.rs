@@ -43,6 +43,41 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
     }
 }
 
+fn serve_registration(
+    http_servers: &[HttpServer],
+    serve_arguments: &[ConsoleArgument],
+) -> TokenStream {
+    let spiffe_secured = serves_spiffe(http_servers);
+    let svid_active = spiffe_secured || has_spiffe_http_client(serve_arguments);
+    let service_arguments = serve_arguments.iter().map(argument_registration);
+    let http_server_arguments = http_servers.iter().map(|server| {
+        let address_argument = server.address_argument();
+        let url_argument = server.url_argument();
+        let uploads_argument = server.uploads_argument();
+        let upload_dir_argument = server.upload_dir_argument();
+        let transport_argument =
+            spiffe_secured.then(|| transport_argument_registration(server));
+
+        quote! {
+            .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
+            .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
+            .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
+            .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
+            #transport_argument
+        }
+    });
+    let spiffe_arguments = svid_active.then(|| {
+        quote! {
+            .arg(clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true))
+            .arg(clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true))
+        }
+    });
+
+    quote! {
+        .subcommand(clap::Command::new("serve")#(#http_server_arguments)*#spiffe_arguments #(#service_arguments)*)
+    }
+}
+
 fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenStream {
     let name = &command.name;
     let matches_binding = if command.arguments.is_empty() {
@@ -154,35 +189,7 @@ pub(crate) fn render(
     };
 
     let serve_registration = if serves {
-        let spiffe_secured = serves_spiffe(http_servers);
-        let svid_active = spiffe_secured || has_spiffe_http_client(serve_arguments);
-        let service_arguments = serve_arguments.iter().map(argument_registration);
-        let http_server_arguments = http_servers.iter().map(|server| {
-            let address_argument = server.address_argument();
-            let url_argument = server.url_argument();
-            let uploads_argument = server.uploads_argument();
-            let upload_dir_argument = server.upload_dir_argument();
-            let transport_argument =
-                spiffe_secured.then(|| transport_argument_registration(server));
-
-            quote! {
-                .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
-                .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
-                .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
-                .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
-                #transport_argument
-            }
-        });
-        let spiffe_arguments = svid_active.then(|| {
-            quote! {
-                .arg(clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true))
-                .arg(clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true))
-            }
-        });
-
-        quote! {
-            .subcommand(clap::Command::new("serve")#(#http_server_arguments)*#spiffe_arguments #(#service_arguments)*)
-        }
+        serve_registration(http_servers, serve_arguments)
     } else {
         quote! {}
     };
