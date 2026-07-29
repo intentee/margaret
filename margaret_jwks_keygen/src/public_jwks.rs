@@ -9,6 +9,7 @@ use crate::jwk_public::JwkPublic;
 use crate::jwks_key_error::JwksKeyError;
 use crate::jwks_secret::JwksSecret;
 use crate::jws_header::JwsHeader;
+use crate::token_malformation::TokenMalformation;
 use crate::token_verification::TokenVerification;
 use crate::verifies_token::VerifiesToken;
 
@@ -53,13 +54,24 @@ impl VerifiesToken for PublicJwks {
         &self,
         token: &str,
     ) -> Result<TokenVerification<TClaims>, JwksKeyError> {
-        let compact_jws = CompactJws::parse(token)?;
-        let header: JwsHeader = serde_json::from_slice(&compact_jws.header_bytes)
-            .map_err(|source| JwksKeyError::HeaderJson { source })?;
+        let compact_jws = match CompactJws::parse(token) {
+            Ok(compact_jws) => compact_jws,
+            Err(malformation) => return Ok(TokenVerification::Malformed(malformation)),
+        };
+        let header: JwsHeader = match serde_json::from_slice(&compact_jws.header_bytes) {
+            Ok(header) => header,
+            Err(source) => {
+                return Ok(TokenVerification::Malformed(TokenMalformation::HeaderJson(
+                    source,
+                )));
+            }
+        };
 
         match self.find_by_kid(&header.kid) {
             Some(key) => key.verify(token),
-            None => Err(JwksKeyError::UnknownKeyId { kid: header.kid }),
+            None => Ok(TokenVerification::Malformed(
+                TokenMalformation::UnknownKeyId { kid: header.kid },
+            )),
         }
     }
 }

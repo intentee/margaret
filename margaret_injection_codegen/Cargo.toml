@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
+margaret_syn_type_peeling = { path = "../margaret_syn_type_peeling" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

@@ -10,8 +10,8 @@ use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen::verifies_any_token::VerifiesAnyToken;
+use margaret_token_signer::access_token_minting::AccessTokenMinting;
 use margaret_token_signer::mint_access_token::mint_access_token;
-use margaret_token_signer::minted_tokens::MintedTokens;
 
 use crate::jwks_secret_store_error::JwksSecretStoreError;
 
@@ -29,7 +29,7 @@ impl JwksSecretStore {
         &self,
         refresh_token: &str,
         now: DateTime<Utc>,
-    ) -> Result<MintedTokens, JwksSecretStoreError> {
+    ) -> Result<AccessTokenMinting, JwksSecretStoreError> {
         let secret = self.current_secret()?;
 
         mint_access_token(&secret, refresh_token, now)
@@ -87,6 +87,9 @@ mod tests {
     use margaret_token_signer_tests::sign_refresh_token::sign_refresh_token;
     use margaret_token_signer_tests::unix_time::unix_time;
 
+    use margaret_token_signer::access_token_minting::AccessTokenMinting;
+    use margaret_token_signer::minted_tokens::MintedTokens;
+
     use super::JwksSecretStore;
 
     struct Unserializable;
@@ -112,16 +115,39 @@ mod tests {
         (JwksSecretStore::new(holder), secret)
     }
 
+    fn minted_tokens(minting: AccessTokenMinting) -> Option<MintedTokens> {
+        match minting {
+            AccessTokenMinting::Minted(minted) => Some(minted),
+            AccessTokenMinting::ExpiredRefreshToken
+            | AccessTokenMinting::MalformedRefreshToken(_)
+            | AccessTokenMinting::UnknownRefreshTokenKey => None,
+        }
+    }
+
+    fn verified_claims(
+        result: JwksSecretVerificationResult<RefreshTokenClaims>,
+    ) -> Option<RefreshTokenClaims> {
+        match result {
+            JwksSecretVerificationResult::SignedWithCurrent(claims)
+            | JwksSecretVerificationResult::SignedWithPrevious(claims) => Some(claims),
+            JwksSecretVerificationResult::Invalid | JwksSecretVerificationResult::Malformed(_) => {
+                None
+            }
+        }
+    }
+
     #[tokio::test]
     async fn mints_an_access_token_from_a_valid_refresh_token() {
         let (store, secret) = store_with_secret();
         let refresh_token =
             sign_refresh_token(&secret.current.signing, &refresh_claims(1_000)).await;
 
-        let minted = store
+        let minting = store
             .mint_access_token(&refresh_token, unix_time(500))
             .await
-            .expect("the access token is minted");
+            .expect("the signing secret is usable");
+
+        let minted = minted_tokens(minting).expect("a valid refresh token mints an access token");
 
         assert!(!minted.access_token.is_empty());
         assert!(!minted.refresh_token.is_empty());
@@ -145,22 +171,6 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
-    async fn verifies_a_token_signed_with_the_current_key() {
-        let (store, _secret) = store_with_secret();
-        let claims = refresh_claims(1_000);
-        let token = store.sign(&claims).await.expect("the claims are signed");
-
-        let verification = store
-            .verify::<RefreshTokenClaims>(&token)
-            .expect("the token verifies");
-
-        assert!(matches!(
-            verification,
-            JwksSecretVerificationResult::SignedWithCurrent(verified) if verified.sub == claims.sub
-        ));
-    }
-
     #[test]
     fn reports_the_secret_is_unavailable_when_verifying_before_a_roll() {
         let store = JwksSecretStore::new(JwksSecretHolder::default());
@@ -173,14 +183,14 @@ mod tests {
     }
 
     #[test]
-    fn reports_a_verify_failure_for_a_malformed_token() {
+    fn reports_a_malformed_token_as_a_verification_outcome() {
         let (store, _secret) = store_with_secret();
 
-        assert!(
-            store
-                .verify::<RefreshTokenClaims>("not.a.valid.token")
-                .is_err_and(|error| error.to_string().contains("failed to verify a token"))
-        );
+        let result = store
+            .verify::<RefreshTokenClaims>("not.a.valid.token")
+            .expect("the signing secret is usable");
+
+        assert!(verified_claims(result).is_none());
     }
 
     #[tokio::test]
@@ -208,15 +218,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reports_a_mint_failure_for_an_invalid_refresh_token() {
+    async fn reports_a_malformed_refresh_token_as_a_minting_outcome() {
         let (store, _secret) = store_with_secret();
 
-        assert!(
-            store
-                .mint_access_token("not.a.valid.token", unix_time(500))
-                .await
-                .is_err_and(|error| error.to_string().contains("failed to mint an access token"))
-        );
+        let minting = store
+            .mint_access_token("not.a.valid.token", unix_time(500))
+            .await
+            .expect("the signing secret is usable");
+
+        assert!(minted_tokens(minting).is_none());
     }
 
     #[tokio::test]
@@ -228,6 +238,87 @@ mod tests {
                 .sign(&Unserializable)
                 .await
                 .is_err_and(|error| error.to_string().contains("failed to sign claims"))
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_a_mint_failure_when_the_current_key_is_corrupt() {
+        let (store, secret) = store_with_secret();
+        let refresh_token =
+            sign_refresh_token(&secret.current.signing, &refresh_claims(1_000)).await;
+        let mut corrupt = secret;
+
+        corrupt.current.public.x = "invalid @@@".to_string();
+
+        let corrupt_holder = JwksSecretHolder::default();
+
+        corrupt_holder.set(Some(Arc::new(corrupt)));
+
+        let corrupt_store = JwksSecretStore::new(corrupt_holder);
+
+        drop(store);
+
+        assert!(
+            corrupt_store
+                .mint_access_token(&refresh_token, unix_time(500))
+                .await
+                .is_err_and(|error| error.to_string().contains("failed to mint an access token"))
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_a_verify_failure_when_the_current_key_is_corrupt() {
+        let (_store, secret) = store_with_secret();
+        let token = sign_refresh_token(&secret.current.signing, &refresh_claims(1_000)).await;
+        let mut corrupt = secret;
+
+        corrupt.current.public.x = "invalid @@@".to_string();
+
+        let holder = JwksSecretHolder::default();
+
+        holder.set(Some(Arc::new(corrupt)));
+
+        assert!(
+            JwksSecretStore::new(holder)
+                .verify::<RefreshTokenClaims>(&token)
+                .is_err_and(|error| error.to_string().contains("failed to verify a token"))
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_the_claims_of_a_token_signed_with_the_current_key() {
+        let (store, secret) = store_with_secret();
+        let claims = refresh_claims(1_000);
+        let token = sign_refresh_token(&secret.current.signing, &claims).await;
+
+        let result = store
+            .verify::<RefreshTokenClaims>(&token)
+            .expect("the signing secret is usable");
+
+        assert_eq!(
+            verified_claims(result).map(|verified| verified.jti),
+            Some(claims.jti)
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_the_claims_of_a_token_signed_with_the_previous_key() {
+        let rotated = fresh_p256_secret()
+            .rotate()
+            .expect("the signing secret rotates");
+        let claims = refresh_claims(1_000);
+        let token = sign_refresh_token(&rotated.previous.signing, &claims).await;
+        let holder = JwksSecretHolder::default();
+
+        holder.set(Some(Arc::new(rotated)));
+
+        let result = JwksSecretStore::new(holder)
+            .verify::<RefreshTokenClaims>(&token)
+            .expect("the signing secret is usable");
+
+        assert_eq!(
+            verified_claims(result).map(|verified| verified.jti),
+            Some(claims.jti)
         );
     }
 }

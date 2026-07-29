@@ -30,6 +30,7 @@ mod verify_accepts_expired_token_signature;
 mod verify_errors_when_claims_do_not_match;
 mod verify_rejects_alg_none_token;
 mod verify_rejects_algorithm_mismatch;
+mod verify_rejects_coordinates_of_the_wrong_length;
 mod verify_rejects_high_s_malleated_token;
 mod verify_rejects_hmac_algorithm_confusion;
 mod verify_rejects_wrong_key_signature;

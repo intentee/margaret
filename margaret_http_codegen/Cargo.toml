@@ -13,7 +13,6 @@ margaret_injection_codegen = { path = "../margaret_injection_codegen" }
 margaret_middleware_codegen = { path = "../margaret_middleware_codegen" }
 margaret_request_binding_codegen = { path = "../margaret_request_binding_codegen" }
 margaret_route_parameter_codegen = { path = "../margaret_route_parameter_codegen" }
-heck = { workspace = true }
 http = { workspace = true }
 matchit = { workspace = true }
 proc-macro2 = { workspace = true }

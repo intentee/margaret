@@ -79,6 +79,18 @@ fn server_layouts<'server>(
 
 fn segments_tokens(named: &NamedRoute<'_>) -> TokenStream {
     let segments = named.path.segments().iter().map(|segment| match segment {
+        UrlSegment::CatchAllParameter(name) => {
+            let value = format_ident!("{}", name);
+
+            quote! {
+                margaret::framework::http::url_segment::UrlSegment::CatchAllParameter(
+                    margaret::framework::http::url_parameter::UrlParameter {
+                        name: #name,
+                        value: #value,
+                    },
+                )
+            }
+        }
         UrlSegment::Literal(text) => {
             quote! { margaret::framework::http::url_segment::UrlSegment::Literal(#text) }
         }
@@ -87,18 +99,6 @@ fn segments_tokens(named: &NamedRoute<'_>) -> TokenStream {
 
             quote! {
                 margaret::framework::http::url_segment::UrlSegment::Parameter(
-                    margaret::framework::http::url_parameter::UrlParameter {
-                        name: #name,
-                        value: #value,
-                    },
-                )
-            }
-        }
-        UrlSegment::WildcardParameter(name) => {
-            let value = format_ident!("{}", name);
-
-            quote! {
-                margaret::framework::http::url_segment::UrlSegment::WildcardParameter(
                     margaret::framework::http::url_parameter::UrlParameter {
                         name: #name,
                         value: #value,

@@ -24,7 +24,7 @@ async fn public_set_verifies_token_from_matching_key() -> Result<()> {
     let set = PublicJwks {
         keys: vec![keypair.public],
     };
-    let verified: TestClaims = set.verify(&token)?.must()?;
+    let verified: TestClaims = set.verify(&token)?.verified().expect("the token verifies");
 
     assert_eq!(verified, claims);
 

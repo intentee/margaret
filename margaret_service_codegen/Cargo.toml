@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-heck = { workspace = true }
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
 margaret_container = { path = "../margaret_container" }

@@ -27,6 +27,12 @@ fn file_storage_error_variants_report_their_source() {
     assert!(write.to_string().contains("/secrets/jwks.json"));
     assert!(write.source().is_some());
 
+    let no_parent = FileJwksSecretStorageError::PathHasNoParentDirectory {
+        path: PathBuf::from("/"),
+    };
+    assert!(no_parent.to_string().contains("filesystem root"));
+    assert!(no_parent.source().is_none());
+
     let deserialize = FileJwksSecretStorageError::Deserialize {
         path: path.clone(),
         source: invalid_json_error(),

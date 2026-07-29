@@ -11,6 +11,9 @@ pub enum FileJwksSecretStorageError {
         source: serde_json::Error,
     },
 
+    #[error("the jwks secret path '{}' is a filesystem root and has no parent directory", .path.display())]
+    PathHasNoParentDirectory { path: PathBuf },
+
     #[error("failed to read the jwks secret file at '{}': {source}", .path.display())]
     Read {
         path: PathBuf,

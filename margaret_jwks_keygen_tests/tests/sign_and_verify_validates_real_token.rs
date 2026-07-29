@@ -20,7 +20,11 @@ async fn sign_and_verify_validates_real_token() -> Result<()> {
     };
 
     let token = keypair.signing.sign(&claims).await?;
-    let verified: TestClaims = keypair.public.verify(&token)?.must()?;
+    let verified: TestClaims = keypair
+        .public
+        .verify(&token)?
+        .verified()
+        .expect("the token verifies");
 
     assert_eq!(verified, claims);
 

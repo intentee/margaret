@@ -860,14 +860,14 @@ struct PatchArticle;
 impl PatchArticle { #[process] fn respond(&self, #[route_parameter(from = "article")] article: String) -> anyhow::Result<Response> {} }
 
 #[singleton]
+#[responds_to_http(method = "get", name = "get_file", path = "/files/{*rest}", server = "public")]
+struct GetFile;
+impl GetFile { #[process] fn respond(&self, #[route_parameter(from = "rest")] rest: String) -> anyhow::Result<Response> {} }
+
+#[singleton]
 #[responds_to_http(method = "get", path = "/health", server = "internal")]
 struct GetHealth;
 impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
-
-#[singleton]
-#[responds_to_http(method = "get", name = "get_asset", path = "/assets/{*asset_path}", server = "public")]
-struct GetAsset;
-impl GetAsset { #[process] fn respond(&self, #[route_parameter(from = "asset_path")] asset_path: String) -> anyhow::Result<Response> {} }
 "#;
 
     #[test]
@@ -896,11 +896,11 @@ impl GetAsset { #[process] fn respond(&self, #[route_parameter(from = "asset_pat
     }
 
     #[test]
-    fn renders_a_catch_all_parameter_as_a_wildcard_segment() {
+    fn generates_a_catch_all_segment_for_a_named_wildcard_get() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
         assert!(source.contains(
-            "margaret::framework::http::url_segment::UrlSegment::WildcardParameter(margaret::framework::http::url_parameter::UrlParameter{name:\"asset_path\",value:asset_path,})"
+            "margaret::framework::http::url_segment::UrlSegment::CatchAllParameter(margaret::framework::http::url_parameter::UrlParameter{name:\"rest\",value:rest,})"
         ));
     }
 
