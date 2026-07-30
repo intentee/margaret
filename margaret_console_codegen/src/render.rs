@@ -239,6 +239,7 @@ pub(crate) fn render(
             Argument: Into<std::ffi::OsString> + Clone,
         {
             let mut command = clap::Command::new(env!("CARGO_PKG_NAME"))
+                .version(env!("CARGO_PKG_VERSION"))
                 #(#subcommands)*
                 #serve_registration
                 #schema_registration;

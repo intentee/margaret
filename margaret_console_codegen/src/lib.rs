@@ -200,6 +200,16 @@ impl Farewell {
     }
 
     #[test]
+    fn declares_the_package_version_on_the_generated_command() {
+        let source = source_for(
+            "#[singleton]\n#[console_command(name = \"boot\")]\nstruct Boot;\n\nimpl Boot {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains(r#".version(env!("CARGO_PKG_VERSION"))"#));
+    }
+
+    #[test]
     fn accepts_commands_named_after_the_generated_entry_point() {
         let source = source_for(
             "#[singleton]\n#[console_command(name = \"run\")]\nstruct Run;\n\nimpl Run {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"command\")]\nstruct Command;\n\nimpl Command {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
