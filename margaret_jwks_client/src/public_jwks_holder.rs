@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_sync_holder::sync_holder::SyncHolder;
+use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 
 #[derive(Clone, Default)]
 pub struct PublicJwksHolder {
@@ -21,5 +22,10 @@ impl PublicJwksHolder {
 
     pub fn set(&self, value: Option<Arc<PublicJwks>>) {
         self.inner.set(value);
+    }
+
+    #[must_use]
+    pub fn subscribe(&self) -> SyncHolderSubscription<Arc<PublicJwks>> {
+        self.inner.subscribe()
     }
 }

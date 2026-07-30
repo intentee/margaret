@@ -2258,6 +2258,7 @@ dependencies = [
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
+ "margaret_sync_holder",
  "reqwest",
  "rustls",
  "serde",
