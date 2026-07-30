@@ -24,6 +24,9 @@ pub struct WebSocketPlan {
 }
 
 impl WebSocketPlan {
+    /// # Errors
+    ///
+    /// Returns `WebSocketCodegenError` propagated from the work it performs.
     pub fn build(
         index: &AttributeIndex,
         bindings: &ContainerBindings,

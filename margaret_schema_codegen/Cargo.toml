@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
 margaret_generated_module = { path = "../margaret_generated_module" }
 margaret_model_codegen = { path = "../margaret_model_codegen" }
 proc-macro2 = { workspace = true }

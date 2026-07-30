@@ -48,6 +48,9 @@ fn infer_from_request_method<'index>(
         })
 }
 
+/// # Errors
+///
+/// Returns `RequestBindingError::AuthenticatedUserProviderNotAStruct` or `RequestBindingError::AuthenticatedUserProviderRequiresSingleton` or `RequestBindingError::AuthenticatedUserProviderUnknownUserModel`.
 pub fn authenticated_user_providers(
     index: &AttributeIndex,
     registries: &BindingRegistries,
@@ -114,12 +117,14 @@ pub fn authenticated_user_providers(
             model: model.clone(),
             wrapper: format_ident!("{}", identifier.type_name()),
         };
+        let is_async = method.signature().asyncness.is_some();
         let method_name = format_ident!("{}", method.identifier());
 
         registry.insert(
             model,
             AuthenticatedUserProvider {
                 application,
+                is_async,
                 method_name,
                 parameters,
             },

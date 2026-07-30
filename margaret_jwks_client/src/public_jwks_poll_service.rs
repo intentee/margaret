@@ -26,6 +26,9 @@ pub struct PublicJwksPollService {
 }
 
 impl PublicJwksPollService {
+    /// # Errors
+    ///
+    /// Returns `JwksClientError::EndpointResolution` or `JwksClientError::DocumentFetch`.
     pub async fn fetch_public_jwks(&self) -> Result<PublicJwks, JwksClientError> {
         let jwks_url = self
             .endpoint_provider

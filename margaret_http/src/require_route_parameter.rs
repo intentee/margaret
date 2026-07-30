@@ -12,6 +12,9 @@ where
     }
 }
 
+/// # Errors
+///
+/// Returns `Response` when the request does not carry a usable value for the parameter.
 pub fn require_route_parameter<Value>(request: &Request, name: &str) -> Result<Value, Response>
 where
     Value: TryFrom<String>,

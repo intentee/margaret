@@ -1,4 +1,5 @@
 use margaret_codegen::generated_code::GeneratedCode;
+use margaret_generated_module::generated_module::GeneratedModule;
 
 #[must_use]
 pub fn generated_module_source<'code>(
@@ -8,5 +9,5 @@ pub fn generated_module_source<'code>(
     code.modules()
         .iter()
         .find(|module| module.name() == name)
-        .map(|module| module.source())
+        .map(GeneratedModule::source)
 }

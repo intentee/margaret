@@ -33,7 +33,10 @@ impl JwksRoller {
         self.public_jwks_handler.clone()
     }
 
-    pub async fn run(&self) -> Result<(), JwksRollerServerError> {
+    /// # Errors
+    ///
+    /// Returns `JwksRollerServerError` propagated from the work it performs.
+    pub fn run(&self) -> Result<(), JwksRollerServerError> {
         self.bundle.roll_and_publish()
     }
 
@@ -60,14 +63,11 @@ mod tests {
         assert_eq!(roller().public_jwks_handler().respond().status(), 503);
     }
 
-    #[tokio::test]
-    async fn serves_the_rolled_document_after_a_run() {
+    #[test]
+    fn serves_the_rolled_document_after_a_run() {
         let roller = roller();
 
-        roller
-            .run()
-            .await
-            .expect("the first roll publishes a document");
+        roller.run().expect("the first roll publishes a document");
 
         assert_eq!(roller.public_jwks_handler().respond().status(), 200);
     }
@@ -80,7 +80,7 @@ mod tests {
 
         assert!(store.sign(&claims).await.is_err());
 
-        roller.run().await.expect("the first roll seeds the secret");
+        roller.run().expect("the first roll seeds the secret");
 
         assert!(store.sign(&claims).await.is_ok());
     }

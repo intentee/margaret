@@ -104,6 +104,9 @@ fn insert_value(
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns `RequestBindingError` propagated from the work it performs.
 pub fn route_parameter_resolutions(
     index: &AttributeIndex,
 ) -> Result<HashMap<CanonicalPath, RouteParameterResolution>, RequestBindingError> {
@@ -175,7 +178,7 @@ mod tests {
         let mut resolutions = resolutions_for(lib_source).expect("the crate is accepted");
 
         match resolutions.remove(&CanonicalPath::new(
-            segments.iter().map(|segment| segment.to_string()).collect(),
+            segments.iter().map(std::string::ToString::to_string).collect(),
         )) {
             Some(RouteParameterResolution::Binder(RouteParameterBinder { provider, .. })) => {
                 ResolvedBy::Binder(provider.to_string())

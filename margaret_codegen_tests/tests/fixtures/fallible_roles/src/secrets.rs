@@ -9,6 +9,9 @@ pub struct Secrets {
 }
 
 impl Secrets {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create() -> AppResult<Self> {
         Ok(Self {

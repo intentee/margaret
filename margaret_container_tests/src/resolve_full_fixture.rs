@@ -11,6 +11,9 @@ use margaret_container::render_container::render_container;
 use margaret_container::resolve_injectable::resolve_injectable;
 
 #[must_use]
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub fn resolve_full_fixture(consumer: &str, declared: &str) -> InjectableResolution {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/full");
     let index = AttributeIndexBuilder::new()

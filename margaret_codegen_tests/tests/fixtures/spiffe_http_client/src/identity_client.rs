@@ -9,6 +9,9 @@ pub struct IdentityClient {
 }
 
 impl IdentityClient {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(#[spiffe_http_client] http_client: Client) -> anyhow::Result<Self> {
         Ok(Self { http_client })

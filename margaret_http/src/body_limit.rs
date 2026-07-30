@@ -1,8 +1,8 @@
-const DEFAULT_MAX_BODY_SIZE: u64 = 8 * 1024 * 1024;
+const DEFAULT_MAX_BODY_SIZE: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Copy)]
 pub struct BodyLimit {
-    max_bytes: u64,
+    max_bytes: usize,
 }
 
 impl Default for BodyLimit {
@@ -15,12 +15,12 @@ impl Default for BodyLimit {
 
 impl BodyLimit {
     #[must_use]
-    pub fn new(max_bytes: u64) -> Self {
+    pub fn new(max_bytes: usize) -> Self {
         Self { max_bytes }
     }
 
     #[must_use]
-    pub fn max_bytes(&self) -> u64 {
+    pub fn max_bytes(&self) -> usize {
         self.max_bytes
     }
 }

@@ -18,6 +18,7 @@ mod injectability_is_gated_by_singleton;
 mod injects_a_uri_selected_framework_provider;
 mod injects_jwks_secret_stores;
 mod moves_a_copy_console_argument_shared_by_dependencies;
+mod names_container_fields_by_construction_position;
 mod planned_container_errors;
 mod propagates_index_failure;
 mod propagates_malformed_singleton_arguments;

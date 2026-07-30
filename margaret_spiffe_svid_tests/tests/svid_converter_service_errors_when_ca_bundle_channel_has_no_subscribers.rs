@@ -12,7 +12,7 @@ async fn convert_x509_context_errors_when_ca_bundle_channel_has_no_subscribers()
     let service = build_converter_service(ca_bundle_tx);
     let context = build_workload_x509_context().unwrap();
 
-    let result = service.convert_x509_context(context).await;
+    let result = service.convert_x509_context(&context);
 
     assert!(result.is_err());
 }

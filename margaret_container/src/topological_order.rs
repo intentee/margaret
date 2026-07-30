@@ -9,7 +9,7 @@ use crate::container_error::ContainerError;
 use crate::dependency_kind::DependencyKind;
 use crate::provider::Provider;
 
-fn dependency_cycle(cycle: Cycle<CanonicalPath>) -> ContainerError {
+fn dependency_cycle(cycle: &Cycle<CanonicalPath>) -> ContainerError {
     ContainerError::DependencyCycle {
         path: cycle
             .path
@@ -43,5 +43,5 @@ pub(crate) fn topological_order(
         .map(|(key, provider)| (key.clone(), dependency_keys(provider)))
         .collect();
 
-    order_by_dependencies(&dependencies).map_err(dependency_cycle)
+    order_by_dependencies(&dependencies).map_err(|cycle| dependency_cycle(&cycle))
 }

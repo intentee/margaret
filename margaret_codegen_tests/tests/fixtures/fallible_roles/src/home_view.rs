@@ -18,6 +18,9 @@ pub struct HomeView {
 }
 
 impl HomeView {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(secrets: Arc<Secrets>) -> failures::Result<Self> {
         Ok(Self { secrets })

@@ -19,13 +19,19 @@ pub struct GetGreetingCard {
 }
 
 impl GetGreetingCard {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(greeter: Arc<EnglishGreeter>) -> anyhow::Result<Self> {
         Ok(Self { greeter })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(&self, routes: &Routes, views: &Views) -> anyhow::Result<Response> {
+    pub fn respond(&self, routes: &Routes, views: &Views) -> anyhow::Result<Response> {
         Ok({
             Response::html(
                 200,
@@ -74,7 +80,6 @@ mod tests {
         assert_eq!(
             responder
                 .respond(&routes, &views)
-                .await
                 .expect("the responder succeeds")
                 .status(),
             200

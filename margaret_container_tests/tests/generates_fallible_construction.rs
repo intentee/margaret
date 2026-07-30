@@ -18,7 +18,7 @@ fn fixture(name: &str) -> String {
 fn renders_a_fallible_root_builder_returning_a_result() {
     let source = fixture("fallible_constructor");
 
-    assert!(source.contains("pub(crate)fnconstruct_loader("));
+    assert!(source.contains("pubfnconstruct_loader("));
     assert!(source.contains("::std::sync::Arc<crate::Loader>"));
     assert!(source.contains("margaret::framework::construction_error::ConstructionError"));
 }
@@ -28,7 +28,7 @@ fn wraps_a_fallible_constructor_through_the_framework_error_adapter() {
     let source = fixture("fallible_constructor");
 
     assert!(source.contains(
-        "margaret::framework::construction_error::ConstructionError::wrap(\"crate::Loader\",crate::Loader::new(),)?"
+        "margaret::framework::construct_singleton::construct_singleton(\"crate::Loader\",crate::Loader::new(),)?"
     ));
     assert!(!source.contains("anyhow"));
 }
@@ -37,21 +37,21 @@ fn wraps_a_fallible_constructor_through_the_framework_error_adapter() {
 fn propagates_fallibility_to_an_explicitly_constructed_dependent() {
     let source = fixture("fallible_constructor");
 
-    assert!(source.contains("pub(crate)fnconstruct_consumer("));
+    assert!(source.contains("pubfnconstruct_consumer("));
     assert!(source.contains("::std::sync::Arc<crate::Consumer>"));
     assert!(source.contains("crate::Consumer::new("));
     assert!(source.contains("::std::sync::Arc::clone(&loader)"));
-    assert!(source.contains("wrap(\"crate::Consumer\""));
+    assert!(source.contains("construct_singleton(\"crate::Consumer\""));
 }
 
 #[test]
 fn renders_a_fallible_service_construction_that_depends_on_a_fallible_singleton() {
     let source = fixture("fallible_service");
 
-    assert!(source.contains("pub(crate)fnconstruct_worker("));
+    assert!(source.contains("pubfnconstruct_worker("));
     assert!(source.contains("::std::sync::Arc<crate::Worker>"));
     assert!(source.contains(
-        "margaret::framework::construction_error::ConstructionError::wrap(\"crate::Worker\""
+        "margaret::framework::construct_singleton::construct_singleton(\"crate::Worker\""
     ));
     assert!(source.contains("crate::Worker::new("));
     assert!(source.contains("::std::sync::Arc::clone(&loader)"));

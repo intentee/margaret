@@ -56,7 +56,6 @@ pub fn render_request_extraction(
                 Err(response) => #error_return,
             };
         },
-        RequestBinding::BoundRouteParameter { .. } => TokenStream::new(),
         RequestBinding::FormRequest { source, extraction } => {
             let variant = source.variant();
 
@@ -98,7 +97,8 @@ pub fn render_request_extraction(
         RequestBinding::AssetBag => quote! {
             let #holder = ::margaret::framework::asset_bag::asset_bag::AssetBag::new();
         },
-        RequestBinding::Forwarder
+        RequestBinding::BoundRouteParameter { .. }
+        | RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
         | RequestBinding::Next
         | RequestBinding::Routes

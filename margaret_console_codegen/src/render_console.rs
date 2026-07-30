@@ -9,25 +9,24 @@ use crate::render::render;
 
 #[must_use]
 pub fn render_console(
-    plan: ConsolePlan,
+    plan: &ConsolePlan,
     serves: bool,
     has_models: bool,
-    servers: &[HttpServer],
+    http_servers: &[HttpServer],
     serve_arguments: &[ConsoleArgument],
     bindings: &ContainerBindings,
 ) -> ConsoleArtifacts {
+    let rendered = render(
+        &plan.commands,
+        serves,
+        has_models,
+        http_servers,
+        serve_arguments,
+        bindings,
+    );
+
     ConsoleArtifacts {
-        module: GeneratedModuleTokens::new(
-            "run",
-            render(
-                &plan.commands,
-                serves,
-                has_models,
-                servers,
-                serve_arguments,
-                bindings,
-            ),
-        ),
+        modules: vec![GeneratedModuleTokens::new("run", rendered.run)],
         construction_roots: plan.construction_roots().to_vec(),
     }
 }

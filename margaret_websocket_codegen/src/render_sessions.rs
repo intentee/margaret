@@ -5,6 +5,7 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::injected_dependency::InjectedDependency;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
@@ -227,6 +228,7 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
     let extractions = create_extractions(session, &handshake, captured);
     let arguments = build_arguments(session);
     let method_name = &session.method_name;
+    let create_too_many_lines = too_many_lines_allow();
 
     quote! {
         struct Factory {
@@ -237,6 +239,7 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
         impl margaret::framework::websocket::web_socket_session_factory::WebSocketSessionFactory for Factory {
             type Session = #session_path;
 
+            #create_too_many_lines
             async fn create(
                 &self,
                 #handshake: &margaret::framework::http::request::Request,
@@ -383,6 +386,7 @@ fn render_dispatch_table(
 
     let requests_mutability = mutability(!plan.request_handlers.is_empty());
     let notifications_mutability = mutability(!plan.notification_handlers.is_empty());
+    let dispatch_too_many_lines = too_many_lines_allow();
     let table_type = quote! {
         ::std::sync::Arc<
             margaret::framework::websocket::web_socket_dispatch_table::WebSocketDispatchTable<#session_path>,
@@ -397,7 +401,8 @@ fn render_dispatch_table(
         )
     };
     quote! {
-        async fn dispatch_table(
+        #dispatch_too_many_lines
+        fn dispatch_table(
             #container: &super::super::super::container::Container,
         ) -> #table_type {
             let #requests_mutability #requests: ::std::collections::HashMap<
@@ -442,7 +447,7 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
         .iter()
         .map(|binding| render_notification_dispatch(binding, &session_path));
     let dispatch_table = render_dispatch_table(plan, &session_path, bindings);
-    let dispatch_call = quote! { dispatch_table(container).await };
+    let dispatch_call = quote! { dispatch_table(container) };
     let upgrade_type = quote! {
         ::std::sync::Arc<dyn margaret::framework::http::web_socket_upgrade::WebSocketUpgrade>
     };
@@ -464,7 +469,8 @@ fn render_session(plan: &SessionPlan, bindings: &ContainerBindings) -> TokenStre
 
         #dispatch_table
 
-        pub async fn upgrade_entry(
+        #[must_use]
+        pub fn upgrade_entry(
             container: &super::super::super::container::Container,
             #routes_parameter
         ) -> #upgrade_type {

@@ -13,7 +13,7 @@ fn skips_non_path_self_type_impl_methods() {
     let has_tuple_method = index
         .items()
         .iter()
-        .flat_map(|item| item.methods())
+        .flat_map(margaret_attributes::indexed_item::IndexedItem::methods)
         .any(|method| method.identifier() == "skipped_tuple_method");
 
     assert!(!has_tuple_method);

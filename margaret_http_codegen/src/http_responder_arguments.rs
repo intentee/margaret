@@ -2,7 +2,7 @@ use margaret_attributes::attribute_args::AttributeArgs;
 
 use crate::http_codegen_error::HttpCodegenError;
 
-fn normalized_method(method: String, responder: &str) -> Result<String, HttpCodegenError> {
+fn normalized_method(method: &str, responder: &str) -> Result<String, HttpCodegenError> {
     let method = method.to_uppercase();
 
     http::Method::from_bytes(method.as_bytes()).map_err(|source| {
@@ -29,14 +29,12 @@ impl HttpResponderArguments {
         responder: &str,
     ) -> Result<Self, HttpCodegenError> {
         arguments.interpret(|reader| {
-            let method = normalized_method(
-                reader.take_string("method")?.ok_or_else(|| {
-                    HttpCodegenError::MissingHttpMethod {
-                        responder: responder.to_string(),
-                    }
-                })?,
-                responder,
-            )?;
+            let declared_method = reader.take_string("method")?.ok_or_else(|| {
+                HttpCodegenError::MissingHttpMethod {
+                    responder: responder.to_string(),
+                }
+            })?;
+            let method = normalized_method(&declared_method, responder)?;
             let path =
                 reader
                     .take_string("path")?

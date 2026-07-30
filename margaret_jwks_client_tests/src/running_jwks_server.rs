@@ -25,6 +25,9 @@ pub struct RunningJwksServer {
 }
 
 impl RunningJwksServer {
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
     pub async fn start(server_config: Arc<ServerConfig>, handler: Arc<dyn Handler>) -> Self {
         let server = Server::new(
             "jwks",
@@ -34,7 +37,7 @@ impl RunningJwksServer {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 WELL_KNOWN_JWKS_PATH,
-                vec![MethodHandler::new("GET", handler)],
+                vec![MethodHandler::anonymous("GET", handler)],
             )])
             .expect("the well known jwks route registers cleanly"),
         );
@@ -61,6 +64,9 @@ impl RunningJwksServer {
         self.address.port()
     }
 
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
     pub async fn stop(self) {
         self.cancellation_token.cancel();
         self.join_handle

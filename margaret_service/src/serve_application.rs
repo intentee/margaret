@@ -14,6 +14,9 @@ use margaret_http::upload_config::UploadConfig;
 use crate::server_assembly::ServerAssembly;
 use crate::server_service::ServerService;
 
+/// # Errors
+///
+/// Returns `CommandOutcome::Failed`.
 pub fn serve_application(
     matches: &ArgMatches,
     servers: Vec<ServerAssembly>,
@@ -41,8 +44,7 @@ pub fn serve_application(
             UploadConfig::enabled(
                 matches
                     .get_one::<String>(upload_dir_argument)
-                    .map(PathBuf::from)
-                    .unwrap_or_else(std::env::temp_dir),
+                    .map_or_else(std::env::temp_dir, PathBuf::from),
             )
         } else {
             UploadConfig::Disabled
@@ -119,10 +121,7 @@ mod tests {
     }
 
     fn empty_routes() -> ServerRoutes {
-        ServerRoutes::new(
-            Router::build(Vec::new()).expect("an empty router builds"),
-            Vec::new(),
-        )
+        ServerRoutes::build(Vec::new()).expect("an empty entry list builds server routes")
     }
 
     #[test]

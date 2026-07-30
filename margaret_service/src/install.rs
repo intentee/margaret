@@ -8,6 +8,9 @@ fn install_signals(interrupt: SignalKind, terminate: SignalKind) -> Result<Shutd
     Ok(ShutdownSignals::new(signal(interrupt)?, signal(terminate)?))
 }
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub fn install() -> Result<ShutdownSignals> {
     install_signals(SignalKind::interrupt(), SignalKind::terminate())
 }

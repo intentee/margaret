@@ -17,6 +17,9 @@ pub struct JwksSecret {
 }
 
 impl JwksSecret {
+    /// # Errors
+    ///
+    /// Returns `JwksKeyError` propagated from the work it performs.
     pub fn fresh(crv: Curve) -> Result<Self, JwksKeyError> {
         generate_keypair_random_kid(crv).and_then(|current| {
             generate_keypair_random_kid(crv).map(|next| Self {
@@ -27,6 +30,9 @@ impl JwksSecret {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns `JwksKeyError` propagated from the work it performs.
     pub fn rotate(&self) -> Result<Self, JwksKeyError> {
         generate_keypair_random_kid(self.current.signing.crv).map(|next| Self {
             current: self.next.clone(),

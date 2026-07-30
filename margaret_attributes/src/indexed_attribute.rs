@@ -28,7 +28,7 @@ pub struct IndexedAttribute {
 
 impl IndexedAttribute {
     #[must_use]
-    pub fn new(attribute: Attribute) -> Self {
+    pub fn new(attribute: &Attribute) -> Self {
         let canonical_path = CanonicalPath::new(
             attribute
                 .path()
@@ -38,11 +38,11 @@ impl IndexedAttribute {
                 .collect(),
         );
 
-        Self::from_canonical(attribute, canonical_path)
+        Self::from_canonical(attribute, &canonical_path)
     }
 
-    pub(crate) fn from_canonical(attribute: Attribute, canonical_path: CanonicalPath) -> Self {
-        let args = match AttributeArgs::from_attribute(&attribute) {
+    pub(crate) fn from_canonical(attribute: &Attribute, canonical_path: &CanonicalPath) -> Self {
+        let args = match AttributeArgs::from_attribute(attribute) {
             Ok(args) => IndexedAttributeArgs::Parsed(args),
             Err(AttributeArgsParseError::Malformed {
                 attribute_path,
@@ -60,11 +60,11 @@ impl IndexedAttribute {
             },
         };
 
-        let framework_attribute = FrameworkAttribute::from_canonical_path(&canonical_path);
+        let framework_attribute = FrameworkAttribute::from_canonical_path(canonical_path);
 
         Self {
             args,
-            attribute,
+            attribute: attribute.clone(),
             framework_attribute,
         }
     }
@@ -79,6 +79,9 @@ impl IndexedAttribute {
         self.framework_attribute
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeError::DuplicateNamedArgument` or `AttributeError::AttributeArguments`.
     pub fn args(&self) -> Result<&AttributeArgs, AttributeError> {
         match &self.args {
             IndexedAttributeArgs::DuplicateNamedArgument {
@@ -113,7 +116,7 @@ mod tests {
 
     #[test]
     fn preserves_a_malformed_argument_error_until_the_attribute_is_consumed() {
-        let attribute = IndexedAttribute::new(parse_quote!(#[bad_args(= 5)]));
+        let attribute = IndexedAttribute::new(&parse_quote!(#[bad_args(= 5)]));
         let message = attribute
             .args()
             .expect_err("the malformed arguments must be rejected")
@@ -124,7 +127,7 @@ mod tests {
 
     #[test]
     fn preserves_a_duplicate_argument_error_until_the_attribute_is_consumed() {
-        let attribute = IndexedAttribute::new(parse_quote!(#[tag(value = 1, value = 2)]));
+        let attribute = IndexedAttribute::new(&parse_quote!(#[tag(value = 1, value = 2)]));
         let message = attribute
             .args()
             .expect_err("the duplicate must be rejected")
@@ -135,8 +138,8 @@ mod tests {
 
     #[test]
     fn distinguishes_bare_attributes_from_argument_lists() {
-        let bare = IndexedAttribute::new(parse_quote!(#[tag]));
-        let listed = IndexedAttribute::new(parse_quote!(#[tag()]));
+        let bare = IndexedAttribute::new(&parse_quote!(#[tag]));
+        let listed = IndexedAttribute::new(&parse_quote!(#[tag()]));
 
         assert!(bare.is_bare());
         assert!(!listed.is_bare());

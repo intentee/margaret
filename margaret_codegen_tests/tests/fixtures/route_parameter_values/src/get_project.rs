@@ -18,16 +18,19 @@ use super::project_slug::ProjectSlug;
 pub struct GetProject;
 
 impl GetProject {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         #[route_parameter(from = "project_slug")] ProjectSlug(slug): ProjectSlug,
-        #[route_parameter(from = "project_id")] id: ProjectId,
-        #[route_parameter(from = "project_revision")] revision: ProjectRevision,
+        #[route_parameter(from = "project_id")] ProjectId(id): ProjectId,
+        #[route_parameter(from = "project_revision")] ProjectRevision(revision): ProjectRevision,
     ) -> Result<Response> {
         Ok(Response::text(
             200,
-            format!("{slug}/{}@{}", id.0, revision.0),
+            format!("{slug}/{id}@{revision}"),
         ))
     }
 }

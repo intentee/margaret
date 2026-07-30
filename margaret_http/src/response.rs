@@ -31,6 +31,7 @@ impl Response {
         Self::text(403, "Forbidden")
     }
 
+    #[must_use]
     pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.headers.push(Header {
             name: name.into(),
@@ -72,7 +73,8 @@ impl Response {
         Self::text(404, "Not Found")
     }
 
-    pub fn set_cookie(self, cookie: Cookie<'static>) -> Self {
+    #[must_use]
+    pub fn set_cookie(self, cookie: &Cookie<'_>) -> Self {
         self.header("set-cookie", cookie.to_string())
     }
 
@@ -271,7 +273,7 @@ mod tests {
     #[test]
     fn attaches_a_set_cookie_header() {
         let response = Response::text(200, "")
-            .set_cookie(Cookie::new("session", "abc"))
+            .set_cookie(&Cookie::new("session", "abc"))
             .into_http();
 
         assert!(

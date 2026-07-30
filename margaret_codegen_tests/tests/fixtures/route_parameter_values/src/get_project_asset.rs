@@ -18,8 +18,11 @@ use super::project::Project;
 pub struct GetProjectAsset;
 
 impl GetProjectAsset {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         #[route_parameter(from = "project")] Project { name }: Project,
         #[route_parameter(from = "asset_path")] asset_path: String,
@@ -27,7 +30,7 @@ impl GetProjectAsset {
         Ok({
             let _ = asset!("resources/ts/app.ts");
 
-            Response::text(200, format!("{name}:{asset_path}"))
+            Response::text(200, [name, asset_path].join(":"))
         })
     }
 }

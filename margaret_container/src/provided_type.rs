@@ -8,6 +8,13 @@ pub(crate) enum ProvidedType {
 }
 
 impl ProvidedType {
+    pub(crate) fn is_trait_object(&self) -> bool {
+        match self {
+            ProvidedType::Concrete(_) => false,
+            ProvidedType::Endpoint(_) | ProvidedType::UriSelected(_) => true,
+        }
+    }
+
     pub(crate) fn key(&self) -> &CanonicalPath {
         match self {
             ProvidedType::Concrete(path)

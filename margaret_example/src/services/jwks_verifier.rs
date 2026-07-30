@@ -32,6 +32,9 @@ pub struct JwksVerifier {
 }
 
 impl JwksVerifier {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(
         clock: Arc<SystemClock>,
@@ -40,6 +43,9 @@ impl JwksVerifier {
         Ok(Self { clock, verifier })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         match self

@@ -9,6 +9,9 @@ pub struct ConstructionError {
 }
 
 impl ConstructionError {
+    /// # Errors
+    ///
+    /// Returns `Self` propagated from the work it performs.
     pub fn wrap<Constructed>(
         singleton: &'static str,
         outcome: anyhow::Result<Constructed>,

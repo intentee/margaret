@@ -76,10 +76,10 @@ mod tests {
 
     use super::flatten_use_tree;
 
-    fn entries(tree: syn::ItemUse, module_path: &[&str]) -> Vec<(String, String)> {
+    fn entries(tree: &syn::ItemUse, module_path: &[&str]) -> Vec<(String, String)> {
         let module: Vec<String> = module_path
             .iter()
-            .map(|segment| segment.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
 
         flatten_use_tree(&tree.tree, &module)
@@ -92,7 +92,7 @@ mod tests {
     fn resolves_an_external_crate_import_as_written() {
         assert_eq!(
             entries(
-                parse_quote!(
+                &parse_quote!(
                     use margaret_http::request::Request;
                 ),
                 &["crate"]
@@ -108,7 +108,7 @@ mod tests {
     fn resolves_a_crate_rooted_import_as_written() {
         assert_eq!(
             entries(
-                parse_quote!(
+                &parse_quote!(
                     use crate::margaret::routes::Routes;
                 ),
                 &["crate", "routes"]
@@ -124,7 +124,7 @@ mod tests {
     fn resolves_a_self_import_against_the_current_module() {
         assert_eq!(
             entries(
-                parse_quote!(
+                &parse_quote!(
                     use self::User;
                 ),
                 &["crate", "models"]
@@ -137,7 +137,7 @@ mod tests {
     fn resolves_a_super_import_against_the_parent_module() {
         assert_eq!(
             entries(
-                parse_quote!(
+                &parse_quote!(
                     use super::Shared;
                 ),
                 &["crate", "models", "user"]
@@ -150,7 +150,7 @@ mod tests {
     fn resolves_nested_super_imports_against_the_grandparent_module() {
         assert_eq!(
             entries(
-                parse_quote!(
+                &parse_quote!(
                     use super::super::Root;
                 ),
                 &["crate", "models", "user"]
@@ -163,7 +163,7 @@ mod tests {
     fn flattens_a_rename_under_its_alias() {
         assert_eq!(
             entries(
-                parse_quote!(
+                &parse_quote!(
                     use foo::Bar as Renamed;
                 ),
                 &["crate"]
@@ -176,7 +176,7 @@ mod tests {
     fn flattens_a_group() {
         assert_eq!(
             entries(
-                parse_quote!(
+                &parse_quote!(
                     use foo::{Bar, baz::Qux};
                 ),
                 &["crate"]
@@ -192,7 +192,7 @@ mod tests {
     fn skips_the_self_group_member() {
         assert_eq!(
             entries(
-                parse_quote!(
+                &parse_quote!(
                     use foo::{self, Bar};
                 ),
                 &["crate"]
@@ -205,7 +205,7 @@ mod tests {
     fn ignores_a_glob() {
         assert!(
             entries(
-                parse_quote!(
+                &parse_quote!(
                     use foo::*;
                 ),
                 &["crate"]

@@ -48,9 +48,7 @@ fn concrete_roles() -> [FrameworkAttribute; 4] {
     ]
 }
 
-fn build_drafts<'index>(
-    index: &'index AttributeIndex,
-) -> Result<DraftedContainer<'index>, ContainerError> {
+fn build_drafts(index: &AttributeIndex) -> Result<DraftedContainer<'_>, ContainerError> {
     let mut provider_drafts: Vec<Draft> = Vec::new();
 
     for matched in index.select_framework_attribute(FrameworkAttribute::Singleton) {
@@ -119,13 +117,12 @@ fn build_provider_draft<'index>(
     index: &AttributeIndex,
 ) -> Result<Draft<'index>, ContainerError> {
     let item = matched.item();
-    let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
-        (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
-        _ => {
-            return Err(ContainerError::NotASingletonStruct {
-                path: item.canonical_path().to_string(),
-            });
-        }
+    let (Some(identifier), ItemKind::Struct(shape)) =
+        (index.struct_identifier(item.canonical_path()), item.kind())
+    else {
+        return Err(ContainerError::NotASingletonStruct {
+            path: item.canonical_path().to_string(),
+        });
     };
 
     let concrete_path = item.canonical_path().clone();
@@ -152,13 +149,12 @@ fn build_endpoint_draft<'index>(
     index: &AttributeIndex,
 ) -> Result<Draft<'index>, ContainerError> {
     let item = matched.item();
-    let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
-        (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
-        _ => {
-            return Err(ContainerError::NotAnEndpointStruct {
-                path: item.canonical_path().to_string(),
-            });
-        }
+    let (Some(identifier), ItemKind::Struct(shape)) =
+        (index.struct_identifier(item.canonical_path()), item.kind())
+    else {
+        return Err(ContainerError::NotAnEndpointStruct {
+            path: item.canonical_path().to_string(),
+        });
     };
 
     let concrete_path = item.canonical_path().clone();
@@ -202,13 +198,12 @@ fn build_construction_draft<'index>(
     item: &'index IndexedItem,
     index: &AttributeIndex,
 ) -> Result<Draft<'index>, ContainerError> {
-    let (identifier, shape) = match (index.struct_identifier(item.canonical_path()), item.kind()) {
-        (Some(identifier), ItemKind::Struct(shape)) => (identifier, shape),
-        _ => {
-            return Err(ContainerError::RoleNotAStruct {
-                path: item.canonical_path().to_string(),
-            });
-        }
+    let (Some(identifier), ItemKind::Struct(shape)) =
+        (index.struct_identifier(item.canonical_path()), item.kind())
+    else {
+        return Err(ContainerError::RoleNotAStruct {
+            path: item.canonical_path().to_string(),
+        });
     };
 
     let concrete_path = item.canonical_path().clone();
@@ -277,7 +272,7 @@ impl DependencyResolver<'_> {
     fn resolve_direct(
         &self,
         item: &IndexedItem,
-        source: ConstructionSource,
+        source: &ConstructionSource,
         jwks_targets: &BTreeMap<usize, JwksSecretStoreTarget>,
         concrete_path: &CanonicalPath,
     ) -> Result<DirectConstruction, ContainerError> {
@@ -292,7 +287,9 @@ impl DependencyResolver<'_> {
                     method: constructor.identifier().to_string(),
                 })
             }
-            ConstructionSource::Fieldless(shape) => Ok(DirectConstruction::Fieldless { shape }),
+            ConstructionSource::Fieldless(shape) => {
+                Ok(DirectConstruction::Fieldless { shape: *shape })
+            }
         }
     }
 
@@ -778,7 +775,7 @@ pub(crate) fn build_plan(
         let provider_key = provided.key().clone();
 
         let construction =
-            resolver.resolve_direct(item, construction, &jwks_targets, &concrete_path)?;
+            resolver.resolve_direct(item, &construction, &jwks_targets, &concrete_path)?;
 
         providers.insert(
             provider_key,
@@ -804,7 +801,7 @@ pub(crate) fn build_plan(
         } = draft;
 
         let construction =
-            resolver.resolve_direct(item, construction, &jwks_targets, &concrete_path)?;
+            resolver.resolve_direct(item, &construction, &jwks_targets, &concrete_path)?;
 
         constructions.insert(
             concrete_path.clone(),

@@ -10,8 +10,11 @@ use margaret::framework::macros::singleton;
 pub struct GetIdentity;
 
 impl GetIdentity {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(&self, peer: &SpiffeId) -> anyhow::Result<Response> {
+    pub fn respond(&self, peer: &SpiffeId) -> anyhow::Result<Response> {
         Ok({
             Response::text(
                 200,

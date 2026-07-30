@@ -9,7 +9,7 @@ fn returns_no_root_hint_subjects() {
     install_crypto_provider();
 
     let verifier =
-        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org".to_string())
+        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
             .unwrap();
 
     assert!(verifier.root_hint_subjects().is_empty());

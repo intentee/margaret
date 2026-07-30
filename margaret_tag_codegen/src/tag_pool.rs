@@ -66,6 +66,9 @@ pub struct TagPool {
 }
 
 impl TagPool {
+    /// # Errors
+    ///
+    /// Returns `TagError` propagated from the work it performs.
     pub fn collect(index: &AttributeIndex) -> Result<Self, TagError> {
         let mut entries: HashMap<Tag, TagEntry> = HashMap::new();
 
@@ -110,6 +113,9 @@ impl TagPool {
             .collect()
     }
 
+    /// # Errors
+    ///
+    /// Returns `TagError::UnknownTag` or `TagError::WrongKind`.
     pub fn resolve(
         &self,
         tag: &Tag,

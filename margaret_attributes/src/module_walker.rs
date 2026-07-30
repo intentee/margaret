@@ -24,6 +24,7 @@ use crate::indexed_associated_type::IndexedAssociatedType;
 use crate::indexed_trait_impl::IndexedTraitImpl;
 use crate::indexed_variant::IndexedVariant;
 use crate::item_kind::ItemKind;
+use crate::item_paths::ItemPaths;
 use crate::module_imports::ModuleImports;
 use crate::resolve_type::resolve_type;
 use crate::scanned_field::ScannedField;
@@ -176,7 +177,7 @@ impl ModuleWalker {
             seen_paths: _,
         } = self;
 
-        let item_paths: HashSet<CanonicalPath> = items
+        let item_paths: ItemPaths = items
             .iter()
             .map(|item| item.canonical_path().clone())
             .collect();
@@ -471,15 +472,12 @@ impl ModuleWalker {
 
         let child_directory = directory.join(item_mod.ident.to_string());
 
-        match &item_mod.content {
-            Some((_brace, items)) => {
-                self.walk_items(items, &child_module_path, file_path, &child_directory)
-            }
-            None => {
-                let resolved_file = resolve_module_file(directory, &item_mod.ident)?;
+        if let Some((_brace, items)) = &item_mod.content {
+            self.walk_items(items, &child_module_path, file_path, &child_directory)
+        } else {
+            let resolved_file = resolve_module_file(directory, &item_mod.ident)?;
 
-                self.walk_file(&resolved_file, &child_module_path, &child_directory)
-            }
+            self.walk_file(&resolved_file, &child_module_path, &child_directory)
         }
     }
 }

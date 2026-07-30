@@ -113,7 +113,7 @@ mod tests {
         failure.expect("the layers fail to resolve").to_string()
     }
 
-    const GUARD: &str = r#"
+    const GUARD: &str = r"
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -124,7 +124,7 @@ impl Guard {
     #[process]
     fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
-"#;
+";
 
     #[test]
     fn generates_a_wrapper_that_forwards_to_the_process_method() {
@@ -135,6 +135,26 @@ impl Guard {
             source
                 .contains("implmargaret::framework::http::http_middleware::HttpMiddlewareforGuard")
         );
+        assert!(source.contains("self.inner.process(request,next)"));
+    }
+
+    #[test]
+    fn awaits_a_middleware_that_declares_an_asynchronous_process_method() {
+        let source = wrappers_for(
+            r"
+use margaret::framework::http::next::Next;
+use margaret::framework::http::request::Request;
+
+#[handles_middleware_attribute(attribute = guard)]
+struct Guard;
+
+impl Guard {
+    #[process]
+    async fn process(&self, request: &Request, next: Next) -> anyhow::Result<ResponseContinuation> {}
+}
+",
+        );
+
         assert!(source.contains("self.inner.process(request,next).await"));
     }
 
@@ -147,7 +167,7 @@ impl Guard {
         assert!(source.contains(
             "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubroutes:std::sync::Arc<super::super::routes::Routes>,}"
         ));
-        assert!(source.contains("self.inner.process(request,next,&self.routes).await"));
+        assert!(source.contains("self.inner.process(request,next,&self.routes)"));
     }
 
     #[test]
@@ -159,7 +179,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,_request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(next).await"));
+        assert!(source.contains("self.inner.process(next)"));
     }
 
     #[test]
@@ -171,7 +191,7 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(request).await"));
+        assert!(source.contains("self.inner.process(request)"));
     }
 
     #[test]
@@ -412,7 +432,7 @@ struct Site;
     #[test]
     fn extracts_a_validation_result_form_request_in_a_middleware() {
         let source = wrappers_for(
-            r#"
+            r"
 use margaret::framework::http::next::Next;
 use margaret::framework::validation::validation_result::ValidationResult;
 
@@ -423,7 +443,7 @@ impl Guard {
     #[process]
     fn process(&self, #[form_request(from = Json)] data: ValidationResult<Data>, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(source.contains(
@@ -437,13 +457,13 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(data,next).await"));
+        assert!(source.contains("self.inner.process(data,next)"));
     }
 
     #[test]
     fn extracts_a_bare_model_form_request_in_a_middleware() {
         let source = wrappers_for(
-            r#"
+            r"
 #[handles_middleware_attribute(attribute = guard)]
 struct Guard;
 
@@ -451,7 +471,7 @@ impl Guard {
     #[process]
     fn process(&self, #[form_request(from = Form)] data: Data) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(source.contains(
@@ -467,13 +487,13 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,_next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(data).await"));
+        assert!(source.contains("self.inner.process(data)"));
     }
 
     #[test]
     fn extracts_a_form_request_alongside_the_request_and_next_in_a_middleware() {
         let source = wrappers_for(
-            r#"
+            r"
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -484,7 +504,7 @@ impl Guard {
     #[process]
     fn process(&self, request: &Request, #[form_request(from = Query)] filters: Filters, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(
@@ -495,13 +515,13 @@ impl Guard {
         assert!(source.contains(
             "asyncfnprocess(&self,request:&margaret::framework::http::request::Request,next:margaret::framework::http::next::Next,)"
         ));
-        assert!(source.contains("self.inner.process(request,filters,next).await"));
+        assert!(source.contains("self.inner.process(request,filters,next)"));
     }
 
     #[test]
     fn injects_the_views_reference_into_the_wrapper() {
         let source = wrappers_for(
-            r#"
+            r"
 use margaret::framework::http::next::Next;
 
 #[handles_middleware_attribute(attribute = traced)]
@@ -511,19 +531,19 @@ impl Tracer {
     #[process]
     fn process(&self, next: Next, views: &crate::margaret::views::Views) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(source.contains(
             "pubstructTracer{pubinner:std::sync::Arc<crate::Tracer>,pubviews:std::sync::Arc<super::super::views::Views>,}"
         ));
-        assert!(source.contains("self.inner.process(next,&self.views).await"));
+        assert!(source.contains("self.inner.process(next,&self.views)"));
     }
 
     #[test]
     fn disambiguates_wrapper_parameters_named_request_and_next() {
         let source = wrappers_for(
-            r#"
+            r"
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -534,7 +554,7 @@ impl Guard {
     #[process]
     fn process(&self, next: &Request, #[form_request(from = Form)] request: Data, following: Next) -> anyhow::Result<ResponseContinuation> {}
 }
-"#,
+",
         );
 
         assert!(source.contains(
@@ -544,7 +564,7 @@ impl Guard {
         assert!(source.contains(
             "margaret::framework::http_validation::require_input::require_input(request_2,"
         ));
-        assert!(source.contains("self.inner.process(next,request,next_2).await"));
+        assert!(source.contains("self.inner.process(next,request,next_2)"));
     }
 
     #[test]

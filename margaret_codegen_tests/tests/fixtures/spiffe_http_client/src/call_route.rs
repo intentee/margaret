@@ -15,13 +15,19 @@ pub struct CallRoute {
 }
 
 impl CallRoute {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(identity_client: Arc<IdentityClient>) -> anyhow::Result<Self> {
         Ok(Self { identity_client })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(&self) -> anyhow::Result<Response> {
+    pub fn respond(&self) -> anyhow::Result<Response> {
         Ok({
             let _http_client = self.identity_client.http_client();
 

@@ -40,11 +40,11 @@ async fn exchange(
     let router = Router::build(vec![
         RouteEntry::new(
             "/submit",
-            vec![MethodHandler::new("POST", Arc::new(Accepts))],
+            vec![MethodHandler::anonymous("POST", Arc::new(Accepts))],
         ),
         RouteEntry::new(
             "/search",
-            vec![MethodHandler::new("QUERY", Arc::new(Accepts))],
+            vec![MethodHandler::anonymous("QUERY", Arc::new(Accepts))],
         ),
     ])
     .expect("the route entries register cleanly");

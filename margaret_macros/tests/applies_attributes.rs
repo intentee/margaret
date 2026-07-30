@@ -33,8 +33,8 @@ impl Subject {
     }
 
     #[process]
-    fn respond(&self, #[route_parameter] id: String) -> String {
-        id
+    fn respond(&self, #[route_parameter] id: &str) -> String {
+        format!("{}/{id}", self.name)
     }
 
     #[process]
@@ -44,17 +44,19 @@ impl Subject {
 }
 
 #[provides_route_parameter]
-struct Binder;
-
-#[route_parameter_value]
-struct Topic(String);
+struct Binder {
+    prefix: String,
+}
 
 #[provides_jwks_endpoint]
 struct JwksEndpoint;
 
+#[route_parameter_value]
+struct SubjectId(String);
+
 impl Binder {
-    fn bind(&self, value: String) -> String {
-        value
+    fn bind(&self, value: &str) -> String {
+        format!("{}{value}", self.prefix)
     }
 }
 
@@ -91,13 +93,19 @@ struct Message {
 fn attribute_macros_leave_runtime_behavior_untouched() {
     let subject = Subject::create("typed-name".to_string());
 
-    assert_eq!(subject.respond("path-id".to_string()), "path-id");
+    assert_eq!(subject.respond("path-id"), "typed-name/path-id");
     assert_eq!(subject.run(), "typed-name");
-    assert_eq!(Binder.bind("bound".to_string()), "bound");
-    assert_eq!(Topic("weather".to_string()).0, "weather");
+    assert_eq!(
+        Binder {
+            prefix: "bind-".to_string(),
+        }
+        .bind("bound"),
+        "bind-bound"
+    );
 
-    let _jwks_endpoint = JwksEndpoint;
-    let _worker = Worker;
+    assert_eq!(SubjectId("7".to_string()).0, "7");
+    assert_eq!(size_of::<JwksEndpoint>(), 0);
+    assert_eq!(size_of::<Worker>(), 0);
 
     let record = Record {
         id: "the-id".to_string(),

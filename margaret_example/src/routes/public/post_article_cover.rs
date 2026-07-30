@@ -11,8 +11,11 @@ use crate::models::article::Article;
 pub struct PostArticleCover;
 
 impl PostArticleCover {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         request: &Request,
         #[route_parameter(from = "article")] Article { title, .. }: Article,

@@ -1,3 +1,4 @@
+pub mod asset_path;
 pub mod delete_article;
 pub mod get_article;
 pub mod get_articles;

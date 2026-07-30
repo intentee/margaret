@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::hash::BuildHasher;
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -7,8 +8,9 @@ use validator::Validate;
 use crate::validation_result::ValidationResult;
 
 #[must_use]
-pub fn validate<Model>(data: &HashMap<String, String>) -> ValidationResult<Model>
+pub fn validate<Model, FieldHasher>(data: &HashMap<String, String, FieldHasher>) -> ValidationResult<Model>
 where
+    FieldHasher: BuildHasher,
     Model: DeserializeOwned + Validate,
 {
     let value = Value::Object(
@@ -36,7 +38,7 @@ mod tests {
     }
 
     fn outcome(data: &HashMap<String, String>) -> Result<Sample, &'static str> {
-        match validate::<Sample>(data) {
+        match validate::<Sample, _>(data) {
             ValidationResult::Valid(sample) => Ok(sample),
             ValidationResult::Invalid(_) => Err("invalid"),
             ValidationResult::Malformed(_) => Err("malformed"),

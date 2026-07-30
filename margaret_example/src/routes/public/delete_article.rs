@@ -16,13 +16,19 @@ pub struct DeleteArticle {
 }
 
 impl DeleteArticle {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(articles: Arc<ArticleStore>) -> anyhow::Result<Self> {
         Ok(Self { articles })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         #[route_parameter(from = "article")] Article { id, title, .. }: Article,
     ) -> anyhow::Result<Response> {

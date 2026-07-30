@@ -21,13 +21,19 @@ pub struct PostArticle {
 }
 
 impl PostArticle {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(articles: Arc<ArticleStore>) -> anyhow::Result<Self> {
         Ok(Self { articles })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(
+    pub fn respond(
         &self,
         #[form_request(from = Form)] PostArticleForm {
             title,
@@ -70,7 +76,6 @@ mod tests {
         assert_eq!(
             responder
                 .respond(form)
-                .await
                 .expect("the responder succeeds")
                 .status(),
             500

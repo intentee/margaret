@@ -19,6 +19,9 @@ impl ServeInputRegistry {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `ConsoleArgumentCodegenError::ConflictingConsoleArgumentId`.
     pub fn register(
         &mut self,
         argument: ConsoleArgument,

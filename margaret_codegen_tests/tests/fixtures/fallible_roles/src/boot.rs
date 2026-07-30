@@ -11,13 +11,19 @@ use margaret::framework::macros::singleton;
 pub struct Boot;
 
 impl Boot {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create() -> Result<Self> {
         Ok(Self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn run(&self) -> Result<CommandOutcome> {
+    pub fn run(&self) -> Result<CommandOutcome> {
         Ok(CommandOutcome::Succeeded)
     }
 }

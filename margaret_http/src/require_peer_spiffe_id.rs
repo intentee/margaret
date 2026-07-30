@@ -5,6 +5,9 @@ use margaret_peer_identity::peer_identity::PeerIdentity;
 use crate::request::Request;
 use crate::response::Response;
 
+/// # Errors
+///
+/// Returns `Response` propagated from the work it performs.
 pub fn require_peer_spiffe_id(request: &Request) -> Result<&SpiffeId, Response> {
     match request.peer_identity() {
         PeerIdentity::Verified { spiffe_id } => Ok(spiffe_id),

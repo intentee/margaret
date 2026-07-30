@@ -8,12 +8,18 @@ pub struct BoardSession {
 }
 
 impl BoardSession {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[build_for_session]
     pub fn assemble(
         #[route_parameter(from = "topic")] topic: String,
         #[authenticated_user] reader: Option<crate::reader::Reader>,
     ) -> anyhow::Result<Self> {
-        Ok(Self { reader, topic })
+        Ok(Self {
+            reader,
+            topic,
+        })
     }
 
     #[must_use]

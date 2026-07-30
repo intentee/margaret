@@ -3,6 +3,9 @@ use std::path::Path;
 use anyhow::Context as _;
 use anyhow::Result;
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub async fn write_spire_config(path: &Path, contents: String) -> Result<()> {
     tokio::fs::write(path, contents)
         .await

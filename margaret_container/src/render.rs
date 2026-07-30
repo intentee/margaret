@@ -1,31 +1,30 @@
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+
 use proc_macro2::TokenStream;
-use quote::format_ident;
 use quote::quote;
 
+use crate::container_field_ident::container_field_ident;
 use crate::field_ident::field_ident;
 use crate::field_type::field_type;
 use crate::planned_provider::PlannedProvider;
 use crate::provider::Provider;
 
-fn field_declaration(provider: &Provider, accessible: bool) -> TokenStream {
-    let field = field_ident(provider);
-    let name = if accessible {
-        field
-    } else {
-        format_ident!("_{field}")
-    };
+fn field_declaration(position: usize, provider: &Provider, accessible: bool) -> TokenStream {
+    let name = container_field_ident(position, accessible);
     let field_type = field_type(provider);
 
     quote! { #name: #field_type }
 }
 
-fn accessor(provider: &Provider) -> TokenStream {
+fn accessor(position: usize, provider: &Provider) -> TokenStream {
     let name = field_ident(provider);
+    let field = container_field_ident(position, true);
     let field_type = field_type(provider);
 
     quote! {
         pub(crate) fn #name(&self) -> #field_type {
-            ::std::sync::Arc::clone(&self.#name)
+            ::std::sync::Arc::clone(&self.#field)
         }
     }
 }
@@ -34,14 +33,23 @@ pub(crate) fn render(
     construction_roots: &[&PlannedProvider],
     accessible_roots: &[&PlannedProvider],
 ) -> TokenStream {
-    let accessible: std::collections::BTreeSet<_> =
-        accessible_roots.iter().map(|entry| &entry.key).collect();
-    let entries = construction_roots.iter().map(|entry| &entry.provider);
-    let fields = entries
-        .map(|provider| field_declaration(provider, accessible.contains(&provider.provided.key())));
-    let accessors = accessible_roots
+    let accessible: BTreeSet<_> = accessible_roots.iter().map(|entry| &entry.key).collect();
+    let positions: BTreeMap<_, _> = construction_roots
         .iter()
-        .map(|entry| accessor(&entry.provider));
+        .enumerate()
+        .map(|(position, entry)| (&entry.key, position))
+        .collect();
+    let fields = construction_roots
+        .iter()
+        .enumerate()
+        .map(|(position, entry)| {
+            field_declaration(position, &entry.provider, accessible.contains(&entry.key))
+        });
+    let accessors = accessible_roots.iter().filter_map(|entry| {
+        positions
+            .get(&entry.key)
+            .map(|position| accessor(*position, &entry.provider))
+    });
     let accessor_impl = (!accessible_roots.is_empty()).then(|| {
         quote! {
             impl Container {

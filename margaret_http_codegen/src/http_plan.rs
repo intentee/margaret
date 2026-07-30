@@ -26,6 +26,9 @@ pub struct HttpPlan {
 }
 
 impl HttpPlan {
+    /// # Errors
+    ///
+    /// Returns `HttpCodegenError` propagated from the work it performs.
     pub fn build(
         index: &AttributeIndex,
         has_views: bool,
@@ -100,26 +103,13 @@ fn merge_websocket_servers(
             .iter()
             .any(|server| server.name() == websocket_server)
         {
-            servers.push(
-                HttpServer::new(websocket_server.clone(), ServerTransportPolicy::Negotiable)
-                    .with_async_routes(),
-            );
+            servers.push(HttpServer::new(
+                websocket_server.clone(),
+                ServerTransportPolicy::Negotiable,
+            ));
         }
     }
 
-    servers = servers
-        .into_iter()
-        .map(|server| {
-            if websocket_servers
-                .iter()
-                .any(|websocket_server| websocket_server == server.name())
-            {
-                server.with_async_routes()
-            } else {
-                server
-            }
-        })
-        .collect();
     servers.sort_by_key(|server| server.name().to_string());
 
     servers

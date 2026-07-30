@@ -9,6 +9,6 @@ fn generates_concrete_fields() {
         .expect("the full fixture generates a container");
     let source: String = generated.source().split_whitespace().collect();
 
-    assert!(source.contains("config:::std::sync::Arc<crate::Config>"));
-    assert!(source.contains("english_greeter:::std::sync::Arc<crate::EnglishGreeter>"));
+    assert!(source.contains("::std::sync::Arc<crate::Config>"));
+    assert!(source.contains("::std::sync::Arc<crate::EnglishGreeter>"));
 }

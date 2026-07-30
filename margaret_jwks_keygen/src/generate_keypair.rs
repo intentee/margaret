@@ -30,8 +30,8 @@ fn build_jwk_pair(
             kid: kid.clone(),
             kty: KeyType::Ec,
             use_: KeyUse::Signature,
-            x: encode_coordinate(x.as_deref(), "x")?,
-            y: encode_coordinate(y.as_deref(), "y")?,
+            x: encode_coordinate(x, "x")?,
+            y: encode_coordinate(y, "y")?,
         },
         signing: JwkSigning {
             crv,
@@ -42,15 +42,18 @@ fn build_jwk_pair(
 }
 
 fn encode_coordinate(
-    coordinate: Option<&[u8]>,
+    coordinate: Option<Vec<u8>>,
     name: &'static str,
 ) -> Result<String, JwksKeyError> {
     match coordinate {
-        Some(bytes) => Ok(Base64UrlUnpadded::encode_string(bytes)),
+        Some(bytes) => Ok(Base64UrlUnpadded::encode_string(&bytes)),
         None => Err(JwksKeyError::MissingPublicKeyCoordinate { coordinate: name }),
     }
 }
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub fn generate_keypair(
     GenerateKeypairParams { crv, kid }: GenerateKeypairParams,
 ) -> Result<JwkPair, JwksKeyError> {

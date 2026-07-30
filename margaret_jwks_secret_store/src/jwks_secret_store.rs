@@ -25,6 +25,9 @@ impl JwksSecretStore {
         Self { holder }
     }
 
+    /// # Errors
+    ///
+    /// Returns `JwksSecretStoreError::Mint`.
     pub async fn mint_access_token(
         &self,
         refresh_token: &str,
@@ -37,6 +40,9 @@ impl JwksSecretStore {
             .map_err(|source| JwksSecretStoreError::Mint { source })
     }
 
+    /// # Errors
+    ///
+    /// Returns `JwksSecretStoreError::Sign`.
     pub async fn sign<TClaims: Send + Serialize + Sync>(
         &self,
         claims: &TClaims,
@@ -51,6 +57,9 @@ impl JwksSecretStore {
             .map_err(|source| JwksSecretStoreError::Sign { source })
     }
 
+    /// # Errors
+    ///
+    /// Returns `JwksSecretStoreError::Verify`.
     pub fn verify<TClaims: DeserializeOwned>(
         &self,
         token: &str,

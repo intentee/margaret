@@ -353,6 +353,60 @@ fn verify_single_inference(
     Ok(())
 }
 
+struct ParameterMarkers<'marker> {
+    authenticated_user: Option<&'marker IndexedAttribute>,
+    form_request: Option<&'marker IndexedAttribute>,
+    route_parameter: Option<&'marker IndexedAttribute>,
+}
+
+fn parameter_markers<'marker>(
+    attributes: &'marker [IndexedAttribute],
+    subject: &str,
+    position: usize,
+    is_peer_spiffe_id: bool,
+) -> Result<ParameterMarkers<'marker>, RequestBindingError> {
+    let marker = |attribute: FrameworkAttribute| {
+        attributes
+            .iter()
+            .find(|candidate| candidate.framework_attribute() == Some(attribute))
+    };
+    let authenticated_user = marker(FrameworkAttribute::AuthenticatedUser);
+    let form_request = marker(FrameworkAttribute::FormRequest);
+    let route_parameter = marker(FrameworkAttribute::RouteParameter);
+
+    if route_parameter.is_some() && form_request.is_some() {
+        return Err(RequestBindingError::ConflictingArgumentMarkers {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if authenticated_user.is_some() && (route_parameter.is_some() || form_request.is_some()) {
+        return Err(RequestBindingError::ConflictingAuthenticatedUserMarkers {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if is_peer_spiffe_id
+        && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
+    {
+        return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    Ok(ParameterMarkers {
+        authenticated_user,
+        form_request,
+        route_parameter,
+    })
+}
+
+/// # Errors
+///
+/// Returns `RequestBindingError` propagated from the work it performs.
 pub fn classify_parameters(
     index: &AttributeIndex,
     item: &IndexedItem,
@@ -371,48 +425,15 @@ pub fn classify_parameters(
         position,
     } in parameters(method)
     {
-        let authenticated_user = attributes.iter().find(|attribute| {
-            attribute.framework_attribute() == Some(FrameworkAttribute::AuthenticatedUser)
-        });
-        let route_parameter = attributes.iter().find(|attribute| {
-            attribute.framework_attribute() == Some(FrameworkAttribute::RouteParameter)
-        });
-        let form_request = attributes.iter().find(|attribute| {
-            attribute.framework_attribute() == Some(FrameworkAttribute::FormRequest)
-        });
         let resolved = index.resolve_item_type(item, declared);
         let is_reference = matches!(declared, Type::Reference(_));
-        let is_asset_bag = RequestInjectable::AssetBag.matches(resolved.as_ref(), is_reference);
-        let is_current_request =
-            RequestInjectable::CurrentRequest.matches(resolved.as_ref(), is_reference);
-        let is_next = RequestInjectable::Next.matches(resolved.as_ref(), is_reference);
-        let is_peer_spiffe_id =
-            RequestInjectable::PeerSpiffeId.matches(resolved.as_ref(), is_reference);
-        let is_routes = RequestInjectable::Routes.matches(resolved.as_ref(), is_reference);
-        let is_views = RequestInjectable::Views.matches(resolved.as_ref(), is_reference);
-
-        if route_parameter.is_some() && form_request.is_some() {
-            return Err(RequestBindingError::ConflictingArgumentMarkers {
-                subject: subject.to_string(),
-                parameter: position.to_string(),
-            });
-        }
-
-        if authenticated_user.is_some() && (route_parameter.is_some() || form_request.is_some()) {
-            return Err(RequestBindingError::ConflictingAuthenticatedUserMarkers {
-                subject: subject.to_string(),
-                parameter: position.to_string(),
-            });
-        }
-
-        if is_peer_spiffe_id
-            && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
-        {
-            return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
-                subject: subject.to_string(),
-                parameter: position.to_string(),
-            });
-        }
+        let injectable = RequestInjectable::resolve(resolved.as_ref(), is_reference);
+        let is_peer_spiffe_id = matches!(injectable, Some(RequestInjectable::PeerSpiffeId));
+        let ParameterMarkers {
+            authenticated_user,
+            form_request,
+            route_parameter,
+        } = parameter_markers(attributes, subject, position, is_peer_spiffe_id)?;
 
         let binding = if authenticated_user.is_some() {
             classify_authenticated_user(
@@ -435,7 +456,7 @@ pub fn classify_parameters(
                 &registries.route_parameters,
                 &mut bound_route_parameters,
             )?
-        } else if is_next {
+        } else if matches!(injectable, Some(RequestInjectable::Next)) {
             match context {
                 BindingContext::Middleware { .. } => RequestBinding::Next,
                 BindingContext::AuthenticatedUserProvider { .. }
@@ -449,13 +470,13 @@ pub fn classify_parameters(
             }
         } else if is_peer_spiffe_id {
             RequestBinding::PeerSpiffeId
-        } else if is_routes {
+        } else if matches!(injectable, Some(RequestInjectable::Routes)) {
             RequestBinding::Routes
-        } else if is_views {
+        } else if matches!(injectable, Some(RequestInjectable::Views)) {
             classify_views(context, position, registries.views)?
-        } else if is_asset_bag {
+        } else if matches!(injectable, Some(RequestInjectable::AssetBag)) {
             RequestBinding::AssetBag
-        } else if is_current_request {
+        } else if matches!(injectable, Some(RequestInjectable::CurrentRequest)) {
             RequestBinding::CurrentRequest
         } else {
             classify_context_specific(

@@ -9,7 +9,7 @@ use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::route_entry::RouteEntry;
-use margaret_http::router::Router;
+use margaret_http::server_routes::ServerRoutes;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
 use margaret_http::transport_config::TransportConfig;
@@ -65,8 +65,9 @@ impl RunningWebSocketServer {
             TransportConfig::Plain,
             UploadConfig::Disabled,
             BodyLimit::default(),
-            Router::build(vec![RouteEntry::web_socket("/ws", upgrade, middleware)])
-                .expect("the route entries register cleanly"),
+            ServerRoutes::build(vec![RouteEntry::web_socket("/ws", upgrade, middleware)])
+                .expect("the route entries register cleanly")
+                .router,
         );
         let server_registry = Arc::new(ServerRegistry::new(vec![server]));
         let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
@@ -91,6 +92,9 @@ impl RunningWebSocketServer {
         self.address
     }
 
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
     pub async fn stop(self) {
         self.cancellation_token.cancel();
         self.join_handle

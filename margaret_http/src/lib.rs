@@ -16,6 +16,7 @@ pub mod forwardable_route;
 pub mod handler;
 pub mod handler_error;
 pub mod handler_future;
+pub mod handler_name;
 pub mod header;
 pub mod http_middleware;
 pub mod http_route_parameter_binder;

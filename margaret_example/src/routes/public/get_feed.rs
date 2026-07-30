@@ -10,11 +10,11 @@ use crate::models::user::User;
 pub struct GetFeed;
 
 impl GetFeed {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(
-        &self,
-        #[authenticated_user] reader: Option<User>,
-    ) -> anyhow::Result<Response> {
+    pub fn respond(&self, #[authenticated_user] reader: Option<User>) -> anyhow::Result<Response> {
         Ok({
             match reader {
                 Some(reader) => Response::text(200, format!("your feed, {}", reader.name)),

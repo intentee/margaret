@@ -13,9 +13,9 @@ fn rejects_tls12_signatures() {
     install_crypto_provider();
 
     let verifier =
-        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org".to_string())
+        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
             .unwrap();
-    let dss = build_digitally_signed_struct(SignatureScheme::RSA_PSS_SHA256, vec![0u8; 256]);
+    let dss = build_digitally_signed_struct(SignatureScheme::RSA_PSS_SHA256, &[0u8; 256]);
 
     let result =
         verifier.verify_tls12_signature(b"any message", &CertificateDer::from(vec![0u8]), &dss);

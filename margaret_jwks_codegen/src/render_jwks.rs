@@ -7,6 +7,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use crate::jwks_client_module::JwksClientModule;
 use crate::jwks_module_name::JWKS_MODULE_NAME;
 use crate::jwks_server_module::JwksServerModule;
+use crate::jwks_server_part::JwksServerPart;
 
 fn client_submodule_tokens(client: &JwksClientModule) -> TokenStream {
     let client_use = client.has_client.then(|| {
@@ -24,22 +25,22 @@ fn client_submodule_tokens(client: &JwksClientModule) -> TokenStream {
 }
 
 fn server_root_tokens(server: &JwksServerModule) -> TokenStream {
-    let roller = server.has_roller.then(|| {
+    let roller = server.contains(JwksServerPart::Roller).then(|| {
         quote! {
             pub use margaret::framework::jwks_roller_server::jwks_roller::JwksRoller;
         }
     });
-    let handler = server.has_handler.then(|| {
+    let handler = server.contains(JwksServerPart::Handler).then(|| {
         quote! {
             pub use margaret::framework::jwks_roller_server::public_jwks_handler::PublicJwksHandler;
         }
     });
-    let secret_store = server.has_secret_store.then(|| {
+    let secret_store = server.contains(JwksServerPart::SecretStore).then(|| {
         quote! {
             pub use margaret::framework::jwks_secret_store::jwks_secret_store::JwksSecretStore;
         }
     });
-    let minter = server.has_minter.then(|| {
+    let minter = server.contains(JwksServerPart::Minter).then(|| {
         quote! {
             pub use margaret::framework::access_token_minter::mint_access_token_handler::MintAccessTokenHandler;
         }
@@ -91,14 +92,25 @@ mod tests {
     use super::render_jwks;
     use crate::jwks_client_module::JwksClientModule;
     use crate::jwks_server_module::JwksServerModule;
+    use crate::jwks_server_part::JwksServerPart;
 
     fn no_server() -> JwksServerModule {
-        JwksServerModule {
-            has_handler: false,
-            has_minter: false,
-            has_roller: false,
-            has_secret_store: false,
+        JwksServerModule::default()
+    }
+
+    fn full_server() -> JwksServerModule {
+        let mut server = JwksServerModule::default();
+
+        for part in [
+            JwksServerPart::Handler,
+            JwksServerPart::Minter,
+            JwksServerPart::Roller,
+            JwksServerPart::SecretStore,
+        ] {
+            server.enable_if(part, true);
         }
+
+        server
     }
 
     fn client(segment: &str, has_client: bool, has_verifier: bool) -> JwksClientModule {
@@ -129,12 +141,7 @@ mod tests {
 
     #[test]
     fn re_exports_the_server_side_types_when_present() {
-        let server = JwksServerModule {
-            has_handler: true,
-            has_minter: true,
-            has_roller: true,
-            has_secret_store: true,
-        };
+        let server = full_server();
         let source = module_source(render_jwks(&server, &[]), "jwks");
 
         assert!(

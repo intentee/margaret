@@ -7,7 +7,7 @@ members = [
     "margaret_attributes",
     "margaret_codegen",
     "margaret_codegen_tests",
-    "margaret_codegen_tests/tests/fixtures/clippy_clean_console_arguments",
+    "margaret_codegen_tests/tests/fixtures/collisions_and_diamonds",
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
     "margaret_codegen_tests/tests/fixtures/linear_construction_future",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",
@@ -18,6 +18,7 @@ members = [
     "margaret_console",
     "margaret_console_argument_codegen",
     "margaret_console_codegen",
+    "margaret_construction",
     "margaret_container",
     "margaret_container_tests",
     "margaret_jwks_endpoint",
@@ -138,6 +139,7 @@ zeroize = "1.9"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
 ignored_unit_patterns = "warn"
 must_use_candidate = "warn"
 

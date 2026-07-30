@@ -18,6 +18,9 @@ pub struct PostMintAccessToken {
 }
 
 impl PostMintAccessToken {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(
         clock: Arc<SystemClock>,
@@ -31,6 +34,9 @@ impl PostMintAccessToken {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn respond(&self, request: &Request) -> anyhow::Result<Response> {
         Ok({

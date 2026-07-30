@@ -49,6 +49,9 @@ impl SvidClientBundle {
         self.svid_client_side.client_readiness()
     }
 
+    /// # Errors
+    ///
+    /// Returns `SvidError` propagated from the work it performs.
     pub fn reqwest_client(&self) -> Result<Client, SvidError> {
         self.svid_client_side.reqwest_client()
     }

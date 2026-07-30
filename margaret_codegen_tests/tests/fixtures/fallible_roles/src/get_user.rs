@@ -13,8 +13,11 @@ use super::user::User;
 pub struct GetUser;
 
 impl GetUser {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(&self, #[route_parameter(from = "user")] user: User) -> Result<Response> {
+    pub fn respond(&self, #[route_parameter(from = "user")] user: User) -> Result<Response> {
         Ok(Response::text(200, user.name))
     }
 }

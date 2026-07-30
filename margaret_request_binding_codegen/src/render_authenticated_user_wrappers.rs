@@ -31,6 +31,7 @@ fn provider_argument_value(parameter: &BoundParameter) -> TokenStream {
 fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     let AuthenticatedUserProvider {
         application,
+        is_async,
         method_name,
         parameters,
     } = provider;
@@ -96,6 +97,11 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
         )
     });
     let call_arguments = parameters.iter().map(provider_argument_value);
+    let infer_call = if *is_async {
+        quote! { self.inner.#method_name(#(#call_arguments),*).await }
+    } else {
+        quote! { self.inner.#method_name(#(#call_arguments),*) }
+    };
 
     quote! {
         pub struct #wrapper {
@@ -115,7 +121,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
                 margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>,
             > {
                 #(#extractions)*
-                self.inner.#method_name(#(#call_arguments),*).await
+                #infer_call
             }
         }
     }

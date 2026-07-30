@@ -17,6 +17,9 @@ pub struct ChatResponder {
 }
 
 impl ChatResponder {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(secrets: Arc<Secrets>) -> errors::Result<Self> {
         Ok(Self { secrets })

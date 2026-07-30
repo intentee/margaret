@@ -10,8 +10,11 @@ use crate::margaret::forwarders::public::Forwarder;
 pub struct GetWelcome;
 
 impl GetWelcome {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {
+    pub fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {
         Ok(forward.get_greeting())
     }
 }

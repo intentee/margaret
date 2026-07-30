@@ -30,7 +30,10 @@ impl IndexedParameter {
         };
 
         Self {
-            attributes: attributes.into_iter().map(IndexedAttribute::new).collect(),
+            attributes: attributes
+                .into_iter()
+                .map(|attribute| IndexedAttribute::new(&attribute))
+                .collect(),
             declared,
             diagnostic_name,
             holder,

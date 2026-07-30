@@ -2,40 +2,35 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::container_error::ContainerError;
+use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
 use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 use margaret_tag_codegen::tag_pool::TagPool;
 
-use crate::application_features::ApplicationFeatures;
 use crate::asset_bag_modules::asset_bag_modules;
 use crate::build_jwks_artifacts::build_jwks_artifacts;
 use crate::codegen_error::CodegenError;
 use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
+use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
 use crate::serve_arguments::serve_arguments;
 use crate::umbrella::umbrella;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
-pub fn build(
-    crate_root: &CrateRoot,
-    metafile_contents: Option<String>,
-    assets_directory: &Path,
-    embed_relative: &str,
-) -> Result<GeneratedCode, CodegenError> {
-    let index = AttributeIndexBuilder::new()
-        .exclude_root_module(UMBRELLA_MODULE_NAME)
-        .index_crate(crate_root)?
-        .build();
-    let features = ApplicationFeatures::from_index(&index);
-    let registry = margaret_console_argument_codegen::scan::scan(&index)?;
-    let client_bindings = TagPool::collect(&index)
-        .map_err(ContainerError::from)?
-        .jwks_client_bindings();
+/// # Errors
+///
+/// Returns `CodegenError` propagated from the work it performs.
+fn framework_providers(
+    client_bindings: &[margaret_tag_codegen::jwks_client_binding::JwksClientBinding],
+) -> Vec<margaret_container::framework_provider::FrameworkProvider> {
     let mut framework_providers = vec![
         margaret_container::framework_provider::FrameworkProvider {
             construction: margaret_container::framework_construction::FrameworkConstruction::Unit,
@@ -48,56 +43,40 @@ pub fn build(
         crate::jwks_secret_storage_provider::jwks_secret_storage_provider(),
     ];
     framework_providers.extend(crate::jwks_framework_providers::jwks_framework_providers(
-        &client_bindings,
+        client_bindings,
     ));
-    let planned_container = margaret_container::plan_container::plan_container(
-        &index,
-        &registry,
-        &framework_providers,
-    )?;
-    let bindings = planned_container.bindings();
-    let application_roots = planned_container.roots();
-    let has_asset_bag = metafile_contents.is_some();
-    let mut module_tokens = asset_bag_modules(
-        metafile_contents.as_deref(),
-        bindings,
-        assets_directory,
-        embed_relative,
-    )?;
-    let jwks = build_jwks_artifacts(bindings, &client_bindings);
-    module_tokens.extend(jwks.modules);
 
-    let views_availability = if features.has_views {
-        ViewsAvailability::Available
-    } else {
-        ViewsAvailability::Unavailable
-    };
-    let registries = BindingRegistries::collect(&index, views_availability)?;
-    if features.has_authenticated_users && (features.has_http || features.has_websockets) {
-        module_tokens.extend(render_authenticated_user_wrappers(&registries.providers()));
-    }
+    framework_providers
+}
 
-    let middleware_plans =
-        margaret_middleware_codegen::middleware_plans::middleware_plans(&index, &registries)?;
-    if features.has_middleware && (features.has_http || features.has_websockets) {
-        module_tokens.extend(
-            margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers(
-                &middleware_plans,
-            ),
-        );
-    }
+struct ServingModules {
+    http_roots: Vec<CanonicalPath>,
+    modules: Vec<GeneratedModuleTokens>,
+    servers: Vec<margaret_http_codegen::http_server::HttpServer>,
+    view_roots: Vec<CanonicalPath>,
+    websocket_roots: Vec<CanonicalPath>,
+}
+
+fn render_serving_modules(
+    index: &AttributeIndex,
+    bindings: &ContainerBindings,
+    features: &GeneratedFeatures,
+    middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+    registries: &BindingRegistries,
+) -> Result<ServingModules, CodegenError> {
+    let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
     let (websocket_roots, websocket_servers, websocket_server_arguments) =
-        if features.has_websockets {
+        if features.contains(GeneratedFeature::Websockets) {
             let plan = margaret_websocket_codegen::web_socket_plan::WebSocketPlan::build(
-                &index,
+                index,
                 bindings,
-                &middleware_plans,
-                &registries,
+                middleware_plans,
+                registries,
             )?;
             let artifacts =
                 margaret_websocket_codegen::render_websocket::render_websocket(plan, bindings);
-            module_tokens.extend(artifacts.modules);
+            modules.extend(artifacts.modules);
 
             (
                 artifacts.retained_roots,
@@ -108,75 +87,192 @@ pub fn build(
             (Vec::new(), Vec::new(), BTreeMap::new())
         };
 
-    let view_roots = if features.has_views {
-        let plan = margaret_views_codegen::views_plan::ViewsPlan::build(&index, bindings)?;
+    let view_roots = if features.contains(GeneratedFeature::Views) {
+        let plan = margaret_views_codegen::views_plan::ViewsPlan::build(index, bindings)?;
         let artifacts = margaret_views_codegen::render_views::render_views(plan, bindings);
-        module_tokens.extend(artifacts.modules);
+        modules.extend(artifacts.modules);
 
         artifacts.retained_roots
     } else {
         Vec::new()
     };
 
-    let (http_roots, servers) = if features.has_http || features.has_websockets {
+    let (http_roots, servers) = if features.contains(GeneratedFeature::Http)
+        || features.contains(GeneratedFeature::Websockets)
+    {
         let plan = margaret_http_codegen::http_plan::HttpPlan::build(
-            &index,
-            features.has_views,
+            index,
+            features.contains(GeneratedFeature::Views),
             &websocket_servers,
-            &middleware_plans,
+            middleware_plans,
             bindings,
             &websocket_server_arguments,
-            &registries,
+            registries,
         )?;
         let artifacts = margaret_http_codegen::render_http::render_http(plan, bindings);
-        module_tokens.extend(artifacts.modules);
+        modules.extend(artifacts.modules);
 
         (artifacts.retained_roots, artifacts.servers)
     } else {
         (Vec::new(), Vec::new())
     };
 
+    Ok(ServingModules {
+        http_roots,
+        modules,
+        servers,
+        view_roots,
+        websocket_roots,
+    })
+}
+
+struct RoleModules {
+    console_roots: Vec<CanonicalPath>,
+    modules: Vec<GeneratedModuleTokens>,
+    service_roots: Vec<CanonicalPath>,
+}
+
+fn render_role_modules(
+    index: &AttributeIndex,
+    bindings: &ContainerBindings,
+    features: &GeneratedFeatures,
+    jwks_services: &[margaret_service_codegen::framework_service::FrameworkService],
+    servers: &[margaret_http_codegen::http_server::HttpServer],
+) -> Result<RoleModules, CodegenError> {
+    let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
+
     let serve_arguments = serve_arguments(bindings);
     let service_plan = margaret_service_codegen::service_plan::ServicePlan::build(
-        &index,
-        &jwks.services,
+        index,
+        jwks_services,
         bindings,
         &serve_arguments,
     )?;
     let service_roots = service_plan.roots().to_vec();
 
-    if features.serves {
-        module_tokens.push(margaret_service_codegen::render_services::render_services(
+    if features.contains(GeneratedFeature::Serves) {
+        modules.push(margaret_service_codegen::render_services::render_services(
             &service_plan,
-            &servers,
-            features.has_views,
+            servers,
+            features.contains(GeneratedFeature::Views),
             bindings,
         ));
     }
 
-    if features.has_models {
-        let models = margaret_model_codegen::models::models(&index)?;
-        module_tokens.push(margaret_schema_codegen::render_schema::render_schema(
+    if features.contains(GeneratedFeature::Models) {
+        let models = margaret_model_codegen::models::models(index)?;
+        modules.push(margaret_schema_codegen::render_schema::render_schema(
             &models,
         ));
     }
 
-    let console_roots = if features.has_console {
-        let plan = margaret_console_codegen::console_plan::ConsolePlan::build(&index, bindings)?;
+    let console_roots = if features.contains(GeneratedFeature::Console) {
+        let plan = margaret_console_codegen::console_plan::ConsolePlan::build(index, bindings)?;
         let console = margaret_console_codegen::render_console::render_console(
-            plan,
-            features.serves,
-            features.has_models,
-            &servers,
+            &plan,
+            features.contains(GeneratedFeature::Serves),
+            features.contains(GeneratedFeature::Models),
+            servers,
             &serve_arguments,
             bindings,
         );
-        module_tokens.push(console.module);
+        modules.extend(console.modules);
 
         console.construction_roots
     } else {
         Vec::new()
     };
+
+    Ok(RoleModules {
+        console_roots,
+        modules,
+        service_roots,
+    })
+}
+
+/// # Errors
+///
+/// Returns `CodegenError` propagated from the work it performs.
+pub fn build(
+    crate_root: &CrateRoot,
+    metafile_contents: Option<&str>,
+    assets_directory: &Path,
+    embed_relative: &str,
+) -> Result<GeneratedCode, CodegenError> {
+    let index = AttributeIndexBuilder::new()
+        .exclude_root_module(UMBRELLA_MODULE_NAME)
+        .index_crate(crate_root)?
+        .build();
+    let mut features = GeneratedFeatures::from_index(&index);
+    let registry = margaret_console_argument_codegen::scan::scan(&index)?;
+    let client_bindings = TagPool::collect(&index)
+        .map_err(ContainerError::from)?
+        .jwks_client_bindings();
+    let framework_providers = framework_providers(&client_bindings);
+    let planned_container = margaret_container::plan_container::plan_container(
+        &index,
+        &registry,
+        &framework_providers,
+    )?;
+    let bindings = planned_container.bindings();
+    let application_roots = planned_container.roots();
+    features.enable_if(GeneratedFeature::AssetBag, metafile_contents.is_some());
+    let mut module_tokens = asset_bag_modules(
+        metafile_contents,
+        bindings,
+        assets_directory,
+        embed_relative,
+    )?;
+    let jwks = build_jwks_artifacts(bindings, &client_bindings);
+
+    features.enable_if(GeneratedFeature::Jwks, jwks.enabled);
+    module_tokens.extend(jwks.modules);
+
+    let jwks_services = jwks.services;
+
+    let views_availability = if features.contains(GeneratedFeature::Views) {
+        ViewsAvailability::Available
+    } else {
+        ViewsAvailability::Unavailable
+    };
+    let registries = BindingRegistries::collect(&index, views_availability)?;
+    if features.contains(GeneratedFeature::AuthenticatedUsers)
+        && (features.contains(GeneratedFeature::Http)
+            || features.contains(GeneratedFeature::Websockets))
+    {
+        module_tokens.extend(render_authenticated_user_wrappers(&registries.providers()));
+    }
+
+    let middleware_plans =
+        margaret_middleware_codegen::middleware_plans::middleware_plans(&index, &registries)?;
+    if features.contains(GeneratedFeature::Middleware)
+        && (features.contains(GeneratedFeature::Http)
+            || features.contains(GeneratedFeature::Websockets))
+    {
+        module_tokens.extend(
+            margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers(
+                &middleware_plans,
+            ),
+        );
+    }
+
+    let ServingModules {
+        http_roots,
+        modules: serving_modules,
+        servers,
+        view_roots,
+        websocket_roots,
+    } = render_serving_modules(&index, bindings, &features, &middleware_plans, &registries)?;
+
+    module_tokens.extend(serving_modules);
+
+    let RoleModules {
+        console_roots,
+        modules: role_modules,
+        service_roots,
+    } = render_role_modules(&index, bindings, &features, &jwks_services, &servers)?;
+
+    module_tokens.extend(role_modules);
 
     let mut retained_roots: BTreeSet<_> = service_roots.into_iter().collect();
     retained_roots.extend(websocket_roots);
@@ -192,18 +288,7 @@ pub fn build(
             format_pass(module_tokens)
                 .map_err(CodegenError::from)
                 .map(|mut modules| {
-                    modules.push(umbrella(GeneratedFeatures {
-                        has_asset_bag,
-                        has_authenticated_users: features.has_authenticated_users,
-                        has_console: features.has_console,
-                        has_http: features.has_http,
-                        has_jwks: jwks.enabled,
-                        has_middleware: features.has_middleware,
-                        has_models: features.has_models,
-                        has_views: features.has_views,
-                        has_websockets: features.has_websockets,
-                        serves: features.serves,
-                    }));
+                    modules.push(umbrella(&features));
 
                     GeneratedCode::new(modules)
                 })
@@ -372,7 +457,7 @@ struct Room;
     fn concatenated(code: &GeneratedCode) -> String {
         code.modules()
             .iter()
-            .map(|module| module.source())
+            .map(margaret_generated_module::generated_module::GeneratedModule::source)
             .collect::<Vec<&str>>()
             .join("\n")
     }
@@ -409,10 +494,7 @@ struct Room;
 
         let code = build(
             &CrateRoot::new("crate", directory.path().join("src")),
-            Some(
-                r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
-                    .to_string(),
-            ),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &directory.path().join("assets"),
             EMBED_RELATIVE,
         )
@@ -456,10 +538,7 @@ impl AssetRoute {
 
         let code = build(
             &CrateRoot::new("crate", directory.path().join("src")),
-            Some(
-                r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
-                    .to_string(),
-            ),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &assets,
             EMBED_RELATIVE,
         )
@@ -485,10 +564,7 @@ impl AssetRoute {
 
         let message = build(
             &CrateRoot::new("crate", directory.path().join("src")),
-            Some(
-                r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#
-                    .to_string(),
-            ),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &directory.path().join("assets"),
             EMBED_RELATIVE,
         )
@@ -521,7 +597,7 @@ impl AssetRoute {
 
         let message = build(
             &CrateRoot::new("crate", directory.path().join("src")),
-            Some(r#"{ "outputs": {} }"#.to_string()),
+            Some(r#"{ "outputs": {} }"#),
             &directory.path().join("assets"),
             EMBED_RELATIVE,
         )
@@ -670,10 +746,10 @@ impl Worker {
         assert!(!serve.contains("bundle_services"));
         assert!(!serve.contains("spiffe_server_config"));
 
-        let construction: String = module(&code, "container/build/serve")
+        let construction: String = module(&code, "container/build/serve_arguments")
             .split_whitespace()
             .collect();
-        assert!(construction.contains("console_argument_0:reqwest::Client"));
+        assert!(construction.contains("pubargument0:reqwest::Client,"));
 
         let run: String = module(&code, "run").split_whitespace().collect();
         assert!(run.contains(
@@ -725,7 +801,7 @@ impl CallRoute {
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(serve.contains(
-            "letserver_services=matchmargaret::framework::service::serve_application::serve_application(matches,servers,){Ok(server_services)=>server_services,Err(outcome)=>returnoutcome,};"
+            "letserver_services=margaret::framework::service::serve_application::serve_application(matches,servers,)?;"
         ));
         assert!(serve.contains(
             "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"
@@ -787,7 +863,7 @@ impl GetIdentity {
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(serve.contains(
-            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:spiffe_server_config.clone(),}"
+            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:::std::sync::Arc::clone(spiffe_server_config),}"
         ));
         assert!(serve.contains(
             "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"
@@ -1010,11 +1086,10 @@ impl GetJwks {
         let code = generate(JWKS_NAME_COLLISION_CRATE)
             .expect("a user component named JwksRoller coexists");
 
-        let construction: String = module(&code, "container/build/serve")
-            .split_whitespace()
-            .collect();
-        assert!(construction.contains("std::sync::Arc<crate::JwksRoller>"));
-        assert!(construction.contains("std::sync::Arc<crate::margaret::jwks::JwksRoller>"));
+        let container: String = module(&code, "container").split_whitespace().collect();
+
+        assert!(container.contains("std::sync::Arc<crate::JwksRoller>"));
+        assert!(container.contains("std::sync::Arc<crate::margaret::jwks::JwksRoller>"));
     }
 
     const JWKS_FIELD_COLLISION_CRATE: &str = "\
@@ -1046,11 +1121,12 @@ impl GetJwks {
         let code = generate(JWKS_FIELD_COLLISION_CRATE)
             .expect("a user component flattening to a framework field coexists");
 
+        let container: String = module(&code, "container").split_whitespace().collect();
         let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
 
-        assert!(construction.contains("std::sync::Arc<crate::margaret_jwks::JwksRoller>"));
+        assert!(container.contains("std::sync::Arc<crate::margaret_jwks::JwksRoller>"));
         assert!(construction.contains("margaret_jwks_jwks_roller_2"));
     }
 
@@ -1519,7 +1595,7 @@ impl GetCard {
         assert!(module(&code, "mod").contains("pub mod views;"));
         assert!(module(&code, "views").contains("pub struct Views"));
         assert!(module(&code, "views").contains("card"));
-        assert!(module(&code, "views/build").contains("pub async fn build"));
+        assert!(module(&code, "views/build").contains("pub fn build"));
         assert!(concatenated(&code).contains("super::views::build::build(container)"));
     }
 
@@ -1713,10 +1789,12 @@ impl New {
         let routes: String = module(&code, "routes").split_whitespace().collect();
         let http: String = concatenated(&code).split_whitespace().collect();
 
-        assert!(build.contains("pub(crate)fnserve("));
-        assert!(build.contains("std::sync::Arc<crate::Build>"));
-        assert!(build.contains("std::sync::Arc<crate::Container>"));
-        assert!(build.contains("std::sync::Arc<crate::Routes>"));
+        let container: String = module(&code, "container").split_whitespace().collect();
+
+        assert!(build.contains("pubfnserve("));
+        assert!(container.contains("std::sync::Arc<crate::Build>"));
+        assert!(container.contains("std::sync::Arc<crate::Container>"));
+        assert!(container.contains("std::sync::Arc<crate::Routes>"));
         assert!(!build.contains("build_2"));
         assert!(!build.contains("container_2"));
         assert!(!build.contains("routes_2"));
@@ -1739,11 +1817,12 @@ impl New {
         assert!(module(&code, "schema").contains("\"widgets\""));
         assert!(module(&code, "schema").contains("ColumnType::Uuid"));
 
+        let command: String = module(&code, "run").split_whitespace().collect();
         let run: String = module(&code, "run").split_whitespace().collect();
 
         assert!(run.contains("pubfnrun"));
         assert!(!run.contains("pubasyncfnrun"));
-        assert!(run.contains("\"schema\""));
+        assert!(command.contains("\"schema\""));
         assert!(run.contains("super::schema::schema()"));
     }
 
@@ -1781,7 +1860,9 @@ impl Page {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains(
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+        ));
         assert!(serve.contains("server_public(container,&routes"));
         assert!(!serve.contains("server_public(container,&console_argument_0"));
 
@@ -1818,7 +1899,9 @@ impl Page {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains(
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+        ));
         assert!(serve.contains("super::views::build::build(container)"));
     }
 
@@ -1859,7 +1942,9 @@ impl RespondsToWebSocketMessage for Chatter {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains(
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+        ));
         assert!(serve.contains("server_public(container,&routes"));
         assert!(!serve.contains("server_public(container,&console_argument_0"));
     }
@@ -1910,7 +1995,9 @@ impl RespondsToWebSocketMessage for Chatter {
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
         assert!(serve.contains("letconsole_argument_0="));
-        assert!(serve.contains("super::container::build::serve(console_argument_0"));
+        assert!(serve.contains(
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+        ));
         assert!(serve.contains("server_public(container,&routes"));
         assert!(!serve.contains("server_public(container,&console_argument_0"));
     }

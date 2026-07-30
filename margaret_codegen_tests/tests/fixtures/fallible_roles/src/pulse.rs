@@ -5,8 +5,11 @@ use margaret::framework::macros::scheduled_with_tick_timer;
 pub struct Pulse;
 
 impl Pulse {
+    /// # Errors
+    ///
+    /// Returns `Error` propagated from the work it performs.
     #[process]
-    pub async fn run(&self) -> core::result::Result<(), failures::Error> {
+    pub fn run(&self) -> core::result::Result<(), failures::Error> {
         Ok(())
     }
 }

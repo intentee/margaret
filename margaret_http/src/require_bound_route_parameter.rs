@@ -3,6 +3,9 @@ use crate::request::Request;
 use crate::request_binding_error::RequestBindingError;
 use crate::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 
+/// # Errors
+///
+/// Returns `RequestBindingError::RouteParameterBinder`.
 pub async fn require_bound_route_parameter<Binder>(
     request: &Request,
     name: &'static str,

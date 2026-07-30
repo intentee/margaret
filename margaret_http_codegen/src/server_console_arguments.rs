@@ -24,14 +24,14 @@ fn responder_and_binder_arguments(
     let mut collected = Vec::new();
 
     for route in routes {
-        collected.extend_from_slice(bindings.console_arguments(&route.responder_path)?);
+        collected.extend_from_slice(&bindings.console_arguments(&route.responder_path)?.arguments);
 
         for argument in &route.arguments {
             collected.extend(binding_console_arguments(&argument.binding, bindings)?);
         }
 
         for layer in &route.layers {
-            collected.extend_from_slice(bindings.console_arguments(&layer.concrete)?);
+            collected.extend_from_slice(&bindings.console_arguments(&layer.concrete)?.arguments);
         }
     }
 

@@ -14,6 +14,9 @@ pub struct ViewsPlan {
 }
 
 impl ViewsPlan {
+    /// # Errors
+    ///
+    /// Returns `ViewsCodegenError` propagated from the work it performs.
     pub fn build(
         index: &AttributeIndex,
         bindings: &ContainerBindings,

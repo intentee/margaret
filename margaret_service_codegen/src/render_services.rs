@@ -1,6 +1,7 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_container::container_bindings::ContainerBindings;
@@ -19,6 +20,18 @@ use crate::service_unit::ServiceUnit;
 use crate::service_unit_origin::ServiceUnitOrigin;
 use crate::spiffe_activation::SpiffeActivation;
 
+fn failed_outcome() -> TokenStream {
+    quote! { return margaret::framework::console::command_outcome::CommandOutcome::Failed }
+}
+
+fn failed_registration() -> TokenStream {
+    quote! {
+        return ::std::result::Result::Err(
+            margaret::framework::console::command_outcome::CommandOutcome::Failed,
+        )
+    }
+}
+
 fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStream {
     if !spiffe_secured {
         return quote! { margaret::framework::http::transport_config::TransportConfig::Plain };
@@ -27,7 +40,7 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
     match server.transport_policy() {
         ServerTransportPolicy::PinnedSpiffeMtls => quote! {
             margaret::framework::http::transport_config::TransportConfig::MutualTls {
-                server_config: spiffe_server_config.clone(),
+                server_config: ::std::sync::Arc::clone(spiffe_server_config),
             }
         },
         ServerTransportPolicy::Negotiable => {
@@ -37,10 +50,12 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
                 match matches.get_one::<String>(#transport_argument).map(String::as_str) {
                     Some("plain") => margaret::framework::http::transport_config::TransportConfig::Plain,
                     Some("spiffe_mtls") => margaret::framework::http::transport_config::TransportConfig::MutualTls {
-                        server_config: spiffe_server_config.clone(),
+                        server_config: ::std::sync::Arc::clone(spiffe_server_config),
                     },
                     Some(_) | None => {
-                        return margaret::framework::console::command_outcome::CommandOutcome::Failed;
+                        return ::std::result::Result::Err(
+                            margaret::framework::console::command_outcome::CommandOutcome::Failed,
+                        );
                     }
                 }
             }
@@ -62,11 +77,13 @@ fn svid_identity_prelude(
         &quote! { String },
         "spiffe-trust-domain",
         &quote! { value.clone() },
+        &failed_outcome(),
     );
     let spire_agent_addr = required_flag_read(
         &quote! { String },
         "spire-agent-addr",
         &quote! { value.clone() },
+        &failed_outcome(),
     );
 
     let bundle_constructor = if server_active && client_active {
@@ -155,16 +172,13 @@ fn server_registration(
     has_views: bool,
     activation: SpiffeActivation,
 ) -> TokenStream {
-    if servers.is_empty() {
-        return quote! {};
-    }
-
     let origins = servers.iter().map(|server| {
         let origin_variable = format_ident!("origin_{}", server.name());
         let origin_read = required_flag_read(
             &quote! { String },
             &server.url_argument(),
             &quote! { value.clone().into() },
+            &failed_registration(),
         );
 
         quote! {
@@ -186,14 +200,8 @@ fn server_registration(
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
         let transport = transport_expression(server, activation.server_active);
-        let routes = if server.routes_are_async() {
-            quote! {
-                super::http::#function_name::#function_name(container, &routes #views_argument).await
-            }
-        } else {
-            quote! {
-                super::http::#function_name::#function_name(container, &routes #views_argument)
-            }
+        let routes = quote! {
+            super::http::#function_name::#function_name(container, &routes #views_argument)
         };
 
         quote! {
@@ -210,10 +218,8 @@ fn server_registration(
     let assemblies = vec_literal_tokens(assemblies);
 
     let views_setup = has_views.then(|| {
-        let built = quote! { super::views::build::build(container).await };
-
         quote! {
-            let views = ::std::sync::Arc::new(#built);
+            let views = ::std::sync::Arc::new(super::views::build::build(container));
         }
     });
 
@@ -228,21 +234,20 @@ fn server_registration(
         #views_setup
         let servers = #assemblies;
 
-        let server_services = match margaret::framework::service::serve_application::serve_application(
+        let server_services = margaret::framework::service::serve_application::serve_application(
             matches,
             servers,
-        ) {
-            Ok(server_services) => server_services,
-            Err(outcome) => return outcome,
-        };
+        )?;
 
         for server_service in server_services {
             #register_server
         }
+
+        ::std::result::Result::Ok(())
     }
 }
 
-fn missed_tick_behavior_method(behavior: &Option<CanonicalPath>) -> TokenStream {
+fn missed_tick_behavior_method(behavior: Option<&CanonicalPath>) -> TokenStream {
     match behavior {
         Some(behavior) => {
             let behavior = path_tokens(behavior);
@@ -260,7 +265,9 @@ fn missed_tick_behavior_method(behavior: &Option<CanonicalPath>) -> TokenStream 
 fn adapter(unit: &ServiceUnit) -> TokenStream {
     match &unit.kind {
         ServiceKind::Service => service_adapter(unit),
-        ServiceKind::Ticker { behavior, interval } => ticker_adapter(unit, behavior, interval),
+        ServiceKind::Ticker { behavior, interval } => {
+            ticker_adapter(unit, behavior.as_ref(), interval)
+        }
     }
 }
 
@@ -281,7 +288,7 @@ fn runner_outcome(unit: &ServiceUnit, call: &TokenStream) -> TokenStream {
 
 fn ticker_adapter(
     unit: &ServiceUnit,
-    behavior: &Option<CanonicalPath>,
+    behavior: Option<&CanonicalPath>,
     interval: &CanonicalPath,
 ) -> TokenStream {
     let name = adapter_ident(unit);
@@ -289,16 +296,15 @@ fn ticker_adapter(
     let interval = path_tokens(interval);
     let runner = format_ident!("{}", unit.runner);
     let missed_tick_behavior_method = missed_tick_behavior_method(behavior);
-    let (token_binding, call) = if unit.takes_token {
-        (
-            quote! { cancellation_token },
-            quote! { self.inner.#runner(cancellation_token).await },
-        )
+    let (token_binding, arguments) = if unit.takes_token {
+        (quote! { cancellation_token }, quote! { cancellation_token })
     } else {
-        (
-            quote! { _cancellation_token },
-            quote! { self.inner.#runner().await },
-        )
+        (quote! { _cancellation_token }, quote! {})
+    };
+    let call = if unit.is_async {
+        quote! { self.inner.#runner(#arguments).await }
+    } else {
+        quote! { self.inner.#runner(#arguments) }
     };
     let outcome = runner_outcome(unit, &call);
 
@@ -330,16 +336,15 @@ fn service_adapter(unit: &ServiceUnit) -> TokenStream {
     let name = adapter_ident(unit);
     let concrete = path_tokens(&unit.concrete_path);
     let runner = format_ident!("{}", unit.runner);
-    let (token_binding, call) = if unit.takes_token {
-        (
-            quote! { cancellation_token },
-            quote! { self.inner.#runner(cancellation_token).await },
-        )
+    let (token_binding, arguments) = if unit.takes_token {
+        (quote! { cancellation_token }, quote! { cancellation_token })
     } else {
-        (
-            quote! { _cancellation_token },
-            quote! { self.inner.#runner().await },
-        )
+        (quote! { _cancellation_token }, quote! {})
+    };
+    let call = if unit.is_async {
+        quote! { self.inner.#runner(#arguments).await }
+    } else {
+        quote! { self.inner.#runner(#arguments) }
     };
     let outcome = runner_outcome(unit, &call);
 
@@ -378,6 +383,68 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
 }
 
 #[must_use]
+fn register_servers_definition(
+    servers: &[HttpServer],
+    has_views: bool,
+    activation: SpiffeActivation,
+) -> TokenStream {
+    if servers.is_empty() {
+        return TokenStream::new();
+    }
+
+    let body = server_registration(servers, has_views, activation);
+    let spiffe_server_parameter = activation
+        .server_active
+        .then(|| quote! { spiffe_server_config: &::std::sync::Arc<margaret::framework::spiffe_svid::rustls::ServerConfig>, });
+    let spiffe_client_parameter = activation.client_active.then(|| {
+        quote! {
+            spiffe_client_readiness: &margaret::framework::spiffe_svid_client::svid_client_readiness::SvidClientReadiness,
+        }
+    });
+    let too_many_lines = too_many_lines_allow();
+
+    quote! {
+        #too_many_lines
+        fn register_servers(
+            manager: &mut trzcina::ServiceManager,
+            matches: &clap::ArgMatches,
+            container: &super::container::Container,
+            #spiffe_server_parameter
+            #spiffe_client_parameter
+        ) -> ::std::result::Result<
+            (),
+            margaret::framework::console::command_outcome::CommandOutcome,
+        > {
+            #body
+        }
+    }
+}
+
+fn register_servers_invocation(servers: &[HttpServer], activation: SpiffeActivation) -> TokenStream {
+    if servers.is_empty() {
+        return TokenStream::new();
+    }
+
+    let spiffe_server_argument = activation
+        .server_active
+        .then(|| quote! { &spiffe_server_config, });
+    let spiffe_client_argument = activation
+        .client_active
+        .then(|| quote! { &spiffe_client_readiness, });
+
+    quote! {
+        if let Err(outcome) = register_servers(
+            &mut manager,
+            matches,
+            container,
+            #spiffe_server_argument
+            #spiffe_client_argument
+        ) {
+            return outcome;
+        }
+    }
+}
+
 pub fn render_services(
     plan: &ServicePlan,
     servers: &[HttpServer],
@@ -396,7 +463,8 @@ pub fn render_services(
         .map(|unit| registration(unit, bindings, activation.client_active));
     let identity_prelude = svid_identity_prelude(activation);
     let bundle_registration = bundle_registration(activation);
-    let server_registration = server_registration(servers, has_views, activation);
+    let register_servers = register_servers_definition(servers, has_views, activation);
+    let server_registration = register_servers_invocation(servers, activation);
     let construction_invocation = bindings.serve_invocation(&plan.construction_arguments);
     let construction = quote! {
         let container = match #construction_invocation {
@@ -413,10 +481,14 @@ pub fn render_services(
         quote! { matches }
     };
     let prelude = &plan.prelude;
+    let serve_too_many_lines = too_many_lines_allow();
 
     let tokens = quote! {
         #(#adapters)*
 
+        #register_servers
+
+        #serve_too_many_lines
         pub async fn serve(
             #matches_binding: &clap::ArgMatches,
             cancellation_token: tokio_util::sync::CancellationToken,

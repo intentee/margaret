@@ -12,6 +12,9 @@ impl WebSocketDriverSender {
         Self { inner }
     }
 
+    /// # Errors
+    ///
+    /// Returns `WebSocketDriver` propagated from the work it performs.
     pub async fn send(&self, driver: WebSocketDriver) -> Result<(), WebSocketDriver> {
         self.inner.send(driver).await.map_err(|error| error.0)
     }

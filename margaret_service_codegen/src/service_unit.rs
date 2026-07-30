@@ -8,6 +8,7 @@ use crate::service_unit_origin::ServiceUnitOrigin;
 pub(crate) struct ServiceUnit {
     pub(crate) concrete_path: CanonicalPath,
     pub(crate) field_name: String,
+    pub(crate) is_async: bool,
     pub(crate) kind: ServiceKind,
     pub(crate) origin: ServiceUnitOrigin,
     pub(crate) runner: String,
@@ -20,6 +21,7 @@ impl ServiceUnit {
         FrameworkService {
             concrete_path,
             field_name,
+            is_async,
             kind,
             runner,
             takes_token,
@@ -29,6 +31,7 @@ impl ServiceUnit {
         Self {
             concrete_path: concrete_path.clone(),
             field_name: field_name.clone(),
+            is_async: *is_async,
             kind: match kind {
                 FrameworkServiceKind::Service => ServiceKind::Service,
                 FrameworkServiceKind::Ticker { interval } => ServiceKind::Ticker {

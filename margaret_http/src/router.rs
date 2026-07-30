@@ -25,6 +25,9 @@ pub struct Router {
 }
 
 impl Router {
+    /// # Errors
+    ///
+    /// Returns `InsertError` propagated from the work it performs.
     pub fn build(entries: Vec<RouteEntry>) -> Result<Self, InsertError> {
         let mut matcher: matchit::Router<RouteTarget> = matchit::Router::new();
 
@@ -36,7 +39,11 @@ impl Router {
                         RouteTarget::Http(
                             handlers
                                 .into_iter()
-                                .map(|MethodHandler { handler, method }| (method, handler))
+                                .map(
+                                    |MethodHandler {
+                                         handler, method, ..
+                                     }| (method, handler),
+                                )
                                 .collect(),
                         ),
                     )?;

@@ -28,6 +28,9 @@ fn next_secret(
     }
 }
 
+/// # Errors
+///
+/// Returns `RollerError::SecretPersist`.
 pub fn roll(
     storage: &dyn JwksSecretStorage,
     holder: &JwksSecretHolder,

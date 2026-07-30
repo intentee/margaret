@@ -10,6 +10,9 @@ pub struct MintAccessTokenRequest {
 }
 
 impl MintAccessTokenRequest {
+    /// # Errors
+    ///
+    /// Returns `MintAccessTokenError::MissingBody` or `MintAccessTokenError::MalformedRequest`.
     pub fn from_request(request: &Request) -> Result<Self, MintAccessTokenError> {
         let body = request
             .inputs

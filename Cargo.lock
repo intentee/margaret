@@ -1790,6 +1790,7 @@ dependencies = [
  "margaret_asset_bag",
  "margaret_codegen",
  "margaret_console",
+ "margaret_construction",
  "margaret_http",
  "margaret_http_validation",
  "margaret_identity",
@@ -1815,7 +1816,6 @@ dependencies = [
  "margaret_validation",
  "margaret_views",
  "margaret_websocket",
- "thiserror",
 ]
 
 [[package]]
@@ -1848,6 +1848,7 @@ name = "margaret_asset_bag_codegen"
 version = "0.1.0"
 dependencies = [
  "esbuild-metafile",
+ "margaret_codegen_tokens",
  "margaret_generated_module",
  "proc-macro2",
  "quote",
@@ -1894,7 +1895,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_codegen_clippy_fixture"
+name = "margaret_codegen_collisions_and_diamonds_fixture"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1960,6 +1961,7 @@ dependencies = [
  "margaret_codegen_fallible_roles_fixture",
  "margaret_codegen_linear_construction_future_fixture",
  "margaret_console_argument_codegen",
+ "margaret_generated_module",
  "tokio",
 ]
 
@@ -2018,6 +2020,7 @@ name = "margaret_console_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
@@ -2031,9 +2034,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_construction"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "thiserror",
+]
+
+[[package]]
 name = "margaret_container"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "margaret_attributes",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
@@ -2246,6 +2258,7 @@ dependencies = [
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
+ "margaret_sync_holder",
  "reqwest",
  "rustls",
  "serde",
@@ -2505,6 +2518,7 @@ name = "margaret_schema_codegen"
 version = "0.1.0"
 dependencies = [
  "margaret_attributes",
+ "margaret_codegen_tokens",
  "margaret_generated_module",
  "margaret_model_codegen",
  "proc-macro2",

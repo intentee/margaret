@@ -27,7 +27,10 @@ pub struct SvidConverterService {
 }
 
 impl SvidConverterService {
-    pub async fn convert_x509_context(&self, x509_context: X509Context) -> Result<()> {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
+    pub fn convert_x509_context(&self, x509_context: &X509Context) -> Result<()> {
         let default_svid: &X509Svid = x509_context
             .default_svid()
             .ok_or(SvidError::MissingDefaultSvid)?;
@@ -35,7 +38,7 @@ impl SvidConverterService {
         self.svid_certified_key_holder
             .set(Some(Arc::new(extract_server_credentials(default_svid)?)));
         self.ca_bundle_tx
-            .send(extract_ca_bundle(default_svid, &x509_context)?.into())?;
+            .send(extract_ca_bundle(default_svid, x509_context)?.into())?;
 
         Ok(())
     }
@@ -53,7 +56,7 @@ impl Service for SvidConverterService {
                         Ok(x509_context) => {
                             info!("Received x509 SVID context");
 
-                            if let Err(err) = self.convert_x509_context(x509_context).await {
+                            if let Err(err) = self.convert_x509_context(&x509_context) {
                                 error!("Unable to process SVID context: {err:#?}");
                             }
                         }

@@ -8,8 +8,11 @@ use margaret::framework::macros::singleton;
 pub struct GetLogo;
 
 impl GetLogo {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(&self) -> anyhow::Result<Response> {
+    pub fn respond(&self) -> anyhow::Result<Response> {
         Ok({
             Response::bytes(
                 200,

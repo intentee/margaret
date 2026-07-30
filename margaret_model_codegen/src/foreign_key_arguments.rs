@@ -56,13 +56,13 @@ mod tests {
     use crate::foreign_key_arguments::ForeignKeyArguments;
     use crate::model_codegen_error::ModelCodegenError;
 
-    fn parse(attribute: Attribute) -> Result<ForeignKeyArguments, ModelCodegenError> {
-        let arguments = AttributeArgs::from_attribute(&attribute).expect("the arguments parse");
+    fn parse(attribute: &Attribute) -> Result<ForeignKeyArguments, ModelCodegenError> {
+        let arguments = AttributeArgs::from_attribute(attribute).expect("the arguments parse");
 
         ForeignKeyArguments::parse(&arguments, "crate::Model", "author")
     }
 
-    fn on_delete(attribute: Attribute) -> String {
+    fn on_delete(attribute: &Attribute) -> String {
         parse(attribute)
             .expect("the foreign key arguments resolve")
             .on_delete
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn defaults_to_no_action_when_absent() {
         assert_eq!(
-            on_delete(parse_quote!(#[foreign_key])),
+            on_delete(&parse_quote!(#[foreign_key])),
             quote!(margaret::framework::model::on_delete::OnDelete::NoAction).to_string()
         );
     }
@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn maps_cascade() {
         assert_eq!(
-            on_delete(parse_quote!(#[foreign_key(on_delete = cascade)])),
+            on_delete(&parse_quote!(#[foreign_key(on_delete = cascade)])),
             quote!(margaret::framework::model::on_delete::OnDelete::Cascade).to_string()
         );
     }
@@ -88,7 +88,7 @@ mod tests {
     #[test]
     fn maps_restrict() {
         assert_eq!(
-            on_delete(parse_quote!(#[foreign_key(on_delete = restrict)])),
+            on_delete(&parse_quote!(#[foreign_key(on_delete = restrict)])),
             quote!(margaret::framework::model::on_delete::OnDelete::Restrict).to_string()
         );
     }
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn maps_set_null() {
         assert_eq!(
-            on_delete(parse_quote!(#[foreign_key(on_delete = set_null)])),
+            on_delete(&parse_quote!(#[foreign_key(on_delete = set_null)])),
             quote!(margaret::framework::model::on_delete::OnDelete::SetNull).to_string()
         );
     }
@@ -104,14 +104,14 @@ mod tests {
     #[test]
     fn maps_set_default() {
         assert_eq!(
-            on_delete(parse_quote!(#[foreign_key(on_delete = set_default)])),
+            on_delete(&parse_quote!(#[foreign_key(on_delete = set_default)])),
             quote!(margaret::framework::model::on_delete::OnDelete::SetDefault).to_string()
         );
     }
 
     #[test]
     fn rejects_no_action_as_an_explicit_value() {
-        let message = parse(parse_quote!(#[foreign_key(on_delete = no_action)]))
+        let message = parse(&parse_quote!(#[foreign_key(on_delete = no_action)]))
             .err()
             .unwrap()
             .to_string();
@@ -121,6 +121,6 @@ mod tests {
 
     #[test]
     fn rejects_a_string_valued_action() {
-        assert!(parse(parse_quote!(#[foreign_key(on_delete = "cascade")])).is_err());
+        assert!(parse(&parse_quote!(#[foreign_key(on_delete = "cascade")])).is_err());
     }
 }

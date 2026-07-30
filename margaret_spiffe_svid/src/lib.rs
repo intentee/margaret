@@ -1,3 +1,5 @@
+pub use rustls;
+
 pub mod build_svid_certified_key;
 pub mod ca_bundle;
 pub mod extract_ca_bundle;

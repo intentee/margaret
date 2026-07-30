@@ -31,7 +31,7 @@ fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
 
     quote! {
         #[must_use]
-        pub fn #method(&self, #(#parameters),*) -> margaret::framework::http::forward::Forward {
+        pub fn #method(self, #(#parameters),*) -> margaret::framework::http::forward::Forward {
             margaret::framework::http::forward::Forward::new(#name, #path_params)
         }
     }

@@ -11,6 +11,7 @@ test = false
 [dependencies]
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_codegen = { path = "../margaret_codegen" }
+margaret_generated_module = { path = "../margaret_generated_module" }
 
 [dev-dependencies]
 margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }

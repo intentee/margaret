@@ -7,6 +7,8 @@ use tokio_util::sync::CancellationToken;
 use trzcina::Service as _;
 
 use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret_jwks_keygen::public_jwks::PublicJwks;
+use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 
 use crate::public_jwks_holder::PublicJwksHolder;
 use crate::public_jwks_poll_service::PublicJwksPollService;
@@ -26,11 +28,17 @@ impl JwksClient {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn run(&self, cancellation_token: CancellationToken) -> Result<()> {
         self.run_with_client_builder(Client::builder(), cancellation_token)
             .await
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn run_with_client_builder(
         &self,
         client_builder: ClientBuilder,
@@ -44,6 +52,11 @@ impl JwksClient {
         };
 
         Box::new(poll_service).run(cancellation_token).await
+    }
+
+    #[must_use]
+    pub fn subscribe(&self) -> SyncHolderSubscription<Arc<PublicJwks>> {
+        self.public_jwks_holder.subscribe()
     }
 
     #[must_use]

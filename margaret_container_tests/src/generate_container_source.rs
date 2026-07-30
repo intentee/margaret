@@ -9,6 +9,9 @@ use margaret_generated_module::generated_module::GeneratedModule;
 
 use crate::container_module_source::container_module_source;
 
+/// # Errors
+///
+/// Returns `ContainerError` propagated from the work it performs.
 pub fn generate_container_source(
     crate_name: &str,
     source_directory: &Path,

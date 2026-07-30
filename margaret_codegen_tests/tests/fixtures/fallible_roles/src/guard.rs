@@ -9,6 +9,9 @@ use margaret::framework::macros::process;
 pub struct Guard;
 
 impl Guard {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn process(
         &self,

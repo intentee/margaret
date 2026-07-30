@@ -76,6 +76,9 @@ pub struct BoundServer {
 }
 
 impl BoundServer {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub async fn bind(
         server_registry: Arc<ServerRegistry>,
         forward_targets: Arc<ForwardTargets>,
@@ -108,6 +111,9 @@ impl BoundServer {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
         self.listener.local_addr()
     }
@@ -243,7 +249,7 @@ fn peer_identity_from_tls_stream(tls_stream: &TlsStream<TcpStream>) -> PeerIdent
             .1
             .peer_certificates()
             .and_then(|certificates| certificates.first())
-            .map(|certificate| certificate.as_ref()),
+            .map(std::convert::AsRef::as_ref),
     )
 }
 
@@ -481,7 +487,7 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/upload",
-                vec![MethodHandler::new("POST", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("POST", Arc::new(PlainOk))],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -496,7 +502,7 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/files/{name}",
-                vec![MethodHandler::new("GET", Arc::new(EchoesTheNameParameter))],
+                vec![MethodHandler::anonymous("GET", Arc::new(EchoesTheNameParameter))],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -511,7 +517,7 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -526,7 +532,7 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/articles/{article}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
             )])
             .expect("the route paths do not conflict"),
         )]))
@@ -563,11 +569,11 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/items/{id}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
             ),
             RouteEntry::new(
                 "/items/{name}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
             ),
         ]);
 
@@ -579,7 +585,7 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/x/{id}",
-                vec![MethodHandler::new("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
             ),
             RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade), Vec::new()),
         ]);
@@ -593,6 +599,27 @@ mod tests {
             Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)),
             drop,
         );
+    }
+
+    #[tokio::test]
+    async fn hands_the_peer_address_of_an_accepted_connection_to_the_acceptor() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("the listener binds");
+        let listening_on = listener
+            .local_addr()
+            .expect("the listener reports its address");
+        let client = TcpStream::connect(listening_on)
+            .await
+            .expect("the client connects");
+        let client_addr = client.local_addr().expect("the client reports its address");
+        let mut accepted_from = None;
+
+        accept_outcome(listener.accept().await, |connection| {
+            accepted_from = Some(connection.remote_addr);
+        });
+
+        assert_eq!(accepted_from, Some(client_addr));
     }
 
     #[tokio::test]
@@ -959,7 +986,7 @@ mod tests {
                 .expect("the delegated test handler succeeds");
 
             Ok(ResponseContinuation::Done(
-                Response::forbidden().set_cookie(Cookie::new("session", "rotated")),
+                Response::forbidden().set_cookie(&Cookie::new("session", "rotated")),
             ))
         }
     }

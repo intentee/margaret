@@ -23,6 +23,9 @@ pub struct FarewellView {
 }
 
 impl FarewellView {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(card_layout: Arc<CardLayout>) -> anyhow::Result<Self> {
         Ok(Self { card_layout })

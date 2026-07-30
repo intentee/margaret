@@ -10,6 +10,7 @@ use margaret_request_binding_codegen::request_binding::RequestBinding;
 pub struct MiddlewarePlan {
     pub concrete: CanonicalPath,
     pub(crate) field: Ident,
+    pub(crate) is_async: bool,
     pub(crate) parameters: Vec<BoundParameter>,
     pub(crate) tag: Tag,
     pub(crate) wrapper: Ident,

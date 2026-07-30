@@ -18,6 +18,9 @@ pub struct Greet {
 }
 
 impl Greet {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(
         greeter: Arc<EnglishGreeter>,
@@ -35,8 +38,11 @@ impl Greet {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn run(&self) -> anyhow::Result<CommandOutcome> {
+    pub fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok({
             println!(
                 "{}, {} (salutation: {:?}, loud: {})",

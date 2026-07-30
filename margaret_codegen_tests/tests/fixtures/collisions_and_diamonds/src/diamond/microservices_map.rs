@@ -7,6 +7,9 @@ pub struct MicroservicesMap {
 }
 
 impl MicroservicesMap {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(
         #[console_argument(from = "microservices-map")] mapper: Option<String>,

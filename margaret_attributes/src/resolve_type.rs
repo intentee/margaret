@@ -1,8 +1,7 @@
-use std::collections::HashSet;
-
 use syn::Type;
 
 use crate::canonical_path::CanonicalPath;
+use crate::item_paths::ItemPaths;
 use crate::module_imports::ModuleImports;
 use crate::resolve_path::resolve_path;
 
@@ -11,7 +10,7 @@ pub fn resolve_type(
     declared: &Type,
     module_path: &[String],
     imports: &ModuleImports,
-    item_paths: &HashSet<CanonicalPath>,
+    item_paths: &ItemPaths,
 ) -> Option<CanonicalPath> {
     match declared {
         Type::Reference(reference) => {
@@ -24,25 +23,30 @@ pub fn resolve_type(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
 
     use syn::parse_quote;
 
     use crate::canonical_path::CanonicalPath;
+    use crate::item_paths::ItemPaths;
     use crate::module_imports::ModuleImports;
 
     use super::resolve_type;
 
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
+        CanonicalPath::new(
+            segments
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
+        )
     }
 
     fn resolved(
-        declared: syn::Type,
+        declared: &syn::Type,
         imports: &ModuleImports,
-        items: &HashSet<CanonicalPath>,
+        items: &ItemPaths,
     ) -> Option<String> {
-        resolve_type(&declared, &["crate".to_string()], imports, items).map(|path| path.to_string())
+        resolve_type(declared, &["crate".to_string()], imports, items).map(|path| path.to_string())
     }
 
     #[test]
@@ -54,7 +58,7 @@ mod tests {
         );
 
         assert_eq!(
-            resolved(parse_quote!(&Routes), &imports, &HashSet::new()),
+            resolved(&parse_quote!(&Routes), &imports, &ItemPaths::default()),
             Some("crate::margaret::routes::Routes".to_string())
         );
     }
@@ -65,7 +69,7 @@ mod tests {
         imports.insert("Routes".to_string(), path(&["crate", "routes", "Routes"]));
 
         assert_eq!(
-            resolved(parse_quote!(&mut Routes), &imports, &HashSet::new()),
+            resolved(&parse_quote!(&mut Routes), &imports, &ItemPaths::default()),
             Some("crate::routes::Routes".to_string())
         );
     }
@@ -74,9 +78,9 @@ mod tests {
     fn returns_none_for_a_non_path_type() {
         assert_eq!(
             resolved(
-                parse_quote!((u8, u8)),
+                &parse_quote!((u8, u8)),
                 &ModuleImports::default(),
-                &HashSet::new()
+                &ItemPaths::default()
             ),
             None
         );

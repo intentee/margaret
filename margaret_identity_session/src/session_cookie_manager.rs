@@ -15,6 +15,9 @@ pub struct SessionCookieManager {
 }
 
 impl SessionCookieManager {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn access_token_cookie(
         &self,
         AccessTokenClaimsSigned { exp, signed_claims }: AccessTokenClaimsSigned,
@@ -33,6 +36,9 @@ impl SessionCookieManager {
             .into_owned())
     }
 
+    /// # Errors
+    ///
+    /// Returns `IdentitySessionError` propagated from the work it performs.
     pub fn access_token_removal_cookie(&self) -> Result<Cookie<'static>, IdentitySessionError> {
         let mut cookie = Cookie::build((COOKIE_NAME_ACCESS_TOKEN, ""))
             .domain(self.cookie_domain.clone())
@@ -48,6 +54,9 @@ impl SessionCookieManager {
         Ok(cookie)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn refresh_token_cookie(
         &self,
         RefreshTokenClaimsSigned { exp, signed_claims }: RefreshTokenClaimsSigned,
@@ -66,6 +75,9 @@ impl SessionCookieManager {
             .into_owned())
     }
 
+    /// # Errors
+    ///
+    /// Returns `IdentitySessionError` propagated from the work it performs.
     pub fn refresh_token_removal_cookie(&self) -> Result<Cookie<'static>, IdentitySessionError> {
         let mut cookie = Cookie::build((COOKIE_NAME_REFRESH_TOKEN, ""))
             .domain(self.cookie_domain.clone())

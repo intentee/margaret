@@ -1,5 +1,8 @@
 use std::future::Future;
 
+/// # Errors
+///
+/// Returns an error propagated from the work it performs.
 pub async fn join_route_parameter_bindings<First, Second, FirstModel, SecondModel, Error>(
     first: First,
     second: Second,

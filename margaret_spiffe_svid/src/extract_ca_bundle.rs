@@ -5,6 +5,9 @@ use spiffe::X509Svid;
 use crate::ca_bundle::CaBundle;
 use crate::svid_error::SvidError;
 
+/// # Errors
+///
+/// Returns `SvidError::MissingCaBundle`.
 pub fn extract_ca_bundle(
     default_svid: &X509Svid,
     x509_context: &X509Context,

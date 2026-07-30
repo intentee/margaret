@@ -1,36 +1,24 @@
 use margaret_generated_module::generated_module::GeneratedModule;
 
+use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
 
-pub(crate) fn umbrella(
-    GeneratedFeatures {
-        has_asset_bag,
-        has_authenticated_users,
-        has_console,
-        has_http,
-        has_jwks,
-        has_middleware,
-        has_models,
-        has_views,
-        has_websockets,
-        serves,
-    }: GeneratedFeatures,
-) -> GeneratedModule {
-    let serves_http = has_http || has_websockets;
+pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
+    let serves_http = features.serves_http();
     let mut source =
         String::from("#![forbid(unsafe_code)]\n#[rustfmt::skip]\npub use ::margaret::framework;\n");
 
     source.push_str("#[rustfmt::skip]\npub mod container;\n");
 
-    if has_asset_bag {
+    if features.contains(GeneratedFeature::AssetBag) {
         source.push_str("#[rustfmt::skip]\npub mod asset_bag;\n");
     }
 
-    if has_jwks {
+    if features.contains(GeneratedFeature::Jwks) {
         source.push_str("#[rustfmt::skip]\npub mod jwks;\n");
     }
 
-    if has_authenticated_users && serves_http {
+    if features.contains(GeneratedFeature::AuthenticatedUsers) && serves_http {
         source.push_str("#[rustfmt::skip]\npub mod authenticated_users;\n");
     }
 
@@ -40,27 +28,27 @@ pub(crate) fn umbrella(
         source.push_str("#[rustfmt::skip]\npub mod routes;\n");
     }
 
-    if has_middleware && serves_http {
+    if features.contains(GeneratedFeature::Middleware) && serves_http {
         source.push_str("#[rustfmt::skip]\npub mod middleware;\n");
     }
 
-    if has_websockets {
+    if features.contains(GeneratedFeature::Websockets) {
         source.push_str("#[rustfmt::skip]\npub mod websocket;\n");
     }
 
-    if has_models {
+    if features.contains(GeneratedFeature::Models) {
         source.push_str("#[rustfmt::skip]\npub mod schema;\n");
     }
 
-    if has_views {
+    if features.contains(GeneratedFeature::Views) {
         source.push_str("#[rustfmt::skip]\npub mod views;\n");
     }
 
-    if serves {
+    if features.contains(GeneratedFeature::Serves) {
         source.push_str("#[rustfmt::skip]\npub mod serve;\n");
     }
 
-    if has_console {
+    if features.contains(GeneratedFeature::Console) {
         source.push_str("#[rustfmt::skip]\npub mod run;\n");
     }
 
@@ -74,24 +62,13 @@ mod tests {
     use super::umbrella;
 
     fn minimal_features() -> GeneratedFeatures {
-        GeneratedFeatures {
-            has_asset_bag: false,
-            has_authenticated_users: false,
-            has_console: false,
-            has_http: false,
-            has_jwks: false,
-            has_middleware: false,
-            has_models: false,
-            has_views: false,
-            has_websockets: false,
-            serves: false,
-        }
+        GeneratedFeatures::default()
     }
 
     #[test]
     fn forwards_the_framework_re_exports_into_the_generated_module() {
         assert!(
-            umbrella(minimal_features())
+            umbrella(&minimal_features())
                 .source()
                 .contains("pub use ::margaret::framework;")
         );
@@ -100,7 +77,7 @@ mod tests {
     #[test]
     fn forbids_unsafe_code_throughout_the_generated_module() {
         assert!(
-            umbrella(minimal_features())
+            umbrella(&minimal_features())
                 .source()
                 .starts_with("#![forbid(unsafe_code)]")
         );

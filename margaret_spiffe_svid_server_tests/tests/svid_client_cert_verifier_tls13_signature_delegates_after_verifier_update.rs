@@ -13,9 +13,9 @@ fn tls13_signature_delegates_after_verifier_update() {
     install_crypto_provider();
 
     let verifier =
-        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org".to_string())
+        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
             .unwrap();
-    let dss = build_digitally_signed_struct(SignatureScheme::ECDSA_NISTP256_SHA256, vec![0u8; 64]);
+    let dss = build_digitally_signed_struct(SignatureScheme::ECDSA_NISTP256_SHA256, &[0u8; 64]);
 
     let result = verifier.verify_tls13_signature(
         b"any message",

@@ -12,6 +12,9 @@ use crate::middleware_attribute_arguments::MiddlewareAttributeArguments;
 use crate::middleware_codegen_error::MiddlewareCodegenError;
 use crate::middleware_plan::MiddlewarePlan;
 
+/// # Errors
+///
+/// Returns `MiddlewareCodegenError::MiddlewareHandlerNotOnStruct` or `MiddlewareCodegenError::MalformedMiddlewareTag`.
 pub fn middleware_plans(
     index: &AttributeIndex,
     registries: &BindingRegistries,
@@ -47,6 +50,7 @@ pub fn middleware_plans(
         plans.push(MiddlewarePlan {
             concrete: item.canonical_path().clone(),
             field: format_ident!("{}", identifier.field()),
+            is_async: method.signature().asyncness.is_some(),
             parameters,
             tag,
             wrapper: format_ident!("{}", identifier.type_name()),

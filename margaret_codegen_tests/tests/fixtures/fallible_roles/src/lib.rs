@@ -2,19 +2,19 @@
 #[path = "../margaret/mod.rs"]
 pub mod margaret;
 
-mod boot;
-mod chat;
-mod get_home;
-mod get_profile;
-mod get_user;
-mod guard;
-mod home_view;
-mod home_view_props;
-mod interval;
-mod pulse;
-mod result;
-mod secrets;
-mod session_user_provider;
-mod user;
-mod user_binder;
-mod worker;
+pub mod boot;
+pub mod chat;
+pub mod get_home;
+pub mod get_profile;
+pub mod get_user;
+pub mod guard;
+pub mod home_view;
+pub mod home_view_props;
+pub mod interval;
+pub mod pulse;
+pub mod result;
+pub mod secrets;
+pub mod session_user_provider;
+pub mod user;
+pub mod user_binder;
+pub mod worker;

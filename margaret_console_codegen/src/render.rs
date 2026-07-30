@@ -5,6 +5,8 @@ use margaret_console_argument_codegen::argument_registration::argument_registrat
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
+use margaret_container::console_argument_binding::ConsoleArgumentBinding;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
@@ -42,6 +44,41 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
     }
 }
 
+fn serve_registration(
+    http_servers: &[HttpServer],
+    serve_arguments: &[ConsoleArgument],
+) -> TokenStream {
+    let spiffe_secured = serves_spiffe(http_servers);
+    let svid_active = spiffe_secured || has_spiffe_http_client(serve_arguments);
+    let service_arguments = serve_arguments.iter().map(argument_registration);
+    let http_server_arguments = http_servers.iter().map(|server| {
+        let address_argument = server.address_argument();
+        let url_argument = server.url_argument();
+        let uploads_argument = server.uploads_argument();
+        let upload_dir_argument = server.upload_dir_argument();
+        let transport_argument =
+            spiffe_secured.then(|| transport_argument_registration(server));
+
+        quote! {
+            .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
+            .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
+            .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
+            .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
+            #transport_argument
+        }
+    });
+    let spiffe_arguments = svid_active.then(|| {
+        quote! {
+            .arg(clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true))
+            .arg(clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true))
+        }
+    });
+
+    quote! {
+        .subcommand(clap::Command::new("serve")#(#http_server_arguments)*#spiffe_arguments #(#service_arguments)*)
+    }
+}
+
 fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenStream {
     let name = &command.name;
     let matches_binding = if command.arguments.is_empty() {
@@ -49,7 +86,15 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
     } else {
         quote! { matches }
     };
-    let values: Vec<TokenStream> = command.arguments.iter().map(argument_value).collect();
+    let values: Vec<ConsoleArgumentBinding> = command
+        .arguments
+        .iter()
+        .zip(&command.console_slots)
+        .map(|(argument, slot)| ConsoleArgumentBinding {
+            slot: *slot,
+            value: argument_value(argument),
+        })
+        .collect();
     let construction = bindings.construction_invocation(&command.accessor.to_string(), &values);
     let accessor_access = quote! {
         (match #construction {
@@ -61,13 +106,19 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
     };
 
     if command.takes_token {
+        let run_call = if command.is_async {
+            quote! { #accessor_access.run(cancellation_token).await }
+        } else {
+            quote! { #accessor_access.run(cancellation_token) }
+        };
+
         quote! {
             Some((#name, #matches_binding)) => {
                 margaret::framework::service::dispatch_serve::dispatch_serve(
                     margaret::framework::service::install::install,
                     |cancellation_token| async move {
                         margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
-                            #accessor_access.run(cancellation_token).await,
+                            #run_call,
                         )
                     },
                 )
@@ -75,36 +126,33 @@ fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenS
             }
         }
     } else {
+        let run_call = if command.is_async {
+            quote! { #accessor_access.run().await }
+        } else {
+            quote! { #accessor_access.run() }
+        };
+
         quote! {
             Some((#name, #matches_binding)) => {
                 margaret::framework::console::command_outcome::CommandOutcome::from_user_result(
-                    #accessor_access.run().await,
+                    #run_call,
                 )
-            },
+            }
         }
     }
 }
 
-pub(crate) fn render(
-    commands: &[ConsoleCommand],
-    serves: bool,
-    has_models: bool,
-    servers: &[HttpServer],
-    serve_arguments: &[ConsoleArgument],
-    bindings: &ContainerBindings,
-) -> TokenStream {
-    let dispatches_asynchronously = !commands.is_empty() || serves;
-    let run_asyncness = if dispatches_asynchronously {
-        quote! { async }
-    } else {
-        quote! {}
-    };
-    let subcommands = commands.iter().map(subcommand_registration);
-    let arms = commands
-        .iter()
-        .map(|command| command_arm(command, bindings));
+struct SchemaTokens {
+    arm: TokenStream,
+    registration: TokenStream,
+}
 
-    let schema_registration = if has_models {
+pub(crate) struct RenderedConsole {
+    pub(crate) run: TokenStream,
+}
+
+fn schema_tokens(has_models: bool) -> SchemaTokens {
+    let registration = if has_models {
         quote! {
             .subcommand(clap::Command::new("schema"))
         }
@@ -112,7 +160,7 @@ pub(crate) fn render(
         quote! {}
     };
 
-    let schema_arm = if has_models {
+    let arm = if has_models {
         quote! {
             Some(("schema", _matches)) => {
                 println!(
@@ -127,36 +175,41 @@ pub(crate) fn render(
         quote! {}
     };
 
+    SchemaTokens { arm, registration }
+}
+
+pub(crate) fn render(
+    commands: &[ConsoleCommand],
+    serves: bool,
+    has_models: bool,
+    http_servers: &[HttpServer],
+    serve_arguments: &[ConsoleArgument],
+    bindings: &ContainerBindings,
+) -> RenderedConsole {
+    let dispatches_asynchronously = serves
+        || commands.iter().any(|command| {
+            command.takes_token
+                || command.is_async
+                || bindings.construction_is_async(&command.accessor.to_string())
+        });
+    let run_asyncness = if dispatches_asynchronously {
+        quote! { async }
+    } else {
+        quote! {}
+    };
+    let subcommands = commands.iter().map(subcommand_registration);
+    let arms = commands
+        .iter()
+        .map(|command| command_arm(command, bindings))
+        .collect::<Vec<TokenStream>>();
+
+    let SchemaTokens {
+        arm: schema_arm,
+        registration: schema_registration,
+    } = schema_tokens(has_models);
+
     let serve_registration = if serves {
-        let spiffe_secured = serves_spiffe(servers);
-        let svid_active = spiffe_secured || has_spiffe_http_client(serve_arguments);
-        let service_arguments = serve_arguments.iter().map(argument_registration);
-        let server_arguments = servers.iter().map(|server| {
-            let address_argument = server.address_argument();
-            let url_argument = server.url_argument();
-            let uploads_argument = server.uploads_argument();
-            let upload_dir_argument = server.upload_dir_argument();
-            let transport_argument =
-                spiffe_secured.then(|| transport_argument_registration(server));
-
-            quote! {
-                .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
-                .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
-                .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
-                .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
-                #transport_argument
-            }
-        });
-        let spiffe_arguments = svid_active.then(|| {
-            quote! {
-                .arg(clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true))
-                .arg(clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true))
-            }
-        });
-
-        quote! {
-            .subcommand(clap::Command::new("serve")#(#server_arguments)*#spiffe_arguments #(#service_arguments)*)
-        }
+        serve_registration(http_servers, serve_arguments)
     } else {
         quote! {}
     };
@@ -175,7 +228,9 @@ pub(crate) fn render(
         quote! {}
     };
 
-    quote! {
+    let too_many_lines = too_many_lines_allow();
+    let run = quote! {
+        #too_many_lines
         pub #run_asyncness fn run<Arguments, Argument>(
             args: Arguments,
         ) -> margaret::framework::console::command_outcome::CommandOutcome
@@ -196,9 +251,11 @@ pub(crate) fn render(
                     _ => margaret::framework::console::print_help::print_help(&mut command),
                 },
                 Err(error) => {
-                    margaret::framework::console::outcome_for_clap_error::outcome_for_clap_error(error)
+                    margaret::framework::console::outcome_for_clap_error::outcome_for_clap_error(&error)
                 }
             }
         }
-    }
+    };
+
+    RenderedConsole { run }
 }

@@ -33,10 +33,13 @@ pub struct SvidServerCertVerifier {
 }
 
 impl SvidServerCertVerifier {
-    pub fn new(root_store: RootCertStore, spiffe_trust_domain: String) -> Result<Self, SvidError> {
+    /// # Errors
+    ///
+    /// Returns `SvidError::CryptoProviderNotInstalled` or `SvidError::ServerVerifier`.
+    pub fn new(root_store: RootCertStore, spiffe_trust_domain: &str) -> Result<Self, SvidError> {
         let default_crypto_provider =
             CryptoProvider::get_default().ok_or(SvidError::CryptoProviderNotInstalled)?;
-        let spiffe_trust_domain = TrustDomain::new(&spiffe_trust_domain)
+        let spiffe_trust_domain = TrustDomain::new(spiffe_trust_domain)
             .map_err(|source| SvidError::TrustDomain { source })?;
         let signature_verification_algorithms =
             default_crypto_provider.signature_verification_algorithms;

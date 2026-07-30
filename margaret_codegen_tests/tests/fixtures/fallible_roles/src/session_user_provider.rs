@@ -11,8 +11,11 @@ use super::user::User;
 pub struct SessionUserProvider;
 
 impl SessionUserProvider {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[infer_from_request]
-    pub async fn infer(&self) -> InferenceResult<AuthenticatedUserOutcome<User>> {
+    pub fn infer(&self) -> InferenceResult<AuthenticatedUserOutcome<User>> {
         Ok(AuthenticatedUserOutcome::Anonymous)
     }
 }

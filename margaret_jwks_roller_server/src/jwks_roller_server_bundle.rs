@@ -40,10 +40,18 @@ impl JwksRollerServerBundle {
     }
 
     #[must_use]
+    pub fn jwks_document_holder(&self) -> JwksDocumentHolder {
+        self.jwks_document_holder.clone()
+    }
+
+    #[must_use]
     pub fn jwks_secret_holder(&self) -> JwksSecretHolder {
         self.jwks_secret_holder.clone()
     }
 
+    /// # Errors
+    ///
+    /// Returns `JwksRollerServerError::SecretRoll` or `JwksRollerServerError::DocumentSerialization`.
     pub fn roll_and_publish(&self) -> Result<(), JwksRollerServerError> {
         let rolled = roll(self.storage.as_ref(), &self.jwks_secret_holder, JWKS_CURVE)
             .map_err(JwksRollerServerError::SecretRoll)?;

@@ -26,7 +26,7 @@ async fn convert_x509_context_errors_when_private_key_is_unsupported_for_signing
 
     let context = X509Context::new(vec![svid], bundle_set);
 
-    let result = service.convert_x509_context(context).await;
+    let result = service.convert_x509_context(&context);
 
     assert!(result.is_err());
 }

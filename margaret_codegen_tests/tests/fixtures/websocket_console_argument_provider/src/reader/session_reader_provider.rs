@@ -16,13 +16,19 @@ pub struct SessionReaderProvider {
 }
 
 impl SessionReaderProvider {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(realm: Arc<crate::reader::reader_realm::ReaderRealm>) -> anyhow::Result<Self> {
         Ok(Self { realm })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[infer_from_request]
-    pub async fn infer_reader(
+    pub fn infer_reader(
         &self,
         request: &Request,
         #[form_request(from = Cookie)] cookie: crate::reader::reader_cookie::ReaderCookie,

@@ -2,6 +2,9 @@ use crate::console_argument::ConsoleArgument;
 use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::serve_input_registry::ServeInputRegistry;
 
+/// # Errors
+///
+/// Returns `ConsoleArgumentCodegenError` propagated from the work it performs.
 pub fn unify_by_key(
     arguments: &[ConsoleArgument],
 ) -> Result<Vec<ConsoleArgument>, ConsoleArgumentCodegenError> {

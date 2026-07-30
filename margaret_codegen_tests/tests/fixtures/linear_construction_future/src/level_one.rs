@@ -6,17 +6,23 @@ use margaret::framework::macros::singleton;
 
 #[singleton]
 #[console_command(name = "level-one")]
-pub(crate) struct LevelOne;
+pub struct LevelOne;
 
 impl LevelOne {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub(crate) async fn create() -> anyhow::Result<Self> {
-        super::record::record(0);
+    pub async fn create() -> anyhow::Result<Self> {
+        super::record::record(0).await;
         Ok(Self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub(crate) async fn run(&self) -> anyhow::Result<CommandOutcome> {
+    pub fn run(&self) -> anyhow::Result<CommandOutcome> {
         Ok(CommandOutcome::Succeeded)
     }
 }

@@ -38,7 +38,7 @@ pub(crate) fn render_server_routes(
             )
         };
         let upgrade_call = quote! {
-            super::#module::upgrade_entry(container, #routes_argument).await
+            super::#module::upgrade_entry(container, #routes_argument)
         };
         quote! {
             margaret::framework::http::route_entry::RouteEntry::web_socket(
@@ -51,7 +51,8 @@ pub(crate) fn render_server_routes(
 
     let list = quote! { ::std::vec::Vec::from([#(#entries)*]) };
     quote! {
-        pub async fn #function(
+        #[must_use]
+        pub fn #function(
             container: &super::super::container::Container,
             #routes_name: &::std::sync::Arc<super::super::routes::Routes>,
         ) -> ::std::vec::Vec<margaret::framework::http::route_entry::RouteEntry> {

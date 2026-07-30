@@ -72,7 +72,9 @@ pub(crate) fn console_commands(
 
         validate_runner(index, item, runner, &command)?;
 
-        let arguments = bindings.console_arguments(item.canonical_path())?.to_vec();
+        let provider_arguments = bindings.console_arguments(item.canonical_path())?;
+        let arguments = provider_arguments.arguments.to_vec();
+        let console_slots = provider_arguments.slots.to_vec();
 
         if arguments
             .iter()
@@ -87,8 +89,10 @@ pub(crate) fn console_commands(
                 accessor,
                 arguments,
                 command_path: command.clone(),
+                console_slots,
                 construction_root: item.canonical_path().clone(),
                 description,
+                is_async: runner.signature().asyncness.is_some(),
                 name: name.clone(),
                 takes_token: runner_takes_token(index, item, runner),
             },

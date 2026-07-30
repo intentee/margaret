@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use syn::Path;
 use syn::Type;
@@ -9,6 +8,7 @@ use crate::field_base::field_base;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::identifier::Identifier;
 use crate::indexed_item::IndexedItem;
+use crate::item_paths::ItemPaths;
 use crate::matched_attribute::MatchedAttribute;
 use crate::module_imports::ModuleImports;
 use crate::name_allocator::NameAllocator;
@@ -19,8 +19,15 @@ pub struct AttributeIndex {
     empty_imports: ModuleImports,
     identifiers: HashMap<CanonicalPath, Identifier>,
     imports: HashMap<CanonicalPath, ModuleImports>,
-    item_paths: HashSet<CanonicalPath>,
+    item_paths: ItemPaths,
     items: Vec<IndexedItem>,
+}
+
+fn module_of(item: &IndexedItem) -> &[String] {
+    item.canonical_path()
+        .segments()
+        .split_last()
+        .map_or(&[], |(_, module)| module)
 }
 
 fn allocate_identifiers(items: &[IndexedItem]) -> HashMap<CanonicalPath, Identifier> {
@@ -45,7 +52,7 @@ impl AttributeIndex {
         items: Vec<IndexedItem>,
         imports: HashMap<CanonicalPath, ModuleImports>,
     ) -> Self {
-        let mut item_paths = HashSet::new();
+        let mut item_paths = ItemPaths::default();
         for item in &items {
             item_paths.insert(item.canonical_path().clone());
         }
@@ -89,12 +96,12 @@ impl AttributeIndex {
 
     #[must_use]
     pub fn resolve_item_path(&self, item: &IndexedItem, path: &Path) -> Option<CanonicalPath> {
-        self.resolve_module_path(self.module_of(item), path)
+        self.resolve_module_path(module_of(item), path)
     }
 
     #[must_use]
     pub fn resolve_item_type(&self, item: &IndexedItem, declared: &Type) -> Option<CanonicalPath> {
-        self.resolve_module_type(self.module_of(item), declared)
+        self.resolve_module_type(module_of(item), declared)
     }
 
     #[must_use]
@@ -138,12 +145,5 @@ impl AttributeIndex {
         self.imports
             .get(&CanonicalPath::new(module.to_vec()))
             .unwrap_or(&self.empty_imports)
-    }
-
-    fn module_of<'index>(&self, item: &'index IndexedItem) -> &'index [String] {
-        item.canonical_path()
-            .segments()
-            .split_last()
-            .map_or(&[], |(_, module)| module)
     }
 }

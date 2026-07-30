@@ -21,6 +21,9 @@ pub struct StoryboardSession {
 }
 
 impl StoryboardSession {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[build_for_session]
     pub fn build_for_session(
         greeter: Arc<EnglishGreeter>,

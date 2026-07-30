@@ -6,6 +6,8 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
+
 use crate::cache_policy::CachePolicy;
 use crate::content_type::content_type;
 
@@ -57,11 +59,14 @@ pub(crate) fn render_asset_responder(
         ));
     }
 
+    let too_many_lines = too_many_lines_allow();
+
     quote! {
         pub struct #type_identifier;
 
         impl #type_identifier {
             #[must_use]
+            #too_many_lines
             pub fn respond(&self, asset_path: &str) -> ::margaret::framework::http::response::Response {
                 match asset_path {
                     #(#arms)*
@@ -79,8 +84,8 @@ mod tests {
     use super::render_asset_responder;
     use crate::cache_policy::CachePolicy;
 
-    fn rendered(served: BTreeMap<String, CachePolicy>) -> String {
-        render_asset_responder(&served, "assets", "..", "AssetResponder").to_string()
+    fn rendered(served: &BTreeMap<String, CachePolicy>) -> String {
+        render_asset_responder(served, "assets", "..", "AssetResponder").to_string()
     }
 
     #[test]
@@ -89,7 +94,7 @@ mod tests {
         served.insert("app_A1B2C3D4.js".to_string(), CachePolicy::Immutable);
         served.insert("service_worker.js".to_string(), CachePolicy::Revalidate);
 
-        let source = rendered(served);
+        let source = rendered(&served);
 
         assert!(source.contains("pub struct AssetResponder"));
         assert!(source.contains("static_bytes"));
@@ -112,7 +117,7 @@ mod tests {
         served.insert("app_A1B2C3D4.js".to_string(), CachePolicy::Immutable);
         served.insert("app_A1B2C3D4.js.map".to_string(), CachePolicy::Immutable);
 
-        let source = rendered(served);
+        let source = rendered(&served);
 
         assert!(source.contains("\"app_A1B2C3D4.js\" =>"));
         assert!(!source.contains(".map"));
@@ -120,7 +125,7 @@ mod tests {
 
     #[test]
     fn renders_only_the_fallback_for_an_empty_served_set() {
-        let source = rendered(BTreeMap::new());
+        let source = rendered(&BTreeMap::new());
 
         assert!(source.contains("pub struct AssetResponder"));
         assert!(source.contains("not_found"));

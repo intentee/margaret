@@ -17,10 +17,10 @@ fn tls13_signature_delegates_after_verifier_update() {
 
     let facade = SvidServerCertVerifierFacade::default();
     facade.update_internal_verifier(Arc::new(
-        SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org".to_string())
+        SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
             .unwrap(),
     ));
-    let dss = build_digitally_signed_struct(SignatureScheme::ECDSA_NISTP256_SHA256, vec![0u8; 64]);
+    let dss = build_digitally_signed_struct(SignatureScheme::ECDSA_NISTP256_SHA256, &[0u8; 64]);
 
     let result = facade.verify_tls13_signature(
         b"any message",

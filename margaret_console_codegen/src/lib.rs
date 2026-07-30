@@ -102,17 +102,17 @@ impl Farewell {
         index: &AttributeIndex,
         serves: bool,
         has_models: bool,
-        servers: &[HttpServer],
+        http_servers: &[HttpServer],
         serve_arguments: &[margaret_console_argument_codegen::console_argument::ConsoleArgument],
         bindings: &ContainerBindings,
     ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
         let plan = ConsolePlan::build(index, bindings)?;
 
         Ok(render_console(
-            plan,
+            &plan,
             serves,
             has_models,
-            servers,
+            http_servers,
             serve_arguments,
             bindings,
         ))
@@ -120,7 +120,7 @@ impl Farewell {
 
     fn source_for(lib_source: &str, has_http: bool) -> String {
         let index = index_for(lib_source);
-        let servers = if has_http {
+        let http_servers = if has_http {
             vec![HttpServer::new(
                 "public".to_string(),
                 ServerTransportPolicy::Negotiable,
@@ -132,11 +132,17 @@ impl Farewell {
         let bindings = bindings(&index);
         let plan = ConsolePlan::build(&index, &bindings).expect("the console is planned");
 
-        render_console(plan, has_http, false, &servers, &[], &bindings)
-            .module
-            .format()
-            .expect("the module formats")
-            .source()
+        render_console(&plan, has_http, false, &http_servers, &[], &bindings)
+            .modules
+            .into_iter()
+            .map(|module| {
+                module
+                    .format()
+                    .expect("the module formats")
+                    .source()
+                    .to_string()
+            })
+            .collect::<String>()
             .split_whitespace()
             .collect()
     }
@@ -164,7 +170,7 @@ impl Farewell {
     fn generates_a_dispatcher_for_each_argument_kind() {
         let source = source_for(COMMANDS, false);
 
-        assert!(source.contains("pubasyncfnrun"));
+        assert!(source.contains("pubfnrun"));
         assert!(source.contains("run<Arguments,Argument>(args:Arguments,)"));
         assert!(source.contains(r#"clap::Command::new("demo").about("Demonstratesarguments")"#));
 
@@ -186,11 +192,25 @@ impl Farewell {
         );
         assert!(source.contains(r#"matches.get_flag("loud")"#));
 
-        assert!(source.contains(r#"("farewell",_matches)"#));
+        assert!(source.contains(r#"Some(("farewell",_matches))=>{"#));
         assert!(source.contains("super::container::build::construct_farewell()"));
         assert!(!source.contains("super::container::build::construct_farewell().await"));
         assert!(source.contains("report_failure::report_failure(error"));
-        assert!(source.contains(".run().await"));
+        assert!(source.contains(".run()"));
+    }
+
+    #[test]
+    fn accepts_commands_named_after_the_generated_entry_point() {
+        let source = source_for(
+            "#[singleton]\n#[console_command(name = \"run\")]\nstruct Run;\n\nimpl Run {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"command\")]\nstruct Command;\n\nimpl Command {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains("pubfnrun<Arguments,Argument>"));
+        assert!(source.contains(r#"Some(("run",_matches))=>{"#));
+        assert!(source.contains(r#"Some(("command",_matches))=>{"#));
+        assert!(source.contains("super::container::build::construct_run()"));
+        assert!(source.contains("super::container::build::construct_command()"));
     }
 
     #[test]
@@ -234,10 +254,16 @@ impl Farewell {
             &bindings(&index),
         )
         .expect("the console source is generated")
-        .module
-        .format()
-        .expect("the module formats")
-        .source()
+        .modules
+        .into_iter()
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .to_string()
+        })
+        .collect::<String>()
         .split_whitespace()
         .collect();
 
@@ -278,10 +304,16 @@ impl Farewell {
             &bindings(&index),
         )
         .expect("the console source is generated")
-        .module
-        .format()
-        .expect("the module formats")
-        .source()
+        .modules
+        .into_iter()
+        .map(|module| {
+            module
+                .format()
+                .expect("the module formats")
+                .source()
+                .to_string()
+        })
+        .collect::<String>()
         .split_whitespace()
         .collect();
 
@@ -301,10 +333,16 @@ impl Farewell {
         let source: String =
             render_planned_console(&index, true, false, &[], &[], &bindings(&index))
                 .expect("the console source is generated")
-                .module
-                .format()
-                .expect("the module formats")
-                .source()
+                .modules
+                .into_iter()
+                .map(|module| {
+                    module
+                        .format()
+                        .expect("the module formats")
+                        .source()
+                        .to_string()
+                })
+                .collect::<String>()
                 .split_whitespace()
                 .collect();
 
@@ -319,10 +357,16 @@ impl Farewell {
         let source: String =
             render_planned_console(&index, false, true, &[], &[], &bindings(&index))
                 .expect("the console source is generated")
-                .module
-                .format()
-                .expect("the module formats")
-                .source()
+                .modules
+                .into_iter()
+                .map(|module| {
+                    module
+                        .format()
+                        .expect("the module formats")
+                        .source()
+                        .to_string()
+                })
+                .collect::<String>()
                 .split_whitespace()
                 .collect();
 
@@ -339,10 +383,16 @@ impl Farewell {
         let source: String =
             render_planned_console(&index, false, true, &[], &[], &bindings(&index))
                 .expect("the console source is generated")
-                .module
-                .format()
-                .expect("the module formats")
-                .source()
+                .modules
+                .into_iter()
+                .map(|module| {
+                    module
+                        .format()
+                        .expect("the module formats")
+                        .source()
+                        .to_string()
+                })
+                .collect::<String>()
                 .split_whitespace()
                 .collect();
 
@@ -360,7 +410,40 @@ impl Farewell {
         assert!(source.contains(
             "margaret::framework::service::dispatch_serve::dispatch_serve(margaret::framework::service::install::install,|cancellation_token|asyncmove"
         ));
+        assert!(source.contains(".run(cancellation_token)"));
+    }
+
+    #[test]
+    fn awaits_an_asynchronous_command_runner_that_takes_the_cancellation_token() {
+        let source = source_for(
+            "use tokio_util::sync::CancellationToken;\n\n#[singleton]\n#[console_command(name = \"watch\")]\nstruct Watch;\n\nimpl Watch {\n    #[process]\n    async fn run(&self, token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
         assert!(source.contains(".run(cancellation_token).await"));
+    }
+
+    #[test]
+    fn awaits_a_command_that_declares_an_asynchronous_runner() {
+        let source = source_for(
+            "#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare;\n\nimpl Bare {\n    #[process]\n    async fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains("pubasyncfnrun"));
+        assert!(source.contains(".run().await"));
+    }
+
+    #[test]
+    fn awaits_a_command_whose_construction_is_asynchronous() {
+        let source = source_for(
+            "#[singleton]\nstruct Slow;\n\nimpl Slow {\n    #[constructor]\n    async fn create() -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"bare\")]\nstruct Bare {\n    slow: Arc<Slow>,\n}\n\nimpl Bare {\n    #[constructor]\n    fn create(slow: Arc<Slow>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains("pubasyncfnrun"));
+        assert!(source.contains("super::container::build::construct_bare().await"));
+        assert!(source.contains(".run()"));
     }
 
     #[test]
@@ -373,7 +456,7 @@ impl Farewell {
         assert!(source.contains("super::container::build::construct_flagged("));
         assert!(source.contains(r#"matches.get_flag("loud")"#));
         assert!(source.contains("report_failure::report_failure(error"));
-        assert!(source.contains(".run().await"));
+        assert!(source.contains(".run()"));
     }
 
     #[test]
@@ -436,11 +519,11 @@ impl Farewell {
             false,
         );
 
-        assert!(source.contains(r#"("bare",_matches)"#));
+        assert!(source.contains(r#"Some(("bare",_matches))=>{"#));
         assert!(source.contains("super::container::build::construct_bare()"));
         assert!(!source.contains("super::container::build::construct_bare().await"));
         assert!(source.contains("report_failure::report_failure(error"));
-        assert!(source.contains(".run().await"));
+        assert!(source.contains(".run()"));
     }
 
     #[test]

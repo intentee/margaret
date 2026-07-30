@@ -2,6 +2,6 @@
 #[path = "../margaret/mod.rs"]
 pub mod margaret;
 
-mod call_route;
-mod heartbeat;
-mod identity_client;
+pub mod call_route;
+pub mod heartbeat;
+pub mod identity_client;

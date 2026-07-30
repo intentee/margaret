@@ -12,6 +12,9 @@ pub struct ConsolePlan {
 }
 
 impl ConsolePlan {
+    /// # Errors
+    ///
+    /// Returns `ConsoleCodegenError` propagated from the work it performs.
     pub fn build(
         index: &AttributeIndex,
         bindings: &ContainerBindings,

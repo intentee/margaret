@@ -28,6 +28,9 @@ impl Next {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `HandlerError` propagated from the work it performs.
     pub async fn run(self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
         match self.handler {
             NextHandler::OneShot(handler) => handler.handle(request).await,

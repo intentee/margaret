@@ -14,7 +14,7 @@ fn bindings(fixture: &str) -> ContainerBindings {
     bindings_for_fixture("crate", &directory)
 }
 
-fn collapsed(tokens: TokenStream) -> String {
+fn collapsed(tokens: &TokenStream) -> String {
     tokens.to_string().split_whitespace().collect()
 }
 
@@ -23,7 +23,7 @@ fn reads_a_completed_dependency_without_async_or_failure_handling() {
     let bindings = bindings("fallible_constructor");
     let invocation = bindings.accessor_invocation(&format_ident!("container"), "loader");
 
-    assert_eq!(collapsed(invocation), "container.loader()");
+    assert_eq!(collapsed(&invocation), "container.loader()");
 }
 
 #[test]
@@ -32,7 +32,7 @@ fn invokes_the_selected_root_construction_function() {
     let invocation = bindings.construction_invocation("loader", &[]);
 
     assert_eq!(
-        collapsed(invocation),
+        collapsed(&invocation),
         "super::container::build::construct_loader()"
     );
 }

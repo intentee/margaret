@@ -8,7 +8,7 @@ fn rejects_an_invalid_trust_domain() {
     install_crypto_provider();
 
     let result =
-        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "EXAMPLE.ORG".to_string());
+        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "EXAMPLE.ORG");
 
     assert!(matches!(result, Err(SvidError::TrustDomain { .. })));
 }

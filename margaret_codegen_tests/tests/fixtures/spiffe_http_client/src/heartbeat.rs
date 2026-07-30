@@ -15,11 +15,17 @@ pub struct Heartbeat {
 }
 
 impl Heartbeat {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(identity_client: Arc<IdentityClient>) -> anyhow::Result<Self> {
         Ok(Self { identity_client })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         let _asset = asset!("resources/ts/app.ts");

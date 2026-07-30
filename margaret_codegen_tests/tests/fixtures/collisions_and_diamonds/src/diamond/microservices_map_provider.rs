@@ -9,6 +9,9 @@ pub struct MicroservicesMapProvider {
 }
 
 impl MicroservicesMapProvider {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(
         map: Arc<crate::diamond::microservices_map::MicroservicesMap>,

@@ -15,13 +15,19 @@ pub struct Sweeper {
 }
 
 impl Sweeper {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(metrics: Arc<Metrics>) -> anyhow::Result<Self> {
         Ok(Self { metrics })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn run(&self) -> anyhow::Result<()> {
+    pub fn run(&self) -> anyhow::Result<()> {
         self.metrics.record_sweep();
 
         Ok(())

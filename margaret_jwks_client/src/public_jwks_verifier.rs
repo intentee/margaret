@@ -20,6 +20,9 @@ impl PublicJwksVerifier {
         Self { public_jwks_holder }
     }
 
+    /// # Errors
+    ///
+    /// Returns `JwksClientError::NotReady` or `JwksClientError::TokenVerification` or `JwksClientError::TokenExpiry`.
     pub fn verify<TClaims: DeserializeOwned + IsExpired>(
         &self,
         token: &str,

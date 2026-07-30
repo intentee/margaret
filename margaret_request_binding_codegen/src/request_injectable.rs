@@ -62,6 +62,21 @@ impl RequestInjectable {
     }
 
     #[must_use]
+    pub fn resolve(resolved: Option<&CanonicalPath>, is_reference: bool) -> Option<Self> {
+        [
+            Self::AssetBag,
+            Self::CurrentRequest,
+            Self::Next,
+            Self::PeerSpiffeId,
+            Self::Routes,
+            Self::ValidationResult,
+            Self::Views,
+        ]
+        .into_iter()
+        .find(|injectable| injectable.matches(resolved, is_reference))
+    }
+
+    #[must_use]
     pub fn matches(&self, resolved: Option<&CanonicalPath>, is_reference: bool) -> bool {
         resolved == Some(&self.canonical_path()) && is_reference == self.requires_reference()
     }
@@ -81,7 +96,12 @@ mod tests {
     use super::RequestInjectable;
 
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(segments.iter().map(|segment| segment.to_string()).collect())
+        CanonicalPath::new(
+            segments
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
+        )
     }
 
     #[test]

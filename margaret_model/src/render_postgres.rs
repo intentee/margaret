@@ -182,14 +182,20 @@ mod tests {
 
     fn index(columns: &[&str], name: &str) -> Index {
         Index {
-            columns: columns.iter().map(|column| column.to_string()).collect(),
+            columns: columns
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
             name: name.to_string(),
         }
     }
 
     fn unique_constraint(columns: &[&str]) -> UniqueConstraint {
         UniqueConstraint {
-            columns: columns.iter().map(|column| column.to_string()).collect(),
+            columns: columns
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
         }
     }
 

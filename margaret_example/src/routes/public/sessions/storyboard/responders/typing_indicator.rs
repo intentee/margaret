@@ -16,6 +16,9 @@ use crate::routes::public::sessions::storyboard::storyboard_session::StoryboardS
 pub struct TypingIndicator;
 
 impl TypingIndicator {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create() -> anyhow::Result<Self> {
         Ok(Self)

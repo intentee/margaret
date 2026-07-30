@@ -24,6 +24,7 @@ margaret_http_tests = { path = "../margaret_http_tests" }
 margaret_jwks_client = { path = "../margaret_jwks_client" }
 margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 margaret_jwks_roller_server = { path = "../margaret_jwks_roller_server" }
+margaret_sync_holder = { path = "../margaret_sync_holder" }
 reqwest = { workspace = true }
 
 [[test]]

@@ -27,8 +27,11 @@ pub struct SvidClientCertVerifier {
 }
 
 impl SvidClientCertVerifier {
-    pub fn new(root_store: RootCertStore, spiffe_trust_domain: String) -> Result<Self, SvidError> {
-        let spiffe_trust_domain = TrustDomain::new(&spiffe_trust_domain)
+    /// # Errors
+    ///
+    /// Returns `SvidError::ClientVerifier`.
+    pub fn new(root_store: RootCertStore, spiffe_trust_domain: &str) -> Result<Self, SvidError> {
+        let spiffe_trust_domain = TrustDomain::new(spiffe_trust_domain)
             .map_err(|source| SvidError::TrustDomain { source })?;
         let inner_verifier = WebPkiClientVerifier::builder(Arc::new(root_store))
             .build()

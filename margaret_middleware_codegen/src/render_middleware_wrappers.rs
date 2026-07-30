@@ -102,6 +102,11 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
     let call_arguments = parameters
         .iter()
         .map(|parameter| middleware_argument_value(parameter, &next_binding));
+    let process_call = if plan.is_async {
+        quote! { self.inner.process(#(#call_arguments),*).await }
+    } else {
+        quote! { self.inner.process(#(#call_arguments),*) }
+    };
 
     quote! {
         pub struct #wrapper {
@@ -121,9 +126,7 @@ fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
                 margaret::framework::http::handler_error::HandlerError,
             > {
                 #(#extractions)*
-                self.inner
-                    .process(#(#call_arguments),*)
-                    .await
+                #process_call
                     .map_err(margaret::framework::http::handler_error::HandlerError::consumer)
             }
         }

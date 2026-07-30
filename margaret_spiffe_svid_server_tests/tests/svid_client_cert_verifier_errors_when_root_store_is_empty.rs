@@ -7,7 +7,7 @@ use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider
 fn errors_when_root_store_is_empty() {
     install_crypto_provider();
 
-    let result = SvidClientCertVerifier::new(RootCertStore::empty(), "example.org".to_string());
+    let result = SvidClientCertVerifier::new(RootCertStore::empty(), "example.org");
 
     assert!(result.is_err());
 }

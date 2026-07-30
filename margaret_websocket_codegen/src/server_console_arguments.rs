@@ -15,7 +15,7 @@ pub(crate) fn server_console_arguments(
         collected.extend(session_console_arguments(session_plan, bindings)?);
 
         for layer in &session_plan.session.layers {
-            collected.extend_from_slice(bindings.console_arguments(&layer.concrete)?);
+            collected.extend_from_slice(&bindings.console_arguments(&layer.concrete)?.arguments);
         }
     }
 

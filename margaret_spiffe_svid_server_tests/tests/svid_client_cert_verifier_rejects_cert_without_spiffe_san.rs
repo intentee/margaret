@@ -15,7 +15,7 @@ fn rejects_cert_without_spiffe_san() {
     install_crypto_provider();
 
     let verifier =
-        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org".to_string())
+        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
             .expect("the verifier is built");
 
     let result = verifier.verify_client_cert(

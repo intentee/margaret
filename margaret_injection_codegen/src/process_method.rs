@@ -4,6 +4,9 @@ use margaret_attributes::indexed_method::IndexedMethod;
 
 use crate::injection_error::InjectionError;
 
+/// # Errors
+///
+/// Returns `InjectionError::AmbiguousProcessMethod` or `InjectionError::MissingProcessMethod`.
 pub fn process_method(item: &IndexedItem) -> Result<&IndexedMethod, InjectionError> {
     let mut found: Vec<&IndexedMethod> = item
         .methods()
@@ -66,7 +69,7 @@ mod tests {
     #[test]
     fn returns_the_single_process_method() {
         let index = index_for(
-            r#"
+            r"
 #[singleton]
 struct One;
 
@@ -74,7 +77,7 @@ impl One {
     #[process]
     fn run(&self) -> Response {}
 }
-"#,
+",
         );
 
         let method =
@@ -86,7 +89,7 @@ impl One {
     #[test]
     fn reports_a_missing_process_method() {
         let index = index_for(
-            r#"
+            r"
 #[singleton]
 struct Bare;
 
@@ -94,7 +97,7 @@ impl Bare {
     #[constructor]
     fn create() -> Self {}
 }
-"#,
+",
         );
 
         let error = process_method(item_named(&index, "Bare"))
@@ -107,7 +110,7 @@ impl Bare {
     #[test]
     fn reports_an_ambiguous_process_method() {
         let index = index_for(
-            r#"
+            r"
 #[singleton]
 struct Two;
 
@@ -118,7 +121,7 @@ impl Two {
     #[process]
     fn second(&self) -> Response {}
 }
-"#,
+",
         );
 
         let error = process_method(item_named(&index, "Two"))

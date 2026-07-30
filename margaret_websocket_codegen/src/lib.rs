@@ -225,8 +225,7 @@ impl RespondsToWebSocketNotification for Typist {
                     .split_whitespace()
                     .collect::<String>()
             })
-            .collect::<Vec<String>>()
-            .join("")
+            .collect::<String>()
     }
 
     fn error(source: &str) -> WebSocketCodegenError {
@@ -275,7 +274,7 @@ impl RespondsToWebSocketMessage for Chatter {
         let source = generated(CONSOLE_ARGUMENT_HANDLER);
 
         assert!(source.contains("container.chatter()"));
-        assert!(source.contains("dispatch_table(container).await"));
+        assert!(source.contains("dispatch_table(container)"));
         assert!(source.contains("public_routes(container:&super::super::container::Container,"));
         assert!(source.contains("upgrade_entry(container"));
         assert!(!source.contains("console_argument_"));
@@ -314,7 +313,7 @@ impl RespondsToWebSocketNotification for Typist {
         let source = generated(CONSOLE_ARGUMENT_NOTIFICATION_HANDLER);
 
         assert!(source.contains("container.typist()"));
-        assert!(source.contains("dispatch_table(container).await"));
+        assert!(source.contains("dispatch_table(container)"));
         assert!(!source.contains("console_argument_"));
     }
 
@@ -599,6 +598,8 @@ impl Room {
 }
 "#;
 
+
+
     #[test]
     fn names_the_factory_handshake_unused_when_no_binding_reads_the_request() {
         let source = generated(INJECTED_ONLY_SESSION);
@@ -763,24 +764,24 @@ impl Guard {
     fn generates_a_public_upgrade_entry() {
         let source = generated(FULL_SESSION);
 
-        assert!(source.contains("pubasyncfnupgrade_entry"));
+        assert!(source.contains("pubfnupgrade_entry"));
         assert!(source.contains("web_socket_upgrade_entry::WebSocketUpgradeEntry::new"));
-        assert!(source.contains("dispatch_table(container).await"));
+        assert!(source.contains("dispatch_table(container)"));
     }
 
     #[test]
     fn generates_a_route_registration_function_per_server() {
         let source = generated(FULL_SESSION);
 
-        assert!(source.contains("pubasyncfnpublic_routes"));
+        assert!(source.contains("pubfnpublic_routes"));
         assert!(source.contains("route_entry::RouteEntry::web_socket(\"/chat/{room}\""));
-        assert!(source.contains("chat_session::upgrade_entry(container).await"));
+        assert!(source.contains("chat_session::upgrade_entry(container)"));
     }
 
     #[test]
     fn rejects_a_message_that_is_not_a_struct() {
         assert!(
-            error(r#"#[websocket_message(response)] enum Bad {}"#)
+            error(r"#[websocket_message(response)] enum Bad {}")
                 .to_string()
                 .contains("carries #[websocket_message]")
         );
@@ -803,7 +804,7 @@ impl Guard {
     #[test]
     fn rejects_a_request_without_a_method() {
         assert!(
-            error(r#"#[websocket_message(request, response = single)] struct Bad;"#)
+            error(r"#[websocket_message(request, response = single)] struct Bad;")
                 .to_string()
                 .contains("missing the required 'method'")
         );
@@ -835,7 +836,7 @@ impl Guard {
     #[test]
     fn rejects_a_response_without_a_method() {
         assert!(
-            error(r#"#[websocket_message(response)] struct Bad;"#)
+            error(r"#[websocket_message(response)] struct Bad;")
                 .to_string()
                 .contains("missing the required 'method'")
         );
@@ -1249,14 +1250,18 @@ impl RespondsToWebSocketMessage for Chatter {
     fn threads_the_console_arguments_of_an_authenticated_user_provider_through_the_handshake() {
         let source = generated(CONSOLE_ARGUMENT_PROVIDER);
 
-        assert!(source.contains(
-            "pubasyncfnupgrade_entry(container:&super::super::super::container::Container,)"
-        ));
+        assert!(
+            source.contains(
+                "pubfnupgrade_entry(container:&super::super::super::container::Container,)"
+            )
+        );
         assert!(source.contains("inner:container.session_user_provider(),"));
-        assert!(source.contains(
-            "pubasyncfnpublic_routes(container:&super::super::container::Container,_routes:"
-        ));
-        assert!(source.contains("upgrade_entry(container).await"));
+        assert!(
+            source.contains(
+                "pubfnpublic_routes(container:&super::super::container::Container,_routes:"
+            )
+        );
+        assert!(source.contains("upgrade_entry(container)"));
     }
 
     #[test]
@@ -1812,7 +1817,7 @@ impl BetaSession {
     #[test]
     fn propagates_a_non_string_request_method() {
         assert!(
-            error(r#"#[websocket_message(request, method = 5, response = single)] struct Bad;"#)
+            error(r"#[websocket_message(request, method = 5, response = single)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );
@@ -1821,7 +1826,7 @@ impl BetaSession {
     #[test]
     fn rejects_a_notification_without_a_method() {
         assert!(
-            error(r#"#[websocket_message(notification)] struct Bad;"#)
+            error(r"#[websocket_message(notification)] struct Bad;")
                 .to_string()
                 .contains("missing the required 'method'")
         );
@@ -1830,7 +1835,7 @@ impl BetaSession {
     #[test]
     fn rejects_a_response_that_declares_a_cardinality() {
         assert!(
-            error(r#"#[websocket_message(response, response = single)] struct Bad;"#)
+            error(r"#[websocket_message(response, response = single)] struct Bad;")
                 .to_string()
                 .contains("declares a response cardinality but is not a request")
         );
@@ -1839,7 +1844,7 @@ impl BetaSession {
     #[test]
     fn propagates_a_non_string_response_method() {
         assert!(
-            error(r#"#[websocket_message(response, method = 5)] struct Bad;"#)
+            error(r"#[websocket_message(response, method = 5)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );
@@ -1848,7 +1853,7 @@ impl BetaSession {
     #[test]
     fn propagates_malformed_message_arguments() {
         assert!(
-            error(r#"#[websocket_message(= 5)] struct Bad;"#)
+            error(r"#[websocket_message(= 5)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );
@@ -1857,7 +1862,7 @@ impl BetaSession {
     #[test]
     fn propagates_malformed_session_arguments() {
         assert!(
-            error(r#"#[websocket_session(= 5)] struct Bad;"#)
+            error(r"#[websocket_session(= 5)] struct Bad;")
                 .to_string()
                 .contains("failed to read")
         );

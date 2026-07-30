@@ -58,7 +58,7 @@ fn materializes_the_provider_as_a_trait_object_field() {
 fn parameterizes_the_root_builder_with_the_uri_console_argument() {
     assert!(
         render_with_provider("uri_selected_provider").contains(
-            "pub(crate)fnconstruct_test_storage(console_argument_0:crate::TestStorageUri,)"
+            "pubfnconstruct_test_storage(arguments:super::construct_test_storage_arguments::ConstructTestStorageArguments,)"
         )
     );
 }
@@ -68,7 +68,7 @@ fn injects_the_resolver_result_without_rewrapping_it_in_a_new_arc() {
     let source = render_with_provider("uri_selected_provider");
 
     assert!(source.contains(
-        "std::sync::Arc<dyncrate::TestStorage>=crate::resolve_test_storage(console_argument_0,)"
+        "std::sync::Arc<dyncrate::TestStorage>=crate::resolve_test_storage(arguments.argument0,)"
     ));
     assert!(!source.contains("Arc::new(crate::resolve_test_storage"));
 }

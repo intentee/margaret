@@ -21,6 +21,9 @@ async fn sign_with_current<TClaims: Send + Serialize + Sync>(
     secret.current.signing.sign(claims).await
 }
 
+/// # Errors
+///
+/// Returns `TokenSignerError::UnverifiableRefreshToken` or `TokenSignerError::InvalidRefreshToken` or `TokenSignerError::ExpiredRefreshToken`.
 pub async fn mint_access_token(
     secret: &JwksSecret,
     refresh_token: &str,

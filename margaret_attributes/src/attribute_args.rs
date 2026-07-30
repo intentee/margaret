@@ -18,6 +18,9 @@ pub struct AttributeArgs {
 }
 
 impl AttributeArgs {
+    /// # Errors
+    ///
+    /// Returns `AttributeArgsParseError::Malformed` or `AttributeArgsParseError::DuplicateNamedArgument`.
     pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgsParseError> {
         let attribute_path = format_path(attribute.path());
 
@@ -75,6 +78,9 @@ impl AttributeArgs {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     pub fn interpret<Interpreted, InterpretError>(
         &self,
         interpret: impl FnOnce(&mut AttributeArgumentsReader) -> Result<Interpreted, InterpretError>,
@@ -109,22 +115,22 @@ mod tests {
     use crate::attribute_args_parse_error::AttributeArgsParseError;
     use crate::attribute_error::AttributeError;
 
-    fn parse(attribute: Attribute) -> Result<AttributeArgs, AttributeArgsParseError> {
-        AttributeArgs::from_attribute(&attribute)
+    fn parse(attribute: &Attribute) -> Result<AttributeArgs, AttributeArgsParseError> {
+        AttributeArgs::from_attribute(attribute)
     }
 
-    fn parsed(attribute: Attribute) -> AttributeArgs {
+    fn parsed(attribute: &Attribute) -> AttributeArgs {
         parse(attribute).expect("the arguments parse")
     }
 
     #[test]
     fn a_bare_attribute_is_empty() {
-        assert!(parsed(parse_quote!(#[singleton])).is_empty());
+        assert!(parsed(&parse_quote!(#[singleton])).is_empty());
     }
 
     #[test]
     fn a_name_value_attribute_carries_one_named_argument() {
-        let arguments = parsed(parse_quote!(#[doc = "text"]));
+        let arguments = parsed(&parse_quote!(#[doc = "text"]));
 
         assert!(!arguments.is_empty());
         assert_eq!(
@@ -137,13 +143,13 @@ mod tests {
 
     #[test]
     fn a_list_attribute_is_empty_when_it_has_no_arguments() {
-        assert!(parsed(parse_quote!(#[column()])).is_empty());
+        assert!(parsed(&parse_quote!(#[column()])).is_empty());
     }
 
     #[test]
     fn interpret_reads_named_and_positional_arguments_together() {
         let arguments =
-            parsed(parse_quote!(#[route(method = Get, pattern = "/home", primary, tag)]));
+            parsed(&parse_quote!(#[route(method = Get, pattern = "/home", primary, tag)]));
 
         let outcome = arguments
             .interpret(|reader| {
@@ -169,7 +175,7 @@ mod tests {
 
     #[test]
     fn interpret_rejects_a_leftover_named_argument() {
-        let error = parsed(parse_quote!(#[index(name = "title", bogus = "x")]))
+        let error = parsed(&parse_quote!(#[index(name = "title", bogus = "x")]))
             .interpret(|reader| reader.take_string("name"))
             .expect_err("the stray named argument is rejected");
 
@@ -182,7 +188,7 @@ mod tests {
 
     #[test]
     fn interpret_rejects_a_leftover_positional_argument() {
-        let error = parsed(parse_quote!(#[singleton(bogus)]))
+        let error = parsed(&parse_quote!(#[singleton(bogus)]))
             .interpret(|_reader| Ok::<(), AttributeError>(()))
             .expect_err("the stray positional argument is rejected");
 
@@ -195,7 +201,7 @@ mod tests {
 
     #[test]
     fn take_string_returns_none_when_the_argument_is_absent() {
-        let value = parsed(parse_quote!(#[column]))
+        let value = parsed(&parse_quote!(#[column]))
             .interpret(|reader| reader.take_string("name"))
             .expect("an absent string reads as none");
 
@@ -204,7 +210,7 @@ mod tests {
 
     #[test]
     fn take_string_rejects_a_non_string_literal() {
-        let error = parsed(parse_quote!(#[column(name = 5)]))
+        let error = parsed(&parse_quote!(#[column(name = 5)]))
             .interpret(|reader| reader.take_string("name"))
             .expect_err("an integer is not a string literal");
 
@@ -217,7 +223,7 @@ mod tests {
 
     #[test]
     fn take_string_rejects_a_non_literal_expression() {
-        let error = parsed(parse_quote!(#[column(name = some::path)]))
+        let error = parsed(&parse_quote!(#[column(name = some::path)]))
             .interpret(|reader| reader.take_string("name"))
             .expect_err("a path is not a string literal");
 
@@ -230,7 +236,7 @@ mod tests {
 
     #[test]
     fn take_path_returns_none_when_the_argument_is_absent() {
-        let value = parsed(parse_quote!(#[foreign_key]))
+        let value = parsed(&parse_quote!(#[foreign_key]))
             .interpret(|reader| reader.take_path("on_delete"))
             .expect("an absent path reads as none");
 
@@ -239,7 +245,7 @@ mod tests {
 
     #[test]
     fn take_path_rejects_a_non_path_expression() {
-        let error = parsed(parse_quote!(#[foreign_key(on_delete = "cascade")]))
+        let error = parsed(&parse_quote!(#[foreign_key(on_delete = "cascade")]))
             .interpret(|reader| reader.take_path("on_delete"))
             .expect_err("a string literal is not a path");
 
@@ -252,7 +258,7 @@ mod tests {
 
     #[test]
     fn take_flag_reports_absent_and_present_flags() {
-        let outcome = parsed(parse_quote!(#[column(unique)]))
+        let outcome = parsed(&parse_quote!(#[column(unique)]))
             .interpret(|reader| {
                 let unique = reader.take_flag("unique");
                 let primary_key = reader.take_flag("primary_key");
@@ -266,7 +272,7 @@ mod tests {
 
     #[test]
     fn take_positional_path_returns_none_when_there_is_no_positional_argument() {
-        let value = parsed(parse_quote!(#[provides]))
+        let value = parsed(&parse_quote!(#[provides]))
             .interpret(|reader| Ok::<_, AttributeError>(reader.take_positional_path()))
             .expect("an absent positional path reads as none");
 
@@ -275,7 +281,7 @@ mod tests {
 
     #[test]
     fn from_attribute_rejects_a_duplicated_named_argument() {
-        let error = parse(parse_quote!(#[index(name = "a", name = "b")]))
+        let error = parse(&parse_quote!(#[index(name = "a", name = "b")]))
             .map(|_| ())
             .expect_err("duplicates fail");
 
@@ -288,7 +294,7 @@ mod tests {
 
     #[test]
     fn from_attribute_rejects_a_malformed_argument_list() {
-        let error = parse(parse_quote!(#[index(= 5)]))
+        let error = parse(&parse_quote!(#[index(= 5)]))
             .map(|_| ())
             .expect_err("malformed lists fail");
 

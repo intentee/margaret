@@ -96,7 +96,7 @@ impl MultipartBody {
         upload_config: &UploadConfig,
     ) -> Result<RequestOutcome<Self>, RequestError> {
         let constraints =
-            Constraints::new().size_limit(SizeLimit::new().whole_stream(body_limit.max_bytes()));
+            Constraints::new().size_limit(SizeLimit::new().whole_stream(body_limit.max_bytes() as u64));
         let mut multipart =
             Multipart::with_constraints(BodyDataStream::new(body), boundary, constraints);
         let mut files = Vec::new();

@@ -6,6 +6,9 @@ use margaret_model::render_postgres::render_postgres;
 
 use crate::schema_fixture::schema_fixture;
 
+/// # Panics
+///
+/// Panics when the fixture it builds cannot be prepared.
 pub async fn apply_schema(pool: &PgPool) {
     let ddl = render_postgres(&schema_fixture());
 

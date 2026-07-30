@@ -15,11 +15,13 @@ use crate::models::user::User;
 pub struct GetProfile;
 
 impl GetProfile {
+    /// # Errors
+    ///
+    /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {
-        Ok(Response::text(
-            200,
-            format!("signed in as {} ({})", user.name, user.id),
-        ))
+    pub fn respond(&self, #[authenticated_user] user: User) -> anyhow::Result<Response> {
+        let User { id, name, .. } = user;
+
+        Ok(Response::text(200, format!("signed in as {name} ({id})")))
     }
 }

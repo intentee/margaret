@@ -204,6 +204,7 @@ impl GetUser {
 }
 "#;
 
+
     #[test]
     fn rejects_a_responder_absent_from_the_container_plan() {
         assert!(error_with_container_source(ROUTE_PARAMETER, "").contains("crate::GetUser"));
@@ -334,7 +335,7 @@ impl GetProfile {
             .split_whitespace()
             .collect();
 
-        assert!(source.contains("responder.present(user).await"));
+        assert!(source.contains("responder.present(user)"));
     }
 
     #[test]
@@ -769,8 +770,7 @@ impl Health {
                 .source()
                 .to_string()
         })
-        .collect::<Vec<String>>()
-        .join("")
+        .collect::<String>()
         .split_whitespace()
         .collect()
     }
@@ -779,17 +779,15 @@ impl Health {
     fn splices_websocket_routes_into_a_server_with_http_routes() {
         let source = websocket_http_source(HEALTH_RESPONDER, &["public".to_string()]);
 
-        assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
+        assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
     }
 
     #[test]
     fn generates_a_server_module_for_a_websocket_only_server() {
         let source = websocket_http_source(HEALTH_RESPONDER, &["realtime".to_string()]);
 
-        assert!(source.contains("pub(crate)asyncfnserver_realtime"));
-        assert!(
-            source.contains("super::super::websocket::realtime_routes(container,routes).await")
-        );
+        assert!(source.contains("pub(crate)fnserver_realtime"));
+        assert!(source.contains("super::super::websocket::realtime_routes(container,routes)"));
     }
 
     #[test]
@@ -797,7 +795,7 @@ impl Health {
         let source =
             websocket_http_source_with_views(HEALTH_RESPONDER, &["public".to_string()], true);
 
-        assert!(source.contains("super::super::websocket::public_routes(container,routes).await"));
+        assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
         assert!(source.contains("_views:&::std::sync::Arc<super::super::views::Views>"));
     }
 
@@ -950,7 +948,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 
         assert!(source.contains("&::std::sync::Arc<super::super::routes::Routes>"));
         assert!(source.contains("letroutes=routes.clone();"));
-        assert!(source.contains("responder.respond(routes.as_ref()).await"));
+        assert!(source.contains("responder.respond(routes.as_ref())"));
     }
 
     #[test]
@@ -966,7 +964,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains(
             "letasset_bag=::margaret::framework::asset_bag::asset_bag::AssetBag::new();"
         ));
-        assert!(source.contains("responder.respond(asset_bag).await"));
+        assert!(source.contains("responder.respond(asset_bag)"));
     }
 
     #[test]
@@ -1100,7 +1098,7 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains(
             "|responder:std::sync::Arc<crate::Open>,_request:&margaret::framework::http::request::Request"
         ));
-        assert!(source.contains("responder.respond().await"));
+        assert!(source.contains("responder.respond()"));
         assert!(source.contains(
             "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard(),}),margaret::framework::http::responder_handler::responder_handler(container.resource()"
         ));
@@ -1142,7 +1140,17 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         ));
         assert!(source.contains("Ok(value)=>value"));
         assert!(source.contains("::std::result::Result::Ok(response.into())"));
-        assert!(source.contains("responder.respond(id).await"));
+        assert!(source.contains("responder.respond(id)"));
+    }
+
+
+    #[test]
+    fn awaits_a_responder_that_declares_an_asynchronous_process_method() {
+        let source = source_for(
+            "#[singleton]\n#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    async fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert!(source.contains("responder.respond().await"));
     }
 
     #[test]
@@ -1176,7 +1184,8 @@ impl GetProject {
         assert!(source.contains(
             r#"letproject_id=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"project_id""#
         ));
-        assert!(source.contains("responder.respond(project_slug,project_id).await"));
+        assert!(source.contains("responder.respond(project_slug,project_id)"));
+        assert!(!source.contains("responder.respond(project_slug,project_id).await"));
     }
 
     #[test]
@@ -1198,7 +1207,7 @@ impl GetProject {
         assert!(source.contains(
             r#"letid=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"id""#
         ));
-        assert!(source.contains("responder.respond(request,id).await"));
+        assert!(source.contains("responder.respond(request,id)"));
     }
 
     #[test]
@@ -1209,7 +1218,7 @@ impl GetProject {
         );
 
         assert!(source.contains("letincoming=request;"));
-        assert!(source.contains("responder.respond(incoming).await"));
+        assert!(source.contains("responder.respond(incoming)"));
     }
 
     #[test]
@@ -1223,7 +1232,7 @@ impl GetProject {
         assert!(source.contains(
             r#"letrequest=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request_2,"request""#
         ));
-        assert!(source.contains("responder.respond(request).await"));
+        assert!(source.contains("responder.respond(request)"));
     }
 
     #[test]
@@ -1237,7 +1246,7 @@ impl GetProject {
         assert!(source.contains(
             r#"letresponder=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"responder""#
         ));
-        assert!(source.contains("responder_2.respond(responder).await"));
+        assert!(source.contains("responder_2.respond(responder)"));
     }
 
     #[test]
@@ -1247,7 +1256,7 @@ impl GetProject {
         assert!(source.contains(
             r#"margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,"id",user_binder.as_ref()"#
         ));
-        assert!(source.contains("responder.respond(argument_1).await"));
+        assert!(source.contains("responder.respond(argument_1)"));
     }
 
     #[test]
@@ -1259,7 +1268,7 @@ impl GetProject {
             r#"margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(request,"user",user_binder.as_ref()"#
         ));
         assert!(!source.contains("http_route_parameter_binder::HttpRouteParameterBinder"));
-        assert!(source.contains("responder.respond(user).await"));
+        assert!(source.contains("responder.respond(user)"));
         assert!(!source.contains("forbidden"));
     }
 
@@ -1459,7 +1468,7 @@ impl GetProject {
         );
 
         assert!(source.contains(
-            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"QUERY\","
+            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"QUERY\","
         ));
     }
 
@@ -1579,7 +1588,7 @@ impl GetProject {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"GET\","));
     }
 
     const NAMED_ROUTE: &str = r#"
@@ -1604,10 +1613,7 @@ impl GetGreeting {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","));
-        assert!(source.contains(
-            "margaret::framework::http::named_handler::NamedHandler::new(\"get_greeting\","
-        ));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::named(\"GET\",\"get_greeting\","));
     }
 
     #[test]
@@ -1701,7 +1707,7 @@ impl GetGreeting {
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(source.contains("responder.respond().await"));
+        assert!(source.contains("responder.respond()"));
         assert!(source.contains(
             "margaret::framework::http::response_continuation::ResponseContinuation::from"
         ));
@@ -1745,10 +1751,10 @@ impl GetMetrics {
         let source = source_for(MULTIPLE_SERVERS);
 
         assert!(source.contains(
-            "server_public(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::router::Router::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","
+            "server_public(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::server_routes::ServerRoutes::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/\","
         ));
         assert!(source.contains(
-            "server_internal(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::router::Router::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/metrics\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::new(\"GET\","
+            "server_internal(container:&super::super::container::Container,routes:&::std::sync::Arc<super::super::routes::Routes>,)->::std::result::Result<margaret::framework::http::server_routes::ServerRoutes,margaret::framework::http::matchit::InsertError,>{margaret::framework::http::server_routes::ServerRoutes::build(::std::vec::Vec::from([margaret::framework::http::route_entry::RouteEntry::new(\"/metrics\","
         ));
     }
 
@@ -1777,7 +1783,7 @@ impl GetMetrics {
                 "margaret::framework::http_validation::request_input::RequestInput::Form"
             )
         );
-        assert!(source.contains("responder.respond(data).await"));
+        assert!(source.contains("responder.respond(data)"));
     }
 
     #[test]
@@ -1889,7 +1895,7 @@ impl GetMetrics {
         );
         assert!(source.contains("Ok(model)=>model"));
         assert!(source.contains("::std::result::Result::Ok(response.into())"));
-        assert!(source.contains("responder.respond(data).await"));
+        assert!(source.contains("responder.respond(data)"));
     }
 
     #[test]
@@ -2144,7 +2150,6 @@ impl Configured {
     fn keeps_the_http_boundary_thin_for_a_configured_responder() {
         let source = source_for(CONSOLE_ARGUMENT_MIXED_CATEGORIES);
 
-        assert!(!source.contains("#[expect("));
         assert!(source.contains("container.configured()"));
         assert!(!source.contains("console_argument_"));
     }
