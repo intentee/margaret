@@ -1,10 +1,12 @@
 use serde::Deserialize;
 use serde::Serialize;
+use serde::Serializer;
 use serde::de::DeserializeOwned;
 
 use crate::compact_jws::CompactJws;
 use crate::curve::Curve;
 use crate::jwks_key_error::JwksKeyError;
+use crate::jws_algorithm::JwsAlgorithm;
 use crate::jws_header::JwsHeader;
 use crate::key_type::KeyType;
 use crate::key_use::KeyUse;
@@ -14,7 +16,7 @@ use crate::token_verification::TokenVerification;
 use crate::verifies_token::VerifiesToken;
 use crate::verify_signature::verify_signature;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct JwkPublic {
     pub crv: Curve,
     pub kid: String,
@@ -23,6 +25,36 @@ pub struct JwkPublic {
     pub use_: KeyUse,
     pub x: String,
     pub y: String,
+}
+
+impl Serialize for JwkPublic {
+    fn serialize<Target>(&self, serializer: Target) -> Result<Target::Ok, Target::Error>
+    where
+        Target: Serializer,
+    {
+        #[derive(Serialize)]
+        struct JwkPublicWire<'key> {
+            alg: JwsAlgorithm,
+            crv: Curve,
+            kid: &'key str,
+            kty: &'key KeyType,
+            #[serde(rename = "use")]
+            use_: &'key KeyUse,
+            x: &'key str,
+            y: &'key str,
+        }
+
+        JwkPublicWire {
+            alg: self.crv.algorithm(),
+            crv: self.crv,
+            kid: &self.kid,
+            kty: &self.kty,
+            use_: &self.use_,
+            x: &self.x,
+            y: &self.y,
+        }
+        .serialize(serializer)
+    }
 }
 
 impl VerifiesToken for JwkPublic {

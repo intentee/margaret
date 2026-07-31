@@ -21,7 +21,7 @@ fn public_jwks_serializes_to_jwks_wire_format() -> Result<()> {
     let serialized = to_value(&set)?;
     let key = &serialized["keys"][0];
 
-    assert!(key.get("alg").is_none());
+    assert_eq!(key["alg"], "ES256");
     assert_eq!(key["crv"], "P-256");
     assert_eq!(key["kid"], "wire-kid");
     assert_eq!(key["kty"], "EC");

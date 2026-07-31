@@ -10,6 +10,7 @@ serde = { workspace = true, features = ["derive"] }
 [dev-dependencies]
 anyhow = { workspace = true }
 base64ct = { workspace = true }
+jsonwebtoken = { workspace = true }
 margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
 p256 = { workspace = true }
 p384 = { workspace = true }

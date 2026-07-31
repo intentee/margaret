@@ -21,6 +21,7 @@ mod public_set_rejects_kidless_token;
 mod public_set_rejects_malformed_token;
 mod public_set_reports_unknown_key_id;
 mod public_set_verifies_token_from_matching_key;
+mod published_jwks_loads_into_a_standard_jwt_verifier;
 mod sign_and_verify_validates_real_token;
 mod sign_and_verify_validates_real_token_p384;
 mod sign_errors_on_invalid_pem;
