@@ -2,22 +2,16 @@ use syn::Attribute;
 use syn::Meta;
 use syn::Path;
 
-use crate::attribute_args::AttributeArgs;
-use crate::attribute_args_parse_error::AttributeArgsParseError;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
+
 use crate::attribute_error::AttributeError;
 use crate::canonical_path::CanonicalPath;
 use crate::framework_attribute::FrameworkAttribute;
 
 enum IndexedAttributeArgs {
-    DuplicateNamedArgument {
-        attribute_path: String,
-        key: String,
-    },
-    Malformed {
-        attribute_path: String,
-        message: String,
-    },
     Parsed(AttributeArgs),
+    Rejected(AttributeArgumentsError),
 }
 
 pub struct IndexedAttribute {
@@ -27,6 +21,21 @@ pub struct IndexedAttribute {
 }
 
 impl IndexedAttribute {
+    pub(crate) fn from_canonical(attribute: &Attribute, canonical_path: &CanonicalPath) -> Self {
+        let args = match AttributeArgs::from_attribute(attribute) {
+            Ok(args) => IndexedAttributeArgs::Parsed(args),
+            Err(rejected) => IndexedAttributeArgs::Rejected(rejected),
+        };
+
+        let framework_attribute = FrameworkAttribute::from_canonical_path(canonical_path);
+
+        Self {
+            args,
+            attribute: attribute.clone(),
+            framework_attribute,
+        }
+    }
+
     #[must_use]
     pub fn new(attribute: &Attribute) -> Self {
         let canonical_path = CanonicalPath::new(
@@ -41,37 +50,14 @@ impl IndexedAttribute {
         Self::from_canonical(attribute, &canonical_path)
     }
 
-    pub(crate) fn from_canonical(attribute: &Attribute, canonical_path: &CanonicalPath) -> Self {
-        let args = match AttributeArgs::from_attribute(attribute) {
-            Ok(args) => IndexedAttributeArgs::Parsed(args),
-            Err(AttributeArgsParseError::Malformed {
-                attribute_path,
-                source,
-            }) => IndexedAttributeArgs::Malformed {
-                attribute_path,
-                message: source.to_string(),
-            },
-            Err(AttributeArgsParseError::DuplicateNamedArgument {
-                attribute_path,
-                key,
-            }) => IndexedAttributeArgs::DuplicateNamedArgument {
-                attribute_path,
-                key,
-            },
-        };
-
-        let framework_attribute = FrameworkAttribute::from_canonical_path(canonical_path);
-
-        Self {
-            args,
-            attribute: attribute.clone(),
-            framework_attribute,
+    /// # Errors
+    ///
+    /// Returns `AttributeError::Arguments`.
+    pub fn args(&self) -> Result<&AttributeArgs, AttributeError> {
+        match &self.args {
+            IndexedAttributeArgs::Parsed(args) => Ok(args),
+            IndexedAttributeArgs::Rejected(rejected) => Err(rejected.clone().into()),
         }
-    }
-
-    #[must_use]
-    pub fn path(&self) -> &Path {
-        self.attribute.path()
     }
 
     #[must_use]
@@ -79,32 +65,14 @@ impl IndexedAttribute {
         self.framework_attribute
     }
 
-    /// # Errors
-    ///
-    /// Returns `AttributeError::DuplicateNamedArgument` or `AttributeError::AttributeArguments`.
-    pub fn args(&self) -> Result<&AttributeArgs, AttributeError> {
-        match &self.args {
-            IndexedAttributeArgs::DuplicateNamedArgument {
-                attribute_path,
-                key,
-            } => Err(AttributeError::DuplicateNamedArgument {
-                attribute_path: attribute_path.clone(),
-                key: key.clone(),
-            }),
-            IndexedAttributeArgs::Malformed {
-                attribute_path,
-                message,
-            } => Err(AttributeError::AttributeArguments {
-                attribute_path: attribute_path.clone(),
-                source: syn::Error::new(proc_macro2::Span::call_site(), message),
-            }),
-            IndexedAttributeArgs::Parsed(args) => Ok(args),
-        }
-    }
-
     #[must_use]
     pub fn is_bare(&self) -> bool {
         matches!(self.attribute.meta, Meta::Path(_))
+    }
+
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        self.attribute.path()
     }
 }
 

@@ -1,6 +1,6 @@
 use syn::Path;
 
-use margaret_attributes::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_tag_codegen::read_middleware_attribute::read_middleware_attribute;
 
 use crate::middleware_codegen_error::MiddlewareCodegenError;

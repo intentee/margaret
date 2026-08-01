@@ -12,8 +12,7 @@ fn accepts_matching_trust_domain() {
     install_crypto_provider();
 
     let verifier =
-        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
-            .unwrap();
+        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org").unwrap();
 
     let result = verifier.verify_client_cert(
         &CertificateDer::from(LEAF_SPIFFE_EXAMPLE_ORG_CLIENT_DER.to_vec()),

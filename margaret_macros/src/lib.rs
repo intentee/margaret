@@ -9,6 +9,59 @@ use syn::ItemStruct;
 const REQUEST_BINDING_MARKERS: [&str; 3] =
     ["authenticated_user", "route_parameter", "form_request"];
 
+fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {
+    attributes.retain(|attribute| {
+        !markers
+            .iter()
+            .any(|marker| attribute.path().is_ident(marker))
+    });
+}
+
+fn or_compile_error(result: Result<TokenStream2, syn::Error>) -> TokenStream2 {
+    match result {
+        Ok(stripped) => stripped,
+        Err(error) => error.to_compile_error(),
+    }
+}
+
+fn strip_parameter_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
+    strip_or_compile_error(item.into(), markers).into()
+}
+
+fn strip_field_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
+    strip_struct_or_compile_error(item.into(), markers).into()
+}
+
+fn strip_or_compile_error(item: TokenStream2, markers: &[&str]) -> TokenStream2 {
+    or_compile_error(strip(item, markers))
+}
+
+fn strip_struct_or_compile_error(item: TokenStream2, markers: &[&str]) -> TokenStream2 {
+    or_compile_error(strip_struct(item, markers))
+}
+
+fn strip(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
+    let mut function: ImplItemFn = syn::parse2(item)?;
+
+    for input in &mut function.sig.inputs {
+        if let FnArg::Typed(pattern_type) = input {
+            retain_non_marker_attributes(&mut pattern_type.attrs, markers);
+        }
+    }
+
+    Ok(quote!(#function))
+}
+
+fn strip_struct(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
+    let mut item_struct: ItemStruct = syn::parse2(item)?;
+
+    for field in &mut item_struct.fields {
+        retain_non_marker_attributes(&mut field.attrs, markers);
+    }
+
+    Ok(quote!(#item_struct))
+}
+
 #[proc_macro_attribute]
 pub fn singleton(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
@@ -109,59 +162,6 @@ pub fn websocket_message(_attributes: TokenStream, item: TokenStream) -> TokenSt
 #[proc_macro_attribute]
 pub fn build_for_session(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     strip_parameter_markers(item, &REQUEST_BINDING_MARKERS)
-}
-
-fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {
-    attributes.retain(|attribute| {
-        !markers
-            .iter()
-            .any(|marker| attribute.path().is_ident(marker))
-    });
-}
-
-fn or_compile_error(result: Result<TokenStream2, syn::Error>) -> TokenStream2 {
-    match result {
-        Ok(stripped) => stripped,
-        Err(error) => error.to_compile_error(),
-    }
-}
-
-fn strip_parameter_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
-    strip_or_compile_error(item.into(), markers).into()
-}
-
-fn strip_field_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
-    strip_struct_or_compile_error(item.into(), markers).into()
-}
-
-fn strip_or_compile_error(item: TokenStream2, markers: &[&str]) -> TokenStream2 {
-    or_compile_error(strip(item, markers))
-}
-
-fn strip_struct_or_compile_error(item: TokenStream2, markers: &[&str]) -> TokenStream2 {
-    or_compile_error(strip_struct(item, markers))
-}
-
-fn strip(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
-    let mut function: ImplItemFn = syn::parse2(item)?;
-
-    for input in &mut function.sig.inputs {
-        if let FnArg::Typed(pattern_type) = input {
-            retain_non_marker_attributes(&mut pattern_type.attrs, markers);
-        }
-    }
-
-    Ok(quote!(#function))
-}
-
-fn strip_struct(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
-    let mut item_struct: ItemStruct = syn::parse2(item)?;
-
-    for field in &mut item_struct.fields {
-        retain_non_marker_attributes(&mut field.attrs, markers);
-    }
-
-    Ok(quote!(#item_struct))
 }
 
 #[cfg(test)]

@@ -1,3 +1,5 @@
+use quote::format_ident;
+
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_container::container_bindings::ContainerBindings;
@@ -7,7 +9,6 @@ use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
 use margaret_route_parameter_codegen::route_path::RoutePath;
-use quote::format_ident;
 
 use crate::build_for_session_method::build_for_session_method;
 use crate::session_arguments::SessionArguments;

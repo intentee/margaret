@@ -8,19 +8,18 @@ use chrono::Utc;
 use dashmap::DashMap;
 use uuid::Uuid;
 
-use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
-use margaret::framework::http::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::provides_route_parameter;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;
+use margaret::framework::route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 
 use crate::models::article::Article;
 use crate::models::article_status::ArticleStatus;
 use crate::models::author::Author;
 use crate::stores::article_store_error::ArticleStoreError;
+use crate::stores::featured_article_id::FEATURED_ARTICLE_ID;
 use crate::system_clock::SystemClock;
-
-pub use super::featured_article_id::FEATURED_ARTICLE_ID;
 
 const FIRST_AUTHORED_ID: u64 = 103;
 
@@ -201,8 +200,8 @@ mod tests {
 
     use uuid::Uuid;
 
-    use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
-    use margaret::framework::http::route_parameter_binding_outcome::RouteParameterBindingOutcome;
+    use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;
+    use margaret::framework::route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 
     use super::ArticleStore;
     use super::FEATURED_ARTICLE_ID;

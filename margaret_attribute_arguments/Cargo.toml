@@ -1,0 +1,12 @@
+[package]
+name = "margaret_attribute_arguments"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+quote = { workspace = true }
+syn = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

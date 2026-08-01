@@ -1,7 +1,7 @@
 use tokio_util::sync::CancellationToken;
 
-use margaret_spiffe_svid::SvidServiceBundleParams;
-use margaret_spiffe_svid_client::SvidClientBundle;
+use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
+use margaret_spiffe_svid_client::svid_client_bundle::SvidClientBundle;
 use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider;
 use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
 

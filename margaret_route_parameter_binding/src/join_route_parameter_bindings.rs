@@ -1,17 +1,21 @@
 use std::future::Future;
 
+use crate::joined_route_parameter_bindings::JoinedRouteParameterBindings;
+
 /// # Errors
 ///
 /// Returns an error propagated from the work it performs.
 pub async fn join_route_parameter_bindings<First, Second, FirstModel, SecondModel, Error>(
     first: First,
     second: Second,
-) -> Result<(FirstModel, SecondModel), Error>
+) -> Result<JoinedRouteParameterBindings<FirstModel, SecondModel>, Error>
 where
     First: Future<Output = Result<FirstModel, Error>>,
     Second: Future<Output = Result<SecondModel, Error>>,
 {
-    tokio::try_join!(first, second)
+    let (first, second) = tokio::try_join!(first, second)?;
+
+    Ok(JoinedRouteParameterBindings { first, second })
 }
 
 #[cfg(test)]
@@ -34,11 +38,13 @@ mod tests {
 
     #[tokio::test]
     async fn returns_both_successful_values() {
-        let result =
+        let joined =
             join_route_parameter_bindings(async { Ok::<_, &'static str>(1) }, async { Ok(2) })
-                .await;
+                .await
+                .expect("both bindings resolve");
 
-        assert_eq!(result, Ok((1, 2)));
+        assert_eq!(joined.first, 1);
+        assert_eq!(joined.second, 2);
     }
 
     #[tokio::test]
@@ -64,9 +70,12 @@ mod tests {
             })
         };
 
-        let result = join_route_parameter_bindings(first, second).await;
+        let error = join_route_parameter_bindings(first, second)
+            .await
+            .err()
+            .expect("the failing binding is reported");
 
-        assert_eq!(result, Err("database unavailable"));
+        assert_eq!(error, "database unavailable");
         assert!(first_dropped.load(Ordering::SeqCst));
     }
 }

@@ -1,10 +1,17 @@
 use thiserror::Error;
 
+use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_schema_identifier_naming::schema_identifier_naming_error::SchemaIdentifierNamingError;
 
 #[derive(Debug, Error)]
 pub enum ModelCodegenError {
+    #[error("failed to read the attribute arguments: {source}")]
+    AttributeArguments {
+        #[from]
+        source: AttributeArgumentsError,
+    },
+
     #[error("failed to read the model attributes: {source}")]
     Index {
         #[from]

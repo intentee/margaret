@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+margaret_attribute_arguments = { path = "../margaret_attribute_arguments" }
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_schema_identifier_naming = { path = "../margaret_schema_identifier_naming" }
 margaret_toposort = { path = "../margaret_toposort" }

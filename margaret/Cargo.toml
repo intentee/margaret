@@ -11,6 +11,7 @@ margaret_codegen = { path = "../margaret_codegen", optional = true }
 margaret_console = { path = "../margaret_console", optional = true }
 margaret_construction = { path = "../margaret_construction", optional = true }
 margaret_http = { path = "../margaret_http", optional = true }
+margaret_http_uploaded_file = { path = "../margaret_http_uploaded_file", optional = true }
 margaret_http_validation = { path = "../margaret_http_validation", optional = true }
 margaret_identity = { path = "../margaret_identity", optional = true }
 margaret_identity_session = { path = "../margaret_identity_session", optional = true }
@@ -25,6 +26,7 @@ margaret_jwks_secret_store = { path = "../margaret_jwks_secret_store", optional 
 margaret_macros = { path = "../margaret_macros", optional = true }
 margaret_model = { path = "../margaret_model", optional = true }
 margaret_peer_identity = { path = "../margaret_peer_identity", optional = true }
+margaret_route_parameter_binding = { path = "../margaret_route_parameter_binding", optional = true }
 margaret_service = { path = "../margaret_service", optional = true }
 margaret_spiffe_svid = { path = "../margaret_spiffe_svid", optional = true }
 margaret_spiffe_svid_bundle = { path = "../margaret_spiffe_svid_bundle", optional = true }
@@ -35,6 +37,7 @@ margaret_token_signer = { path = "../margaret_token_signer", optional = true }
 margaret_validation = { path = "../margaret_validation", optional = true }
 margaret_views = { path = "../margaret_views", optional = true }
 margaret_websocket = { path = "../margaret_websocket", optional = true }
+margaret_websocket_session = { path = "../margaret_websocket_session", optional = true }
 
 [features]
 default = ["runtime"]
@@ -46,6 +49,7 @@ runtime = [
     "dep:margaret_console",
     "dep:margaret_construction",
     "dep:margaret_http",
+    "dep:margaret_http_uploaded_file",
     "dep:margaret_http_validation",
     "dep:margaret_identity",
     "dep:margaret_identity_session",
@@ -60,6 +64,7 @@ runtime = [
     "dep:margaret_macros",
     "dep:margaret_model",
     "dep:margaret_peer_identity",
+    "dep:margaret_route_parameter_binding",
     "dep:margaret_service",
     "dep:margaret_spiffe_svid",
     "dep:margaret_spiffe_svid_bundle",
@@ -70,6 +75,7 @@ runtime = [
     "dep:margaret_validation",
     "dep:margaret_views",
     "dep:margaret_websocket",
+    "dep:margaret_websocket_session",
 ]
 
 [lints]

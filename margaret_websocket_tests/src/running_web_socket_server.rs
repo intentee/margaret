@@ -9,14 +9,14 @@ use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::route_entry::RouteEntry;
-use margaret_http::server_routes::ServerRoutes;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
+use margaret_http::server_routes::ServerRoutes;
 use margaret_http::transport_config::TransportConfig;
-use margaret_http::upload_config::UploadConfig;
 use margaret_http::web_socket_upgrade::WebSocketUpgrade;
-use margaret_websocket::web_socket_session_factory::WebSocketSessionFactory;
+use margaret_http_uploaded_file::upload_config::UploadConfig;
 use margaret_websocket::web_socket_upgrade_entry::WebSocketUpgradeEntry;
+use margaret_websocket_session::web_socket_session_factory::WebSocketSessionFactory;
 
 use crate::test_dispatch_table::test_dispatch_table;
 use crate::test_session::TestSession;
@@ -31,28 +31,6 @@ pub struct RunningWebSocketServer {
 impl RunningWebSocketServer {
     pub async fn start() -> Self {
         Self::start_with(TestSessionFactory).await
-    }
-
-    pub async fn start_with<Factory>(factory: Factory) -> Self
-    where
-        Factory: WebSocketSessionFactory<Session = TestSession> + 'static,
-    {
-        Self::start_from(
-            Arc::new(WebSocketUpgradeEntry::new(factory, test_dispatch_table())),
-            Vec::new(),
-        )
-        .await
-    }
-
-    pub async fn start_gated(middleware: Vec<Arc<dyn HttpMiddleware>>) -> Self {
-        Self::start_from(
-            Arc::new(WebSocketUpgradeEntry::new(
-                TestSessionFactory,
-                test_dispatch_table(),
-            )),
-            middleware,
-        )
-        .await
     }
 
     async fn start_from(
@@ -85,6 +63,28 @@ impl RunningWebSocketServer {
             cancellation_token,
             join_handle,
         }
+    }
+
+    pub async fn start_gated(middleware: Vec<Arc<dyn HttpMiddleware>>) -> Self {
+        Self::start_from(
+            Arc::new(WebSocketUpgradeEntry::new(
+                TestSessionFactory,
+                test_dispatch_table(),
+            )),
+            middleware,
+        )
+        .await
+    }
+
+    pub async fn start_with<Factory>(factory: Factory) -> Self
+    where
+        Factory: WebSocketSessionFactory<Session = TestSession> + 'static,
+    {
+        Self::start_from(
+            Arc::new(WebSocketUpgradeEntry::new(factory, test_dispatch_table())),
+            Vec::new(),
+        )
+        .await
     }
 
     #[must_use]

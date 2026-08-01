@@ -1,4 +1,4 @@
-use margaret_attributes::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 
 use crate::web_socket_codegen_error::WebSocketCodegenError;

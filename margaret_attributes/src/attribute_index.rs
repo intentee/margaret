@@ -15,14 +15,6 @@ use crate::name_allocator::NameAllocator;
 use crate::resolve_path::resolve_path;
 use crate::resolve_type::resolve_type;
 
-pub struct AttributeIndex {
-    empty_imports: ModuleImports,
-    identifiers: HashMap<CanonicalPath, Identifier>,
-    imports: HashMap<CanonicalPath, ModuleImports>,
-    item_paths: ItemPaths,
-    items: Vec<IndexedItem>,
-}
-
 fn module_of(item: &IndexedItem) -> &[String] {
     item.canonical_path()
         .segments()
@@ -45,6 +37,14 @@ fn allocate_identifiers(items: &[IndexedItem]) -> HashMap<CanonicalPath, Identif
         .into_iter()
         .map(|path| (path.clone(), allocator.allocate(&field_base(path))))
         .collect()
+}
+
+pub struct AttributeIndex {
+    empty_imports: ModuleImports,
+    identifiers: HashMap<CanonicalPath, Identifier>,
+    imports: HashMap<CanonicalPath, ModuleImports>,
+    item_paths: ItemPaths,
+    items: Vec<IndexedItem>,
 }
 
 impl AttributeIndex {

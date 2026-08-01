@@ -1,7 +1,8 @@
-use margaret_spiffe_svid::SvidServiceBundleParams;
-use margaret_spiffe_svid_server::SvidServerBundle;
-use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider;
 use trzcina::ServiceBundle;
+
+use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
+use margaret_spiffe_svid_server::svid_server_bundle::SvidServerBundle;
+use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider;
 
 #[tokio::test]
 async fn registers_rotation_services_with_the_client_cert_verifier() {

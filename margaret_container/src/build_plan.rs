@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use syn::Path;
 
-use margaret_attributes::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -38,6 +38,11 @@ use crate::provides_endpoint_path::provides_endpoint_path;
 use crate::resolve_construction::resolve_construction;
 use crate::topological_order::topological_order;
 use crate::type_text::type_text;
+
+struct BuildableConstruction {
+    construction: DirectConstruction,
+    path: CanonicalPath,
+}
 
 fn concrete_roles() -> [FrameworkAttribute; 4] {
     [
@@ -269,30 +274,6 @@ struct DependencyResolver<'resolver> {
 }
 
 impl DependencyResolver<'_> {
-    fn resolve_direct(
-        &self,
-        item: &IndexedItem,
-        source: &ConstructionSource,
-        jwks_targets: &BTreeMap<usize, JwksSecretStoreTarget>,
-        concrete_path: &CanonicalPath,
-    ) -> Result<DirectConstruction, ContainerError> {
-        match source {
-            ConstructionSource::Constructor(constructor) => {
-                let dependencies =
-                    self.resolve_dependencies(item, concrete_path, constructor, jwks_targets)?;
-
-                Ok(DirectConstruction::Constructor {
-                    dependencies,
-                    is_async: constructor.signature().asyncness.is_some(),
-                    method: constructor.identifier().to_string(),
-                })
-            }
-            ConstructionSource::Fieldless(shape) => {
-                Ok(DirectConstruction::Fieldless { shape: *shape })
-            }
-        }
-    }
-
     fn resolve_dependencies(
         &self,
         item: &IndexedItem,
@@ -381,6 +362,30 @@ impl DependencyResolver<'_> {
         }
 
         Ok(dependencies)
+    }
+
+    fn resolve_direct(
+        &self,
+        item: &IndexedItem,
+        source: &ConstructionSource,
+        jwks_targets: &BTreeMap<usize, JwksSecretStoreTarget>,
+        concrete_path: &CanonicalPath,
+    ) -> Result<DirectConstruction, ContainerError> {
+        match source {
+            ConstructionSource::Constructor(constructor) => {
+                let dependencies =
+                    self.resolve_dependencies(item, concrete_path, constructor, jwks_targets)?;
+
+                Ok(DirectConstruction::Constructor {
+                    dependencies,
+                    is_async: constructor.signature().asyncness.is_some(),
+                    method: constructor.identifier().to_string(),
+                })
+            }
+            ConstructionSource::Fieldless(shape) => {
+                Ok(DirectConstruction::Fieldless { shape: *shape })
+            }
+        }
     }
 }
 
@@ -482,10 +487,13 @@ fn resolve_framework_providers(
     let mut allocator = index.reserved_allocator();
     let mut providers = Vec::new();
 
-    let mut buildable: Vec<(CanonicalPath, DirectConstruction)> = buildable.into_iter().collect();
-    buildable.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut buildable: Vec<BuildableConstruction> = buildable
+        .into_iter()
+        .map(|(path, construction)| BuildableConstruction { construction, path })
+        .collect();
+    buildable.sort_by(|left, right| left.path.cmp(&right.path));
 
-    for (path, construction) in buildable {
+    for BuildableConstruction { construction, path } in buildable {
         if !included.contains(&path) {
             continue;
         }

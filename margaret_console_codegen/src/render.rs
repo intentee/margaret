@@ -1,11 +1,11 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_console_argument_codegen::argument_registration::argument_registration;
 use margaret_console_argument_codegen::argument_value::argument_value;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
-use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_container::console_argument_binding::ConsoleArgumentBinding;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::http_server::HttpServer;

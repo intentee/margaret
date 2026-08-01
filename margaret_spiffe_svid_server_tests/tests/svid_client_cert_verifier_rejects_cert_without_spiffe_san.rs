@@ -14,9 +14,8 @@ use margaret_spiffe_svid_tests::leaf_dns_only_der::LEAF_DNS_ONLY_DER;
 fn rejects_cert_without_spiffe_san() {
     install_crypto_provider();
 
-    let verifier =
-        SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
-            .expect("the verifier is built");
+    let verifier = SvidClientCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
+        .expect("the verifier is built");
 
     let result = verifier.verify_client_cert(
         &CertificateDer::from(LEAF_DNS_ONLY_DER.to_vec()),

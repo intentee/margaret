@@ -1,6 +1,9 @@
 [profile.default]
 slow-timeout = { period = "100ms", terminate-after = 2 }
 
+[test-groups]
+postgres-container = { max-threads = 1 }
+
 [[profile.default.overrides]]
 filter = 'package(~_spiffe_svid)'
 slow-timeout = { period = "1s", terminate-after = 2 }
@@ -8,3 +11,4 @@ slow-timeout = { period = "1s", terminate-after = 2 }
 [[profile.default.overrides]]
 filter = 'package(margaret_schema_postgres_tests)'
 slow-timeout = { period = "2s", terminate-after = 2 }
+test-group = 'postgres-container'

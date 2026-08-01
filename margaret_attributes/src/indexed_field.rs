@@ -13,18 +13,6 @@ pub struct IndexedField {
 }
 
 impl IndexedField {
-    #[cfg(test)]
-    pub(crate) fn new(identifier: FieldIdentifier, ty: Type, attributes: Vec<Attribute>) -> Self {
-        Self {
-            attributes: attributes
-                .into_iter()
-                .map(|attribute| IndexedAttribute::new(&attribute))
-                .collect(),
-            identifier,
-            ty,
-        }
-    }
-
     pub(crate) fn from_parts(
         identifier: FieldIdentifier,
         ty: Type,
@@ -32,6 +20,18 @@ impl IndexedField {
     ) -> Self {
         Self {
             attributes,
+            identifier,
+            ty,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new(identifier: FieldIdentifier, ty: Type, attributes: Vec<Attribute>) -> Self {
+        Self {
+            attributes: attributes
+                .into_iter()
+                .map(|attribute| IndexedAttribute::new(&attribute))
+                .collect(),
             identifier,
             ty,
         }

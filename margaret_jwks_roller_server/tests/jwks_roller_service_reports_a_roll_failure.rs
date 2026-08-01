@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use margaret_jwks_roller_server::JwksRollerServerBundle;
-use margaret_jwks_roller_server::JwksRollerServerBundleParams;
+use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
+use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 use margaret_jwks_roller_server::jwks_roller_server_error::JwksRollerServerError;
 use margaret_jwks_roller_tests::unreachable_jwks_secret_storage::UnreachableJwksSecretStorage;
 

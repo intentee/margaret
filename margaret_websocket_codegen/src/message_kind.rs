@@ -1,5 +1,5 @@
-use margaret_attributes::attribute_args::AttributeArgs;
-use margaret_attributes::attribute_arguments_reader::AttributeArgumentsReader;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_arguments_reader::AttributeArgumentsReader;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 
 use crate::message_cardinality::MessageCardinality;

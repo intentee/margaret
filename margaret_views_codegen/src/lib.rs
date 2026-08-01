@@ -11,6 +11,8 @@ mod views;
 
 #[cfg(test)]
 mod tests {
+    use crate::views_codegen_error::ViewsCodegenError;
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use tempfile::TempDir;
@@ -67,11 +69,14 @@ mod tests {
         render_views(plan, &bindings)
     }
 
-    fn rejection(lib_source: &str) -> String {
+    fn rejection_for(lib_source: &str) -> ViewsCodegenError {
         ViewsPlan::build(&index_for(lib_source), &empty_bindings())
             .map(drop)
             .expect_err("the invalid view is rejected")
-            .to_string()
+    }
+
+    fn rejection(lib_source: &str) -> String {
+        rejection_for(lib_source).to_string()
     }
 
     #[test]
@@ -197,10 +202,18 @@ impl Banner {
 
     #[test]
     fn propagates_a_non_string_view_name() {
-        assert!(
-            rejection("#[renders_view(name = 5)]\n#[singleton]\nstruct Bad;\n")
-                .contains("failed to index the crate")
-        );
+        let error = rejection_for("#[renders_view(name = 5)]\n#[singleton]\nstruct Bad;\n");
+
+        assert!(matches!(
+            error,
+            ViewsCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "name" && expected == "string literal"
+        ));
     }
 
     #[test]

@@ -65,40 +65,6 @@ impl FrameworkAttribute {
     ];
 
     #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::AuthenticatedUser => "authenticated_user",
-            Self::BuildForSession => "build_for_session",
-            Self::Column => "column",
-            Self::ConsoleArgument => "console_argument",
-            Self::ConsoleCommand => "console_command",
-            Self::Constructor => "constructor",
-            Self::ForeignKey => "foreign_key",
-            Self::FormRequest => "form_request",
-            Self::HandlesMiddlewareAttribute => "handles_middleware_attribute",
-            Self::Index => "index",
-            Self::InferFromRequest => "infer_from_request",
-            Self::InfersAuthenticatedUser => "infers_authenticated_user",
-            Self::JwksSecretStore => "jwks_secret_store",
-            Self::Middleware => "middleware",
-            Self::Model => "model",
-            Self::Process => "process",
-            Self::ProvidesJwksEndpoint => "provides_jwks_endpoint",
-            Self::ProvidesRouteParameter => "provides_route_parameter",
-            Self::RendersView => "renders_view",
-            Self::RespondsToHttp => "responds_to_http",
-            Self::RouteParameter => "route_parameter",
-            Self::RouteParameterValue => "route_parameter_value",
-            Self::ScheduledWithTickTimer => "scheduled_with_tick_timer",
-            Self::Service => "service",
-            Self::Singleton => "singleton",
-            Self::SpiffeHttpClient => "spiffe_http_client",
-            Self::WebsocketMessage => "websocket_message",
-            Self::WebsocketSession => "websocket_session",
-        }
-    }
-
-    #[must_use]
     pub fn from_canonical_path(path: &CanonicalPath) -> Option<Self> {
         let name = match path.segments() {
             [name] => name.as_str(),
@@ -141,6 +107,40 @@ impl FrameworkAttribute {
             "websocket_message" => Some(Self::WebsocketMessage),
             "websocket_session" => Some(Self::WebsocketSession),
             _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::AuthenticatedUser => "authenticated_user",
+            Self::BuildForSession => "build_for_session",
+            Self::Column => "column",
+            Self::ConsoleArgument => "console_argument",
+            Self::ConsoleCommand => "console_command",
+            Self::Constructor => "constructor",
+            Self::ForeignKey => "foreign_key",
+            Self::FormRequest => "form_request",
+            Self::HandlesMiddlewareAttribute => "handles_middleware_attribute",
+            Self::Index => "index",
+            Self::InferFromRequest => "infer_from_request",
+            Self::InfersAuthenticatedUser => "infers_authenticated_user",
+            Self::JwksSecretStore => "jwks_secret_store",
+            Self::Middleware => "middleware",
+            Self::Model => "model",
+            Self::Process => "process",
+            Self::ProvidesJwksEndpoint => "provides_jwks_endpoint",
+            Self::ProvidesRouteParameter => "provides_route_parameter",
+            Self::RendersView => "renders_view",
+            Self::RespondsToHttp => "responds_to_http",
+            Self::RouteParameter => "route_parameter",
+            Self::RouteParameterValue => "route_parameter_value",
+            Self::ScheduledWithTickTimer => "scheduled_with_tick_timer",
+            Self::Service => "service",
+            Self::Singleton => "singleton",
+            Self::SpiffeHttpClient => "spiffe_http_client",
+            Self::WebsocketMessage => "websocket_message",
+            Self::WebsocketSession => "websocket_session",
         }
     }
 }

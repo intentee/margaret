@@ -1,19 +1,14 @@
 use thiserror::Error;
 
+use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
+
 #[derive(Debug, Error)]
 pub enum AttributeError {
-    #[error("arguments of attribute '{attribute_path}' could not be parsed: {source}")]
-    AttributeArguments {
-        attribute_path: String,
-        #[source]
-        source: syn::Error,
-    },
+    #[error(transparent)]
+    Arguments(#[from] AttributeArgumentsError),
 
     #[error("two items resolve to the same canonical path '{path}'")]
     DuplicateCanonicalPath { path: String },
-
-    #[error("argument '{key}' of attribute '{attribute_path}' is provided more than once")]
-    DuplicateNamedArgument { attribute_path: String, key: String },
 
     #[error("failed to parse Rust source file '{path}': {source}")]
     FileParse {
@@ -62,18 +57,5 @@ pub enum AttributeError {
     RepeatedAttribute {
         attribute_path: String,
         target: String,
-    },
-
-    #[error("argument '{key}' of attribute '{attribute_path}' is not a {expected}")]
-    UnexpectedArgument {
-        attribute_path: String,
-        key: String,
-        expected: String,
-    },
-
-    #[error("attribute '{attribute_path}' has an unrecognized argument '{argument}'")]
-    UnrecognizedArgument {
-        argument: String,
-        attribute_path: String,
     },
 }

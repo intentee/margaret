@@ -7,8 +7,8 @@ use margaret_http::request::Request;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
-use margaret_jwks_roller_server::JwksRollerServerBundle;
-use margaret_jwks_roller_server::JwksRollerServerBundleParams;
+use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
+use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 
 #[tokio::test]
 async fn public_jwks_handler_serves_the_document_after_a_roll() {

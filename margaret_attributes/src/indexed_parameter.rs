@@ -16,6 +16,22 @@ pub struct IndexedParameter {
 }
 
 impl IndexedParameter {
+    pub(crate) fn from_parts(
+        attributes: Vec<IndexedAttribute>,
+        declared: Type,
+        diagnostic_name: String,
+        holder: Ident,
+        position: usize,
+    ) -> Self {
+        Self {
+            attributes,
+            declared,
+            diagnostic_name,
+            holder,
+            position,
+        }
+    }
+
     pub(crate) fn new(
         attributes: Vec<Attribute>,
         declared: Type,
@@ -34,22 +50,6 @@ impl IndexedParameter {
                 .into_iter()
                 .map(|attribute| IndexedAttribute::new(&attribute))
                 .collect(),
-            declared,
-            diagnostic_name,
-            holder,
-            position,
-        }
-    }
-
-    pub(crate) fn from_parts(
-        attributes: Vec<IndexedAttribute>,
-        declared: Type,
-        diagnostic_name: String,
-        holder: Ident,
-        position: usize,
-    ) -> Self {
-        Self {
-            attributes,
             declared,
             diagnostic_name,
             holder,

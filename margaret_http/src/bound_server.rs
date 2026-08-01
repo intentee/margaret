@@ -22,6 +22,8 @@ use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 use tokio_util::sync::CancellationToken;
 
+use margaret_http_uploaded_file::upload_config::UploadConfig;
+use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
 use crate::body_limit::BodyLimit;
@@ -30,7 +32,6 @@ use crate::forward_targets::ForwardTargets;
 use crate::one_shot_handler::OneShotHandler;
 use crate::one_shot_layer::one_shot_layer;
 use crate::request::Request;
-use crate::request_error::RequestError;
 use crate::request_inputs::RequestInputs;
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
@@ -44,8 +45,7 @@ use crate::server_params::ServerParams;
 use crate::server_registry::ServerRegistry;
 use crate::transport_config::TransportConfig;
 use crate::upgrade_route::UpgradeRoute;
-use crate::upload_config::UploadConfig;
-use crate::web_socket_driver_channel::web_socket_driver_channel;
+use crate::web_socket_driver_channel::WebSocketDriverChannel;
 use crate::web_socket_driver_sender::WebSocketDriverSender;
 use crate::web_socket_upgrade_terminal::WebSocketUpgradeTerminal;
 
@@ -64,6 +64,203 @@ struct ConnectionContext {
     remote_addr: SocketAddr,
     router: Arc<Router>,
     upload_config: Arc<UploadConfig>,
+}
+
+struct AcceptedConnection {
+    remote_addr: SocketAddr,
+    stream: TcpStream,
+}
+
+fn accept_outcome<Accept>(accepted: std::io::Result<(TcpStream, SocketAddr)>, accept: Accept)
+where
+    Accept: FnOnce(AcceptedConnection),
+{
+    match accepted {
+        Ok((stream, remote_addr)) => accept(AcceptedConnection {
+            remote_addr,
+            stream,
+        }),
+        Err(error) => {
+            eprintln!("margaret_http: accept error: {error}");
+        }
+    }
+}
+
+fn peer_identity_from_tls_stream(tls_stream: &TlsStream<TcpStream>) -> PeerIdentity {
+    PeerIdentity::from_peer_certificate(
+        tls_stream
+            .get_ref()
+            .1
+            .peer_certificates()
+            .and_then(|certificates| certificates.first())
+            .map(std::convert::AsRef::as_ref),
+    )
+}
+
+fn report_connection_outcome<Error: Display>(outcome: Result<(), Error>) {
+    if let Err(error) = outcome {
+        eprintln!("margaret_http: connection error: {error}");
+    }
+}
+
+fn report_connection_task_outcome(outcome: Result<(), JoinError>) {
+    if let Err(error) = outcome {
+        eprintln!("margaret_http: connection task failed: {error}");
+    }
+}
+
+fn error_response(error: &UploadedFileError) -> Response {
+    eprintln!("margaret_http: the request could not be received: {error}");
+
+    Response::text(500, "Internal Server Error")
+}
+
+fn rejection_response(rejection: RequestRejection) -> Response {
+    eprintln!("margaret_http: the request was rejected: {rejection}");
+
+    rejection.into_response()
+}
+
+async fn serve_connection<Io>(
+    builder: Arc<Builder<TokioExecutor>>,
+    watcher: Watcher,
+    io: Io,
+    connection_context: ConnectionContext,
+) where
+    Io: hyper::rt::Read + hyper::rt::Write + Unpin + Send + 'static,
+{
+    let WebSocketDriverChannel {
+        receiver: driver_receiver,
+        sender: driver_sender,
+    } = WebSocketDriverChannel::new();
+    let service = TowerToHyperService::new(tower::service_fn(
+        move |request: http::Request<Incoming>| {
+            let connection_context = connection_context.clone();
+            let driver_sender = driver_sender.clone();
+
+            async move {
+                Ok::<_, Infallible>(dispatch(connection_context, driver_sender, request).await)
+            }
+        },
+    ));
+
+    let connection = watcher.watch(builder.serve_connection_with_upgrades(io, service));
+    let outcome = drive_connection(connection, driver_receiver).await;
+
+    report_connection_outcome(outcome);
+}
+
+async fn complete_request(
+    route: RequestRoute,
+    request: Request,
+    forward_targets: &Arc<ForwardTargets>,
+) -> http::Response<Full<Bytes>> {
+    match route {
+        RequestRoute::Handler {
+            handler,
+            path_params,
+        } => respond_recursively(
+            forward_targets,
+            request.with_path_params(path_params),
+            handler,
+        )
+        .await
+        .into_http(),
+        RequestRoute::MethodNotAllowed => Response::text(405, "Method Not Allowed").into_http(),
+        RequestRoute::NotFound => Response::not_found().into_http(),
+    }
+}
+
+async fn dispatch_web_socket(
+    server: ServerParams,
+    on_upgrade: OnUpgrade,
+    peer_identity: Arc<PeerIdentity>,
+    cancellation_token: CancellationToken,
+    UpgradeRoute {
+        middleware,
+        path_params,
+        upgrade,
+    }: UpgradeRoute,
+    forward_targets: &Arc<ForwardTargets>,
+    driver_sender: WebSocketDriverSender,
+) -> http::Response<Full<Bytes>> {
+    match RequestInputs::from_handshake(server) {
+        RequestOutcome::Parsed(inputs) => {
+            let handshake = Request::from_inputs(inputs)
+                .with_peer_identity(peer_identity)
+                .with_path_params(path_params);
+
+            let mut onion: Box<dyn OneShotHandler> = Box::new(WebSocketUpgradeTerminal::new(
+                upgrade,
+                on_upgrade,
+                cancellation_token,
+                driver_sender,
+            ));
+
+            for middleware_layer in middleware.iter().rev() {
+                onion = one_shot_layer(middleware_layer.clone(), onion);
+            }
+
+            respond_once(forward_targets, handshake, onion)
+                .await
+                .into_http()
+        }
+        RequestOutcome::Rejected(rejection) => rejection_response(rejection).into_http(),
+    }
+}
+
+async fn dispatch(
+    ConnectionContext {
+        body_limit,
+        cancellation_token,
+        forward_targets,
+        peer_identity,
+        remote_addr,
+        router,
+        upload_config,
+    }: ConnectionContext,
+    driver_sender: WebSocketDriverSender,
+    mut request: http::Request<Incoming>,
+) -> http::Response<Full<Bytes>> {
+    let on_upgrade = hyper::upgrade::on(&mut request);
+    let (parts, incoming) = request.into_parts();
+    let server = match ServerParams::from_parts(parts, remote_addr) {
+        RequestOutcome::Parsed(server) => server,
+        RequestOutcome::Rejected(rejection) => return rejection_response(rejection).into_http(),
+    };
+
+    match router.resolve(server.method(), server.path()) {
+        RouteResolution::Upgrade(upgrade_route) => {
+            dispatch_web_socket(
+                server,
+                on_upgrade,
+                peer_identity,
+                cancellation_token.child_token(),
+                upgrade_route,
+                &forward_targets,
+                driver_sender,
+            )
+            .await
+        }
+        RouteResolution::Request(route) => {
+            let body = incoming.map_err(std::io::Error::other).boxed_unsync();
+
+            match RequestInputs::parse(server, body, &body_limit, &upload_config).await {
+                Ok(RequestOutcome::Parsed(inputs)) => {
+                    complete_request(
+                        route,
+                        Request::from_inputs(inputs).with_peer_identity(peer_identity),
+                        &forward_targets,
+                    )
+                    .await
+                }
+                Ok(RequestOutcome::Rejected(rejection)) => {
+                    rejection_response(rejection).into_http()
+                }
+                Err(error) => error_response(&error).into_http(),
+            }
+        }
+    }
 }
 
 pub struct BoundServer {
@@ -222,200 +419,6 @@ impl BoundServer {
     }
 }
 
-struct AcceptedConnection {
-    remote_addr: SocketAddr,
-    stream: TcpStream,
-}
-
-fn accept_outcome<Accept>(accepted: std::io::Result<(TcpStream, SocketAddr)>, accept: Accept)
-where
-    Accept: FnOnce(AcceptedConnection),
-{
-    match accepted {
-        Ok((stream, remote_addr)) => accept(AcceptedConnection {
-            remote_addr,
-            stream,
-        }),
-        Err(error) => {
-            eprintln!("margaret_http: accept error: {error}");
-        }
-    }
-}
-
-fn peer_identity_from_tls_stream(tls_stream: &TlsStream<TcpStream>) -> PeerIdentity {
-    PeerIdentity::from_peer_certificate(
-        tls_stream
-            .get_ref()
-            .1
-            .peer_certificates()
-            .and_then(|certificates| certificates.first())
-            .map(std::convert::AsRef::as_ref),
-    )
-}
-
-fn report_connection_outcome<Error: Display>(outcome: Result<(), Error>) {
-    if let Err(error) = outcome {
-        eprintln!("margaret_http: connection error: {error}");
-    }
-}
-
-fn report_connection_task_outcome(outcome: Result<(), JoinError>) {
-    if let Err(error) = outcome {
-        eprintln!("margaret_http: connection task failed: {error}");
-    }
-}
-
-fn error_response(error: &RequestError) -> Response {
-    eprintln!("margaret_http: the request could not be received: {error}");
-
-    Response::text(500, "Internal Server Error")
-}
-
-fn rejection_response(rejection: RequestRejection) -> Response {
-    eprintln!("margaret_http: the request was rejected: {rejection}");
-
-    rejection.into_response()
-}
-
-async fn serve_connection<Io>(
-    builder: Arc<Builder<TokioExecutor>>,
-    watcher: Watcher,
-    io: Io,
-    connection_context: ConnectionContext,
-) where
-    Io: hyper::rt::Read + hyper::rt::Write + Unpin + Send + 'static,
-{
-    let (driver_sender, driver_receiver) = web_socket_driver_channel();
-    let service = TowerToHyperService::new(tower::service_fn(
-        move |request: http::Request<Incoming>| {
-            let connection_context = connection_context.clone();
-            let driver_sender = driver_sender.clone();
-
-            async move {
-                Ok::<_, Infallible>(dispatch(connection_context, driver_sender, request).await)
-            }
-        },
-    ));
-
-    let connection = watcher.watch(builder.serve_connection_with_upgrades(io, service));
-    let outcome = drive_connection(connection, driver_receiver).await;
-
-    report_connection_outcome(outcome);
-}
-
-async fn complete_request(
-    route: RequestRoute,
-    request: Request,
-    forward_targets: &Arc<ForwardTargets>,
-) -> http::Response<Full<Bytes>> {
-    match route {
-        RequestRoute::Handler {
-            handler,
-            path_params,
-        } => respond_recursively(
-            forward_targets,
-            request.with_path_params(path_params),
-            handler,
-        )
-        .await
-        .into_http(),
-        RequestRoute::MethodNotAllowed => Response::text(405, "Method Not Allowed").into_http(),
-        RequestRoute::NotFound => Response::not_found().into_http(),
-    }
-}
-
-async fn dispatch_web_socket(
-    server: ServerParams,
-    on_upgrade: OnUpgrade,
-    peer_identity: Arc<PeerIdentity>,
-    cancellation_token: CancellationToken,
-    UpgradeRoute {
-        middleware,
-        path_params,
-        upgrade,
-    }: UpgradeRoute,
-    forward_targets: &Arc<ForwardTargets>,
-    driver_sender: WebSocketDriverSender,
-) -> http::Response<Full<Bytes>> {
-    match RequestInputs::from_handshake(server) {
-        RequestOutcome::Parsed(inputs) => {
-            let handshake = Request::from_inputs(inputs)
-                .with_peer_identity(peer_identity)
-                .with_path_params(path_params);
-
-            let mut onion: Box<dyn OneShotHandler> = Box::new(WebSocketUpgradeTerminal::new(
-                upgrade,
-                on_upgrade,
-                cancellation_token,
-                driver_sender,
-            ));
-
-            for middleware_layer in middleware.iter().rev() {
-                onion = one_shot_layer(middleware_layer.clone(), onion);
-            }
-
-            respond_once(forward_targets, handshake, onion)
-                .await
-                .into_http()
-        }
-        RequestOutcome::Rejected(rejection) => rejection_response(rejection).into_http(),
-    }
-}
-
-async fn dispatch(
-    ConnectionContext {
-        body_limit,
-        cancellation_token,
-        forward_targets,
-        peer_identity,
-        remote_addr,
-        router,
-        upload_config,
-    }: ConnectionContext,
-    driver_sender: WebSocketDriverSender,
-    mut request: http::Request<Incoming>,
-) -> http::Response<Full<Bytes>> {
-    let on_upgrade = hyper::upgrade::on(&mut request);
-    let (parts, incoming) = request.into_parts();
-    let server = match ServerParams::from_parts(parts, remote_addr) {
-        RequestOutcome::Parsed(server) => server,
-        RequestOutcome::Rejected(rejection) => return rejection_response(rejection).into_http(),
-    };
-
-    match router.resolve(server.method(), server.path()) {
-        RouteResolution::Upgrade(upgrade_route) => {
-            dispatch_web_socket(
-                server,
-                on_upgrade,
-                peer_identity,
-                cancellation_token.child_token(),
-                upgrade_route,
-                &forward_targets,
-                driver_sender,
-            )
-            .await
-        }
-        RouteResolution::Request(route) => {
-            let body = incoming.map_err(std::io::Error::other).boxed_unsync();
-
-            match RequestInputs::parse(server, body, &body_limit, &upload_config).await {
-                Ok(RequestOutcome::Parsed(inputs)) => {
-                    complete_request(
-                        route,
-                        Request::from_inputs(inputs).with_peer_identity(peer_identity),
-                        &forward_targets,
-                    )
-                    .await
-                }
-                Ok(RequestOutcome::Rejected(rejection)) => {
-                    rejection_response(rejection).into_http()
-                }
-                Err(error) => error_response(&error).into_http(),
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -445,7 +448,6 @@ mod tests {
     use crate::next::Next;
     use crate::redirect::Redirect;
     use crate::request::Request;
-    use crate::request_error::RequestError;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
     use crate::route_entry::RouteEntry;
@@ -453,9 +455,10 @@ mod tests {
     use crate::server::Server;
     use crate::server_registry::ServerRegistry;
     use crate::transport_config::TransportConfig;
-    use crate::upload_config::UploadConfig;
     use crate::web_socket_driver_sender::WebSocketDriverSender;
     use crate::web_socket_upgrade::WebSocketUpgrade;
+    use margaret_http_uploaded_file::upload_config::UploadConfig;
+    use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 
     struct PlainOk;
 
@@ -502,7 +505,10 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/files/{name}",
-                vec![MethodHandler::anonymous("GET", Arc::new(EchoesTheNameParameter))],
+                vec![MethodHandler::anonymous(
+                    "GET",
+                    Arc::new(EchoesTheNameParameter),
+                )],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -545,7 +551,7 @@ mod tests {
     #[test]
     fn answers_a_system_failure_with_internal_server_error() {
         assert_eq!(
-            error_response(&RequestError::UploadTempFile {
+            error_response(&UploadedFileError::UploadTempFile {
                 source: std::io::Error::other("the upload directory is unusable"),
             })
             .status(),

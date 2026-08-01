@@ -11,7 +11,9 @@ http = { workspace = true }
 hyper = { workspace = true, features = ["http1"] }
 hyper-util = { workspace = true, features = ["tokio"] }
 margaret_http = { path = "../margaret_http" }
+margaret_route_parameter_binding = { path = "../margaret_route_parameter_binding" }
 margaret_validation = { path = "../margaret_validation" }
+margaret_websocket_session = { path = "../margaret_websocket_session" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

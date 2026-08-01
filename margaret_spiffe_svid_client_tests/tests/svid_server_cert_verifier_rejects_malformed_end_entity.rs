@@ -14,8 +14,7 @@ fn rejects_malformed_end_entity() {
     install_crypto_provider();
 
     let verifier =
-        SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
-            .unwrap();
+        SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org").unwrap();
 
     let result = verifier.verify_server_cert(
         &CertificateDer::from(vec![0u8; 4]),

@@ -15,6 +15,17 @@ impl<'index> AttributeQuery<'index> {
         Self { item }
     }
 
+    #[must_use]
+    pub fn find_all_framework(
+        &self,
+        framework_attribute: FrameworkAttribute,
+    ) -> Vec<MatchedAttribute<'index>> {
+        select_framework_attributes(self.item.attributes(), framework_attribute)
+            .into_iter()
+            .map(|attribute| MatchedAttribute::new(self.item, attribute))
+            .collect()
+    }
+
     /// # Errors
     ///
     /// Returns `AttributeError` propagated from the work it performs.
@@ -28,17 +39,6 @@ impl<'index> AttributeQuery<'index> {
             })?;
 
         Ok(unique.map(|attribute| MatchedAttribute::new(self.item, attribute)))
-    }
-
-    #[must_use]
-    pub fn find_all_framework(
-        &self,
-        framework_attribute: FrameworkAttribute,
-    ) -> Vec<MatchedAttribute<'index>> {
-        select_framework_attributes(self.item.attributes(), framework_attribute)
-            .into_iter()
-            .map(|attribute| MatchedAttribute::new(self.item, attribute))
-            .collect()
     }
 }
 

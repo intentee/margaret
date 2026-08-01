@@ -5,6 +5,7 @@ edition = "2024"
 autotests = false
 
 [dependencies]
+margaret_attribute_arguments = { path = "../margaret_attribute_arguments" }
 margaret_attributes = { path = "../margaret_attributes" }
 margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
 margaret_container = { path = "../margaret_container" }

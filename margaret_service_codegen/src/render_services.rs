@@ -1,3 +1,8 @@
+use proc_macro2::Ident;
+use proc_macro2::TokenStream;
+use quote::format_ident;
+use quote::quote;
+
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
@@ -9,10 +14,6 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
-use proc_macro2::Ident;
-use proc_macro2::TokenStream;
-use quote::format_ident;
-use quote::quote;
 
 use crate::service_kind::ServiceKind;
 use crate::service_plan::ServicePlan;
@@ -87,11 +88,11 @@ fn svid_identity_prelude(
     );
 
     let bundle_constructor = if server_active && client_active {
-        quote! { margaret::framework::spiffe_svid_bundle::SvidBundle }
+        quote! { margaret::framework::spiffe_svid_bundle::svid_bundle::SvidBundle }
     } else if server_active {
-        quote! { margaret::framework::spiffe_svid_server::SvidServerBundle }
+        quote! { margaret::framework::spiffe_svid_server::svid_server_bundle::SvidServerBundle }
     } else {
-        quote! { margaret::framework::spiffe_svid_client::SvidClientBundle }
+        quote! { margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle }
     };
 
     let server_config = server_active.then(|| {
@@ -121,7 +122,7 @@ fn svid_identity_prelude(
         margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
 
         let spiffe_bundle = #bundle_constructor::new(
-            margaret::framework::spiffe_svid::SvidServiceBundleParams {
+            margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams {
                 spiffe_trust_domain: #spiffe_trust_domain,
                 spire_agent_addr: #spire_agent_addr,
             },
@@ -420,7 +421,10 @@ fn register_servers_definition(
     }
 }
 
-fn register_servers_invocation(servers: &[HttpServer], activation: SpiffeActivation) -> TokenStream {
+fn register_servers_invocation(
+    servers: &[HttpServer],
+    activation: SpiffeActivation,
+) -> TokenStream {
     if servers.is_empty() {
         return TokenStream::new();
     }

@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use matchit::InsertError;
+
 use crate::handler_name::HandlerName;
-use crate::matchit::InsertError;
 use crate::method_handler::MethodHandler;
 use crate::named_handler::NamedHandler;
 use crate::route_entry::RouteEntry;

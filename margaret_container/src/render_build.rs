@@ -24,6 +24,7 @@ use crate::field_type::field_type;
 use crate::planned_dependency::PlannedDependency;
 use crate::planned_provider::PlannedProvider;
 use crate::reverse_console_argument_weaver::ReverseConsoleArgumentWeaver;
+use crate::serve_console_arguments::ServeConsoleArguments;
 
 fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {
     match shape {
@@ -235,25 +236,6 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     }
 }
 
-fn serve_arguments(roots: &[&PlannedProvider]) -> (Vec<ConsoleArgument>, Vec<usize>) {
-    let mut arguments_by_slot = std::collections::BTreeMap::new();
-
-    for root in roots {
-        for (argument, slot) in root
-            .console_arguments
-            .iter()
-            .zip(root.console_slots.iter().copied())
-        {
-            arguments_by_slot.entry(slot).or_insert(argument);
-        }
-    }
-
-    arguments_by_slot
-        .into_iter()
-        .map(|(slot, argument)| (argument.clone(), slot))
-        .unzip()
-}
-
 pub(crate) fn render_build(
     plan: &ContainerPlan,
     construction_roots: &[&PlannedProvider],
@@ -265,7 +247,10 @@ pub(crate) fn render_build(
         .map(|root| root_builder(root, plan))
         .collect::<Vec<_>>();
     let serve_flow = construction_flow(plan, construction_roots);
-    let (serve_arguments, serve_slots) = serve_arguments(construction_roots);
+    let ServeConsoleArguments {
+        arguments: serve_arguments,
+        slots: serve_slots,
+    } = ServeConsoleArguments::from_roots(construction_roots);
     let serve_function = format_ident!("serve");
     let serve_parameters = arguments_declaration(&serve_function, &serve_arguments);
     let serve_arguments_module = arguments_module(&serve_function, &serve_arguments, &serve_slots);
@@ -316,7 +301,7 @@ pub(crate) fn render_build(
         }
     };
 
-    let builder_modules = root_builders.iter().map(|builder| {
+    let builder_module_declarations = root_builders.iter().map(|builder| {
         let function = &builder.function;
         let arguments_module = builder
             .arguments
@@ -327,8 +312,12 @@ pub(crate) fn render_build(
         quote! {
             #arguments_module
             pub mod #function;
-            pub use #function::#function;
         }
+    });
+    let builder_module_exports = root_builders.iter().map(|builder| {
+        let function = &builder.function;
+
+        quote! { pub use #function::#function; }
     });
     let serve_arguments_declaration = serve_arguments_module
         .as_ref()
@@ -337,9 +326,11 @@ pub(crate) fn render_build(
     let mut modules = vec![GeneratedModuleTokens::new(
         "container/build",
         quote! {
-            #(#builder_modules)*
+            #(#builder_module_declarations)*
             #serve_arguments_declaration
             pub mod serve;
+
+            #(#builder_module_exports)*
             pub use serve::serve;
         },
     )];

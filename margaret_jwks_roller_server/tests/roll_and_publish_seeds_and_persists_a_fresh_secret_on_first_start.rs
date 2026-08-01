@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage::FileJwksSecretStorage;
-use margaret_jwks_roller_server::JwksRollerServerBundle;
-use margaret_jwks_roller_server::JwksRollerServerBundleParams;
+use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
+use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 
 #[test]
 fn roll_and_publish_seeds_and_persists_a_fresh_secret_on_first_start() {

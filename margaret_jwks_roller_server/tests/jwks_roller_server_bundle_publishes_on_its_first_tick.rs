@@ -4,8 +4,8 @@ use tokio_util::sync::CancellationToken;
 use trzcina::ServiceBundle as _;
 
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
-use margaret_jwks_roller_server::JwksRollerServerBundle;
-use margaret_jwks_roller_server::JwksRollerServerBundleParams;
+use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
+use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 
 #[tokio::test(start_paused = true)]
 async fn jwks_roller_server_bundle_publishes_on_its_first_tick() {

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::request_binding_error::RequestBindingError;
+use margaret_route_parameter_binding::route_parameter_binding_error::RouteParameterBindingError;
 
 #[derive(Debug, Error)]
 pub enum HandlerError {
@@ -11,7 +11,7 @@ pub enum HandlerError {
     },
 
     #[error(transparent)]
-    RequestBinding(#[from] RequestBindingError),
+    RequestBinding(#[from] RouteParameterBindingError),
 
     #[error("the responder forward cycle re-entered '{responder}'")]
     ForwardCycle { responder: &'static str },

@@ -1,11 +1,14 @@
 use syn::UseTree;
 
 use crate::canonical_path::CanonicalPath;
+use crate::flattened_import::FlattenedImport;
 
-fn resolve_anchor<'tree>(
+struct UseTreeAnchor<'tree> {
+    prefix: Vec<String>,
     tree: &'tree UseTree,
-    module_path: &[String],
-) -> (&'tree UseTree, Vec<String>) {
+}
+
+fn resolve_anchor<'tree>(tree: &'tree UseTree, module_path: &[String]) -> UseTreeAnchor<'tree> {
     let mut base = module_path.to_vec();
     let mut current = tree;
     let mut relative = false;
@@ -21,12 +24,17 @@ fn resolve_anchor<'tree>(
                 base.truncate(base.len().saturating_sub(1));
                 current = &use_path.tree;
             }
-            _ => return (current, if relative { base } else { Vec::new() }),
+            _ => {
+                return UseTreeAnchor {
+                    prefix: if relative { base } else { Vec::new() },
+                    tree: current,
+                };
+            }
         }
     }
 }
 
-fn flatten(tree: &UseTree, prefix: Vec<String>) -> Vec<(String, CanonicalPath)> {
+fn flatten(tree: &UseTree, prefix: Vec<String>) -> Vec<FlattenedImport> {
     match tree {
         UseTree::Path(use_path) => {
             let mut child_prefix = prefix;
@@ -44,13 +52,19 @@ fn flatten(tree: &UseTree, prefix: Vec<String>) -> Vec<(String, CanonicalPath)> 
             let mut segments = prefix;
             segments.push(name.clone());
 
-            vec![(name, CanonicalPath::new(segments))]
+            vec![FlattenedImport {
+                name,
+                path: CanonicalPath::new(segments),
+            }]
         }
         UseTree::Rename(use_rename) => {
             let mut segments = prefix;
             segments.push(use_rename.ident.to_string());
 
-            vec![(use_rename.rename.to_string(), CanonicalPath::new(segments))]
+            vec![FlattenedImport {
+                name: use_rename.rename.to_string(),
+                path: CanonicalPath::new(segments),
+            }]
         }
         UseTree::Group(use_group) => use_group
             .items
@@ -61,13 +75,10 @@ fn flatten(tree: &UseTree, prefix: Vec<String>) -> Vec<(String, CanonicalPath)> 
     }
 }
 
-pub(crate) fn flatten_use_tree(
-    tree: &UseTree,
-    module_path: &[String],
-) -> Vec<(String, CanonicalPath)> {
-    let (stripped, prefix) = resolve_anchor(tree, module_path);
+pub(crate) fn flatten_use_tree(tree: &UseTree, module_path: &[String]) -> Vec<FlattenedImport> {
+    let UseTreeAnchor { prefix, tree } = resolve_anchor(tree, module_path);
 
-    flatten(stripped, prefix)
+    flatten(tree, prefix)
 }
 
 #[cfg(test)]
@@ -76,7 +87,20 @@ mod tests {
 
     use super::flatten_use_tree;
 
-    fn entries(tree: &syn::ItemUse, module_path: &[&str]) -> Vec<(String, String)> {
+    #[derive(Debug, PartialEq, Eq)]
+    struct Entry {
+        name: String,
+        path: String,
+    }
+
+    fn entry(name: &str, path: &str) -> Entry {
+        Entry {
+            name: name.to_string(),
+            path: path.to_string(),
+        }
+    }
+
+    fn entries(tree: &syn::ItemUse, module_path: &[&str]) -> Vec<Entry> {
         let module: Vec<String> = module_path
             .iter()
             .map(std::string::ToString::to_string)
@@ -84,7 +108,10 @@ mod tests {
 
         flatten_use_tree(&tree.tree, &module)
             .into_iter()
-            .map(|(name, path)| (name, path.to_string()))
+            .map(|import| Entry {
+                name: import.name,
+                path: import.path.to_string(),
+            })
             .collect()
     }
 
@@ -97,10 +124,7 @@ mod tests {
                 ),
                 &["crate"]
             ),
-            vec![(
-                "Request".to_string(),
-                "margaret_http::request::Request".to_string()
-            )]
+            vec![entry("Request", "margaret_http::request::Request")]
         );
     }
 
@@ -113,10 +137,7 @@ mod tests {
                 ),
                 &["crate", "routes"]
             ),
-            vec![(
-                "Routes".to_string(),
-                "crate::margaret::routes::Routes".to_string()
-            )]
+            vec![entry("Routes", "crate::margaret::routes::Routes")]
         );
     }
 
@@ -129,7 +150,7 @@ mod tests {
                 ),
                 &["crate", "models"]
             ),
-            vec![("User".to_string(), "crate::models::User".to_string())]
+            vec![entry("User", "crate::models::User")]
         );
     }
 
@@ -142,7 +163,7 @@ mod tests {
                 ),
                 &["crate", "models", "user"]
             ),
-            vec![("Shared".to_string(), "crate::models::Shared".to_string())]
+            vec![entry("Shared", "crate::models::Shared")]
         );
     }
 
@@ -155,7 +176,7 @@ mod tests {
                 ),
                 &["crate", "models", "user"]
             ),
-            vec![("Root".to_string(), "crate::Root".to_string())]
+            vec![entry("Root", "crate::Root")]
         );
     }
 
@@ -168,7 +189,7 @@ mod tests {
                 ),
                 &["crate"]
             ),
-            vec![("Renamed".to_string(), "foo::Bar".to_string())]
+            vec![entry("Renamed", "foo::Bar")]
         );
     }
 
@@ -181,10 +202,7 @@ mod tests {
                 ),
                 &["crate"]
             ),
-            vec![
-                ("Bar".to_string(), "foo::Bar".to_string()),
-                ("Qux".to_string(), "foo::baz::Qux".to_string()),
-            ]
+            vec![entry("Bar", "foo::Bar"), entry("Qux", "foo::baz::Qux"),]
         );
     }
 
@@ -197,7 +215,7 @@ mod tests {
                 ),
                 &["crate"]
             ),
-            vec![("Bar".to_string(), "foo::Bar".to_string())]
+            vec![entry("Bar", "foo::Bar")]
         );
     }
 

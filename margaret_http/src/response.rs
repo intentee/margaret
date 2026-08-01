@@ -31,16 +31,6 @@ impl Response {
         Self::text(403, "Forbidden")
     }
 
-    #[must_use]
-    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.push(Header {
-            name: name.into(),
-            value: value.into(),
-        });
-
-        self
-    }
-
     pub fn html(status: u16, body: impl Into<String>) -> Self {
         Self::bytes(status, "text/html; charset=utf-8", body.into())
     }
@@ -74,17 +64,8 @@ impl Response {
     }
 
     #[must_use]
-    pub fn set_cookie(self, cookie: &Cookie<'_>) -> Self {
-        self.header("set-cookie", cookie.to_string())
-    }
-
-    #[must_use]
     pub fn static_bytes(status: u16, content_type: &'static str, body: &'static [u8]) -> Self {
         Self::new(status, Bytes::from_static(body)).header("content-type", content_type)
-    }
-
-    pub fn status(&self) -> u16 {
-        self.status
     }
 
     pub fn text(status: u16, body: impl Into<String>) -> Self {
@@ -94,6 +75,25 @@ impl Response {
     #[must_use]
     pub fn unauthorized() -> Self {
         Self::text(401, "Unauthorized")
+    }
+
+    #[must_use]
+    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push(Header {
+            name: name.into(),
+            value: value.into(),
+        });
+
+        self
+    }
+
+    #[must_use]
+    pub fn set_cookie(self, cookie: &Cookie<'_>) -> Self {
+        self.header("set-cookie", cookie.to_string())
+    }
+
+    pub fn status(&self) -> u16 {
+        self.status
     }
 
     pub(crate) fn into_http(self) -> http::Response<Full<Bytes>> {

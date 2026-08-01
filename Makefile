@@ -3,6 +3,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_access_token_minter \
 	-p margaret_asset_bag \
 	-p margaret_asset_bag_codegen \
+	-p margaret_attribute_arguments \
 	-p margaret_attributes \
 	-p margaret_codegen \
 	-p margaret_codegen_tests \
@@ -18,6 +19,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_http \
 	-p margaret_http_codegen \
 	-p margaret_http_tests \
+	-p margaret_http_uploaded_file \
 	-p margaret_http_validation \
 	-p margaret_identity \
 	-p margaret_identity_session \
@@ -42,6 +44,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
 	-p margaret_request_binding_codegen \
+	-p margaret_route_parameter_binding \
 	-p margaret_route_parameter_codegen \
 	-p margaret_schema_codegen \
 	-p margaret_schema_identifier_naming \
@@ -69,6 +72,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_views_codegen \
 	-p margaret_websocket \
 	-p margaret_websocket_codegen \
+	-p margaret_websocket_session \
 	-p margaret_websocket_tests
 COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_example \
@@ -84,6 +88,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_access_token_minter \
 	-p margaret_asset_bag \
 	-p margaret_asset_bag_codegen \
+	-p margaret_attribute_arguments \
 	-p margaret_attributes \
 	-p margaret_codegen \
 	-p margaret_codegen_tokens \
@@ -95,6 +100,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_generated_module \
 	-p margaret_http \
 	-p margaret_http_codegen \
+	-p margaret_http_uploaded_file \
 	-p margaret_http_validation \
 	-p margaret_identity \
 	-p margaret_identity_session \
@@ -114,6 +120,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_model_codegen \
 	-p margaret_peer_identity \
 	-p margaret_request_binding_codegen \
+	-p margaret_route_parameter_binding \
 	-p margaret_route_parameter_codegen \
 	-p margaret_schema_codegen \
 	-p margaret_schema_identifier_naming \
@@ -132,7 +139,8 @@ RUNTIME_PACKAGES := \
 	-p margaret_views \
 	-p margaret_views_codegen \
 	-p margaret_websocket \
-	-p margaret_websocket_codegen
+	-p margaret_websocket_codegen \
+	-p margaret_websocket_session
 RUNTIME_LINTS := \
 	-D unsafe-code \
 	-D clippy::exit \
@@ -177,6 +185,7 @@ coverage: node_modules postgres-image
 		--gated margaret_access_token_minter=100 \
 		--gated margaret_asset_bag=100 \
 		--gated margaret_asset_bag_codegen=100 \
+		--gated margaret_attribute_arguments=100 \
 		--gated margaret_attributes=100 \
 		--gated margaret_codegen=100 \
 		--gated margaret_codegen_tests=100 \
@@ -192,6 +201,7 @@ coverage: node_modules postgres-image
 		--gated margaret_http=100 \
 		--gated margaret_http_codegen=100 \
 		--gated margaret_http_tests=100 \
+		--gated margaret_http_uploaded_file=100 \
 		--gated margaret_http_validation=100 \
 		--gated margaret_identity=100 \
 		--gated margaret_identity_session=100 \
@@ -216,6 +226,7 @@ coverage: node_modules postgres-image
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
 		--gated margaret_request_binding_codegen=100 \
+		--gated margaret_route_parameter_binding=100 \
 		--gated margaret_route_parameter_codegen=100 \
 		--gated margaret_schema_codegen=100 \
 		--gated margaret_schema_identifier_naming=100 \
@@ -243,6 +254,7 @@ coverage: node_modules postgres-image
 		--gated margaret_views_codegen=100 \
 		--gated margaret_websocket=100 \
 		--gated margaret_websocket_codegen=100 \
+		--gated margaret_websocket_session=100 \
 		--gated margaret_websocket_tests=100
 
 .PHONY: fmt
@@ -253,13 +265,13 @@ fmt:
 postgres-image:
 	docker pull $(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG)
 
-.PHONY: test.unit
-test.unit:
-	cargo nextest run --workspace
+.PHONY: test
+test: test.integration
 
 .PHONY: test.integration
 test.integration: postgres-image
 	cargo nextest run --workspace $(POSTGRES_FEATURES) $(SPIRE_FEATURES)
 
-.PHONY: test
-test: test.integration
+.PHONY: test.unit
+test.unit:
+	cargo nextest run --workspace

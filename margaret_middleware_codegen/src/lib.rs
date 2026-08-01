@@ -11,6 +11,7 @@ pub mod resolve_layers;
 
 #[cfg(test)]
 mod tests {
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use quote::format_ident;
@@ -86,13 +87,16 @@ mod tests {
             .collect()
     }
 
-    fn plans_error_for(lib_source: &str) -> String {
+    fn plans_rejection_for(lib_source: &str) -> MiddlewareCodegenError {
         let index = index_for(lib_source);
-        let failure = middleware_plans(&index, &registries_for(&index)).err();
 
-        failure
+        middleware_plans(&index, &registries_for(&index))
+            .err()
             .expect("the middleware plans fail to collect")
-            .to_string()
+    }
+
+    fn plans_error_for(lib_source: &str) -> String {
+        plans_rejection_for(lib_source).to_string()
     }
 
     fn layers_for(lib_source: &str) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
@@ -222,10 +226,20 @@ impl Guard {
 
     #[test]
     fn rejects_a_handler_with_a_non_path_attribute_argument() {
-        assert!(
-            plans_error_for("#[handles_middleware_attribute(attribute = \"x\")]\nstruct Bad;\n")
-                .contains("failed to index")
+        let error = plans_rejection_for(
+            "#[handles_middleware_attribute(attribute = \"x\")]\nstruct Bad;\n",
         );
+
+        assert!(matches!(
+            error,
+            MiddlewareCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "attribute" && expected == "path"
+        ));
     }
 
     #[test]

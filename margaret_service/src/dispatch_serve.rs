@@ -8,23 +8,6 @@ use margaret_console::report_failure::report_failure;
 
 use crate::shutdown_signals::ShutdownSignals;
 
-pub async fn dispatch_serve<Install, Serve, ServeFuture>(
-    install: Install,
-    serve: Serve,
-) -> CommandOutcome
-where
-    Install: FnOnce() -> IoResult<ShutdownSignals>,
-    Serve: FnOnce(CancellationToken) -> ServeFuture,
-    ServeFuture: Future<Output = CommandOutcome>,
-{
-    let signals = match install() {
-        Ok(signals) => signals,
-        Err(error) => return report_failure(error),
-    };
-
-    dispatch_installed(signals.wait(), serve).await
-}
-
 async fn dispatch_installed<SignalFuture, Serve, ServeFuture>(
     signal: SignalFuture,
     serve: Serve,
@@ -50,6 +33,23 @@ where
             }
         }
     }
+}
+
+pub async fn dispatch_serve<Install, Serve, ServeFuture>(
+    install: Install,
+    serve: Serve,
+) -> CommandOutcome
+where
+    Install: FnOnce() -> IoResult<ShutdownSignals>,
+    Serve: FnOnce(CancellationToken) -> ServeFuture,
+    ServeFuture: Future<Output = CommandOutcome>,
+{
+    let signals = match install() {
+        Ok(signals) => signals,
+        Err(error) => return report_failure(error),
+    };
+
+    dispatch_installed(signals.wait(), serve).await
 }
 
 #[cfg(test)]

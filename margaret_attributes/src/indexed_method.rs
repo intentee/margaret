@@ -14,6 +14,20 @@ pub struct IndexedMethod {
 }
 
 impl IndexedMethod {
+    pub(crate) fn from_parts(
+        attributes: Vec<IndexedAttribute>,
+        identifier: String,
+        parameters: Vec<IndexedParameter>,
+        signature: Box<Signature>,
+    ) -> Self {
+        Self {
+            attributes,
+            identifier,
+            parameters,
+            signature,
+        }
+    }
+
     #[must_use]
     pub fn new(identifier: String, attributes: Vec<Attribute>, signature: Signature) -> Self {
         let parameters = signature
@@ -42,28 +56,9 @@ impl IndexedMethod {
         }
     }
 
-    pub(crate) fn from_parts(
-        attributes: Vec<IndexedAttribute>,
-        identifier: String,
-        parameters: Vec<IndexedParameter>,
-        signature: Box<Signature>,
-    ) -> Self {
-        Self {
-            attributes,
-            identifier,
-            parameters,
-            signature,
-        }
-    }
-
     #[must_use]
     pub fn attributes(&self) -> &[IndexedAttribute] {
         &self.attributes
-    }
-
-    #[must_use]
-    pub fn identifier(&self) -> &str {
-        &self.identifier
     }
 
     #[must_use]
@@ -74,8 +69,13 @@ impl IndexedMethod {
     }
 
     #[must_use]
-    pub fn signature(&self) -> &Signature {
-        self.signature.as_ref()
+    pub fn has_receiver(&self) -> bool {
+        self.signature.receiver().is_some()
+    }
+
+    #[must_use]
+    pub fn identifier(&self) -> &str {
+        &self.identifier
     }
 
     #[must_use]
@@ -84,8 +84,8 @@ impl IndexedMethod {
     }
 
     #[must_use]
-    pub fn has_receiver(&self) -> bool {
-        self.signature.receiver().is_some()
+    pub fn signature(&self) -> &Signature {
+        self.signature.as_ref()
     }
 }
 

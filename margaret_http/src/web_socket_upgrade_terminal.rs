@@ -70,7 +70,7 @@ mod tests {
     use crate::resolve_continuation::resolve_continuation;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
-    use crate::web_socket_driver_channel::web_socket_driver_channel;
+    use crate::web_socket_driver_channel::WebSocketDriverChannel;
     use crate::web_socket_driver_sender::WebSocketDriverSender;
     use crate::web_socket_upgrade::WebSocketUpgrade;
 
@@ -112,7 +112,7 @@ mod tests {
             Arc::new(AcceptingUpgrade),
             on_upgrade,
             CancellationToken::new(),
-            web_socket_driver_channel().0,
+            WebSocketDriverChannel::new().sender,
         ));
         let handshake = Request::new(Method::GET, "/chat".to_string());
 

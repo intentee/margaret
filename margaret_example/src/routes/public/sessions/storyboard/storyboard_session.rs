@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use tokio::sync::Mutex;
+
 use margaret::framework::macros::build_for_session;
 use margaret::framework::macros::websocket_session;
-use tokio::sync::Mutex;
 
 use crate::english_greeter::EnglishGreeter;
 use crate::forms::get_articles_form::GetArticlesForm;

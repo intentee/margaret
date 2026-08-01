@@ -35,11 +35,6 @@ impl JwksRollerServerBundle {
     }
 
     #[must_use]
-    pub fn public_jwks_handler(&self) -> Arc<PublicJwksHandler> {
-        Arc::new(PublicJwksHandler::new(self.jwks_document_holder.clone()))
-    }
-
-    #[must_use]
     pub fn jwks_document_holder(&self) -> JwksDocumentHolder {
         self.jwks_document_holder.clone()
     }
@@ -47,6 +42,11 @@ impl JwksRollerServerBundle {
     #[must_use]
     pub fn jwks_secret_holder(&self) -> JwksSecretHolder {
         self.jwks_secret_holder.clone()
+    }
+
+    #[must_use]
+    pub fn public_jwks_handler(&self) -> Arc<PublicJwksHandler> {
+        Arc::new(PublicJwksHandler::new(self.jwks_document_holder.clone()))
     }
 
     /// # Errors

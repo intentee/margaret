@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum RequestError {
+pub enum UploadedFileError {
     #[error("an uploaded file temporary file could not be created: {source}")]
     UploadTempFile {
         #[source]

@@ -75,8 +75,8 @@ pub fn render_jwks(
     let mut modules = vec![GeneratedModuleTokens::new(
         JWKS_MODULE_NAME,
         quote! {
-            #server_root
             #(#submodule_declarations)*
+            #server_root
         },
     )];
 

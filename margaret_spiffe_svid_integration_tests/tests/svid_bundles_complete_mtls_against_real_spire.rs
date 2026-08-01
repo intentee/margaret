@@ -7,8 +7,8 @@ use tokio_util::sync::CancellationToken;
 use trzcina::ServiceManager;
 use trzcina::ServiceShutdownOptions;
 
-use margaret_spiffe_svid::SvidServiceBundleParams;
-use margaret_spiffe_svid_bundle::SvidBundle;
+use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
+use margaret_spiffe_svid_bundle::svid_bundle::SvidBundle;
 use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider;
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
 use margaret_spiffe_svid_tests::spire_test_cluster::SpireTestCluster;

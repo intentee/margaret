@@ -6,12 +6,17 @@ use crate::bound_parameter::BoundParameter;
 use crate::captured_providers::CapturedProviders;
 use crate::request_binding::RequestBinding;
 
+struct BoundRouteParameter<'parameter> {
+    parameter: &'parameter BoundParameter,
+    path_key: &'parameter str,
+}
+
 fn joined_future(first: &TokenStream, remaining: &[TokenStream]) -> TokenStream {
     if let Some((second, tail)) = remaining.split_first() {
         let remaining = joined_future(second, tail);
 
         quote! {
-            margaret::framework::http::join_route_parameter_bindings::join_route_parameter_bindings(
+            margaret::framework::route_parameter_binding::join_route_parameter_bindings::join_route_parameter_bindings(
                 #first,
                 #remaining,
             )
@@ -25,7 +30,12 @@ fn joined_pattern(first: &Ident, remaining: &[&Ident]) -> TokenStream {
     if let Some((second, tail)) = remaining.split_first() {
         let remaining = joined_pattern(second, tail);
 
-        quote! { (#first, #remaining) }
+        quote! {
+            margaret::framework::route_parameter_binding::joined_route_parameter_bindings::JoinedRouteParameterBindings {
+                first: #first,
+                second: #remaining,
+            }
+        }
     } else {
         quote! { #first }
     }
@@ -40,12 +50,13 @@ pub fn render_bound_request_extractions(
     error_return: &TokenStream,
     not_found_return: &TokenStream,
 ) -> TokenStream {
-    let bound: Vec<(&BoundParameter, &str)> = parameters
+    let bound: Vec<BoundRouteParameter<'_>> = parameters
         .iter()
         .filter_map(|parameter| match &parameter.binding {
-            RequestBinding::BoundRouteParameter { path_key, .. } => {
-                Some((parameter, path_key.as_str()))
-            }
+            RequestBinding::BoundRouteParameter { path_key, .. } => Some(BoundRouteParameter {
+                parameter,
+                path_key: path_key.as_str(),
+            }),
             _ => None,
         })
         .collect();
@@ -54,8 +65,9 @@ pub fn render_bound_request_extractions(
         return TokenStream::new();
     };
 
-    let binding_future = |(parameter, path_key): &(&BoundParameter, &str)| {
-        let provider = captured.access(&parameter.binding, owner);
+    let binding_future = |bound: &BoundRouteParameter<'_>| {
+        let provider = captured.access(&bound.parameter.binding, owner);
+        let path_key = bound.path_key;
 
         quote! {
             margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(
@@ -67,10 +79,10 @@ pub fn render_bound_request_extractions(
     };
     let first_future = binding_future(first);
     let remaining_futures: Vec<TokenStream> = remaining.iter().map(binding_future).collect();
-    let first_holder = &first.0.holder;
+    let first_holder = &first.parameter.holder;
     let remaining_holders: Vec<&Ident> = remaining
         .iter()
-        .map(|(parameter, _)| &parameter.holder)
+        .map(|bound| &bound.parameter.holder)
         .collect();
     let future = joined_future(&first_future, &remaining_futures);
     let pattern = joined_pattern(first_holder, &remaining_holders);
@@ -79,10 +91,10 @@ pub fn render_bound_request_extractions(
         .map(|holder| {
             quote! {
                 let #holder = match #holder {
-                    margaret::framework::http::route_parameter_binding_outcome::RouteParameterBindingOutcome::Bound(
+                    margaret::framework::route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome::Bound(
                         model,
                     ) => model,
-                    margaret::framework::http::route_parameter_binding_outcome::RouteParameterBindingOutcome::NotFound => {
+                    margaret::framework::route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome::NotFound => {
                         #not_found_return
                     }
                 };

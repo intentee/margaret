@@ -16,10 +16,7 @@ impl BoardSession {
         #[route_parameter(from = "topic")] topic: String,
         #[authenticated_user] reader: Option<crate::reader::Reader>,
     ) -> anyhow::Result<Self> {
-        Ok(Self {
-            reader,
-            topic,
-        })
+        Ok(Self { reader, topic })
     }
 
     #[must_use]

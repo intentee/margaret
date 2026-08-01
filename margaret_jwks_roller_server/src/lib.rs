@@ -7,7 +7,3 @@ pub mod jwks_roller_server_bundle_params;
 pub mod jwks_roller_server_error;
 pub mod jwks_roller_service;
 pub mod public_jwks_handler;
-
-pub use crate::jwks_roller::JwksRoller;
-pub use crate::jwks_roller_server_bundle::JwksRollerServerBundle;
-pub use crate::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;

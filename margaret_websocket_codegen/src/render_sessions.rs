@@ -141,21 +141,21 @@ fn create_extractions(
 ) -> TokenStream {
     let continuation_return = quote! {
         return ::std::result::Result::Ok(
-            margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
+            margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
                 response,
             ),
         )
     };
     let response_return = quote! {
         return ::std::result::Result::Ok(
-            margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
+            margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
                 response.into(),
             ),
         )
     };
     let error_return = quote! {
         return ::std::result::Result::Err(
-            margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError::consumer(
+            margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer(
                 error,
             ),
         )
@@ -169,7 +169,7 @@ fn create_extractions(
         &quote! { return ::std::result::Result::Err(error.into()) },
         &quote! {
             return ::std::result::Result::Ok(
-                margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
+                margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
                     margaret::framework::http::response_continuation::ResponseContinuation::from(
                         margaret::framework::http::response::Response::not_found(),
                     ),
@@ -236,7 +236,7 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
         }
 
         #[async_trait::async_trait]
-        impl margaret::framework::websocket::web_socket_session_factory::WebSocketSessionFactory for Factory {
+        impl margaret::framework::websocket_session::web_socket_session_factory::WebSocketSessionFactory for Factory {
             type Session = #session_path;
 
             #create_too_many_lines
@@ -244,16 +244,16 @@ fn render_factory(session: &WebSocketSession, captured: &CapturedProviders) -> T
                 &self,
                 #handshake: &margaret::framework::http::request::Request,
             ) -> ::std::result::Result<
-                margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome<Self::Session>,
-                margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError,
+                margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome<Self::Session>,
+                margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError,
             > {
                 #extractions
 
                 #session_path::#method_name(#arguments)
                     .map(::std::sync::Arc::new)
-                    .map(margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created)
+                    .map(margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Created)
                     .map_err(
-                        margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
+                        margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer,
                     )
             }
         }

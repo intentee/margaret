@@ -6,8 +6,8 @@ use crate::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use crate::serve_input_key::ServeInputKey;
 
 pub struct ServeInputRegistry {
-    arguments: Vec<ConsoleArgument>,
-    slots: BTreeMap<ServeInputKey, usize>,
+    pub arguments: Vec<ConsoleArgument>,
+    pub slots: BTreeMap<ServeInputKey, usize>,
 }
 
 impl ServeInputRegistry {
@@ -50,10 +50,5 @@ impl ServeInputRegistry {
                 Ok(next_slot)
             }
         }
-    }
-
-    #[must_use]
-    pub fn into_parts(self) -> (Vec<ConsoleArgument>, BTreeMap<ServeInputKey, usize>) {
-        (self.arguments, self.slots)
     }
 }

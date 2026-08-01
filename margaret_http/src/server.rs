@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
+use margaret_http_uploaded_file::upload_config::UploadConfig;
+
 use crate::body_limit::BodyLimit;
 use crate::router::Router;
 use crate::transport_config::TransportConfig;
-use crate::upload_config::UploadConfig;
 
 pub struct Server {
     address: String,

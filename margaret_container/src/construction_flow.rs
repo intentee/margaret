@@ -13,12 +13,12 @@ pub(crate) fn construction_flow<'plan>(
     let mut selected: BTreeSet<CanonicalPath> =
         roots.iter().map(|entry| entry.key.clone()).collect();
 
-    for (key, provider) in plan.entries().rev() {
-        if !selected.contains(key) {
+    for entry in plan.planned_entries().rev() {
+        if !selected.contains(&entry.key) {
             continue;
         }
 
-        for dependency in provider.dependencies() {
+        for dependency in entry.provider.dependencies() {
             if let DependencyKind::Single { provider_key } = dependency {
                 selected.insert(provider_key.clone());
             }

@@ -9,6 +9,7 @@ pub mod render_console;
 
 #[cfg(test)]
 mod tests {
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use tempfile::TempDir;
@@ -147,12 +148,15 @@ impl Farewell {
             .collect()
     }
 
-    fn error_for(lib_source: &str) -> String {
+    fn rejection_for(lib_source: &str) -> ConsoleCodegenError {
         let index = index_for(lib_source);
 
         render_planned_console(&index, false, false, &[], &[], &bindings(&index))
             .expect_err("the console source fails to generate")
-            .to_string()
+    }
+
+    fn error_for(lib_source: &str) -> String {
+        rejection_for(lib_source).to_string()
     }
 
     #[test]
@@ -510,16 +514,35 @@ impl Farewell {
 
     #[test]
     fn rejects_a_non_string_command_name() {
-        let message = error_for("#[console_command(name = 5)]\nstruct Bad;\n");
+        let error = rejection_for("#[console_command(name = 5)]\nstruct Bad;\n");
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            ConsoleCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "name" && expected == "string literal"
+        ));
     }
 
     #[test]
     fn rejects_a_non_string_command_description() {
-        let message = error_for("#[console_command(name = \"x\", description = 5)]\nstruct Bad;\n");
+        let error =
+            rejection_for("#[console_command(name = \"x\", description = 5)]\nstruct Bad;\n");
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            ConsoleCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "description" && expected == "string literal"
+        ));
     }
 
     #[test]

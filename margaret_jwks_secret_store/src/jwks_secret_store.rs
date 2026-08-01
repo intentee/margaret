@@ -112,16 +112,21 @@ mod tests {
         }
     }
 
-    fn store_with_secret() -> (
-        JwksSecretStore,
-        margaret_jwks_keygen::jwks_secret::JwksSecret,
-    ) {
+    struct StoreWithSecret {
+        secret: margaret_jwks_keygen::jwks_secret::JwksSecret,
+        store: JwksSecretStore,
+    }
+
+    fn store_with_secret() -> StoreWithSecret {
         let secret = fresh_p256_secret();
         let holder = JwksSecretHolder::default();
 
         holder.set(Some(Arc::new(secret.clone())));
 
-        (JwksSecretStore::new(holder), secret)
+        StoreWithSecret {
+            secret,
+            store: JwksSecretStore::new(holder),
+        }
     }
 
     fn minted_tokens(minting: AccessTokenMinting) -> Option<MintedTokens> {
@@ -147,7 +152,7 @@ mod tests {
 
     #[tokio::test]
     async fn mints_an_access_token_from_a_valid_refresh_token() {
-        let (store, secret) = store_with_secret();
+        let StoreWithSecret { secret, store } = store_with_secret();
         let refresh_token =
             sign_refresh_token(&secret.current.signing, &refresh_claims(1_000)).await;
 
@@ -164,7 +169,7 @@ mod tests {
 
     #[tokio::test]
     async fn signs_claims_with_the_current_key() {
-        let (store, secret) = store_with_secret();
+        let StoreWithSecret { secret, store } = store_with_secret();
         let claims = refresh_claims(1_000);
 
         let token = store.sign(&claims).await.expect("the claims are signed");
@@ -193,7 +198,7 @@ mod tests {
 
     #[test]
     fn reports_a_malformed_token_as_a_verification_outcome() {
-        let (store, _secret) = store_with_secret();
+        let StoreWithSecret { store, .. } = store_with_secret();
 
         let result = store
             .verify::<RefreshTokenClaims>("not.a.valid.token")
@@ -228,7 +233,7 @@ mod tests {
 
     #[tokio::test]
     async fn reports_a_malformed_refresh_token_as_a_minting_outcome() {
-        let (store, _secret) = store_with_secret();
+        let StoreWithSecret { store, .. } = store_with_secret();
 
         let minting = store
             .mint_access_token("not.a.valid.token", unix_time(500))
@@ -240,7 +245,7 @@ mod tests {
 
     #[tokio::test]
     async fn reports_a_sign_failure_for_unserializable_claims() {
-        let (store, _secret) = store_with_secret();
+        let StoreWithSecret { store, .. } = store_with_secret();
 
         assert!(
             store
@@ -252,7 +257,7 @@ mod tests {
 
     #[tokio::test]
     async fn reports_a_mint_failure_when_the_current_key_is_corrupt() {
-        let (store, secret) = store_with_secret();
+        let StoreWithSecret { secret, store } = store_with_secret();
         let refresh_token =
             sign_refresh_token(&secret.current.signing, &refresh_claims(1_000)).await;
         let mut corrupt = secret;
@@ -277,7 +282,7 @@ mod tests {
 
     #[tokio::test]
     async fn reports_a_verify_failure_when_the_current_key_is_corrupt() {
-        let (_store, secret) = store_with_secret();
+        let StoreWithSecret { secret, .. } = store_with_secret();
         let token = sign_refresh_token(&secret.current.signing, &refresh_claims(1_000)).await;
         let mut corrupt = secret;
 
@@ -296,7 +301,7 @@ mod tests {
 
     #[tokio::test]
     async fn reports_the_claims_of_a_token_signed_with_the_current_key() {
-        let (store, secret) = store_with_secret();
+        let StoreWithSecret { secret, store } = store_with_secret();
         let claims = refresh_claims(1_000);
         let token = sign_refresh_token(&secret.current.signing, &claims).await;
 

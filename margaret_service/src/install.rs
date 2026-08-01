@@ -1,8 +1,9 @@
 use std::io::Result;
 
-use crate::shutdown_signals::ShutdownSignals;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::unix::signal;
+
+use crate::shutdown_signals::ShutdownSignals;
 
 fn install_signals(interrupt: SignalKind, terminate: SignalKind) -> Result<ShutdownSignals> {
     Ok(ShutdownSignals::new(signal(interrupt)?, signal(terminate)?))

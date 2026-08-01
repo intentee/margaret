@@ -1,6 +1,7 @@
+use tokio_tungstenite::tungstenite::Message;
+
 use margaret_websocket_tests::driver_harness::DriverHarness;
 use margaret_websocket_tests::test_dispatch_table::test_dispatch_table;
-use tokio_tungstenite::tungstenite::Message;
 
 #[tokio::test]
 async fn streams_a_request_across_many_frames() {

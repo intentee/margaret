@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
+use tokio_util::sync::CancellationToken;
+
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
-use tokio_util::sync::CancellationToken;
 
 use super::secrets::Secrets;
 
-type WorkerResult<T> = failures::Result<T>;
-type ChainedWorkerResult<T> = WorkerResult<T>;
+type WorkerResult<Value> = failures::Result<Value>;
+type ChainedWorkerResult<Value> = WorkerResult<Value>;
 
 #[service]
 pub struct Worker {

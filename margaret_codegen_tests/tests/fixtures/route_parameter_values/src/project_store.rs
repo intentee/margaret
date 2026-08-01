@@ -1,9 +1,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder;
-use margaret::framework::http::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 use margaret::framework::macros::provides_route_parameter;
 use margaret::framework::macros::singleton;
+use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;
+use margaret::framework::route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 
 use super::project::Project;
 

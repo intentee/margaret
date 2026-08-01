@@ -4,6 +4,7 @@ members = [
     "margaret_access_token_minter",
     "margaret_asset_bag",
     "margaret_asset_bag_codegen",
+    "margaret_attribute_arguments",
     "margaret_attributes",
     "margaret_codegen",
     "margaret_codegen_tests",
@@ -27,6 +28,7 @@ members = [
     "margaret_http",
     "margaret_http_codegen",
     "margaret_http_tests",
+    "margaret_http_uploaded_file",
     "margaret_http_validation",
     "margaret_identity",
     "margaret_identity_session",
@@ -52,6 +54,7 @@ members = [
     "margaret_peer_identity",
     "margaret_peer_identity_tests",
     "margaret_request_binding_codegen",
+    "margaret_route_parameter_binding",
     "margaret_route_parameter_codegen",
     "margaret_schema_codegen",
     "margaret_schema_identifier_naming",
@@ -79,6 +82,7 @@ members = [
     "margaret_views_codegen",
     "margaret_websocket",
     "margaret_websocket_codegen",
+    "margaret_websocket_session",
     "margaret_websocket_tests",
 ]
 

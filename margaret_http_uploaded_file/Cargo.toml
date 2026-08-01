@@ -1,0 +1,15 @@
+[package]
+name = "margaret_http_uploaded_file"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["fs", "io-util"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "rt"] }
+
+[lints]
+workspace = true
