@@ -143,10 +143,8 @@ x509-parser = "0.17"
 zeroize = "1.9"
 
 [workspace.lints.clippy]
-all = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-ignored_unit_patterns = "warn"
-must_use_candidate = "warn"
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
 
 [profile.dev.package."*"]
 opt-level = 3

@@ -83,6 +83,15 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_websocket_fixture \
 	--exclude-from-report margaret_self_referential_model_fixture \
 	--exclude-from-report margaret_spiffe_http_client_fixture
+GENERATED_CODE_PACKAGES := \
+	-p margaret_codegen_collisions_and_diamonds_fixture \
+	-p margaret_codegen_fallible_roles_fixture \
+	-p margaret_codegen_linear_construction_future_fixture \
+	-p margaret_codegen_route_parameter_values_fixture \
+	-p margaret_codegen_websocket_fixture \
+	-p margaret_example \
+	-p margaret_self_referential_model_fixture \
+	-p margaret_spiffe_http_client_fixture
 RUNTIME_PACKAGES := \
 	-p margaret \
 	-p margaret_access_token_minter \
@@ -171,6 +180,9 @@ node_modules: package.json
 clippy:
 	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(SPIRE_FEATURES) -- -D warnings
 	cargo clippy $(RUNTIME_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
+	cargo clippy $(GENERATED_CODE_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
+	cargo clippy -p margaret --all-targets --no-default-features -- -D warnings
+	cargo clippy -p margaret --all-targets --no-default-features --features codegen -- -D warnings
 
 .PHONY: coverage
 coverage: node_modules postgres-image
