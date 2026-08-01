@@ -19,8 +19,12 @@ tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 http = { workspace = true }
+http-body-util = { workspace = true }
+jsonwebtoken = { workspace = true }
 margaret_identity_session = { path = "../margaret_identity_session" }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_file_secret_storage = { path = "../margaret_jwks_file_secret_storage" }
 margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
 tempfile = { workspace = true }

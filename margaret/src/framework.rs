@@ -37,6 +37,8 @@ pub use margaret_jwks_secret_storage_selection as jwks_secret_storage_selection;
 #[cfg(feature = "runtime")]
 pub use margaret_jwks_secret_store as jwks_secret_store;
 #[cfg(feature = "runtime")]
+pub use margaret_jwt_claims as jwt_claims;
+#[cfg(feature = "runtime")]
 pub use margaret_macros as macros;
 #[cfg(feature = "runtime")]
 pub use margaret_model as model;

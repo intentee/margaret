@@ -1,29 +1,15 @@
 use std::sync::Arc;
 
-use chrono::DateTime;
-use chrono::Utc;
-use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 
-use margaret::framework::identity_session::is_expired::IsExpired;
 use margaret::framework::jwks_client::access_token_verification::AccessTokenVerification;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
 
+use crate::access_claims::AccessClaims;
 use crate::margaret::jwks::jwks_endpoint_jwks_endpoint::PublicJwksVerifier;
 use crate::system_clock::SystemClock;
-
-#[derive(Deserialize)]
-struct AccessClaims {
-    exp: i64,
-}
-
-impl IsExpired for AccessClaims {
-    fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
-        Ok(self.exp < now.timestamp())
-    }
-}
 
 #[service]
 pub struct JwksVerifier {
@@ -52,11 +38,14 @@ impl JwksVerifier {
             .verifier
             .verify::<AccessClaims>("sample.access.token", self.clock.now())
         {
-            Ok(AccessTokenVerification::Verified(_)) => {
-                println!("the jwks verifier accepted the sample access token");
+            Ok(AccessTokenVerification::AudienceMismatch) => {
+                println!("the sample access token was minted for another audience");
             }
             Ok(AccessTokenVerification::Expired) => {
                 println!("the sample access token is expired");
+            }
+            Ok(AccessTokenVerification::IssuerMismatch) => {
+                println!("the sample access token came from another issuer");
             }
             Ok(AccessTokenVerification::Malformed(malformation)) => {
                 println!("the sample access token is malformed: {malformation}");
@@ -66,6 +55,9 @@ impl JwksVerifier {
             }
             Ok(AccessTokenVerification::SignatureMismatch) => {
                 println!("the sample access token signature does not match a published key");
+            }
+            Ok(AccessTokenVerification::Verified(_)) => {
+                println!("the jwks verifier accepted the sample access token");
             }
             Err(error) => println!("the jwks verifier could not verify the sample token: {error}"),
         }

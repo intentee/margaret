@@ -8,6 +8,8 @@ use trzcina::Service as _;
 
 use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
+use margaret_jwt_claims::expected_claims::ExpectedClaims;
+use margaret_jwt_claims::provides_expected_claims::ProvidesExpectedClaims;
 use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 
 use crate::public_jwks_holder::PublicJwksHolder;
@@ -16,14 +18,18 @@ use crate::public_jwks_verifier::PublicJwksVerifier;
 
 pub struct JwksClient {
     endpoint_provider: Arc<dyn ProvidesEndpoint>,
+    expected_claims: ExpectedClaims,
     public_jwks_holder: PublicJwksHolder,
 }
 
 impl JwksClient {
     #[must_use]
-    pub fn create(endpoint_provider: Arc<dyn ProvidesEndpoint>) -> Self {
+    pub fn create<TIssuer: ProvidesEndpoint + ProvidesExpectedClaims + 'static>(
+        issuer: Arc<TIssuer>,
+    ) -> Self {
         Self {
-            endpoint_provider,
+            expected_claims: issuer.expected_claims(),
+            endpoint_provider: issuer,
             public_jwks_holder: PublicJwksHolder::default(),
         }
     }
@@ -61,50 +67,9 @@ impl JwksClient {
 
     #[must_use]
     pub fn verifier(&self) -> Arc<PublicJwksVerifier> {
-        Arc::new(PublicJwksVerifier::new(self.public_jwks_holder.clone()))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use reqwest::Client;
-    use tokio_util::sync::CancellationToken;
-    use url::Url;
-
-    use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
-
-    use super::JwksClient;
-
-    fn client() -> JwksClient {
-        let endpoint = StaticEndpoint::new(
-            Url::parse("https://issuer.invalid/.well-known/jwks.json").expect("the url parses"),
-        );
-
-        JwksClient::create(Arc::new(endpoint))
-    }
-
-    #[tokio::test]
-    async fn returns_when_cancelled_before_the_first_poll() {
-        let cancellation_token = CancellationToken::new();
-        cancellation_token.cancel();
-
-        client()
-            .run(cancellation_token)
-            .await
-            .expect("a cancelled client shuts down cleanly");
-    }
-
-    #[tokio::test]
-    async fn reports_a_client_builder_that_cannot_be_built() {
-        let broken_builder = Client::builder().use_preconfigured_tls(0u8);
-
-        assert!(
-            client()
-                .run_with_client_builder(broken_builder, CancellationToken::new())
-                .await
-                .is_err()
-        );
+        Arc::new(PublicJwksVerifier::new(
+            self.expected_claims.clone(),
+            self.public_jwks_holder.clone(),
+        ))
     }
 }

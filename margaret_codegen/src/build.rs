@@ -631,6 +631,7 @@ impl GetJwks {
 pub mod margaret;
 
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwt_claims::provides_expected_claims::ProvidesExpectedClaims;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -638,11 +639,15 @@ struct AuthJwksEndpoint;
 
 impl ProvidesEndpoint for AuthJwksEndpoint {}
 
+impl ProvidesExpectedClaims for AuthJwksEndpoint {}
+
 #[singleton]
 #[provides_jwks_endpoint(partner)]
 struct PartnerJwksEndpoint;
 
 impl ProvidesEndpoint for PartnerJwksEndpoint {}
+
+impl ProvidesExpectedClaims for PartnerJwksEndpoint {}
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
@@ -1015,6 +1020,7 @@ impl GetIdentity {
 pub mod margaret;
 
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwt_claims::provides_expected_claims::ProvidesExpectedClaims;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -1026,6 +1032,8 @@ impl AuthJwksEndpoint {
 }
 
 impl ProvidesEndpoint for AuthJwksEndpoint {}
+
+impl ProvidesExpectedClaims for AuthJwksEndpoint {}
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
@@ -1156,6 +1164,7 @@ impl GetJwks {
 pub mod margaret;
 
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwt_claims::provides_expected_claims::ProvidesExpectedClaims;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -1163,11 +1172,15 @@ struct FirstEndpoint;
 
 impl ProvidesEndpoint for FirstEndpoint {}
 
+impl ProvidesExpectedClaims for FirstEndpoint {}
+
 #[singleton]
 #[provides_jwks_endpoint(auth)]
 struct SecondEndpoint;
 
 impl ProvidesEndpoint for SecondEndpoint {}
+
+impl ProvidesExpectedClaims for SecondEndpoint {}
 ";
 
     #[test]

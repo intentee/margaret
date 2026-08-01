@@ -10,11 +10,13 @@ use url::Url;
 
 use margaret_http_tests::mtls_fixture::MtlsFixture;
 use margaret_jwks_client::JwksClient;
+use margaret_jwks_client::static_issuer::StaticIssuer;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
+use margaret_jwks_client_tests::test_expected_claims::test_expected_claims;
 use margaret_jwks_client_tests::running_jwks_server::RunningJwksServer;
 use margaret_jwks_client_tests::test_claims::TestClaims;
+use margaret_jwks_client_tests::test_claims_expiring_at::test_claims_expiring_at;
 use margaret_jwks_client_tests::test_instant::test_instant;
-use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 use margaret_jwks_keygen::signs_claims::SignsClaims as _;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
@@ -54,10 +56,7 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
     );
 
     let secret = jwks_secret_holder.get().expect("the first roll published");
-    let claims = TestClaims {
-        exp: 1_700_000_060,
-        sub: "subject".to_string(),
-    };
+    let claims = test_claims_expiring_at(1_700_000_060);
     let token = secret
         .current
         .signing
@@ -80,7 +79,7 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
         WELL_KNOWN_JWKS_PATH,
     ))
     .expect("the jwks url parses");
-    let jwks_client = JwksClient::create(Arc::new(StaticEndpoint::new(jwks_url)));
+    let jwks_client = JwksClient::create(Arc::new(StaticIssuer::new(jwks_url, test_expected_claims())));
     let verifier = jwks_client.verifier();
     let mut jwks_subscription = jwks_client.subscribe();
 

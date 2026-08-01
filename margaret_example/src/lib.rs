@@ -1,3 +1,6 @@
+pub mod access_claims;
+pub mod access_token_audience;
+pub mod access_token_issuer;
 pub mod app_name;
 pub mod auth;
 pub mod commands;

@@ -44,6 +44,7 @@ members = [
     "margaret_jwks_secret_storage_selection",
     "margaret_jwks_secret_storage_selection_tests",
     "margaret_jwks_secret_store",
+    "margaret_jwt_claims",
     "margaret",
     "margaret_macros",
     "margaret_middleware_codegen",

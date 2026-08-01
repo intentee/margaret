@@ -63,6 +63,14 @@ fn rejects_a_jwks_endpoint_provider_without_the_trait() {
 }
 
 #[test]
+fn rejects_a_jwks_endpoint_provider_without_the_expected_claims_trait() {
+    assert!(matches!(
+        error("endpoint_missing_expected_claims_trait"),
+        ContainerError::EndpointProviderMissingExpectedClaimsTrait { .. }
+    ));
+}
+
+#[test]
 fn rejects_a_jwks_endpoint_provider_with_fields_but_no_constructor() {
     assert!(matches!(
         error("endpoint_requires_constructor"),

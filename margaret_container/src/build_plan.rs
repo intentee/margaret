@@ -35,6 +35,7 @@ use crate::peel_target::peel_target;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
 use crate::provides_endpoint_path::provides_endpoint_path;
+use crate::provides_expected_claims_path::provides_expected_claims_path;
 use crate::resolve_construction::resolve_construction;
 use crate::topological_order::topological_order;
 use crate::type_text::type_text;
@@ -174,8 +175,14 @@ fn build_endpoint_draft<'index>(
         });
     }
 
-    if !implements_provides_endpoint(index, item) {
+    if !implements_trait(index, item, &provides_endpoint_path()) {
         return Err(ContainerError::EndpointProviderMissingTrait {
+            path: concrete_path.to_string(),
+        });
+    }
+
+    if !implements_trait(index, item, &provides_expected_claims_path()) {
+        return Err(ContainerError::EndpointProviderMissingExpectedClaimsTrait {
             path: concrete_path.to_string(),
         });
     }
@@ -252,12 +259,12 @@ fn has_concrete_role(item: &IndexedItem) -> bool {
         .any(|role| item.has_framework_attribute(*role))
 }
 
-fn implements_provides_endpoint(index: &AttributeIndex, item: &IndexedItem) -> bool {
+fn implements_trait(index: &AttributeIndex, item: &IndexedItem, trait_path: &CanonicalPath) -> bool {
     item.trait_impls().iter().any(|trait_impl| {
         index
             .resolve_module_path(trait_impl.module_path(), trait_impl.trait_path())
             .as_ref()
-            == Some(&provides_endpoint_path())
+            == Some(trait_path)
     })
 }
 

@@ -1,3 +1,11 @@
 pub mod already_expired_expiry;
+pub mod consumer_audience;
+pub mod consumer_claims;
+pub mod consumer_claims_expiring_at;
+pub mod consumer_expected_claims;
+pub mod consumer_grant;
+pub mod consumer_issuer;
 pub mod far_future_expiry;
+pub mod signing_algorithm;
+pub mod standard_verifier;
 pub mod test_claims;

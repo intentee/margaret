@@ -35,6 +35,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_jwks_secret_storage_selection \
 	-p margaret_jwks_secret_storage_selection_tests \
 	-p margaret_jwks_secret_store \
+	-p margaret_jwt_claims \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
@@ -108,6 +109,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_jwks_roller_server \
 	-p margaret_jwks_secret_storage_selection \
 	-p margaret_jwks_secret_store \
+	-p margaret_jwt_claims \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
@@ -209,6 +211,7 @@ coverage: node_modules postgres-image
 		--gated margaret_jwks_secret_storage_selection=100 \
 		--gated margaret_jwks_secret_storage_selection_tests=100 \
 		--gated margaret_jwks_secret_store=100 \
+		--gated margaret_jwt_claims=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_middleware_codegen=100 \
 		--gated margaret_model=100 \

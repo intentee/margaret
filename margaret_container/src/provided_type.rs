@@ -10,8 +10,8 @@ pub(crate) enum ProvidedType {
 impl ProvidedType {
     pub(crate) fn is_trait_object(&self) -> bool {
         match self {
-            ProvidedType::Concrete(_) => false,
-            ProvidedType::Endpoint(_) | ProvidedType::UriSelected(_) => true,
+            ProvidedType::Concrete(_) | ProvidedType::Endpoint(_) => false,
+            ProvidedType::UriSelected(_) => true,
         }
     }
 

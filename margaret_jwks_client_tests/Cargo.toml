@@ -12,6 +12,7 @@ margaret_jwks_endpoint = { path = "../margaret_jwks_endpoint" }
 margaret_http = { path = "../margaret_http" }
 margaret_identity_session = { path = "../margaret_identity_session" }
 margaret_jwks_roller = { path = "../margaret_jwks_roller" }
+margaret_jwt_claims = { path = "../margaret_jwt_claims" }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "test-util", "time"] }

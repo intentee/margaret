@@ -1,6 +1,10 @@
 pub mod failing_endpoint;
 pub mod first_tick_context;
 pub mod running_jwks_server;
+pub mod test_audience;
 pub mod test_claims;
+pub mod test_claims_expiring_at;
+pub mod test_expected_claims;
 pub mod test_instant;
+pub mod test_issuer;
 pub mod unreachable_endpoint;

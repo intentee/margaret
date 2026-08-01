@@ -41,6 +41,11 @@ pub enum ContainerError {
     )]
     EndpointProviderMissingTrait { path: String },
 
+    #[error(
+        "the jwks endpoint provider '{path}' does not implement margaret::framework::jwt_claims::provides_expected_claims::ProvidesExpectedClaims"
+    )]
+    EndpointProviderMissingExpectedClaimsTrait { path: String },
+
     #[error("{site} references a jwks secret store that is not available: {target}")]
     UnknownJwksSecretStore { site: String, target: String },
 
