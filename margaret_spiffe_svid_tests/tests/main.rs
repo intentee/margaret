@@ -1,63 +1,124 @@
 #[cfg(feature = "tests_that_use_spire")]
 mod build_svid_certified_key_builds_for_valid_inputs;
+#[cfg(feature = "tests_that_use_spire")]
 mod build_svid_certified_key_errors_when_key_algorithm_unsupported;
+#[cfg(feature = "tests_that_use_spire")]
 mod build_svid_certified_key_errors_when_key_bytes_not_recognized;
+#[cfg(feature = "tests_that_use_spire")]
 mod ca_bundle_converts_multiple_cas_to_root_store;
+#[cfg(feature = "tests_that_use_spire")]
 mod ca_bundle_converts_single_ca_to_root_store;
+#[cfg(feature = "tests_that_use_spire")]
 mod ca_bundle_empty_ca_certs_produces_empty_root_store;
+#[cfg(feature = "tests_that_use_spire")]
 mod ca_bundle_rejects_invalid_der;
+#[cfg(feature = "tests_that_use_spire")]
 mod extract_ca_bundle_extracts_ca_certs_from_x509_context;
+#[cfg(feature = "tests_that_use_spire")]
 mod extract_ca_bundle_rejects_when_bundle_set_lacks_trust_domain;
+#[cfg(feature = "tests_that_use_spire")]
 mod extract_server_credentials_produces_valid_certified_key;
+#[cfg(feature = "tests_that_use_spire")]
 mod extract_spiffe_trust_domain_extracts_from_spiffe_san_uri;
+#[cfg(feature = "tests_that_use_spire")]
 mod extract_spiffe_trust_domain_rejects_cert_without_spiffe_san;
+#[cfg(feature = "tests_that_use_spire")]
 mod extract_spiffe_trust_domain_rejects_invalid_der;
+#[cfg(feature = "tests_that_use_spire")]
 mod extract_spiffe_trust_domain_rejects_non_spiffe_uri_san;
+#[cfg(feature = "tests_that_use_spire")]
 mod obtain_join_token_errors_when_server_unreachable;
+#[cfg(feature = "tests_that_use_spire")]
 mod obtain_trust_bundle_errors_when_server_unreachable;
+#[cfg(feature = "tests_that_use_spire")]
 mod peer_identity_rejection_reports_none_for_an_unrelated_error;
+#[cfg(feature = "tests_that_use_spire")]
 mod pump_tls_handshake_gives_up_when_handshake_cannot_progress;
+#[cfg(feature = "tests_that_use_spire")]
 mod pump_tls_handshake_propagates_server_decode_error;
+#[cfg(feature = "tests_that_use_spire")]
 mod register_workload_entry_errors_when_server_unreachable;
+#[cfg(feature = "tests_that_use_spire")]
 mod root_cert_store_holder_changed_resolves_for_value_set_after_subscribe;
+#[cfg(feature = "tests_that_use_spire")]
 mod root_cert_store_holder_read_current_returns_value_set_before_subscribe;
+#[cfg(feature = "tests_that_use_spire")]
 mod root_cert_store_holder_returns_none_before_set;
+#[cfg(feature = "tests_that_use_spire")]
 mod root_cert_store_holder_returns_store_after_set;
+#[cfg(feature = "tests_that_use_spire")]
 mod root_cert_store_service_converts_ca_bundle_into_root_cert_store;
+#[cfg(feature = "tests_that_use_spire")]
 mod root_cert_store_service_run_propagates_error_when_channel_closes;
+#[cfg(feature = "tests_that_use_spire")]
 mod run_spire_server_errors_on_invalid_subcommand;
+#[cfg(feature = "tests_that_use_spire")]
 mod spawn_test_subprocess_errors_when_binary_does_not_exist;
+#[cfg(feature = "tests_that_use_spire")]
 mod spawn_test_subprocess_runs_binary_and_kills_on_drop;
+#[cfg(feature = "tests_that_use_spire")]
 mod spawn_test_subprocess_spawns_real_short_lived_binary;
+#[cfg(feature = "tests_that_use_spire")]
 mod spire_server_exits_immediately_fixture_returns_quickly;
+#[cfg(feature = "tests_that_use_spire")]
 mod spire_server_exits_non_zero_fixture_surfaces_as_command_error;
+#[cfg(feature = "tests_that_use_spire")]
 mod spire_server_unparseable_join_token_fixture_fails_to_parse;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_agent_binary_missing;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_agent_conf_path_is_a_directory;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_agent_socket_never_ready;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_bundle_show_rejected;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_data_dir_blocked_by_file;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_entry_create_rejected;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_join_token_unparseable;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_server_binary_missing;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_server_conf_path_is_a_directory;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_server_socket_never_ready;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_trust_bundle_path_blocked;
+#[cfg(feature = "tests_that_use_spire")]
 mod start_spire_test_cluster_errors_when_workload_api_never_ready;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_certified_key_holder_reports_client_credentials_when_set;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_certified_key_holder_reports_no_client_credentials_when_empty;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_certified_key_holder_returns_key_after_set;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_certified_key_holder_returns_none_before_key_is_set;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_converter_service_errors_on_context_without_default_svid;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_converter_service_errors_when_bundle_lacks_trust_domain;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_converter_service_errors_when_ca_bundle_channel_has_no_subscribers;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_converter_service_errors_when_private_key_unsupported_for_signing;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_converter_service_populates_holder_and_broadcasts_ca_bundle;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_converter_service_run_propagates_error_when_channel_closes;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_rotate_loop_breaks_on_stream_error;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_rotate_loop_does_not_panic_when_no_subscribers;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_rotate_loop_exits_on_cancellation;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_rotate_loop_forwards_context_to_subscriber;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_rotate_service_returns_when_stream_rpc_is_rejected;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_rotate_service_stream_from_agent_returns_on_cancel;
+#[cfg(feature = "tests_that_use_spire")]
 mod svid_rotate_service_streams_from_spire_agent;
