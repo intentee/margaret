@@ -18,8 +18,9 @@ use crate::models::article::Article;
 use crate::models::article_status::ArticleStatus;
 use crate::models::author::Author;
 use crate::stores::article_store_error::ArticleStoreError;
-use crate::stores::featured_article_id::FEATURED_ARTICLE_ID;
 use crate::system_clock::SystemClock;
+
+pub use super::featured_article_id::FEATURED_ARTICLE_ID;
 
 const FIRST_AUTHORED_ID: u64 = 103;
 

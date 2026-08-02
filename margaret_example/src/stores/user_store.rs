@@ -5,7 +5,8 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::singleton;
 
 use crate::models::user::User;
-use crate::stores::milo_session::MILO_SESSION;
+
+pub use super::milo_session::MILO_SESSION;
 
 fn milo() -> User {
     User {
