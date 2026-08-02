@@ -1,5 +1,6 @@
-use margaret::framework::macros::websocket_message;
 use serde::Serialize;
+
+use margaret::framework::macros::websocket_message;
 
 #[websocket_message(response, method = "board_chunk")]
 #[derive(Serialize)]

@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_container::container_error::ContainerError;
 use margaret_container_tests::generate_container_source::generate_container_source;
@@ -49,7 +50,7 @@ fn rejects_a_jwks_endpoint_provider_with_malformed_singleton_arguments() {
     assert!(matches!(
         error("endpoint_malformed_singleton_arguments"),
         ContainerError::Index {
-            source: AttributeError::AttributeArguments { .. }
+            source: AttributeError::Arguments(AttributeArgumentsError::Malformed { .. })
         }
     ));
 }

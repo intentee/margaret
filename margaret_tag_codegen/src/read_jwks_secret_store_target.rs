@@ -1,4 +1,4 @@
-use margaret_attributes::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::tag::Tag;
 
 use crate::jwks_secret_store_target::JwksSecretStoreTarget;
@@ -34,7 +34,7 @@ mod tests {
     use syn::Attribute;
     use syn::parse_quote;
 
-    use margaret_attributes::attribute_args::AttributeArgs;
+    use margaret_attribute_arguments::attribute_args::AttributeArgs;
 
     use crate::jwks_secret_store_target::JwksSecretStoreTarget;
     use crate::read_jwks_secret_store_target::read_jwks_secret_store_target;

@@ -21,7 +21,7 @@ use margaret_http::router::Router;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
 use margaret_http::transport_config::TransportConfig;
-use margaret_http::upload_config::UploadConfig;
+use margaret_http_uploaded_file::upload_config::UploadConfig;
 
 struct EchoPeer;
 

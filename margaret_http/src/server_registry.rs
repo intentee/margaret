@@ -31,7 +31,7 @@ mod tests {
     use crate::router::Router;
     use crate::server::Server;
     use crate::transport_config::TransportConfig;
-    use crate::upload_config::UploadConfig;
+    use margaret_http_uploaded_file::upload_config::UploadConfig;
 
     fn registry() -> ServerRegistry {
         ServerRegistry::new(vec![Server::new(

@@ -15,7 +15,9 @@ http-body = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server", "server-auto", "server-graceful", "service", "tokio"] }
+margaret_http_uploaded_file = { path = "../margaret_http_uploaded_file" }
 margaret_peer_identity = { path = "../margaret_peer_identity" }
+margaret_route_parameter_binding = { path = "../margaret_route_parameter_binding" }
 matchit = { workspace = true }
 maud = { workspace = true }
 mime = { workspace = true }

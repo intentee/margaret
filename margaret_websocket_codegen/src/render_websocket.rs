@@ -24,7 +24,7 @@ pub fn render_websocket(plan: WebSocketPlan, bindings: &ContainerBindings) -> We
         let function = format_ident!("{server}_routes");
 
         quote! {
-            pub mod #function;
+            mod #function;
             pub use #function::#function;
         }
     });

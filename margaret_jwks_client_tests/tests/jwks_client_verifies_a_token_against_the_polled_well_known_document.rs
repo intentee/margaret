@@ -9,8 +9,8 @@ use trzcina::ServiceBundle as _;
 use url::Url;
 
 use margaret_http_tests::mtls_fixture::MtlsFixture;
-use margaret_jwks_client::JwksClient;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
+use margaret_jwks_client::jwks_client::JwksClient;
 use margaret_jwks_client_tests::running_jwks_server::RunningJwksServer;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
@@ -18,8 +18,8 @@ use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 use margaret_jwks_keygen::signs_claims::SignsClaims as _;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
-use margaret_jwks_roller_server::JwksRollerServerBundle;
-use margaret_jwks_roller_server::JwksRollerServerBundleParams;
+use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
+use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
 
 #[tokio::test(flavor = "multi_thread")]

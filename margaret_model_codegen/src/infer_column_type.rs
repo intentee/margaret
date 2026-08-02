@@ -2,10 +2,11 @@ use quote::ToTokens;
 use quote::quote;
 use syn::Type;
 
-use crate::inferred_column::InferredColumn;
-use crate::model_codegen_error::ModelCodegenError;
 use margaret_syn_type_peeling::option_inner::option_inner;
 use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
+
+use crate::inferred_column::InferredColumn;
+use crate::model_codegen_error::ModelCodegenError;
 
 fn is_u8(ty: &Type) -> bool {
     let Type::Path(type_path) = ty else {

@@ -2,6 +2,7 @@ use std::path::Path;
 
 use tempfile::TempPath;
 
+#[derive(Debug)]
 pub struct UploadedFile {
     content_type: String,
     field_name: String,
@@ -11,7 +12,8 @@ pub struct UploadedFile {
 }
 
 impl UploadedFile {
-    pub(crate) fn new(
+    #[must_use]
+    pub fn new(
         field_name: String,
         file_name: String,
         content_type: String,

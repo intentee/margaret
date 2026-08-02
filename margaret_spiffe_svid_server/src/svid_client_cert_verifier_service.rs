@@ -20,8 +20,7 @@ pub struct SvidClientCertVerifierService {
 impl SvidClientCertVerifierService {
     fn update_client_cert_verifier(&self, root_cert_store: Option<RootCertStore>) -> Result<()> {
         if let Some(root_store) = root_cert_store {
-            let verifier =
-                SvidClientCertVerifier::new(root_store, &self.spiffe_trust_domain)?;
+            let verifier = SvidClientCertVerifier::new(root_store, &self.spiffe_trust_domain)?;
 
             self.svid_client_cert_verifier_facade
                 .update_internal_verifier(Arc::new(verifier));

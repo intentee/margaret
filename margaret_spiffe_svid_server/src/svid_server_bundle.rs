@@ -4,9 +4,9 @@ use rustls::ServerConfig;
 use trzcina::Service;
 use trzcina::ServiceBundle;
 
-use margaret_spiffe_svid::SvidService;
-use margaret_spiffe_svid::SvidServiceBundleParams;
-use margaret_spiffe_svid::SvidSideParams;
+use margaret_spiffe_svid::svid_service::SvidService;
+use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
+use margaret_spiffe_svid::svid_side_params::SvidSideParams;
 
 use crate::svid_server_side::SvidServerSide;
 

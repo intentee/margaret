@@ -1,4 +1,4 @@
-use margaret_attributes::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
 
 use crate::views_codegen_error::ViewsCodegenError;
 

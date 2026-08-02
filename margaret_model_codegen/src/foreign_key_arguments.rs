@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use margaret_attributes::attribute_args::AttributeArgs;
-use margaret_attributes::format_path::format_path;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::format_path::format_path;
 
 use crate::model_codegen_error::ModelCodegenError;
 
@@ -51,7 +51,7 @@ mod tests {
     use syn::Attribute;
     use syn::parse_quote;
 
-    use margaret_attributes::attribute_args::AttributeArgs;
+    use margaret_attribute_arguments::attribute_args::AttributeArgs;
 
     use crate::foreign_key_arguments::ForeignKeyArguments;
     use crate::model_codegen_error::ModelCodegenError;

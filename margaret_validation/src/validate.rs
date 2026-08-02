@@ -8,7 +8,9 @@ use validator::Validate;
 use crate::validation_result::ValidationResult;
 
 #[must_use]
-pub fn validate<Model, FieldHasher>(data: &HashMap<String, String, FieldHasher>) -> ValidationResult<Model>
+pub fn validate<Model, FieldHasher>(
+    data: &HashMap<String, String, FieldHasher>,
+) -> ValidationResult<Model>
 where
     FieldHasher: BuildHasher,
     Model: DeserializeOwned + Validate,

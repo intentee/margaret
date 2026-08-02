@@ -95,7 +95,7 @@ impl ContainerPlan {
             });
         }
 
-        let (arguments, slots) = argument_registry.into_parts();
+        let ServeInputRegistry { arguments, slots } = argument_registry;
 
         Ok(Self {
             arguments: arguments.into(),
@@ -104,6 +104,18 @@ impl ContainerPlan {
             injectable,
             slots: Arc::new(slots),
         })
+    }
+
+    pub(crate) fn arguments(&self) -> Arc<[ConsoleArgument]> {
+        Arc::clone(&self.arguments)
+    }
+
+    pub(crate) fn injectable(&self, key: &CanonicalPath) -> bool {
+        self.injectable.contains(key)
+    }
+
+    pub(crate) fn planned_entries(&self) -> impl DoubleEndedIterator<Item = &PlannedProvider> {
+        self.entries.iter()
     }
 
     pub(crate) fn planned_entry(
@@ -118,26 +130,8 @@ impl ContainerPlan {
             })
     }
 
-    pub(crate) fn entries(&self) -> impl DoubleEndedIterator<Item = (&CanonicalPath, &Provider)> {
-        self.entries
-            .iter()
-            .map(|entry| (&entry.key, &entry.provider))
-    }
-
-    pub(crate) fn injectable(&self, key: &CanonicalPath) -> bool {
-        self.injectable.contains(key)
-    }
-
     pub(crate) fn roots(&self) -> impl Iterator<Item = &CanonicalPath> {
         self.entries.iter().map(|entry| &entry.key)
-    }
-
-    pub(crate) fn planned_entries(&self) -> impl Iterator<Item = &PlannedProvider> {
-        self.entries.iter()
-    }
-
-    pub(crate) fn arguments(&self) -> Arc<[ConsoleArgument]> {
-        Arc::clone(&self.arguments)
     }
 
     pub(crate) fn slots(&self) -> Arc<BTreeMap<ServeInputKey, usize>> {

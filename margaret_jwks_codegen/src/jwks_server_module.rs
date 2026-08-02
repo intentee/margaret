@@ -13,14 +13,14 @@ impl JwksServerModule {
         self.present.contains(&part)
     }
 
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.present.is_empty()
-    }
-
     pub fn enable_if(&mut self, part: JwksServerPart, present: bool) {
         if present {
             self.present.insert(part);
         }
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.present.is_empty()
     }
 }

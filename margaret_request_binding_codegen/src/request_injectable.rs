@@ -11,6 +11,26 @@ pub enum RequestInjectable {
 }
 
 impl RequestInjectable {
+    #[must_use]
+    pub fn resolve(resolved: Option<&CanonicalPath>, is_reference: bool) -> Option<Self> {
+        [
+            Self::AssetBag,
+            Self::CurrentRequest,
+            Self::Next,
+            Self::PeerSpiffeId,
+            Self::Routes,
+            Self::ValidationResult,
+            Self::Views,
+        ]
+        .into_iter()
+        .find(|injectable| injectable.matches(resolved, is_reference))
+    }
+
+    #[must_use]
+    pub fn matches(&self, resolved: Option<&CanonicalPath>, is_reference: bool) -> bool {
+        resolved == Some(&self.canonical_path()) && is_reference == self.requires_reference()
+    }
+
     pub(crate) fn canonical_path(&self) -> CanonicalPath {
         match self {
             Self::AssetBag => CanonicalPath::new(vec![
@@ -59,26 +79,6 @@ impl RequestInjectable {
                 "Views".to_string(),
             ]),
         }
-    }
-
-    #[must_use]
-    pub fn resolve(resolved: Option<&CanonicalPath>, is_reference: bool) -> Option<Self> {
-        [
-            Self::AssetBag,
-            Self::CurrentRequest,
-            Self::Next,
-            Self::PeerSpiffeId,
-            Self::Routes,
-            Self::ValidationResult,
-            Self::Views,
-        ]
-        .into_iter()
-        .find(|injectable| injectable.matches(resolved, is_reference))
-    }
-
-    #[must_use]
-    pub fn matches(&self, resolved: Option<&CanonicalPath>, is_reference: bool) -> bool {
-        resolved == Some(&self.canonical_path()) && is_reference == self.requires_reference()
     }
 
     fn requires_reference(&self) -> bool {

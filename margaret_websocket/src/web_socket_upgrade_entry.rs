@@ -15,11 +15,11 @@ use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::web_socket_driver_sender::WebSocketDriverSender;
 use margaret_http::web_socket_upgrade::WebSocketUpgrade;
+use margaret_websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome;
+use margaret_websocket_session::web_socket_session_factory::WebSocketSessionFactory;
 
 use crate::serve_web_socket_connection::serve_web_socket_connection;
 use crate::web_socket_dispatch_table::WebSocketDispatchTable;
-use crate::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome;
-use crate::web_socket_session_factory::WebSocketSessionFactory;
 
 const SUPPORTED_WEB_SOCKET_VERSION: &str = "13";
 

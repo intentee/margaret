@@ -116,6 +116,7 @@ mod tests {
 
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
@@ -343,12 +344,17 @@ mod tests {
 
     #[test]
     fn reports_a_non_string_from_value() {
-        assert!(
-            error_message(
-                "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = 5)] value: String) -> Self {}\n}\n",
-            )
-            .contains("failed to index the crate")
-        );
+        let error = registry_for(
+            "#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = 5)] value: String) -> Self {}\n}\n",
+        )
+        .expect_err("the crate is rejected");
+
+        assert!(matches!(
+            error,
+            ConsoleArgumentCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument { ref key, ref expected, .. }
+            } if key == "from" && expected == "string literal"
+        ));
     }
 
     #[test]

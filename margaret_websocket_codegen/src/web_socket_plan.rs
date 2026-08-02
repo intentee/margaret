@@ -6,13 +6,40 @@ use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
-use margaret_request_binding_codegen::request_binding::RequestBinding;
+use margaret_request_binding_codegen::binding_root::binding_root;
 
 use crate::build_websocket_plan::build_websocket_plan;
+use crate::built_websocket_plan::BuiltWebSocketPlan;
 use crate::server_console_arguments::server_console_arguments;
 use crate::session_plan::SessionPlan;
 use crate::web_socket_codegen_error::WebSocketCodegenError;
 use crate::web_socket_message::WebSocketMessage;
+
+fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
+    let mut roots = std::collections::BTreeSet::new();
+
+    for session_plan in sessions {
+        for layer in &session_plan.session.layers {
+            roots.insert(layer.concrete.clone());
+        }
+
+        for parameter in &session_plan.session.parameters {
+            if let Some(root) = binding_root(&parameter.binding) {
+                roots.insert(root.clone());
+            }
+        }
+
+        for handler in session_plan
+            .request_handlers
+            .iter()
+            .chain(&session_plan.notification_handlers)
+        {
+            roots.insert(handler.handler_path.clone());
+        }
+    }
+
+    roots.into_iter().collect()
+}
 
 pub struct WebSocketPlan {
     pub(crate) messages: Vec<WebSocketMessage>,
@@ -33,7 +60,7 @@ impl WebSocketPlan {
         middleware_plans: &[MiddlewarePlan],
         registries: &BindingRegistries,
     ) -> Result<Self, WebSocketCodegenError> {
-        let (messages, sessions) =
+        let BuiltWebSocketPlan { messages, sessions } =
             build_websocket_plan(index, bindings, middleware_plans, registries)?;
         let mut sessions_by_server: BTreeMap<String, Vec<usize>> = BTreeMap::new();
 
@@ -68,49 +95,4 @@ impl WebSocketPlan {
             sessions_by_server,
         })
     }
-}
-
-fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
-    match binding {
-        RequestBinding::AuthenticatedUser { application, .. } => Some(&application.concrete),
-        RequestBinding::BoundRouteParameter {
-            binder_provider, ..
-        } => Some(binder_provider),
-        RequestBinding::Injectable { dependency } => Some(&dependency.concrete),
-        RequestBinding::AssetBag
-        | RequestBinding::CurrentRequest
-        | RequestBinding::FormRequest { .. }
-        | RequestBinding::Forwarder
-        | RequestBinding::Next
-        | RequestBinding::PeerSpiffeId
-        | RequestBinding::RouteParameterValue { .. }
-        | RequestBinding::Routes
-        | RequestBinding::Views => None,
-    }
-}
-
-fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
-    let mut roots = std::collections::BTreeSet::new();
-
-    for session_plan in sessions {
-        for layer in &session_plan.session.layers {
-            roots.insert(layer.concrete.clone());
-        }
-
-        for parameter in &session_plan.session.parameters {
-            if let Some(root) = binding_root(&parameter.binding) {
-                roots.insert(root.clone());
-            }
-        }
-
-        for handler in session_plan
-            .request_handlers
-            .iter()
-            .chain(&session_plan.notification_handlers)
-        {
-            roots.insert(handler.handler_path.clone());
-        }
-    }
-
-    roots.into_iter().collect()
 }

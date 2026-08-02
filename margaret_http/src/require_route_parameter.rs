@@ -1,6 +1,7 @@
+use margaret_route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome;
+
 use crate::request::Request;
 use crate::response::Response;
-use crate::route_parameter_binding_outcome::RouteParameterBindingOutcome;
 
 fn route_parameter_value<Value>(value: String) -> RouteParameterBindingOutcome<Value>
 where

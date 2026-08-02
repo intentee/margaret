@@ -148,7 +148,7 @@ pub fn render_middleware_wrappers(plans: &[MiddlewarePlan]) -> Vec<GeneratedModu
     let mut generated = vec![GeneratedModuleTokens::new(
         "middleware",
         quote! {
-            #(pub mod #modules;)*
+            #(mod #modules;)*
             #(#exports)*
         },
     )];

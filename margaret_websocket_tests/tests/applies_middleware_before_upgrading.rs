@@ -2,14 +2,15 @@ use std::sync::Arc;
 
 use futures_util::SinkExt;
 use futures_util::StreamExt;
+use tokio::net::TcpStream;
+use tokio_tungstenite::client_async;
+use tokio_tungstenite::tungstenite::Message;
+
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_websocket_tests::blocking_middleware::BlockingMiddleware;
 use margaret_websocket_tests::passing_middleware::PassingMiddleware;
 use margaret_websocket_tests::raw_http_exchange::raw_http_exchange;
 use margaret_websocket_tests::running_web_socket_server::RunningWebSocketServer;
-use tokio::net::TcpStream;
-use tokio_tungstenite::client_async;
-use tokio_tungstenite::tungstenite::Message;
 
 #[tokio::test]
 async fn blocks_the_handshake_when_a_middleware_short_circuits() {

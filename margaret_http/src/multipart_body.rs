@@ -5,18 +5,17 @@ use multer::Constraints;
 use multer::Field;
 use multer::Multipart;
 use multer::SizeLimit;
-use tempfile::NamedTempFile;
-use tempfile::TempPath;
-use tokio::io::AsyncWriteExt;
+
+use margaret_http_uploaded_file::upload_config::UploadConfig;
+use margaret_http_uploaded_file::uploaded_file::UploadedFile;
+use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
+use margaret_http_uploaded_file::uploaded_file_writer::UploadedFileWriter;
 
 use crate::body_limit::BodyLimit;
 use crate::form_field::FormField;
 use crate::request_body::RequestBody;
-use crate::request_error::RequestError;
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
-use crate::upload_config::UploadConfig;
-use crate::uploaded_file::UploadedFile;
 
 fn reject_multipart(source: multer::Error) -> RequestRejection {
     match source {
@@ -25,40 +24,24 @@ fn reject_multipart(source: multer::Error) -> RequestRejection {
     }
 }
 
-fn upload_write(source: std::io::Error) -> RequestError {
-    RequestError::UploadWrite { source }
-}
-
-async fn write_field_to_uploaded_file(
-    file: &mut tokio::fs::File,
+async fn stream_field_into_writer(
+    mut writer: UploadedFileWriter,
     field: &mut Field<'_>,
-    path: TempPath,
     field_name: String,
     file_name: String,
     content_type: String,
-) -> Result<RequestOutcome<UploadedFile>, RequestError> {
-    let mut size = 0;
-
+) -> Result<RequestOutcome<UploadedFile>, UploadedFileError> {
     loop {
         match field.chunk().await {
-            Ok(Some(chunk)) => {
-                file.write_all(&chunk).await.map_err(upload_write)?;
-                size += chunk.len() as u64;
-            }
+            Ok(Some(chunk)) => writer.write_chunk(&chunk).await?,
             Ok(None) => break,
             Err(source) => return Ok(RequestOutcome::Rejected(reject_multipart(source))),
         }
     }
 
-    file.flush().await.map_err(upload_write)?;
-
-    Ok(RequestOutcome::Parsed(UploadedFile::new(
-        field_name,
-        file_name,
-        content_type,
-        size,
-        path,
-    )))
+    Ok(RequestOutcome::Parsed(
+        writer.finish(field_name, file_name, content_type).await?,
+    ))
 }
 
 async fn stream_field_to_file(
@@ -67,15 +50,10 @@ async fn stream_field_to_file(
     file_name: String,
     content_type: String,
     directory: &Path,
-) -> Result<RequestOutcome<UploadedFile>, RequestError> {
-    let temporary = NamedTempFile::new_in(directory)
-        .map_err(|source| RequestError::UploadTempFile { source })?;
-    let (file, path) = temporary.into_parts();
-    let mut file = tokio::fs::File::from_std(file);
-    write_field_to_uploaded_file(
-        &mut file,
+) -> Result<RequestOutcome<UploadedFile>, UploadedFileError> {
+    stream_field_into_writer(
+        UploadedFileWriter::create_in(directory)?,
         &mut field,
-        path,
         field_name,
         file_name,
         content_type,
@@ -94,9 +72,9 @@ impl MultipartBody {
         boundary: String,
         body_limit: &BodyLimit,
         upload_config: &UploadConfig,
-    ) -> Result<RequestOutcome<Self>, RequestError> {
-        let constraints =
-            Constraints::new().size_limit(SizeLimit::new().whole_stream(body_limit.max_bytes() as u64));
+    ) -> Result<RequestOutcome<Self>, UploadedFileError> {
+        let constraints = Constraints::new()
+            .size_limit(SizeLimit::new().whole_stream(body_limit.max_bytes() as u64));
         let mut multipart =
             Multipart::with_constraints(BodyDataStream::new(body), boundary, constraints);
         let mut files = Vec::new();
@@ -157,20 +135,24 @@ impl MultipartBody {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
-    use tempfile::NamedTempFile;
+    use std::mem::discriminant;
 
+    use bytes::Bytes;
     use http_body_util::BodyDataStream;
     use http_body_util::Full;
     use multer::Multipart;
+    use tempfile::NamedTempFile;
+    use tokio::fs::OpenOptions;
 
-    use super::write_field_to_uploaded_file;
-    use crate::request_error::RequestError;
+    use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
+    use margaret_http_uploaded_file::uploaded_file_writer::UploadedFileWriter;
+
+    use super::stream_field_into_writer;
 
     const UPLOADED_FILE: &[u8] =
         b"--X\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a\"\r\n\r\ndata\r\n--X--\r\n";
 
-    async fn write_uploaded_file_to_dev_full(write_buffer: usize) -> RequestError {
+    async fn write_uploaded_file_to_dev_full(write_buffer: usize) -> UploadedFileError {
         let mut multipart = Multipart::new(
             BodyDataStream::new(Full::new(Bytes::from_static(UPLOADED_FILE))),
             "X",
@@ -180,7 +162,7 @@ mod tests {
             .await
             .expect("the field parses")
             .expect("a field is present");
-        let mut file = tokio::fs::OpenOptions::new()
+        let mut file = OpenOptions::new()
             .write(true)
             .open("/dev/full")
             .await
@@ -193,36 +175,36 @@ mod tests {
             .into_parts()
             .1;
 
-        write_field_to_uploaded_file(
-            &mut file,
+        stream_field_into_writer(
+            UploadedFileWriter::new(file, path),
             &mut field,
-            path,
             "f".to_string(),
             "a".to_string(),
             "application/octet-stream".to_string(),
         )
         .await
-        .err()
-        .expect("writing to /dev/full fails")
+        .expect_err("writing to /dev/full fails")
+    }
+
+    fn upload_write() -> UploadedFileError {
+        UploadedFileError::UploadWrite {
+            source: std::io::Error::other("the temporary file is full"),
+        }
     }
 
     #[tokio::test]
     async fn maps_a_buffered_write_failure_to_upload_write() {
-        assert!(
-            write_uploaded_file_to_dev_full(UPLOADED_FILE.len())
-                .await
-                .to_string()
-                .contains("could not be written")
+        assert_eq!(
+            discriminant(&write_uploaded_file_to_dev_full(UPLOADED_FILE.len()).await),
+            discriminant(&upload_write())
         );
     }
 
     #[tokio::test]
     async fn maps_a_streaming_write_failure_to_upload_write() {
-        assert!(
-            write_uploaded_file_to_dev_full(1)
-                .await
-                .to_string()
-                .contains("could not be written")
+        assert_eq!(
+            discriminant(&write_uploaded_file_to_dev_full(1).await),
+            discriminant(&upload_write())
         );
     }
 }

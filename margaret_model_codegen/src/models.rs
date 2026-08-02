@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use quote::ToTokens;
 use quote::quote;
 
-use margaret_attributes::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_identifier::FieldIdentifier;
@@ -22,6 +22,7 @@ use margaret_schema_identifier_naming::primary_key_index_name::primary_key_index
 use margaret_schema_identifier_naming::schema_identifier::schema_identifier;
 use margaret_schema_identifier_naming::unique_index_name::unique_index_name;
 use margaret_schema_identifier_naming::validate_identifier_length::validate_identifier_length;
+use margaret_syn_type_peeling::option_inner::option_inner;
 use margaret_toposort::topological_order::topological_order;
 
 use crate::collected_model::CollectedModel;
@@ -47,7 +48,6 @@ use crate::resolved_column::ResolvedColumn;
 use crate::resolved_foreign_key::ResolvedForeignKey;
 use crate::resolved_index::ResolvedIndex;
 use crate::resolved_unique_constraint::ResolvedUniqueConstraint;
-use margaret_syn_type_peeling::option_inner::option_inner;
 
 fn field_display(identifier: &FieldIdentifier) -> String {
     match identifier {

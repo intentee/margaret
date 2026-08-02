@@ -303,7 +303,9 @@ mod tests {
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 
     use super::build;
     use crate::codegen_error::CodegenError;
@@ -724,7 +726,7 @@ impl Worker {
             "margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
         ));
         assert!(serve.contains(
-            "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+            "letspiffe_bundle=margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
         ));
         assert!(serve.contains("letspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(serve.contains(
@@ -795,7 +797,7 @@ impl CallRoute {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains(
-            "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+            "letspiffe_bundle=margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
         ));
         assert!(serve.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
@@ -850,7 +852,7 @@ impl GetIdentity {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains(
-            "letspiffe_bundle=margaret::framework::spiffe_svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+            "letspiffe_bundle=margaret::framework::spiffe_svid_bundle::svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
         ));
         assert!(serve.contains(
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
@@ -1250,7 +1252,8 @@ impl RequestLog {
         let code = generate(MIDDLEWARE_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod middleware;"));
-        assert!(module(&code, "middleware").contains("pub mod request_log;"));
+        assert!(module(&code, "middleware").contains("pub use request_log::RequestLog;"));
+        assert!(!module(&code, "middleware").contains("pub mod request_log;"));
         assert!(module(&code, "middleware/request_log").contains("pub struct RequestLog"));
         assert!(concatenated(&code).contains("super::super::middleware::RequestLog"));
     }
@@ -1287,7 +1290,11 @@ impl GetProfile {
         let code = generate(AUTHENTICATED_USER_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod authenticated_users;"));
-        assert!(module(&code, "authenticated_users").contains("pub mod session_user_provider;"));
+        assert!(
+            module(&code, "authenticated_users")
+                .contains("pub use session_user_provider::SessionUserProvider;")
+        );
+        assert!(!module(&code, "authenticated_users").contains("pub mod session_user_provider;"));
         assert!(
             module(&code, "authenticated_users/session_user_provider")
                 .contains("pub struct SessionUserProvider")
@@ -1382,7 +1389,8 @@ impl RequestLog {
 
         assert!(module(&code, "mod").contains("pub mod websocket;"));
         assert!(module(&code, "mod").contains("pub mod middleware;"));
-        assert!(module(&code, "middleware").contains("pub mod request_log;"));
+        assert!(module(&code, "middleware").contains("pub use request_log::RequestLog;"));
+        assert!(!module(&code, "middleware").contains("pub mod request_log;"));
         assert!(module(&code, "middleware/request_log").contains("pub struct RequestLog"));
         assert!(concatenated(&code).contains("super::middleware::RequestLog"));
         assert!(!concatenated(&code).contains("GatedWebSocketUpgrade"));
@@ -1722,13 +1730,19 @@ impl Metrics {
 
     #[test]
     fn rejects_a_non_string_server() {
-        let message = generate(
+        let error = generate(
             "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/\", server = crate::Ghost)]\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         )
-        .expect_err("the build fails")
-        .to_string();
+        .expect_err("the build fails");
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            CodegenError::Http {
+                source: HttpCodegenError::AttributeArguments {
+                    source: AttributeArgumentsError::UnexpectedArgument { ref key, ref expected, .. }
+                }
+            } if key == "server" && expected == "string literal"
+        ));
     }
 
     #[test]

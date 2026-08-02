@@ -4,9 +4,8 @@ use syn::Meta;
 use syn::Token;
 use syn::punctuated::Punctuated;
 
-use crate::attribute_args_parse_error::AttributeArgsParseError;
+use crate::attribute_arguments_error::AttributeArgumentsError;
 use crate::attribute_arguments_reader::AttributeArgumentsReader;
-use crate::attribute_error::AttributeError;
 use crate::format_path::format_path;
 use crate::named_argument::NamedArgument;
 
@@ -20,8 +19,8 @@ pub struct AttributeArgs {
 impl AttributeArgs {
     /// # Errors
     ///
-    /// Returns `AttributeArgsParseError::Malformed` or `AttributeArgsParseError::DuplicateNamedArgument`.
-    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgsParseError> {
+    /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
+    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgumentsError> {
         let attribute_path = format_path(attribute.path());
 
         match &attribute.meta {
@@ -43,7 +42,7 @@ impl AttributeArgs {
                 let expressions = match meta_list.parse_args_with(parser) {
                     Ok(expressions) => expressions,
                     Err(source) => {
-                        return Err(AttributeArgsParseError::Malformed {
+                        return Err(AttributeArgumentsError::Malformed {
                             attribute_path,
                             source,
                         });
@@ -57,7 +56,7 @@ impl AttributeArgs {
                     match NamedArgument::from_expression(&expression) {
                         Some(found) => {
                             if named.iter().any(|existing| existing.name == found.name) {
-                                return Err(AttributeArgsParseError::DuplicateNamedArgument {
+                                return Err(AttributeArgumentsError::DuplicateNamedArgument {
                                     attribute_path,
                                     key: found.name,
                                 });
@@ -86,7 +85,7 @@ impl AttributeArgs {
         interpret: impl FnOnce(&mut AttributeArgumentsReader) -> Result<Interpreted, InterpretError>,
     ) -> Result<Interpreted, InterpretError>
     where
-        InterpretError: From<AttributeError>,
+        InterpretError: From<AttributeArgumentsError>,
     {
         let mut reader = AttributeArgumentsReader::new(
             self.attribute_path.clone(),
@@ -112,10 +111,23 @@ mod tests {
     use syn::parse_quote;
 
     use crate::attribute_args::AttributeArgs;
-    use crate::attribute_args_parse_error::AttributeArgsParseError;
-    use crate::attribute_error::AttributeError;
+    use crate::attribute_arguments_error::AttributeArgumentsError;
 
-    fn parse(attribute: &Attribute) -> Result<AttributeArgs, AttributeArgsParseError> {
+    #[derive(Debug, PartialEq, Eq)]
+    struct ReadArguments {
+        method_is_get: Option<bool>,
+        pattern: Option<String>,
+        primary: bool,
+        positional_is_tag: Option<bool>,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ReadFlags {
+        primary_key: bool,
+        unique: bool,
+    }
+
+    fn parse(attribute: &Attribute) -> Result<AttributeArgs, AttributeArgumentsError> {
         AttributeArgs::from_attribute(attribute)
     }
 
@@ -156,20 +168,25 @@ mod tests {
                 let method = reader.take_path("method").expect("method is a path");
                 let pattern = reader.take_string("pattern").expect("pattern is a string");
 
-                Ok::<_, AttributeError>((
-                    method.map(|path| path.is_ident("Get")),
+                Ok::<_, AttributeArgumentsError>(ReadArguments {
+                    method_is_get: method.map(|path| path.is_ident("Get")),
                     pattern,
-                    reader.take_flag("primary"),
-                    reader
+                    primary: reader.take_flag("primary"),
+                    positional_is_tag: reader
                         .take_positional_path()
                         .map(|path| path.is_ident("tag")),
-                ))
+                })
             })
             .expect("every argument is consumed");
 
         assert_eq!(
             outcome,
-            (Some(true), Some("/home".to_string()), true, Some(true))
+            ReadArguments {
+                method_is_get: Some(true),
+                pattern: Some("/home".to_string()),
+                primary: true,
+                positional_is_tag: Some(true),
+            }
         );
     }
 
@@ -181,7 +198,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            AttributeError::UnrecognizedArgument { argument, attribute_path }
+            AttributeArgumentsError::UnrecognizedArgument { argument, attribute_path }
                 if argument == "bogus" && attribute_path == "index"
         ));
     }
@@ -189,12 +206,12 @@ mod tests {
     #[test]
     fn interpret_rejects_a_leftover_positional_argument() {
         let error = parsed(&parse_quote!(#[singleton(bogus)]))
-            .interpret(|_reader| Ok::<(), AttributeError>(()))
+            .interpret(|_reader| Ok::<(), AttributeArgumentsError>(()))
             .expect_err("the stray positional argument is rejected");
 
         assert!(matches!(
             error,
-            AttributeError::UnrecognizedArgument { argument, attribute_path }
+            AttributeArgumentsError::UnrecognizedArgument { argument, attribute_path }
                 if argument == "bogus" && attribute_path == "singleton"
         ));
     }
@@ -216,7 +233,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            AttributeError::UnexpectedArgument { key, expected, .. }
+            AttributeArgumentsError::UnexpectedArgument { key, expected, .. }
                 if key == "name" && expected == "string literal"
         ));
     }
@@ -229,7 +246,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            AttributeError::UnexpectedArgument { expected, .. }
+            AttributeArgumentsError::UnexpectedArgument { expected, .. }
                 if expected == "string literal"
         ));
     }
@@ -251,7 +268,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            AttributeError::UnexpectedArgument { key, expected, .. }
+            AttributeArgumentsError::UnexpectedArgument { key, expected, .. }
                 if key == "on_delete" && expected == "path"
         ));
     }
@@ -263,17 +280,26 @@ mod tests {
                 let unique = reader.take_flag("unique");
                 let primary_key = reader.take_flag("primary_key");
 
-                Ok::<_, AttributeError>((unique, primary_key))
+                Ok::<_, AttributeArgumentsError>(ReadFlags {
+                    primary_key,
+                    unique,
+                })
             })
             .expect("the flags are consumed");
 
-        assert_eq!(outcome, (true, false));
+        assert_eq!(
+            outcome,
+            ReadFlags {
+                primary_key: false,
+                unique: true,
+            }
+        );
     }
 
     #[test]
     fn take_positional_path_returns_none_when_there_is_no_positional_argument() {
         let value = parsed(&parse_quote!(#[provides]))
-            .interpret(|reader| Ok::<_, AttributeError>(reader.take_positional_path()))
+            .interpret(|reader| Ok::<_, AttributeArgumentsError>(reader.take_positional_path()))
             .expect("an absent positional path reads as none");
 
         assert!(value.is_none());
@@ -287,7 +313,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            AttributeArgsParseError::DuplicateNamedArgument { attribute_path, key }
+            AttributeArgumentsError::DuplicateNamedArgument { attribute_path, key }
                 if attribute_path == "index" && key == "name"
         ));
     }
@@ -300,7 +326,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            AttributeArgsParseError::Malformed { attribute_path, .. }
+            AttributeArgumentsError::Malformed { attribute_path, .. }
                 if attribute_path == "index"
         ));
     }

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use rustls::ServerConfig;
 
-use margaret_spiffe_svid::SvidSideParams;
 use margaret_spiffe_svid::root_cert_store_holder::RootCertStoreHolder;
+use margaret_spiffe_svid::svid_side_params::SvidSideParams;
 
 use crate::svid_client_cert_verifier_facade::SvidClientCertVerifierFacade;
 use crate::svid_client_cert_verifier_service::SvidClientCertVerifierService;

@@ -17,8 +17,7 @@ fn delegates_after_verifier_update() {
 
     let facade = SvidServerCertVerifierFacade::default();
     facade.update_internal_verifier(Arc::new(
-        SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
-            .unwrap(),
+        SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org").unwrap(),
     ));
 
     let result = facade.verify_server_cert(

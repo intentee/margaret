@@ -1,5 +1,3 @@
-pub use rustls;
-
 pub mod build_svid_certified_key;
 pub mod ca_bundle;
 pub mod extract_ca_bundle;
@@ -19,6 +17,4 @@ pub mod svid_service;
 pub mod svid_service_bundle_params;
 pub mod svid_side_params;
 
-pub use crate::svid_service::SvidService;
-pub use crate::svid_service_bundle_params::SvidServiceBundleParams;
-pub use crate::svid_side_params::SvidSideParams;
+pub use rustls;

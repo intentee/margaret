@@ -9,7 +9,7 @@ use margaret_http::body_limit::BodyLimit;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
-use margaret_http::upload_config::UploadConfig;
+use margaret_http_uploaded_file::upload_config::UploadConfig;
 
 use crate::server_assembly::ServerAssembly;
 use crate::server_service::ServerService;

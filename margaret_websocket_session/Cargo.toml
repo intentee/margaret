@@ -1,0 +1,14 @@
+[package]
+name = "margaret_websocket_session"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+margaret_http = { path = "../margaret_http" }
+margaret_route_parameter_binding = { path = "../margaret_route_parameter_binding" }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

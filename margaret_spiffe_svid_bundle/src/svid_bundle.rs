@@ -6,13 +6,13 @@ use rustls::ServerConfig;
 use trzcina::Service;
 use trzcina::ServiceBundle;
 
-use margaret_spiffe_svid::SvidService;
-use margaret_spiffe_svid::SvidServiceBundleParams;
-use margaret_spiffe_svid::SvidSideParams;
-use margaret_spiffe_svid_client::SvidClientSide;
+use margaret_spiffe_svid::svid_service::SvidService;
+use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
+use margaret_spiffe_svid::svid_side_params::SvidSideParams;
 use margaret_spiffe_svid_client::svid_client_readiness::SvidClientReadiness;
+use margaret_spiffe_svid_client::svid_client_side::SvidClientSide;
 use margaret_spiffe_svid_client::svid_error::SvidError;
-use margaret_spiffe_svid_server::SvidServerSide;
+use margaret_spiffe_svid_server::svid_server_side::SvidServerSide;
 
 pub struct SvidBundle {
     client_side: SvidClientSide,

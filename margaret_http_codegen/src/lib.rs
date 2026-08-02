@@ -20,6 +20,9 @@ pub mod serves_spiffe;
 
 #[cfg(test)]
 mod tests {
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
+    use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
+    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use std::collections::BTreeMap;
     use std::fs;
     use std::path::Path;
@@ -203,7 +206,6 @@ impl GetUser {
     fn respond(&self, #[route_parameter(from = "id")] id: String) -> anyhow::Result<Response> {}
 }
 "#;
-
 
     #[test]
     fn rejects_a_responder_absent_from_the_container_plan() {
@@ -579,7 +581,7 @@ impl GetPair {
             2
         );
         assert!(source.contains(
-            "margaret::framework::http::join_route_parameter_bindings::join_route_parameter_bindings("
+            "margaret::framework::route_parameter_binding::join_route_parameter_bindings::join_route_parameter_bindings("
         ));
         assert!(source.contains("\"author\",user_binder.as_ref(),"));
         assert!(source.contains("\"editor\",user_binder.as_ref(),"));
@@ -679,12 +681,15 @@ impl Echo {
             .collect()
     }
 
-    fn error_for(lib_source: &str) -> String {
+    fn rejection_for(lib_source: &str) -> HttpCodegenError {
         let directory = crate_with(lib_source);
 
         generate_http_source("crate", &directory.path().join("src"))
             .expect_err("the http source fails to generate")
-            .to_string()
+    }
+
+    fn error_for(lib_source: &str) -> String {
+        rejection_for(lib_source).to_string()
     }
 
     const VIEWS_INJECTION: &str = r#"
@@ -1143,7 +1148,6 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains("responder.respond(id)"));
     }
 
-
     #[test]
     fn awaits_a_responder_that_declares_an_asynchronous_process_method() {
         let source = source_for(
@@ -1377,12 +1381,23 @@ impl GetProject {
 
     #[test]
     fn rejects_a_non_string_route_parameter_source() {
-        let message = error_for(
+        let error = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self, #[route_parameter(from = 5)] id: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("failed to read a binding attribute"));
+        assert!(matches!(
+            error,
+            HttpCodegenError::Binding {
+                source: RequestBindingError::AttributeArguments {
+                    source: AttributeArgumentsError::UnexpectedArgument {
+                        ref key,
+                        ref expected,
+                        ..
+                    }
+                }
+            } if key == "from" && expected == "string literal"
+        ));
     }
 
     #[test]
@@ -1442,12 +1457,21 @@ impl GetProject {
 
     #[test]
     fn propagates_a_non_string_method_argument() {
-        let message = error_for(
+        let error = rejection_for(
             "#[singleton]
 #[responds_to_http(method = 5, path = \"/x\", server = \"public\")]\nstruct Bad;\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            HttpCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "method" && expected == "string literal"
+        ));
     }
 
     #[test]
@@ -1485,12 +1509,21 @@ impl GetProject {
 
     #[test]
     fn propagates_a_non_string_path_argument() {
-        let message = error_for(
+        let error = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = 5, server = \"public\")]\nstruct Bad;\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            HttpCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "path" && expected == "string literal"
+        ));
     }
 
     #[test]
@@ -1529,10 +1562,21 @@ impl GetProject {
 
     #[test]
     fn propagates_a_non_path_handles_argument() {
-        let message =
-            error_for("#[handles_middleware_attribute(attribute = \"x\")]\nstruct Bad;\n");
+        let error =
+            rejection_for("#[handles_middleware_attribute(attribute = \"x\")]\nstruct Bad;\n");
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            HttpCodegenError::Middleware {
+                source: MiddlewareCodegenError::AttributeArguments {
+                    source: AttributeArgumentsError::UnexpectedArgument {
+                        ref key,
+                        ref expected,
+                        ..
+                    }
+                }
+            } if key == "attribute" && expected == "path"
+        ));
     }
 
     #[test]
@@ -1692,12 +1736,21 @@ impl GetGreeting {
 
     #[test]
     fn propagates_a_non_string_name_argument() {
-        let message = error_for(
+        let error = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", name = crate::symbols::RouteName::Shared, path = \"/a\", server = \"public\")]\nstruct A;\nimpl A {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            HttpCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "name" && expected == "string literal"
+        ));
     }
 
     #[test]
@@ -1760,12 +1813,21 @@ impl GetMetrics {
 
     #[test]
     fn propagates_a_non_string_server_argument() {
-        let message = error_for(
+        let error = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/\", server = ServerMarker)]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            HttpCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "server" && expected == "string literal"
+        ));
     }
 
     #[test]
@@ -1860,12 +1922,23 @@ impl GetMetrics {
 
     #[test]
     fn rejects_a_non_path_form_request_source() {
-        let message = error_for(
+        let error = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = 5)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("failed to read a binding attribute"));
+        assert!(matches!(
+            error,
+            HttpCodegenError::Binding {
+                source: RequestBindingError::AttributeArguments {
+                    source: AttributeArgumentsError::UnexpectedArgument {
+                        ref key,
+                        ref expected,
+                        ..
+                    }
+                }
+            } if key == "from" && expected == "path"
+        ));
     }
 
     #[test]

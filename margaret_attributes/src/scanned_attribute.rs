@@ -8,6 +8,10 @@ pub(crate) struct ScannedAttribute {
 }
 
 impl ScannedAttribute {
+    fn new(attribute: Attribute) -> Self {
+        Self { attribute }
+    }
+
     pub(crate) fn scan_all(attributes: Vec<Attribute>) -> Vec<Self> {
         attributes.into_iter().map(Self::new).collect()
     }
@@ -24,9 +28,5 @@ impl ScannedAttribute {
                 IndexedAttribute::from_canonical(&attribute.attribute, &canonical_path)
             })
             .collect()
-    }
-
-    fn new(attribute: Attribute) -> Self {
-        Self { attribute }
     }
 }

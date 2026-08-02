@@ -416,11 +416,11 @@ impl ModuleWalker {
             Item::Use(item_use) => {
                 check_use(item_use, file_path)?;
 
-                for (name, path) in flatten_use_tree(&item_use.tree, module_path) {
+                for import in flatten_use_tree(&item_use.tree, module_path) {
                     self.imports
                         .entry(CanonicalPath::new(module_path.to_vec()))
                         .or_default()
-                        .insert(name, path);
+                        .insert(import.name, import.path);
                 }
 
                 None

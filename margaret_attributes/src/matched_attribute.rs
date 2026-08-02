@@ -1,6 +1,7 @@
-use crate::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::format_path::format_path;
+
 use crate::attribute_error::AttributeError;
-use crate::format_path::format_path;
 use crate::indexed_attribute::IndexedAttribute;
 use crate::indexed_item::IndexedItem;
 

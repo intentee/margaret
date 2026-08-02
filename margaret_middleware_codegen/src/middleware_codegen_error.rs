@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_injection_codegen::injection_error::InjectionError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
@@ -7,6 +8,12 @@ use margaret_tag_codegen::tag_error::TagError;
 
 #[derive(Debug, Error)]
 pub enum MiddlewareCodegenError {
+    #[error("failed to read the attribute arguments: {source}")]
+    AttributeArguments {
+        #[from]
+        source: AttributeArgumentsError,
+    },
+
     #[error("failed to index the crate: {source}")]
     Index {
         #[from]

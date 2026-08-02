@@ -43,5 +43,6 @@ pub mod rendered_container;
 mod resolve_construction;
 pub mod resolve_injectable;
 mod reverse_console_argument_weaver;
+mod serve_console_arguments;
 mod topological_order;
 mod type_text;

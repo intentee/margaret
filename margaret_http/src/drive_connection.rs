@@ -45,11 +45,11 @@ mod tests {
     use tokio::sync::oneshot;
 
     use super::drive_connection;
-    use crate::web_socket_driver_channel::web_socket_driver_channel;
+    use crate::web_socket_driver_channel::WebSocketDriverChannel;
 
     #[tokio::test]
     async fn polls_a_received_driver_while_the_connection_is_open() {
-        let (sender, receiver) = web_socket_driver_channel();
+        let WebSocketDriverChannel { receiver, sender } = WebSocketDriverChannel::new();
         let (driver_done, observed_driver) = oneshot::channel();
         assert!(
             sender
@@ -87,7 +87,7 @@ mod tests {
 
     #[tokio::test]
     async fn drains_a_queued_driver_after_the_connection_finishes() {
-        let (sender, receiver) = web_socket_driver_channel();
+        let WebSocketDriverChannel { receiver, sender } = WebSocketDriverChannel::new();
         let completed = Arc::new(AtomicBool::new(false));
         let completed_by_driver = Arc::clone(&completed);
         assert!(

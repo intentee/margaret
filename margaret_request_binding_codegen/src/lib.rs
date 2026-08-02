@@ -6,6 +6,7 @@ pub mod binding_console_arguments;
 pub mod binding_context;
 pub mod binding_reads_request;
 pub mod binding_registries;
+pub mod binding_root;
 pub mod binding_shadows_request;
 pub mod bound_parameter;
 pub mod captured_provider;

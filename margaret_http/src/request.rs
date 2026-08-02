@@ -31,6 +31,15 @@ impl Request {
         }
     }
 
+    pub fn path_param(&self, name: &str) -> Option<&str> {
+        self.path_params.get(name).map(String::as_str)
+    }
+
+    #[must_use]
+    pub fn peer_identity(&self) -> &PeerIdentity {
+        &self.peer_identity
+    }
+
     pub(crate) fn with_path_params(self, path_params: HashMap<String, String>) -> Self {
         Self {
             inputs: self.inputs,
@@ -45,15 +54,6 @@ impl Request {
             path_params: self.path_params,
             peer_identity,
         }
-    }
-
-    pub fn path_param(&self, name: &str) -> Option<&str> {
-        self.path_params.get(name).map(String::as_str)
-    }
-
-    #[must_use]
-    pub fn peer_identity(&self) -> &PeerIdentity {
-        &self.peer_identity
     }
 }
 

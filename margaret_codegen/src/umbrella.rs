@@ -5,8 +5,7 @@ use crate::generated_features::GeneratedFeatures;
 
 pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
     let serves_http = features.serves_http();
-    let mut source =
-        String::from("#![forbid(unsafe_code)]\n#[rustfmt::skip]\npub use ::margaret::framework;\n");
+    let mut source = String::from("#![forbid(unsafe_code)]\n");
 
     source.push_str("#[rustfmt::skip]\npub mod container;\n");
 
@@ -51,6 +50,8 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
     if features.contains(GeneratedFeature::Console) {
         source.push_str("#[rustfmt::skip]\npub mod run;\n");
     }
+
+    source.push_str("#[rustfmt::skip]\npub use ::margaret::framework;\n");
 
     GeneratedModule::new("mod", source)
 }

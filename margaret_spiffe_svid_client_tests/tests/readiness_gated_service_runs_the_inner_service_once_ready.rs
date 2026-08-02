@@ -19,8 +19,7 @@ async fn runs_the_inner_service_once_ready() {
 
     let facade = SvidServerCertVerifierFacade::default();
     facade.update_internal_verifier(Arc::new(
-        SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org")
-            .unwrap(),
+        SvidServerCertVerifier::new(build_root_cert_store_with_ca(), "example.org").unwrap(),
     ));
 
     let ran = Arc::new(AtomicBool::new(false));

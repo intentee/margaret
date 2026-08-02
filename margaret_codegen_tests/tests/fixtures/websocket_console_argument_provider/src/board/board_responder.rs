@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use tokio_util::sync::CancellationToken;
+
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::singleton;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret::framework::websocket::web_socket::WebSocket;
-use tokio_util::sync::CancellationToken;
 
 #[singleton]
 pub struct BoardResponder;

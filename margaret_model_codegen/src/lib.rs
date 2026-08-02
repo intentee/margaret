@@ -26,6 +26,8 @@ mod positioned_field;
 
 #[cfg(test)]
 mod tests {
+    use crate::model_codegen_error::ModelCodegenError;
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
     use std::path::Path;
 
@@ -65,12 +67,14 @@ struct Author {
             .build()
     }
 
-    fn error_message(lib_source: &str) -> String {
+    fn rejection_for(lib_source: &str) -> ModelCodegenError {
         let directory = crate_with(lib_source);
 
-        models(&index_of(directory.path()))
-            .expect_err("the models fail to resolve")
-            .to_string()
+        models(&index_of(directory.path())).expect_err("the models fail to resolve")
+    }
+
+    fn error_message(lib_source: &str) -> String {
+        rejection_for(lib_source).to_string()
     }
 
     fn with_author(referencing: &str) -> String {
@@ -105,10 +109,18 @@ struct Author {
 
     #[test]
     fn rejects_a_non_string_table_name() {
-        assert!(
-            error_message("#[model(table = 5)]\nstruct S;\n")
-                .contains("failed to read the model attributes")
-        );
+        let error = rejection_for("#[model(table = 5)]\nstruct S;\n");
+
+        assert!(matches!(
+            error,
+            ModelCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "table" && expected == "string literal"
+        ));
     }
 
     #[test]
@@ -173,12 +185,20 @@ struct B {
 
     #[test]
     fn rejects_a_non_string_column_name() {
-        assert!(
-            error_message(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column(name = 5)]\n    id: i64,\n}\n"
-            )
-            .contains("failed to read the model attributes")
+        let error = rejection_for(
+            "#[model(table = \"t\")]\nstruct S {\n    #[column(name = 5)]\n    id: i64,\n}\n",
         );
+
+        assert!(matches!(
+            error,
+            ModelCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "name" && expected == "string literal"
+        ));
     }
 
     #[test]
@@ -676,12 +696,20 @@ struct Book {
 
     #[test]
     fn rejects_a_non_string_index_name() {
-        assert!(
-            error_message(
-                "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index(name = 5)]\n    value: String,\n}\n",
-            )
-            .contains("failed to read the model attributes")
+        let error = rejection_for(
+            "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index(name = 5)]\n    value: String,\n}\n",
         );
+
+        assert!(matches!(
+            error,
+            ModelCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "name" && expected == "string literal"
+        ));
     }
 
     fn table_order(lib_source: &str) -> Vec<String> {

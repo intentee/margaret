@@ -5,6 +5,7 @@ pub mod web_socket_plan;
 
 mod build_for_session_method;
 mod build_websocket_plan;
+mod built_websocket_plan;
 mod discovered_handler;
 mod handler_binding;
 mod handler_console_arguments;
@@ -598,8 +599,6 @@ impl Room {
 }
 "#;
 
-
-
     #[test]
     fn names_the_factory_handshake_unused_when_no_binding_reads_the_request() {
         let source = generated(INJECTED_ONLY_SESSION);
@@ -1105,10 +1104,10 @@ impl RespondsToWebSocketMessage for Chatter {
 
         assert!(source.contains("->::std::result::Result<"));
         assert!(source.contains(
-            "margaret::framework::websocket::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome<Self::Session,>"
+            "margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome<Self::Session,>"
         ));
         assert!(source.contains(
-            "margaret::framework::websocket::web_socket_session_creation_error::WebSocketSessionCreationError"
+            "margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError"
         ));
     }
 
@@ -1403,7 +1402,7 @@ impl ArticleStore {
     fn new() -> anyhow::Result<Self> {}
 }
 
-impl margaret::framework::http::http_route_parameter_binder::HttpRouteParameterBinder for ArticleStore {
+impl margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder for ArticleStore {
     type Model = Article;
 }
 

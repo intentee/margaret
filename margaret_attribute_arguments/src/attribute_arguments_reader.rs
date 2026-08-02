@@ -3,7 +3,7 @@ use syn::Expr;
 use syn::Lit;
 use syn::Path;
 
-use crate::attribute_error::AttributeError;
+use crate::attribute_arguments_error::AttributeArgumentsError;
 use crate::named_argument::NamedArgument;
 
 pub struct AttributeArgumentsReader {
@@ -40,8 +40,8 @@ impl AttributeArgumentsReader {
 
     /// # Errors
     ///
-    /// Returns `AttributeError` propagated from the work it performs.
-    pub fn take_path(&mut self, key: &str) -> Result<Option<Path>, AttributeError> {
+    /// Returns `AttributeArgumentsError::UnexpectedArgument`.
+    pub fn take_path(&mut self, key: &str) -> Result<Option<Path>, AttributeArgumentsError> {
         match self.take_named(key) {
             None => Ok(None),
             Some(Expr::Path(expression)) => Ok(Some(expression.path)),
@@ -64,8 +64,8 @@ impl AttributeArgumentsReader {
 
     /// # Errors
     ///
-    /// Returns `AttributeError` propagated from the work it performs.
-    pub fn take_string(&mut self, key: &str) -> Result<Option<String>, AttributeError> {
+    /// Returns `AttributeArgumentsError::UnexpectedArgument`.
+    pub fn take_string(&mut self, key: &str) -> Result<Option<String>, AttributeArgumentsError> {
         match self.take_named(key) {
             None => Ok(None),
             Some(Expr::Lit(expression)) => match expression.lit {
@@ -76,16 +76,16 @@ impl AttributeArgumentsReader {
         }
     }
 
-    pub(crate) fn into_result(self) -> Result<(), AttributeError> {
+    pub(crate) fn into_result(self) -> Result<(), AttributeArgumentsError> {
         if let Some(argument) = self.named.first() {
-            return Err(AttributeError::UnrecognizedArgument {
+            return Err(AttributeArgumentsError::UnrecognizedArgument {
                 argument: argument.name.clone(),
                 attribute_path: self.attribute_path,
             });
         }
 
         if let Some(argument) = self.positional.first() {
-            return Err(AttributeError::UnrecognizedArgument {
+            return Err(AttributeArgumentsError::UnrecognizedArgument {
                 argument: argument.to_token_stream().to_string(),
                 attribute_path: self.attribute_path,
             });
@@ -101,8 +101,8 @@ impl AttributeArgumentsReader {
             .map(|index| self.named.remove(index).value)
     }
 
-    fn unexpected_argument(&self, key: &str, expected: &str) -> AttributeError {
-        AttributeError::UnexpectedArgument {
+    fn unexpected_argument(&self, key: &str, expected: &str) -> AttributeArgumentsError {
+        AttributeArgumentsError::UnexpectedArgument {
             attribute_path: self.attribute_path.clone(),
             key: key.to_string(),
             expected: expected.to_string(),

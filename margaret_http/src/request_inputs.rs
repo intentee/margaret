@@ -4,6 +4,10 @@ use cookie::Cookie;
 use http::Method;
 use http::header::COOKIE;
 
+use margaret_http_uploaded_file::upload_config::UploadConfig;
+use margaret_http_uploaded_file::uploaded_file::UploadedFile;
+use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
+
 use crate::body_class::BodyClass;
 use crate::body_limit::BodyLimit;
 use crate::collect_limited::collect_limited;
@@ -11,12 +15,9 @@ use crate::form_field::FormField;
 use crate::form_fields::form_fields;
 use crate::multipart_body::MultipartBody;
 use crate::request_body::RequestBody;
-use crate::request_error::RequestError;
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
 use crate::server_params::ServerParams;
-use crate::upload_config::UploadConfig;
-use crate::uploaded_file::UploadedFile;
 
 fn parse_cookies(server: &ServerParams) -> RequestOutcome<HashMap<String, String>> {
     let mut cookies = HashMap::new();
@@ -105,7 +106,7 @@ async fn parse_body(
     body: RequestBody,
     body_limit: &BodyLimit,
     upload_config: &UploadConfig,
-) -> Result<RequestOutcome<ParsedBody>, RequestError> {
+) -> Result<RequestOutcome<ParsedBody>, UploadedFileError> {
     let body_class = match BodyClass::from_server_params(server) {
         RequestOutcome::Parsed(body_class) => body_class,
         RequestOutcome::Rejected(rejection) => return Ok(RequestOutcome::Rejected(rejection)),
@@ -220,7 +221,7 @@ impl RequestInputs {
         body: RequestBody,
         body_limit: &BodyLimit,
         upload_config: &UploadConfig,
-    ) -> Result<RequestOutcome<Self>, RequestError> {
+    ) -> Result<RequestOutcome<Self>, UploadedFileError> {
         let cookies = match parse_cookies(&server) {
             RequestOutcome::Parsed(cookies) => cookies,
             RequestOutcome::Rejected(rejection) => return Ok(RequestOutcome::Rejected(rejection)),
@@ -283,12 +284,12 @@ mod tests {
     use super::RequestInputs;
     use crate::body_limit::BodyLimit;
     use crate::request_body::RequestBody;
-    use crate::request_error::RequestError;
     use crate::request_outcome::RequestOutcome;
     use crate::request_rejection::RequestRejection;
     use crate::server_params::ServerParams;
     use crate::singleton_request_header::SingletonRequestHeader;
-    use crate::upload_config::UploadConfig;
+    use margaret_http_uploaded_file::upload_config::UploadConfig;
+    use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 
     fn any_name() -> String {
         "name".to_string()
@@ -304,6 +305,18 @@ mod tests {
 
     const TRAVERSING_UPLOAD: &[u8] = b"--X\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"../../escape.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n--X--\r\n";
 
+    struct SyntheticHeader<'header> {
+        name: &'header str,
+        value: &'header [u8],
+    }
+
+    fn synthetic_header<'header>(
+        name: &'header str,
+        value: &'header [u8],
+    ) -> SyntheticHeader<'header> {
+        SyntheticHeader { name, value }
+    }
+
     fn upload_in(directory: &TempDir) -> UploadConfig {
         UploadConfig::enabled(directory.path().to_path_buf())
     }
@@ -311,15 +324,18 @@ mod tests {
     fn head(
         method: Method,
         target: &str,
-        headers: &[(&str, &[u8])],
+        headers: &[SyntheticHeader<'_>],
     ) -> Result<ServerParams, RequestRejection> {
         let mut builder = Request::builder()
             .method(method)
             .uri(target)
             .header(HOST, "localhost");
 
-        for (name, value) in headers {
-            builder = builder.header(*name, HeaderValue::from_bytes(value).expect("a value"));
+        for header in headers {
+            builder = builder.header(
+                header.name,
+                HeaderValue::from_bytes(header.value).expect("a value"),
+            );
         }
 
         let parts = builder.body(()).expect("a request").into_parts().0;
@@ -330,7 +346,11 @@ mod tests {
         }
     }
 
-    fn server_params(method: Method, target: &str, headers: &[(&str, &[u8])]) -> ServerParams {
+    fn server_params(
+        method: Method,
+        target: &str,
+        headers: &[SyntheticHeader<'_>],
+    ) -> ServerParams {
         head(method, target, headers).expect("the request head is unambiguous")
     }
 
@@ -341,7 +361,10 @@ mod tests {
                 &head(
                     Method::GET,
                     "/",
-                    &[(COOKIE.as_str(), b"a=1"), (COOKIE.as_str(), b"b=2")]
+                    &[
+                        synthetic_header(COOKIE.as_str(), b"a=1"),
+                        synthetic_header(COOKIE.as_str(), b"b=2"),
+                    ]
                 )
                 .err()
                 .expect("a repeated Cookie header is ambiguous")
@@ -357,7 +380,7 @@ mod tests {
         target: &str,
         body: &'static [u8],
         upload_config: &UploadConfig,
-    ) -> Result<RequestOutcome<RequestInputs>, RequestError> {
+    ) -> Result<RequestOutcome<RequestInputs>, UploadedFileError> {
         parse_inputs_with_limit(
             content_type,
             target,
@@ -374,9 +397,12 @@ mod tests {
         body: &'static [u8],
         body_limit: &BodyLimit,
         upload_config: &UploadConfig,
-    ) -> Result<RequestOutcome<RequestInputs>, RequestError> {
-        let headers: Vec<(&str, &[u8])> = match content_type {
-            Some(value) => vec![(CONTENT_TYPE.as_str(), value.as_bytes())],
+    ) -> Result<RequestOutcome<RequestInputs>, UploadedFileError> {
+        let headers: Vec<SyntheticHeader<'_>> = match content_type {
+            Some(value) => vec![SyntheticHeader {
+                name: CONTENT_TYPE.as_str(),
+                value: value.as_bytes(),
+            }],
             None => Vec::new(),
         };
 
@@ -460,7 +486,7 @@ mod tests {
     fn handshake_outcome(
         method: Method,
         target: &str,
-        headers: &[(&str, &[u8])],
+        headers: &[SyntheticHeader<'_>],
     ) -> Result<RequestInputs, RequestRejection> {
         match RequestInputs::from_handshake(server_params(method, target, headers)) {
             RequestOutcome::Parsed(inputs) => Ok(inputs),
@@ -470,7 +496,11 @@ mod tests {
 
     async fn cookie_outcome(value: &[u8]) -> Result<RequestInputs, RequestRejection> {
         match RequestInputs::parse(
-            server_params(Method::GET, "/", &[(COOKIE.as_str(), value)]),
+            server_params(
+                Method::GET,
+                "/",
+                &[synthetic_header(COOKIE.as_str(), value)],
+            ),
             boxed(b""),
             &BodyLimit::default(),
             &UploadConfig::Disabled,
@@ -488,7 +518,7 @@ mod tests {
         let inputs = handshake_outcome(
             Method::GET,
             "/socket?room=lobby",
-            &[(COOKIE.as_str(), b"session=abc")],
+            &[synthetic_header(COOKIE.as_str(), b"session=abc")],
         )
         .expect("the handshake is unambiguous");
 
@@ -508,9 +538,13 @@ mod tests {
     fn rejects_a_handshake_with_a_malformed_cookie_header() {
         assert_eq!(
             discriminant(
-                &handshake_outcome(Method::GET, "/socket", &[(COOKIE.as_str(), b"=nameless")])
-                    .err()
-                    .expect("a malformed cookie is rejected")
+                &handshake_outcome(
+                    Method::GET,
+                    "/socket",
+                    &[synthetic_header(COOKIE.as_str(), b"=nameless")]
+                )
+                .err()
+                .expect("a malformed cookie is rejected")
             ),
             discriminant(&RequestRejection::MalformedCookie {
                 source: cookie::Cookie::parse("=nameless").expect_err("a malformed cookie")
@@ -922,7 +956,7 @@ mod tests {
 
         assert_eq!(
             discriminant(&error),
-            discriminant(&RequestError::UploadTempFile {
+            discriminant(&UploadedFileError::UploadTempFile {
                 source: std::io::Error::other("an unusable upload directory"),
             })
         );

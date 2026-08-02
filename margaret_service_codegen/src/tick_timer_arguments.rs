@@ -1,6 +1,6 @@
 use syn::Path;
 
-use margaret_attributes::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
 
 use crate::service_codegen_error::ServiceCodegenError;
 

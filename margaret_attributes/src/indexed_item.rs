@@ -23,30 +23,6 @@ pub struct IndexedItem {
 }
 
 impl IndexedItem {
-    #[cfg(test)]
-    pub(crate) fn new(
-        kind: ItemKind,
-        identifier: String,
-        canonical_path: CanonicalPath,
-        attributes: Vec<Attribute>,
-        fields: Vec<IndexedField>,
-        variants: Vec<IndexedVariant>,
-    ) -> Self {
-        Self {
-            attributes: attributes
-                .into_iter()
-                .map(|attribute| IndexedAttribute::new(&attribute))
-                .collect(),
-            canonical_path,
-            fields,
-            identifier,
-            kind,
-            methods: Vec::new(),
-            trait_impls: Vec::new(),
-            variants,
-        }
-    }
-
     pub(crate) fn from_parts(parts: IndexedItemParts) -> Self {
         let IndexedItemParts {
             attributes,
@@ -67,6 +43,30 @@ impl IndexedItem {
             kind,
             methods,
             trait_impls,
+            variants,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new(
+        kind: ItemKind,
+        identifier: String,
+        canonical_path: CanonicalPath,
+        attributes: Vec<Attribute>,
+        fields: Vec<IndexedField>,
+        variants: Vec<IndexedVariant>,
+    ) -> Self {
+        Self {
+            attributes: attributes
+                .into_iter()
+                .map(|attribute| IndexedAttribute::new(&attribute))
+                .collect(),
+            canonical_path,
+            fields,
+            identifier,
+            kind,
+            methods: Vec::new(),
+            trait_impls: Vec::new(),
             variants,
         }
     }

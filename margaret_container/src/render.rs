@@ -45,11 +45,18 @@ pub(crate) fn render(
         .map(|(position, entry)| {
             field_declaration(position, &entry.provider, accessible.contains(&entry.key))
         });
-    let accessors = accessible_roots.iter().filter_map(|entry| {
-        positions
-            .get(&entry.key)
-            .map(|position| accessor(*position, &entry.provider))
-    });
+    let accessors: BTreeMap<String, TokenStream> = accessible_roots
+        .iter()
+        .filter_map(|entry| {
+            positions.get(&entry.key).map(|position| {
+                (
+                    field_ident(&entry.provider).to_string(),
+                    accessor(*position, &entry.provider),
+                )
+            })
+        })
+        .collect();
+    let accessors = accessors.values();
     let accessor_impl = (!accessible_roots.is_empty()).then(|| {
         quote! {
             impl Container {

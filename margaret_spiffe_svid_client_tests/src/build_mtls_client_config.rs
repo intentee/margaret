@@ -22,10 +22,8 @@ pub fn build_mtls_client_config(
     ClientConfig::builder()
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(
-            SvidServerCertVerifier::new(
-                build_root_cert_store_with_ca(), spiffe_trust_domain,
-            )
-            .unwrap(),
+            SvidServerCertVerifier::new(build_root_cert_store_with_ca(), spiffe_trust_domain)
+                .unwrap(),
         ))
         .with_client_auth_cert(cert_chain, private_key)
         .unwrap()

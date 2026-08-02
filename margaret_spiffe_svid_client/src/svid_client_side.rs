@@ -4,8 +4,8 @@ use reqwest::Client;
 use reqwest::tls::Version;
 use rustls::ClientConfig;
 
-use margaret_spiffe_svid::SvidSideParams;
 use margaret_spiffe_svid::root_cert_store_holder::RootCertStoreHolder;
+use margaret_spiffe_svid::svid_side_params::SvidSideParams;
 
 use crate::build_reqwest_client::build_reqwest_client;
 use crate::svid_client_readiness::SvidClientReadiness;

@@ -28,9 +28,6 @@ impl GetProject {
         #[route_parameter(from = "project_id")] ProjectId(id): ProjectId,
         #[route_parameter(from = "project_revision")] ProjectRevision(revision): ProjectRevision,
     ) -> Result<Response> {
-        Ok(Response::text(
-            200,
-            format!("{slug}/{id}@{revision}"),
-        ))
+        Ok(Response::text(200, format!("{slug}/{id}@{revision}")))
     }
 }

@@ -30,6 +30,11 @@ fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
     quote! { super::container::build::#module::#arguments_type }
 }
 
+struct SlottedConsoleArgument {
+    argument: ConsoleArgument,
+    slot: usize,
+}
+
 pub struct ContainerBindings {
     arguments: Arc<[ConsoleArgument]>,
     asynchronous_constructions: BTreeSet<String>,
@@ -83,6 +88,11 @@ impl ContainerBindings {
         quote! { #container.#accessor() }
     }
 
+    #[must_use]
+    pub fn all_console_arguments(&self) -> &[ConsoleArgument] {
+        &self.arguments
+    }
+
     /// # Errors
     ///
     /// Returns `ContainerError::MissingConsoleClosure`.
@@ -117,19 +127,25 @@ impl ContainerBindings {
         arguments: &[ConsoleArgument],
     ) -> Result<Vec<ConsoleArgument>, ContainerError> {
         let mut seen: BTreeSet<ServeInputKey> = BTreeSet::new();
-        let mut unified: Vec<(usize, ConsoleArgument)> = Vec::new();
+        let mut unified: Vec<SlottedConsoleArgument> = Vec::new();
 
         for argument in arguments {
             let key = argument.slot_key();
 
             if seen.insert(key.clone()) {
-                unified.push((self.console_slot(&key)?, argument.clone()));
+                unified.push(SlottedConsoleArgument {
+                    argument: argument.clone(),
+                    slot: self.console_slot(&key)?,
+                });
             }
         }
 
-        unified.sort_by_key(|(slot, _)| *slot);
+        unified.sort_by_key(|slotted| slotted.slot);
 
-        Ok(unified.into_iter().map(|(_, argument)| argument).collect())
+        Ok(unified
+            .into_iter()
+            .map(|slotted| slotted.argument)
+            .collect())
     }
 
     /// # Errors
@@ -167,22 +183,6 @@ impl ContainerBindings {
         self.asynchronous_constructions.contains(field_name)
     }
 
-
-    #[must_use]
-    pub fn serve_invocation(&self, arguments: &[ConsoleArgumentBinding]) -> TokenStream {
-        let literal = bootstrap_arguments_literal(
-            &bootstrap_arguments_path(&format_ident!("serve")),
-            arguments,
-        );
-        let invocation = quote! { super::container::build::serve(#literal) };
-
-        if self.asynchronous_constructions.is_empty() {
-            invocation
-        } else {
-            quote! { #invocation.await }
-        }
-    }
-
     /// # Errors
     ///
     /// Returns `ContainerError` propagated from the work it performs.
@@ -190,7 +190,10 @@ impl ContainerBindings {
         &self,
         dependency: &InjectedDependency,
     ) -> Result<Vec<ConsoleArgument>, ContainerError> {
-        Ok(self.console_arguments(&dependency.concrete)?.arguments.to_vec())
+        Ok(self
+            .console_arguments(&dependency.concrete)?
+            .arguments
+            .to_vec())
     }
 
     #[must_use]
@@ -223,8 +226,18 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn all_console_arguments(&self) -> &[ConsoleArgument] {
-        &self.arguments
+    pub fn serve_invocation(&self, arguments: &[ConsoleArgumentBinding]) -> TokenStream {
+        let literal = bootstrap_arguments_literal(
+            &bootstrap_arguments_path(&format_ident!("serve")),
+            arguments,
+        );
+        let invocation = quote! { super::container::build::serve(#literal) };
+
+        if self.asynchronous_constructions.is_empty() {
+            invocation
+        } else {
+            quote! { #invocation.await }
+        }
     }
 
     fn materialize(&self, argument: &ConsoleArgument) -> Result<TokenStream, ContainerError> {

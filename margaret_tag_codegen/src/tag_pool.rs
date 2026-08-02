@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use syn::Path;
 
-use margaret_attributes::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_base::field_base;
@@ -14,6 +14,11 @@ use crate::jwks_client_binding::JwksClientBinding;
 use crate::read_middleware_attribute::read_middleware_attribute;
 use crate::tag_error::TagError;
 use crate::tag_kind::TagKind;
+
+struct TaggedEntry<'pool> {
+    entry: &'pool TagEntry,
+    tag: &'pool Tag,
+}
 
 struct TagEntry {
     concrete: CanonicalPath,
@@ -90,19 +95,20 @@ impl TagPool {
 
     #[must_use]
     pub fn jwks_client_bindings(&self) -> Vec<JwksClientBinding> {
-        let mut entries: Vec<(&Tag, &TagEntry)> = self
+        let mut entries: Vec<TaggedEntry<'_>> = self
             .entries
             .iter()
             .filter(|(_, entry)| entry.kind == TagKind::JwksClient)
+            .map(|(tag, entry)| TaggedEntry { entry, tag })
             .collect();
 
-        entries.sort_by_key(|(tag, _)| tag.to_string());
+        entries.sort_by_key(|tagged| tagged.tag.to_string());
 
         let mut allocator = NameAllocator::new();
 
         entries
             .into_iter()
-            .map(|(tag, entry)| JwksClientBinding {
+            .map(|TaggedEntry { entry, tag }| JwksClientBinding {
                 endpoint: entry.concrete.clone(),
                 module_segment: allocator
                     .allocate(&field_base(&entry.concrete))
@@ -141,6 +147,7 @@ impl TagPool {
 
 #[cfg(test)]
 mod tests {
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use syn::Path;
@@ -179,11 +186,14 @@ mod tests {
         Tag::from_path(&path).expect("the tag is a plain name")
     }
 
-    fn error_for(lib_source: &str) -> String {
+    fn rejection_for(lib_source: &str) -> TagError {
         pool_for(lib_source)
             .err()
             .expect("the pool fails to collect")
-            .to_string()
+    }
+
+    fn error_for(lib_source: &str) -> String {
+        rejection_for(lib_source).to_string()
     }
 
     #[test]
@@ -332,12 +342,20 @@ mod tests {
 
     #[test]
     fn reports_a_non_path_middleware_tag_argument() {
-        assert!(
-            error_for(
-                "#[handles_middleware_attribute(attribute = \"logged\")]\nstruct RequestLog;\n"
-            )
-            .contains("failed to index")
+        let error = rejection_for(
+            "#[handles_middleware_attribute(attribute = \"logged\")]\nstruct RequestLog;\n",
         );
+
+        assert!(matches!(
+            error,
+            TagError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "attribute" && expected == "path"
+        ));
     }
 
     #[test]

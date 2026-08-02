@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_console_argument_codegen::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use margaret_container::container_error::ContainerError;
@@ -7,6 +8,12 @@ use margaret_injection_codegen::injection_error::InjectionError;
 
 #[derive(Debug, Error)]
 pub enum ConsoleCodegenError {
+    #[error("failed to read the attribute arguments: {source}")]
+    AttributeArguments {
+        #[from]
+        source: AttributeArgumentsError,
+    },
+
     #[error(transparent)]
     Container {
         #[from]

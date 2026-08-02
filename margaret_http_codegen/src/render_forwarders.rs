@@ -76,7 +76,7 @@ pub(crate) fn render_forwarders(
         modules.push(GeneratedModuleTokens::new(
             format!("forwarders/{}", server.name()),
             quote! {
-                pub mod forwarder;
+                mod forwarder;
                 pub use forwarder::Forwarder;
             },
         ));

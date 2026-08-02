@@ -14,7 +14,7 @@ pub fn unify_by_key(
         registry.register(argument.clone())?;
     }
 
-    Ok(registry.into_parts().0)
+    Ok(registry.arguments)
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@ pub mod render_services;
 pub mod service_codegen_error;
 pub mod service_plan;
 
+mod serve_inputs;
 mod service_kind;
 mod service_unit;
 mod service_unit_origin;
@@ -13,6 +14,8 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
+    use crate::service_codegen_error::ServiceCodegenError;
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use tempfile::TempDir;
@@ -105,14 +108,17 @@ mod tests {
         render_source(lib_source, servers, true)
     }
 
-    fn error_for(lib_source: &str) -> String {
+    fn rejection_for(lib_source: &str) -> ServiceCodegenError {
         let placeholder = bindings(&index_for("#[singleton]\nstruct Placeholder;\n"));
 
         let index = index_for(lib_source);
         ServicePlan::build(&index, &[], &placeholder, &[])
             .err()
             .expect("the services source fails to generate")
-            .to_string()
+    }
+
+    fn error_for(lib_source: &str) -> String {
+        rejection_for(lib_source).to_string()
     }
 
     fn public() -> Vec<HttpServer> {
@@ -435,7 +441,7 @@ impl Flusher {
             "margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
         ));
         assert!(source.contains(
-            "margaret::framework::spiffe_svid_server::SvidServerBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+            "margaret::framework::spiffe_svid_server::svid_server_bundle::SvidServerBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
         ));
         assert!(source.contains(r#"matches.get_one::<String>("spiffe-trust-domain")"#));
         assert!(source.contains(r#"matches.get_one::<String>("spire-agent-addr")"#));
@@ -474,7 +480,7 @@ impl Flusher {
         let source = rendered(SPIFFE_CLIENT, &[]);
 
         assert!(source.contains(
-            "letspiffe_bundle=margaret::framework::spiffe_svid_client::SvidClientBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+            "letspiffe_bundle=margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
         ));
         assert!(source.contains("letspiffe_client_readiness=spiffe_bundle.client_readiness();"));
         assert!(source.contains(
@@ -507,7 +513,7 @@ impl Flusher {
         );
 
         assert!(source.contains(
-            "letspiffe_bundle=margaret::framework::spiffe_svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::SvidServiceBundleParams{"
+            "letspiffe_bundle=margaret::framework::spiffe_svid_bundle::svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
         ));
         assert!(source.contains(
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
@@ -585,20 +591,38 @@ impl Flusher {
 
     #[test]
     fn rejects_a_non_path_interval() {
-        let message = error_for(
+        let error = rejection_for(
             "#[scheduled_with_tick_timer(interval = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            ServiceCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "interval" && expected == "path"
+        ));
     }
 
     #[test]
     fn rejects_a_non_path_behavior() {
-        let message = error_for(
+        let error = rejection_for(
             "#[scheduled_with_tick_timer(interval = crate::P, behavior = 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert!(matches!(
+            error,
+            ServiceCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "behavior" && expected == "path"
+        ));
     }
 
     #[test]

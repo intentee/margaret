@@ -2,8 +2,8 @@
 #[path = "../margaret/mod.rs"]
 pub mod margaret;
 
-pub mod construction_counts;
-pub mod construction_future_sizes;
+mod construction_counts;
+mod construction_future_sizes;
 pub mod counts;
 pub mod level_eight;
 pub mod level_five;
@@ -14,7 +14,7 @@ pub mod level_six;
 pub mod level_three;
 pub mod level_two;
 pub mod record;
-pub mod serve_construction;
+mod serve_construction;
 
 pub use construction_counts::construction_counts;
 pub use construction_future_sizes::construction_future_sizes;

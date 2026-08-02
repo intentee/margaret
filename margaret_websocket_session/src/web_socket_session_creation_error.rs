@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use margaret_http::request_binding_error::RequestBindingError;
+use margaret_route_parameter_binding::route_parameter_binding_error::RouteParameterBindingError;
 
 #[derive(Debug, Error)]
 pub enum WebSocketSessionCreationError {
@@ -11,7 +11,7 @@ pub enum WebSocketSessionCreationError {
     },
 
     #[error(transparent)]
-    RequestBinding(#[from] RequestBindingError),
+    RouteParameterBinding(#[from] RouteParameterBindingError),
 }
 
 impl WebSocketSessionCreationError {
