@@ -492,7 +492,7 @@ pub(crate) fn render_sessions(
                 GeneratedModuleTokens::new(
                     format!("websocket/{module_name}"),
                     quote! {
-                        pub mod upgrade_entry;
+                        mod upgrade_entry;
                         pub use upgrade_entry::upgrade_entry;
                     },
                 ),

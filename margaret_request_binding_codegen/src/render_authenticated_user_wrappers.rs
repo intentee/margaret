@@ -144,7 +144,7 @@ pub fn render_authenticated_user_wrappers(
     let mut generated = vec![GeneratedModuleTokens::new(
         "authenticated_users",
         quote! {
-            #(pub mod #modules;)*
+            #(mod #modules;)*
             #(#exports)*
         },
     )];

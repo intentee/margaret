@@ -311,7 +311,7 @@ pub(crate) fn render_build(
 
         quote! {
             #arguments_module
-            pub mod #function;
+            mod #function;
         }
     });
     let builder_module_exports = root_builders.iter().map(|builder| {
@@ -328,7 +328,7 @@ pub(crate) fn render_build(
         quote! {
             #(#builder_module_declarations)*
             #serve_arguments_declaration
-            pub mod serve;
+            mod serve;
 
             #(#builder_module_exports)*
             pub use serve::serve;

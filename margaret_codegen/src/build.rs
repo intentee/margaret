@@ -1252,7 +1252,8 @@ impl RequestLog {
         let code = generate(MIDDLEWARE_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod middleware;"));
-        assert!(module(&code, "middleware").contains("pub mod request_log;"));
+        assert!(module(&code, "middleware").contains("pub use request_log::RequestLog;"));
+        assert!(!module(&code, "middleware").contains("pub mod request_log;"));
         assert!(module(&code, "middleware/request_log").contains("pub struct RequestLog"));
         assert!(concatenated(&code).contains("super::super::middleware::RequestLog"));
     }
@@ -1289,7 +1290,11 @@ impl GetProfile {
         let code = generate(AUTHENTICATED_USER_CRATE).expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod authenticated_users;"));
-        assert!(module(&code, "authenticated_users").contains("pub mod session_user_provider;"));
+        assert!(
+            module(&code, "authenticated_users")
+                .contains("pub use session_user_provider::SessionUserProvider;")
+        );
+        assert!(!module(&code, "authenticated_users").contains("pub mod session_user_provider;"));
         assert!(
             module(&code, "authenticated_users/session_user_provider")
                 .contains("pub struct SessionUserProvider")
@@ -1384,7 +1389,8 @@ impl RequestLog {
 
         assert!(module(&code, "mod").contains("pub mod websocket;"));
         assert!(module(&code, "mod").contains("pub mod middleware;"));
-        assert!(module(&code, "middleware").contains("pub mod request_log;"));
+        assert!(module(&code, "middleware").contains("pub use request_log::RequestLog;"));
+        assert!(!module(&code, "middleware").contains("pub mod request_log;"));
         assert!(module(&code, "middleware/request_log").contains("pub struct RequestLog"));
         assert!(concatenated(&code).contains("super::middleware::RequestLog"));
         assert!(!concatenated(&code).contains("GatedWebSocketUpgrade"));
