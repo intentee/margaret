@@ -183,6 +183,7 @@ clippy:
 	cargo clippy $(GENERATED_CODE_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy -p margaret --all-targets --no-default-features -- -D warnings
 	cargo clippy -p margaret --all-targets --no-default-features --features codegen -- -D warnings
+	cargo clippy -p margaret --all-targets --all-features -- -D warnings
 
 .PHONY: coverage
 coverage: node_modules postgres-image
