@@ -5,7 +5,7 @@ slow-timeout = { period = "100ms", terminate-after = 2 }
 postgres-container = { max-threads = 1 }
 
 [[profile.default.overrides]]
-filter = 'package(~_spiffe_svid)'
+filter = 'package(~_spiffe_svid) | package(~margaret_jwks_client) | package(margaret_http_tests)'
 slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]

@@ -22,7 +22,7 @@ use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBund
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
     let fixture = MtlsFixture::new();
 
