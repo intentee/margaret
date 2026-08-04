@@ -10,6 +10,15 @@ pub(crate) enum ScaffoldError {
         source: std::io::Error,
     },
 
+    #[error(
+        "failed to remove the partially scaffolded directory '{path}' after scaffolding failed with '{scaffold_failure}': {source}"
+    )]
+    DiscardPartialScaffold {
+        path: PathBuf,
+        scaffold_failure: Box<ScaffoldError>,
+        source: std::io::Error,
+    },
+
     #[error("the scaffolded directory '{path}' already exists")]
     TargetDirectoryExists { path: PathBuf },
 

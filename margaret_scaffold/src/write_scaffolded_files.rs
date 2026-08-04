@@ -20,12 +20,24 @@ fn claim_target_directory(target_directory: &Path) -> Result<(), ScaffoldError> 
     })
 }
 
-pub(crate) fn write_scaffolded_files(
+fn discard_partial_scaffold(
+    target_directory: &Path,
+    scaffold_failure: ScaffoldError,
+) -> ScaffoldError {
+    match fs::remove_dir_all(target_directory) {
+        Ok(()) => scaffold_failure,
+        Err(source) => ScaffoldError::DiscardPartialScaffold {
+            path: target_directory.to_path_buf(),
+            scaffold_failure: Box::new(scaffold_failure),
+            source,
+        },
+    }
+}
+
+fn fill_claimed_directory(
     target_directory: &Path,
     files: &[ScaffoldedFile],
 ) -> Result<(), ScaffoldError> {
-    claim_target_directory(target_directory)?;
-
     for file in files {
         let path = target_directory.join(&file.relative_path);
         let parent = path.parent().unwrap_or(target_directory);
@@ -43,6 +55,16 @@ pub(crate) fn write_scaffolded_files(
     Ok(())
 }
 
+pub(crate) fn write_scaffolded_files(
+    target_directory: &Path,
+    files: &[ScaffoldedFile],
+) -> Result<(), ScaffoldError> {
+    claim_target_directory(target_directory)?;
+
+    fill_claimed_directory(target_directory, files)
+        .map_err(|scaffold_failure| discard_partial_scaffold(target_directory, scaffold_failure))
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -50,6 +72,7 @@ mod tests {
 
     use tempfile::tempdir;
 
+    use super::discard_partial_scaffold;
     use super::write_scaffolded_files;
     use crate::scaffold_error::ScaffoldError;
     use crate::scaffolded_file::ScaffoldedFile;
@@ -167,5 +190,81 @@ mod tests {
             &error,
             ScaffoldError::WriteFile { path, .. } if *path == target.join("src")
         ));
+    }
+
+    #[test]
+    fn leaves_no_directory_behind_when_a_file_cannot_be_written() {
+        let workspace = tempdir().expect("a temporary workspace directory");
+        let target = workspace.path().join("acme");
+        let blocked = [
+            ScaffoldedFile {
+                contents: String::new(),
+                relative_path: PathBuf::from("src").join("lib.rs"),
+            },
+            ScaffoldedFile {
+                contents: String::new(),
+                relative_path: PathBuf::from("src"),
+            },
+        ];
+
+        write_scaffolded_files(&target, &blocked).expect_err("a blocked file is reported");
+
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn scaffolds_into_the_same_directory_after_an_earlier_attempt_failed() {
+        let workspace = tempdir().expect("a temporary workspace directory");
+        let target = workspace.path().join("acme");
+
+        write_scaffolded_files(
+            &target,
+            &[
+                ScaffoldedFile {
+                    contents: String::new(),
+                    relative_path: PathBuf::from("src").join("lib.rs"),
+                },
+                ScaffoldedFile {
+                    contents: String::new(),
+                    relative_path: PathBuf::from("src"),
+                },
+            ],
+        )
+        .expect_err("the first attempt fails");
+
+        write_scaffolded_files(
+            &target,
+            &[ScaffoldedFile {
+                contents: "[workspace]\n".to_string(),
+                relative_path: PathBuf::from("Cargo.toml"),
+            }],
+        )
+        .expect("the retry succeeds");
+
+        assert_eq!(
+            fs::read_to_string(target.join("Cargo.toml")).expect("the manifest is readable"),
+            "[workspace]\n"
+        );
+    }
+
+    #[test]
+    fn keeps_the_original_failure_when_the_partial_scaffold_cannot_be_removed() {
+        let workspace = tempdir().expect("a temporary workspace directory");
+        let removed = workspace.path().join("already-gone");
+        let error = discard_partial_scaffold(
+            &removed,
+            ScaffoldError::TargetDirectoryExists {
+                path: removed.clone(),
+            },
+        );
+
+        let reported = error.to_string();
+
+        assert!(matches!(
+            &error,
+            ScaffoldError::DiscardPartialScaffold { path, .. } if *path == removed
+        ));
+        assert!(reported.contains("failed to remove the partially scaffolded directory"));
+        assert!(reported.contains("the scaffolded directory"));
     }
 }
