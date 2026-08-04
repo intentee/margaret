@@ -29,6 +29,7 @@ mod rust_toolchain_manifest;
 mod scaffold_command;
 mod scaffold_error;
 mod scaffold_operation;
+mod scaffolded_entry;
 mod scaffolded_file;
 mod scaffolded_module;
 mod workspace_dependency_table;

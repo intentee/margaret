@@ -1,8 +1,12 @@
 use std::fs;
 use std::io::ErrorKind;
+use std::io::Result as IoResult;
+use std::iter::once;
 use std::path::Path;
+use std::path::PathBuf;
 
 use crate::scaffold_error::ScaffoldError;
+use crate::scaffolded_entry::ScaffoldedEntry;
 use crate::scaffolded_file::ScaffoldedFile;
 
 fn claim_target_directory(target_directory: &Path) -> Result<(), ScaffoldError> {
@@ -20,23 +24,70 @@ fn claim_target_directory(target_directory: &Path) -> Result<(), ScaffoldError> 
     })
 }
 
+fn tolerate_missing(outcome: IoResult<()>) -> IoResult<()> {
+    match outcome {
+        Err(source) if source.kind() == ErrorKind::NotFound => Ok(()),
+        outcome => outcome,
+    }
+}
+
+fn scaffolded_directories(target_directory: &Path, files: &[ScaffoldedFile]) -> Vec<PathBuf> {
+    let mut directories: Vec<PathBuf> = files
+        .iter()
+        .filter_map(|file| file.relative_path.parent())
+        .flat_map(Path::ancestors)
+        .filter(|ancestor| !ancestor.as_os_str().is_empty())
+        .map(|ancestor| target_directory.join(ancestor))
+        .collect();
+
+    directories.sort();
+    directories.dedup();
+    directories.reverse();
+
+    directories
+}
+
+fn removal_plan(
+    target_directory: &Path,
+    files: &[ScaffoldedFile],
+    written_files: Vec<PathBuf>,
+) -> Vec<ScaffoldedEntry> {
+    written_files
+        .into_iter()
+        .map(ScaffoldedEntry::File)
+        .chain(
+            scaffolded_directories(target_directory, files)
+                .into_iter()
+                .map(ScaffoldedEntry::Directory),
+        )
+        .chain(once(ScaffoldedEntry::Directory(
+            target_directory.to_path_buf(),
+        )))
+        .collect()
+}
+
 fn discard_partial_scaffold(
     target_directory: &Path,
+    plan: Vec<ScaffoldedEntry>,
     scaffold_failure: ScaffoldError,
 ) -> ScaffoldError {
-    match fs::remove_dir_all(target_directory) {
-        Ok(()) => scaffold_failure,
-        Err(source) => ScaffoldError::DiscardPartialScaffold {
-            path: target_directory.to_path_buf(),
-            scaffold_failure: Box::new(scaffold_failure),
-            source,
-        },
+    for entry in plan {
+        if let Err(source) = tolerate_missing(entry.remove()) {
+            return ScaffoldError::DiscardPartialScaffold {
+                path: target_directory.to_path_buf(),
+                scaffold_failure: Box::new(scaffold_failure),
+                source,
+            };
+        }
     }
+
+    scaffold_failure
 }
 
 fn fill_claimed_directory(
     target_directory: &Path,
     files: &[ScaffoldedFile],
+    written_files: &mut Vec<PathBuf>,
 ) -> Result<(), ScaffoldError> {
     for file in files {
         let path = target_directory.join(&file.relative_path);
@@ -50,6 +101,7 @@ fn fill_claimed_directory(
             path: path.clone(),
             source,
         })?;
+        written_files.push(path);
     }
 
     Ok(())
@@ -61,8 +113,16 @@ pub(crate) fn write_scaffolded_files(
 ) -> Result<(), ScaffoldError> {
     claim_target_directory(target_directory)?;
 
-    fill_claimed_directory(target_directory, files)
-        .map_err(|scaffold_failure| discard_partial_scaffold(target_directory, scaffold_failure))
+    let mut written_files = Vec::new();
+
+    match fill_claimed_directory(target_directory, files, &mut written_files) {
+        Ok(()) => Ok(()),
+        Err(scaffold_failure) => Err(discard_partial_scaffold(
+            target_directory,
+            removal_plan(target_directory, files, written_files),
+            scaffold_failure,
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -75,6 +135,7 @@ mod tests {
     use super::discard_partial_scaffold;
     use super::write_scaffolded_files;
     use crate::scaffold_error::ScaffoldError;
+    use crate::scaffolded_entry::ScaffoldedEntry;
     use crate::scaffolded_file::ScaffoldedFile;
 
     #[test]
@@ -248,21 +309,30 @@ mod tests {
     }
 
     #[test]
-    fn keeps_the_original_failure_when_the_partial_scaffold_cannot_be_removed() {
+    fn keeps_files_it_did_not_scaffold_and_reports_the_original_failure() {
         let workspace = tempdir().expect("a temporary workspace directory");
-        let removed = workspace.path().join("already-gone");
+        let target = workspace.path().join("acme");
+        let foreign = target.join("foreign.rs");
+
+        fs::create_dir(&target).expect("the target directory is created");
+        fs::write(&foreign, "// written by somebody else\n").expect("the foreign file is written");
+
         let error = discard_partial_scaffold(
-            &removed,
+            &target,
+            vec![ScaffoldedEntry::Directory(target.clone())],
             ScaffoldError::TargetDirectoryExists {
-                path: removed.clone(),
+                path: target.clone(),
             },
         );
-
         let reported = error.to_string();
 
+        assert_eq!(
+            fs::read_to_string(&foreign).expect("the foreign file is readable"),
+            "// written by somebody else\n"
+        );
         assert!(matches!(
             &error,
-            ScaffoldError::DiscardPartialScaffold { path, .. } if *path == removed
+            ScaffoldError::DiscardPartialScaffold { path, .. } if *path == target
         ));
         assert!(reported.contains("failed to remove the partially scaffolded directory"));
         assert!(reported.contains("the scaffolded directory"));
