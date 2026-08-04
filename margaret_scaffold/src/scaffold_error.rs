@@ -10,12 +10,15 @@ pub(crate) enum ScaffoldError {
         source: std::io::Error,
     },
 
-    #[error(
-        "failed to remove the partially scaffolded directory '{path}' after scaffolding failed with '{scaffold_failure}': {source}"
-    )]
-    DiscardPartialScaffold {
+    #[error("failed to move the staged project into '{path}': {source}")]
+    PublishScaffold {
         path: PathBuf,
-        scaffold_failure: Box<ScaffoldError>,
+        source: std::io::Error,
+    },
+
+    #[error("failed to stage the scaffolded project inside '{path}': {source}")]
+    StageScaffold {
+        path: PathBuf,
         source: std::io::Error,
     },
 

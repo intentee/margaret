@@ -1,13 +1,18 @@
 use std::fs;
 use std::io::ErrorKind;
-use std::io::Result as IoResult;
-use std::iter::once;
 use std::path::Path;
-use std::path::PathBuf;
+
+use tempfile::TempDir;
 
 use crate::scaffold_error::ScaffoldError;
-use crate::scaffolded_entry::ScaffoldedEntry;
 use crate::scaffolded_file::ScaffoldedFile;
+
+fn staging_parent(target_directory: &Path) -> &Path {
+    match target_directory.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    }
+}
 
 fn claim_target_directory(target_directory: &Path) -> Result<(), ScaffoldError> {
     fs::create_dir(target_directory).map_err(|source| {
@@ -24,122 +29,84 @@ fn claim_target_directory(target_directory: &Path) -> Result<(), ScaffoldError> 
     })
 }
 
-fn tolerate_missing(outcome: IoResult<()>) -> IoResult<()> {
-    match outcome {
-        Err(source) if source.kind() == ErrorKind::NotFound => Ok(()),
-        outcome => outcome,
-    }
+fn publish_scaffold(staging: &Path, target_directory: &Path) -> Result<(), ScaffoldError> {
+    fs::rename(staging, target_directory).map_err(|source| ScaffoldError::PublishScaffold {
+        path: target_directory.to_path_buf(),
+        source,
+    })
 }
 
-fn scaffolded_directories(target_directory: &Path, files: &[ScaffoldedFile]) -> Vec<PathBuf> {
-    let mut directories: Vec<PathBuf> = files
-        .iter()
-        .filter_map(|file| file.relative_path.parent())
-        .flat_map(Path::ancestors)
-        .filter(|ancestor| !ancestor.as_os_str().is_empty())
-        .map(|ancestor| target_directory.join(ancestor))
-        .collect();
-
-    directories.sort();
-    directories.dedup();
-    directories.reverse();
-
-    directories
-}
-
-fn removal_plan(
+fn stage_scaffolded_files(
     target_directory: &Path,
     files: &[ScaffoldedFile],
-    written_files: Vec<PathBuf>,
-) -> Vec<ScaffoldedEntry> {
-    written_files
-        .into_iter()
-        .map(ScaffoldedEntry::File)
-        .chain(
-            scaffolded_directories(target_directory, files)
-                .into_iter()
-                .map(ScaffoldedEntry::Directory),
-        )
-        .chain(once(ScaffoldedEntry::Directory(
-            target_directory.to_path_buf(),
-        )))
-        .collect()
-}
+) -> Result<TempDir, ScaffoldError> {
+    let parent = staging_parent(target_directory);
+    let staging = TempDir::new_in(parent).map_err(|source| ScaffoldError::StageScaffold {
+        path: parent.to_path_buf(),
+        source,
+    })?;
 
-fn discard_partial_scaffold(
-    target_directory: &Path,
-    plan: Vec<ScaffoldedEntry>,
-    scaffold_failure: ScaffoldError,
-) -> ScaffoldError {
-    for entry in plan {
-        if let Err(source) = tolerate_missing(entry.remove()) {
-            return ScaffoldError::DiscardPartialScaffold {
-                path: target_directory.to_path_buf(),
-                scaffold_failure: Box::new(scaffold_failure),
-                source,
-            };
-        }
-    }
-
-    scaffold_failure
-}
-
-fn fill_claimed_directory(
-    target_directory: &Path,
-    files: &[ScaffoldedFile],
-    written_files: &mut Vec<PathBuf>,
-) -> Result<(), ScaffoldError> {
     for file in files {
-        let path = target_directory.join(&file.relative_path);
-        let parent = path.parent().unwrap_or(target_directory);
+        let relative_directory = file.relative_path.parent().unwrap_or(Path::new(""));
 
-        fs::create_dir_all(parent).map_err(|source| ScaffoldError::CreateDirectory {
-            path: parent.to_path_buf(),
-            source,
+        fs::create_dir_all(staging.path().join(relative_directory)).map_err(|source| {
+            ScaffoldError::CreateDirectory {
+                path: target_directory.join(relative_directory),
+                source,
+            }
         })?;
-        fs::write(&path, &file.contents).map_err(|source| ScaffoldError::WriteFile {
-            path: path.clone(),
-            source,
+        fs::write(staging.path().join(&file.relative_path), &file.contents).map_err(|source| {
+            ScaffoldError::WriteFile {
+                path: target_directory.join(&file.relative_path),
+                source,
+            }
         })?;
-        written_files.push(path);
     }
 
-    Ok(())
+    Ok(staging)
 }
 
 pub(crate) fn write_scaffolded_files(
     target_directory: &Path,
     files: &[ScaffoldedFile],
 ) -> Result<(), ScaffoldError> {
+    let staging = stage_scaffolded_files(target_directory, files)?;
+
     claim_target_directory(target_directory)?;
 
-    let mut written_files = Vec::new();
-
-    match fill_claimed_directory(target_directory, files, &mut written_files) {
-        Ok(()) => Ok(()),
-        Err(scaffold_failure) => Err(discard_partial_scaffold(
-            target_directory,
-            removal_plan(target_directory, files, written_files),
-            scaffold_failure,
-        )),
-    }
+    publish_scaffold(staging.path(), target_directory)
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::Path;
     use std::path::PathBuf;
 
     use tempfile::tempdir;
 
-    use super::discard_partial_scaffold;
+    use super::claim_target_directory;
+    use super::publish_scaffold;
+    use super::staging_parent;
     use super::write_scaffolded_files;
     use crate::scaffold_error::ScaffoldError;
-    use crate::scaffolded_entry::ScaffoldedEntry;
     use crate::scaffolded_file::ScaffoldedFile;
 
+    fn blocked_files() -> Vec<ScaffoldedFile> {
+        vec![
+            ScaffoldedFile {
+                contents: String::new(),
+                relative_path: PathBuf::from("src").join("lib.rs"),
+            },
+            ScaffoldedFile {
+                contents: String::new(),
+                relative_path: PathBuf::from("src"),
+            },
+        ]
+    }
+
     #[test]
-    fn writes_every_file_below_the_claimed_directory() {
+    fn writes_every_file_below_the_published_directory() {
         let workspace = tempdir().expect("a temporary workspace directory");
         let target = workspace.path().join("acme");
 
@@ -186,19 +153,54 @@ mod tests {
     }
 
     #[test]
-    fn reports_a_target_directory_that_cannot_be_claimed() {
+    fn never_creates_the_target_when_a_file_cannot_be_written() {
         let workspace = tempdir().expect("a temporary workspace directory");
-        let blocker = workspace.path().join("blocker");
+        let target = workspace.path().join("acme");
 
-        fs::write(&blocker, "").expect("the blocking file is written");
-
-        let target = blocker.join("acme");
-        let error = write_scaffolded_files(&target, &[]).expect_err("a blocked target is reported");
+        let error = write_scaffolded_files(&target, &blocked_files())
+            .expect_err("a blocked file is reported");
 
         assert!(matches!(
             &error,
-            ScaffoldError::CreateDirectory { path, .. } if *path == target
+            ScaffoldError::WriteFile { path, .. } if *path == target.join("src")
         ));
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn scaffolds_into_the_same_directory_after_an_earlier_attempt_failed() {
+        let workspace = tempdir().expect("a temporary workspace directory");
+        let target = workspace.path().join("acme");
+
+        write_scaffolded_files(&target, &blocked_files()).expect_err("the first attempt fails");
+        write_scaffolded_files(
+            &target,
+            &[ScaffoldedFile {
+                contents: "[workspace]\n".to_string(),
+                relative_path: PathBuf::from("Cargo.toml"),
+            }],
+        )
+        .expect("the retry succeeds");
+
+        assert_eq!(
+            fs::read_to_string(target.join("Cargo.toml")).expect("the manifest is readable"),
+            "[workspace]\n"
+        );
+    }
+
+    #[test]
+    fn leaves_nothing_behind_in_the_directory_it_stages_into() {
+        let workspace = tempdir().expect("a temporary workspace directory");
+        let target = workspace.path().join("acme");
+
+        write_scaffolded_files(&target, &blocked_files()).expect_err("the attempt fails");
+
+        assert_eq!(
+            fs::read_dir(workspace.path())
+                .expect("the workspace is readable")
+                .count(),
+            0
+        );
     }
 
     #[test]
@@ -228,113 +230,61 @@ mod tests {
     }
 
     #[test]
-    fn reports_a_file_that_cannot_be_written() {
+    fn reports_a_directory_the_scaffold_cannot_be_staged_in() {
         let workspace = tempdir().expect("a temporary workspace directory");
-        let target = workspace.path().join("acme");
-
-        let error = write_scaffolded_files(
-            &target,
-            &[
-                ScaffoldedFile {
-                    contents: String::new(),
-                    relative_path: PathBuf::from("src").join("lib.rs"),
-                },
-                ScaffoldedFile {
-                    contents: String::new(),
-                    relative_path: PathBuf::from("src"),
-                },
-            ],
-        )
-        .expect_err("a blocked file is reported");
+        let missing = workspace.path().join("missing");
+        let error = write_scaffolded_files(&missing.join("acme"), &[])
+            .expect_err("a missing staging parent is reported");
 
         assert!(matches!(
             &error,
-            ScaffoldError::WriteFile { path, .. } if *path == target.join("src")
+            ScaffoldError::StageScaffold { path, .. } if *path == missing
         ));
     }
 
     #[test]
-    fn leaves_no_directory_behind_when_a_file_cannot_be_written() {
+    fn reports_a_target_directory_that_cannot_be_claimed() {
         let workspace = tempdir().expect("a temporary workspace directory");
-        let target = workspace.path().join("acme");
-        let blocked = [
-            ScaffoldedFile {
-                contents: String::new(),
-                relative_path: PathBuf::from("src").join("lib.rs"),
-            },
-            ScaffoldedFile {
-                contents: String::new(),
-                relative_path: PathBuf::from("src"),
-            },
-        ];
+        let blocker = workspace.path().join("blocker");
 
-        write_scaffolded_files(&target, &blocked).expect_err("a blocked file is reported");
+        fs::write(&blocker, "").expect("the blocking file is written");
 
-        assert!(!target.exists());
-    }
+        let target = blocker.join("acme");
+        let error =
+            claim_target_directory(&target).expect_err("a blocked target directory is reported");
 
-    #[test]
-    fn scaffolds_into_the_same_directory_after_an_earlier_attempt_failed() {
-        let workspace = tempdir().expect("a temporary workspace directory");
-        let target = workspace.path().join("acme");
-
-        write_scaffolded_files(
-            &target,
-            &[
-                ScaffoldedFile {
-                    contents: String::new(),
-                    relative_path: PathBuf::from("src").join("lib.rs"),
-                },
-                ScaffoldedFile {
-                    contents: String::new(),
-                    relative_path: PathBuf::from("src"),
-                },
-            ],
-        )
-        .expect_err("the first attempt fails");
-
-        write_scaffolded_files(
-            &target,
-            &[ScaffoldedFile {
-                contents: "[workspace]\n".to_string(),
-                relative_path: PathBuf::from("Cargo.toml"),
-            }],
-        )
-        .expect("the retry succeeds");
-
-        assert_eq!(
-            fs::read_to_string(target.join("Cargo.toml")).expect("the manifest is readable"),
-            "[workspace]\n"
-        );
-    }
-
-    #[test]
-    fn keeps_files_it_did_not_scaffold_and_reports_the_original_failure() {
-        let workspace = tempdir().expect("a temporary workspace directory");
-        let target = workspace.path().join("acme");
-        let foreign = target.join("foreign.rs");
-
-        fs::create_dir(&target).expect("the target directory is created");
-        fs::write(&foreign, "// written by somebody else\n").expect("the foreign file is written");
-
-        let error = discard_partial_scaffold(
-            &target,
-            vec![ScaffoldedEntry::Directory(target.clone())],
-            ScaffoldError::TargetDirectoryExists {
-                path: target.clone(),
-            },
-        );
-        let reported = error.to_string();
-
-        assert_eq!(
-            fs::read_to_string(&foreign).expect("the foreign file is readable"),
-            "// written by somebody else\n"
-        );
         assert!(matches!(
             &error,
-            ScaffoldError::DiscardPartialScaffold { path, .. } if *path == target
+            ScaffoldError::CreateDirectory { path, .. } if *path == target
         ));
-        assert!(reported.contains("failed to remove the partially scaffolded directory"));
-        assert!(reported.contains("the scaffolded directory"));
+    }
+
+    #[test]
+    fn reports_a_scaffold_that_cannot_be_published() {
+        let workspace = tempdir().expect("a temporary workspace directory");
+        let staging = workspace.path().join("staging");
+
+        fs::create_dir(&staging).expect("the staging directory is created");
+
+        let target = workspace.path().join("missing").join("acme");
+        let error = publish_scaffold(&staging, &target).expect_err("a blocked move is reported");
+
+        assert!(matches!(
+            &error,
+            ScaffoldError::PublishScaffold { path, .. } if *path == target
+        ));
+    }
+
+    #[test]
+    fn stages_next_to_the_target_directory() {
+        assert_eq!(
+            staging_parent(Path::new("/home/margaret/acme")),
+            Path::new("/home/margaret")
+        );
+    }
+
+    #[test]
+    fn stages_in_the_working_directory_for_a_bare_project_name() {
+        assert_eq!(staging_parent(Path::new("acme")), Path::new("."));
     }
 }
