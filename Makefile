@@ -5,6 +5,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_asset_bag_codegen \
 	-p margaret_attribute_arguments \
 	-p margaret_attributes \
+	-p margaret_cli \
 	-p margaret_codegen \
 	-p margaret_codegen_tests \
 	-p margaret_codegen_tokens \
@@ -46,6 +47,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_binding \
 	-p margaret_route_parameter_codegen \
+	-p margaret_scaffold \
 	-p margaret_schema_codegen \
 	-p margaret_schema_identifier_naming \
 	-p margaret_schema_postgres_tests \
@@ -99,6 +101,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_asset_bag_codegen \
 	-p margaret_attribute_arguments \
 	-p margaret_attributes \
+	-p margaret_cli \
 	-p margaret_codegen \
 	-p margaret_codegen_tokens \
 	-p margaret_console \
@@ -131,6 +134,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_binding \
 	-p margaret_route_parameter_codegen \
+	-p margaret_scaffold \
 	-p margaret_schema_codegen \
 	-p margaret_schema_identifier_naming \
 	-p margaret_service \
@@ -181,6 +185,7 @@ clippy:
 	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(SPIRE_FEATURES) -- -D warnings
 	cargo clippy $(RUNTIME_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy $(GENERATED_CODE_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
+	cargo clippy -p margaret_cli --bins -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy -p margaret --all-targets --no-default-features -- -D warnings
 	cargo clippy -p margaret --all-targets --no-default-features --features codegen -- -D warnings
 	cargo clippy -p margaret --all-targets --all-features -- -D warnings
@@ -203,6 +208,7 @@ coverage: node_modules postgres-image
 		--gated margaret_asset_bag_codegen=100 \
 		--gated margaret_attribute_arguments=100 \
 		--gated margaret_attributes=100 \
+		--gated margaret_cli=100 \
 		--gated margaret_codegen=100 \
 		--gated margaret_codegen_tests=100 \
 		--gated margaret_codegen_tokens=100 \
@@ -244,6 +250,7 @@ coverage: node_modules postgres-image
 		--gated margaret_request_binding_codegen=100 \
 		--gated margaret_route_parameter_binding=100 \
 		--gated margaret_route_parameter_codegen=100 \
+		--gated margaret_scaffold=100 \
 		--gated margaret_schema_codegen=100 \
 		--gated margaret_schema_identifier_naming=100 \
 		--gated margaret_schema_postgres_tests=100 \

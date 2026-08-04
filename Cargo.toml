@@ -15,6 +15,7 @@ members = [
     "margaret_codegen_tests/tests/fixtures/self_referential_model",
     "margaret_codegen_tests/tests/fixtures/spiffe_http_client",
     "margaret_codegen_tests/tests/fixtures/websocket_console_argument_provider",
+    "margaret_cli",
     "margaret_codegen_tokens",
     "margaret_console",
     "margaret_console_argument_codegen",
@@ -56,6 +57,7 @@ members = [
     "margaret_request_binding_codegen",
     "margaret_route_parameter_binding",
     "margaret_route_parameter_codegen",
+    "margaret_scaffold",
     "margaret_schema_codegen",
     "margaret_schema_identifier_naming",
     "margaret_schema_postgres_tests",
@@ -134,6 +136,7 @@ tokio-rustls = "0.26"
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 tokio-util = "0.7"
 toml = "0.8"
+toml_edit = "0.22"
 tower = "0.5"
 trzcina = "0.4"
 url = "2.5"
