@@ -9,6 +9,10 @@ filter = 'package(~_spiffe_svid) | package(~margaret_jwks_client) | package(marg
 slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]
+filter = 'package(margaret_jwks_file_secret_storage_tests) | package(margaret_jwks_roller_server) | package(margaret_jwks_secret_storage_selection_tests)'
+slow-timeout = { period = "1s", terminate-after = 2 }
+
+[[profile.default.overrides]]
 filter = 'package(margaret_schema_postgres_tests)'
 slow-timeout = { period = "2s", terminate-after = 2 }
 test-group = 'postgres-container'
