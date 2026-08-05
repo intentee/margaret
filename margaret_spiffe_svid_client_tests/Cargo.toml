@@ -2,6 +2,7 @@
 name = "margaret_spiffe_svid_client_tests"
 version = "0.1.0"
 edition = "2024"
+publish = false
 autotests = false
 
 [dependencies]
