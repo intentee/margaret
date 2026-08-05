@@ -5,11 +5,11 @@ slow-timeout = { period = "100ms", terminate-after = 2 }
 postgres-container = { max-threads = 1 }
 
 [[profile.default.overrides]]
-filter = 'package(~_spiffe_svid) | package(~margaret_jwks_client) | package(margaret_http_tests)'
+filter = 'package(~_spiffe_svid) | test(~verifies_a_token_against_the_polled_well_known_document) | test(~returns_when_cancelled_before_the_first_poll) | test(~serves_a_request_over_spiffe_mtls) | test(~forbids_a_peer_without_a_spiffe_id)'
 slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = 'package(margaret_jwks_file_secret_storage_tests) | package(margaret_jwks_roller_server) | package(margaret_jwks_secret_storage_selection_tests)'
+filter = 'test(~file_storage_persist) | test(~roll_and_publish) | test(~resolve_selects_file_storage)'
 slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]
