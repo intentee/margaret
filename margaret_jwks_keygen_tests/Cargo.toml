@@ -12,7 +12,7 @@ serde = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 base64ct = { workspace = true }
 jsonwebtoken = { workspace = true }
-margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
+margaret_jwks_keygen = { workspace = true }
 p256 = { workspace = true }
 p384 = { workspace = true }
 serde_json = { workspace = true }

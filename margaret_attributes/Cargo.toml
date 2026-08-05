@@ -1,12 +1,18 @@
 [package]
 name = "margaret_attributes"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Compile-time attribute metadata for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 autotests = false
 
 [dependencies]
 heck = { workspace = true }
-margaret_attribute_arguments = { path = "../margaret_attribute_arguments" }
+margaret_attribute_arguments = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

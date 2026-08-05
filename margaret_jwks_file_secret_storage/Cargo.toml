@@ -1,12 +1,18 @@
 [package]
 name = "margaret_jwks_file_secret_storage"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "File-backed JWKS secret storage for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
-margaret_jwks_roller = { path = "../margaret_jwks_roller" }
+margaret_jwks_keygen = { workspace = true }
+margaret_jwks_roller = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

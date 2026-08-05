@@ -1,14 +1,20 @@
 [package]
 name = "margaret_token_signer"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Cryptographic token signing for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true }
 futures-util = { workspace = true }
-margaret_identity_session = { path = "../margaret_identity_session" }
-margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
+margaret_identity_session = { workspace = true }
+margaret_jwks_keygen = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 

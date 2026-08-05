@@ -1,18 +1,24 @@
 [package]
 name = "margaret_container"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Dependency-container code generation for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
 heck = { workspace = true }
-margaret_attribute_arguments = { path = "../margaret_attribute_arguments" }
-margaret_attributes = { path = "../margaret_attributes" }
-margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
-margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
-margaret_generated_module = { path = "../margaret_generated_module" }
-margaret_tag_codegen = { path = "../margaret_tag_codegen" }
-margaret_toposort = { path = "../margaret_toposort" }
-margaret_syn_type_peeling = { path = "../margaret_syn_type_peeling" }
+margaret_attribute_arguments = { workspace = true }
+margaret_attributes = { workspace = true }
+margaret_codegen_tokens = { workspace = true }
+margaret_console_argument_codegen = { workspace = true }
+margaret_generated_module = { workspace = true }
+margaret_tag_codegen = { workspace = true }
+margaret_toposort = { workspace = true }
+margaret_syn_type_peeling = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

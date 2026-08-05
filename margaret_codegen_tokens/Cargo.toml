@@ -1,10 +1,16 @@
 [package]
 name = "margaret_codegen_tokens"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Shared code-generation tokens for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
-margaret_attributes = { path = "../margaret_attributes" }
+margaret_attributes = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

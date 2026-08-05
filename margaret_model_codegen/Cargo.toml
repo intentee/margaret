@@ -1,14 +1,20 @@
 [package]
 name = "margaret_model_codegen"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Model code generation for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
-margaret_attribute_arguments = { path = "../margaret_attribute_arguments" }
-margaret_attributes = { path = "../margaret_attributes" }
-margaret_schema_identifier_naming = { path = "../margaret_schema_identifier_naming" }
-margaret_toposort = { path = "../margaret_toposort" }
-margaret_syn_type_peeling = { path = "../margaret_syn_type_peeling" }
+margaret_attribute_arguments = { workspace = true }
+margaret_attributes = { workspace = true }
+margaret_schema_identifier_naming = { workspace = true }
+margaret_toposort = { workspace = true }
+margaret_syn_type_peeling = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

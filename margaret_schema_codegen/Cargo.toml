@@ -1,17 +1,23 @@
 [package]
 name = "margaret_schema_codegen"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Database schema code generation for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
-margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
-margaret_generated_module = { path = "../margaret_generated_module" }
-margaret_model_codegen = { path = "../margaret_model_codegen" }
+margaret_codegen_tokens = { workspace = true }
+margaret_generated_module = { workspace = true }
+margaret_model_codegen = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 
 [dev-dependencies]
-margaret_attributes = { path = "../margaret_attributes" }
+margaret_attributes = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

@@ -1,7 +1,13 @@
 [package]
 name = "margaret_attribute_arguments"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Typed attribute-argument parsing for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
 quote = { workspace = true }

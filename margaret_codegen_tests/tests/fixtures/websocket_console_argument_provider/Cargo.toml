@@ -8,7 +8,7 @@ publish = false
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
-margaret = { path = "../../../../margaret" }
+margaret = { workspace = true, features = ["runtime"] }
 maud = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -19,7 +19,7 @@ trzcina = { workspace = true }
 validator = { workspace = true, features = ["derive"] }
 
 [build-dependencies]
-margaret = { path = "../../../../margaret", default-features = false, features = ["codegen"] }
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
 
 [lints]
 workspace = true

@@ -1,16 +1,22 @@
 [package]
 name = "margaret_spiffe_svid_client"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "SPIFFE SVID client support for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 log = { workspace = true }
-margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
+margaret_spiffe_svid = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types"] }
-margaret_sync_holder = { path = "../margaret_sync_holder" }
+margaret_sync_holder = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 rustls-webpki = { workspace = true }

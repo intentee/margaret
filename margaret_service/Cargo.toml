@@ -1,15 +1,21 @@
 [package]
 name = "margaret_service"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Application service runtime support for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
-margaret_console = { path = "../margaret_console" }
-margaret_http = { path = "../margaret_http" }
-margaret_http_uploaded_file = { path = "../margaret_http_uploaded_file" }
+margaret_console = { workspace = true }
+margaret_http = { workspace = true }
+margaret_http_uploaded_file = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "signal"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }

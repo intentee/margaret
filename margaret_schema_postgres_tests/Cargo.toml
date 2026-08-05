@@ -7,7 +7,7 @@ autotests = false
 
 [dependencies]
 ephemeral-postgres = { workspace = true }
-margaret_model = { path = "../margaret_model" }
+margaret_model = { workspace = true }
 sqlx = { workspace = true }
 
 [dev-dependencies]

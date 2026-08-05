@@ -8,9 +8,9 @@ autotests = false
 [dependencies]
 anyhow = { workspace = true }
 libc = { workspace = true }
-margaret_peer_identity = { path = "../margaret_peer_identity" }
-margaret_spiffe_svid = { path = "../margaret_spiffe_svid" }
-margaret_sync_holder = { path = "../margaret_sync_holder" }
+margaret_peer_identity = { workspace = true }
+margaret_spiffe_svid = { workspace = true }
+margaret_sync_holder = { workspace = true }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

@@ -1,11 +1,17 @@
 [package]
 name = "margaret_tag_codegen"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Dependency tag code generation for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
-margaret_attribute_arguments = { path = "../margaret_attribute_arguments" }
-margaret_attributes = { path = "../margaret_attributes" }
+margaret_attribute_arguments = { workspace = true }
+margaret_attributes = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 

@@ -1,7 +1,13 @@
 [package]
 name = "margaret_websocket"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "WebSocket runtime support for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
@@ -10,10 +16,10 @@ futures-util = { workspace = true }
 http = { workspace = true }
 hyper = { workspace = true, features = ["http1"] }
 hyper-util = { workspace = true, features = ["tokio"] }
-margaret_http = { path = "../margaret_http" }
-margaret_route_parameter_binding = { path = "../margaret_route_parameter_binding" }
-margaret_validation = { path = "../margaret_validation" }
-margaret_websocket_session = { path = "../margaret_websocket_session" }
+margaret_http = { workspace = true }
+margaret_route_parameter_binding = { workspace = true }
+margaret_validation = { workspace = true }
+margaret_websocket_session = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

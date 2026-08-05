@@ -1,17 +1,23 @@
 [package]
 name = "margaret_request_binding_codegen"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Request binding code generation for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
-margaret_attribute_arguments = { path = "../margaret_attribute_arguments" }
-margaret_attributes = { path = "../margaret_attributes" }
-margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
-margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
-margaret_container = { path = "../margaret_container" }
-margaret_generated_module = { path = "../margaret_generated_module" }
-margaret_injection_codegen = { path = "../margaret_injection_codegen" }
-margaret_route_parameter_codegen = { path = "../margaret_route_parameter_codegen" }
+margaret_attribute_arguments = { workspace = true }
+margaret_attributes = { workspace = true }
+margaret_codegen_tokens = { workspace = true }
+margaret_console_argument_codegen = { workspace = true }
+margaret_container = { workspace = true }
+margaret_generated_module = { workspace = true }
+margaret_injection_codegen = { workspace = true }
+margaret_route_parameter_codegen = { workspace = true }
 heck = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }

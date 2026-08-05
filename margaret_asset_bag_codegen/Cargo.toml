@@ -1,12 +1,18 @@
 [package]
 name = "margaret_asset_bag_codegen"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Asset collection code generation for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
 esbuild-metafile = { workspace = true }
-margaret_codegen_tokens = { path = "../margaret_codegen_tokens" }
-margaret_generated_module = { path = "../margaret_generated_module" }
+margaret_codegen_tokens = { workspace = true }
+margaret_generated_module = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 serde_json = { workspace = true }

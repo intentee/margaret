@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-margaret = { path = "../../../../margaret" }
+margaret = { workspace = true, features = ["runtime"] }
 uuid = { workspace = true }
 
 [lints]

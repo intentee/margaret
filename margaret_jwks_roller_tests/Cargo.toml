@@ -7,8 +7,8 @@ autotests = false
 
 [dependencies]
 anyhow = { workspace = true }
-margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
-margaret_jwks_roller = { path = "../margaret_jwks_roller" }
+margaret_jwks_keygen = { workspace = true }
+margaret_jwks_roller = { workspace = true }
 thiserror = { workspace = true }
 
 [[test]]

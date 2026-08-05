@@ -1,26 +1,32 @@
 [package]
 name = "margaret_codegen"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Application code-generation orchestration for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
-margaret_asset_bag_codegen = { path = "../margaret_asset_bag_codegen" }
-margaret_attribute_arguments = { path = "../margaret_attribute_arguments" }
-margaret_attributes = { path = "../margaret_attributes" }
-margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
-margaret_console_codegen = { path = "../margaret_console_codegen" }
-margaret_container = { path = "../margaret_container" }
-margaret_generated_module = { path = "../margaret_generated_module" }
-margaret_http_codegen = { path = "../margaret_http_codegen" }
-margaret_jwks_codegen = { path = "../margaret_jwks_codegen" }
-margaret_middleware_codegen = { path = "../margaret_middleware_codegen" }
-margaret_model_codegen = { path = "../margaret_model_codegen" }
-margaret_request_binding_codegen = { path = "../margaret_request_binding_codegen" }
-margaret_schema_codegen = { path = "../margaret_schema_codegen" }
-margaret_service_codegen = { path = "../margaret_service_codegen" }
-margaret_tag_codegen = { path = "../margaret_tag_codegen" }
-margaret_views_codegen = { path = "../margaret_views_codegen" }
-margaret_websocket_codegen = { path = "../margaret_websocket_codegen" }
+margaret_asset_bag_codegen = { workspace = true }
+margaret_attribute_arguments = { workspace = true }
+margaret_attributes = { workspace = true }
+margaret_console_argument_codegen = { workspace = true }
+margaret_console_codegen = { workspace = true }
+margaret_container = { workspace = true }
+margaret_generated_module = { workspace = true }
+margaret_http_codegen = { workspace = true }
+margaret_jwks_codegen = { workspace = true }
+margaret_middleware_codegen = { workspace = true }
+margaret_model_codegen = { workspace = true }
+margaret_request_binding_codegen = { workspace = true }
+margaret_schema_codegen = { workspace = true }
+margaret_service_codegen = { workspace = true }
+margaret_tag_codegen = { workspace = true }
+margaret_views_codegen = { workspace = true }
+margaret_websocket_codegen = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 

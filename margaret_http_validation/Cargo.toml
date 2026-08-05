@@ -1,11 +1,17 @@
 [package]
 name = "margaret_http_validation"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "HTTP request validation for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
-margaret_http = { path = "../margaret_http" }
-margaret_validation = { path = "../margaret_validation" }
+margaret_http = { workspace = true }
+margaret_validation = { workspace = true }
 serde = { workspace = true }
 validator = { workspace = true }
 

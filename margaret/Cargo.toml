@@ -1,43 +1,51 @@
 [package]
 name = "margaret"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "An opinionated Rust application framework with compile-time verified architecture and dependency injection."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+keywords = ["framework", "dependency-injection", "code-generation", "compile-time"]
+categories = ["web-programming"]
 
 [dependencies]
 anyhow = { workspace = true, optional = true }
-margaret_access_token_minter = { path = "../margaret_access_token_minter", optional = true }
-margaret_asset_bag = { path = "../margaret_asset_bag", optional = true }
-margaret_codegen = { path = "../margaret_codegen", optional = true }
-margaret_console = { path = "../margaret_console", optional = true }
-margaret_construction = { path = "../margaret_construction", optional = true }
-margaret_http = { path = "../margaret_http", optional = true }
-margaret_http_uploaded_file = { path = "../margaret_http_uploaded_file", optional = true }
-margaret_http_validation = { path = "../margaret_http_validation", optional = true }
-margaret_identity = { path = "../margaret_identity", optional = true }
-margaret_identity_session = { path = "../margaret_identity_session", optional = true }
-margaret_jwks_client = { path = "../margaret_jwks_client", optional = true }
-margaret_jwks_endpoint = { path = "../margaret_jwks_endpoint", optional = true }
-margaret_jwks_file_secret_storage = { path = "../margaret_jwks_file_secret_storage", optional = true }
-margaret_jwks_keygen = { path = "../margaret_jwks_keygen", optional = true }
-margaret_jwks_roller = { path = "../margaret_jwks_roller", optional = true }
-margaret_jwks_roller_server = { path = "../margaret_jwks_roller_server", optional = true }
-margaret_jwks_secret_storage_selection = { path = "../margaret_jwks_secret_storage_selection", optional = true }
-margaret_jwks_secret_store = { path = "../margaret_jwks_secret_store", optional = true }
-margaret_macros = { path = "../margaret_macros", optional = true }
-margaret_model = { path = "../margaret_model", optional = true }
-margaret_peer_identity = { path = "../margaret_peer_identity", optional = true }
-margaret_route_parameter_binding = { path = "../margaret_route_parameter_binding", optional = true }
-margaret_service = { path = "../margaret_service", optional = true }
-margaret_spiffe_svid = { path = "../margaret_spiffe_svid", optional = true }
-margaret_spiffe_svid_bundle = { path = "../margaret_spiffe_svid_bundle", optional = true }
-margaret_spiffe_svid_client = { path = "../margaret_spiffe_svid_client", optional = true }
-margaret_spiffe_svid_server = { path = "../margaret_spiffe_svid_server", optional = true }
-margaret_sync_holder = { path = "../margaret_sync_holder", optional = true }
-margaret_token_signer = { path = "../margaret_token_signer", optional = true }
-margaret_validation = { path = "../margaret_validation", optional = true }
-margaret_views = { path = "../margaret_views", optional = true }
-margaret_websocket = { path = "../margaret_websocket", optional = true }
-margaret_websocket_session = { path = "../margaret_websocket_session", optional = true }
+margaret_access_token_minter = { workspace = true, optional = true }
+margaret_asset_bag = { workspace = true, optional = true }
+margaret_codegen = { workspace = true, optional = true }
+margaret_console = { workspace = true, optional = true }
+margaret_construction = { workspace = true, optional = true }
+margaret_http = { workspace = true, optional = true }
+margaret_http_uploaded_file = { workspace = true, optional = true }
+margaret_http_validation = { workspace = true, optional = true }
+margaret_identity = { workspace = true, optional = true }
+margaret_identity_session = { workspace = true, optional = true }
+margaret_jwks_client = { workspace = true, optional = true }
+margaret_jwks_endpoint = { workspace = true, optional = true }
+margaret_jwks_file_secret_storage = { workspace = true, optional = true }
+margaret_jwks_keygen = { workspace = true, optional = true }
+margaret_jwks_roller = { workspace = true, optional = true }
+margaret_jwks_roller_server = { workspace = true, optional = true }
+margaret_jwks_secret_storage_selection = { workspace = true, optional = true }
+margaret_jwks_secret_store = { workspace = true, optional = true }
+margaret_macros = { workspace = true, optional = true }
+margaret_model = { workspace = true, optional = true }
+margaret_peer_identity = { workspace = true, optional = true }
+margaret_route_parameter_binding = { workspace = true, optional = true }
+margaret_service = { workspace = true, optional = true }
+margaret_spiffe_svid = { workspace = true, optional = true }
+margaret_spiffe_svid_bundle = { workspace = true, optional = true }
+margaret_spiffe_svid_client = { workspace = true, optional = true }
+margaret_spiffe_svid_server = { workspace = true, optional = true }
+margaret_sync_holder = { workspace = true, optional = true }
+margaret_token_signer = { workspace = true, optional = true }
+margaret_validation = { workspace = true, optional = true }
+margaret_views = { workspace = true, optional = true }
+margaret_websocket = { workspace = true, optional = true }
+margaret_websocket_session = { workspace = true, optional = true }
 
 [features]
 default = ["runtime"]
@@ -80,3 +88,6 @@ runtime = [
 
 [lints]
 workspace = true
+
+[package.metadata.docs.rs]
+all-features = true

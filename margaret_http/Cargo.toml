@@ -1,7 +1,13 @@
 [package]
 name = "margaret_http"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "HTTP server runtime support for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
@@ -15,9 +21,9 @@ http-body = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server", "server-auto", "server-graceful", "service", "tokio"] }
-margaret_http_uploaded_file = { path = "../margaret_http_uploaded_file" }
-margaret_peer_identity = { path = "../margaret_peer_identity" }
-margaret_route_parameter_binding = { path = "../margaret_route_parameter_binding" }
+margaret_http_uploaded_file = { workspace = true }
+margaret_peer_identity = { workspace = true }
+margaret_route_parameter_binding = { workspace = true }
 matchit = { workspace = true }
 maud = { workspace = true }
 mime = { workspace = true }

@@ -10,7 +10,7 @@ async-trait = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 clap = { workspace = true }
 dashmap = { workspace = true }
-margaret = { path = "../margaret" }
+margaret = { workspace = true, features = ["runtime"] }
 maud = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -24,7 +24,7 @@ uuid = { workspace = true, features = ["serde"] }
 validator = { workspace = true, features = ["derive"] }
 
 [build-dependencies]
-margaret = { path = "../margaret", default-features = false, features = ["codegen"] }
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
 
 [lints]
 workspace = true

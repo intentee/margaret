@@ -8,14 +8,14 @@ publish = false
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
-margaret = { path = "../../../../margaret" }
+margaret = { workspace = true, features = ["runtime"] }
 reqwest = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
 [build-dependencies]
-margaret = { path = "../../../../margaret", default-features = false, features = ["codegen"] }
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
 
 [lints]
 workspace = true

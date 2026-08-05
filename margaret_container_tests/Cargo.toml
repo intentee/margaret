@@ -6,11 +6,11 @@ publish = false
 autotests = false
 
 [dependencies]
-margaret_attribute_arguments = { path = "../margaret_attribute_arguments" }
-margaret_attributes = { path = "../margaret_attributes" }
-margaret_console_argument_codegen = { path = "../margaret_console_argument_codegen" }
-margaret_container = { path = "../margaret_container" }
-margaret_generated_module = { path = "../margaret_generated_module" }
+margaret_attribute_arguments = { workspace = true }
+margaret_attributes = { workspace = true }
+margaret_console_argument_codegen = { workspace = true }
+margaret_container = { workspace = true }
+margaret_generated_module = { workspace = true }
 syn = { workspace = true }
 
 [dev-dependencies]

@@ -8,9 +8,9 @@ autotests = false
 [dev-dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-margaret_jwks_keygen = { path = "../margaret_jwks_keygen" }
-margaret_jwks_roller = { path = "../margaret_jwks_roller" }
-margaret_jwks_secret_storage_selection = { path = "../margaret_jwks_secret_storage_selection" }
+margaret_jwks_keygen = { workspace = true }
+margaret_jwks_roller = { workspace = true }
+margaret_jwks_secret_storage_selection = { workspace = true }
 tempfile = { workspace = true }
 
 [[test]]

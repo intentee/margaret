@@ -7,8 +7,8 @@ autotests = false
 
 [dependencies]
 async-trait = { workspace = true }
-margaret_http = { path = "../margaret_http" }
-margaret_http_uploaded_file = { path = "../margaret_http_uploaded_file" }
+margaret_http = { workspace = true }
+margaret_http_uploaded_file = { workspace = true }
 rcgen = { workspace = true }
 rustls = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread"] }
