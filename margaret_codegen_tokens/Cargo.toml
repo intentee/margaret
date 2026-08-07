@@ -1,6 +1,6 @@
 [package]
 name = "margaret_codegen_tokens"
-version.workspace = true
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "Shared code-generation tokens for the Margaret application framework."

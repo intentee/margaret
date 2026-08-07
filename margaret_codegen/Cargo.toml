@@ -1,6 +1,6 @@
 [package]
 name = "margaret_codegen"
-version.workspace = true
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "Application code-generation orchestration for the Margaret application framework."

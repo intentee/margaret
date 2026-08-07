@@ -1,6 +1,6 @@
 [package]
 name = "margaret_tag_codegen"
-version.workspace = true
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "Dependency tag code generation for the Margaret application framework."

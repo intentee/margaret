@@ -1,6 +1,6 @@
 [package]
 name = "margaret_asset_bag_codegen"
-version.workspace = true
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "Asset collection code generation for the Margaret application framework."

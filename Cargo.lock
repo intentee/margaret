@@ -1867,7 +1867,7 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "margaret"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "margaret_access_token_minter",
@@ -1932,7 +1932,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_asset_bag_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "esbuild-metafile",
  "margaret_codegen_tokens",
@@ -1946,7 +1946,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_attribute_arguments"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -1955,7 +1955,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_attributes"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "heck",
  "margaret_attribute_arguments",
@@ -1967,7 +1967,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_asset_bag_codegen",
  "margaret_attribute_arguments",
@@ -2065,7 +2065,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_codegen_tokens"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attributes",
  "proc-macro2",
@@ -2101,7 +2101,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_console_argument_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2116,7 +2116,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_console_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2143,7 +2143,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_container"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "heck",
  "margaret_attribute_arguments",
@@ -2247,7 +2247,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_http_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "http",
  "margaret_attribute_arguments",
@@ -2326,7 +2326,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_injection_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attributes",
  "margaret_syn_type_peeling",
@@ -2387,7 +2387,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attributes",
  "margaret_generated_module",
@@ -2552,7 +2552,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_middleware_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "heck",
  "margaret_attribute_arguments",
@@ -2573,11 +2573,11 @@ dependencies = [
 
 [[package]]
 name = "margaret_model"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "margaret_model_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2612,7 +2612,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_request_binding_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "heck",
  "margaret_attribute_arguments",
@@ -2646,7 +2646,7 @@ version = "0.1.0"
 
 [[package]]
 name = "margaret_schema_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attributes",
  "margaret_codegen_tokens",
@@ -2703,7 +2703,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_service_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2917,7 +2917,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_tag_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2976,7 +2976,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_views_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -3015,7 +3015,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_websocket_codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
