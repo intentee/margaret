@@ -207,6 +207,37 @@ struct Second {
     }
 
     #[test]
+    fn generates_a_numeric_column_from_a_decimal() {
+        let source = schema_source(
+            "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(precision = 12, scale = 2)]\n    unit_price: rust_decimal::Decimal,\n}\n",
+        );
+
+        assert!(source.contains(
+            "margaret::framework::model::column_type::ColumnType::Numeric{precision:12u32,scale:2u32,}"
+        ));
+    }
+
+    #[test]
+    fn generates_a_real_column_from_an_f32() {
+        let source = schema_source(
+            "#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    reputation: f32,\n}\n",
+        );
+
+        assert!(source.contains("margaret::framework::model::column_type::ColumnType::Real"));
+    }
+
+    #[test]
+    fn generates_a_double_precision_column_from_an_f64() {
+        let source = schema_source(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    reading_minutes: f64,\n}\n",
+        );
+
+        assert!(
+            source.contains("margaret::framework::model::column_type::ColumnType::DoublePrecision")
+        );
+    }
+
+    #[test]
     fn generates_a_text_column_from_an_enum_field() {
         let source = schema_source(
             "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n}\n",

@@ -4,6 +4,7 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 
 use crate::models::article::Article;
+use crate::models::author::Author;
 
 #[singleton]
 #[responds_to_http(
@@ -24,13 +25,24 @@ impl GetArticle {
         #[route_parameter(from = "article")] Article {
             title,
             body,
+            price,
+            reading_minutes,
             created_at,
+            author,
             ..
         }: Article,
     ) -> anyhow::Result<Response> {
+        let Author {
+            name: author_name,
+            reputation,
+            ..
+        } = author;
+
         Ok(Response::text(
             200,
-            format!("\"{title}\" (posted at {created_at}): {body}"),
+            format!(
+                "\"{title}\" by {author_name} (reputation {reputation}), posted at {created_at}, {price} for a {reading_minutes} minute read: {body}"
+            ),
         ))
     }
 }

@@ -129,12 +129,13 @@ proc-macro2 = "1.0"
 quote = "1.0"
 rcgen = "0.14"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+rust_decimal = { version = "1.42", default-features = false, features = ["std"] }
 rustls = "0.23"
 rustls-webpki = "0.103"
 serde = "1.0"
 serde_json = "1.0"
 spiffe = { version = "0.6", default-features = false }
-sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "uuid"] }
+sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "rust_decimal", "uuid"] }
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 tempfile = "3.20"
 thiserror = "2.0"
@@ -151,8 +152,6 @@ validator = "0.20"
 x509-parser = "0.17"
 zeroize = "1.9"
 
-# Margaret production crates. The path is used inside this workspace and the
-# compatible registry version is used when a package is published.
 margaret = { path = "margaret", version = "0.1.0", default-features = false }
 margaret_access_token_minter = { path = "margaret_access_token_minter", version = "0.1.0" }
 margaret_asset_bag = { path = "margaret_asset_bag", version = "0.1.0" }

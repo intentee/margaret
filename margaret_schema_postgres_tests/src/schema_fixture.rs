@@ -93,9 +93,47 @@ fn article_table() -> Table {
     }
 }
 
+fn line_item_table() -> Table {
+    Table {
+        columns: vec![
+            column("id", ColumnType::Uuid, ColumnDefault::UuidV7, false),
+            column(
+                "price",
+                ColumnType::Numeric {
+                    precision: 12,
+                    scale: 2,
+                },
+                ColumnDefault::NotSet,
+                false,
+            ),
+            column(
+                "discount",
+                ColumnType::Numeric {
+                    precision: 5,
+                    scale: 4,
+                },
+                ColumnDefault::NotSet,
+                true,
+            ),
+            column("weight_kg", ColumnType::Real, ColumnDefault::NotSet, false),
+            column(
+                "volume_litres",
+                ColumnType::DoublePrecision,
+                ColumnDefault::NotSet,
+                false,
+            ),
+        ],
+        foreign_keys: Vec::new(),
+        indexes: Vec::new(),
+        name: "line_items".to_string(),
+        primary_key: vec!["id".to_string()],
+        unique_constraints: Vec::new(),
+    }
+}
+
 #[must_use]
 pub fn schema_fixture() -> Schema {
     Schema {
-        tables: vec![author_table(), article_table()],
+        tables: vec![author_table(), article_table(), line_item_table()],
     }
 }

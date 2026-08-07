@@ -19,6 +19,10 @@ pub struct Article {
     pub cover: Option<Vec<u8>>,
     #[column]
     pub published: bool,
+    #[column(precision = 12, scale = 2)]
+    pub price: rust_decimal::Decimal,
+    #[column]
+    pub reading_minutes: f64,
     #[column]
     pub status: ArticleStatus,
     #[column]

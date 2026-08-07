@@ -18,4 +18,6 @@ pub struct Author {
     pub joined_at: DateTime<Utc>,
     #[column]
     pub bio: Option<String>,
+    #[column]
+    pub reputation: f32,
 }

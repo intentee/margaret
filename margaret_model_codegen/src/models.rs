@@ -22,14 +22,13 @@ use margaret_schema_identifier_naming::primary_key_index_name::primary_key_index
 use margaret_schema_identifier_naming::schema_identifier::schema_identifier;
 use margaret_schema_identifier_naming::unique_index_name::unique_index_name;
 use margaret_schema_identifier_naming::validate_identifier_length::validate_identifier_length;
-use margaret_syn_type_peeling::option_inner::option_inner;
 use margaret_toposort::topological_order::topological_order;
 
 use crate::collected_model::CollectedModel;
 use crate::column_arguments::ColumnArguments;
 use crate::column_type_context::ColumnTypeContext;
+use crate::declared_column_type::DeclaredColumnType;
 use crate::deferred_foreign_key::DeferredForeignKey;
-use crate::enum_column::enum_column;
 use crate::foreign_key_arguments::ForeignKeyArguments;
 use crate::foreign_key_target::ForeignKeyTarget;
 use crate::foreign_key_target_column::ForeignKeyTargetColumn;
@@ -38,11 +37,12 @@ use crate::index_column_member::IndexColumnMember;
 use crate::index_membership::IndexMembership;
 use crate::index_redundancy::IndexRedundancy;
 use crate::indirection_inner::indirection_inner;
-use crate::infer_column_type::infer_column_type;
+use crate::infer_column::infer_column;
 use crate::inferred_column::InferredColumn;
 use crate::model::Model;
 use crate::model_arguments::ModelArguments;
 use crate::model_codegen_error::ModelCodegenError;
+use crate::numeric_digits::NumericDigits;
 use crate::positioned_field::PositionedField;
 use crate::resolved_column::ResolvedColumn;
 use crate::resolved_foreign_key::ResolvedForeignKey;
@@ -263,6 +263,7 @@ fn register_index_name(
 fn resolve_scalar_column(
     ColumnArguments {
         name,
+        numeric_digits,
         primary_key,
         unique,
     }: ColumnArguments,
@@ -283,21 +284,13 @@ fn resolve_scalar_column(
 
     let column_name = register_column_name(column_name, model, seen_columns)?;
 
-    let (base, nullable) = match option_inner(field.ty()) {
-        Some(inner) => (inner, true),
-        None => (field.ty(), false),
-    };
-
-    let inferred = match enum_column(
+    let inferred = infer_column(
         &mut column_type_context,
-        base,
-        nullable,
+        &DeclaredColumnType::of(field.ty()),
+        &numeric_digits,
         model,
         &column_name,
-    )? {
-        Some(inferred) => inferred,
-        None => infer_column_type(field.ty(), model, &column_name)?,
-    };
+    )?;
 
     Ok(ResolvedColumn {
         indexes,
@@ -312,6 +305,7 @@ fn resolve_scalar_column(
 fn defer_foreign_key(
     ColumnArguments {
         name,
+        numeric_digits,
         primary_key,
         unique,
     }: ColumnArguments,
@@ -324,6 +318,13 @@ fn defer_foreign_key(
 ) -> Result<DeferredForeignKey, ModelCodegenError> {
     if name.is_some() {
         return Err(ModelCodegenError::ForeignKeyColumnNameIsDerived {
+            field: field_display(field.identifier()),
+            model: model.to_string(),
+        });
+    }
+
+    if matches!(numeric_digits, NumericDigits::Declared { .. }) {
+        return Err(ModelCodegenError::ForeignKeyCannotDeclareNumericDigits {
             field: field_display(field.identifier()),
             model: model.to_string(),
         });
@@ -349,10 +350,11 @@ fn defer_foreign_key(
     let ForeignKeyArguments { on_delete } =
         ForeignKeyArguments::parse(foreign_key_arguments, model, &field_name)?;
 
-    let (after_option, nullable) = match option_inner(field.ty()) {
-        Some(inner) => (inner, true),
-        None => (field.ty(), false),
-    };
+    let DeclaredColumnType {
+        base: after_option,
+        declared: _,
+        nullable,
+    } = DeclaredColumnType::of(field.ty());
 
     let (target_type, indirected) = match indirection_inner(after_option) {
         Some(inner) => (inner, true),
@@ -443,7 +445,11 @@ fn collect_model_columns(
                 });
             }
             (Some(column_attribute), foreign_key_attribute) => {
-                let column_arguments = ColumnArguments::parse(column_attribute.args()?)?;
+                let column_arguments = ColumnArguments::parse(
+                    column_attribute.args()?,
+                    model,
+                    &field_display(field.identifier()),
+                )?;
 
                 match foreign_key_attribute {
                     None => {

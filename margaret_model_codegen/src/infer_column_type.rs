@@ -2,9 +2,9 @@ use quote::ToTokens;
 use quote::quote;
 use syn::Type;
 
-use margaret_syn_type_peeling::option_inner::option_inner;
 use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
 
+use crate::declared_column_type::DeclaredColumnType;
 use crate::inferred_column::InferredColumn;
 use crate::model_codegen_error::ModelCodegenError;
 
@@ -47,6 +47,18 @@ fn base_column_type(ty: &Type) -> Option<InferredColumn> {
             default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
             nullable: false,
         }),
+        Some(segment) if segment.ident == "f32" => Some(InferredColumn {
+            column_type: quote!(margaret::framework::model::column_type::ColumnType::Real),
+            default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
+            nullable: false,
+        }),
+        Some(segment) if segment.ident == "f64" => Some(InferredColumn {
+            column_type: quote!(
+                margaret::framework::model::column_type::ColumnType::DoublePrecision
+            ),
+            default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
+            nullable: false,
+        }),
         Some(segment) if segment.ident == "DateTime" => Some(InferredColumn {
             column_type: quote!(margaret::framework::model::column_type::ColumnType::Timestamptz),
             default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
@@ -66,24 +78,23 @@ fn base_column_type(ty: &Type) -> Option<InferredColumn> {
 }
 
 pub(crate) fn infer_column_type(
-    ty: &Type,
+    DeclaredColumnType {
+        base,
+        declared,
+        nullable,
+    }: &DeclaredColumnType,
     model: &str,
     column: &str,
 ) -> Result<InferredColumn, ModelCodegenError> {
-    let (base, nullable) = match option_inner(ty) {
-        Some(inner) => (inner, true),
-        None => (ty, false),
-    };
-
     match base_column_type(base) {
         Some(inferred) => Ok(InferredColumn {
-            nullable,
+            nullable: *nullable,
             ..inferred
         }),
         None => Err(ModelCodegenError::UninferrableColumnType {
             column: column.to_string(),
             model: model.to_string(),
-            rust_type: ty.to_token_stream().to_string(),
+            rust_type: declared.to_token_stream().to_string(),
         }),
     }
 }
@@ -93,6 +104,7 @@ mod tests {
     use quote::quote;
     use syn::Type;
 
+    use crate::declared_column_type::DeclaredColumnType;
     use crate::infer_column_type::infer_column_type;
     use crate::inferred_column::InferredColumn;
     use crate::model_codegen_error::ModelCodegenError;
@@ -100,7 +112,7 @@ mod tests {
     fn infer(type_source: &str) -> Result<InferredColumn, ModelCodegenError> {
         let ty: Type = syn::parse_str(type_source).expect("the type fixture parses");
 
-        infer_column_type(&ty, "crate::Model", "value")
+        infer_column_type(&DeclaredColumnType::of(&ty), "crate::Model", "value")
     }
 
     fn column_type(type_source: &str) -> String {
@@ -154,6 +166,23 @@ mod tests {
         assert_eq!(
             column_type("i64"),
             quote!(margaret::framework::model::column_type::ColumnType::BigInt).to_string()
+        );
+    }
+
+    #[test]
+    fn infers_real_from_f32() {
+        assert_eq!(
+            column_type("f32"),
+            quote!(margaret::framework::model::column_type::ColumnType::Real).to_string()
+        );
+    }
+
+    #[test]
+    fn infers_double_precision_from_f64() {
+        assert_eq!(
+            column_type("f64"),
+            quote!(margaret::framework::model::column_type::ColumnType::DoublePrecision)
+                .to_string()
         );
     }
 

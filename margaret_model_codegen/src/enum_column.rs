@@ -1,18 +1,33 @@
-use quote::quote;
-use syn::Type;
+use std::collections::HashSet;
 
+use quote::quote;
+
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::struct_shape::StructShape;
 
-use crate::column_type_context::ColumnTypeContext;
 use crate::inferred_column::InferredColumn;
 use crate::model_codegen_error::ModelCodegenError;
 
-fn validate_enum(
+fn text_column(nullable: bool) -> InferredColumn {
+    InferredColumn {
+        column_type: quote!(margaret::framework::model::column_type::ColumnType::Text),
+        default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
+        nullable,
+    }
+}
+
+pub(crate) fn enum_column(
+    validated_enums: &mut HashSet<CanonicalPath>,
     enum_item: &IndexedItem,
+    nullable: bool,
     model: &str,
     column: &str,
-) -> Result<(), ModelCodegenError> {
+) -> Result<InferredColumn, ModelCodegenError> {
+    if validated_enums.contains(enum_item.canonical_path()) {
+        return Ok(text_column(nullable));
+    }
+
     if enum_item.variants().is_empty() {
         return Err(ModelCodegenError::EmptyEnumColumn {
             column: column.to_string(),
@@ -32,39 +47,7 @@ fn validate_enum(
         }
     }
 
-    Ok(())
-}
+    validated_enums.insert(enum_item.canonical_path().clone());
 
-pub(crate) fn enum_column(
-    context: &mut ColumnTypeContext,
-    base: &Type,
-    nullable: bool,
-    model: &str,
-    column: &str,
-) -> Result<Option<InferredColumn>, ModelCodegenError> {
-    let attribute_index = context.attribute_index;
-    let item = context.item;
-
-    let Some(path) = attribute_index.resolve_item_type(item, base) else {
-        return Ok(None);
-    };
-
-    let Some(enum_item) = attribute_index.item(&path) else {
-        return Ok(None);
-    };
-
-    if !enum_item.kind().is_enum() {
-        return Ok(None);
-    }
-
-    if !context.validated_enums.contains(&path) {
-        validate_enum(enum_item, model, column)?;
-        context.validated_enums.insert(path);
-    }
-
-    Ok(Some(InferredColumn {
-        column_type: quote!(margaret::framework::model::column_type::ColumnType::Text),
-        default: quote!(margaret::framework::model::column_default::ColumnDefault::NotSet),
-        nullable,
-    }))
+    Ok(text_column(nullable))
 }
