@@ -12,6 +12,7 @@ sqlx = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true, features = ["clock"] }
+rust_decimal = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 uuid = { workspace = true, features = ["v4"] }
 

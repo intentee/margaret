@@ -76,6 +76,31 @@ impl AttributeArgumentsReader {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::UnexpectedArgument` or
+    /// `AttributeArgumentsError::MalformedUnsignedInteger`.
+    pub fn take_unsigned_integer(
+        &mut self,
+        key: &str,
+    ) -> Result<Option<u32>, AttributeArgumentsError> {
+        match self.take_named(key) {
+            None => Ok(None),
+            Some(Expr::Lit(expression)) => match expression.lit {
+                Lit::Int(literal) => match literal.base10_parse::<u32>() {
+                    Ok(value) => Ok(Some(value)),
+                    Err(source) => Err(AttributeArgumentsError::MalformedUnsignedInteger {
+                        attribute_path: self.attribute_path.clone(),
+                        key: key.to_string(),
+                        source,
+                    }),
+                },
+                _ => Err(self.unexpected_argument(key, "unsigned integer literal")),
+            },
+            Some(_) => Err(self.unexpected_argument(key, "unsigned integer literal")),
+        }
+    }
+
     pub(crate) fn into_result(self) -> Result<(), AttributeArgumentsError> {
         if let Some(argument) = self.named.first() {
             return Err(AttributeArgumentsError::UnrecognizedArgument {

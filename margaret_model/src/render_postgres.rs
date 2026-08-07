@@ -274,6 +274,108 @@ mod tests {
     }
 
     #[test]
+    fn renders_a_real_column() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![column(
+                    "reputation",
+                    ColumnType::Real,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "authors".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"authors\" (\n    \"reputation\" REAL NOT NULL\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_double_precision_column() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![column(
+                    "reading_minutes",
+                    ColumnType::DoublePrecision,
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "articles".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"articles\" (\n    \"reading_minutes\" DOUBLE PRECISION NOT NULL\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_numeric_column_with_its_precision_and_scale() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![column(
+                    "price",
+                    ColumnType::Numeric {
+                        precision: 12,
+                        scale: 2,
+                    },
+                    false,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "line_items".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"line_items\" (\n    \"price\" NUMERIC(12, 2) NOT NULL\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_nullable_numeric_column() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![column(
+                    "discount",
+                    ColumnType::Numeric {
+                        precision: 5,
+                        scale: 4,
+                    },
+                    true,
+                    ColumnDefault::NotSet,
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "line_items".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"line_items\" (\n    \"discount\" NUMERIC(5, 4)\n);"
+        );
+    }
+
+    #[test]
     fn renders_a_composite_primary_key() {
         let schema = Schema {
             tables: vec![Table {

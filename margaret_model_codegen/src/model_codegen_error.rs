@@ -65,6 +65,59 @@ pub enum ModelCodegenError {
     },
 
     #[error(
+        "column '{column}' of model '{model}' has the type '{rust_type}', which resolves to '{resolved_type}' declared in this crate but is not a fieldless enum; a crate type becomes a column only as a fieldless enum, or through #[foreign_key] when it is a #[model]"
+    )]
+    LocalColumnTypeIsNotAnEnum {
+        column: String,
+        model: String,
+        resolved_type: String,
+        rust_type: String,
+    },
+
+    #[error(
+        "field '{field}' of model '{model}' declares a NUMERIC scale without a precision; both are required"
+    )]
+    NumericPrecisionMissing { field: String, model: String },
+
+    #[error(
+        "field '{field}' of model '{model}' declares a NUMERIC precision without a scale; both are required"
+    )]
+    NumericScaleMissing { field: String, model: String },
+
+    #[error(
+        "field '{field}' of model '{model}' declares the NUMERIC precision {precision}; the precision must be between 1 and 28, because rust_decimal::Decimal stores a 96-bit mantissa whose largest value is 79228162514264337593543950335"
+    )]
+    NumericPrecisionOutOfRange {
+        field: String,
+        model: String,
+        precision: u32,
+    },
+
+    #[error(
+        "field '{field}' of model '{model}' declares the NUMERIC scale {scale}, which exceeds its precision {precision}"
+    )]
+    NumericScaleExceedsPrecision {
+        field: String,
+        model: String,
+        precision: u32,
+        scale: u32,
+    },
+
+    #[error(
+        "column '{column}' of model '{model}' is a rust_decimal::Decimal and requires an explicit precision and scale, e.g. #[column(precision = 12, scale = 2)]"
+    )]
+    NumericColumnRequiresDigits { column: String, model: String },
+
+    #[error(
+        "column '{column}' of model '{model}' declares a NUMERIC precision and scale but has the type '{rust_type}'; only a rust_decimal::Decimal column is sized that way"
+    )]
+    NumericDigitsOnNonNumericColumn {
+        column: String,
+        model: String,
+        rust_type: String,
+    },
+
+    #[error(
         "column '{column}' of model '{model}' maps to enum '{enum_type}', which has no variants; an enum column requires at least one variant"
     )]
     EmptyEnumColumn {
@@ -95,6 +148,11 @@ pub enum ModelCodegenError {
 
     #[error("foreign key field '{field}' of model '{model}' cannot be a primary key")]
     ForeignKeyCannotBePrimaryKey { field: String, model: String },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' must not declare a NUMERIC precision or scale; a foreign key column takes the type of the primary key it references"
+    )]
+    ForeignKeyCannotDeclareNumericDigits { field: String, model: String },
 
     #[error(
         "the positional foreign key field at index {position} of model '{model}' requires a named field"

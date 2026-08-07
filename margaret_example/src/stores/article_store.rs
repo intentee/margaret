@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use dashmap::DashMap;
+use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use margaret::framework::macros::constructor;
@@ -35,6 +36,7 @@ fn milo() -> Author {
         active: true,
         joined_at: at_epoch_seconds(1_600_000_000),
         bio: Some("Writes public notes.".to_string()),
+        reputation: 4.5,
     }
 }
 
@@ -45,6 +47,7 @@ fn mona() -> Author {
         active: true,
         joined_at: at_epoch_seconds(1_610_000_000),
         bio: None,
+        reputation: 3.75,
     }
 }
 
@@ -60,6 +63,8 @@ fn seed() -> Vec<Article> {
             body: "A public note from Milo.".to_string(),
             cover: None,
             published: true,
+            price: Decimal::new(499, 2),
+            reading_minutes: 7.5,
             status: ArticleStatus::Published,
             created_at: at_epoch_seconds(1_704_067_200),
             author: milo(),
@@ -70,6 +75,8 @@ fn seed() -> Vec<Article> {
             body: "An unpublished draft from Milo.".to_string(),
             cover: None,
             published: false,
+            price: Decimal::ZERO,
+            reading_minutes: 2.25,
             status: ArticleStatus::Draft,
             created_at: at_epoch_seconds(1_704_153_600),
             author: milo(),
@@ -80,6 +87,8 @@ fn seed() -> Vec<Article> {
             body: "An unpublished draft from Mona.".to_string(),
             cover: None,
             published: false,
+            price: Decimal::ZERO,
+            reading_minutes: 3.0,
             status: ArticleStatus::Draft,
             created_at: at_epoch_seconds(1_704_240_000),
             author: mona(),
@@ -159,6 +168,8 @@ impl ArticleStore {
             body,
             cover: None,
             published: false,
+            price: Decimal::ZERO,
+            reading_minutes: 0.0,
             status: ArticleStatus::Draft,
             created_at: self.clock.now(),
             author,

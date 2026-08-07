@@ -12,6 +12,16 @@ pub enum AttributeArgumentsError {
         source: syn::Error,
     },
 
+    #[error(
+        "argument '{key}' of attribute '{attribute_path}' is not a valid unsigned integer: {source}"
+    )]
+    MalformedUnsignedInteger {
+        attribute_path: String,
+        key: String,
+        #[source]
+        source: syn::Error,
+    },
+
     #[error("argument '{key}' of attribute '{attribute_path}' is not a {expected}")]
     UnexpectedArgument {
         attribute_path: String,

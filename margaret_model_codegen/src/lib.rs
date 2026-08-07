@@ -11,6 +11,9 @@ pub mod resolved_unique_constraint;
 mod collected_model;
 mod column_arguments;
 mod column_type_context;
+mod column_type_source;
+mod decimal_canonical_path;
+mod declared_column_type;
 mod deferred_foreign_key;
 mod enum_column;
 mod foreign_key_arguments;
@@ -20,8 +23,10 @@ mod index_arguments;
 mod index_column_member;
 mod index_redundancy;
 mod indirection_inner;
+mod infer_column;
 mod infer_column_type;
 mod model_arguments;
+mod numeric_digits;
 mod positioned_field;
 
 #[cfg(test)]
@@ -198,6 +203,42 @@ struct B {
                     ..
                 }
             } if key == "name" && expected == "string literal"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_non_integer_precision() {
+        let error = rejection_for(
+            "#[model(table = \"t\")]\nstruct S {\n    #[column(precision = \"12\", scale = 2)]\n    value: rust_decimal::Decimal,\n}\n",
+        );
+
+        assert!(matches!(
+            error,
+            ModelCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "precision" && expected == "unsigned integer literal"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_non_integer_scale() {
+        let error = rejection_for(
+            "#[model(table = \"t\")]\nstruct S {\n    #[column(precision = 12, scale = \"2\")]\n    value: rust_decimal::Decimal,\n}\n",
+        );
+
+        assert!(matches!(
+            error,
+            ModelCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    ref key,
+                    ref expected,
+                    ..
+                }
+            } if key == "scale" && expected == "unsigned integer literal"
         ));
     }
 
@@ -832,6 +873,105 @@ struct Book {
     fn rejects_a_struct_column_that_is_not_a_foreign_key() {
         let source = "struct Author {}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column]\n    author: Author,\n}\n";
 
-        assert!(error_message(source).contains("cannot be mapped to an SQL type"));
+        assert!(error_message(source).contains(
+            "resolves to 'crate::Author' declared in this crate but is not a fieldless enum"
+        ));
+    }
+
+    #[test]
+    fn infers_a_numeric_column_from_a_fully_qualified_decimal() {
+        let source = "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 12, scale = 2)]\n    unit_price: rust_decimal::Decimal,\n}\n";
+
+        assert_eq!(
+            inferred_column(source, "line_items", "unit_price")
+                .column_type
+                .to_string(),
+            quote!(
+                margaret::framework::model::column_type::ColumnType::Numeric {
+                    precision: 12u32,
+                    scale: 2u32,
+                }
+            )
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn infers_a_numeric_column_from_an_imported_decimal() {
+        let source = "use rust_decimal::Decimal;\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 4, scale = 4)]\n    rate: Decimal,\n}\n";
+
+        assert_eq!(
+            inferred_column(source, "line_items", "rate")
+                .column_type
+                .to_string(),
+            quote!(
+                margaret::framework::model::column_type::ColumnType::Numeric {
+                    precision: 4u32,
+                    scale: 4u32,
+                }
+            )
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn treats_an_optional_decimal_as_a_nullable_numeric_column() {
+        let source = "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 12, scale = 2)]\n    discount: Option<rust_decimal::Decimal>,\n}\n";
+
+        assert!(inferred_column(source, "line_items", "discount").nullable);
+    }
+
+    #[test]
+    fn rejects_a_decimal_column_without_a_precision_and_scale() {
+        let source = "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column]\n    unit_price: rust_decimal::Decimal,\n}\n";
+
+        assert!(error_message(source).contains("requires an explicit precision and scale"));
+    }
+
+    #[test]
+    fn does_not_treat_a_crate_local_decimal_as_a_numeric_column() {
+        let source = "struct Decimal {}\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 12, scale = 2)]\n    unit_price: Decimal,\n}\n";
+
+        assert!(
+            error_message(source)
+                .contains("declares a NUMERIC precision and scale but has the type 'Decimal'")
+        );
+    }
+
+    #[test]
+    fn rejects_a_precision_and_scale_on_a_non_numeric_column() {
+        let source = "#[model(table = \"articles\")]\nstruct Article {\n    #[column(precision = 12, scale = 2)]\n    title: String,\n}\n";
+
+        assert!(
+            error_message(source)
+                .contains("declares a NUMERIC precision and scale but has the type 'String'")
+        );
+    }
+
+    #[test]
+    fn rejects_a_precision_and_scale_on_an_enum_column() {
+        let source = "enum ArticleStatus {\n    Draft,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(precision = 12, scale = 2)]\n    status: ArticleStatus,\n}\n";
+
+        assert!(
+            error_message(source).contains(
+                "declares a NUMERIC precision and scale but has the type 'ArticleStatus'"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_a_precision_and_scale_on_a_foreign_key() {
+        let source = with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(precision = 12, scale = 2)]\n    #[foreign_key]\n    author: Author,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("must not declare a NUMERIC precision or scale"));
+    }
+
+    #[test]
+    fn rejects_a_precision_that_a_decimal_cannot_hold() {
+        let source = "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 29, scale = 2)]\n    unit_price: rust_decimal::Decimal,\n}\n";
+
+        assert!(error_message(source).contains("the precision must be between 1 and 28"));
     }
 }

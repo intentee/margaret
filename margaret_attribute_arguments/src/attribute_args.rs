@@ -252,6 +252,63 @@ mod tests {
     }
 
     #[test]
+    fn take_unsigned_integer_returns_none_when_the_argument_is_absent() {
+        let value = parsed(&parse_quote!(#[column]))
+            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .expect("an absent unsigned integer reads as none");
+
+        assert_eq!(value, None);
+    }
+
+    #[test]
+    fn take_unsigned_integer_reads_an_integer_literal() {
+        let value = parsed(&parse_quote!(#[column(precision = 12)]))
+            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .expect("the unsigned integer reads");
+
+        assert_eq!(value, Some(12));
+    }
+
+    #[test]
+    fn take_unsigned_integer_rejects_a_non_integer_literal() {
+        let error = parsed(&parse_quote!(#[column(precision = "12")]))
+            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .expect_err("a string is not an unsigned integer literal");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { key, expected, .. }
+                if key == "precision" && expected == "unsigned integer literal"
+        ));
+    }
+
+    #[test]
+    fn take_unsigned_integer_rejects_a_negative_literal() {
+        let error = parsed(&parse_quote!(#[column(precision = -12)]))
+            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .expect_err("a negative literal is not an unsigned integer literal");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { key, expected, .. }
+                if key == "precision" && expected == "unsigned integer literal"
+        ));
+    }
+
+    #[test]
+    fn take_unsigned_integer_rejects_a_literal_that_overflows() {
+        let error = parsed(&parse_quote!(#[column(precision = 4294967296)]))
+            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .expect_err("a literal above u32::MAX is rejected");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::MalformedUnsignedInteger { attribute_path, key, .. }
+                if attribute_path == "column" && key == "precision"
+        ));
+    }
+
+    #[test]
     fn take_path_returns_none_when_the_argument_is_absent() {
         let value = parsed(&parse_quote!(#[foreign_key]))
             .interpret(|reader| reader.take_path("on_delete"))
