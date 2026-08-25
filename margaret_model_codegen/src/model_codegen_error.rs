@@ -325,4 +325,104 @@ pub enum ModelCodegenError {
         "the single-column index on column '{column}' of model '{model}' is redundant; it is the leading column of the primary key, which is already indexed"
     )]
     RedundantIndexOnPrimaryKeyColumn { column: String, model: String },
+
+    #[error(
+        "column '{field}' of model '{model}' declares 'byte_length = 0'; a byte length check must require at least one byte"
+    )]
+    ByteLengthMustBePositive { field: String, model: String },
+
+    #[error(
+        "column '{column}' of model '{model}' declares 'byte_length', which only applies to a BYTEA column declared as Vec<u8>"
+    )]
+    ByteLengthOnNonByteaColumn { column: String, model: String },
+
+    #[error("model '{model}' derives a byte length constraint name that is too long: {source}")]
+    ByteLengthConstraintNameTooLong {
+        model: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
+    },
+
+    #[error(
+        "column '{field}' of model '{model}' declares both 'byte_length' and 'minimum'; a byte length applies to a BYTEA column and a minimum applies to a numeric column, so a column can declare at most one of them"
+    )]
+    ConflictingColumnChecks { field: String, model: String },
+
+    #[error(
+        "column '{column}' of model '{model}' declares 'minimum', which only applies to a numeric column"
+    )]
+    MinimumOnNonNumericColumn { column: String, model: String },
+
+    #[error("model '{model}' derives a minimum constraint name that is too long: {source}")]
+    MinimumConstraintNameTooLong {
+        model: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
+    },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' cannot declare a check constraint; declare it on the column the foreign key references"
+    )]
+    ForeignKeyCannotDeclareCheckConstraint { field: String, model: String },
+
+    #[error(
+        "the foreign key on model '{model}' requires the columns it constrains, e.g. #[foreign_key(columns = [partition, hash], references = crate::Target)]"
+    )]
+    ModelForeignKeyRequiresColumns { model: String },
+
+    #[error(
+        "the foreign key on model '{model}' requires the model it references, e.g. #[foreign_key(columns = [partition, hash], references = crate::Target)]"
+    )]
+    ModelForeignKeyRequiresReferences { model: String },
+
+    #[error(
+        "the foreign key on model '{model}' names '{column}', which is not a plain column identifier"
+    )]
+    ModelForeignKeyColumnIsNotAnIdentifier { column: String, model: String },
+
+    #[error(
+        "the foreign key on model '{model}' references '{references}', which is not a model declared with #[model]"
+    )]
+    ModelForeignKeyTargetNotAModel { model: String, references: String },
+
+    #[error(
+        "the foreign key on model '{model}' references '{target}', which has no primary key to reference"
+    )]
+    ModelForeignKeyTargetWithoutPrimaryKey { model: String, target: String },
+
+    #[error(
+        "the foreign key on model '{model}' constrains {declared} column(s) but '{target}' has a primary key of {expected} column(s)"
+    )]
+    ModelForeignKeyArityMismatch {
+        declared: usize,
+        expected: usize,
+        model: String,
+        target: String,
+    },
+
+    #[error(
+        "the foreign key on model '{model}' constrains column '{column}', which the model does not declare"
+    )]
+    ModelForeignKeyColumnNotDeclared { column: String, model: String },
+
+    #[error("the foreign key on model '{model}' constrains column '{column}' more than once")]
+    ModelForeignKeyDuplicateColumn { column: String, model: String },
+
+    #[error(
+        "the foreign key on model '{model}' constrains column '{column}', whose type differs from column '{target_column}' of '{target}'"
+    )]
+    ModelForeignKeyColumnTypeMismatch {
+        column: String,
+        model: String,
+        target: String,
+        target_column: String,
+    },
+
+    #[error("model '{model}' declares more than one foreign key on columns '{columns}'")]
+    DuplicateModelForeignKey { columns: String, model: String },
+
+    #[error(
+        "the foreign key on model '{model}' has an unknown ON DELETE action '{action}'; valid actions are cascade, restrict, set_null, set_default"
+    )]
+    UnknownModelForeignKeyOnDeleteAction { action: String, model: String },
 }

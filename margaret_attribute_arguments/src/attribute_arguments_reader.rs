@@ -49,6 +49,33 @@ impl AttributeArgumentsReader {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::UnexpectedArgument`.
+    pub fn take_path_array(
+        &mut self,
+        key: &str,
+    ) -> Result<Option<Vec<Path>>, AttributeArgumentsError> {
+        let Some(expression) = self.take_named(key) else {
+            return Ok(None);
+        };
+        let Expr::Array(array) = expression else {
+            return Err(self.unexpected_argument(key, "array of paths"));
+        };
+
+        let mut paths = Vec::with_capacity(array.elems.len());
+
+        for element in array.elems {
+            let Expr::Path(element) = element else {
+                return Err(self.unexpected_argument(key, "array of paths"));
+            };
+
+            paths.push(element.path);
+        }
+
+        Ok(Some(paths))
+    }
+
     pub fn take_positional_path(&mut self) -> Option<Path> {
         match self.positional.first() {
             Some(Expr::Path(expression)) => {

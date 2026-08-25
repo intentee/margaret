@@ -11,6 +11,13 @@ use margaret_schema_postgres_tests::apply_schema::apply_schema;
 use margaret_schema_postgres_tests::schema_fixture::schema_fixture;
 use margaret_schema_postgres_tests::start_database::start_database;
 
+#[derive(Debug, Eq, PartialEq)]
+struct ForeignKeyDefinition {
+    columns: Vec<String>,
+    references_columns: Vec<String>,
+    references_table: String,
+}
+
 async fn unique_column_sets(pool: &PgPool, table: &str) -> Vec<Vec<String>> {
     let rows: Vec<(String, String)> = query_as(
         "SELECT tc.constraint_name, kcu.column_name \
@@ -87,26 +94,61 @@ async fn assert_primary_key_matches(pool: &PgPool, table: &Table) {
     );
 }
 
-async fn assert_foreign_keys_match(pool: &PgPool, table: &Table) {
-    for foreign_key in &table.foreign_keys {
-        let (referenced_table, referenced_column): (String, String) = query_as(
-            "SELECT ccu.table_name, ccu.column_name \
-             FROM information_schema.table_constraints tc \
-             JOIN information_schema.key_column_usage kcu \
-               ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema \
-             JOIN information_schema.constraint_column_usage ccu \
-               ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema \
-             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' \
-               AND tc.table_name = $1 AND kcu.column_name = $2",
-        )
-        .bind(&table.name)
-        .bind(&foreign_key.column)
-        .fetch_one(pool)
-        .await
-        .expect("the foreign key is introspected");
+async fn foreign_key_definitions(pool: &PgPool, table: &str) -> Vec<ForeignKeyDefinition> {
+    let rows: Vec<(Vec<String>, String, Vec<String>)> = query_as(
+        "SELECT array_agg(local_attribute.attname::text ORDER BY local_key.ordinality), \
+                referenced.relname::text, \
+                array_agg(referenced_attribute.attname::text ORDER BY referenced_key.ordinality) \
+         FROM pg_constraint constraint_entry \
+         JOIN pg_class local ON local.oid = constraint_entry.conrelid \
+         JOIN pg_class referenced ON referenced.oid = constraint_entry.confrelid \
+         JOIN pg_namespace namespace ON namespace.oid = local.relnamespace \
+         CROSS JOIN LATERAL unnest(constraint_entry.conkey) \
+             WITH ORDINALITY AS local_key(attnum, ordinality) \
+         CROSS JOIN LATERAL unnest(constraint_entry.confkey) \
+             WITH ORDINALITY AS referenced_key(attnum, ordinality) \
+         JOIN pg_attribute local_attribute \
+           ON local_attribute.attrelid = constraint_entry.conrelid \
+          AND local_attribute.attnum = local_key.attnum \
+         JOIN pg_attribute referenced_attribute \
+           ON referenced_attribute.attrelid = constraint_entry.confrelid \
+          AND referenced_attribute.attnum = referenced_key.attnum \
+         WHERE constraint_entry.contype = 'f' AND namespace.nspname = 'public' \
+           AND local.relname = $1 AND local_key.ordinality = referenced_key.ordinality \
+         GROUP BY constraint_entry.oid, referenced.relname",
+    )
+    .bind(table)
+    .fetch_all(pool)
+    .await
+    .expect("the foreign keys are introspected");
 
-        assert_eq!(referenced_table, foreign_key.references_table);
-        assert_eq!(referenced_column, foreign_key.references_column);
+    rows.into_iter()
+        .map(
+            |(columns, references_table, references_columns)| ForeignKeyDefinition {
+                columns,
+                references_columns,
+                references_table,
+            },
+        )
+        .collect()
+}
+
+async fn assert_foreign_keys_match(pool: &PgPool, table: &Table) {
+    let observed = foreign_key_definitions(pool, &table.name).await;
+
+    for foreign_key in &table.foreign_keys {
+        let expected = ForeignKeyDefinition {
+            columns: foreign_key.columns.clone(),
+            references_columns: foreign_key.references_columns.clone(),
+            references_table: foreign_key.references_table.clone(),
+        };
+
+        assert!(
+            observed.contains(&expected),
+            "foreign key over {:?} of table '{}' is missing",
+            foreign_key.columns,
+            table.name,
+        );
     }
 }
 

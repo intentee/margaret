@@ -1,13 +1,12 @@
-use proc_macro2::TokenStream;
-use quote::quote;
-
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attribute_arguments::format_path::format_path;
+use margaret_model::on_delete::OnDelete;
 
 use crate::model_codegen_error::ModelCodegenError;
+use crate::on_delete_argument::OnDeleteArgument;
 
 pub(crate) struct ForeignKeyArguments {
-    pub(crate) on_delete: TokenStream,
+    pub(crate) on_delete: OnDelete,
 }
 
 impl ForeignKeyArguments {
@@ -17,21 +16,9 @@ impl ForeignKeyArguments {
         field: &str,
     ) -> Result<Self, ModelCodegenError> {
         arguments.interpret(|reader| {
-            let on_delete = match reader.take_path("on_delete")? {
-                None => quote!(margaret::framework::model::on_delete::OnDelete::NoAction),
-                Some(path) if path.is_ident("cascade") => {
-                    quote!(margaret::framework::model::on_delete::OnDelete::Cascade)
-                }
-                Some(path) if path.is_ident("restrict") => {
-                    quote!(margaret::framework::model::on_delete::OnDelete::Restrict)
-                }
-                Some(path) if path.is_ident("set_null") => {
-                    quote!(margaret::framework::model::on_delete::OnDelete::SetNull)
-                }
-                Some(path) if path.is_ident("set_default") => {
-                    quote!(margaret::framework::model::on_delete::OnDelete::SetDefault)
-                }
-                Some(path) => {
+            let on_delete = match OnDeleteArgument::of(reader.take_path("on_delete")?) {
+                OnDeleteArgument::Known(on_delete) => on_delete,
+                OnDeleteArgument::Unknown(path) => {
                     return Err(ModelCodegenError::UnknownOnDeleteAction {
                         action: format_path(&path),
                         field: field.to_string(),
@@ -47,11 +34,11 @@ impl ForeignKeyArguments {
 
 #[cfg(test)]
 mod tests {
-    use quote::quote;
     use syn::Attribute;
     use syn::parse_quote;
 
     use margaret_attribute_arguments::attribute_args::AttributeArgs;
+    use margaret_model::on_delete::OnDelete;
 
     use crate::foreign_key_arguments::ForeignKeyArguments;
     use crate::model_codegen_error::ModelCodegenError;
@@ -62,26 +49,22 @@ mod tests {
         ForeignKeyArguments::parse(&arguments, "crate::Model", "author")
     }
 
-    fn on_delete(attribute: &Attribute) -> String {
+    fn on_delete(attribute: &Attribute) -> OnDelete {
         parse(attribute)
             .expect("the foreign key arguments resolve")
             .on_delete
-            .to_string()
     }
 
     #[test]
     fn defaults_to_no_action_when_absent() {
-        assert_eq!(
-            on_delete(&parse_quote!(#[foreign_key])),
-            quote!(margaret::framework::model::on_delete::OnDelete::NoAction).to_string()
-        );
+        assert_eq!(on_delete(&parse_quote!(#[foreign_key])), OnDelete::NoAction);
     }
 
     #[test]
     fn maps_cascade() {
         assert_eq!(
             on_delete(&parse_quote!(#[foreign_key(on_delete = cascade)])),
-            quote!(margaret::framework::model::on_delete::OnDelete::Cascade).to_string()
+            OnDelete::Cascade
         );
     }
 
@@ -89,7 +72,7 @@ mod tests {
     fn maps_restrict() {
         assert_eq!(
             on_delete(&parse_quote!(#[foreign_key(on_delete = restrict)])),
-            quote!(margaret::framework::model::on_delete::OnDelete::Restrict).to_string()
+            OnDelete::Restrict
         );
     }
 
@@ -97,7 +80,7 @@ mod tests {
     fn maps_set_null() {
         assert_eq!(
             on_delete(&parse_quote!(#[foreign_key(on_delete = set_null)])),
-            quote!(margaret::framework::model::on_delete::OnDelete::SetNull).to_string()
+            OnDelete::SetNull
         );
     }
 
@@ -105,7 +88,7 @@ mod tests {
     fn maps_set_default() {
         assert_eq!(
             on_delete(&parse_quote!(#[foreign_key(on_delete = set_default)])),
-            quote!(margaret::framework::model::on_delete::OnDelete::SetDefault).to_string()
+            OnDelete::SetDefault
         );
     }
 

@@ -1,0 +1,12 @@
+[package]
+name = "margaret_composite_foreign_key_model_fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+margaret = { workspace = true, features = ["runtime"] }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

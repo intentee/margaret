@@ -1,4 +1,6 @@
+use crate::check_predicate::CheckPredicate;
 use crate::column::Column;
+use crate::column_check::ColumnCheck;
 use crate::column_default::ColumnDefault;
 use crate::foreign_key::ForeignKey;
 use crate::index::Index;
@@ -19,6 +21,25 @@ fn quote_identifier_list(identifiers: &[String]) -> String {
         .join(", ")
 }
 
+fn render_check_predicate(column_name: &str, predicate: CheckPredicate) -> String {
+    match predicate {
+        CheckPredicate::ByteLength { length } => {
+            format!("length({}) = {length}", quote_identifier(column_name))
+        }
+        CheckPredicate::Minimum { minimum } => {
+            format!("{} >= {minimum}", quote_identifier(column_name))
+        }
+    }
+}
+
+fn render_column_check(column_name: &str, check: &ColumnCheck) -> String {
+    format!(
+        "CONSTRAINT {} CHECK ({})",
+        quote_identifier(&check.name),
+        render_check_predicate(column_name, check.predicate)
+    )
+}
+
 fn render_column(column: &Column) -> String {
     let mut definition = format!(
         "{} {}",
@@ -35,15 +56,28 @@ fn render_column(column: &Column) -> String {
         ColumnDefault::UuidV7 => definition.push_str(" DEFAULT uuidv7()"),
     }
 
+    let mut check_definitions: Vec<String> = column
+        .checks
+        .iter()
+        .map(|check| render_column_check(&column.name, check))
+        .collect();
+
+    check_definitions.sort();
+
+    for check_definition in &check_definitions {
+        definition.push(' ');
+        definition.push_str(check_definition);
+    }
+
     definition
 }
 
 fn render_foreign_key(foreign_key: &ForeignKey) -> String {
     let mut definition = format!(
         "FOREIGN KEY ({}) REFERENCES {} ({})",
-        quote_identifier(&foreign_key.column),
+        quote_identifier_list(&foreign_key.columns),
         quote_identifier(&foreign_key.references_table),
-        quote_identifier(&foreign_key.references_column)
+        quote_identifier_list(&foreign_key.references_columns)
     );
 
     match foreign_key.on_delete {
@@ -141,7 +175,9 @@ pub fn render_postgres(schema: &Schema) -> String {
 
 #[cfg(test)]
 mod tests {
+    use crate::check_predicate::CheckPredicate;
     use crate::column::Column;
+    use crate::column_check::ColumnCheck;
     use crate::column_default::ColumnDefault;
     use crate::column_type::ColumnType;
     use crate::foreign_key::ForeignKey;
@@ -159,6 +195,7 @@ mod tests {
         default: ColumnDefault,
     ) -> Column {
         Column {
+            checks: Vec::new(),
             column_type,
             default,
             name: name.to_string(),
@@ -166,16 +203,39 @@ mod tests {
         }
     }
 
+    fn checked_column(name: &str, column_type: ColumnType, checks: Vec<ColumnCheck>) -> Column {
+        Column {
+            checks,
+            column_type,
+            default: ColumnDefault::NotSet,
+            name: name.to_string(),
+            nullable: false,
+        }
+    }
+
+    fn column_check(name: &str, predicate: CheckPredicate) -> ColumnCheck {
+        ColumnCheck {
+            name: name.to_string(),
+            predicate,
+        }
+    }
+
     fn foreign_key(
-        column: &str,
-        references_column: &str,
+        columns: &[&str],
+        references_columns: &[&str],
         references_table: &str,
         on_delete: OnDelete,
     ) -> ForeignKey {
         ForeignKey {
-            column: column.to_string(),
+            columns: columns
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
             on_delete,
-            references_column: references_column.to_string(),
+            references_columns: references_columns
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
             references_table: references_table.to_string(),
         }
     }
@@ -429,8 +489,8 @@ mod tests {
                     column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
                 ],
                 foreign_keys: vec![foreign_key(
-                    "author_id",
-                    "id",
+                    &["author_id"],
+                    &["id"],
                     "authors",
                     OnDelete::NoAction,
                 )],
@@ -502,8 +562,8 @@ mod tests {
                     column("author_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
                 ],
                 foreign_keys: vec![foreign_key(
-                    "author_id",
-                    "id",
+                    &["author_id"],
+                    &["id"],
                     "authors",
                     OnDelete::NoAction,
                 )],
@@ -531,8 +591,8 @@ mod tests {
                     ColumnDefault::NotSet,
                 )],
                 foreign_keys: vec![foreign_key(
-                    "author_id",
-                    "id",
+                    &["author_id"],
+                    &["id"],
                     "authors",
                     OnDelete::NoAction,
                 )],
@@ -558,8 +618,8 @@ mod tests {
                     column("editor_id", ColumnType::Uuid, false, ColumnDefault::NotSet),
                 ],
                 foreign_keys: vec![
-                    foreign_key("editor_id", "id", "users", OnDelete::NoAction),
-                    foreign_key("author_id", "id", "users", OnDelete::NoAction),
+                    foreign_key(&["editor_id"], &["id"], "users", OnDelete::NoAction),
+                    foreign_key(&["author_id"], &["id"], "users", OnDelete::NoAction),
                 ],
                 indexes: Vec::new(),
                 name: "docs".to_string(),
@@ -584,7 +644,12 @@ mod tests {
                     false,
                     ColumnDefault::NotSet,
                 )],
-                foreign_keys: vec![foreign_key("author_id", "id", "authors", OnDelete::Cascade)],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::Cascade,
+                )],
                 indexes: Vec::new(),
                 name: "posts".to_string(),
                 primary_key: Vec::new(),
@@ -609,8 +674,8 @@ mod tests {
                     ColumnDefault::NotSet,
                 )],
                 foreign_keys: vec![foreign_key(
-                    "author_id",
-                    "id",
+                    &["author_id"],
+                    &["id"],
                     "authors",
                     OnDelete::Restrict,
                 )],
@@ -637,7 +702,12 @@ mod tests {
                     true,
                     ColumnDefault::NotSet,
                 )],
-                foreign_keys: vec![foreign_key("author_id", "id", "authors", OnDelete::SetNull)],
+                foreign_keys: vec![foreign_key(
+                    &["author_id"],
+                    &["id"],
+                    "authors",
+                    OnDelete::SetNull,
+                )],
                 indexes: Vec::new(),
                 name: "posts".to_string(),
                 primary_key: Vec::new(),
@@ -662,8 +732,8 @@ mod tests {
                     ColumnDefault::NotSet,
                 )],
                 foreign_keys: vec![foreign_key(
-                    "author_id",
-                    "id",
+                    &["author_id"],
+                    &["id"],
                     "authors",
                     OnDelete::SetDefault,
                 )],
@@ -767,6 +837,117 @@ mod tests {
         assert_eq!(
             render_postgres(&schema),
             "CREATE TABLE \"articles\" (\n    \"author_id\" UUID NOT NULL,\n    \"created_at\" TIMESTAMPTZ NOT NULL\n);\n\nCREATE INDEX \"articles_author_id_index\" ON \"articles\" (\"author_id\");\n\nCREATE INDEX \"articles_created_at_index\" ON \"articles\" (\"created_at\");"
+        );
+    }
+
+    #[test]
+    fn renders_a_byte_length_check() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![checked_column(
+                    "hash",
+                    ColumnType::Bytea,
+                    vec![column_check(
+                        "fragment_metadata_hash_byte_length",
+                        CheckPredicate::ByteLength { length: 32 },
+                    )],
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "fragment_metadata".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"fragment_metadata\" (\n    \"hash\" BYTEA NOT NULL CONSTRAINT \"fragment_metadata_hash_byte_length\" CHECK (length(\"hash\") = 32)\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_minimum_check() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![checked_column(
+                    "size_payload",
+                    ColumnType::BigInt,
+                    vec![column_check(
+                        "fragment_metadata_size_payload_minimum",
+                        CheckPredicate::Minimum { minimum: 0 },
+                    )],
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "fragment_metadata".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"fragment_metadata\" (\n    \"size_payload\" BIGINT NOT NULL CONSTRAINT \"fragment_metadata_size_payload_minimum\" CHECK (\"size_payload\" >= 0)\n);"
+        );
+    }
+
+    #[test]
+    fn renders_checks_on_one_column_in_a_deterministic_order() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![checked_column(
+                    "hash",
+                    ColumnType::Bytea,
+                    vec![
+                        column_check(
+                            "hashes_hash_minimum",
+                            CheckPredicate::Minimum { minimum: 1 },
+                        ),
+                        column_check(
+                            "hashes_hash_byte_length",
+                            CheckPredicate::ByteLength { length: 32 },
+                        ),
+                    ],
+                )],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+                name: "hashes".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"hashes\" (\n    \"hash\" BYTEA NOT NULL CONSTRAINT \"hashes_hash_byte_length\" CHECK (length(\"hash\") = 32) CONSTRAINT \"hashes_hash_minimum\" CHECK (\"hash\" >= 1)\n);"
+        );
+    }
+
+    #[test]
+    fn renders_a_composite_foreign_key() {
+        let schema = Schema {
+            tables: vec![Table {
+                columns: vec![
+                    column("partition", ColumnType::Uuid, false, ColumnDefault::NotSet),
+                    column("hash", ColumnType::Bytea, false, ColumnDefault::NotSet),
+                ],
+                foreign_keys: vec![foreign_key(
+                    &["partition", "hash"],
+                    &["partition", "hash"],
+                    "fragment_metadata",
+                    OnDelete::NoAction,
+                )],
+                indexes: Vec::new(),
+                name: "fragment".to_string(),
+                primary_key: Vec::new(),
+                unique_constraints: Vec::new(),
+            }],
+        };
+
+        assert_eq!(
+            render_postgres(&schema),
+            "CREATE TABLE \"fragment\" (\n    \"partition\" UUID NOT NULL,\n    \"hash\" BYTEA NOT NULL,\n    FOREIGN KEY (\"partition\", \"hash\") REFERENCES \"fragment_metadata\" (\"partition\", \"hash\")\n);"
         );
     }
 }

@@ -13,8 +13,10 @@ mod column_arguments;
 mod column_type_context;
 mod column_type_source;
 mod decimal_canonical_path;
+mod declared_column_check;
 mod declared_column_type;
 mod deferred_foreign_key;
+mod deferred_model_foreign_key;
 mod enum_column;
 mod foreign_key_arguments;
 mod foreign_key_target;
@@ -26,25 +28,31 @@ mod indirection_inner;
 mod infer_column;
 mod infer_column_type;
 mod model_arguments;
+mod model_foreign_key_arguments;
 mod numeric_digits;
+mod on_delete_argument;
 mod positioned_field;
 
 #[cfg(test)]
 mod tests {
-    use crate::model_codegen_error::ModelCodegenError;
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
     use std::path::Path;
 
-    use quote::quote;
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_model::check_predicate::CheckPredicate;
+    use margaret_model::column_check::ColumnCheck;
+    use margaret_model::column_type::ColumnType;
+    use margaret_model::on_delete::OnDelete;
 
     use crate::inferred_column::InferredColumn;
+    use crate::model::Model;
+    use crate::model_codegen_error::ModelCodegenError;
     use crate::models::models;
 
     const AUTHOR_MODEL: &str = "\
@@ -804,6 +812,16 @@ struct Book {
         assert!(error_message(source).contains("foreign key dependency cycle"));
     }
 
+    fn resolved_model(lib_source: &str, table: &str) -> Model {
+        let directory = crate_with(lib_source);
+
+        models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .find(|model| model.table == table)
+            .expect("the model resolves")
+    }
+
     fn inferred_column(lib_source: &str, table: &str, column: &str) -> InferredColumn {
         let directory = crate_with(lib_source);
 
@@ -824,10 +842,7 @@ struct Book {
         let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n    #[column]\n    cover: Vec<u8>,\n}\n";
         let inferred = inferred_column(source, "articles", "status");
 
-        assert_eq!(
-            inferred.column_type.to_string(),
-            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
-        );
+        assert_eq!(inferred.column_type, ColumnType::Text);
         assert!(!inferred.nullable);
     }
 
@@ -836,10 +851,7 @@ struct Book {
         let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: Option<ArticleStatus>,\n}\n";
         let inferred = inferred_column(source, "articles", "status");
 
-        assert_eq!(
-            inferred.column_type.to_string(),
-            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
-        );
+        assert_eq!(inferred.column_type, ColumnType::Text);
         assert!(inferred.nullable);
     }
 
@@ -848,10 +860,8 @@ struct Book {
         let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n    #[column]\n    previous_status: ArticleStatus,\n}\n";
 
         assert_eq!(
-            inferred_column(source, "articles", "previous_status")
-                .column_type
-                .to_string(),
-            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
+            inferred_column(source, "articles", "previous_status").column_type,
+            ColumnType::Text
         );
     }
 
@@ -883,16 +893,11 @@ struct Book {
         let source = "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 12, scale = 2)]\n    unit_price: rust_decimal::Decimal,\n}\n";
 
         assert_eq!(
-            inferred_column(source, "line_items", "unit_price")
-                .column_type
-                .to_string(),
-            quote!(
-                margaret::framework::model::column_type::ColumnType::Numeric {
-                    precision: 12u32,
-                    scale: 2u32,
-                }
-            )
-            .to_string()
+            inferred_column(source, "line_items", "unit_price").column_type,
+            ColumnType::Numeric {
+                precision: 12,
+                scale: 2
+            }
         );
     }
 
@@ -901,16 +906,11 @@ struct Book {
         let source = "use rust_decimal::Decimal;\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 4, scale = 4)]\n    rate: Decimal,\n}\n";
 
         assert_eq!(
-            inferred_column(source, "line_items", "rate")
-                .column_type
-                .to_string(),
-            quote!(
-                margaret::framework::model::column_type::ColumnType::Numeric {
-                    precision: 4u32,
-                    scale: 4u32,
-                }
-            )
-            .to_string()
+            inferred_column(source, "line_items", "rate").column_type,
+            ColumnType::Numeric {
+                precision: 4,
+                scale: 4
+            }
         );
     }
 
@@ -973,5 +973,228 @@ struct Book {
         let source = "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 29, scale = 2)]\n    unit_price: rust_decimal::Decimal,\n}\n";
 
         assert!(error_message(source).contains("the precision must be between 1 and 28"));
+    }
+
+    const FRAGMENT_METADATA_MODEL: &str = "#[model(table = \"fragment_metadata\")]
+struct FragmentMetadata {
+    #[column(primary_key)]
+    partition: uuid::Uuid,
+    #[column(primary_key, byte_length = 32)]
+    hash: Vec<u8>,
+    #[column(minimum = 0)]
+    size_payload: i64,
+}
+";
+
+    fn with_fragment_metadata(referencing: &str) -> String {
+        format!("{FRAGMENT_METADATA_MODEL}\n{referencing}")
+    }
+
+    fn column_checks(lib_source: &str, table: &str, column: &str) -> Vec<ColumnCheck> {
+        let directory = crate_with(lib_source);
+
+        models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .find(|model| model.table == table)
+            .expect("the model resolves")
+            .columns
+            .into_iter()
+            .find(|resolved| resolved.name == column)
+            .expect("the column resolves")
+            .checks
+    }
+
+    #[test]
+    fn resolves_a_byte_length_check_from_a_column_attribute() {
+        assert_eq!(
+            column_checks(FRAGMENT_METADATA_MODEL, "fragment_metadata", "hash"),
+            vec![ColumnCheck {
+                name: "fragment_metadata_hash_byte_length".to_string(),
+                predicate: CheckPredicate::ByteLength { length: 32 },
+            }]
+        );
+    }
+
+    #[test]
+    fn resolves_a_minimum_check_from_a_column_attribute() {
+        assert_eq!(
+            column_checks(FRAGMENT_METADATA_MODEL, "fragment_metadata", "size_payload"),
+            vec![ColumnCheck {
+                name: "fragment_metadata_size_payload_minimum".to_string(),
+                predicate: CheckPredicate::Minimum { minimum: 0 },
+            }]
+        );
+    }
+
+    #[test]
+    fn resolves_no_checks_for_a_column_that_declares_none() {
+        assert!(
+            column_checks(FRAGMENT_METADATA_MODEL, "fragment_metadata", "partition").is_empty()
+        );
+    }
+
+    #[test]
+    fn rejects_a_byte_length_on_a_text_column() {
+        let source = "#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key, byte_length = 32)]\n    name: String,\n}\n";
+
+        assert!(error_message(source).contains("only applies to a BYTEA column"));
+    }
+
+    #[test]
+    fn rejects_a_minimum_on_a_text_column() {
+        let source = "#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key, minimum = 0)]\n    name: String,\n}\n";
+
+        assert!(error_message(source).contains("only applies to a numeric column"));
+    }
+
+    #[test]
+    fn rejects_a_check_constraint_on_a_foreign_key_field() {
+        let source = with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(byte_length = 32)]\n    #[foreign_key]\n    author: Author,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("cannot declare a check constraint"));
+    }
+
+    #[test]
+    fn resolves_a_composite_foreign_key_from_a_model_attribute() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    partition: uuid::Uuid,\n    #[column(primary_key)]\n    hash: Vec<u8>,\n    #[column(primary_key)]\n    context: uuid::Uuid,\n}\n",
+        );
+
+        let foreign_keys = resolved_model(&source, "fragment").foreign_keys;
+
+        assert_eq!(foreign_keys.len(), 1);
+        assert_eq!(
+            foreign_keys[0].columns,
+            vec!["partition".to_string(), "hash".to_string()]
+        );
+        assert_eq!(
+            foreign_keys[0].references_columns,
+            vec!["partition".to_string(), "hash".to_string()]
+        );
+        assert_eq!(foreign_keys[0].references_table, "fragment_metadata");
+        assert_eq!(foreign_keys[0].on_delete, OnDelete::NoAction);
+    }
+
+    #[test]
+    fn orders_a_composite_foreign_key_target_before_the_model_that_references_it() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    partition: uuid::Uuid,\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n",
+        );
+        let directory = crate_with(&source);
+
+        let tables: Vec<String> = models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .map(|model| model.table)
+            .collect();
+
+        assert_eq!(
+            tables,
+            vec!["fragment_metadata".to_string(), "fragment".to_string()]
+        );
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_to_a_type_that_is_not_a_model() {
+        let source = "#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = crate::Missing)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("which is not a model declared with #[model]"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_to_a_model_without_a_primary_key() {
+        let source = "#[model(table = \"metadata\")]\nstruct Metadata {\n    #[column]\n    hash: Vec<u8>,\n}\n\n#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = crate::Metadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("which has no primary key to reference"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_with_the_wrong_number_of_columns() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("constrains 1 column(s) but"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_on_a_column_the_model_does_not_declare() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[foreign_key(columns = [partition, digest], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    partition: uuid::Uuid,\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("which the model does not declare"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_that_repeats_a_column() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[foreign_key(columns = [partition, partition], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    partition: uuid::Uuid,\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("more than once"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_whose_column_type_differs_from_the_target() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash, partition], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    partition: uuid::Uuid,\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("whose type differs from column"));
+    }
+
+    #[test]
+    fn rejects_two_composite_foreign_keys_on_the_same_columns() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    partition: uuid::Uuid,\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("more than one foreign key on columns"));
+    }
+
+    #[test]
+    fn rejects_a_byte_length_that_is_not_an_unsigned_integer() {
+        let source = "#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, byte_length = \"thirty two\")]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("'byte_length'"));
+    }
+
+    #[test]
+    fn rejects_a_minimum_that_is_not_an_unsigned_integer() {
+        let source = "#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, minimum = \"zero\")]\n    size_payload: i64,\n}\n";
+
+        assert!(error_message(source).contains("'minimum'"));
+    }
+
+    #[test]
+    fn rejects_a_zero_byte_length_on_a_column() {
+        let source = "#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, byte_length = 0)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("must require at least one byte"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_whose_target_path_does_not_resolve() {
+        let source = "#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = Missing)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("which is not a model declared with #[model]"));
+    }
+
+    #[test]
+    fn rejects_malformed_composite_foreign_key_arguments() {
+        let source = "#[model(table = \"fragment\")]\n#[foreign_key(= 5)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("failed to read the model attributes"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_without_columns() {
+        let source = "#[model(table = \"fragment\")]\n#[foreign_key(references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("requires the columns it constrains"));
     }
 }

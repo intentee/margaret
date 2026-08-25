@@ -1,4 +1,6 @@
+use margaret_model::check_predicate::CheckPredicate;
 use margaret_model::column::Column;
+use margaret_model::column_check::ColumnCheck;
 use margaret_model::column_default::ColumnDefault;
 use margaret_model::column_type::ColumnType;
 use margaret_model::foreign_key::ForeignKey;
@@ -10,10 +12,24 @@ use margaret_model::unique_constraint::UniqueConstraint;
 
 fn column(name: &str, column_type: ColumnType, default: ColumnDefault, nullable: bool) -> Column {
     Column {
+        checks: Vec::new(),
         column_type,
         default,
         name: name.to_string(),
         nullable,
+    }
+}
+
+fn checked_column(name: &str, column_type: ColumnType, predicate: CheckPredicate) -> Column {
+    Column {
+        checks: vec![ColumnCheck {
+            name: format!("fragment_metadata_{name}_check"),
+            predicate,
+        }],
+        column_type,
+        default: ColumnDefault::NotSet,
+        name: name.to_string(),
+        nullable: false,
     }
 }
 
@@ -72,9 +88,9 @@ fn article_table() -> Table {
             column("author_id", ColumnType::Uuid, ColumnDefault::NotSet, false),
         ],
         foreign_keys: vec![ForeignKey {
-            column: "author_id".to_string(),
+            columns: vec!["author_id".to_string()],
             on_delete: OnDelete::Cascade,
-            references_column: "id".to_string(),
+            references_columns: vec!["id".to_string()],
             references_table: "authors".to_string(),
         }],
         indexes: vec![
@@ -131,9 +147,62 @@ fn line_item_table() -> Table {
     }
 }
 
+fn fragment_metadata_table() -> Table {
+    Table {
+        columns: vec![
+            column("partition", ColumnType::Uuid, ColumnDefault::NotSet, false),
+            checked_column(
+                "hash",
+                ColumnType::Bytea,
+                CheckPredicate::ByteLength { length: 32 },
+            ),
+            checked_column(
+                "size_payload",
+                ColumnType::BigInt,
+                CheckPredicate::Minimum { minimum: 0 },
+            ),
+        ],
+        foreign_keys: Vec::new(),
+        indexes: Vec::new(),
+        name: "fragment_metadata".to_string(),
+        primary_key: vec!["partition".to_string(), "hash".to_string()],
+        unique_constraints: Vec::new(),
+    }
+}
+
+fn fragment_table() -> Table {
+    Table {
+        columns: vec![
+            column("partition", ColumnType::Uuid, ColumnDefault::NotSet, false),
+            column("hash", ColumnType::Bytea, ColumnDefault::NotSet, false),
+            column("context", ColumnType::Uuid, ColumnDefault::NotSet, false),
+        ],
+        foreign_keys: vec![ForeignKey {
+            columns: vec!["partition".to_string(), "hash".to_string()],
+            on_delete: OnDelete::Cascade,
+            references_columns: vec!["partition".to_string(), "hash".to_string()],
+            references_table: "fragment_metadata".to_string(),
+        }],
+        indexes: Vec::new(),
+        name: "fragment".to_string(),
+        primary_key: vec![
+            "partition".to_string(),
+            "hash".to_string(),
+            "context".to_string(),
+        ],
+        unique_constraints: Vec::new(),
+    }
+}
+
 #[must_use]
 pub fn schema_fixture() -> Schema {
     Schema {
-        tables: vec![author_table(), article_table(), line_item_table()],
+        tables: vec![
+            author_table(),
+            article_table(),
+            line_item_table(),
+            fragment_metadata_table(),
+            fragment_table(),
+        ],
     }
 }
