@@ -190,7 +190,9 @@ fn fragment_table() -> Table {
             "hash".to_string(),
             "context".to_string(),
         ],
-        unique_constraints: Vec::new(),
+        unique_constraints: vec![UniqueConstraint {
+            columns: vec!["hash".to_string(), "context".to_string()],
+        }],
     }
 }
 

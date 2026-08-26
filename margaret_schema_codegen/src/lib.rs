@@ -319,9 +319,9 @@ struct Second {
     }
 
     #[test]
-    fn combines_columns_that_share_an_index_name_into_one_index() {
+    fn generates_a_composite_index_from_a_model_attribute() {
         let source = schema_source(
-            "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"events_kind_label\")]\n    kind: String,\n    #[column]\n    #[index(name = \"events_kind_label\")]\n    label: String,\n}\n",
+            "#[model(table = \"events\")]\n#[index(name = \"events_kind_label\", columns = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n",
         );
 
         assert!(source.contains(
@@ -330,9 +330,9 @@ struct Second {
     }
 
     #[test]
-    fn orders_composite_index_columns_by_field_declaration() {
+    fn orders_composite_index_columns_as_declared() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[index(name = \"articles_author_title\")]\n    author: Author,\n    #[column]\n    #[index(name = \"articles_author_title\")]\n    title: String,\n}\n",
+            "#[model(table = \"articles\")]\n#[index(name = \"articles_author_title\", columns = [author_id, title])]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n    #[column]\n    title: String,\n}\n",
         ));
 
         assert!(source.contains(
@@ -343,7 +343,7 @@ struct Second {
     #[test]
     fn allows_a_unique_column_inside_a_composite_index() {
         let source = schema_source(
-            "#[model(table = \"members\")]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[index(name = \"members_email_label\")]\n    email: String,\n    #[column]\n    #[index(name = \"members_email_label\")]\n    label: String,\n}\n",
+            "#[model(table = \"members\")]\n#[index(name = \"members_email_label\", columns = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: String,\n    #[column]\n    label: String,\n}\n",
         );
 
         assert!(source.contains(
@@ -399,7 +399,7 @@ struct Second {
     #[test]
     fn generates_a_composite_foreign_key_from_a_model_attribute() {
         let source = schema_source(
-            "#[model(table = \"fragment_metadata\")]\nstruct FragmentMetadata {\n    #[column(primary_key)]\n    partition: uuid::Uuid,\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n\n#[model(table = \"fragment\")]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata, on_delete = cascade)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    partition: uuid::Uuid,\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n",
+            "#[model(table = \"fragment_metadata\")]\n#[primary_key(columns = [partition, hash])]\nstruct FragmentMetadata {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n\n#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata, on_delete = cascade)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
         );
 
         assert!(source.contains(

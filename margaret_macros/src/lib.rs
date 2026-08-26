@@ -108,7 +108,10 @@ pub fn renders_view(_attributes: TokenStream, item: TokenStream) -> TokenStream 
 
 #[proc_macro_attribute]
 pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_struct_markers(item, &["column", "foreign_key", "index"])
+    strip_struct_markers(
+        item,
+        &["column", "foreign_key", "index", "primary_key", "unique"],
+    )
 }
 
 #[proc_macro_attribute]
@@ -380,5 +383,59 @@ mod tests {
         assert!(!stripped.contains("column"));
         assert!(stripped.contains("derive"));
         assert!(stripped.contains("partition"));
+    }
+
+    #[test]
+    fn removes_primary_key_markers_from_the_struct_itself() {
+        let stripped = strip_struct_or_compile_error(
+            quote! {
+                #[primary_key(columns = [partition, hash])]
+                pub struct FragmentAssociation {
+                    #[column]
+                    pub partition: Uuid,
+                }
+            },
+            &["column", "foreign_key", "index", "primary_key", "unique"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("primary_key"));
+        assert!(stripped.contains("partition"));
+    }
+
+    #[test]
+    fn removes_unique_markers_from_the_struct_itself() {
+        let stripped = strip_struct_or_compile_error(
+            quote! {
+                #[unique(columns = [hash, context])]
+                pub struct FragmentAssociation {
+                    #[column]
+                    pub hash: Vec<u8>,
+                }
+            },
+            &["column", "foreign_key", "index", "primary_key", "unique"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("unique"));
+        assert!(stripped.contains("hash"));
+    }
+
+    #[test]
+    fn removes_index_markers_from_the_struct_itself() {
+        let stripped = strip_struct_or_compile_error(
+            quote! {
+                #[index(name = "fragment_context", columns = [context, partition])]
+                pub struct FragmentAssociation {
+                    #[column]
+                    pub context: Uuid,
+                }
+            },
+            &["column", "foreign_key", "index", "primary_key", "unique"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("index"));
+        assert!(stripped.contains("context"));
     }
 }

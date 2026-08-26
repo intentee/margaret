@@ -2,9 +2,12 @@ use syn::Path;
 
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attribute_arguments::format_path::format_path;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_model::on_delete::OnDelete;
 
+use crate::column_list_arity::ColumnListArity;
 use crate::model_codegen_error::ModelCodegenError;
+use crate::model_column_list::ModelColumnList;
 use crate::on_delete_argument::OnDeleteArgument;
 
 #[derive(Debug)]
@@ -17,26 +20,12 @@ pub(crate) struct ModelForeignKeyArguments {
 impl ModelForeignKeyArguments {
     pub(crate) fn parse(arguments: &AttributeArgs, model: &str) -> Result<Self, ModelCodegenError> {
         arguments.interpret(|reader| {
-            let declared_columns = reader.take_path_array("columns")?.unwrap_or_default();
-
-            if declared_columns.is_empty() {
-                return Err(ModelCodegenError::ModelForeignKeyRequiresColumns {
-                    model: model.to_string(),
-                });
-            }
-
-            let mut columns: Vec<String> = Vec::with_capacity(declared_columns.len());
-
-            for declared_column in &declared_columns {
-                let Some(identifier) = declared_column.get_ident() else {
-                    return Err(ModelCodegenError::ModelForeignKeyColumnIsNotAnIdentifier {
-                        column: format_path(declared_column),
-                        model: model.to_string(),
-                    });
-                };
-
-                columns.push(identifier.to_string());
-            }
+            let ModelColumnList { columns } = ModelColumnList::read(
+                reader,
+                FrameworkAttribute::ForeignKey,
+                ColumnListArity::OneOrMore,
+                model,
+            )?;
 
             let references = reader.take_path("references")?.ok_or_else(|| {
                 ModelCodegenError::ModelForeignKeyRequiresReferences {
@@ -112,38 +101,6 @@ mod tests {
             .on_delete,
             OnDelete::Cascade
         );
-    }
-
-    #[test]
-    fn rejects_absent_columns() {
-        assert!(matches!(
-            parse(&parse_quote!(#[foreign_key(references = crate::Metadata)]))
-                .expect_err("a foreign key without columns is rejected"),
-            ModelCodegenError::ModelForeignKeyRequiresColumns { ref model }
-                if model == "crate::Model"
-        ));
-    }
-
-    #[test]
-    fn rejects_an_empty_column_list() {
-        assert!(matches!(
-            parse(&parse_quote!(#[foreign_key(columns = [], references = crate::Metadata)]))
-                .expect_err("an empty column list is rejected"),
-            ModelCodegenError::ModelForeignKeyRequiresColumns { ref model }
-                if model == "crate::Model"
-        ));
-    }
-
-    #[test]
-    fn rejects_a_column_that_is_not_a_plain_identifier() {
-        assert!(matches!(
-            parse(&parse_quote!(
-                #[foreign_key(columns = [outer::inner], references = crate::Metadata)]
-            ))
-            .expect_err("a multi segment column path is rejected"),
-            ModelCodegenError::ModelForeignKeyColumnIsNotAnIdentifier { ref column, .. }
-                if column == "outer::inner"
-        ));
     }
 
     #[test]

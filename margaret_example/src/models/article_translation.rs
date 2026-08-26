@@ -1,6 +1,7 @@
 use margaret::framework::macros::model;
 
 #[model(table = "article_translations")]
+#[primary_key(columns = [article_id, locale])]
 #[foreign_key(
     columns = [article_id],
     references = crate::models::article::Article,
@@ -8,9 +9,9 @@ use margaret::framework::macros::model;
 )]
 #[derive(Clone)]
 pub struct ArticleTranslation {
-    #[column(primary_key)]
+    #[column]
     pub article_id: uuid::Uuid,
-    #[column(primary_key)]
+    #[column]
     pub locale: String,
     #[column]
     pub title: String,

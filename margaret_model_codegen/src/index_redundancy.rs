@@ -1,4 +1,4 @@
 pub(crate) enum IndexRedundancy {
-    PrimaryKeyLeadingColumn,
+    PrimaryKeyLeadingColumns,
     UniqueConstraint,
 }

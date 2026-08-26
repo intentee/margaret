@@ -65,8 +65,11 @@ impl Binder {
 struct Worker;
 
 #[model(table = "records")]
+#[primary_key(columns = [id, label])]
+#[unique(columns = [label, id])]
+#[index(name = "records_label_id", columns = [label, id])]
 struct Record {
-    #[column(primary_key, name = "id")]
+    #[column(name = "id")]
     id: String,
     #[column]
     label: String,

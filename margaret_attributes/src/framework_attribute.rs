@@ -17,6 +17,7 @@ pub enum FrameworkAttribute {
     JwksSecretStore,
     Middleware,
     Model,
+    PrimaryKey,
     Process,
     ProvidesJwksEndpoint,
     ProvidesRouteParameter,
@@ -28,12 +29,13 @@ pub enum FrameworkAttribute {
     Service,
     Singleton,
     SpiffeHttpClient,
+    Unique,
     WebsocketMessage,
     WebsocketSession,
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 30] = [
         Self::AuthenticatedUser,
         Self::BuildForSession,
         Self::Column,
@@ -49,6 +51,7 @@ impl FrameworkAttribute {
         Self::JwksSecretStore,
         Self::Middleware,
         Self::Model,
+        Self::PrimaryKey,
         Self::Process,
         Self::ProvidesJwksEndpoint,
         Self::ProvidesRouteParameter,
@@ -60,6 +63,7 @@ impl FrameworkAttribute {
         Self::Service,
         Self::Singleton,
         Self::SpiffeHttpClient,
+        Self::Unique,
         Self::WebsocketMessage,
         Self::WebsocketSession,
     ];
@@ -93,6 +97,7 @@ impl FrameworkAttribute {
             "jwks_secret_store" => Some(Self::JwksSecretStore),
             "middleware" => Some(Self::Middleware),
             "model" => Some(Self::Model),
+            "primary_key" => Some(Self::PrimaryKey),
             "process" => Some(Self::Process),
             "provides_jwks_endpoint" => Some(Self::ProvidesJwksEndpoint),
             "provides_route_parameter" => Some(Self::ProvidesRouteParameter),
@@ -104,6 +109,7 @@ impl FrameworkAttribute {
             "service" => Some(Self::Service),
             "singleton" => Some(Self::Singleton),
             "spiffe_http_client" => Some(Self::SpiffeHttpClient),
+            "unique" => Some(Self::Unique),
             "websocket_message" => Some(Self::WebsocketMessage),
             "websocket_session" => Some(Self::WebsocketSession),
             _ => None,
@@ -128,6 +134,7 @@ impl FrameworkAttribute {
             Self::JwksSecretStore => "jwks_secret_store",
             Self::Middleware => "middleware",
             Self::Model => "model",
+            Self::PrimaryKey => "primary_key",
             Self::Process => "process",
             Self::ProvidesJwksEndpoint => "provides_jwks_endpoint",
             Self::ProvidesRouteParameter => "provides_route_parameter",
@@ -139,6 +146,7 @@ impl FrameworkAttribute {
             Self::Service => "service",
             Self::Singleton => "singleton",
             Self::SpiffeHttpClient => "spiffe_http_client",
+            Self::Unique => "unique",
             Self::WebsocketMessage => "websocket_message",
             Self::WebsocketSession => "websocket_session",
         }
