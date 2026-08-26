@@ -1,6 +1,6 @@
 [package]
 name = "margaret_attribute_arguments"
-version = "0.3.1"
+version = "0.4.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "Typed attribute-argument parsing for the Margaret application framework."

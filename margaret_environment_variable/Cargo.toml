@@ -1,6 +1,6 @@
 [package]
 name = "margaret_environment_variable"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "Environment variable input reading for the Margaret application framework."
