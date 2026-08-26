@@ -17,10 +17,10 @@ Margaret has separate runtime and code-generation feature sets. Add the same cra
 
 ```toml
 [dependencies]
-margaret = "0.3.0"
+margaret = "0.3.1"
 
 [build-dependencies]
-margaret = { version = "0.3.0", default-features = false, features = ["codegen"] }
+margaret = { version = "0.3.1", default-features = false, features = ["codegen"] }
 ```
 
 Run Margaret's generator from the consumer's build script:
