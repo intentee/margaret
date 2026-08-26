@@ -14,9 +14,14 @@ enum IndexedAttributeArgs {
     Rejected(AttributeArgumentsError),
 }
 
+fn derive_path() -> CanonicalPath {
+    CanonicalPath::new(vec!["derive".to_string()])
+}
+
 pub struct IndexedAttribute {
     args: IndexedAttributeArgs,
     attribute: Attribute,
+    canonical_path: CanonicalPath,
     framework_attribute: Option<FrameworkAttribute>,
 }
 
@@ -32,6 +37,7 @@ impl IndexedAttribute {
         Self {
             args,
             attribute: attribute.clone(),
+            canonical_path: canonical_path.clone(),
             framework_attribute,
         }
     }
@@ -58,6 +64,25 @@ impl IndexedAttribute {
             IndexedAttributeArgs::Parsed(args) => Ok(args),
             IndexedAttributeArgs::Rejected(rejected) => Err(rejected.clone().into()),
         }
+    }
+
+    /// # Errors
+    ///
+    /// Returns `AttributeError::Arguments`.
+    pub fn derived_paths(&self) -> Result<Vec<Path>, AttributeError> {
+        if self.canonical_path != derive_path() {
+            return Ok(Vec::new());
+        }
+
+        self.args()?.interpret(|reader| {
+            let mut paths = Vec::new();
+
+            while let Some(path) = reader.take_positional_path() {
+                paths.push(path);
+            }
+
+            Ok(paths)
+        })
     }
 
     #[must_use]

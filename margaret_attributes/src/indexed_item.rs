@@ -16,6 +16,7 @@ pub struct IndexedItem {
     canonical_path: CanonicalPath,
     fields: Vec<IndexedField>,
     identifier: String,
+    is_copy: bool,
     kind: ItemKind,
     methods: Vec<IndexedMethod>,
     trait_impls: Vec<IndexedTraitImpl>,
@@ -29,6 +30,7 @@ impl IndexedItem {
             canonical_path,
             fields,
             identifier,
+            is_copy,
             kind,
             methods,
             trait_impls,
@@ -40,6 +42,7 @@ impl IndexedItem {
             canonical_path,
             fields,
             identifier,
+            is_copy,
             kind,
             methods,
             trait_impls,
@@ -55,6 +58,7 @@ impl IndexedItem {
         attributes: Vec<Attribute>,
         fields: Vec<IndexedField>,
         variants: Vec<IndexedVariant>,
+        is_copy: bool,
     ) -> Self {
         Self {
             attributes: attributes
@@ -64,6 +68,7 @@ impl IndexedItem {
             canonical_path,
             fields,
             identifier,
+            is_copy,
             kind,
             methods: Vec::new(),
             trait_impls: Vec::new(),
@@ -96,6 +101,11 @@ impl IndexedItem {
     #[must_use]
     pub fn identifier(&self) -> &str {
         &self.identifier
+    }
+
+    #[must_use]
+    pub fn is_copy(&self) -> bool {
+        self.is_copy
     }
 
     #[must_use]

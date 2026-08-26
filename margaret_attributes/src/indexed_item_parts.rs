@@ -11,6 +11,7 @@ pub(crate) struct IndexedItemParts {
     pub(crate) canonical_path: CanonicalPath,
     pub(crate) fields: Vec<IndexedField>,
     pub(crate) identifier: String,
+    pub(crate) is_copy: bool,
     pub(crate) kind: ItemKind,
     pub(crate) methods: Vec<IndexedMethod>,
     pub(crate) trait_impls: Vec<IndexedTraitImpl>,

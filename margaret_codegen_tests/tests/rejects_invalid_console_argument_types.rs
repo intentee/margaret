@@ -12,7 +12,7 @@ fn rejects_a_generic_console_argument_value_type() {
                 parameter,
                 value_type,
             },
-        } if owner == "generic_console_argument::Config"
+        } if owner == "crate::Config"
             && parameter == "tags"
             && value_type == "Vec < String >"
     ));
@@ -28,7 +28,7 @@ fn rejects_a_non_path_console_argument_value_type() {
                 parameter,
                 value_type,
             },
-        } if owner == "non_path_console_argument::Config"
+        } if owner == "crate::Config"
             && parameter == "pair"
             && value_type == "(u8 , u8)"
     ));
@@ -44,7 +44,7 @@ fn rejects_an_unresolvable_console_argument_value_type() {
                 parameter,
                 value_type,
             },
-        } if owner == "unresolvable_console_argument::Config"
+        } if owner == "crate::Config"
             && parameter == "widget"
             && value_type == "Widget"
     ));

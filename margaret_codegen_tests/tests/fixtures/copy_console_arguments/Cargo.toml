@@ -1,0 +1,16 @@
+[package]
+name = "margaret_codegen_copy_console_arguments_fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+margaret = { workspace = true, features = ["runtime"] }
+
+[build-dependencies]
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
+
+[lints]
+workspace = true

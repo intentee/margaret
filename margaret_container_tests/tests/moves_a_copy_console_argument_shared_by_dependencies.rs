@@ -13,7 +13,9 @@ fn moves_a_copy_console_argument_shared_by_dependencies() {
         .collect();
 
     assert!(source.contains("crate::Parent::create("));
-    assert!(source.contains("arguments.argument0"));
+    assert!(source.contains("console_argument_0"));
+    assert!(source.contains("console_argument_1"));
+    assert!(source.contains("console_argument_2"));
     assert!(source.contains("::std::sync::Arc::clone(&child)"));
-    assert!(!source.contains("arguments.argument0.clone()"));
+    assert!(!source.contains(".clone()"));
 }

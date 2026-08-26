@@ -4,3 +4,4 @@ mod generates_fallible_role_assembly;
 mod keeps_construction_futures_linear;
 mod rejects_invalid_console_argument_types;
 mod weaves_console_arguments_by_type;
+mod weaves_copy_console_arguments_without_cloning;

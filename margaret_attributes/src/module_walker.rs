@@ -21,6 +21,7 @@ use crate::canonical_path::CanonicalPath;
 use crate::field_identifier::FieldIdentifier;
 use crate::flatten_use_tree::flatten_use_tree;
 use crate::indexed_associated_type::IndexedAssociatedType;
+use crate::indexed_item::IndexedItem;
 use crate::indexed_trait_impl::IndexedTraitImpl;
 use crate::indexed_variant::IndexedVariant;
 use crate::item_kind::ItemKind;
@@ -165,10 +166,10 @@ impl ModuleWalker {
 
         walker.walk_file(&root_file, &module_path, source_directory)?;
 
-        Ok(walker.into_output())
+        walker.into_output()
     }
 
-    fn into_output(self) -> WalkOutput {
+    fn into_output(self) -> Result<WalkOutput, AttributeError> {
         let Self {
             excluded_root_modules: _,
             imports,
@@ -248,9 +249,9 @@ impl ModuleWalker {
                     })
                 })
             })
-            .collect();
+            .collect::<Result<Vec<IndexedItem>, AttributeError>>()?;
 
-        WalkOutput { imports, items }
+        Ok(WalkOutput { imports, items })
     }
 
     fn record(

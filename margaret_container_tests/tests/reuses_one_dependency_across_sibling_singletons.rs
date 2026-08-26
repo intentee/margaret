@@ -12,7 +12,7 @@ fn reuses_one_dependency_across_sibling_singletons() {
         .split_whitespace()
         .collect();
 
-    assert!(source.contains("crate::Mapper::create(arguments.argument0)"));
+    assert!(source.contains("crate::Mapper::create(console_argument_0)"));
     assert!(source.contains("crate::First::create(::std::sync::Arc::clone(&mapper))"));
     assert!(source.contains("crate::Second::create(::std::sync::Arc::clone(&mapper))"));
     assert!(source.contains("crate::Third::create(::std::sync::Arc::clone(&mapper))"));

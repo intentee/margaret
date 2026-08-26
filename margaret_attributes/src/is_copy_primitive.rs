@@ -1,5 +1,5 @@
 #[must_use]
-pub fn is_copy_primitive(name: &str) -> bool {
+pub(crate) fn is_copy_primitive(name: &str) -> bool {
     matches!(
         name,
         "bool"

@@ -52,6 +52,7 @@ mod tests {
             vec![attribute],
             Vec::new(),
             Vec::new(),
+            false,
         )
     }
 
