@@ -1,4 +1,3 @@
-pub mod index_membership;
 pub mod inferred_column;
 pub mod model;
 pub mod model_codegen_error;
@@ -10,41 +9,57 @@ pub mod resolved_unique_constraint;
 
 mod collected_model;
 mod column_arguments;
+mod column_list_arity;
 mod column_type_context;
 mod column_type_source;
 mod decimal_canonical_path;
+mod declared_column_check;
 mod declared_column_type;
 mod deferred_foreign_key;
+mod deferred_model_foreign_key;
 mod enum_column;
+mod explicit_index_name;
+mod field_index;
 mod foreign_key_arguments;
 mod foreign_key_target;
 mod foreign_key_target_column;
 mod index_arguments;
-mod index_column_member;
 mod index_redundancy;
 mod indirection_inner;
 mod infer_column;
 mod infer_column_type;
 mod model_arguments;
+mod model_column_list;
+mod model_foreign_key_arguments;
+mod model_index_arguments;
+mod model_primary_key_arguments;
+mod model_unique_arguments;
 mod numeric_digits;
-mod positioned_field;
+mod on_delete_argument;
+mod redundant_index;
+mod resolve_declared_columns;
+mod scalar_column;
 
 #[cfg(test)]
 mod tests {
-    use crate::model_codegen_error::ModelCodegenError;
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
     use std::path::Path;
 
-    use quote::quote;
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_model::check_predicate::CheckPredicate;
+    use margaret_model::column_check::ColumnCheck;
+    use margaret_model::column_type::ColumnType;
+    use margaret_model::on_delete::OnDelete;
 
     use crate::inferred_column::InferredColumn;
+    use crate::model::Model;
+    use crate::model_codegen_error::ModelCodegenError;
     use crate::models::models;
 
     const AUTHOR_MODEL: &str = "\
@@ -288,13 +303,21 @@ struct S {
     }
 
     #[test]
-    fn rejects_a_foreign_key_to_a_composite_primary_key() {
-        assert!(
-            error_message(
-                "#[model(table = \"orders\")]\nstruct Order {\n    #[column(primary_key)]\n    region: String,\n    #[column(primary_key)]\n    number: i64,\n}\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    order: Order,\n}\n",
-            )
-            .contains("composite primary key")
+    fn derives_one_column_per_target_key_column_of_a_composite_foreign_key() {
+        let source = "#[model(table = \"orders\")]\n#[primary_key(columns = [region, number])]\nstruct Order {\n    #[column]\n    region: String,\n    #[column]\n    number: i64,\n}\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    order: Order,\n}\n";
+
+        let foreign_keys = resolved_model(source, "line_items").foreign_keys;
+
+        assert_eq!(foreign_keys.len(), 1);
+        assert_eq!(
+            foreign_keys[0].columns,
+            vec!["order_region".to_string(), "order_number".to_string()]
         );
+        assert_eq!(
+            foreign_keys[0].references_columns,
+            vec!["region".to_string(), "number".to_string()]
+        );
+        assert_eq!(foreign_keys[0].references_table, "orders");
     }
 
     #[test]
@@ -465,12 +488,12 @@ struct S {
     }
 
     #[test]
-    fn rejects_a_repeated_bare_index_attribute() {
+    fn rejects_a_repeated_field_index() {
         assert!(
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index]\n    #[index]\n    value: String,\n}\n",
             )
-            .contains("carries a repeated #[index]")
+            .contains("carries more than one #[index]")
         );
     }
 
@@ -480,7 +503,7 @@ struct S {
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index(name = \"combo\")]\n    #[index(name = \"combo\")]\n    value: String,\n}\n",
             )
-            .contains("carries a repeated #[index]")
+            .contains("carries more than one #[index]")
         );
     }
 
@@ -520,7 +543,7 @@ struct S {
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    #[index]\n    id: uuid::Uuid,\n}\n",
             )
-            .contains("leading column of the primary key")
+            .contains("leading column(s) of the primary key")
         );
     }
 
@@ -528,15 +551,15 @@ struct S {
     fn rejects_an_index_on_the_leading_primary_key_column_of_a_composite_key() {
         assert!(
             error_message(
-                "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    #[index]\n    repository: String,\n    #[column(primary_key)]\n    branch: String,\n    #[column(primary_key)]\n    hash: String,\n}\n",
+                "#[model(table = \"locks\")]\n#[primary_key(columns = [repository, branch, hash])]\nstruct Lock {\n    #[column]\n    #[index]\n    repository: String,\n    #[column]\n    branch: String,\n    #[column]\n    hash: String,\n}\n",
             )
-            .contains("leading column of the primary key")
+            .contains("leading column(s) of the primary key")
         );
     }
 
     #[test]
     fn accepts_an_index_on_a_non_leading_primary_key_column() {
-        let source = "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    repository: String,\n    #[column(primary_key)]\n    branch: String,\n    #[column(primary_key)]\n    #[index]\n    hash: String,\n}\n";
+        let source = "#[model(table = \"locks\")]\n#[primary_key(columns = [repository, branch, hash])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n    #[column]\n    #[index]\n    hash: String,\n}\n";
 
         assert_eq!(
             resolved_index_columns(source),
@@ -625,7 +648,7 @@ struct B {
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index]\n    c: String,\n    #[column]\n    #[index(name = \"t_c_index\")]\n    d: String,\n}\n",
             )
-            .contains("duplicate index name")
+            .contains("declares the index name")
         );
     }
 
@@ -804,6 +827,16 @@ struct Book {
         assert!(error_message(source).contains("foreign key dependency cycle"));
     }
 
+    fn resolved_model(lib_source: &str, table: &str) -> Model {
+        let directory = crate_with(lib_source);
+
+        models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .find(|model| model.table == table)
+            .expect("the model resolves")
+    }
+
     fn inferred_column(lib_source: &str, table: &str, column: &str) -> InferredColumn {
         let directory = crate_with(lib_source);
 
@@ -824,10 +857,7 @@ struct Book {
         let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n    #[column]\n    cover: Vec<u8>,\n}\n";
         let inferred = inferred_column(source, "articles", "status");
 
-        assert_eq!(
-            inferred.column_type.to_string(),
-            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
-        );
+        assert_eq!(inferred.column_type, ColumnType::Text);
         assert!(!inferred.nullable);
     }
 
@@ -836,10 +866,7 @@ struct Book {
         let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: Option<ArticleStatus>,\n}\n";
         let inferred = inferred_column(source, "articles", "status");
 
-        assert_eq!(
-            inferred.column_type.to_string(),
-            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
-        );
+        assert_eq!(inferred.column_type, ColumnType::Text);
         assert!(inferred.nullable);
     }
 
@@ -848,10 +875,8 @@ struct Book {
         let source = "enum ArticleStatus {\n    Draft,\n    Published,\n}\n\n#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    status: ArticleStatus,\n    #[column]\n    previous_status: ArticleStatus,\n}\n";
 
         assert_eq!(
-            inferred_column(source, "articles", "previous_status")
-                .column_type
-                .to_string(),
-            quote!(margaret::framework::model::column_type::ColumnType::Text).to_string()
+            inferred_column(source, "articles", "previous_status").column_type,
+            ColumnType::Text
         );
     }
 
@@ -883,16 +908,11 @@ struct Book {
         let source = "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 12, scale = 2)]\n    unit_price: rust_decimal::Decimal,\n}\n";
 
         assert_eq!(
-            inferred_column(source, "line_items", "unit_price")
-                .column_type
-                .to_string(),
-            quote!(
-                margaret::framework::model::column_type::ColumnType::Numeric {
-                    precision: 12u32,
-                    scale: 2u32,
-                }
-            )
-            .to_string()
+            inferred_column(source, "line_items", "unit_price").column_type,
+            ColumnType::Numeric {
+                precision: 12,
+                scale: 2
+            }
         );
     }
 
@@ -901,16 +921,11 @@ struct Book {
         let source = "use rust_decimal::Decimal;\n\n#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 4, scale = 4)]\n    rate: Decimal,\n}\n";
 
         assert_eq!(
-            inferred_column(source, "line_items", "rate")
-                .column_type
-                .to_string(),
-            quote!(
-                margaret::framework::model::column_type::ColumnType::Numeric {
-                    precision: 4u32,
-                    scale: 4u32,
-                }
-            )
-            .to_string()
+            inferred_column(source, "line_items", "rate").column_type,
+            ColumnType::Numeric {
+                precision: 4,
+                scale: 4
+            }
         );
     }
 
@@ -973,5 +988,522 @@ struct Book {
         let source = "#[model(table = \"line_items\")]\nstruct LineItem {\n    #[column(precision = 29, scale = 2)]\n    unit_price: rust_decimal::Decimal,\n}\n";
 
         assert!(error_message(source).contains("the precision must be between 1 and 28"));
+    }
+
+    const FRAGMENT_METADATA_MODEL: &str = "#[model(table = \"fragment_metadata\")]
+#[primary_key(columns = [partition, hash])]
+struct FragmentMetadata {
+    #[column]
+    partition: uuid::Uuid,
+    #[column(byte_length = 32)]
+    hash: Vec<u8>,
+    #[column(minimum = 0)]
+    size_payload: i64,
+}
+";
+
+    fn with_fragment_metadata(referencing: &str) -> String {
+        format!("{FRAGMENT_METADATA_MODEL}\n{referencing}")
+    }
+
+    fn column_checks(lib_source: &str, table: &str, column: &str) -> Vec<ColumnCheck> {
+        let directory = crate_with(lib_source);
+
+        models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .find(|model| model.table == table)
+            .expect("the model resolves")
+            .columns
+            .into_iter()
+            .find(|resolved| resolved.name == column)
+            .expect("the column resolves")
+            .checks
+    }
+
+    #[test]
+    fn resolves_a_byte_length_check_from_a_column_attribute() {
+        assert_eq!(
+            column_checks(FRAGMENT_METADATA_MODEL, "fragment_metadata", "hash"),
+            vec![ColumnCheck {
+                name: "fragment_metadata_hash_byte_length".to_string(),
+                predicate: CheckPredicate::ByteLength { length: 32 },
+            }]
+        );
+    }
+
+    #[test]
+    fn resolves_a_minimum_check_from_a_column_attribute() {
+        assert_eq!(
+            column_checks(FRAGMENT_METADATA_MODEL, "fragment_metadata", "size_payload"),
+            vec![ColumnCheck {
+                name: "fragment_metadata_size_payload_minimum".to_string(),
+                predicate: CheckPredicate::Minimum { minimum: 0 },
+            }]
+        );
+    }
+
+    #[test]
+    fn resolves_no_checks_for_a_column_that_declares_none() {
+        assert!(
+            column_checks(FRAGMENT_METADATA_MODEL, "fragment_metadata", "partition").is_empty()
+        );
+    }
+
+    #[test]
+    fn rejects_a_byte_length_on_a_text_column() {
+        let source = "#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key, byte_length = 32)]\n    name: String,\n}\n";
+
+        assert!(error_message(source).contains("only applies to a BYTEA column"));
+    }
+
+    #[test]
+    fn rejects_a_minimum_on_a_text_column() {
+        let source = "#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key, minimum = 0)]\n    name: String,\n}\n";
+
+        assert!(error_message(source).contains("only applies to a numeric column"));
+    }
+
+    #[test]
+    fn rejects_a_check_constraint_on_a_foreign_key_field() {
+        let source = with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(byte_length = 32)]\n    #[foreign_key]\n    author: Author,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("cannot declare a check constraint"));
+    }
+
+    #[test]
+    fn resolves_a_composite_foreign_key_from_a_model_attribute() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n    #[column]\n    context: uuid::Uuid,\n}\n",
+        );
+
+        let foreign_keys = resolved_model(&source, "fragment").foreign_keys;
+
+        assert_eq!(foreign_keys.len(), 1);
+        assert_eq!(
+            foreign_keys[0].columns,
+            vec!["partition".to_string(), "hash".to_string()]
+        );
+        assert_eq!(
+            foreign_keys[0].references_columns,
+            vec!["partition".to_string(), "hash".to_string()]
+        );
+        assert_eq!(foreign_keys[0].references_table, "fragment_metadata");
+        assert_eq!(foreign_keys[0].on_delete, OnDelete::NoAction);
+    }
+
+    #[test]
+    fn orders_a_composite_foreign_key_target_before_the_model_that_references_it() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
+        );
+        let directory = crate_with(&source);
+
+        let tables: Vec<String> = models(&index_of(directory.path()))
+            .expect("the models resolve")
+            .into_iter()
+            .map(|model| model.table)
+            .collect();
+
+        assert_eq!(
+            tables,
+            vec!["fragment_metadata".to_string(), "fragment".to_string()]
+        );
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_to_a_type_that_is_not_a_model() {
+        let source = "#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = crate::Missing)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("which is not a model declared with #[model]"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_to_a_model_without_a_primary_key() {
+        let source = "#[model(table = \"metadata\")]\nstruct Metadata {\n    #[column]\n    hash: Vec<u8>,\n}\n\n#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = crate::Metadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("which has no primary key"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_with_the_wrong_number_of_columns() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("column(s) but"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_on_a_column_the_model_does_not_declare() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, digest], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("which the model does not declare"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_that_repeats_a_column() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, partition], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("more than once"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_whose_column_type_differs_from_the_target() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [hash, partition], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("whose type differs from column"));
+    }
+
+    #[test]
+    fn rejects_two_composite_foreign_keys_on_the_same_columns() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(error_message(&source).contains("more than one foreign key on columns"));
+    }
+
+    #[test]
+    fn rejects_a_byte_length_that_is_not_an_unsigned_integer() {
+        let source = "#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, byte_length = \"thirty two\")]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("'byte_length'"));
+    }
+
+    #[test]
+    fn rejects_a_minimum_that_is_not_an_unsigned_integer() {
+        let source = "#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, minimum = \"zero\")]\n    size_payload: i64,\n}\n";
+
+        assert!(error_message(source).contains("'minimum'"));
+    }
+
+    #[test]
+    fn rejects_a_zero_byte_length_on_a_column() {
+        let source = "#[model(table = \"fragments\")]\nstruct Fragment {\n    #[column(primary_key, byte_length = 0)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("must require at least one byte"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_whose_target_path_does_not_resolve() {
+        let source = "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [hash], references = Missing)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("which is not a model declared with #[model]"));
+    }
+
+    #[test]
+    fn rejects_malformed_composite_foreign_key_arguments() {
+        let source = "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(= 5)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("failed to read the model attributes"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_without_columns() {
+        let source = "#[model(table = \"fragment\")]\n#[foreign_key(references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert!(error_message(source).contains("requires the columns it spans"));
+    }
+
+    #[test]
+    fn resolves_a_composite_primary_key_in_the_declared_order() {
+        let source = "#[model(table = \"locks\")]\n#[primary_key(columns = [branch, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
+
+        assert_eq!(
+            resolved_model(source, "locks").primary_key,
+            vec!["branch".to_string(), "repository".to_string()]
+        );
+    }
+
+    #[test]
+    fn rejects_two_fields_flagged_as_the_primary_key() {
+        let source = "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    repository: String,\n    #[column(primary_key)]\n    branch: String,\n}\n";
+
+        assert!(
+            error_message(source).contains("marks more than one field with #[column(primary_key)]")
+        );
+    }
+
+    #[test]
+    fn rejects_a_primary_key_declared_on_both_a_column_and_the_model() {
+        let source = "#[model(table = \"locks\")]\n#[primary_key(columns = [repository, branch])]\nstruct Lock {\n    #[column(primary_key)]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
+
+        assert!(error_message(source).contains("declares a primary key both with"));
+    }
+
+    #[test]
+    fn rejects_more_than_one_model_primary_key() {
+        let source = "#[model(table = \"locks\")]\n#[primary_key(columns = [repository, branch])]\n#[primary_key(columns = [branch, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
+
+        assert!(error_message(source).contains("declares more than one #[primary_key]"));
+    }
+
+    #[test]
+    fn rejects_a_model_primary_key_column_the_model_does_not_declare() {
+        let source = "#[model(table = \"locks\")]\n#[primary_key(columns = [repository, missing])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
+
+        assert!(
+            error_message(source).contains("never of a column derived from a #[foreign_key] field")
+        );
+    }
+
+    #[test]
+    fn rejects_a_model_primary_key_over_a_foreign_key_column() {
+        let source = with_author(
+            "#[model(table = \"articles\")]\n#[primary_key(columns = [author_id, title])]\nstruct Article {\n    #[column]\n    title: String,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n",
+        );
+
+        assert!(
+            error_message(&source)
+                .contains("never of a column derived from a #[foreign_key] field")
+        );
+    }
+
+    #[test]
+    fn rejects_a_primary_key_attribute_on_a_field() {
+        let source = "#[model(table = \"locks\")]\nstruct Lock {\n    #[column]\n    #[primary_key(columns = [repository, branch])]\n    repository: String,\n}\n";
+
+        assert!(error_message(source).contains("carries #[primary_key]"));
+    }
+
+    #[test]
+    fn rejects_a_unique_attribute_on_a_field() {
+        let source = "#[model(table = \"locks\")]\nstruct Lock {\n    #[column(primary_key)]\n    #[unique(columns = [repository, branch])]\n    repository: String,\n}\n";
+
+        assert!(error_message(source).contains("carries #[unique]"));
+    }
+
+    #[test]
+    fn resolves_a_composite_unique_constraint_from_a_model_attribute() {
+        let source = "#[model(table = \"members\")]\n#[unique(columns = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: String,\n}\n";
+
+        assert_eq!(
+            resolved_model(source, "members")
+                .unique_constraints
+                .into_iter()
+                .map(|constraint| constraint.columns)
+                .collect::<Vec<Vec<String>>>(),
+            vec![vec!["email".to_string(), "label".to_string()]]
+        );
+    }
+
+    #[test]
+    fn rejects_a_model_unique_column_the_model_does_not_declare() {
+        let source = "#[model(table = \"members\")]\n#[unique(columns = [email, missing])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n}\n";
+
+        assert!(error_message(source).contains("which the model does not declare"));
+    }
+
+    #[test]
+    fn rejects_two_model_unique_constraints_over_the_same_columns() {
+        let source = "#[model(table = \"members\")]\n#[unique(columns = [email, label])]\n#[unique(columns = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: String,\n}\n";
+
+        assert!(error_message(source).contains("more than one unique constraint on columns"));
+    }
+
+    #[test]
+    fn resolves_a_composite_index_from_a_model_attribute() {
+        let source = "#[model(table = \"events\")]\n#[index(name = \"events_kind_label\", columns = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
+
+        assert_eq!(
+            resolved_index_columns(source),
+            vec![vec!["kind".to_string(), "label".to_string()]]
+        );
+    }
+
+    #[test]
+    fn rejects_a_model_index_without_a_name() {
+        let source = "#[model(table = \"events\")]\n#[index(columns = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
+
+        assert!(error_message(source).contains("requires a name"));
+    }
+
+    #[test]
+    fn rejects_a_model_index_column_the_model_does_not_declare() {
+        let source = "#[model(table = \"events\")]\n#[index(name = \"events_kind_label\", columns = [kind, missing])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n}\n";
+
+        assert!(error_message(source).contains("which the model does not declare"));
+    }
+
+    #[test]
+    fn rejects_a_field_index_that_names_columns() {
+        let source = "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(columns = [kind])]\n    kind: String,\n}\n";
+
+        assert!(error_message(source).contains("must not name columns"));
+    }
+
+    #[test]
+    fn rejects_two_fields_that_share_an_index_name() {
+        let source = "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"events_pair\")]\n    kind: String,\n    #[column]\n    #[index(name = \"events_pair\")]\n    label: String,\n}\n";
+
+        assert!(error_message(source).contains("declares the index name"));
+    }
+
+    #[test]
+    fn rejects_a_model_index_that_duplicates_the_primary_key() {
+        let source = "#[model(table = \"locks\")]\n#[primary_key(columns = [repository, branch])]\n#[index(name = \"locks_repository_branch\", columns = [repository, branch])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
+
+        assert!(error_message(source).contains("leading column(s) of the primary key"));
+    }
+
+    #[test]
+    fn rejects_a_model_index_that_duplicates_a_unique_constraint() {
+        let source = "#[model(table = \"members\")]\n#[unique(columns = [email, label])]\n#[index(name = \"members_email_label\", columns = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n    #[column]\n    label: String,\n}\n";
+
+        assert!(error_message(source).contains("a unique constraint is already indexed"));
+    }
+
+    #[test]
+    fn treats_an_optional_composite_foreign_key_as_nullable_columns() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\nstruct Fragment {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    metadata: Option<FragmentMetadata>,\n}\n",
+        );
+
+        let columns = resolved_model(&source, "fragment").columns;
+
+        assert!(
+            columns
+                .iter()
+                .filter(|column| column.name.starts_with("metadata_"))
+                .all(|column| column.inferred.nullable)
+        );
+    }
+
+    #[test]
+    fn copies_each_target_key_column_type_onto_its_derived_column() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\nstruct Fragment {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    metadata: FragmentMetadata,\n}\n",
+        );
+
+        let columns = resolved_model(&source, "fragment").columns;
+        let derived: Vec<(String, ColumnType)> = columns
+            .into_iter()
+            .filter(|column| column.name.starts_with("metadata_"))
+            .map(|column| (column.name, column.inferred.column_type))
+            .collect();
+
+        assert_eq!(
+            derived,
+            vec![
+                ("metadata_partition".to_string(), ColumnType::Uuid),
+                ("metadata_hash".to_string(), ColumnType::Bytea),
+            ]
+        );
+    }
+
+    #[test]
+    fn indexes_every_column_of_a_composite_foreign_key_field() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\nstruct Fragment {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[index]\n    metadata: FragmentMetadata,\n}\n",
+        );
+
+        assert_eq!(
+            resolved_index_columns(&source),
+            vec![vec![
+                "metadata_partition".to_string(),
+                "metadata_hash".to_string()
+            ]]
+        );
+    }
+
+    #[test]
+    fn constrains_every_column_of_a_unique_composite_foreign_key_field() {
+        let source = with_fragment_metadata(
+            "#[model(table = \"fragment\")]\nstruct Fragment {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[foreign_key]\n    metadata: FragmentMetadata,\n}\n",
+        );
+
+        assert_eq!(
+            resolved_model(&source, "fragment")
+                .unique_constraints
+                .into_iter()
+                .map(|constraint| constraint.columns)
+                .collect::<Vec<Vec<String>>>(),
+            vec![vec![
+                "metadata_partition".to_string(),
+                "metadata_hash".to_string()
+            ]]
+        );
+    }
+
+    #[test]
+    fn rejects_a_model_index_name_that_is_not_a_string() {
+        let source = "#[model(table = \"events\")]\n#[index(name = 5, columns = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
+
+        assert!(error_message(source).contains("is not a string literal"));
+    }
+
+    #[test]
+    fn rejects_a_model_index_over_a_single_column() {
+        let source = "#[model(table = \"events\")]\n#[index(name = \"events_kind\", columns = [kind])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n}\n";
+
+        assert!(error_message(source).contains("names a single column"));
+    }
+
+    #[test]
+    fn rejects_a_model_index_name_that_is_not_snake_case() {
+        let source = "#[model(table = \"events\")]\n#[index(name = \"Events\", columns = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n";
+
+        assert!(error_message(source).contains("invalid index name"));
+    }
+
+    #[test]
+    fn rejects_a_model_primary_key_over_a_single_column() {
+        let source = "#[model(table = \"locks\")]\n#[primary_key(columns = [repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n";
+
+        assert!(error_message(source).contains("names a single column"));
+    }
+
+    #[test]
+    fn rejects_a_model_unique_over_a_single_column() {
+        let source = "#[model(table = \"members\")]\n#[unique(columns = [email])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    email: String,\n}\n";
+
+        assert!(error_message(source).contains("names a single column"));
+    }
+
+    #[test]
+    fn rejects_malformed_model_primary_key_arguments() {
+        let source = "#[model(table = \"locks\")]\n#[primary_key(= 5)]\nstruct Lock {\n    #[column]\n    repository: String,\n}\n";
+
+        assert!(error_message(source).contains("failed to read the model attributes"));
+    }
+
+    #[test]
+    fn rejects_malformed_model_unique_arguments() {
+        let source = "#[model(table = \"members\")]\n#[unique(= 5)]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n";
+
+        assert!(error_message(source).contains("failed to read the model attributes"));
+    }
+
+    #[test]
+    fn rejects_malformed_model_index_arguments() {
+        let source = "#[model(table = \"events\")]\n#[index(= 5)]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n";
+
+        assert!(error_message(source).contains("failed to read the model attributes"));
+    }
+
+    #[test]
+    fn rejects_a_field_index_whose_columns_are_not_an_array() {
+        let source = "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(columns = \"kind\")]\n    kind: String,\n}\n";
+
+        assert!(error_message(source).contains("is not a array of paths"));
+    }
+
+    #[test]
+    fn rejects_a_composite_foreign_key_field_whose_derived_index_name_is_too_long() {
+        let long_field = "a".repeat(40);
+        let source = with_fragment_metadata(&format!(
+            "#[model(table = \"fragment\")]\nstruct Fragment {{\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[index]\n    {long_field}: FragmentMetadata,\n}}\n"
+        ));
+
+        assert!(error_message(&source).contains("index name that is too long"));
     }
 }

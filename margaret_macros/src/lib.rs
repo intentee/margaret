@@ -28,7 +28,7 @@ fn strip_parameter_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
     strip_or_compile_error(item.into(), markers).into()
 }
 
-fn strip_field_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
+fn strip_struct_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
     strip_struct_or_compile_error(item.into(), markers).into()
 }
 
@@ -54,6 +54,8 @@ fn strip(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Erro
 
 fn strip_struct(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
     let mut item_struct: ItemStruct = syn::parse2(item)?;
+
+    retain_non_marker_attributes(&mut item_struct.attrs, markers);
 
     for field in &mut item_struct.fields {
         retain_non_marker_attributes(&mut field.attrs, markers);
@@ -106,7 +108,10 @@ pub fn renders_view(_attributes: TokenStream, item: TokenStream) -> TokenStream 
 
 #[proc_macro_attribute]
 pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    strip_field_markers(item, &["column", "foreign_key", "index"])
+    strip_struct_markers(
+        item,
+        &["column", "foreign_key", "index", "primary_key", "unique"],
+    )
 }
 
 #[proc_macro_attribute]
@@ -357,5 +362,80 @@ mod tests {
             strip_struct_or_compile_error(quote! { fn not_a_struct() {} }, &["column"]).to_string();
 
         assert!(output.contains("compile_error"));
+    }
+
+    #[test]
+    fn removes_foreign_key_markers_from_the_struct_itself() {
+        let stripped = strip_struct_or_compile_error(
+            quote! {
+                #[foreign_key(columns = [partition, hash], references = crate::Metadata)]
+                #[derive(Clone)]
+                pub struct FragmentAssociation {
+                    #[column(primary_key)]
+                    pub partition: Uuid,
+                }
+            },
+            &["column", "foreign_key", "index"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("foreign_key"));
+        assert!(!stripped.contains("column"));
+        assert!(stripped.contains("derive"));
+        assert!(stripped.contains("partition"));
+    }
+
+    #[test]
+    fn removes_primary_key_markers_from_the_struct_itself() {
+        let stripped = strip_struct_or_compile_error(
+            quote! {
+                #[primary_key(columns = [partition, hash])]
+                pub struct FragmentAssociation {
+                    #[column]
+                    pub partition: Uuid,
+                }
+            },
+            &["column", "foreign_key", "index", "primary_key", "unique"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("primary_key"));
+        assert!(stripped.contains("partition"));
+    }
+
+    #[test]
+    fn removes_unique_markers_from_the_struct_itself() {
+        let stripped = strip_struct_or_compile_error(
+            quote! {
+                #[unique(columns = [hash, context])]
+                pub struct FragmentAssociation {
+                    #[column]
+                    pub hash: Vec<u8>,
+                }
+            },
+            &["column", "foreign_key", "index", "primary_key", "unique"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("unique"));
+        assert!(stripped.contains("hash"));
+    }
+
+    #[test]
+    fn removes_index_markers_from_the_struct_itself() {
+        let stripped = strip_struct_or_compile_error(
+            quote! {
+                #[index(name = "fragment_context", columns = [context, partition])]
+                pub struct FragmentAssociation {
+                    #[column]
+                    pub context: Uuid,
+                }
+            },
+            &["column", "foreign_key", "index", "primary_key", "unique"],
+        )
+        .to_string();
+
+        assert!(!stripped.contains("index"));
+        assert!(stripped.contains("context"));
     }
 }

@@ -74,15 +74,28 @@ mod tests {
     use crate::framework::macros::model;
 
     #[model(table = "facade_probes")]
+    #[primary_key(columns = [id, slot])]
+    #[unique(columns = [slot, label])]
+    #[index(name = "facade_probes_label_slot", columns = [label, slot])]
     struct FacadeProbe {
-        #[column(primary_key)]
+        #[column]
         id: u32,
+        #[column]
+        slot: u32,
+        #[column]
+        label: u32,
     }
 
     #[test]
     fn re_exports_attribute_macros_that_expand_through_the_umbrella() {
-        let probe = FacadeProbe { id: 7 };
+        let probe = FacadeProbe {
+            id: 7,
+            slot: 3,
+            label: 1,
+        };
 
         assert_eq!(probe.id, 7);
+        assert_eq!(probe.slot, 3);
+        assert_eq!(probe.label, 1);
     }
 }

@@ -8,6 +8,11 @@ use margaret_model_codegen::resolved_column::ResolvedColumn;
 use margaret_model_codegen::resolved_foreign_key::ResolvedForeignKey;
 use margaret_model_codegen::resolved_index::ResolvedIndex;
 
+use crate::column_check_tokens::column_check_tokens;
+use crate::column_default_tokens::column_default_tokens;
+use crate::column_type_tokens::column_type_tokens;
+use crate::on_delete_tokens::on_delete_tokens;
+
 fn string_vec(values: &[String]) -> TokenStream {
     let items = values.iter().map(|value| {
         let value = Literal::string(value);
@@ -19,13 +24,15 @@ fn string_vec(values: &[String]) -> TokenStream {
 }
 
 fn render_column(column: &ResolvedColumn) -> TokenStream {
-    let column_type = &column.inferred.column_type;
-    let default = &column.inferred.default;
+    let checks = column.checks.iter().map(column_check_tokens);
+    let column_type = column_type_tokens(column.inferred.column_type);
+    let default = column_default_tokens(column.inferred.default);
     let nullable = column.inferred.nullable;
     let name = Literal::string(&column.name);
 
     quote! {
         margaret::framework::model::column::Column {
+            checks: vec![#(#checks),*],
             column_type: #column_type,
             default: #default,
             name: #name.to_string(),
@@ -35,16 +42,16 @@ fn render_column(column: &ResolvedColumn) -> TokenStream {
 }
 
 fn render_foreign_key(foreign_key: &ResolvedForeignKey) -> TokenStream {
-    let column = Literal::string(&foreign_key.column);
-    let on_delete = &foreign_key.on_delete;
-    let references_column = Literal::string(&foreign_key.references_column);
+    let columns = string_vec(&foreign_key.columns);
+    let on_delete = on_delete_tokens(foreign_key.on_delete);
+    let references_columns = string_vec(&foreign_key.references_columns);
     let references_table = Literal::string(&foreign_key.references_table);
 
     quote! {
         margaret::framework::model::foreign_key::ForeignKey {
-            column: #column.to_string(),
+            columns: #columns,
             on_delete: #on_delete,
-            references_column: #references_column.to_string(),
+            references_columns: #references_columns,
             references_table: #references_table.to_string(),
         }
     }

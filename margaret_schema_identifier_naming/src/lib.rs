@@ -1,5 +1,7 @@
+pub mod byte_length_constraint_name;
 pub mod index_name;
 pub mod max_identifier_bytes;
+pub mod minimum_constraint_name;
 pub mod primary_key_index_name;
 pub mod schema_identifier;
 pub mod schema_identifier_naming_error;

@@ -112,6 +112,7 @@ mod tests {
 
     use crate::attribute_args::AttributeArgs;
     use crate::attribute_arguments_error::AttributeArgumentsError;
+    use crate::format_path::format_path;
 
     #[derive(Debug, PartialEq, Eq)]
     struct ReadArguments {
@@ -385,6 +386,55 @@ mod tests {
             error,
             AttributeArgumentsError::Malformed { attribute_path, .. }
                 if attribute_path == "index"
+        ));
+    }
+
+    #[test]
+    fn reads_an_array_of_paths() {
+        let columns = parsed(&parse_quote!(#[foreign_key(columns = [partition, hash])]))
+            .interpret(|reader| reader.take_path_array("columns"))
+            .expect("the array reads")
+            .expect("the argument is present");
+
+        assert_eq!(
+            columns.iter().map(format_path).collect::<Vec<String>>(),
+            vec!["partition".to_string(), "hash".to_string()]
+        );
+    }
+
+    #[test]
+    fn an_absent_path_array_reads_as_none() {
+        assert!(
+            parsed(&parse_quote!(#[foreign_key]))
+                .interpret(|reader| reader.take_path_array("columns"))
+                .expect("the absent array reads")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn rejects_a_path_array_argument_that_is_not_an_array() {
+        let error = parsed(&parse_quote!(#[foreign_key(columns = "partition")]))
+            .interpret(|reader| reader.take_path_array("columns"))
+            .expect_err("a string is not an array of paths");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { expected, key, .. }
+                if expected == "array of paths" && key == "columns"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_path_array_element_that_is_not_a_path() {
+        let error = parsed(&parse_quote!(#[foreign_key(columns = [partition, "hash"])]))
+            .interpret(|reader| reader.take_path_array("columns"))
+            .expect_err("a string element is not a path");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::UnexpectedArgument { expected, key, .. }
+                if expected == "array of paths" && key == "columns"
         ));
     }
 }

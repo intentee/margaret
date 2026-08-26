@@ -1,5 +1,9 @@
 pub mod render_schema;
 
+mod column_check_tokens;
+mod column_default_tokens;
+mod column_type_tokens;
+mod on_delete_tokens;
 mod render;
 
 #[cfg(test)]
@@ -136,11 +140,11 @@ struct Second {
         ));
 
         assert!(source.contains("margaret::framework::model::foreign_key::ForeignKey"));
-        assert!(source.contains("column:\"author_id\".to_string()"));
+        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
         assert!(
             source.contains("on_delete:margaret::framework::model::on_delete::OnDelete::NoAction")
         );
-        assert!(source.contains("references_column:\"id\".to_string()"));
+        assert!(source.contains("references_columns:vec![\"id\".to_string()]"));
         assert!(source.contains("references_table:\"authors\".to_string()"));
         assert!(source.contains(
             "column_type:margaret::framework::model::column_type::ColumnType::Uuid,default:margaret::framework::model::column_default::ColumnDefault::NotSet,name:\"author_id\".to_string(),nullable:false,"
@@ -173,7 +177,7 @@ struct Second {
             "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n}\n\n#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
         );
 
-        assert!(source.contains("column:\"author_id\".to_string()"));
+        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
         assert!(source.contains("references_table:\"authors\".to_string()"));
     }
 
@@ -193,8 +197,8 @@ struct Second {
             "#[model(table = \"users\")]\nstruct User {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n\n#[model(table = \"docs\")]\nstruct Doc {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: User,\n    #[column]\n    #[foreign_key]\n    editor: User,\n}\n",
         );
 
-        assert!(source.contains("column:\"author_id\".to_string()"));
-        assert!(source.contains("column:\"editor_id\".to_string()"));
+        assert!(source.contains("columns:vec![\"author_id\".to_string()]"));
+        assert!(source.contains("columns:vec![\"editor_id\".to_string()]"));
     }
 
     #[test]
@@ -315,9 +319,9 @@ struct Second {
     }
 
     #[test]
-    fn combines_columns_that_share_an_index_name_into_one_index() {
+    fn generates_a_composite_index_from_a_model_attribute() {
         let source = schema_source(
-            "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[index(name = \"events_kind_label\")]\n    kind: String,\n    #[column]\n    #[index(name = \"events_kind_label\")]\n    label: String,\n}\n",
+            "#[model(table = \"events\")]\n#[index(name = \"events_kind_label\", columns = [kind, label])]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    kind: String,\n    #[column]\n    label: String,\n}\n",
         );
 
         assert!(source.contains(
@@ -326,9 +330,9 @@ struct Second {
     }
 
     #[test]
-    fn orders_composite_index_columns_by_field_declaration() {
+    fn orders_composite_index_columns_as_declared() {
         let source = schema_source(&with_author(
-            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[index(name = \"articles_author_title\")]\n    author: Author,\n    #[column]\n    #[index(name = \"articles_author_title\")]\n    title: String,\n}\n",
+            "#[model(table = \"articles\")]\n#[index(name = \"articles_author_title\", columns = [author_id, title])]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    author: Author,\n    #[column]\n    title: String,\n}\n",
         ));
 
         assert!(source.contains(
@@ -339,7 +343,7 @@ struct Second {
     #[test]
     fn allows_a_unique_column_inside_a_composite_index() {
         let source = schema_source(
-            "#[model(table = \"members\")]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    #[index(name = \"members_email_label\")]\n    email: String,\n    #[column]\n    #[index(name = \"members_email_label\")]\n    label: String,\n}\n",
+            "#[model(table = \"members\")]\n#[index(name = \"members_email_label\", columns = [email, label])]\nstruct Member {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column(unique)]\n    email: String,\n    #[column]\n    label: String,\n}\n",
         );
 
         assert!(source.contains(
@@ -359,5 +363,101 @@ struct Second {
         assert!(source.contains(
             "indexes:vec![margaret::framework::model::index::Index{columns:vec![\"created_at\".to_string()],name:\"articles_created_at_index\".to_string(),},margaret::framework::model::index::Index{columns:vec![\"slug\".to_string()],name:\"articles_slug_index\".to_string(),}]"
         ));
+    }
+
+    #[test]
+    fn generates_a_byte_length_check_from_a_column_attribute() {
+        let source = schema_source(
+            "#[model(table = \"fragment_metadata\")]\nstruct FragmentMetadata {\n    #[column(primary_key, byte_length = 32)]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(source.contains(
+            "checks:vec![margaret::framework::model::column_check::ColumnCheck{name:\"fragment_metadata_hash_byte_length\".to_string(),predicate:margaret::framework::model::check_predicate::CheckPredicate::ByteLength{length:32u32,},}]"
+        ));
+    }
+
+    #[test]
+    fn generates_a_minimum_check_from_a_column_attribute() {
+        let source = schema_source(
+            "#[model(table = \"fragment_metadata\")]\nstruct FragmentMetadata {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n    #[column(minimum = 0)]\n    size_payload: i64,\n}\n",
+        );
+
+        assert!(source.contains(
+            "checks:vec![margaret::framework::model::column_check::ColumnCheck{name:\"fragment_metadata_size_payload_minimum\".to_string(),predicate:margaret::framework::model::check_predicate::CheckPredicate::Minimum{minimum:0u32,},}]"
+        ));
+    }
+
+    #[test]
+    fn generates_an_empty_check_list_for_a_column_without_checks() {
+        let source = schema_source(
+            "#[model(table = \"authors\")]\nstruct Author {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n}\n",
+        );
+
+        assert!(source.contains("Column{checks:vec![],"));
+    }
+
+    #[test]
+    fn generates_a_composite_foreign_key_from_a_model_attribute() {
+        let source = schema_source(
+            "#[model(table = \"fragment_metadata\")]\n#[primary_key(columns = [partition, hash])]\nstruct FragmentMetadata {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n\n#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata, on_delete = cascade)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
+        );
+
+        assert!(source.contains(
+            "columns:vec![\"partition\".to_string(),\"hash\".to_string()],on_delete:margaret::framework::model::on_delete::OnDelete::Cascade,references_columns:vec![\"partition\".to_string(),\"hash\".to_string()],references_table:\"fragment_metadata\".to_string(),"
+        ));
+    }
+
+    #[test]
+    fn generates_an_integer_column_from_an_i32() {
+        let source = schema_source(
+            "#[model(table = \"counters\")]\nstruct Counter {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    hits: i32,\n}\n",
+        );
+
+        assert!(source.contains("margaret::framework::model::column_type::ColumnType::Integer"));
+    }
+
+    #[test]
+    fn generates_a_timestamptz_column_from_a_datetime() {
+        let source = schema_source(
+            "#[model(table = \"events\")]\nstruct Event {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    occurred_at: chrono::DateTime<chrono::Utc>,\n}\n",
+        );
+
+        assert!(
+            source.contains("margaret::framework::model::column_type::ColumnType::Timestamptz")
+        );
+    }
+
+    #[test]
+    fn generates_on_delete_restrict() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = restrict)]\n    author: Author,\n}\n",
+        ));
+
+        assert!(
+            source.contains("on_delete:margaret::framework::model::on_delete::OnDelete::Restrict")
+        );
+    }
+
+    #[test]
+    fn generates_on_delete_set_null() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = set_null)]\n    author: Option<Author>,\n}\n",
+        ));
+
+        assert!(
+            source.contains("on_delete:margaret::framework::model::on_delete::OnDelete::SetNull")
+        );
+    }
+
+    #[test]
+    fn generates_on_delete_set_default() {
+        let source = schema_source(&with_author(
+            "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key(on_delete = set_default)]\n    author: Author,\n}\n",
+        ));
+
+        assert!(
+            source
+                .contains("on_delete:margaret::framework::model::on_delete::OnDelete::SetDefault")
+        );
     }
 }

@@ -2092,6 +2092,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_composite_foreign_key_model_fixture"
+version = "0.1.0"
+dependencies = [
+ "margaret",
+ "uuid",
+]
+
+[[package]]
 name = "margaret_console"
 version = "0.1.0"
 dependencies = [
@@ -2581,6 +2589,7 @@ version = "0.2.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
+ "margaret_model",
  "margaret_schema_identifier_naming",
  "margaret_syn_type_peeling",
  "margaret_toposort",
@@ -2651,6 +2660,7 @@ dependencies = [
  "margaret_attributes",
  "margaret_codegen_tokens",
  "margaret_generated_module",
+ "margaret_model",
  "margaret_model_codegen",
  "proc-macro2",
  "quote",

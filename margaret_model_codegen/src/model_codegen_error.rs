@@ -178,15 +178,6 @@ pub enum ModelCodegenError {
     },
 
     #[error(
-        "foreign key field '{field}' of model '{model}' references '{target}', which has a composite primary key; foreign keys are single-column"
-    )]
-    ForeignKeyTargetHasCompositePrimaryKey {
-        field: String,
-        model: String,
-        target: String,
-    },
-
-    #[error(
         "foreign key dependency cycle detected between tables: {path}; inline foreign keys require an acyclic table order"
     )]
     ForeignKeyCycle { path: String },
@@ -233,11 +224,6 @@ pub enum ModelCodegenError {
         "field '{field}' of model '{model}' has an #[index] attribute but no #[column]; #[index] layers on top of #[column]"
     )]
     IndexRequiresColumn { field: String, model: String },
-
-    #[error(
-        "field '{field}' of model '{model}' carries a repeated #[index]; a bare #[index] may appear at most once and each index name at most once per column"
-    )]
-    RepeatedIndexOnColumn { field: String, model: String },
 
     #[error(
         "model '{model}' has an invalid index name '{index}'; it must be a snake_case identifier"
@@ -317,12 +303,182 @@ pub enum ModelCodegenError {
     },
 
     #[error(
-        "the single-column index on column '{column}' of model '{model}' is redundant; a unique constraint is already indexed"
+        "the index on column(s) '{columns}' of model '{model}' is redundant; a unique constraint is already indexed"
     )]
-    RedundantIndexOnUniqueColumn { column: String, model: String },
+    RedundantIndexOnUniqueColumns { columns: String, model: String },
 
     #[error(
-        "the single-column index on column '{column}' of model '{model}' is redundant; it is the leading column of the primary key, which is already indexed"
+        "the index on column(s) '{columns}' of model '{model}' is redundant; they are the leading column(s) of the primary key, which is already indexed"
     )]
-    RedundantIndexOnPrimaryKeyColumn { column: String, model: String },
+    RedundantIndexOnPrimaryKeyColumns { columns: String, model: String },
+
+    #[error(
+        "column '{field}' of model '{model}' declares 'byte_length = 0'; a byte length check must require at least one byte"
+    )]
+    ByteLengthMustBePositive { field: String, model: String },
+
+    #[error(
+        "column '{column}' of model '{model}' declares 'byte_length', which only applies to a BYTEA column declared as Vec<u8>"
+    )]
+    ByteLengthOnNonByteaColumn { column: String, model: String },
+
+    #[error("model '{model}' derives a byte length constraint name that is too long: {source}")]
+    ByteLengthConstraintNameTooLong {
+        model: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
+    },
+
+    #[error(
+        "column '{field}' of model '{model}' declares both 'byte_length' and 'minimum'; a byte length applies to a BYTEA column and a minimum applies to a numeric column, so a column can declare at most one of them"
+    )]
+    ConflictingColumnChecks { field: String, model: String },
+
+    #[error(
+        "column '{column}' of model '{model}' declares 'minimum', which only applies to a numeric column"
+    )]
+    MinimumOnNonNumericColumn { column: String, model: String },
+
+    #[error("model '{model}' derives a minimum constraint name that is too long: {source}")]
+    MinimumConstraintNameTooLong {
+        model: String,
+        #[source]
+        source: SchemaIdentifierNamingError,
+    },
+
+    #[error(
+        "foreign key field '{field}' of model '{model}' cannot declare a check constraint; declare it on the column the foreign key references"
+    )]
+    ForeignKeyCannotDeclareCheckConstraint { field: String, model: String },
+
+    #[error(
+        "the foreign key on model '{model}' requires the model it references, e.g. #[foreign_key(columns = [partition, hash], references = crate::Target)]"
+    )]
+    ModelForeignKeyRequiresReferences { model: String },
+
+    #[error(
+        "the foreign key on model '{model}' references '{references}', which is not a model declared with #[model]"
+    )]
+    ModelForeignKeyTargetNotAModel { model: String, references: String },
+
+    #[error(
+        "the foreign key on model '{model}' references '{target}', which has no primary key to reference"
+    )]
+    ModelForeignKeyTargetWithoutPrimaryKey { model: String, target: String },
+
+    #[error(
+        "the foreign key on model '{model}' constrains {declared} column(s) but '{target}' has a primary key of {expected} column(s)"
+    )]
+    ModelForeignKeyArityMismatch {
+        declared: usize,
+        expected: usize,
+        model: String,
+        target: String,
+    },
+
+    #[error(
+        "the foreign key on model '{model}' constrains column '{column}', whose type differs from column '{target_column}' of '{target}'"
+    )]
+    ModelForeignKeyColumnTypeMismatch {
+        column: String,
+        model: String,
+        target: String,
+        target_column: String,
+    },
+
+    #[error("model '{model}' declares more than one foreign key on columns '{columns}'")]
+    DuplicateModelForeignKey { columns: String, model: String },
+
+    #[error(
+        "the foreign key on model '{model}' has an unknown ON DELETE action '{action}'; valid actions are cascade, restrict, set_null, set_default"
+    )]
+    UnknownModelForeignKeyOnDeleteAction { action: String, model: String },
+
+    #[error(
+        "the #[{declaration}] on model '{model}' requires the columns it spans, e.g. #[{declaration}(columns = [partition, hash])]"
+    )]
+    ModelDeclarationRequiresColumns { declaration: String, model: String },
+
+    #[error(
+        "the #[{declaration}] on model '{model}' names '{column}', which is not a plain column identifier"
+    )]
+    ModelDeclarationColumnIsNotAnIdentifier {
+        column: String,
+        declaration: String,
+        model: String,
+    },
+
+    #[error("the #[{declaration}] on model '{model}' names column '{column}' more than once")]
+    ModelDeclarationRepeatsColumn {
+        column: String,
+        declaration: String,
+        model: String,
+    },
+
+    #[error(
+        "the #[{declaration}] on model '{model}' names a single column; a model declaration spans two or more columns, and one over a single column belongs on the field that declares it"
+    )]
+    ModelDeclarationRequiresSeveralColumns { declaration: String, model: String },
+
+    #[error(
+        "the #[{declaration}] on model '{model}' names column '{column}', which the model does not declare"
+    )]
+    ModelDeclarationColumnNotDeclared {
+        column: String,
+        declaration: String,
+        model: String,
+    },
+
+    #[error(
+        "the #[primary_key] on model '{model}' names column '{column}', which the model does not declare with #[column]; a primary key is composed only of columns declared directly by #[column], never of a column derived from a #[foreign_key] field"
+    )]
+    ModelPrimaryKeyColumnNotDeclared { column: String, model: String },
+
+    #[error(
+        "model '{model}' marks more than one field with #[column(primary_key)]; a primary key spanning several columns is declared once on the model with #[primary_key(columns = [...])], which also fixes the order of its columns"
+    )]
+    CompositePrimaryKeyRequiresModelDeclaration { model: String },
+
+    #[error(
+        "model '{model}' declares more than one #[primary_key]; a model has at most one primary key"
+    )]
+    DuplicateModelPrimaryKey { model: String },
+
+    #[error(
+        "model '{model}' declares a primary key both with #[primary_key(columns = [...])] and with #[column(primary_key)]; a primary key is declared exactly once, in exactly one place"
+    )]
+    ConflictingPrimaryKeyDeclarations { model: String },
+
+    #[error(
+        "the #[index] on model '{model}' requires a name, e.g. #[index(name = \"authors_active_joined\", columns = [is_active, joined_at])]"
+    )]
+    ModelIndexRequiresName { model: String },
+
+    #[error(
+        "model '{model}' declares the index name '{index}' more than once; an index name is declared exactly once, and an index spanning several fields is declared with #[index(name = \"{index}\", columns = [...])] on the model"
+    )]
+    DuplicateIndexDeclaration { index: String, model: String },
+
+    #[error("model '{model}' declares more than one unique constraint on columns '{columns}'")]
+    DuplicateModelUniqueConstraint { columns: String, model: String },
+
+    #[error(
+        "field '{field}' of model '{model}' carries #[primary_key]; a single-column primary key is declared with #[column(primary_key)], and a composite one with #[primary_key(columns = [...])] on the model"
+    )]
+    PrimaryKeyIsNotAFieldAttribute { field: String, model: String },
+
+    #[error(
+        "field '{field}' of model '{model}' carries #[unique]; a single-column unique constraint is declared with #[column(unique)], and one spanning several columns with #[unique(columns = [...])] on the model"
+    )]
+    UniqueIsNotAFieldAttribute { field: String, model: String },
+
+    #[error(
+        "field '{field}' of model '{model}' carries more than one #[index]; a field declares at most one index over its own column(s), and an index spanning several fields is declared with #[index(name = ..., columns = [...])] on the model"
+    )]
+    RepeatedFieldIndex { field: String, model: String },
+
+    #[error(
+        "the #[index] on field '{field}' of model '{model}' must not name columns; a field index covers exactly the column(s) that field declares, and an index spanning several fields is declared on the model"
+    )]
+    FieldIndexCannotDeclareColumns { field: String, model: String },
 }

@@ -1,3 +1,4 @@
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ColumnType {
     BigInt,
     Boolean,

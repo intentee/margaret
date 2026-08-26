@@ -4,8 +4,14 @@ use crate::schema_identifier_naming_error::SchemaIdentifierNamingError;
 /// # Errors
 ///
 /// Returns `SchemaIdentifierNamingError` propagated from the work it performs.
-pub fn index_name(table: &str, column: &str) -> Result<String, SchemaIdentifierNamingError> {
-    schema_identifier(&[table, column, "index"])
+pub fn index_name(table: &str, columns: &[String]) -> Result<String, SchemaIdentifierNamingError> {
+    let mut segments: Vec<&str> = Vec::with_capacity(columns.len() + 2);
+
+    segments.push(table);
+    segments.extend(columns.iter().map(String::as_str));
+    segments.push("index");
+
+    schema_identifier(&segments)
 }
 
 #[cfg(test)]
@@ -17,7 +23,8 @@ mod tests {
     #[test]
     fn joins_the_table_and_column_with_an_index_suffix() {
         assert_eq!(
-            index_name("articles", "created_at").expect("the identifier is within the limit"),
+            index_name("articles", &["created_at".to_string()])
+                .expect("the identifier is within the limit"),
             "articles_created_at_index"
         );
     }
@@ -25,7 +32,8 @@ mod tests {
     #[test]
     fn preserves_underscores_in_the_column() {
         assert_eq!(
-            index_name("articles", "author_id").expect("the identifier is within the limit"),
+            index_name("articles", &["author_id".to_string()])
+                .expect("the identifier is within the limit"),
             "articles_author_id_index"
         );
     }
@@ -33,8 +41,10 @@ mod tests {
     #[test]
     fn is_stable_across_repeated_calls() {
         assert_eq!(
-            index_name("articles", "created_at").expect("the identifier is within the limit"),
-            index_name("articles", "created_at").expect("the identifier is within the limit")
+            index_name("articles", &["created_at".to_string()])
+                .expect("the identifier is within the limit"),
+            index_name("articles", &["created_at".to_string()])
+                .expect("the identifier is within the limit")
         );
     }
 
@@ -42,14 +52,29 @@ mod tests {
     fn rejects_a_derived_name_over_the_byte_limit() {
         let column = "a".repeat(MAX_IDENTIFIER_BYTES);
 
-        let error =
-            index_name("articles", &column).expect_err("the derived index name exceeds the limit");
+        let error = index_name("articles", &[column])
+            .expect_err("the derived index name exceeds the limit");
 
         let SchemaIdentifierNamingError::IdentifierTooLong { length, .. } = error;
 
         assert_eq!(
             length,
             "articles".len() + 1 + MAX_IDENTIFIER_BYTES + "_index".len()
+        );
+    }
+
+    #[test]
+    fn joins_every_column_of_a_composite_index() {
+        assert_eq!(
+            index_name(
+                "fragment",
+                &[
+                    "metadata_partition".to_string(),
+                    "metadata_hash".to_string()
+                ]
+            )
+            .expect("the identifier is within the limit"),
+            "fragment_metadata_partition_metadata_hash_index"
         );
     }
 }
