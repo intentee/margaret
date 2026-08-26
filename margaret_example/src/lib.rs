@@ -1,6 +1,7 @@
 pub mod app_name;
 pub mod auth;
 pub mod commands;
+pub mod deployment_environment;
 pub mod english_greeter;
 pub mod forms;
 pub mod jwks_endpoint;

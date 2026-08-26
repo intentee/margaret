@@ -1,14 +1,14 @@
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
+use margaret_serve_input_codegen::serve_input::ServeInput;
 
 use crate::view::View;
 use crate::views::views;
 use crate::views_codegen_error::ViewsCodegenError;
 
 pub struct ViewsPlan {
-    pub(crate) console_arguments: Vec<ConsoleArgument>,
+    pub(crate) serve_inputs: Vec<ServeInput>,
     pub(crate) retained_roots: Vec<CanonicalPath>,
     pub(crate) views: Vec<View>,
 }
@@ -26,10 +26,10 @@ impl ViewsPlan {
             .iter()
             .map(|view| view.concrete_path.clone())
             .collect::<Vec<_>>();
-        let console_arguments = bindings.serve_arguments(&retained_roots, &[])?;
+        let serve_inputs = bindings.serve_inputs(&retained_roots, &[])?;
 
         Ok(Self {
-            console_arguments,
+            serve_inputs,
             retained_roots,
             views,
         })

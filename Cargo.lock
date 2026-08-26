@@ -1875,6 +1875,7 @@ dependencies = [
  "margaret_codegen",
  "margaret_console",
  "margaret_construction",
+ "margaret_environment_variable",
  "margaret_http",
  "margaret_http_uploaded_file",
  "margaret_http_validation",
@@ -1972,7 +1973,6 @@ dependencies = [
  "margaret_asset_bag_codegen",
  "margaret_attribute_arguments",
  "margaret_attributes",
- "margaret_console_argument_codegen",
  "margaret_console_codegen",
  "margaret_container",
  "margaret_generated_module",
@@ -1982,6 +1982,7 @@ dependencies = [
  "margaret_model_codegen",
  "margaret_request_binding_codegen",
  "margaret_schema_codegen",
+ "margaret_serve_input_codegen",
  "margaret_service_codegen",
  "margaret_tag_codegen",
  "margaret_views_codegen",
@@ -2007,6 +2008,15 @@ dependencies = [
 
 [[package]]
 name = "margaret_codegen_copy_console_arguments_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "margaret",
+]
+
+[[package]]
+name = "margaret_codegen_environment_variable_inputs_fixture"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2069,6 +2079,8 @@ dependencies = [
  "margaret_codegen_linear_construction_future_fixture",
  "margaret_console_argument_codegen",
  "margaret_generated_module",
+ "margaret_input_weaving",
+ "margaret_serve_input_codegen",
  "tokio",
 ]
 
@@ -2123,7 +2135,7 @@ dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_codegen_tokens",
- "margaret_injection_codegen",
+ "margaret_input_weaving",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2138,11 +2150,11 @@ dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_codegen_tokens",
- "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_injection_codegen",
+ "margaret_serve_input_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2168,6 +2180,8 @@ dependencies = [
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_generated_module",
+ "margaret_input_weaving",
+ "margaret_serve_input_codegen",
  "margaret_syn_type_peeling",
  "margaret_tag_codegen",
  "margaret_toposort",
@@ -2186,9 +2200,33 @@ dependencies = [
  "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
+ "margaret_input_weaving",
+ "margaret_serve_input_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "margaret_environment_variable"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "margaret_environment_variable_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attribute_arguments",
+ "margaret_attributes",
+ "margaret_codegen_tokens",
+ "margaret_input_weaving",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -2277,6 +2315,7 @@ dependencies = [
  "margaret_middleware_codegen",
  "margaret_request_binding_codegen",
  "margaret_route_parameter_codegen",
+ "margaret_serve_input_codegen",
  "matchit",
  "proc-macro2",
  "quote",
@@ -2347,6 +2386,20 @@ version = "0.3.1"
 dependencies = [
  "margaret_attributes",
  "margaret_syn_type_peeling",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "margaret_input_weaving"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_codegen_tokens",
+ "margaret_injection_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2575,11 +2628,11 @@ dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_codegen_tokens",
- "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
  "margaret_injection_codegen",
  "margaret_request_binding_codegen",
+ "margaret_serve_input_codegen",
  "margaret_tag_codegen",
  "proc-macro2",
  "quote",
@@ -2636,11 +2689,11 @@ dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_codegen_tokens",
- "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
  "margaret_injection_codegen",
  "margaret_route_parameter_codegen",
+ "margaret_serve_input_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2705,6 +2758,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_serve_input_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_codegen_tokens",
+ "margaret_console_argument_codegen",
+ "margaret_environment_variable_codegen",
+ "margaret_injection_codegen",
+ "margaret_input_weaving",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "margaret_service"
 version = "0.1.0"
 dependencies = [
@@ -2732,6 +2802,8 @@ dependencies = [
  "margaret_generated_module",
  "margaret_http_codegen",
  "margaret_injection_codegen",
+ "margaret_input_weaving",
+ "margaret_serve_input_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -3000,9 +3072,9 @@ dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_codegen_tokens",
- "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
+ "margaret_serve_input_codegen",
  "proc-macro2",
  "quote",
  "tempfile",
@@ -3039,13 +3111,13 @@ dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
  "margaret_codegen_tokens",
- "margaret_console_argument_codegen",
  "margaret_container",
  "margaret_generated_module",
  "margaret_injection_codegen",
  "margaret_middleware_codegen",
  "margaret_request_binding_codegen",
  "margaret_route_parameter_codegen",
+ "margaret_serve_input_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",

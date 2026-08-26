@@ -4,7 +4,6 @@ use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
 use margaret_attributes::tag::Tag;
-use margaret_console_argument_codegen::scan::scan;
 use margaret_container::container_error::ContainerError;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_enablement::FrameworkEnablement;
@@ -13,6 +12,7 @@ use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container::rendered_container::RenderedContainer;
 use margaret_container_tests::container_module_source::container_module_source;
+use margaret_serve_input_codegen::scan::scan;
 
 fn auth_tag() -> Tag {
     let path: syn::Path = syn::parse_str("auth").expect("the tag path parses");
@@ -37,13 +37,15 @@ fn render(fixture: &str, providers: &[FrameworkProvider]) -> Result<String, Cont
         .index_crate(&CrateRoot::new("crate", &directory))
         .expect("the fixture crate is indexed")
         .build();
-    let registry = scan(&index).expect("the console arguments are scanned");
+    let serve_inputs = scan(&index).expect("the serve inputs are scanned");
 
-    render_container(&index, &registry, providers).map(|RenderedContainer { modules, .. }| {
-        container_module_source(modules)
-            .split_whitespace()
-            .collect()
-    })
+    render_container(&index, &serve_inputs, providers).map(
+        |RenderedContainer { modules, .. }| {
+            container_module_source(modules)
+                .split_whitespace()
+                .collect()
+        },
+    )
 }
 
 #[test]
@@ -115,4 +117,22 @@ fn propagates_an_unparseable_jwks_store_on_a_service_constructor() {
         .expect_err("the unparseable service marker must be rejected");
 
     assert!(matches!(error, ContainerError::Index { .. }));
+}
+
+#[test]
+fn rejects_a_parameter_that_is_both_a_serve_input_and_a_jwks_secret_store() {
+    let error = render(
+        "serve_input_and_jwks_secret_store",
+        &[store_provider(
+            FrameworkInjectionRole::JwksServerStore,
+            "ServerStore",
+        )],
+    )
+    .expect_err("a parameter resolves to exactly one source");
+
+    assert!(
+        error
+            .to_string()
+            .contains("carries a serve input together with #[jwks_secret_store]")
+    );
 }

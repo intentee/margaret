@@ -27,11 +27,12 @@ mod tests {
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_attributes::framework_attribute::FrameworkAttribute;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-    use margaret_console_argument_codegen::scan::scan;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
+    use margaret_serve_input_codegen::scan::scan;
+    use margaret_serve_input_codegen::serve_input::ServeInput;
 
     use crate::framework_service::FrameworkService;
     use crate::framework_service_kind::FrameworkServiceKind;
@@ -85,11 +86,11 @@ mod tests {
     fn render_source(lib_source: &str, servers: &[HttpServer], has_views: bool) -> String {
         let index = index_for(lib_source);
         let bindings = bindings(&index);
-        let serve_arguments = bindings
-            .serve_arguments(&serve_roots(&index), &[])
+        let serve_inputs = bindings
+            .serve_inputs(&serve_roots(&index), &[])
             .expect("the rendered roots have planned console arguments");
 
-        let plan = ServicePlan::build(&index, &[], &bindings, &serve_arguments)
+        let plan = ServicePlan::build(&index, &[], &bindings, &serve_inputs)
             .expect("the service construction is planned");
 
         render_services(&plan, servers, has_views, &bindings)
@@ -414,10 +415,10 @@ impl Flusher {
     fn rejects_a_serve_input_absent_from_the_container_plan() {
         let index = index_for("");
         let bindings = bindings(&index);
-        let serve_arguments = [ConsoleArgument::Flag {
+        let serve_inputs = [ServeInput::ConsoleArgument(ConsoleArgument::Flag {
             name: "missing".to_string(),
-        }];
-        let error = ServicePlan::build(&index, &[], &bindings, &serve_arguments)
+        })];
+        let error = ServicePlan::build(&index, &[], &bindings, &serve_inputs)
             .err()
             .expect("every serve input must belong to the container plan");
 
@@ -701,7 +702,7 @@ impl Flusher {
     }
 
     #[test]
-    fn weaves_a_console_argument_into_a_ticker() {
+    fn weaves_a_serve_input_into_a_ticker() {
         let source = rendered(
             r#"use std::path::PathBuf;
 
@@ -729,12 +730,12 @@ impl Roller {
         assert!(!source.contains("impltrzcina::Servicefor"));
         assert!(source.contains("manager.register_service(Roller{inner:container.roller(),});"));
         assert!(source.contains(
-            r#"letconsole_argument_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
+            r#"letserve_input_0=matchmatches.get_one::<std::path::PathBuf>("secret-path")"#
         ));
     }
 
     #[test]
-    fn weaves_a_console_argument_and_the_token_into_a_ticker() {
+    fn weaves_a_serve_input_and_the_token_into_a_ticker() {
         let source = rendered(
             r#"use std::path::PathBuf;
 use tokio_util::sync::CancellationToken;
@@ -763,7 +764,7 @@ impl Roller {
     }
 
     #[test]
-    fn weaves_a_console_argument_into_a_service_with_a_token() {
+    fn weaves_a_serve_input_into_a_service_with_a_token() {
         let source = rendered(
             r#"use tokio_util::sync::CancellationToken;
 
@@ -790,7 +791,7 @@ impl Worker {
     }
 
     #[test]
-    fn weaves_a_console_argument_into_a_service() {
+    fn weaves_a_serve_input_into_a_service() {
         let source = rendered(
             r#"#[service]
 struct Worker {
@@ -813,13 +814,15 @@ impl Worker {
             "letoutcome:margaret::framework::anyhow::Result<()>=self.inner.run();outcome"
         ));
         assert!(source.contains("manager.register_service(Worker{inner:container.worker(),});"));
-        assert!(source.contains(
-            r#"letconsole_argument_0=matchmatches.get_one::<std::string::String>("label")"#
-        ));
+        assert!(
+            source.contains(
+                r#"letserve_input_0=matchmatches.get_one::<std::string::String>("label")"#
+            )
+        );
     }
 
     #[test]
-    fn weaves_a_copy_console_argument_into_a_service_by_value() {
+    fn weaves_a_copy_serve_input_into_a_service_by_value() {
         let source = rendered(
             r#"#[service]
 struct Watcher {
@@ -838,11 +841,11 @@ impl Watcher {
         );
 
         assert!(source.contains("manager.register_service(Watcher{inner:container.watcher(),});"));
-        assert!(source.contains(r#"letconsole_argument_0=matches.get_flag("verbose")"#));
+        assert!(source.contains(r#"letserve_input_0=matches.get_flag("verbose")"#));
     }
 
     #[test]
-    fn weaves_a_shared_console_argument_into_both_services_once() {
+    fn weaves_a_shared_serve_input_into_both_services_once() {
         let source = rendered(
             r#"#[service]
 struct First {
@@ -876,7 +879,7 @@ impl Second {
         assert!(source.contains("structFirst"));
         assert!(source.contains("structSecond"));
         assert_eq!(source.matches("manager.register_service(").count(), 2);
-        assert_eq!(source.matches("letconsole_argument_0=").count(), 1);
+        assert_eq!(source.matches("letserve_input_0=").count(), 1);
     }
 
     #[test]

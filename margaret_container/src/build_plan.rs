@@ -15,8 +15,10 @@ use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::matched_attribute::MatchedAttribute;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
-use margaret_console_argument_codegen::weaving_kind::WeavingKind;
+use margaret_input_weaving::input_value::InputValue;
+use margaret_input_weaving::weaving_kind::WeavingKind;
+use margaret_serve_input_codegen::declared_serve_inputs::DeclaredServeInputs;
+use margaret_serve_input_codegen::serve_input::ServeInput;
 use margaret_tag_codegen::jwks_secret_store_target::JwksSecretStoreTarget;
 use margaret_tag_codegen::read_jwks_secret_store_target::read_jwks_secret_store_target;
 
@@ -270,7 +272,7 @@ struct DependencyResolver<'resolver> {
     framework_providers: &'resolver [FrameworkProvider],
     index: &'resolver AttributeIndex,
     provided_keys: &'resolver HashMap<CanonicalPath, CanonicalPath>,
-    registry: &'resolver ConsoleArgumentRegistry,
+    serve_inputs: &'resolver DeclaredServeInputs,
 }
 
 impl DependencyResolver<'_> {
@@ -293,72 +295,48 @@ impl DependencyResolver<'_> {
 
         for indexed_parameter in constructor.parameters() {
             let parameter = indexed_parameter.diagnostic_name().to_string();
-            let console_argument = self
-                .registry
-                .argument(concrete_path, indexed_parameter.position());
+            let serve_input = self
+                .serve_inputs
+                .input(concrete_path, indexed_parameter.position());
             let jwks_target = jwks_targets.get(&indexed_parameter.position());
 
-            if let Some(attribute) =
-                indexed_parameter.framework_attribute(FrameworkAttribute::SpiffeHttpClient)
-            {
-                if console_argument.is_some() || jwks_target.is_some() {
-                    return Err(ContainerError::AmbiguousSpiffeHttpClientInjection {
+            dependencies.push(match (serve_input, jwks_target) {
+                (Some(_), Some(_)) => {
+                    return Err(ContainerError::AmbiguousServeInputAndJwksSecretStore {
                         parameter,
                         singleton: concrete_path.to_string(),
                     });
                 }
-
-                if !attribute.is_bare() {
-                    return Err(ContainerError::SpiffeHttpClientTakesNoArguments {
-                        parameter,
-                        singleton: concrete_path.to_string(),
-                    });
-                }
-
-                dependencies.push(DependencyKind::ConsoleArgument {
-                    argument: Box::new(ConsoleArgument::SpiffeHttpClient),
-                });
-
-                continue;
-            }
-
-            if let Some(argument) = console_argument {
-                dependencies.push(DependencyKind::ConsoleArgument {
-                    argument: Box::new(argument.clone()),
-                });
-
-                continue;
-            }
-
-            if let Some(target) = jwks_target {
-                dependencies.push(DependencyKind::Single {
+                (Some(input), None) => DependencyKind::ServeInput {
+                    input: Box::new(input.clone()),
+                },
+                (None, Some(target)) => DependencyKind::Single {
                     provider_key: resolve_jwks_secret_store(
                         concrete_path,
                         &parameter,
                         target,
                         self.framework_providers,
                     )?,
-                });
+                },
+                (None, None) => {
+                    let Some(written) = peel_target(indexed_parameter.declared()) else {
+                        return Err(ContainerError::UnsupportedParameterShape {
+                            singleton: concrete_path.to_string(),
+                            parameter,
+                            written: type_text(indexed_parameter.declared()),
+                        });
+                    };
 
-                continue;
-            }
-
-            let Some(written) = peel_target(indexed_parameter.declared()) else {
-                return Err(ContainerError::UnsupportedParameterShape {
-                    singleton: concrete_path.to_string(),
-                    parameter,
-                    written: type_text(indexed_parameter.declared()),
-                });
-            };
-
-            dependencies.push(resolve_target(
-                self.index,
-                item,
-                &written,
-                concrete_path,
-                &parameter,
-                self.provided_keys,
-            )?);
+                    resolve_target(
+                        self.index,
+                        item,
+                        &written,
+                        concrete_path,
+                        &parameter,
+                        self.provided_keys,
+                    )?
+                }
+            });
         }
 
         Ok(dependencies)
@@ -609,13 +587,15 @@ fn resolve_framework_construction(
             resolver,
             value_type,
         } => DirectConstruction::Resolved {
-            dependencies: vec![DependencyKind::ConsoleArgument {
-                argument: Box::new(ConsoleArgument::Named {
+            dependencies: vec![DependencyKind::ServeInput {
+                input: Box::new(ServeInput::ConsoleArgument(ConsoleArgument::Named {
                     name: argument_name.clone(),
-                    required: true,
-                    weaving: WeavingKind::from_canonical(index, value_type, true),
-                    value_type: value_type.clone(),
-                }),
+                    value: InputValue {
+                        required: true,
+                        value_type: value_type.clone(),
+                        weaving: WeavingKind::from_canonical(index, value_type, true),
+                    },
+                })),
             }],
             resolver: resolver.clone(),
         },
@@ -747,7 +727,7 @@ fn draft_references_role(draft: &Draft, role: &FrameworkInjectionRole) -> bool {
 
 pub(crate) fn build_plan(
     index: &AttributeIndex,
-    registry: &ConsoleArgumentRegistry,
+    serve_inputs: &DeclaredServeInputs,
     framework_providers: &[FrameworkProvider],
 ) -> Result<ContainerPlan, ContainerError> {
     let DraftedContainer {
@@ -767,7 +747,7 @@ pub(crate) fn build_plan(
         framework_providers,
         index,
         provided_keys: &provided_keys,
-        registry,
+        serve_inputs,
     };
 
     let mut providers = BTreeMap::new();

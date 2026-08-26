@@ -18,11 +18,11 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
-    use margaret_console_argument_codegen::scan::scan;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
+    use margaret_serve_input_codegen::scan::scan;
 
     use crate::console_artifacts::ConsoleArtifacts;
     use crate::console_codegen_error::ConsoleCodegenError;
@@ -104,7 +104,7 @@ impl Farewell {
         serves: bool,
         has_models: bool,
         http_servers: &[HttpServer],
-        serve_arguments: &[margaret_console_argument_codegen::console_argument::ConsoleArgument],
+        serve_inputs: &[margaret_serve_input_codegen::serve_input::ServeInput],
         bindings: &ContainerBindings,
     ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
         let plan = ConsolePlan::build(index, bindings)?;
@@ -114,7 +114,7 @@ impl Farewell {
             serves,
             has_models,
             http_servers,
-            serve_arguments,
+            serve_inputs,
             bindings,
         ))
     }

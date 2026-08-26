@@ -19,7 +19,7 @@ mod jwks_secret_storage_provider;
 mod mint_access_token_handler_canonical_path;
 mod public_jwks_handler_canonical_path;
 mod public_jwks_verifier_canonical_path;
-mod serve_arguments;
+mod serve_inputs;
 mod server_secret_store_canonical_path;
 mod umbrella;
 mod umbrella_module_name;

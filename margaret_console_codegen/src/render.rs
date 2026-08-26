@@ -2,15 +2,15 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
-use margaret_console_argument_codegen::argument_registration::argument_registration;
-use margaret_console_argument_codegen::argument_value::argument_value;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_console_argument_codegen::has_spiffe_http_client::has_spiffe_http_client;
-use margaret_container::console_argument_binding::ConsoleArgumentBinding;
 use margaret_container::container_bindings::ContainerBindings;
+use margaret_container::serve_input_binding::ServeInputBinding;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
+use margaret_serve_input_codegen::has_spiffe_http_client::has_spiffe_http_client;
+use margaret_serve_input_codegen::serve_input::ServeInput;
+use margaret_serve_input_codegen::serve_input_read::serve_input_read;
+use margaret_serve_input_codegen::serve_input_registration::serve_input_registration;
 
 use crate::console_command::ConsoleCommand;
 
@@ -37,20 +37,17 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
         Some(description) => quote! { .about(#description) },
         None => quote! {},
     };
-    let arguments = command.arguments.iter().map(argument_registration);
+    let arguments = command.serve_inputs.iter().map(serve_input_registration);
 
     quote! {
         .subcommand(clap::Command::new(#name)#about #(#arguments)*)
     }
 }
 
-fn serve_registration(
-    http_servers: &[HttpServer],
-    serve_arguments: &[ConsoleArgument],
-) -> TokenStream {
+fn serve_registration(http_servers: &[HttpServer], serve_inputs: &[ServeInput]) -> TokenStream {
     let spiffe_secured = serves_spiffe(http_servers);
-    let svid_active = spiffe_secured || has_spiffe_http_client(serve_arguments);
-    let service_arguments = serve_arguments.iter().map(argument_registration);
+    let svid_active = spiffe_secured || has_spiffe_http_client(serve_inputs);
+    let service_arguments = serve_inputs.iter().map(serve_input_registration);
     let http_server_arguments = http_servers.iter().map(|server| {
         let address_argument = server.address_argument();
         let url_argument = server.url_argument();
@@ -81,18 +78,22 @@ fn serve_registration(
 
 fn command_arm(command: &ConsoleCommand, bindings: &ContainerBindings) -> TokenStream {
     let name = &command.name;
-    let matches_binding = if command.arguments.is_empty() {
-        quote! { _matches }
-    } else {
-        quote! { matches }
-    };
-    let values: Vec<ConsoleArgumentBinding> = command
-        .arguments
+    let matches_binding = if command
+        .serve_inputs
         .iter()
-        .zip(&command.console_slots)
-        .map(|(argument, slot)| ConsoleArgumentBinding {
+        .any(ServeInput::reads_clap_matches)
+    {
+        quote! { matches }
+    } else {
+        quote! { _matches }
+    };
+    let values: Vec<ServeInputBinding> = command
+        .serve_inputs
+        .iter()
+        .zip(&command.serve_input_slots)
+        .map(|(argument, slot)| ServeInputBinding {
             slot: *slot,
-            value: argument_value(argument),
+            value: serve_input_read(argument),
         })
         .collect();
     let construction = bindings.construction_invocation(&command.accessor.to_string(), &values);
@@ -183,7 +184,7 @@ pub(crate) fn render(
     serves: bool,
     has_models: bool,
     http_servers: &[HttpServer],
-    serve_arguments: &[ConsoleArgument],
+    serve_inputs: &[ServeInput],
     bindings: &ContainerBindings,
 ) -> RenderedConsole {
     let dispatches_asynchronously = serves
@@ -209,7 +210,7 @@ pub(crate) fn render(
     } = schema_tokens(has_models);
 
     let serve_registration = if serves {
-        serve_registration(http_servers, serve_arguments)
+        serve_registration(http_servers, serve_inputs)
     } else {
         quote! {}
     };

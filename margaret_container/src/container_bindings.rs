@@ -8,20 +8,20 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_console_argument_codegen::owned_weave::owned_weave;
-use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
+use margaret_codegen_tokens::serve_input_ident::serve_input_ident;
+use margaret_input_weaving::owned_weave::owned_weave;
+use margaret_serve_input_codegen::serve_input::ServeInput;
+use margaret_serve_input_codegen::serve_input_key::ServeInputKey;
 
 use crate::bootstrap_arguments_literal::bootstrap_arguments_literal;
 use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
-use crate::console_argument_binding::ConsoleArgumentBinding;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
 use crate::injected_dependency::InjectedDependency;
 use crate::provider_binding::ProviderBinding;
-use crate::provider_console_arguments::ProviderConsoleArguments;
+use crate::provider_serve_inputs::ProviderServeInputs;
+use crate::serve_input_binding::ServeInputBinding;
 
 fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
     let module = bootstrap_arguments_module(function);
@@ -30,15 +30,15 @@ fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
     quote! { super::container::build::#module::#arguments_type }
 }
 
-struct SlottedConsoleArgument {
-    argument: ConsoleArgument,
+struct SlottedServeInput {
+    input: ServeInput,
     slot: usize,
 }
 
 pub struct ContainerBindings {
-    arguments: Arc<[ConsoleArgument]>,
     asynchronous_constructions: BTreeSet<String>,
-    concrete_providers: BTreeMap<CanonicalPath, ProviderConsoleArguments>,
+    concrete_providers: BTreeMap<CanonicalPath, ProviderServeInputs>,
+    inputs: Arc<[ServeInput]>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
     slots: Arc<BTreeMap<ServeInputKey, usize>>,
 }
@@ -65,17 +65,17 @@ impl ContainerBindings {
             }
             concrete_providers.insert(
                 entry.provider.concrete_path.clone(),
-                ProviderConsoleArguments {
-                    arguments: Arc::clone(&entry.console_arguments),
-                    slots: Arc::clone(&entry.console_slots),
+                ProviderServeInputs {
+                    inputs: Arc::clone(&entry.serve_inputs),
+                    slots: Arc::clone(&entry.serve_input_slots),
                 },
             );
         }
 
         Self {
-            arguments: plan.arguments(),
             asynchronous_constructions,
             concrete_providers,
+            inputs: plan.inputs(),
             providers,
             slots: plan.slots(),
         }
@@ -89,19 +89,19 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn all_console_arguments(&self) -> &[ConsoleArgument] {
-        &self.arguments
+    pub fn all_serve_inputs(&self) -> &[ServeInput] {
+        &self.inputs
     }
 
     /// # Errors
     ///
-    /// Returns `ContainerError::MissingConsoleClosure`.
-    pub fn console_arguments(
+    /// Returns `ContainerError::MissingProviderServeInputs`.
+    pub fn provider_serve_inputs(
         &self,
         concrete_path: &CanonicalPath,
-    ) -> Result<&ProviderConsoleArguments, ContainerError> {
+    ) -> Result<&ProviderServeInputs, ContainerError> {
         self.concrete_providers.get(concrete_path).ok_or_else(|| {
-            ContainerError::MissingConsoleClosure {
+            ContainerError::MissingProviderServeInputs {
                 path: concrete_path.to_string(),
             }
         })
@@ -109,12 +109,12 @@ impl ContainerBindings {
 
     /// # Errors
     ///
-    /// Returns `ContainerError::MissingConsoleSlot`.
-    pub fn console_slot(&self, key: &ServeInputKey) -> Result<usize, ContainerError> {
+    /// Returns `ContainerError::MissingServeInputSlot`.
+    pub fn serve_input_slot(&self, key: &ServeInputKey) -> Result<usize, ContainerError> {
         self.slots
             .get(key)
             .copied()
-            .ok_or_else(|| ContainerError::MissingConsoleSlot {
+            .ok_or_else(|| ContainerError::MissingServeInputSlot {
                 key: format!("{key:?}"),
             })
     }
@@ -122,50 +122,44 @@ impl ContainerBindings {
     /// # Errors
     ///
     /// Returns `ContainerError` propagated from the work it performs.
-    pub fn console_union(
+    pub fn serve_input_union(
         &self,
-        arguments: &[ConsoleArgument],
-    ) -> Result<Vec<ConsoleArgument>, ContainerError> {
+        inputs: &[ServeInput],
+    ) -> Result<Vec<ServeInput>, ContainerError> {
         let mut seen: BTreeSet<ServeInputKey> = BTreeSet::new();
-        let mut unified: Vec<SlottedConsoleArgument> = Vec::new();
+        let mut unified: Vec<SlottedServeInput> = Vec::new();
 
-        for argument in arguments {
-            let key = argument.slot_key();
+        for input in inputs {
+            let key = input.slot_key();
 
             if seen.insert(key.clone()) {
-                unified.push(SlottedConsoleArgument {
-                    argument: argument.clone(),
-                    slot: self.console_slot(&key)?,
+                unified.push(SlottedServeInput {
+                    input: input.clone(),
+                    slot: self.serve_input_slot(&key)?,
                 });
             }
         }
 
         unified.sort_by_key(|slotted| slotted.slot);
 
-        Ok(unified
-            .into_iter()
-            .map(|slotted| slotted.argument)
-            .collect())
+        Ok(unified.into_iter().map(|slotted| slotted.input).collect())
     }
 
     /// # Errors
     ///
     /// Returns `ContainerError` propagated from the work it performs.
-    pub fn console_weaves_owned(
+    pub fn serve_input_weaves_owned(
         &self,
-        arguments: &[ConsoleArgument],
+        inputs: &[ServeInput],
     ) -> Result<Vec<TokenStream>, ContainerError> {
-        arguments
-            .iter()
-            .map(|argument| self.materialize(argument))
-            .collect()
+        inputs.iter().map(|input| self.materialize(input)).collect()
     }
 
     #[must_use]
     pub fn construction_invocation(
         &self,
         field_name: &str,
-        arguments: &[ConsoleArgumentBinding],
+        arguments: &[ServeInputBinding],
     ) -> TokenStream {
         let function = format_ident!("construct_{field_name}");
         let literal = bootstrap_arguments_literal(&bootstrap_arguments_path(&function), arguments);
@@ -186,13 +180,13 @@ impl ContainerBindings {
     /// # Errors
     ///
     /// Returns `ContainerError` propagated from the work it performs.
-    pub fn injected_console_arguments(
+    pub fn injected_serve_inputs(
         &self,
         dependency: &InjectedDependency,
-    ) -> Result<Vec<ConsoleArgument>, ContainerError> {
+    ) -> Result<Vec<ServeInput>, ContainerError> {
         Ok(self
-            .console_arguments(&dependency.concrete)?
-            .arguments
+            .provider_serve_inputs(&dependency.concrete)?
+            .inputs
             .to_vec())
     }
 
@@ -209,24 +203,24 @@ impl ContainerBindings {
     /// # Errors
     ///
     /// Returns `ContainerError` propagated from the work it performs.
-    pub fn serve_arguments(
+    pub fn serve_inputs(
         &self,
         roots: &[CanonicalPath],
-        woven: &[ConsoleArgument],
-    ) -> Result<Vec<ConsoleArgument>, ContainerError> {
-        let mut collected: Vec<ConsoleArgument> = Vec::new();
+        woven: &[ServeInput],
+    ) -> Result<Vec<ServeInput>, ContainerError> {
+        let mut collected: Vec<ServeInput> = Vec::new();
 
         for root in roots {
-            collected.extend_from_slice(&self.console_arguments(root)?.arguments);
+            collected.extend_from_slice(&self.provider_serve_inputs(root)?.inputs);
         }
 
         collected.extend_from_slice(woven);
 
-        self.console_union(&collected)
+        self.serve_input_union(&collected)
     }
 
     #[must_use]
-    pub fn serve_invocation(&self, arguments: &[ConsoleArgumentBinding]) -> TokenStream {
+    pub fn serve_invocation(&self, arguments: &[ServeInputBinding]) -> TokenStream {
         let literal = bootstrap_arguments_literal(
             &bootstrap_arguments_path(&format_ident!("serve")),
             arguments,
@@ -240,10 +234,10 @@ impl ContainerBindings {
         }
     }
 
-    fn materialize(&self, argument: &ConsoleArgument) -> Result<TokenStream, ContainerError> {
-        let slot = self.console_slot(&argument.slot_key())?;
-        let ident = console_argument_ident(slot);
+    fn materialize(&self, input: &ServeInput) -> Result<TokenStream, ContainerError> {
+        let slot = self.serve_input_slot(&input.slot_key())?;
+        let ident = serve_input_ident(slot);
 
-        Ok(owned_weave(argument, &quote! { #ident }, false))
+        Ok(owned_weave(&input.weaving(), &quote! { #ident }, false))
     }
 }

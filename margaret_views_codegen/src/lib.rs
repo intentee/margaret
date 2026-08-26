@@ -21,9 +21,9 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
-    use margaret_console_argument_codegen::scan::scan;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_serve_input_codegen::scan::scan;
 
     use crate::render_views::render_views;
     use crate::views_artifacts::ViewsArtifacts;
@@ -128,15 +128,15 @@ impl Banner {
 ";
 
     #[test]
-    fn records_a_view_console_argument_and_reads_the_preconstructed_view() {
+    fn records_a_view_serve_input_and_reads_the_preconstructed_view() {
         let artifacts = generated(CONSOLE_ARGUMENT_VIEW);
         let source = formatted(artifacts.modules);
-        let slot = artifacts.console_arguments.len();
+        let slot = artifacts.serve_inputs.len();
 
         assert_eq!(slot, 1);
-        assert_eq!(artifacts.console_arguments[0].name(), "title");
+        assert_eq!(artifacts.serve_inputs[0].name(), "title");
         assert!(source.contains("banner: container.banner()"));
-        assert!(!source.contains("console_argument_"));
+        assert!(!source.contains("serve_input_"));
     }
 
     #[test]

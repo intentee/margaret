@@ -3,7 +3,6 @@ use std::path::Path;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_console_argument_codegen::scan::scan;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
@@ -11,6 +10,7 @@ use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container_tests::container_module_source::container_module_source;
+use margaret_serve_input_codegen::scan::scan;
 
 fn jwks_client_provider() -> FrameworkProvider {
     let endpoint = CanonicalPath::new(vec!["crate".to_string(), "JwksEndpoint".to_string()]);
@@ -33,10 +33,10 @@ fn endpoints_container() -> String {
         .index_crate(&CrateRoot::new("crate", &directory))
         .expect("the endpoint fixture is indexed")
         .build();
-    let registry = scan(&index).expect("the console arguments are scanned");
+    let serve_inputs = scan(&index).expect("the serve inputs are scanned");
 
     container_module_source(
-        render_container(&index, &registry, &[jwks_client_provider()])
+        render_container(&index, &serve_inputs, &[jwks_client_provider()])
             .expect("the endpoint fixture renders")
             .modules,
     )
@@ -55,7 +55,7 @@ fn drafts_a_jwks_endpoint_as_the_provides_endpoint_interface() {
 #[test]
 fn injects_the_endpoints_own_dependencies_and_console_argument() {
     assert!(endpoints_container().contains(
-        "crate::JwksEndpoint::new(::std::sync::Arc::clone(&dns_resolver),console_argument_0,)"
+        "crate::JwksEndpoint::new(::std::sync::Arc::clone(&dns_resolver),serve_input_0)"
     ));
 }
 

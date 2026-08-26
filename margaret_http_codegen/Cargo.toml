@@ -14,6 +14,7 @@ margaret_attribute_arguments = { workspace = true }
 margaret_attributes = { workspace = true }
 margaret_codegen_tokens = { workspace = true }
 margaret_console_argument_codegen = { workspace = true }
+margaret_serve_input_codegen = { workspace = true }
 margaret_container = { workspace = true }
 margaret_generated_module = { workspace = true }
 margaret_injection_codegen = { workspace = true }

@@ -1,0 +1,28 @@
+[package]
+name = "margaret_serve_input_codegen"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Serve input code generation for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+margaret_attributes = { workspace = true }
+margaret_codegen_tokens = { workspace = true }
+margaret_console_argument_codegen = { workspace = true }
+margaret_environment_variable_codegen = { workspace = true }
+margaret_injection_codegen = { workspace = true }
+margaret_input_weaving = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+syn = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

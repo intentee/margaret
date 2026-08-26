@@ -3,13 +3,13 @@ use std::path::Path;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_console_argument_codegen::scan::scan;
 use margaret_container::plan_container::plan_container;
 use margaret_container::planned_container::PlannedContainer;
+use margaret_serve_input_codegen::scan::scan;
 
 fn planned_container() -> PlannedContainer {
     let directory =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/console_argument_propagation");
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/serve_input_propagation");
     let index = AttributeIndexBuilder::new()
         .index_crate(&CrateRoot::new("crate", directory))
         .expect("the fixture crate is indexed")

@@ -8,18 +8,18 @@ mod build_websocket_plan;
 mod built_websocket_plan;
 mod discovered_handler;
 mod handler_binding;
-mod handler_console_arguments;
 mod handler_kind;
+mod handler_serve_inputs;
 mod message_cardinality;
 mod message_kind;
 mod render_messages;
 mod render_server_routes;
 mod render_sessions;
-mod server_console_arguments;
+mod server_serve_inputs;
 mod session_arguments;
-mod session_console_arguments;
 mod session_handler_plan;
 mod session_plan;
+mod session_serve_inputs;
 mod web_socket_message;
 mod web_socket_session;
 mod websocket_handlers;
@@ -46,9 +46,9 @@ mod tests {
     use quote::format_ident;
 
     use crate::handler_binding::HandlerBinding;
-    use crate::server_console_arguments::server_console_arguments;
-    use crate::session_console_arguments::session_console_arguments;
+    use crate::server_serve_inputs::server_serve_inputs;
     use crate::session_plan::SessionPlan;
+    use crate::session_serve_inputs::session_serve_inputs;
     use crate::web_socket_codegen_error::WebSocketCodegenError;
     use crate::web_socket_plan::WebSocketPlan;
     use crate::web_socket_session::WebSocketSession;
@@ -160,7 +160,7 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
-        let registry = margaret_console_argument_codegen::scan::scan(index)
+        let registry = margaret_serve_input_codegen::scan::scan(index)
             .expect("the console arguments are scanned");
 
         render_container(index, &registry, &[])
@@ -278,7 +278,7 @@ impl RespondsToWebSocketMessage for Chatter {
         assert!(source.contains("dispatch_table(container)"));
         assert!(source.contains("public_routes(container:&super::super::container::Container,"));
         assert!(source.contains("upgrade_entry(container"));
-        assert!(!source.contains("console_argument_"));
+        assert!(!source.contains("serve_input_"));
     }
 
     const CONSOLE_ARGUMENT_NOTIFICATION_HANDLER: &str = r#"
@@ -315,7 +315,7 @@ impl RespondsToWebSocketNotification for Typist {
 
         assert!(source.contains("container.typist()"));
         assert!(source.contains("dispatch_table(container)"));
-        assert!(!source.contains("console_argument_"));
+        assert!(!source.contains("serve_input_"));
     }
 
     #[test]
@@ -324,7 +324,7 @@ impl RespondsToWebSocketNotification for Typist {
         let mut plan = empty_session_plan();
         plan.notification_handlers.push(missing_handler());
 
-        let error = session_console_arguments(&plan, &bindings(&index))
+        let error = session_serve_inputs(&plan, &bindings(&index))
             .expect_err("an unplanned handler has no console argument closure");
 
         assert!(error.to_string().contains("crate::Missing"));
@@ -336,12 +336,12 @@ impl RespondsToWebSocketNotification for Typist {
         let mut plan = empty_session_plan();
         plan.request_handlers.push(missing_handler());
 
-        let error = session_console_arguments(&plan, &bindings(&index))
+        let error = session_serve_inputs(&plan, &bindings(&index))
             .expect_err("an unplanned handler has no console arguments");
 
         assert!(error.to_string().contains("crate::Missing"));
 
-        let error = server_console_arguments(&[&plan], &bindings(&index))
+        let error = server_serve_inputs(&[&plan], &bindings(&index))
             .expect_err("a server cannot include an unplanned handler");
 
         assert!(error.to_string().contains("crate::Missing"));
@@ -360,7 +360,7 @@ impl RespondsToWebSocketNotification for Typist {
             holder: format_ident!("room"),
         });
 
-        let error = session_console_arguments(&plan, &bindings(&index))
+        let error = session_serve_inputs(&plan, &bindings(&index))
             .expect_err("an unplanned binding has no console arguments");
 
         assert!(error.to_string().contains("crate::Missing"));
@@ -379,7 +379,7 @@ impl RespondsToWebSocketNotification for Typist {
             wrapper: format_ident!("Missing"),
         });
 
-        let error = server_console_arguments(&[&plan], &bindings(&index))
+        let error = server_serve_inputs(&[&plan], &bindings(&index))
             .expect_err("an unplanned middleware layer has no console arguments");
 
         assert!(error.to_string().contains("crate::Missing"));
@@ -674,7 +674,7 @@ impl Guard {
 
         assert!(source.contains("public_routes(container:&super::super::container::Container,"));
         assert!(source.contains("container.guard()"));
-        assert!(!source.contains("console_argument_"));
+        assert!(!source.contains("serve_input_"));
     }
 
     #[test]
@@ -1246,7 +1246,7 @@ impl RespondsToWebSocketMessage for Chatter {
 "#;
 
     #[test]
-    fn threads_the_console_arguments_of_an_authenticated_user_provider_through_the_handshake() {
+    fn threads_the_serve_inputs_of_an_authenticated_user_provider_through_the_handshake() {
         let source = generated(CONSOLE_ARGUMENT_PROVIDER);
 
         assert!(

@@ -25,7 +25,7 @@ syn = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-margaret_console_argument_codegen = { workspace = true }
+margaret_serve_input_codegen = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

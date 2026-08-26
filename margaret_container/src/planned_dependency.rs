@@ -1,11 +1,6 @@
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_serve_input_codegen::serve_input::ServeInput;
 
 pub(crate) enum PlannedDependency {
-    ConsoleArgument {
-        argument: ConsoleArgument,
-        slot: usize,
-    },
-    Single {
-        field_name: String,
-    },
+    ServeInput { input: ServeInput, slot: usize },
+    Single { field_name: String },
 }

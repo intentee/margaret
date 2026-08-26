@@ -13,6 +13,8 @@ pub use margaret_construction::construct_singleton;
 #[cfg(feature = "runtime")]
 pub use margaret_construction::construction_error;
 #[cfg(feature = "runtime")]
+pub use margaret_environment_variable as environment_variable;
+#[cfg(feature = "runtime")]
 pub use margaret_http as http;
 #[cfg(feature = "runtime")]
 pub use margaret_http_uploaded_file as http_uploaded_file;

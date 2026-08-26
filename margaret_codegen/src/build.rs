@@ -21,7 +21,7 @@ use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
 use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
-use crate::serve_arguments::serve_arguments;
+use crate::serve_inputs::serve_inputs;
 use crate::umbrella::umbrella;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
@@ -66,7 +66,7 @@ fn render_serving_modules(
 ) -> Result<ServingModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
-    let (websocket_roots, websocket_servers, websocket_server_arguments) =
+    let (websocket_roots, websocket_servers, websocket_server_serve_inputs) =
         if features.contains(GeneratedFeature::Websockets) {
             let plan = margaret_websocket_codegen::web_socket_plan::WebSocketPlan::build(
                 index,
@@ -81,7 +81,7 @@ fn render_serving_modules(
             (
                 artifacts.retained_roots,
                 artifacts.servers,
-                artifacts.server_console_arguments,
+                artifacts.server_serve_inputs,
             )
         } else {
             (Vec::new(), Vec::new(), BTreeMap::new())
@@ -106,7 +106,7 @@ fn render_serving_modules(
             &websocket_servers,
             middleware_plans,
             bindings,
-            &websocket_server_arguments,
+            &websocket_server_serve_inputs,
             registries,
         )?;
         let artifacts = margaret_http_codegen::render_http::render_http(plan, bindings);
@@ -141,12 +141,12 @@ fn render_role_modules(
 ) -> Result<RoleModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
-    let serve_arguments = serve_arguments(bindings);
+    let serve_inputs = serve_inputs(bindings);
     let service_plan = margaret_service_codegen::service_plan::ServicePlan::build(
         index,
         jwks_services,
         bindings,
-        &serve_arguments,
+        &serve_inputs,
     )?;
     let service_roots = service_plan.roots().to_vec();
 
@@ -173,7 +173,7 @@ fn render_role_modules(
             features.contains(GeneratedFeature::Serves),
             features.contains(GeneratedFeature::Models),
             servers,
-            &serve_arguments,
+            &serve_inputs,
             bindings,
         );
         modules.extend(console.modules);
@@ -204,7 +204,7 @@ pub fn build(
         .index_crate(crate_root)?
         .build();
     let mut features = GeneratedFeatures::from_index(&index);
-    let registry = margaret_console_argument_codegen::scan::scan(&index)?;
+    let registry = margaret_serve_input_codegen::scan::scan(&index)?;
     let client_bindings = TagPool::collect(&index)
         .map_err(ContainerError::from)?
         .jwks_client_bindings();
@@ -735,7 +735,7 @@ impl Worker {
         assert!(serve.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
-        assert!(serve.contains("letconsole_argument_0=spiffe_http_client.clone();"));
+        assert!(serve.contains("letserve_input_0=spiffe_http_client.clone();"));
         assert!(serve.contains(
             "manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),Worker{inner:container.worker(),},),);"
         ));
@@ -886,7 +886,7 @@ impl GetIdentity {
         .expect_err("the build fails")
         .to_string();
 
-        assert!(error.contains("#[spiffe_http_client] does not take any arguments"));
+        assert!(error.contains("the injected client takes no arguments"));
     }
 
     #[test]
@@ -897,7 +897,7 @@ impl GetIdentity {
         .expect_err("the build fails")
         .to_string();
 
-        assert!(error.contains("must resolve to exactly one source"));
+        assert!(error.contains("a constructor parameter is fed by exactly one serve input"));
     }
 
     #[test]
@@ -912,7 +912,7 @@ impl GetIdentity {
     }
 
     #[test]
-    fn allows_a_console_argument_named_after_the_spiffe_http_client() {
+    fn allows_a_serve_input_named_after_the_spiffe_http_client() {
         let code = generate(
             "use reqwest::Client;\nuse std::sync::Arc;\nuse tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct IdentityClient {\n    client: Client,\n}\n\nimpl IdentityClient {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct Labeled {\n    label: String,\n}\n\nimpl Labeled {\n    #[constructor]\n    fn create(#[console_argument(from = \"spiffe_http_client\")] label: String) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    client: Arc<IdentityClient>,\n    labeled: Arc<Labeled>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(client: Arc<IdentityClient>, labeled: Arc<Labeled>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
         )
@@ -1045,7 +1045,7 @@ impl GetVerify {
 ";
 
     #[test]
-    fn weaves_a_console_argument_from_the_jwks_endpoint_through_the_verifier_accessor() {
+    fn weaves_a_serve_input_from_the_jwks_endpoint_through_the_verifier_accessor() {
         let code = generate(JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE).expect("the build succeeds");
 
         let construction: String = module(&code, "container/build/serve")
@@ -1535,15 +1535,15 @@ impl Bad {
 ";
 
     #[test]
-    fn propagates_a_console_argument_failure() {
+    fn propagates_a_serve_input_failure() {
         let message = generate(POSITIONAL_OUTSIDE_COMMAND_CRATE)
             .expect_err("the positional argument outside a command is rejected")
             .to_string();
 
-        assert!(message.contains("failed to read the console arguments"));
+        assert!(message.contains("failed to read the serve inputs"));
     }
 
-    const CONFLICTING_SERVE_ARGUMENT_CRATE: &str = "\
+    const CONFLICTING_SERVE_INPUT_CRATE: &str = "\
 #[rustfmt::skip]
 pub mod margaret;
 
@@ -1570,12 +1570,12 @@ impl Page {
 ";
 
     #[test]
-    fn propagates_a_serve_arguments_failure() {
-        let message = generate(CONFLICTING_SERVE_ARGUMENT_CRATE)
-            .expect_err("the conflicting serve argument is rejected")
+    fn propagates_a_conflicting_serve_input_failure() {
+        let message = generate(CONFLICTING_SERVE_INPUT_CRATE)
+            .expect_err("the conflicting serve input is rejected")
             .to_string();
 
-        assert!(message.contains("declared both as a positional and as a named argument"));
+        assert!(message.contains("a shared serve input must be declared identically everywhere"));
     }
 
     const VIEWS_CRATE: &str = "\
@@ -1869,16 +1869,16 @@ impl Page {
 ";
 
     #[test]
-    fn resolves_a_responder_console_argument_during_container_construction() {
+    fn resolves_a_responder_serve_input_during_container_construction() {
         let code = generate(CONSOLE_ARGUMENT_RESPONDER_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(serve.contains("letconsole_argument_0="));
+        assert!(serve.contains("letserve_input_0="));
         assert!(serve.contains(
-            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0"
         ));
         assert!(serve.contains("server_public(container,&routes"));
-        assert!(!serve.contains("server_public(container,&console_argument_0"));
+        assert!(!serve.contains("server_public(container,&serve_input_0"));
 
         let run = module(&code, "run");
         assert!(run.contains(r#"clap::Arg::new("greeting")"#));
@@ -1908,13 +1908,13 @@ impl Page {
 ";
 
     #[test]
-    fn resolves_a_view_console_argument_during_container_construction() {
+    fn resolves_a_view_serve_input_during_container_construction() {
         let code = generate(CONSOLE_ARGUMENT_VIEW_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(serve.contains("letconsole_argument_0="));
+        assert!(serve.contains("letserve_input_0="));
         assert!(serve.contains(
-            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0"
         ));
         assert!(serve.contains("super::views::build::build(container)"));
     }
@@ -1951,16 +1951,16 @@ impl RespondsToWebSocketMessage for Chatter {
 ";
 
     #[test]
-    fn resolves_a_websocket_handler_console_argument_during_container_construction() {
+    fn resolves_a_websocket_handler_serve_input_during_container_construction() {
         let code = generate(CONSOLE_ARGUMENT_WEBSOCKET_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(serve.contains("letconsole_argument_0="));
+        assert!(serve.contains("letserve_input_0="));
         assert!(serve.contains(
-            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0"
         ));
         assert!(serve.contains("server_public(container,&routes"));
-        assert!(!serve.contains("server_public(container,&console_argument_0"));
+        assert!(!serve.contains("server_public(container,&serve_input_0"));
     }
 
     const CONSOLE_ARGUMENT_SESSION_DEPENDENCY_CRATE: &str = "\
@@ -2004,15 +2004,15 @@ impl RespondsToWebSocketMessage for Chatter {
 ";
 
     #[test]
-    fn resolves_a_console_argument_for_a_session_injected_dependency() {
+    fn resolves_a_serve_input_for_a_session_injected_dependency() {
         let code = generate(CONSOLE_ARGUMENT_SESSION_DEPENDENCY_CRATE).expect("the build succeeds");
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        assert!(serve.contains("letconsole_argument_0="));
+        assert!(serve.contains("letserve_input_0="));
         assert!(serve.contains(
-            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:console_argument_0"
+            "super::container::build::serve(super::container::build::serve_arguments::ServeArguments{argument0:serve_input_0"
         ));
         assert!(serve.contains("server_public(container,&routes"));
-        assert!(!serve.contains("server_public(container,&console_argument_0"));
+        assert!(!serve.contains("server_public(container,&serve_input_0"));
     }
 }

@@ -2,9 +2,9 @@ use std::path::Path;
 
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_console_argument_codegen::scan::scan;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::render_container::render_container;
+use margaret_serve_input_codegen::scan::scan;
 
 #[must_use]
 /// # Panics

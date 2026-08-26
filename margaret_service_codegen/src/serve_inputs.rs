@@ -1,37 +1,37 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
-use margaret_console_argument_codegen::argument_value::argument_value;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_console_argument_codegen::owned_weave::owned_weave;
-use margaret_container::console_argument_binding::ConsoleArgumentBinding;
+use margaret_codegen_tokens::serve_input_ident::serve_input_ident;
 use margaret_container::container_bindings::ContainerBindings;
+use margaret_container::serve_input_binding::ServeInputBinding;
+use margaret_input_weaving::owned_weave::owned_weave;
+use margaret_serve_input_codegen::serve_input::ServeInput;
+use margaret_serve_input_codegen::serve_input_read::serve_input_read;
 
 use crate::service_codegen_error::ServiceCodegenError;
 
 pub(crate) struct ServeInputs {
-    pub(crate) construction_arguments: Vec<ConsoleArgumentBinding>,
+    pub(crate) construction_arguments: Vec<ServeInputBinding>,
     pub(crate) prelude: TokenStream,
 }
 
 impl ServeInputs {
     pub(crate) fn resolve(
-        serve_arguments: &[ConsoleArgument],
+        serve_inputs: &[ServeInput],
         bindings: &ContainerBindings,
     ) -> Result<Self, ServiceCodegenError> {
-        let mut resolutions = Vec::with_capacity(serve_arguments.len());
-        let mut construction_arguments = Vec::with_capacity(serve_arguments.len());
+        let mut resolutions = Vec::with_capacity(serve_inputs.len());
+        let mut construction_arguments = Vec::with_capacity(serve_inputs.len());
 
-        for argument in serve_arguments {
-            let slot = bindings.console_slot(&argument.slot_key())?;
-            let ident = console_argument_ident(slot);
-            let value = argument_value(argument);
+        for input in serve_inputs {
+            let slot = bindings.serve_input_slot(&input.slot_key())?;
+            let ident = serve_input_ident(slot);
+            let value = serve_input_read(input);
 
             resolutions.push(quote! { let #ident = #value; });
-            construction_arguments.push(ConsoleArgumentBinding {
+            construction_arguments.push(ServeInputBinding {
                 slot,
-                value: owned_weave(argument, &quote! { #ident }, true),
+                value: owned_weave(&input.weaving(), &quote! { #ident }, true),
             });
         }
 

@@ -3,13 +3,13 @@ use std::path::Path;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_console_argument_codegen::scan::scan;
 use margaret_container::container_error::ContainerError;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
+use margaret_serve_input_codegen::scan::scan;
 
 fn dropped_provider() -> FrameworkProvider {
     FrameworkProvider {

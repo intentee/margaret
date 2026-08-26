@@ -2,9 +2,9 @@ use thiserror::Error;
 
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
-use margaret_console_argument_codegen::console_argument_codegen_error::ConsoleArgumentCodegenError;
 use margaret_container::container_error::ContainerError;
 use margaret_injection_codegen::injection_error::InjectionError;
+use margaret_serve_input_codegen::serve_input_codegen_error::ServeInputCodegenError;
 
 #[derive(Debug, Error)]
 pub enum ConsoleCodegenError {
@@ -33,9 +33,9 @@ pub enum ConsoleCodegenError {
     },
 
     #[error(transparent)]
-    ConsoleArgument {
+    ServeInput {
         #[from]
-        source: ConsoleArgumentCodegenError,
+        source: ServeInputCodegenError,
     },
 
     #[error("#[console_command] is only supported on structs, but '{target}' is not a struct")]

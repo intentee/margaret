@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
-use margaret_console_argument_codegen::console_argument_codegen_error::ConsoleArgumentCodegenError;
+use margaret_serve_input_codegen::serve_input_codegen_error::ServeInputCodegenError;
 use margaret_tag_codegen::tag_error::TagError;
 
 #[derive(Debug, Error)]
@@ -20,9 +20,9 @@ pub enum ContainerError {
     },
 
     #[error(transparent)]
-    ConsoleArgument {
+    ServeInput {
         #[from]
-        source: ConsoleArgumentCodegenError,
+        source: ServeInputCodegenError,
     },
 
     #[error(transparent)]
@@ -52,17 +52,9 @@ pub enum ContainerError {
     UnknownJwksSecretStore { site: String, target: String },
 
     #[error(
-        "#[spiffe_http_client] does not take any arguments, but parameter '{parameter}' of singleton '{singleton}' declares some"
+        "parameter '{parameter}' of singleton '{singleton}' carries a serve input together with #[jwks_secret_store]; a parameter must resolve to exactly one source"
     )]
-    SpiffeHttpClientTakesNoArguments {
-        parameter: String,
-        singleton: String,
-    },
-
-    #[error(
-        "parameter '{parameter}' of singleton '{singleton}' carries #[spiffe_http_client] together with another injection source; a parameter must resolve to exactly one source"
-    )]
-    AmbiguousSpiffeHttpClientInjection {
+    AmbiguousServeInputAndJwksSecretStore {
         parameter: String,
         singleton: String,
     },
@@ -113,9 +105,9 @@ pub enum ContainerError {
     #[error("the container plan does not contain provider '{path}'")]
     MissingPlannedProvider { path: String },
 
-    #[error("the container plan does not contain the console argument closure for '{path}'")]
-    MissingConsoleClosure { path: String },
+    #[error("the container plan does not contain the serve inputs of '{path}'")]
+    MissingProviderServeInputs { path: String },
 
-    #[error("the container plan does not contain console argument slot '{key}'")]
-    MissingConsoleSlot { key: String },
+    #[error("the container plan does not contain serve input slot '{key}'")]
+    MissingServeInputSlot { key: String },
 }

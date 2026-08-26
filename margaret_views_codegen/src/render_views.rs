@@ -13,7 +13,7 @@ pub fn render_views(plan: ViewsPlan, bindings: &ContainerBindings) -> ViewsArtif
             GeneratedModuleTokens::new("views", render(&plan.views)),
             GeneratedModuleTokens::new("views/build", render_build(&plan.views, bindings)),
         ],
-        console_arguments: plan.console_arguments,
+        serve_inputs: plan.serve_inputs,
         retained_roots: plan.retained_roots,
     }
 }

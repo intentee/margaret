@@ -3,13 +3,13 @@ use std::path::Path;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_console_argument_codegen::scan::scan;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container_tests::container_module_source::container_module_source;
+use margaret_serve_input_codegen::scan::scan;
 
 fn uri_selected_provider() -> FrameworkProvider {
     FrameworkProvider {
@@ -58,7 +58,7 @@ fn materializes_the_provider_as_a_trait_object_field() {
 fn parameterizes_the_root_builder_with_the_uri_console_argument() {
     assert!(
         render_with_provider("uri_selected_provider").contains(
-            "pubfnconstruct_test_storage(super::construct_test_storage_arguments::ConstructTestStorageArguments{argument0:console_argument_0,}:super::construct_test_storage_arguments::ConstructTestStorageArguments,)"
+            "pubfnconstruct_test_storage(super::construct_test_storage_arguments::ConstructTestStorageArguments{argument0:serve_input_0,}:super::construct_test_storage_arguments::ConstructTestStorageArguments,)"
         )
     );
 }
@@ -68,7 +68,7 @@ fn injects_the_resolver_result_without_rewrapping_it_in_a_new_arc() {
     let source = render_with_provider("uri_selected_provider");
 
     assert!(source.contains(
-        "std::sync::Arc<dyncrate::TestStorage>=crate::resolve_test_storage(console_argument_0,)"
+        "std::sync::Arc<dyncrate::TestStorage>=crate::resolve_test_storage(serve_input_0,)"
     ));
     assert!(!source.contains("Arc::new(crate::resolve_test_storage"));
 }

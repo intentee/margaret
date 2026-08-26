@@ -8,6 +8,7 @@ pub enum FrameworkAttribute {
     ConsoleArgument,
     ConsoleCommand,
     Constructor,
+    EnvironmentVariable,
     ForeignKey,
     FormRequest,
     HandlesMiddlewareAttribute,
@@ -35,13 +36,14 @@ pub enum FrameworkAttribute {
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 31] = [
         Self::AuthenticatedUser,
         Self::BuildForSession,
         Self::Column,
         Self::ConsoleArgument,
         Self::ConsoleCommand,
         Self::Constructor,
+        Self::EnvironmentVariable,
         Self::ForeignKey,
         Self::FormRequest,
         Self::HandlesMiddlewareAttribute,
@@ -88,6 +90,7 @@ impl FrameworkAttribute {
             "console_argument" => Some(Self::ConsoleArgument),
             "console_command" => Some(Self::ConsoleCommand),
             "constructor" => Some(Self::Constructor),
+            "environment_variable" => Some(Self::EnvironmentVariable),
             "foreign_key" => Some(Self::ForeignKey),
             "form_request" => Some(Self::FormRequest),
             "handles_middleware_attribute" => Some(Self::HandlesMiddlewareAttribute),
@@ -125,6 +128,7 @@ impl FrameworkAttribute {
             Self::ConsoleArgument => "console_argument",
             Self::ConsoleCommand => "console_command",
             Self::Constructor => "constructor",
+            Self::EnvironmentVariable => "environment_variable",
             Self::ForeignKey => "foreign_key",
             Self::FormRequest => "form_request",
             Self::HandlesMiddlewareAttribute => "handles_middleware_attribute",

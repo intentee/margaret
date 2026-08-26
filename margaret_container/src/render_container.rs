@@ -1,5 +1,5 @@
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
+use margaret_serve_input_codegen::declared_serve_inputs::DeclaredServeInputs;
 
 use crate::container_error::ContainerError;
 use crate::framework_provider::FrameworkProvider;
@@ -11,10 +11,10 @@ use crate::rendered_container::RenderedContainer;
 /// Returns `ContainerError` propagated from the work it performs.
 pub fn render_container(
     index: &AttributeIndex,
-    registry: &ConsoleArgumentRegistry,
+    serve_inputs: &DeclaredServeInputs,
     framework_providers: &[FrameworkProvider],
 ) -> Result<RenderedContainer, ContainerError> {
-    let planned = plan_container(index, registry, framework_providers)?;
+    let planned = plan_container(index, serve_inputs, framework_providers)?;
     let roots = planned.roots();
 
     planned.render(&roots, &roots, &roots)

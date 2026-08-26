@@ -28,7 +28,7 @@ fn dependency_keys(provider: &Provider) -> BTreeSet<CanonicalPath> {
             DependencyKind::Single { provider_key } => {
                 keys.insert(provider_key.clone());
             }
-            DependencyKind::ConsoleArgument { .. } => {}
+            DependencyKind::ServeInput { .. } => {}
         }
     }
 

@@ -2,15 +2,15 @@ use std::collections::BTreeMap;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::binding_root::binding_root;
+use margaret_serve_input_codegen::serve_input::ServeInput;
 
 use crate::build_websocket_plan::build_websocket_plan;
 use crate::built_websocket_plan::BuiltWebSocketPlan;
-use crate::server_console_arguments::server_console_arguments;
+use crate::server_serve_inputs::server_serve_inputs;
 use crate::session_plan::SessionPlan;
 use crate::web_socket_codegen_error::WebSocketCodegenError;
 use crate::web_socket_message::WebSocketMessage;
@@ -44,7 +44,7 @@ fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
 pub struct WebSocketPlan {
     pub(crate) messages: Vec<WebSocketMessage>,
     pub(crate) retained_roots: Vec<CanonicalPath>,
-    pub(crate) server_console_arguments: BTreeMap<String, Vec<ConsoleArgument>>,
+    pub(crate) server_serve_inputs: BTreeMap<String, Vec<ServeInput>>,
     pub(crate) servers: Vec<String>,
     pub(crate) sessions: Vec<SessionPlan>,
     pub(crate) sessions_by_server: BTreeMap<String, Vec<usize>>,
@@ -71,7 +71,7 @@ impl WebSocketPlan {
                 .push(position);
         }
 
-        let server_console_arguments = sessions_by_server
+        let server_serve_inputs = sessions_by_server
             .iter()
             .map(|(server, positions)| {
                 let sessions = positions
@@ -79,7 +79,7 @@ impl WebSocketPlan {
                     .map(|position| &sessions[*position])
                     .collect::<Vec<_>>();
 
-                server_console_arguments(&sessions, bindings)
+                server_serve_inputs(&sessions, bindings)
                     .map(|arguments| (server.clone(), arguments))
             })
             .collect::<Result<_, _>>()?;
@@ -89,7 +89,7 @@ impl WebSocketPlan {
         Ok(Self {
             messages,
             retained_roots,
-            server_console_arguments,
+            server_serve_inputs,
             servers,
             sessions,
             sessions_by_server,

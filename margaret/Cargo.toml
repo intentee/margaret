@@ -18,6 +18,7 @@ margaret_asset_bag = { workspace = true, optional = true }
 margaret_codegen = { workspace = true, optional = true }
 margaret_console = { workspace = true, optional = true }
 margaret_construction = { workspace = true, optional = true }
+margaret_environment_variable = { workspace = true, optional = true }
 margaret_http = { workspace = true, optional = true }
 margaret_http_uploaded_file = { workspace = true, optional = true }
 margaret_http_validation = { workspace = true, optional = true }
@@ -56,6 +57,7 @@ runtime = [
     "dep:margaret_asset_bag",
     "dep:margaret_console",
     "dep:margaret_construction",
+    "dep:margaret_environment_variable",
     "dep:margaret_http",
     "dep:margaret_http_uploaded_file",
     "dep:margaret_http_validation",

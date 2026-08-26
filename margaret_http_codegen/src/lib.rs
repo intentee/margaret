@@ -13,8 +13,8 @@ mod render_forwarders;
 pub mod render_http;
 mod render_routes;
 mod route_group;
-mod server_console_arguments;
 mod server_route_group;
+mod server_serve_inputs;
 pub mod server_transport_policy;
 pub mod serves_spiffe;
 
@@ -34,12 +34,13 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-    use margaret_console_argument_codegen::scan::scan;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
+    use margaret_serve_input_codegen::scan::scan;
+    use margaret_serve_input_codegen::serve_input::ServeInput;
 
     use crate::http_codegen_error::HttpCodegenError;
     use crate::http_plan::HttpPlan;
@@ -51,7 +52,7 @@ mod tests {
         websocket_servers: &[String],
         middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
         bindings: &ContainerBindings,
-        websocket_server_arguments: &BTreeMap<String, Vec<ConsoleArgument>>,
+        websocket_server_serve_inputs: &BTreeMap<String, Vec<ServeInput>>,
         registries: &BindingRegistries,
     ) -> Result<crate::http_artifacts::HttpArtifacts, HttpCodegenError> {
         HttpPlan::build(
@@ -60,7 +61,7 @@ mod tests {
             websocket_servers,
             middleware_plans,
             bindings,
-            websocket_server_arguments,
+            websocket_server_serve_inputs,
             registries,
         )
         .map(|plan| crate::render_http::render_http(plan, bindings))
@@ -74,7 +75,7 @@ mod tests {
             .bindings
     }
 
-    fn no_websocket_arguments() -> BTreeMap<String, Vec<ConsoleArgument>> {
+    fn no_websocket_arguments() -> BTreeMap<String, Vec<ServeInput>> {
         BTreeMap::new()
     }
 
@@ -257,9 +258,9 @@ impl Resource {
         let registries = registries_for(&index, false);
         let websocket_arguments = BTreeMap::from([(
             "public".to_string(),
-            vec![ConsoleArgument::Flag {
+            vec![ServeInput::ConsoleArgument(ConsoleArgument::Flag {
                 name: "missing".to_string(),
-            }],
+            })],
         )]);
         let error = render_http(
             &index,
@@ -328,7 +329,7 @@ impl GetProfile {
             .collect();
 
         assert!(source.contains("container.session_user_provider()"));
-        assert!(!source.contains("console_argument_"));
+        assert!(!source.contains("serve_input_"));
     }
 
     #[test]
@@ -2111,7 +2112,7 @@ impl Greeting {
 "#;
 
     #[test]
-    fn weaves_a_console_argument_into_a_responder_and_its_server() {
+    fn weaves_a_serve_input_into_a_responder_and_its_server() {
         let source = source_for(CONSOLE_ARGUMENT_RESPONDER);
 
         assert!(
@@ -2154,7 +2155,7 @@ impl GetUser {
         let source = source_for(CONSOLE_ARGUMENT_BINDER);
 
         assert!(source.contains("container.user_binder()"));
-        assert!(!source.contains("console_argument_"));
+        assert!(!source.contains("serve_input_"));
     }
 
     const CONSOLE_ARGUMENT_MIDDLEWARE: &str = r#"
@@ -2185,7 +2186,7 @@ impl Guard {
 "#;
 
     #[test]
-    fn weaves_a_console_argument_into_a_middleware_and_its_server() {
+    fn weaves_a_serve_input_into_a_middleware_and_its_server() {
         let source = source_for(CONSOLE_ARGUMENT_MIDDLEWARE);
 
         assert!(
@@ -2224,6 +2225,6 @@ impl Configured {
         let source = source_for(CONSOLE_ARGUMENT_MIXED_CATEGORIES);
 
         assert!(source.contains("container.configured()"));
-        assert!(!source.contains("console_argument_"));
+        assert!(!source.contains("serve_input_"));
     }
 }
