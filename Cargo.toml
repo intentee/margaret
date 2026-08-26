@@ -153,29 +153,29 @@ validator = "0.20"
 x509-parser = "0.17"
 zeroize = "1.9"
 
-margaret = { path = "margaret", version = "0.2.0", default-features = false }
+margaret = { path = "margaret", version = "0.3.0", default-features = false }
 margaret_access_token_minter = { path = "margaret_access_token_minter", version = "0.1.0" }
 margaret_asset_bag = { path = "margaret_asset_bag", version = "0.1.0" }
-margaret_asset_bag_codegen = { path = "margaret_asset_bag_codegen", version = "0.2.0" }
-margaret_attribute_arguments = { path = "margaret_attribute_arguments", version = "0.2.0" }
-margaret_attributes = { path = "margaret_attributes", version = "0.2.0" }
-margaret_codegen = { path = "margaret_codegen", version = "0.2.0" }
-margaret_codegen_tokens = { path = "margaret_codegen_tokens", version = "0.2.0" }
+margaret_asset_bag_codegen = { path = "margaret_asset_bag_codegen", version = "0.3.0" }
+margaret_attribute_arguments = { path = "margaret_attribute_arguments", version = "0.3.0" }
+margaret_attributes = { path = "margaret_attributes", version = "0.3.0" }
+margaret_codegen = { path = "margaret_codegen", version = "0.3.0" }
+margaret_codegen_tokens = { path = "margaret_codegen_tokens", version = "0.3.0" }
 margaret_console = { path = "margaret_console", version = "0.1.0" }
-margaret_console_argument_codegen = { path = "margaret_console_argument_codegen", version = "0.2.0" }
-margaret_console_codegen = { path = "margaret_console_codegen", version = "0.2.0" }
+margaret_console_argument_codegen = { path = "margaret_console_argument_codegen", version = "0.3.0" }
+margaret_console_codegen = { path = "margaret_console_codegen", version = "0.3.0" }
 margaret_construction = { path = "margaret_construction", version = "0.1.0" }
-margaret_container = { path = "margaret_container", version = "0.2.0" }
+margaret_container = { path = "margaret_container", version = "0.3.0" }
 margaret_generated_module = { path = "margaret_generated_module", version = "0.1.0" }
 margaret_http = { path = "margaret_http", version = "0.1.0" }
-margaret_http_codegen = { path = "margaret_http_codegen", version = "0.2.0" }
+margaret_http_codegen = { path = "margaret_http_codegen", version = "0.3.0" }
 margaret_http_uploaded_file = { path = "margaret_http_uploaded_file", version = "0.1.0" }
 margaret_http_validation = { path = "margaret_http_validation", version = "0.1.0" }
 margaret_identity = { path = "margaret_identity", version = "0.1.0" }
 margaret_identity_session = { path = "margaret_identity_session", version = "0.1.0" }
-margaret_injection_codegen = { path = "margaret_injection_codegen", version = "0.2.0" }
+margaret_injection_codegen = { path = "margaret_injection_codegen", version = "0.3.0" }
 margaret_jwks_client = { path = "margaret_jwks_client", version = "0.1.0" }
-margaret_jwks_codegen = { path = "margaret_jwks_codegen", version = "0.2.0" }
+margaret_jwks_codegen = { path = "margaret_jwks_codegen", version = "0.3.0" }
 margaret_jwks_endpoint = { path = "margaret_jwks_endpoint", version = "0.1.0" }
 margaret_jwks_file_secret_storage = { path = "margaret_jwks_file_secret_storage", version = "0.1.0" }
 margaret_jwks_keygen = { path = "margaret_jwks_keygen", version = "0.1.0" }
@@ -183,32 +183,32 @@ margaret_jwks_roller = { path = "margaret_jwks_roller", version = "0.1.0" }
 margaret_jwks_roller_server = { path = "margaret_jwks_roller_server", version = "0.1.0" }
 margaret_jwks_secret_storage_selection = { path = "margaret_jwks_secret_storage_selection", version = "0.1.0" }
 margaret_jwks_secret_store = { path = "margaret_jwks_secret_store", version = "0.1.0" }
-margaret_macros = { path = "margaret_macros", version = "0.1.0" }
-margaret_middleware_codegen = { path = "margaret_middleware_codegen", version = "0.2.0" }
-margaret_model = { path = "margaret_model", version = "0.2.0" }
-margaret_model_codegen = { path = "margaret_model_codegen", version = "0.2.0" }
+margaret_macros = { path = "margaret_macros", version = "0.3.0" }
+margaret_middleware_codegen = { path = "margaret_middleware_codegen", version = "0.3.0" }
+margaret_model = { path = "margaret_model", version = "0.3.0" }
+margaret_model_codegen = { path = "margaret_model_codegen", version = "0.3.0" }
 margaret_peer_identity = { path = "margaret_peer_identity", version = "0.1.0" }
-margaret_request_binding_codegen = { path = "margaret_request_binding_codegen", version = "0.2.0" }
+margaret_request_binding_codegen = { path = "margaret_request_binding_codegen", version = "0.3.0" }
 margaret_route_parameter_binding = { path = "margaret_route_parameter_binding", version = "0.1.0" }
 margaret_route_parameter_codegen = { path = "margaret_route_parameter_codegen", version = "0.1.0" }
-margaret_schema_codegen = { path = "margaret_schema_codegen", version = "0.2.0" }
-margaret_schema_identifier_naming = { path = "margaret_schema_identifier_naming", version = "0.1.0" }
+margaret_schema_codegen = { path = "margaret_schema_codegen", version = "0.3.0" }
+margaret_schema_identifier_naming = { path = "margaret_schema_identifier_naming", version = "0.3.0" }
 margaret_service = { path = "margaret_service", version = "0.1.0" }
-margaret_service_codegen = { path = "margaret_service_codegen", version = "0.2.0" }
+margaret_service_codegen = { path = "margaret_service_codegen", version = "0.3.0" }
 margaret_spiffe_svid = { path = "margaret_spiffe_svid", version = "0.1.0" }
 margaret_spiffe_svid_bundle = { path = "margaret_spiffe_svid_bundle", version = "0.1.0" }
 margaret_spiffe_svid_client = { path = "margaret_spiffe_svid_client", version = "0.1.0" }
 margaret_spiffe_svid_server = { path = "margaret_spiffe_svid_server", version = "0.1.0" }
 margaret_syn_type_peeling = { path = "margaret_syn_type_peeling", version = "0.1.0" }
 margaret_sync_holder = { path = "margaret_sync_holder", version = "0.1.0" }
-margaret_tag_codegen = { path = "margaret_tag_codegen", version = "0.2.0" }
+margaret_tag_codegen = { path = "margaret_tag_codegen", version = "0.3.0" }
 margaret_token_signer = { path = "margaret_token_signer", version = "0.1.0" }
 margaret_toposort = { path = "margaret_toposort", version = "0.1.0" }
 margaret_validation = { path = "margaret_validation", version = "0.1.0" }
 margaret_views = { path = "margaret_views", version = "0.1.0" }
-margaret_views_codegen = { path = "margaret_views_codegen", version = "0.2.0" }
+margaret_views_codegen = { path = "margaret_views_codegen", version = "0.3.0" }
 margaret_websocket = { path = "margaret_websocket", version = "0.1.0" }
-margaret_websocket_codegen = { path = "margaret_websocket_codegen", version = "0.2.0" }
+margaret_websocket_codegen = { path = "margaret_websocket_codegen", version = "0.3.0" }
 margaret_websocket_session = { path = "margaret_websocket_session", version = "0.1.0" }
 
 [workspace.lints.clippy]

@@ -1,6 +1,6 @@
 [package]
 name = "margaret_views_codegen"
-version = "0.2.0"
+version = "0.3.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "View code generation for the Margaret application framework."
