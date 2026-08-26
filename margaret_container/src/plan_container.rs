@@ -1,5 +1,5 @@
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_console_argument_codegen::console_argument_registry::ConsoleArgumentRegistry;
+use margaret_serve_input_codegen::declared_serve_inputs::DeclaredServeInputs;
 
 use crate::build_plan::build_plan;
 use crate::container_bindings::ContainerBindings;
@@ -12,10 +12,10 @@ use crate::planned_container::PlannedContainer;
 /// Returns `ContainerError` propagated from the work it performs.
 pub fn plan_container(
     index: &AttributeIndex,
-    registry: &ConsoleArgumentRegistry,
+    serve_inputs: &DeclaredServeInputs,
     framework_providers: &[FrameworkProvider],
 ) -> Result<PlannedContainer, ContainerError> {
-    let plan = build_plan(index, registry, framework_providers)?;
+    let plan = build_plan(index, serve_inputs, framework_providers)?;
     let bindings = ContainerBindings::from_plan(&plan);
 
     Ok(PlannedContainer::new(bindings, plan))

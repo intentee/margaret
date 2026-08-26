@@ -22,7 +22,7 @@ pub fn render_http(plan: HttpPlan, bindings: &ContainerBindings) -> HttpArtifact
     HttpArtifacts::new(
         modules,
         plan.servers,
-        plan.server_console_arguments,
+        plan.server_serve_inputs,
         plan.retained_roots,
     )
 }

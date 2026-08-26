@@ -5,10 +5,10 @@ use syn::parse_str;
 
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_console_argument_codegen::scan::scan;
 use margaret_container::injectable_resolution::InjectableResolution;
 use margaret_container::render_container::render_container;
 use margaret_container::resolve_injectable::resolve_injectable;
+use margaret_serve_input_codegen::scan::scan;
 
 #[must_use]
 /// # Panics

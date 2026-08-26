@@ -12,6 +12,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_console_argument_codegen \
 	-p margaret_console_codegen \
 	-p margaret_construction \
+	-p margaret_environment_variable \
+	-p margaret_environment_variable_codegen \
 	-p margaret_container \
 	-p margaret_container_tests \
 	-p margaret_jwks_endpoint \
@@ -24,6 +26,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_identity \
 	-p margaret_identity_session \
 	-p margaret_injection_codegen \
+	-p margaret_input_weaving \
 	-p margaret_jwks_client \
 	-p margaret_jwks_client_tests \
 	-p margaret_jwks_codegen \
@@ -50,6 +53,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_schema_identifier_naming \
 	-p margaret_schema_postgres_tests \
 	-p margaret_service \
+	-p margaret_serve_input_codegen \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
 	-p margaret_spiffe_svid \
@@ -78,6 +82,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_example \
 	--exclude-from-report margaret_codegen_collisions_and_diamonds_fixture \
 	--exclude-from-report margaret_codegen_copy_console_arguments_fixture \
+	--exclude-from-report margaret_codegen_environment_variable_inputs_fixture \
 	--exclude-from-report margaret_codegen_fallible_roles_fixture \
 	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
 	--exclude-from-report margaret_codegen_route_parameter_values_fixture \
@@ -88,6 +93,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_collisions_and_diamonds_fixture \
 	-p margaret_codegen_copy_console_arguments_fixture \
+	-p margaret_codegen_environment_variable_inputs_fixture \
 	-p margaret_codegen_fallible_roles_fixture \
 	-p margaret_codegen_linear_construction_future_fixture \
 	-p margaret_codegen_route_parameter_values_fixture \
@@ -109,6 +115,8 @@ RUNTIME_PACKAGES := \
 	-p margaret_console_argument_codegen \
 	-p margaret_console_codegen \
 	-p margaret_construction \
+	-p margaret_environment_variable \
+	-p margaret_environment_variable_codegen \
 	-p margaret_container \
 	-p margaret_generated_module \
 	-p margaret_http \
@@ -118,6 +126,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_identity \
 	-p margaret_identity_session \
 	-p margaret_injection_codegen \
+	-p margaret_input_weaving \
 	-p margaret_jwks_client \
 	-p margaret_jwks_codegen \
 	-p margaret_jwks_endpoint \
@@ -138,6 +147,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_schema_codegen \
 	-p margaret_schema_identifier_naming \
 	-p margaret_service \
+	-p margaret_serve_input_codegen \
 	-p margaret_service_codegen \
 	-p margaret_spiffe_svid \
 	-p margaret_spiffe_svid_bundle \
@@ -214,6 +224,8 @@ coverage: node_modules postgres-image
 		--gated margaret_console_argument_codegen=100 \
 		--gated margaret_console_codegen=100 \
 		--gated margaret_construction=100 \
+		--gated margaret_environment_variable=100 \
+		--gated margaret_environment_variable_codegen=100 \
 		--gated margaret_container=100 \
 		--gated margaret_container_tests=100 \
 		--gated margaret_jwks_endpoint=100 \
@@ -226,6 +238,7 @@ coverage: node_modules postgres-image
 		--gated margaret_identity=100 \
 		--gated margaret_identity_session=100 \
 		--gated margaret_injection_codegen=100 \
+		--gated margaret_input_weaving=100 \
 		--gated margaret_jwks_client=100 \
 		--gated margaret_jwks_client_tests=100 \
 		--gated margaret_jwks_codegen=100 \
@@ -252,6 +265,7 @@ coverage: node_modules postgres-image
 		--gated margaret_schema_identifier_naming=100 \
 		--gated margaret_schema_postgres_tests=100 \
 		--gated margaret_service=100 \
+		--gated margaret_serve_input_codegen=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
 		--gated margaret_spiffe_svid=100 \

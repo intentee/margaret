@@ -24,11 +24,11 @@ mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_attributes::framework_attribute::FrameworkAttribute;
-    use margaret_console_argument_codegen::scan::scan;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
+    use margaret_serve_input_codegen::scan::scan;
 
     use crate::fold_layers::fold_layers;
     use crate::layer_application::LayerApplication;
@@ -427,7 +427,7 @@ struct Site;
 "#;
 
     #[test]
-    fn weaves_a_console_argument_into_the_middleware_instance() {
+    fn weaves_a_serve_input_into_the_middleware_instance() {
         let layers = layers_for(CONSOLE_ARGUMENT_MIDDLEWARE).expect("the layers resolve");
         let bindings = bindings_for(&index_for(CONSOLE_ARGUMENT_MIDDLEWARE));
         let folded = fold_layers(

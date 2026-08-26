@@ -3,9 +3,10 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-use margaret_console_argument_codegen::serve_input_key::ServeInputKey;
-use margaret_console_argument_codegen::serve_input_registry::ServeInputRegistry;
+use margaret_serve_input_codegen::serve_input::ServeInput;
+use margaret_serve_input_codegen::serve_input_key::ServeInputKey;
+use margaret_serve_input_codegen::serve_input_registry::ServeInputRegistry;
+use margaret_serve_input_codegen::serve_input_slots::ServeInputSlots;
 
 use crate::container_error::ContainerError;
 use crate::dependency_kind::DependencyKind;
@@ -14,8 +15,8 @@ use crate::planned_provider::PlannedProvider;
 use crate::provider::Provider;
 
 pub(crate) struct ContainerPlan {
-    arguments: Arc<[ConsoleArgument]>,
     entries: Vec<PlannedProvider>,
+    inputs: Arc<[ServeInput]>,
     positions: BTreeMap<CanonicalPath, usize>,
     injectable: BTreeSet<CanonicalPath>,
     slots: Arc<BTreeMap<ServeInputKey, usize>>,
@@ -29,7 +30,7 @@ impl ContainerPlan {
     ) -> Result<Self, ContainerError> {
         let mut ordered: Vec<PlannedProvider> = Vec::with_capacity(dependency_order.len());
         let mut positions: BTreeMap<CanonicalPath, usize> = BTreeMap::new();
-        let mut argument_registry = ServeInputRegistry::empty();
+        let mut input_registry = ServeInputRegistry::empty();
 
         for key in dependency_order {
             let provider =
@@ -46,15 +47,15 @@ impl ContainerPlan {
 
             for dependency in provider.dependencies() {
                 match dependency {
-                    DependencyKind::ConsoleArgument { argument } => {
-                        let slot = argument_registry.register(argument.as_ref().clone())?;
-                        dependencies.push(PlannedDependency::ConsoleArgument {
-                            argument: argument.as_ref().clone(),
+                    DependencyKind::ServeInput { input } => {
+                        let slot = input_registry.register(&key, input.as_ref().clone())?;
+                        dependencies.push(PlannedDependency::ServeInput {
+                            input: input.as_ref().clone(),
                             slot,
                         });
 
                         if seen_slots.insert(slot) {
-                            collected.push(argument.as_ref().clone());
+                            collected.push(input.as_ref().clone());
                             collected_slots.push(slot);
                         }
                     }
@@ -69,13 +70,13 @@ impl ContainerPlan {
                             field_name: dependency.provider.field_name.clone(),
                         });
 
-                        for (argument, slot) in dependency
-                            .console_arguments
+                        for (input, slot) in dependency
+                            .serve_inputs
                             .iter()
-                            .zip(dependency.console_slots.iter().copied())
+                            .zip(dependency.serve_input_slots.iter().copied())
                         {
                             if seen_slots.insert(slot) {
-                                collected.push(argument.clone());
+                                collected.push(input.clone());
                                 collected_slots.push(slot);
                             }
                         }
@@ -86,28 +87,28 @@ impl ContainerPlan {
 
             positions.insert(key.clone(), ordered.len());
             ordered.push(PlannedProvider {
-                console_arguments: collected.into(),
-                console_slots: collected_slots.into(),
                 dependencies: dependencies.into(),
                 is_async,
                 key,
                 provider,
+                serve_input_slots: collected_slots.into(),
+                serve_inputs: collected.into(),
             });
         }
 
-        let ServeInputRegistry { arguments, slots } = argument_registry;
+        let ServeInputSlots { inputs, slots } = input_registry.into_slots();
 
         Ok(Self {
-            arguments: arguments.into(),
             entries: ordered,
+            inputs: inputs.into(),
             positions,
             injectable,
             slots: Arc::new(slots),
         })
     }
 
-    pub(crate) fn arguments(&self) -> Arc<[ConsoleArgument]> {
-        Arc::clone(&self.arguments)
+    pub(crate) fn inputs(&self) -> Arc<[ServeInput]> {
+        Arc::clone(&self.inputs)
     }
 
     pub(crate) fn injectable(&self, key: &CanonicalPath) -> bool {
@@ -146,7 +147,9 @@ mod tests {
 
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
-    use margaret_console_argument_codegen::weaving_kind::WeavingKind;
+    use margaret_input_weaving::input_value::InputValue;
+    use margaret_input_weaving::weaving_kind::WeavingKind;
+    use margaret_serve_input_codegen::serve_input::ServeInput;
 
     use super::ContainerPlan;
     use crate::dependency_kind::DependencyKind;
@@ -176,21 +179,23 @@ mod tests {
         }
     }
 
-    fn repeated_console_argument_provider() -> Provider {
+    fn repeated_serve_input_provider() -> Provider {
         let concrete_path = path("Root");
-        let argument = || DependencyKind::ConsoleArgument {
-            argument: Box::new(ConsoleArgument::Named {
+        let input = || DependencyKind::ServeInput {
+            input: Box::new(ServeInput::ConsoleArgument(ConsoleArgument::Named {
                 name: "shared".to_string(),
-                required: true,
-                weaving: WeavingKind::Cloned,
-                value_type: path("String"),
-            }),
+                value: InputValue {
+                    required: true,
+                    value_type: path("String"),
+                    weaving: WeavingKind::Cloned,
+                },
+            })),
         };
 
         Provider {
             concrete_path: concrete_path.clone(),
             construction: DirectConstruction::Constructor {
-                dependencies: vec![argument(), argument()],
+                dependencies: vec![input(), input()],
                 is_async: false,
                 method: "create".to_string(),
             },
@@ -236,7 +241,7 @@ mod tests {
         let root = path("Root");
         let plan = ContainerPlan::new(
             vec![root.clone()],
-            BTreeMap::from([(root.clone(), repeated_console_argument_provider())]),
+            BTreeMap::from([(root.clone(), repeated_serve_input_provider())]),
             BTreeSet::new(),
         )
         .expect("repeated named inputs share one slot");
@@ -244,8 +249,8 @@ mod tests {
             .planned_entry(&root)
             .expect("the root belongs to the plan");
 
-        assert_eq!(planned.console_arguments.len(), 1);
-        assert_eq!(planned.console_slots.len(), 1);
+        assert_eq!(planned.serve_inputs.len(), 1);
+        assert_eq!(planned.serve_input_slots.len(), 1);
         assert_eq!(planned.dependencies.len(), 2);
     }
 }

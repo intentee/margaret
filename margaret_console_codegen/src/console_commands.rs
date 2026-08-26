@@ -6,12 +6,12 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_injection_codegen::request_binding_marker::request_binding_marker;
+use margaret_serve_input_codegen::serve_input::ServeInput;
 
 use crate::console_codegen_error::ConsoleCodegenError;
 use crate::console_command::ConsoleCommand;
@@ -72,13 +72,13 @@ pub(crate) fn console_commands(
 
         validate_runner(index, item, runner, &command)?;
 
-        let provider_arguments = bindings.console_arguments(item.canonical_path())?;
-        let arguments = provider_arguments.arguments.to_vec();
-        let console_slots = provider_arguments.slots.to_vec();
+        let provided = bindings.provider_serve_inputs(item.canonical_path())?;
+        let serve_inputs = provided.inputs.to_vec();
+        let serve_input_slots = provided.slots.to_vec();
 
-        if arguments
+        if serve_inputs
             .iter()
-            .any(|argument| matches!(argument, ConsoleArgument::SpiffeHttpClient))
+            .any(|input| matches!(input, ServeInput::SpiffeHttpClient))
         {
             return Err(ConsoleCodegenError::ConsoleCommandInjectsSpiffeHttpClient { command });
         }
@@ -87,9 +87,9 @@ pub(crate) fn console_commands(
             name.clone(),
             ConsoleCommand {
                 accessor,
-                arguments,
+                serve_inputs,
                 command_path: command.clone(),
-                console_slots,
+                serve_input_slots,
                 construction_root: item.canonical_path().clone(),
                 description,
                 is_async: runner.signature().asyncness.is_some(),

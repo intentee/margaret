@@ -479,11 +479,12 @@ pub fn render_services(
         };
         let container = &container;
     };
-    let matches_binding = if servers.is_empty() && plan.construction_arguments.is_empty() {
-        quote! { _matches }
-    } else {
-        quote! { matches }
-    };
+    let matches_binding =
+        if servers.is_empty() && !activation.client_active && !plan.reads_clap_matches {
+            quote! { _matches }
+        } else {
+            quote! { matches }
+        };
     let prelude = &plan.prelude;
     let serve_too_many_lines = too_many_lines_allow();
 

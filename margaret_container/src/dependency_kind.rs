@@ -1,8 +1,8 @@
 use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_serve_input_codegen::serve_input::ServeInput;
 
 #[derive(Clone)]
 pub(crate) enum DependencyKind {
-    ConsoleArgument { argument: Box<ConsoleArgument> },
+    ServeInput { input: Box<ServeInput> },
     Single { provider_key: CanonicalPath },
 }

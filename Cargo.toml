@@ -10,6 +10,7 @@ members = [
     "margaret_codegen_tests",
     "margaret_codegen_tests/tests/fixtures/collisions_and_diamonds",
     "margaret_codegen_tests/tests/fixtures/copy_console_arguments",
+    "margaret_codegen_tests/tests/fixtures/environment_variable_inputs",
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
     "margaret_codegen_tests/tests/fixtures/linear_construction_future",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",
@@ -21,6 +22,8 @@ members = [
     "margaret_console",
     "margaret_console_argument_codegen",
     "margaret_console_codegen",
+    "margaret_environment_variable",
+    "margaret_environment_variable_codegen",
     "margaret_construction",
     "margaret_container",
     "margaret_container_tests",
@@ -35,6 +38,7 @@ members = [
     "margaret_identity",
     "margaret_identity_session",
     "margaret_injection_codegen",
+    "margaret_input_weaving",
     "margaret_jwks_client",
     "margaret_jwks_client_tests",
     "margaret_jwks_codegen",
@@ -62,6 +66,7 @@ members = [
     "margaret_schema_identifier_naming",
     "margaret_schema_postgres_tests",
     "margaret_service",
+    "margaret_serve_input_codegen",
     "margaret_service_codegen",
     "margaret_service_tests",
     "margaret_spiffe_svid",
@@ -167,6 +172,8 @@ margaret_console_argument_codegen = { path = "margaret_console_argument_codegen"
 margaret_console_codegen = { path = "margaret_console_codegen", version = "0.3.1" }
 margaret_construction = { path = "margaret_construction", version = "0.1.0" }
 margaret_container = { path = "margaret_container", version = "0.3.1" }
+margaret_environment_variable = { path = "margaret_environment_variable", version = "0.1.0" }
+margaret_environment_variable_codegen = { path = "margaret_environment_variable_codegen", version = "0.1.0" }
 margaret_generated_module = { path = "margaret_generated_module", version = "0.1.0" }
 margaret_http = { path = "margaret_http", version = "0.1.0" }
 margaret_http_codegen = { path = "margaret_http_codegen", version = "0.3.1" }
@@ -175,6 +182,7 @@ margaret_http_validation = { path = "margaret_http_validation", version = "0.1.0
 margaret_identity = { path = "margaret_identity", version = "0.1.0" }
 margaret_identity_session = { path = "margaret_identity_session", version = "0.1.0" }
 margaret_injection_codegen = { path = "margaret_injection_codegen", version = "0.3.1" }
+margaret_input_weaving = { path = "margaret_input_weaving", version = "0.1.0" }
 margaret_jwks_client = { path = "margaret_jwks_client", version = "0.1.0" }
 margaret_jwks_codegen = { path = "margaret_jwks_codegen", version = "0.3.1" }
 margaret_jwks_endpoint = { path = "margaret_jwks_endpoint", version = "0.1.0" }
@@ -195,6 +203,7 @@ margaret_route_parameter_codegen = { path = "margaret_route_parameter_codegen", 
 margaret_schema_codegen = { path = "margaret_schema_codegen", version = "0.3.1" }
 margaret_schema_identifier_naming = { path = "margaret_schema_identifier_naming", version = "0.3.1" }
 margaret_service = { path = "margaret_service", version = "0.1.0" }
+margaret_serve_input_codegen = { path = "margaret_serve_input_codegen", version = "0.1.0" }
 margaret_service_codegen = { path = "margaret_service_codegen", version = "0.3.1" }
 margaret_spiffe_svid = { path = "margaret_spiffe_svid", version = "0.1.0" }
 margaret_spiffe_svid_bundle = { path = "margaret_spiffe_svid_bundle", version = "0.1.0" }

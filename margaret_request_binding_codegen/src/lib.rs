@@ -2,11 +2,11 @@ pub mod authenticated_user_application;
 pub mod authenticated_user_provider;
 pub mod authenticated_user_providers;
 pub mod authenticated_user_requirement;
-pub mod binding_console_arguments;
 pub mod binding_context;
 pub mod binding_reads_request;
 pub mod binding_registries;
 pub mod binding_root;
+pub mod binding_serve_inputs;
 pub mod binding_shadows_request;
 pub mod bound_parameter;
 pub mod captured_provider;
@@ -41,17 +41,17 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
-    use margaret_console_argument_codegen::scan::scan;
     use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
     use margaret_injection_codegen::process_method::process_method;
     use margaret_route_parameter_codegen::route_path::RoutePath;
+    use margaret_serve_input_codegen::scan::scan;
 
     use crate::authenticated_user_application::AuthenticatedUserApplication;
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
-    use crate::binding_console_arguments::binding_console_arguments;
     use crate::binding_context::BindingContext;
     use crate::binding_registries::BindingRegistries;
+    use crate::binding_serve_inputs::binding_serve_inputs;
     use crate::bound_parameter::BoundParameter;
     use crate::classify_parameters::classify_parameters;
     use crate::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
@@ -480,7 +480,7 @@ impl SessionUserProvider {
             .first()
             .map(|provider| provider.application.clone())
             .expect("the provider is registered");
-        let names: Vec<String> = binding_console_arguments(
+        let names: Vec<String> = binding_serve_inputs(
             &RequestBinding::AuthenticatedUser {
                 application,
                 requirement: AuthenticatedUserRequirement::Required,
@@ -494,7 +494,7 @@ impl SessionUserProvider {
 
         assert_eq!(names, vec!["realm".to_string()]);
         assert!(
-            binding_console_arguments(&RequestBinding::CurrentRequest, &bindings)
+            binding_serve_inputs(&RequestBinding::CurrentRequest, &bindings)
                 .expect("the current request has no container-backed arguments")
                 .is_empty()
         );
@@ -527,7 +527,7 @@ impl SessionUserProvider {
         };
 
         for binding in [authenticated_user, bound, injectable] {
-            let error = binding_console_arguments(&binding, &bindings)
+            let error = binding_serve_inputs(&binding, &bindings)
                 .expect_err("the binding must belong to the same container plan");
 
             assert!(error.to_string().contains("crate::Missing"));

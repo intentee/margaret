@@ -4,12 +4,12 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::struct_shape::StructShape;
-use margaret_codegen_tokens::console_argument_field_ident::console_argument_field_ident;
-use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
+use margaret_codegen_tokens::bootstrap_argument_field_ident::bootstrap_argument_field_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
+use margaret_codegen_tokens::serve_input_ident::serve_input_ident;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_serve_input_codegen::serve_input::ServeInput;
 
 use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
@@ -24,8 +24,8 @@ use crate::field_ident::field_ident;
 use crate::field_type::field_type;
 use crate::planned_dependency::PlannedDependency;
 use crate::planned_provider::PlannedProvider;
-use crate::reverse_console_argument_weaver::ReverseConsoleArgumentWeaver;
-use crate::serve_console_arguments::ServeConsoleArguments;
+use crate::reverse_serve_input_weaver::ReverseServeInputWeaver;
+use crate::root_serve_inputs::RootServeInputs;
 
 fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream {
     match shape {
@@ -37,10 +37,10 @@ fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream 
 
 fn dependency_expression(
     dependency: &PlannedDependency,
-    weaver: &mut ReverseConsoleArgumentWeaver,
+    weaver: &mut ReverseServeInputWeaver,
 ) -> TokenStream {
     match dependency {
-        PlannedDependency::ConsoleArgument { argument, slot } => weaver.weave(argument, *slot),
+        PlannedDependency::ServeInput { input, slot } => weaver.weave(input, *slot),
         PlannedDependency::Single { field_name } => {
             let dependency = format_ident!("{field_name}");
 
@@ -51,7 +51,7 @@ fn dependency_expression(
 
 fn dependency_expressions(
     dependencies: &[PlannedDependency],
-    weaver: &mut ReverseConsoleArgumentWeaver,
+    weaver: &mut ReverseServeInputWeaver,
 ) -> Vec<TokenStream> {
     let mut expressions: Vec<TokenStream> = dependencies
         .iter()
@@ -63,10 +63,7 @@ fn dependency_expressions(
     expressions
 }
 
-fn direct_value(
-    planned: &PlannedProvider,
-    weaver: &mut ReverseConsoleArgumentWeaver,
-) -> TokenStream {
+fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver) -> TokenStream {
     let provider = &planned.provider;
     let concrete = path_tokens(&provider.concrete_path);
     let dependencies = &planned.dependencies;
@@ -116,7 +113,7 @@ fn direct_value(
     }
 }
 
-fn statement(planned: &PlannedProvider, weaver: &mut ReverseConsoleArgumentWeaver) -> TokenStream {
+fn statement(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver) -> TokenStream {
     let provider = &planned.provider;
     let binding = field_ident(provider);
     let declared_type = provider.provided.is_trait_object().then(|| {
@@ -151,8 +148,8 @@ fn arguments_declaration(function: &Ident, slots: &[usize]) -> TokenStream {
     let module = bootstrap_arguments_module(function);
     let arguments_type = bootstrap_arguments_type(function);
     let bindings = slots.iter().map(|slot| {
-        let field = console_argument_field_ident(*slot);
-        let binding = console_argument_ident(*slot);
+        let field = bootstrap_argument_field_ident(*slot);
+        let binding = serve_input_ident(*slot);
 
         quote! { #field: #binding, }
     });
@@ -164,17 +161,17 @@ fn arguments_declaration(function: &Ident, slots: &[usize]) -> TokenStream {
 
 fn arguments_module(
     function: &Ident,
-    arguments: &[ConsoleArgument],
+    inputs: &[ServeInput],
     slots: &[usize],
 ) -> Option<GeneratedModuleTokens> {
-    if arguments.is_empty() {
+    if inputs.is_empty() {
         return None;
     }
 
     let arguments_type = bootstrap_arguments_type(function);
-    let fields = arguments.iter().zip(slots).map(|(argument, slot)| {
-        let field = console_argument_field_ident(*slot);
-        let value_type = argument.field_type();
+    let fields = inputs.iter().zip(slots).map(|(input, slot)| {
+        let field = bootstrap_argument_field_ident(*slot);
+        let value_type = input.field_type();
 
         quote! { pub #field: #value_type, }
     });
@@ -190,7 +187,7 @@ fn arguments_module(
 }
 
 fn flow_statements(flow: &[&PlannedProvider]) -> Vec<TokenStream> {
-    let mut weaver = ReverseConsoleArgumentWeaver::new();
+    let mut weaver = ReverseServeInputWeaver::new();
     let mut statements: Vec<TokenStream> = flow
         .iter()
         .rev()
@@ -205,7 +202,7 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     let flow = construction_flow(plan, &[root]);
     let provider = &root.provider;
     let function = format_ident!("construct_{}", provider.field_name);
-    let parameters = arguments_declaration(&function, &root.console_slots);
+    let parameters = arguments_declaration(&function, &root.serve_input_slots);
     let statements = flow_statements(&flow);
     let root_binding = field_ident(provider);
     let root_type = field_type(provider);
@@ -239,7 +236,7 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     };
 
     RootBuilder {
-        arguments: arguments_module(&function, &root.console_arguments, &root.console_slots),
+        arguments: arguments_module(&function, &root.serve_inputs, &root.serve_input_slots),
         function,
         tokens,
     }
@@ -256,13 +253,13 @@ pub(crate) fn render_build(
         .map(|root| root_builder(root, plan))
         .collect::<Vec<_>>();
     let serve_flow = construction_flow(plan, construction_roots);
-    let ServeConsoleArguments {
-        arguments: serve_arguments,
+    let RootServeInputs {
+        inputs: serve_inputs,
         slots: serve_slots,
-    } = ServeConsoleArguments::from_roots(construction_roots);
+    } = RootServeInputs::from_roots(construction_roots);
     let serve_function = format_ident!("serve");
     let serve_parameters = arguments_declaration(&serve_function, &serve_slots);
-    let serve_arguments_module = arguments_module(&serve_function, &serve_arguments, &serve_slots);
+    let serve_arguments_module = arguments_module(&serve_function, &serve_inputs, &serve_slots);
     let serve_statements = flow_statements(&serve_flow);
     let retained: std::collections::BTreeSet<_> =
         retained_roots.iter().map(|entry| &entry.key).collect();

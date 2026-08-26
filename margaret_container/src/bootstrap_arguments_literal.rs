@@ -1,21 +1,21 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use margaret_codegen_tokens::console_argument_field_ident::console_argument_field_ident;
+use margaret_codegen_tokens::bootstrap_argument_field_ident::bootstrap_argument_field_ident;
 
-use crate::console_argument_binding::ConsoleArgumentBinding;
+use crate::serve_input_binding::ServeInputBinding;
 
 #[must_use]
 pub fn bootstrap_arguments_literal(
     type_path: &TokenStream,
-    bindings: &[ConsoleArgumentBinding],
+    bindings: &[ServeInputBinding],
 ) -> TokenStream {
     if bindings.is_empty() {
         return TokenStream::new();
     }
 
     let fields = bindings.iter().map(|binding| {
-        let field = console_argument_field_ident(binding.slot);
+        let field = bootstrap_argument_field_ident(binding.slot);
         let value = &binding.value;
 
         quote! { #field: #value, }
@@ -28,11 +28,11 @@ pub fn bootstrap_arguments_literal(
 mod tests {
     use quote::quote;
 
-    use crate::console_argument_binding::ConsoleArgumentBinding;
+    use crate::serve_input_binding::ServeInputBinding;
 
     use super::bootstrap_arguments_literal;
 
-    fn collapsed(bindings: &[ConsoleArgumentBinding]) -> String {
+    fn collapsed(bindings: &[ServeInputBinding]) -> String {
         bootstrap_arguments_literal(&quote! { build::ServeArguments }, bindings)
             .to_string()
             .split_whitespace()
@@ -40,26 +40,26 @@ mod tests {
     }
 
     #[test]
-    fn renders_nothing_when_the_bootstrap_takes_no_console_arguments() {
+    fn renders_nothing_when_the_bootstrap_takes_no_serve_inputs() {
         assert_eq!(collapsed(&[]), String::new());
     }
 
     #[test]
     fn names_each_field_after_the_slot_it_carries() {
         let bindings = [
-            ConsoleArgumentBinding {
+            ServeInputBinding {
                 slot: 0,
-                value: quote! { console_argument_0 },
+                value: quote! { serve_input_0 },
             },
-            ConsoleArgumentBinding {
+            ServeInputBinding {
                 slot: 4,
-                value: quote! { console_argument_4.clone() },
+                value: quote! { serve_input_4.clone() },
             },
         ];
 
         assert_eq!(
             collapsed(&bindings),
-            "build::ServeArguments{argument0:console_argument_0,argument4:console_argument_4.clone(),}"
+            "build::ServeArguments{argument0:serve_input_0,argument4:serve_input_4.clone(),}"
         );
     }
 }
