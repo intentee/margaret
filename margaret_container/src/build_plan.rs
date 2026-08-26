@@ -476,7 +476,7 @@ fn resolve_framework_providers(
     provided_keys: &mut HashMap<CanonicalPath, CanonicalPath>,
     framework_providers: &[FrameworkProvider],
 ) -> Result<Vec<Provider>, ContainerError> {
-    let buildable = buildable_constructions(framework_providers);
+    let buildable = buildable_constructions(index, framework_providers);
     let included = included_framework_providers(
         index,
         provider_drafts,
@@ -533,6 +533,7 @@ fn framework_provided_type(construction: &DirectConstruction, path: CanonicalPat
 }
 
 fn buildable_constructions(
+    index: &AttributeIndex,
     framework_providers: &[FrameworkProvider],
 ) -> HashMap<CanonicalPath, DirectConstruction> {
     let mut resolved: HashMap<CanonicalPath, DirectConstruction> = HashMap::new();
@@ -540,7 +541,7 @@ fn buildable_constructions(
     for framework_provider in framework_providers {
         resolved.insert(
             framework_provider.provided.clone(),
-            resolve_framework_construction(&framework_provider.construction),
+            resolve_framework_construction(index, &framework_provider.construction),
         );
     }
 
@@ -568,7 +569,10 @@ fn buildable_constructions(
     resolved
 }
 
-fn resolve_framework_construction(construction: &FrameworkConstruction) -> DirectConstruction {
+fn resolve_framework_construction(
+    index: &AttributeIndex,
+    construction: &FrameworkConstruction,
+) -> DirectConstruction {
     match construction {
         FrameworkConstruction::Accessor { accessor, source } => {
             DirectConstruction::FrameworkAccessor {
@@ -609,7 +613,7 @@ fn resolve_framework_construction(construction: &FrameworkConstruction) -> Direc
                 argument: Box::new(ConsoleArgument::Named {
                     name: argument_name.clone(),
                     required: true,
-                    weaving: WeavingKind::from_canonical(value_type, true),
+                    weaving: WeavingKind::from_canonical(index, value_type, true),
                     value_type: value_type.clone(),
                 }),
             }],

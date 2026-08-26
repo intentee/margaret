@@ -1,12 +1,14 @@
 use syn::Path;
 
 use crate::canonical_path::CanonicalPath;
+use crate::copy_path::copy_path;
 use crate::is_copy_primitive::is_copy_primitive;
 use crate::item_paths::ItemPaths;
 use crate::module_imports::ModuleImports;
 
 fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
     match leaf {
+        "Copy" => Some(copy_path()),
         "String" => Some(CanonicalPath::new(vec![
             "std".to_string(),
             "string".to_string(),
@@ -214,6 +216,19 @@ mod tests {
                 &ItemPaths::default()
             ),
             Some("u16".to_string())
+        );
+    }
+
+    #[test]
+    fn resolves_a_bare_copy_marker_to_the_prelude() {
+        assert_eq!(
+            resolved(
+                &parse_quote!(Copy),
+                &["crate"],
+                &ModuleImports::default(),
+                &ItemPaths::default()
+            ),
+            Some("std::marker::Copy".to_string())
         );
     }
 

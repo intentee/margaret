@@ -13,6 +13,7 @@ fn clones_a_console_argument_used_by_constructor_and_dependency() {
         .collect();
 
     assert!(source.contains("crate::Parent::create("));
-    assert!(source.contains("arguments.argument0"));
+    assert!(source.contains("console_argument_0"));
+    assert!(source.contains("console_argument_0.clone()"));
     assert!(source.contains("::std::sync::Arc::clone(&child)"));
 }

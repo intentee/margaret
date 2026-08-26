@@ -1,4 +1,5 @@
 mod canonicalizes_method_attributes_at_the_impl_site;
+mod detects_copy_types;
 mod does_not_exclude_a_nested_module_with_the_excluded_name;
 mod drops_members_without_an_indexed_item;
 mod excludes_the_named_crate_root_module;
@@ -16,6 +17,7 @@ mod rejects_duplicate_canonical_paths;
 mod rejects_glob_imports;
 mod rejects_glob_imports_inside_inline_modules;
 mod rejects_path_attribute_modules;
+mod reports_a_malformed_derive;
 mod reports_invalid_root_syntax;
 mod reports_invalid_submodule_syntax;
 mod reports_missing_crate_root;

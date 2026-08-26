@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     name: test
-    runs-on: ovh-linux-x64-d2-4
+    runs-on: ovh-linux-x64-b3-16
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -24,7 +24,7 @@ jobs:
 
   clippy:
     name: clippy
-    runs-on: ovh-linux-x64-d2-4
+    runs-on: ovh-linux-x64-b3-16
     steps:
       - name: checkout
         uses: actions/checkout@v4

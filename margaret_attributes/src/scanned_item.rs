@@ -1,10 +1,12 @@
 use syn::Attribute;
 
+use crate::attribute_error::AttributeError;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_item::IndexedItem;
 use crate::indexed_item_parts::IndexedItemParts;
 use crate::indexed_trait_impl::IndexedTraitImpl;
 use crate::indexed_variant::IndexedVariant;
+use crate::item_is_copy::item_is_copy;
 use crate::item_kind::ItemKind;
 use crate::scanned_attribute::ScannedAttribute;
 use crate::scanned_field::ScannedField;
@@ -57,7 +59,7 @@ impl ScannedItem {
     pub(crate) fn resolve(
         mut self,
         resolve: impl Copy + Fn(&[String], &syn::Path) -> CanonicalPath,
-    ) -> IndexedItem {
+    ) -> Result<IndexedItem, AttributeError> {
         self.methods
             .sort_by(|left, right| left.identifier().cmp(right.identifier()));
         let module_path = self
@@ -78,15 +80,18 @@ impl ScannedItem {
             .map(|method| method.resolve(resolve))
             .collect();
 
-        IndexedItem::from_parts(IndexedItemParts {
+        let is_copy = item_is_copy(&attributes, module_path, &self.trait_impls, resolve)?;
+
+        Ok(IndexedItem::from_parts(IndexedItemParts {
             attributes,
             canonical_path: self.canonical_path,
             fields,
             identifier: self.identifier,
+            is_copy,
             kind: self.kind,
             methods,
             trait_impls: self.trait_impls,
             variants: self.variants,
-        })
+        }))
     }
 }

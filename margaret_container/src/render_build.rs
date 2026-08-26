@@ -5,6 +5,7 @@ use quote::quote;
 
 use margaret_attributes::struct_shape::StructShape;
 use margaret_codegen_tokens::console_argument_field_ident::console_argument_field_ident;
+use margaret_codegen_tokens::console_argument_ident::console_argument_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_console_argument_codegen::console_argument::ConsoleArgument;
@@ -142,15 +143,23 @@ struct RootBuilder {
     tokens: TokenStream,
 }
 
-fn arguments_declaration(function: &Ident, arguments: &[ConsoleArgument]) -> TokenStream {
-    if arguments.is_empty() {
+fn arguments_declaration(function: &Ident, slots: &[usize]) -> TokenStream {
+    if slots.is_empty() {
         return TokenStream::new();
     }
 
     let module = bootstrap_arguments_module(function);
     let arguments_type = bootstrap_arguments_type(function);
+    let bindings = slots.iter().map(|slot| {
+        let field = console_argument_field_ident(*slot);
+        let binding = console_argument_ident(*slot);
 
-    quote! { arguments: super::#module::#arguments_type }
+        quote! { #field: #binding, }
+    });
+
+    quote! {
+        super::#module::#arguments_type { #(#bindings)* }: super::#module::#arguments_type
+    }
 }
 
 fn arguments_module(
@@ -196,7 +205,7 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     let flow = construction_flow(plan, &[root]);
     let provider = &root.provider;
     let function = format_ident!("construct_{}", provider.field_name);
-    let parameters = arguments_declaration(&function, &root.console_arguments);
+    let parameters = arguments_declaration(&function, &root.console_slots);
     let statements = flow_statements(&flow);
     let root_binding = field_ident(provider);
     let root_type = field_type(provider);
@@ -252,7 +261,7 @@ pub(crate) fn render_build(
         slots: serve_slots,
     } = ServeConsoleArguments::from_roots(construction_roots);
     let serve_function = format_ident!("serve");
-    let serve_parameters = arguments_declaration(&serve_function, &serve_arguments);
+    let serve_parameters = arguments_declaration(&serve_function, &serve_slots);
     let serve_arguments_module = arguments_module(&serve_function, &serve_arguments, &serve_slots);
     let serve_statements = flow_statements(&serve_flow);
     let retained: std::collections::BTreeSet<_> =

@@ -77,6 +77,7 @@ COVERAGE_PACKAGES := \
 COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_example \
 	--exclude-from-report margaret_codegen_collisions_and_diamonds_fixture \
+	--exclude-from-report margaret_codegen_copy_console_arguments_fixture \
 	--exclude-from-report margaret_codegen_fallible_roles_fixture \
 	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
 	--exclude-from-report margaret_codegen_route_parameter_values_fixture \
@@ -86,6 +87,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_spiffe_http_client_fixture
 GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_collisions_and_diamonds_fixture \
+	-p margaret_codegen_copy_console_arguments_fixture \
 	-p margaret_codegen_fallible_roles_fixture \
 	-p margaret_codegen_linear_construction_future_fixture \
 	-p margaret_codegen_route_parameter_values_fixture \

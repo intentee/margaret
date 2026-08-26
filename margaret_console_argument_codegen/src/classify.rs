@@ -96,7 +96,7 @@ pub fn classify(
         owner,
         parameter,
     )?;
-    let weaving = WeavingKind::from_canonical(&canonical, required);
+    let weaving = WeavingKind::from_canonical(index, &canonical, required);
 
     Ok(match form {
         ConsoleArgumentForm::Named { key } => ConsoleArgument::Named {

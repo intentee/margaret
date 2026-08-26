@@ -2006,6 +2006,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_codegen_copy_console_arguments_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "margaret",
+]
+
+[[package]]
 name = "margaret_codegen_fallible_roles_fixture"
 version = "0.1.0"
 dependencies = [

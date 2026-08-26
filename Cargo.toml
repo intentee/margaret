@@ -9,6 +9,7 @@ members = [
     "margaret_codegen",
     "margaret_codegen_tests",
     "margaret_codegen_tests/tests/fixtures/collisions_and_diamonds",
+    "margaret_codegen_tests/tests/fixtures/copy_console_arguments",
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
     "margaret_codegen_tests/tests/fixtures/linear_construction_future",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",

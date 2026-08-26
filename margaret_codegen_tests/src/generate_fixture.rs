@@ -16,7 +16,7 @@ pub fn generate_fixture(name: &str) -> Result<GeneratedCode, CodegenError> {
     let assets_directory = source_directory.join("assets");
 
     build(
-        &CrateRoot::new(name, source_directory),
+        &CrateRoot::new("crate", source_directory),
         None,
         &assets_directory,
         ".",
