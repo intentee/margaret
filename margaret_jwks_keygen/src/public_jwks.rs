@@ -5,6 +5,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::compact_jws::CompactJws;
+use crate::ec_jwk_public::EcJwkPublic;
 use crate::jwk_public::JwkPublic;
 use crate::jwks_key_error::JwksKeyError;
 use crate::jwks_secret::JwksSecret;
@@ -21,12 +22,12 @@ pub struct PublicJwks {
 impl PublicJwks {
     #[must_use]
     pub fn find_by_kid(&self, kid: &str) -> Option<&JwkPublic> {
-        self.keys.iter().find(|key| key.kid == kid)
+        self.keys.iter().find(|key| key.kid() == kid)
     }
 
-    fn publish(&mut self, jwk_public: &JwkPublic) {
+    fn publish(&mut self, jwk_public: &EcJwkPublic) {
         if self.find_by_kid(&jwk_public.kid).is_none() {
-            self.keys.push(jwk_public.clone());
+            self.keys.push(JwkPublic::from(jwk_public.clone()));
         }
     }
 }

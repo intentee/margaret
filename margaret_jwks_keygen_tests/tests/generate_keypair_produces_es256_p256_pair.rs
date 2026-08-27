@@ -3,7 +3,6 @@ use anyhow::Result;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
-use margaret_jwks_keygen::key_type::KeyType;
 use margaret_jwks_keygen::key_use::KeyUse;
 
 #[test]
@@ -14,7 +13,6 @@ fn generate_keypair_produces_es256_p256_pair() -> Result<()> {
     })?;
 
     assert!(matches!(keypair.public.crv, Curve::P256));
-    assert!(matches!(keypair.public.kty, KeyType::Ec));
     assert!(matches!(keypair.public.use_, KeyUse::Signature));
     assert_eq!(keypair.public.kid, "generated-kid");
     assert_eq!(keypair.signing.kid, "generated-kid");

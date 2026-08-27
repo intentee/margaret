@@ -25,7 +25,7 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "parameter '{parameter}' of {subject} must be a route parameter, a form request, the current request, the peer SPIFFE id, the forwarder, or the routes"
+        "parameter '{parameter}' of {subject} must be a route parameter, a form request, the request body, the current request, the peer SPIFFE id, the forwarder, or the routes"
     )]
     UnmarkedParameter { subject: String, parameter: String },
 
@@ -129,7 +129,33 @@ pub enum RequestBindingError {
     ConflictingArgumentMarkers { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} is the peer SPIFFE id and must not also carry #[authenticated_user], #[route_parameter], or #[form_request]"
+        "argument #{parameter} of {subject} carries #[request_body] alongside another request binding marker; an argument may use at most one"
+    )]
+    ConflictingRequestBodyMarkers { subject: String, parameter: String },
+
+    #[error(
+        "{subject} reads the request body through #[request_body] and also through #[form_request(from = {input_source})]; a route reads its body in exactly one way"
+    )]
+    ConflictingRequestBodyAndFormRequest {
+        subject: String,
+        input_source: String,
+    },
+
+    #[error("{subject} declares more than one #[request_body] argument")]
+    MultipleRequestBodyParameters { subject: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[request_body] and must be written as `&margaret::framework::http::bytes::Bytes`"
+    )]
+    RequestBodyType { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[request_body], which is only available on an HTTP responder"
+    )]
+    RequestBodyOutsideResponder { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} is the peer SPIFFE id and must not also carry #[authenticated_user], #[route_parameter], #[form_request], or #[request_body]"
     )]
     MarkedPeerSpiffeIdParameter { subject: String, parameter: String },
 

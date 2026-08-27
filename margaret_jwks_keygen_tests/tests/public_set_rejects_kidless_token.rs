@@ -5,6 +5,7 @@ use base64ct::Encoding;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
+use margaret_jwks_keygen::jwk_public::JwkPublic;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_keygen::token_malformation::TokenMalformation;
 use margaret_jwks_keygen::token_verification::TokenVerification;
@@ -28,7 +29,7 @@ fn public_set_rejects_kidless_token() -> Result<()> {
     let kidless = format!("{header}.{payload}.c2lnbmF0dXJl");
 
     let set = PublicJwks {
-        keys: vec![keypair.public],
+        keys: vec![JwkPublic::Ec(keypair.public)],
     };
     let result = set.verify::<TestClaims>(&kidless);
 

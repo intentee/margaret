@@ -14,6 +14,12 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
+    use std::mem::discriminant;
+
+    use margaret_injection_codegen::injection_error::InjectionError;
+
+    use margaret_attributes::attribute_error::AttributeError;
+
     use crate::service_codegen_error::ServiceCodegenError;
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
@@ -118,8 +124,15 @@ mod tests {
             .expect("the services source fails to generate")
     }
 
-    fn error_for(lib_source: &str) -> String {
-        rejection_for(lib_source).to_string()
+    fn any_text() -> String {
+        "any".to_string()
+    }
+
+    fn injection_rejection(error: &ServiceCodegenError) -> Option<&InjectionError> {
+        match error {
+            ServiceCodegenError::Injection { source } => Some(source),
+            _ => None,
+        }
     }
 
     fn public() -> Vec<HttpServer> {
@@ -212,22 +225,30 @@ impl Flusher {
 
     #[test]
     fn rejects_an_unresolvable_ticker_interval_path() {
-        let message = error_for(
-            "#[scheduled_with_tick_timer(interval = PERIOD)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[scheduled_with_tick_timer(interval = PERIOD)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            )),
+            discriminant(&ServiceCodegenError::UnresolvedTickerPath {
+                ticker: any_text(),
+                argument: "any",
+                path: any_text()
+            })
         );
-
-        assert!(message.contains("'interval' path 'PERIOD'"));
-        assert!(message.contains("cannot be resolved"));
     }
 
     #[test]
     fn rejects_an_unresolvable_ticker_behavior_path() {
-        let message = error_for(
-            "#[scheduled_with_tick_timer(interval = crate::PERIOD, behavior = Delay)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[scheduled_with_tick_timer(interval = crate::PERIOD, behavior = Delay)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            )),
+            discriminant(&ServiceCodegenError::UnresolvedTickerPath {
+                ticker: any_text(),
+                argument: "any",
+                path: any_text()
+            })
         );
-
-        assert!(message.contains("'behavior' path 'Delay'"));
-        assert!(message.contains("cannot be resolved"));
     }
 
     fn canonical(segments: &[&str]) -> CanonicalPath {
@@ -378,7 +399,7 @@ impl Flusher {
 
         assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",body_limit_argument:"public-body-limit",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
@@ -565,13 +586,13 @@ impl Flusher {
         );
 
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",body_limit_argument:"public-body-limit",name:"public",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",body_limit_argument:"internal-body-limit",name:"internal",routes:super::http::server_internal::server_internal(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#
@@ -583,11 +604,12 @@ impl Flusher {
 
     #[test]
     fn rejects_a_ticker_conflicting_with_a_command() {
-        let message = error_for(
-            "#[scheduled_with_tick_timer(interval = crate::P)]\n#[console_command(name = \"x\")]\nstruct Bad;\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[scheduled_with_tick_timer(interval = crate::P)]\n#[console_command(name = \"x\")]\nstruct Bad;\n",
+            )),
+            discriminant(&ServiceCodegenError::ConflictingRoles { path: any_text() })
         );
-
-        assert!(message.contains("mutually exclusive"));
     }
 
     #[test]
@@ -628,77 +650,112 @@ impl Flusher {
 
     #[test]
     fn rejects_a_service_on_a_non_struct() {
-        assert!(error_for("#[service]\nenum Bad {}\n").contains("#[service]"));
+        assert_eq!(
+            discriminant(&rejection_for("#[service]\nenum Bad {}\n")),
+            discriminant(&ServiceCodegenError::ServiceNotAStruct { path: any_text() })
+        );
     }
 
     #[test]
     fn rejects_a_ticker_on_a_non_struct() {
-        assert!(
-            error_for("#[scheduled_with_tick_timer(interval = crate::P)]\nenum Bad {}\n")
-                .contains("#[scheduled_with_tick_timer]")
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[scheduled_with_tick_timer(interval = crate::P)]\nenum Bad {}\n"
+            )),
+            discriminant(&ServiceCodegenError::TickerNotAStruct { path: any_text() })
         );
     }
 
     #[test]
     fn rejects_conflicting_roles() {
-        let message = error_for(
-            "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            )),
+            discriminant(&ServiceCodegenError::ConflictingRoles { path: any_text() })
         );
+    }
 
-        assert!(message.contains("mutually exclusive"));
+    #[test]
+    fn reads_no_injection_rejection_from_an_unrelated_service_error() {
+        assert!(
+            injection_rejection(&ServiceCodegenError::ServiceNotAStruct { path: any_text() })
+                .is_none()
+        );
     }
 
     #[test]
     fn rejects_a_unit_without_a_runner() {
-        assert!(error_for("#[service]\nstruct Bad;\n").contains("no #[process] method"));
+        assert_eq!(
+            discriminant(
+                injection_rejection(&rejection_for("#[service]\nstruct Bad;\n"))
+                    .expect("the unit is rejected by its #[process] runner"),
+            ),
+            discriminant(&InjectionError::MissingProcessMethod { item: any_text() })
+        );
     }
 
     #[test]
     fn rejects_an_ambiguous_runner() {
-        let message = error_for(
+        assert_eq!(
+            discriminant(
+                injection_rejection(&rejection_for(
             "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> anyhow::Result<()> {}\n    #[process]\n    fn b(&self) -> anyhow::Result<()> {}\n}\n",
+        ))
+                    .expect("the unit is rejected by its #[process] runner"),
+            ),
+            discriminant(&InjectionError::AmbiguousProcessMethod { item: any_text(), methods: any_text() })
         );
-
-        assert!(message.contains("more than one #[process]"));
     }
 
     #[test]
     fn rejects_a_ticker_without_an_interval() {
-        let message = error_for(
-            "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            )),
+            discriminant(&ServiceCodegenError::TickerMissingInterval { ticker: any_text() })
         );
-
-        assert!(message.contains("missing the 'interval'"));
     }
 
     #[test]
     fn rejects_an_unmarked_runner_parameter() {
-        let message = error_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<()> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<()> {}\n}\n",
+            )),
+            discriminant(&ServiceCodegenError::RunnerArgument {
+                path: any_text(),
+                parameter: any_text()
+            })
         );
-
-        assert!(message.contains("takes parameter 'value'"));
-        assert!(message.contains("a runner may only take &self and an optional CancellationToken"));
     }
 
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
-        let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
+            )),
+            discriminant(&ServiceCodegenError::RunnerRequestBinding {
+                path: any_text(),
+                marker: any_text(),
+                parameter: any_text()
+            })
         );
-
-        assert!(message.contains("carries #[authenticated_user]"));
-        assert!(message.contains("only available in an HTTP responder"));
     }
 
     #[test]
     fn rejects_a_cancellation_token_passed_by_reference() {
-        let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> anyhow::Result<()> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> anyhow::Result<()> {}\n}\n",
+            )),
+            discriminant(&ServiceCodegenError::RunnerArgument {
+                path: any_text(),
+                parameter: any_text()
+            })
         );
-
-        assert!(message.contains("takes parameter 'token'"));
-        assert!(message.contains("a runner may only take &self and an optional CancellationToken"));
     }
 
     #[test]
@@ -884,10 +941,13 @@ impl Second {
 
     #[test]
     fn propagates_malformed_ticker_arguments() {
-        let message = error_for(
-            "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
+            )),
+            discriminant(&ServiceCodegenError::Index {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
         );
-
-        assert!(message.contains("failed to index"));
     }
 }

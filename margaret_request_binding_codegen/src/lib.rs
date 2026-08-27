@@ -24,6 +24,7 @@ pub mod render_bound_request_extractions;
 pub mod render_request_extraction;
 pub mod request_binding;
 pub mod request_binding_error;
+mod request_body_type;
 pub mod request_injectable;
 pub mod request_input_source;
 mod route_parameter_arguments;
@@ -34,13 +35,19 @@ pub mod views_availability;
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error as _;
     use std::fs;
+    use std::mem::discriminant;
 
+    use proc_macro2::Span;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
+    use margaret_attributes::attribute_error::AttributeError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_container::container_error::ContainerError;
     use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
     use margaret_injection_codegen::process_method::process_method;
@@ -61,6 +68,7 @@ mod tests {
     use quote::format_ident;
 
     const PRELUDE: &str = "\
+use margaret::framework::http::bytes::Bytes;
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
@@ -110,14 +118,28 @@ struct User;
         registries_with(declaration, ViewsAvailability::Available)
     }
 
-    fn rejection_for(declaration: &str) -> String {
+    fn any_text() -> String {
+        "any".to_string()
+    }
+
+    fn attribute_source(error: &RequestBindingError) -> &AttributeError {
+        error
+            .source()
+            .and_then(|source| source.downcast_ref::<AttributeError>())
+            .expect("the rejection wraps an attribute error")
+    }
+
+    fn malformed_arguments() -> syn::Error {
+        syn::Error::new(Span::call_site(), "malformed")
+    }
+
+    fn rejection_for(declaration: &str) -> RequestBindingError {
         BindingRegistries::collect(
             &index_for(&provider_source(declaration)),
             ViewsAvailability::Available,
         )
         .err()
         .expect("the binding registries are rejected")
-        .to_string()
     }
 
     const SESSION_PROVIDER: &str = "\
@@ -148,85 +170,125 @@ impl SessionUserProvider {
 
     #[test]
     fn rejects_a_provider_on_a_non_struct() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nenum Bad {}\n"
-            )
-            .contains("is only supported on structs")
+            )),
+            discriminant(&RequestBindingError::AuthenticatedUserProviderNotAStruct {
+                provider: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_a_repeated_provider_attribute() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(attribute_source(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
-            )
-            .contains("is repeated on")
+            ))),
+            discriminant(&AttributeError::RepeatedAttribute {
+                attribute_path: any_text(),
+                target: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_a_provider_that_is_not_a_singleton() {
-        assert!(
-            rejection_for("#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n")
-                .contains("must also be declared as a #[singleton]")
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
+            )),
+            discriminant(
+                &RequestBindingError::AuthenticatedUserProviderRequiresSingleton {
+                    provider: any_text()
+                }
+            )
         );
     }
 
     #[test]
     fn rejects_a_provider_without_a_user_model() {
-        assert!(
-            rejection_for("#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n")
-                .contains("is missing `user_model")
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[singleton]\n#[infers_authenticated_user]\nstruct Bad;\n"
+            )),
+            discriminant(
+                &RequestBindingError::AuthenticatedUserProviderMissingUserModel {
+                    provider: any_text()
+                }
+            )
         );
     }
 
     #[test]
     fn rejects_a_provider_whose_user_model_is_not_a_path() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = \"User\")]\nstruct Bad;\n"
-            )
-            .contains("is not a path")
+            )),
+            discriminant(&RequestBindingError::AttributeArguments {
+                source: AttributeArgumentsError::UnexpectedArgument {
+                    attribute_path: any_text(),
+                    expected: any_text(),
+                    key: any_text()
+                }
+            })
         );
     }
 
     #[test]
     fn rejects_a_provider_whose_user_model_matches_no_struct() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = Ghost)]\nstruct Bad;\n"
+            )),
+            discriminant(
+                &RequestBindingError::AuthenticatedUserProviderUnknownUserModel {
+                    provider: any_text(),
+                    written: any_text()
+                }
             )
-            .contains("matches no struct")
         );
     }
 
     #[test]
     fn propagates_malformed_provider_arguments() {
-        assert!(
-            rejection_for("#[singleton]\n#[infers_authenticated_user(= 5)]\nstruct Bad;\n")
-                .contains("could not be parsed")
+        assert_eq!(
+            discriminant(attribute_source(&rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(= 5)]\nstruct Bad;\n"
+            ))),
+            discriminant(&AttributeError::Arguments(
+                AttributeArgumentsError::Malformed {
+                    attribute_path: any_text(),
+                    source: malformed_arguments()
+                }
+            ))
         );
     }
 
     #[test]
     fn rejects_a_provider_without_an_inference_method() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
-            )
-            .contains("no #[infer_from_request] method")
+            )),
+            discriminant(&RequestBindingError::MissingInferFromRequest {
+                provider: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_a_provider_with_more_than_one_inference_method() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn first(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n\n    #[infer_from_request]\n    fn second(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
-            )
-            .contains("more than one #[infer_from_request] method")
+            )),
+            discriminant(&RequestBindingError::AmbiguousInferFromRequest {
+                provider: any_text(),
+                methods: any_text()
+            })
         );
     }
 
@@ -251,51 +313,67 @@ impl SessionUserProvider {
 
     #[test]
     fn rejects_two_providers_for_the_same_user_model() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct First;\n\nimpl First {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Second;\n\nimpl Second {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
-            )
-            .contains("has more than one authenticated user provider")
+            )),
+            discriminant(&RequestBindingError::AmbiguousAuthenticatedUserProvider {
+                model: any_text(),
+                first: any_text(),
+                second: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_the_next_handler_in_an_inference_method() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, next: Next) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
-            )
-            .contains("only available inside an HTTP middleware")
+            )),
+            discriminant(&RequestBindingError::NextOutsideMiddleware {
+                subject: any_text(),
+                parameter: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_a_route_parameter_in_an_inference_method() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
-            )
-            .contains("has no route path to bind from")
+            )),
+            discriminant(&RequestBindingError::RouteParameterUnavailable {
+                subject: any_text(),
+                parameter: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_an_authenticated_user_in_an_inference_method() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[authenticated_user] user: User) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
-            )
-            .contains("only available in an HTTP responder")
+            )),
+            discriminant(&RequestBindingError::AuthenticatedUserUnavailable {
+                subject: any_text(),
+                parameter: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_an_unmarked_parameter_in_an_inference_method() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, flag: bool) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
-            )
-            .contains("must be the current request, a form request")
+            )),
+            discriminant(&RequestBindingError::UnmarkedProviderParameter {
+                subject: any_text(),
+                parameter: any_text()
+            })
         );
     }
 
@@ -329,11 +407,10 @@ impl SessionUserProvider {
         )
     }
 
-    fn responder_rejection(declaration: &str) -> String {
+    fn responder_rejection(declaration: &str) -> RequestBindingError {
         responder_binding("Page", declaration)
             .err()
             .expect("the responder is rejected")
-            .to_string()
     }
 
     fn authenticated_user_requirements(declaration: &str) -> Vec<AuthenticatedUserRequirement> {
@@ -345,6 +422,88 @@ impl SessionUserProvider {
                 _ => None,
             })
             .collect()
+    }
+
+    fn request_body_bindings(declaration: &str) -> usize {
+        responder_binding("Page", declaration)
+            .expect("the responder binds")
+            .iter()
+            .filter(|parameter| matches!(parameter.binding, RequestBinding::RequestBody))
+            .count()
+    }
+
+    #[test]
+    fn binds_a_declared_request_body() {
+        assert_eq!(
+            request_body_bindings(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[request_body] body: &Bytes) -> anyhow::Result<Response> {}\n}\n"
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn rejects_a_request_body_that_is_not_a_byte_reference() {
+        assert_eq!(
+            discriminant(&responder_rejection(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[request_body] body: String) -> anyhow::Result<Response> {}\n}\n"
+            )),
+            discriminant(&RequestBindingError::RequestBodyType {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_a_request_body_outside_a_responder() {
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, #[request_body] body: &Bytes) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n"
+            )),
+            discriminant(&RequestBindingError::RequestBodyOutsideResponder {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_a_request_body_that_also_carries_another_marker() {
+        assert_eq!(
+            discriminant(&responder_rejection(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[request_body] #[route_parameter(from = \"x\")] body: &Bytes) -> anyhow::Result<Response> {}\n}\n"
+            )),
+            discriminant(&RequestBindingError::ConflictingRequestBodyMarkers {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_a_request_body_beside_a_form_request() {
+        assert_eq!(
+            discriminant(&responder_rejection(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[request_body] body: &Bytes, #[form_request(from = Json)] form: User) -> anyhow::Result<Response> {}\n}\n"
+            )),
+            discriminant(&RequestBindingError::ConflictingRequestBodyAndFormRequest {
+                subject: any_text(),
+                input_source: any_text()
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_more_than_one_request_body() {
+        assert_eq!(
+            discriminant(&responder_rejection(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[request_body] first: &Bytes, #[request_body] second: &Bytes) -> anyhow::Result<Response> {}\n}\n"
+            )),
+            discriminant(&RequestBindingError::MultipleRequestBodyParameters {
+                subject: any_text()
+            })
+        );
     }
 
     #[test]
@@ -379,61 +538,81 @@ impl SessionUserProvider {
 
     #[test]
     fn rejects_an_authenticated_user_taken_by_reference() {
-        assert!(
-            responder_rejection(
+        assert_eq!(
+            discriminant(&responder_rejection(
                 "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: &User) -> anyhow::Result<Response> {}\n}\n"
-            )
-            .contains("must be taken by value")
+            )),
+            discriminant(&RequestBindingError::AuthenticatedUserByReference {
+                subject: any_text(),
+                parameter: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_an_authenticated_user_model_that_matches_no_struct() {
-        assert!(
-            responder_rejection(
+        assert_eq!(
+            discriminant(&responder_rejection(
                 "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: (u8, u8)) -> anyhow::Result<Response> {}\n}\n"
-            )
-            .contains("which matches no struct")
+            )),
+            discriminant(&RequestBindingError::UnknownAuthenticatedUserModel {
+                subject: any_text(),
+                parameter: any_text(),
+                written: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_an_authenticated_user_model_without_a_provider() {
-        assert!(
-            responder_rejection(
+        assert_eq!(
+            discriminant(&responder_rejection(
                 "struct Admin;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {}\n}\n"
-            )
-            .contains("which no #[infers_authenticated_user] provides")
+            )),
+            discriminant(&RequestBindingError::MissingAuthenticatedUserProvider {
+                subject: any_text(),
+                parameter: any_text(),
+                model: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_an_authenticated_user_that_also_carries_a_route_parameter() {
-        assert!(
-            responder_rejection(
+        assert_eq!(
+            discriminant(&responder_rejection(
                 "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] #[route_parameter(from = \"x\")] user: User) -> anyhow::Result<Response> {}\n}\n"
-            )
-            .contains("an argument may use at most one")
+            )),
+            discriminant(&RequestBindingError::ConflictingAuthenticatedUserMarkers {
+                subject: any_text(),
+                parameter: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_the_same_authenticated_user_requested_twice() {
-        assert!(
-            responder_rejection(
+        assert_eq!(
+            discriminant(&responder_rejection(
                 "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] first: User, #[authenticated_user] second: Option<User>) -> anyhow::Result<Response> {}\n}\n"
-            )
-            .contains("more than once")
+            )),
+            discriminant(&RequestBindingError::MultipleAuthenticatedUserParameters {
+                subject: any_text(),
+                model: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_the_same_route_parameter_bound_twice() {
-        assert!(
-            responder_rejection(
+        assert_eq!(
+            discriminant(&responder_rejection(
                 "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] first: String, #[route_parameter(from = \"x\")] second: String) -> anyhow::Result<Response> {}\n}\n"
-            )
-            .contains("requests route parameter 'x' more than once")
+            )),
+            discriminant(&RequestBindingError::MultipleRouteParameterBindings {
+                subject: any_text(),
+                parameter: any_text()
+            })
         );
     }
 
@@ -446,10 +625,15 @@ impl SessionUserProvider {
             ViewsAvailability::Unavailable,
         )
         .err()
-        .expect("the binding registries are rejected")
-        .to_string();
+        .expect("the binding registries are rejected");
 
-        assert!(rejection.contains("requests the views, but this crate generates none"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&RequestBindingError::ViewsUnavailable {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     const CONSOLE_ARGUMENT_PROVIDER: &str = "\
@@ -530,7 +714,10 @@ impl SessionUserProvider {
             let error = binding_serve_inputs(&binding, &bindings)
                 .expect_err("the binding must belong to the same container plan");
 
-            assert!(error.to_string().contains("crate::Missing"));
+            assert_eq!(
+                discriminant(&error),
+                discriminant(&ContainerError::MissingProviderServeInputs { path: any_text() })
+            );
         }
     }
 

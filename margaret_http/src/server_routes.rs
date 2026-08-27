@@ -50,6 +50,7 @@ mod tests {
     use hyper::Method;
 
     use super::ServerRoutes;
+    use crate::body_intake::BodyIntake;
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
     use crate::handler_error::HandlerError;
@@ -91,8 +92,8 @@ mod tests {
         let server_routes = ServerRoutes::build(Vec::from([RouteEntry::new(
             "/articles",
             Vec::from([
-                MethodHandler::named("GET", "get_articles", not_found()),
-                MethodHandler::anonymous("POST", not_found()),
+                MethodHandler::named("GET", BodyIntake::Discarded, "get_articles", not_found()),
+                MethodHandler::anonymous("POST", BodyIntake::Discarded, not_found()),
             ]),
         )]))
         .expect("the entries build a router");
@@ -104,7 +105,12 @@ mod tests {
     async fn names_the_very_handler_the_entry_declared() {
         let server_routes = ServerRoutes::build(Vec::from([RouteEntry::new(
             "/articles",
-            Vec::from([MethodHandler::named("GET", "get_articles", not_found())]),
+            Vec::from([MethodHandler::named(
+                "GET",
+                BodyIntake::Discarded,
+                "get_articles",
+                not_found(),
+            )]),
         )]))
         .expect("the entries build a router");
         let named = server_routes
@@ -128,11 +134,19 @@ mod tests {
             ServerRoutes::build(Vec::from([
                 RouteEntry::new(
                     "/items/{id}",
-                    Vec::from([MethodHandler::anonymous("GET", not_found())]),
+                    Vec::from([MethodHandler::anonymous(
+                        "GET",
+                        BodyIntake::Discarded,
+                        not_found()
+                    )]),
                 ),
                 RouteEntry::new(
                     "/items/{name}",
-                    Vec::from([MethodHandler::anonymous("GET", not_found())]),
+                    Vec::from([MethodHandler::anonymous(
+                        "GET",
+                        BodyIntake::Discarded,
+                        not_found()
+                    )]),
                 ),
             ]))
             .is_err()

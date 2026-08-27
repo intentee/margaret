@@ -5,12 +5,12 @@ use clap::ArgMatches;
 
 use margaret_console::command_outcome::CommandOutcome;
 use margaret_console::report_failure::report_failure;
-use margaret_http::body_limit::BodyLimit;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 
+use crate::resolve_body_limit::resolve_body_limit;
 use crate::server_assembly::ServerAssembly;
 use crate::server_service::ServerService;
 
@@ -26,6 +26,7 @@ pub fn serve_application(
 
     for ServerAssembly {
         address_argument,
+        body_limit_argument,
         name,
         routes,
         transport,
@@ -40,6 +41,7 @@ pub fn serve_application(
             Ok(server_routes) => server_routes,
             Err(error) => return Err(report_failure(error)),
         };
+        let body_limit = resolve_body_limit(matches, body_limit_argument);
         let upload_config = if matches.get_flag(uploads_argument) {
             UploadConfig::enabled(
                 matches
@@ -59,7 +61,7 @@ pub fn serve_application(
             address,
             transport,
             upload_config,
-            BodyLimit::default(),
+            body_limit,
             server_routes.router,
         ));
     }
@@ -98,6 +100,11 @@ mod tests {
         Command::new("test")
             .arg(Arg::new("public-addr").long("public-addr"))
             .arg(
+                Arg::new("public-body-limit")
+                    .long("public-body-limit")
+                    .value_parser(clap::value_parser!(usize)),
+            )
+            .arg(
                 Arg::new("public-uploads")
                     .long("public-uploads")
                     .action(ArgAction::SetTrue),
@@ -112,6 +119,7 @@ mod tests {
     ) -> ServerAssembly {
         ServerAssembly {
             address_argument: "public-addr",
+            body_limit_argument: "public-body-limit",
             name: "public",
             routes,
             transport: TransportConfig::Plain,

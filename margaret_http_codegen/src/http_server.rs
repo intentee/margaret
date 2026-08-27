@@ -24,6 +24,11 @@ impl HttpServer {
     }
 
     #[must_use]
+    pub fn body_limit_argument(&self) -> String {
+        format!("{}-body-limit", self.name)
+    }
+
+    #[must_use]
     pub fn function_name(&self) -> Ident {
         format_ident!("server_{}", self.name)
     }

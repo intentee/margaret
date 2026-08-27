@@ -6,6 +6,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio_util::sync::CancellationToken;
 
+use margaret_http::body_intake::BodyIntake;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
@@ -31,6 +32,19 @@ impl Handler for Accepts {
     }
 }
 
+struct EchoesBody;
+
+#[async_trait]
+impl Handler for EchoesBody {
+    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        Ok(ResponseContinuation::Done(Response::bytes(
+            200,
+            "application/octet-stream",
+            request.inputs.body.clone(),
+        )))
+    }
+}
+
 async fn exchange(
     request: &[u8],
     body_limit: BodyLimit,
@@ -40,11 +54,27 @@ async fn exchange(
     let router = Router::build(vec![
         RouteEntry::new(
             "/submit",
-            vec![MethodHandler::anonymous("POST", Arc::new(Accepts))],
+            vec![MethodHandler::anonymous(
+                "POST",
+                BodyIntake::Discarded,
+                Arc::new(Accepts),
+            )],
         ),
         RouteEntry::new(
             "/search",
-            vec![MethodHandler::anonymous("QUERY", Arc::new(Accepts))],
+            vec![MethodHandler::anonymous(
+                "QUERY",
+                BodyIntake::Discarded,
+                Arc::new(Accepts),
+            )],
+        ),
+        RouteEntry::new(
+            "/publish",
+            vec![MethodHandler::anonymous(
+                "PUT",
+                BodyIntake::Collected,
+                Arc::new(EchoesBody),
+            )],
         ),
     ])
     .expect("the route entries register cleanly");
@@ -155,4 +185,31 @@ async fn rejects_a_known_path_reached_with_an_unhandled_method() {
     .await;
 
     assert!(response.contains(" 405 "));
+}
+
+#[tokio::test]
+async fn hands_a_declared_binary_body_to_the_route_unchanged() {
+    let response = exchange(
+        b"PUT /publish HTTP/1.1\r\nHost: test\r\nContent-Type: application/octet-stream\r\nContent-Length: 9\r\nConnection: close\r\n\r\n\x04\x00\x00\x00cargo",
+        BodyLimit::default(),
+        UploadConfig::Disabled,
+        false,
+    )
+    .await;
+
+    assert!(response.contains(" 200 "));
+    assert!(response.ends_with("\u{4}\u{0}\u{0}\u{0}cargo"));
+}
+
+#[tokio::test]
+async fn rejects_a_declared_binary_body_that_exceeds_the_limit() {
+    let response = exchange(
+        b"PUT /publish HTTP/1.1\r\nHost: test\r\nContent-Type: application/octet-stream\r\nContent-Length: 9\r\nConnection: close\r\n\r\n\x04\x00\x00\x00cargo",
+        BodyLimit::new(4),
+        UploadConfig::Disabled,
+        false,
+    )
+    .await;
+
+    assert!(response.contains(" 413 "));
 }

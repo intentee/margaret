@@ -34,6 +34,23 @@ pub enum JwksKeyError {
         source: p256::pkcs8::Error,
     },
 
+    #[error("the jwk rsa public exponent is not valid base64url: {source}")]
+    RsaExponentBase64 {
+        #[source]
+        source: base64ct::Error,
+    },
+
+    #[error("the jwk rsa public modulus is not valid base64url: {source}")]
+    RsaModulusBase64 {
+        #[source]
+        source: base64ct::Error,
+    },
+
+    #[error(
+        "the jwk rsa public modulus decodes to {found} bytes but rs256 verification requires at least {expected}"
+    )]
+    RsaModulusTooShort { expected: usize, found: usize },
+
     #[error("the signing key pem could not be parsed into an ecdsa signing key: {source}")]
     SigningKeyRejected {
         #[source]

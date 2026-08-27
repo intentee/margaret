@@ -6,6 +6,7 @@ use rustls::ServerConfig;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+use margaret_http::body_intake::BodyIntake;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
@@ -57,7 +58,11 @@ impl RunningMtlsServer {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::anonymous("GET", Arc::new(EchoPeer))],
+                vec![MethodHandler::anonymous(
+                    "GET",
+                    BodyIntake::Discarded,
+                    Arc::new(EchoPeer),
+                )],
             )])
             .expect("the route entries register cleanly"),
         );

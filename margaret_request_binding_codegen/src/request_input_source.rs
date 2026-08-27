@@ -11,23 +11,23 @@ pub enum RequestInputSource {
 
 impl RequestInputSource {
     pub(crate) fn from_path(path: &Path) -> Option<Self> {
-        let leaf = path.segments.last().map(|segment| &segment.ident);
-
-        match leaf {
-            Some(leaf) if leaf == "Cookie" => Some(Self::Cookie),
-            Some(leaf) if leaf == "Form" => Some(Self::Form),
-            Some(leaf) if leaf == "Query" => Some(Self::Query),
-            Some(leaf) if leaf == "Json" => Some(Self::Json),
-            _ => None,
-        }
+        path.segments.last().and_then(|segment| {
+            [Self::Cookie, Self::Form, Self::Query, Self::Json]
+                .into_iter()
+                .find(|source| segment.ident == source.written())
+        })
     }
 
     pub(crate) fn variant(&self) -> Ident {
+        format_ident!("{}", self.written())
+    }
+
+    pub(crate) fn written(&self) -> &'static str {
         match self {
-            Self::Cookie => format_ident!("Cookie"),
-            Self::Form => format_ident!("Form"),
-            Self::Query => format_ident!("Query"),
-            Self::Json => format_ident!("Json"),
+            Self::Cookie => "Cookie",
+            Self::Form => "Form",
+            Self::Query => "Query",
+            Self::Json => "Json",
         }
     }
 }

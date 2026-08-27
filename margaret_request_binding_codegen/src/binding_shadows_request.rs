@@ -10,5 +10,6 @@ pub fn binding_shadows_request(binding: &RequestBinding) -> bool {
             | RequestBinding::BoundRouteParameter { .. }
             | RequestBinding::FormRequest { .. }
             | RequestBinding::PeerSpiffeId
+            | RequestBinding::RequestBody
     )
 }

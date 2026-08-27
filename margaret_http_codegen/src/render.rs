@@ -27,6 +27,7 @@ use margaret_request_binding_codegen::request_binding::RequestBinding;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
+use crate::route_body_intake::route_body_intake;
 use crate::route_group::RouteGroup;
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
@@ -412,6 +413,7 @@ fn route_entries<'handler>(
                 .map(|(route, rendered_handler)| {
                     let function = &rendered_handler.function;
                     let method = &route.method;
+                    let body_intake = route_body_intake(route);
                     let handler_call = quote! {
                         #function(container, #routes_param, #views_argument)
                     };
@@ -420,6 +422,7 @@ fn route_entries<'handler>(
                         quote! {
                             margaret::framework::http::method_handler::MethodHandler::named(
                                 #method,
+                                #body_intake,
                                 #name,
                                 #handler_call,
                             )
@@ -428,6 +431,7 @@ fn route_entries<'handler>(
                         quote! {
                             margaret::framework::http::method_handler::MethodHandler::anonymous(
                                 #method,
+                                #body_intake,
                                 #handler_call,
                             )
                         }

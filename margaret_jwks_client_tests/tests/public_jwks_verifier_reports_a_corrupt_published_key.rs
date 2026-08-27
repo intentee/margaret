@@ -8,6 +8,7 @@ use margaret_jwks_client_tests::test_instant::test_instant;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
+use margaret_jwks_keygen::jwk_public::JwkPublic;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_keygen::signs_claims::SignsClaims as _;
 
@@ -32,7 +33,7 @@ async fn public_jwks_verifier_reports_a_corrupt_published_key() {
     let holder = PublicJwksHolder::default();
 
     holder.set(Some(Arc::new(PublicJwks {
-        keys: vec![keypair.public],
+        keys: vec![JwkPublic::Ec(keypair.public)],
     })));
 
     let result =

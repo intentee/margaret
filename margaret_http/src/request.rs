@@ -61,6 +61,7 @@ impl Request {
 mod tests {
     use std::collections::HashMap;
 
+    use bytes::Bytes;
     use http::Method;
 
     use super::Request;
@@ -70,6 +71,7 @@ mod tests {
     #[test]
     fn exposes_its_inputs_and_path_parameters() {
         let request = Request::from_inputs(RequestInputs {
+            body: Bytes::new(),
             cookies: HashMap::new(),
             files: HashMap::new(),
             json: None,

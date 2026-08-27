@@ -8,6 +8,7 @@ use margaret_jwks_client_tests::test_instant::test_instant;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
+use margaret_jwks_keygen::jwk_public::JwkPublic;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_keygen::signs_claims::SignsClaims as _;
 
@@ -35,7 +36,7 @@ async fn public_jwks_verifier_reports_a_signature_mismatch() {
     let holder = PublicJwksHolder::default();
 
     holder.set(Some(Arc::new(PublicJwks {
-        keys: vec![published_keypair.public],
+        keys: vec![JwkPublic::Ec(published_keypair.public)],
     })));
 
     let verification = PublicJwksVerifier::new(holder)

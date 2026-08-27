@@ -13,6 +13,7 @@ members = [
     "margaret_codegen_tests/tests/fixtures/environment_variable_inputs",
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
     "margaret_codegen_tests/tests/fixtures/linear_construction_future",
+    "margaret_codegen_tests/tests/fixtures/request_body_route",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",
     "margaret_codegen_tests/tests/fixtures/composite_foreign_key_model",
     "margaret_codegen_tests/tests/fixtures/self_referential_model",
@@ -136,6 +137,7 @@ proc-macro2 = "1.0"
 quote = "1.0"
 rcgen = "0.14"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+ring = "0.17"
 rust_decimal = { version = "1.42", default-features = false, features = ["std"] }
 rustls = "0.23"
 rustls-webpki = "0.103"

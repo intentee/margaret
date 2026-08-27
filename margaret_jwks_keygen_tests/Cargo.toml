@@ -6,16 +6,17 @@ publish = false
 autotests = false
 
 [dependencies]
+base64ct = { workspace = true }
+ring = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-base64ct = { workspace = true }
 jsonwebtoken = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 p256 = { workspace = true }
 p384 = { workspace = true }
-serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 zeroize = { workspace = true }
 

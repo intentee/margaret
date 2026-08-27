@@ -6,8 +6,12 @@ use syn::FnArg;
 use syn::ImplItemFn;
 use syn::ItemStruct;
 
-const REQUEST_BINDING_MARKERS: [&str; 3] =
-    ["authenticated_user", "route_parameter", "form_request"];
+const REQUEST_BINDING_MARKERS: [&str; 4] = [
+    "authenticated_user",
+    "route_parameter",
+    "form_request",
+    "request_body",
+];
 
 fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {
     attributes.retain(|attribute| {

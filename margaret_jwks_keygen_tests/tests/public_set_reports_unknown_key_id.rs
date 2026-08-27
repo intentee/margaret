@@ -3,6 +3,7 @@ use anyhow::Result;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
+use margaret_jwks_keygen::jwk_public::JwkPublic;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen::token_malformation::TokenMalformation;
@@ -28,7 +29,7 @@ async fn public_set_reports_unknown_key_id() -> Result<()> {
 
     let token = absent_keypair.signing.sign(&claims).await?;
     let set = PublicJwks {
-        keys: vec![present_keypair.public],
+        keys: vec![JwkPublic::Ec(present_keypair.public)],
     };
     let result = set.verify::<TestClaims>(&token);
 

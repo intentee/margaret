@@ -4,6 +4,7 @@ use serde_json::to_value;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
+use margaret_jwks_keygen::jwk_public::JwkPublic;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 
 #[test]
@@ -15,7 +16,7 @@ fn public_jwks_serializes_to_jwks_wire_format() -> Result<()> {
     let expected_x = keypair.public.x.clone();
     let expected_y = keypair.public.y.clone();
     let set = PublicJwks {
-        keys: vec![keypair.public],
+        keys: vec![JwkPublic::Ec(keypair.public)],
     };
 
     let serialized = to_value(&set)?;

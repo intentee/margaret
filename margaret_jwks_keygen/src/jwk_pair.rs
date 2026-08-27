@@ -1,8 +1,8 @@
-use crate::jwk_public::JwkPublic;
+use crate::ec_jwk_public::EcJwkPublic;
 use crate::jwk_signing::JwkSigning;
 
 #[derive(Clone)]
 pub struct JwkPair {
-    pub public: JwkPublic,
+    pub public: EcJwkPublic,
     pub signing: JwkSigning,
 }

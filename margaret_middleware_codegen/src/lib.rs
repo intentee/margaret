@@ -11,6 +11,16 @@ pub mod resolve_layers;
 
 #[cfg(test)]
 mod tests {
+    use std::mem::discriminant;
+
+    use margaret_tag_codegen::tag_error::TagError;
+
+    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+
+    use margaret_injection_codegen::injection_error::InjectionError;
+
+    use margaret_attributes::attribute_error::AttributeError;
+
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
@@ -95,8 +105,15 @@ mod tests {
             .expect("the middleware plans fail to collect")
     }
 
-    fn plans_error_for(lib_source: &str) -> String {
-        plans_rejection_for(lib_source).to_string()
+    fn any_text() -> String {
+        "any".to_string()
+    }
+
+    fn binding_rejection(error: &MiddlewareCodegenError) -> Option<&RequestBindingError> {
+        match error {
+            MiddlewareCodegenError::Binding { source } => Some(source),
+            _ => None,
+        }
     }
 
     fn layers_for(lib_source: &str) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
@@ -111,10 +128,10 @@ mod tests {
         resolve_layers(site.item(), &plans, "site 'Site'")
     }
 
-    fn layers_error_for(lib_source: &str) -> String {
+    fn layers_rejection_for(lib_source: &str) -> MiddlewareCodegenError {
         let failure = layers_for(lib_source).err();
 
-        failure.expect("the layers fail to resolve").to_string()
+        failure.expect("the layers fail to resolve")
     }
 
     const GUARD: &str = r"
@@ -210,17 +227,35 @@ impl Guard {
 
     #[test]
     fn rejects_a_handler_on_a_non_struct() {
+        assert_eq!(
+            discriminant(&plans_rejection_for(
+                "#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n"
+            )),
+            discriminant(&MiddlewareCodegenError::MiddlewareHandlerNotOnStruct {
+                target: any_text()
+            })
+        );
+    }
+
+    #[test]
+    fn reads_no_binding_rejection_from_an_unrelated_middleware_error() {
         assert!(
-            plans_error_for("#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n")
-                .contains("#[handles_middleware_attribute]")
+            binding_rejection(&MiddlewareCodegenError::MissingMiddlewareHandles {
+                middleware: any_text()
+            })
+            .is_none()
         );
     }
 
     #[test]
     fn rejects_a_handler_without_the_attribute_argument() {
-        assert!(
-            plans_error_for("#[handles_middleware_attribute]\nstruct Bad;\n")
-                .contains("missing the 'attribute'")
+        assert_eq!(
+            discriminant(&plans_rejection_for(
+                "#[handles_middleware_attribute]\nstruct Bad;\n"
+            )),
+            discriminant(&MiddlewareCodegenError::MissingMiddlewareHandles {
+                middleware: any_text()
+            })
         );
     }
 
@@ -244,27 +279,38 @@ impl Guard {
 
     #[test]
     fn propagates_malformed_handler_arguments() {
-        assert!(
-            plans_error_for("#[handles_middleware_attribute(= 5)]\nstruct Bad;\n")
-                .contains("failed to index")
+        assert_eq!(
+            discriminant(&plans_rejection_for(
+                "#[handles_middleware_attribute(= 5)]\nstruct Bad;\n"
+            )),
+            discriminant(&MiddlewareCodegenError::Index {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
         );
     }
 
     #[test]
     fn rejects_a_handler_without_a_process_method() {
-        assert!(
-            plans_error_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n")
-                .contains("no #[process] method")
+        assert_eq!(
+            discriminant(&plans_rejection_for(
+                "#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n"
+            )),
+            discriminant(&MiddlewareCodegenError::Injection {
+                source: InjectionError::MissingProcessMethod { item: any_text() }
+            })
         );
     }
 
     #[test]
     fn rejects_an_unclassifiable_handler_parameter() {
-        assert!(
-            plans_error_for(
+        assert_eq!(
+            discriminant(
+                binding_rejection(&plans_rejection_for(
                 "#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n"
-            )
-            .contains("must be the current request, the next handler")
+            ))
+                    .expect("the middleware is rejected by its request bindings"),
+            ),
+            discriminant(&RequestBindingError::UnmarkedMiddlewareParameter { subject: any_text(), parameter: any_text() })
         );
     }
 
@@ -282,42 +328,58 @@ impl Guard {
 
     #[test]
     fn rejects_a_middleware_attribute_without_a_tag() {
-        assert!(
-            layers_error_for("#[middleware]\nstruct Site;\n")
-                .contains("must reference exactly one tag")
+        assert_eq!(
+            discriminant(&layers_rejection_for("#[middleware]\nstruct Site;\n")),
+            discriminant(&MiddlewareCodegenError::Tag {
+                source: TagError::MalformedReference { site: any_text() }
+            })
         );
     }
 
     #[test]
     fn rejects_an_unknown_middleware_tag() {
-        assert!(
-            layers_error_for("#[middleware(missing)]\nstruct Site;\n")
-                .contains("no #[handles_middleware_attribute] handles it")
+        assert_eq!(
+            discriminant(&layers_rejection_for(
+                "#[middleware(missing)]\nstruct Site;\n"
+            )),
+            discriminant(&MiddlewareCodegenError::UnknownMiddleware {
+                site: any_text(),
+                tag: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_a_handler_with_a_multi_segment_tag() {
-        assert!(
-            plans_error_for(
+        assert_eq!(
+            discriminant(&plans_rejection_for(
                 "#[handles_middleware_attribute(attribute = tags::guard)]\nstruct Guard;\n"
-            )
-            .contains("not a single plain name")
+            )),
+            discriminant(&MiddlewareCodegenError::MalformedMiddlewareTag {
+                middleware: any_text()
+            })
         );
     }
 
     #[test]
     fn propagates_malformed_middleware_attribute_arguments() {
-        assert!(layers_error_for("#[middleware(= 5)]\nstruct Site;\n").contains("failed to index"));
+        assert_eq!(
+            discriminant(&layers_rejection_for("#[middleware(= 5)]\nstruct Site;\n")),
+            discriminant(&MiddlewareCodegenError::Index {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
+        );
     }
 
     #[test]
     fn propagates_a_plan_failure_while_resolving_layers() {
-        assert!(
-            layers_error_for(
+        assert_eq!(
+            discriminant(&layers_rejection_for(
                 "#[middleware(logged)]\nstruct Site;\n\n#[handles_middleware_attribute]\nstruct Bad;\n"
-            )
-            .contains("missing the 'attribute'")
+            )),
+            discriminant(&MiddlewareCodegenError::MissingMiddlewareHandles {
+                middleware: any_text()
+            })
         );
     }
 
@@ -583,21 +645,27 @@ impl Guard {
 
     #[test]
     fn rejects_a_middleware_with_multiple_next_handlers() {
-        assert!(
-            plans_error_for(
+        assert_eq!(
+            discriminant(
+                binding_rejection(&plans_rejection_for(
                 "use margaret::framework::http::next::Next;\n\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, first: Next, second: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n"
-            )
-            .contains("declares more than one next handler")
+            ))
+                    .expect("the middleware is rejected by its request bindings"),
+            ),
+            discriminant(&RequestBindingError::MultipleNextParameters { subject: any_text() })
         );
     }
 
     #[test]
     fn rejects_a_route_parameter_in_a_middleware() {
-        assert!(
-            plans_error_for(
+        assert_eq!(
+            discriminant(
+                binding_rejection(&plans_rejection_for(
                 "#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\nimpl Guard {\n    #[process]\n    fn process(&self, #[route_parameter(from = \"id\")] id: String) -> anyhow::Result<ResponseContinuation> {}\n}\n"
-            )
-            .contains("has no route path to bind from")
+            ))
+                    .expect("the middleware is rejected by its request bindings"),
+            ),
+            discriminant(&RequestBindingError::RouteParameterUnavailable { subject: any_text(), parameter: any_text() })
         );
     }
 }

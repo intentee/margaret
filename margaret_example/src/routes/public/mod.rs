@@ -19,6 +19,7 @@ pub mod get_profile;
 pub mod get_welcome;
 pub mod patch_article;
 pub mod post_article;
+pub mod post_article_archive;
 pub mod post_article_cover;
 pub mod post_article_import;
 pub mod sessions;

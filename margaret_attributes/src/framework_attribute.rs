@@ -23,6 +23,7 @@ pub enum FrameworkAttribute {
     ProvidesJwksEndpoint,
     ProvidesRouteParameter,
     RendersView,
+    RequestBody,
     RespondsToHttp,
     RouteParameter,
     RouteParameterValue,
@@ -36,7 +37,7 @@ pub enum FrameworkAttribute {
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 32] = [
         Self::AuthenticatedUser,
         Self::BuildForSession,
         Self::Column,
@@ -58,6 +59,7 @@ impl FrameworkAttribute {
         Self::ProvidesJwksEndpoint,
         Self::ProvidesRouteParameter,
         Self::RendersView,
+        Self::RequestBody,
         Self::RespondsToHttp,
         Self::RouteParameter,
         Self::RouteParameterValue,
@@ -105,6 +107,7 @@ impl FrameworkAttribute {
             "provides_jwks_endpoint" => Some(Self::ProvidesJwksEndpoint),
             "provides_route_parameter" => Some(Self::ProvidesRouteParameter),
             "renders_view" => Some(Self::RendersView),
+            "request_body" => Some(Self::RequestBody),
             "responds_to_http" => Some(Self::RespondsToHttp),
             "route_parameter" => Some(Self::RouteParameter),
             "route_parameter_value" => Some(Self::RouteParameterValue),
@@ -143,6 +146,7 @@ impl FrameworkAttribute {
             Self::ProvidesJwksEndpoint => "provides_jwks_endpoint",
             Self::ProvidesRouteParameter => "provides_route_parameter",
             Self::RendersView => "renders_view",
+            Self::RequestBody => "request_body",
             Self::RespondsToHttp => "responds_to_http",
             Self::RouteParameter => "route_parameter",
             Self::RouteParameterValue => "route_parameter_value",

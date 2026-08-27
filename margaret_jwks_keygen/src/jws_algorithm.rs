@@ -1,12 +1,13 @@
 use serde::Deserialize;
-use serde::Serialize;
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 pub enum JwsAlgorithm {
     #[serde(rename = "ES256")]
     Es256,
     #[serde(rename = "ES384")]
     Es384,
+    #[serde(rename = "RS256")]
+    Rs256,
 }
 
 impl JwsAlgorithm {
@@ -15,6 +16,7 @@ impl JwsAlgorithm {
         match self {
             Self::Es256 => "ES256",
             Self::Es384 => "ES384",
+            Self::Rs256 => "RS256",
         }
     }
 }

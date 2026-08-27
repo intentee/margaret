@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bytes::Bytes;
 use cookie::Cookie;
 use http::Method;
 use http::header::COOKIE;
@@ -9,6 +10,7 @@ use margaret_http_uploaded_file::uploaded_file::UploadedFile;
 use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 
 use crate::body_class::BodyClass;
+use crate::body_intake::BodyIntake;
 use crate::body_limit::BodyLimit;
 use crate::collect_limited::collect_limited;
 use crate::form_field::FormField;
@@ -86,14 +88,25 @@ fn parse_query(server: &ServerParams) -> RequestOutcome<HashMap<String, String>>
 }
 
 struct ParsedBody {
+    body: Bytes,
     files: HashMap<String, UploadedFile>,
     form: HashMap<String, String>,
     json: Option<serde_json::Value>,
 }
 
 impl ParsedBody {
+    fn collected(body: Bytes) -> Self {
+        Self {
+            body,
+            files: HashMap::new(),
+            form: HashMap::new(),
+            json: None,
+        }
+    }
+
     fn empty() -> Self {
         Self {
+            body: Bytes::new(),
             files: HashMap::new(),
             form: HashMap::new(),
             json: None,
@@ -104,9 +117,17 @@ impl ParsedBody {
 async fn parse_body(
     server: &ServerParams,
     body: RequestBody,
+    body_intake: BodyIntake,
     body_limit: &BodyLimit,
     upload_config: &UploadConfig,
 ) -> Result<RequestOutcome<ParsedBody>, UploadedFileError> {
+    if let BodyIntake::Collected = body_intake {
+        return Ok(match collect_limited(body, body_limit.max_bytes()).await {
+            RequestOutcome::Parsed(bytes) => RequestOutcome::Parsed(ParsedBody::collected(bytes)),
+            RequestOutcome::Rejected(rejection) => RequestOutcome::Rejected(rejection),
+        });
+    }
+
     let body_class = match BodyClass::from_server_params(server) {
         RequestOutcome::Parsed(body_class) => body_class,
         RequestOutcome::Rejected(rejection) => return Ok(RequestOutcome::Rejected(rejection)),
@@ -139,6 +160,7 @@ async fn parse_body(
                 };
 
             Ok(RequestOutcome::Parsed(ParsedBody {
+                body: Bytes::new(),
                 files,
                 form,
                 json: None,
@@ -156,6 +178,7 @@ async fn parse_body(
                 RequestRejection::DuplicateFormField { name }
             }) {
                 RequestOutcome::Parsed(form) => Ok(RequestOutcome::Parsed(ParsedBody {
+                    body: Bytes::new(),
                     files: HashMap::new(),
                     form,
                     json: None,
@@ -173,6 +196,7 @@ async fn parse_body(
 
             match serde_json::from_slice(&bytes) {
                 Ok(json) => Ok(RequestOutcome::Parsed(ParsedBody {
+                    body: Bytes::new(),
                     files: HashMap::new(),
                     form: HashMap::new(),
                     json: Some(json),
@@ -187,6 +211,7 @@ async fn parse_body(
 }
 
 pub struct RequestInputs {
+    pub body: Bytes,
     pub cookies: HashMap<String, String>,
     pub files: HashMap<String, UploadedFile>,
     pub json: Option<serde_json::Value>,
@@ -207,6 +232,7 @@ impl RequestInputs {
         };
 
         RequestOutcome::Parsed(Self {
+            body: Bytes::new(),
             cookies,
             files: HashMap::new(),
             json: None,
@@ -219,6 +245,7 @@ impl RequestInputs {
     pub(crate) async fn parse(
         server: ServerParams,
         body: RequestBody,
+        body_intake: BodyIntake,
         body_limit: &BodyLimit,
         upload_config: &UploadConfig,
     ) -> Result<RequestOutcome<Self>, UploadedFileError> {
@@ -230,8 +257,14 @@ impl RequestInputs {
             RequestOutcome::Parsed(query) => query,
             RequestOutcome::Rejected(rejection) => return Ok(RequestOutcome::Rejected(rejection)),
         };
-        let ParsedBody { files, form, json } = {
-            let parsed_body = parse_body(&server, body, body_limit, upload_config).await?;
+        let ParsedBody {
+            body,
+            files,
+            form,
+            json,
+        } = {
+            let parsed_body =
+                parse_body(&server, body, body_intake, body_limit, upload_config).await?;
 
             match parsed_body {
                 RequestOutcome::Parsed(parsed) => parsed,
@@ -242,6 +275,7 @@ impl RequestInputs {
         };
 
         Ok(RequestOutcome::Parsed(Self {
+            body,
             cookies,
             files,
             json,
@@ -253,6 +287,7 @@ impl RequestInputs {
 
     pub(crate) fn synthetic(method: Method, path: String) -> Self {
         Self {
+            body: Bytes::new(),
             cookies: HashMap::new(),
             files: HashMap::new(),
             json: None,
@@ -282,6 +317,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::RequestInputs;
+    use crate::body_intake::BodyIntake;
     use crate::body_limit::BodyLimit;
     use crate::request_body::RequestBody;
     use crate::request_outcome::RequestOutcome;
@@ -409,6 +445,7 @@ mod tests {
         RequestInputs::parse(
             server_params(Method::POST, target, &headers),
             boxed(body),
+            BodyIntake::Discarded,
             body_limit,
             upload_config,
         )
@@ -502,6 +539,7 @@ mod tests {
                 &[synthetic_header(COOKIE.as_str(), value)],
             ),
             boxed(b""),
+            BodyIntake::Discarded,
             &BodyLimit::default(),
             &UploadConfig::Disabled,
         )
@@ -571,6 +609,92 @@ mod tests {
         assert_eq!(inputs.server.path(), "/greeting");
         assert!(inputs.cookies.is_empty());
         assert!(inputs.query.is_empty());
+    }
+
+    async fn collected(
+        content_type: &str,
+        body: &'static [u8],
+        body_limit: &BodyLimit,
+    ) -> Result<RequestInputs, RequestRejection> {
+        let headers = [synthetic_header(
+            CONTENT_TYPE.as_str(),
+            content_type.as_bytes(),
+        )];
+
+        match RequestInputs::parse(
+            server_params(Method::POST, "/crates/new", &headers),
+            boxed(body),
+            BodyIntake::Collected,
+            body_limit,
+            &UploadConfig::Disabled,
+        )
+        .await
+        .expect("the request body is readable")
+        {
+            RequestOutcome::Parsed(inputs) => Ok(inputs),
+            RequestOutcome::Rejected(rejection) => Err(rejection),
+        }
+    }
+
+    #[tokio::test]
+    async fn hands_a_declared_binary_body_to_the_route_verbatim() {
+        let inputs = collected(
+            "application/octet-stream",
+            b"\x04\x00\x00\x00cargo",
+            &BodyLimit::default(),
+        )
+        .await
+        .expect("the request is unambiguous");
+
+        assert_eq!(inputs.body.as_ref(), b"\x04\x00\x00\x00cargo");
+        assert!(inputs.form.is_empty());
+        assert!(inputs.files.is_empty());
+        assert!(inputs.json.is_none());
+    }
+
+    #[tokio::test]
+    async fn keeps_a_declared_binary_body_out_of_the_form_inputs() {
+        let inputs = collected(
+            "application/x-www-form-urlencoded",
+            b"username=margaret",
+            &BodyLimit::default(),
+        )
+        .await
+        .expect("the request is unambiguous");
+
+        assert_eq!(inputs.body.as_ref(), b"username=margaret");
+        assert!(inputs.form.is_empty());
+    }
+
+    #[tokio::test]
+    async fn rejects_a_declared_binary_body_that_exceeds_the_limit() {
+        assert_eq!(
+            discriminant(
+                &collected(
+                    "application/octet-stream",
+                    b"0123456789",
+                    &BodyLimit::new(8),
+                )
+                .await
+                .err()
+                .expect("the request is ambiguous")
+            ),
+            discriminant(&RequestRejection::PayloadTooLarge { limit: 0 })
+        );
+    }
+
+    #[tokio::test]
+    async fn discards_an_undeclared_binary_body() {
+        let directory = tempdir().expect("a temporary directory");
+        let inputs = parsed(
+            Some("application/octet-stream"),
+            "/crates/new",
+            b"\x04\x00\x00\x00cargo",
+            &upload_in(&directory),
+        )
+        .await;
+
+        assert!(inputs.body.is_empty());
     }
 
     #[tokio::test]

@@ -3,11 +3,10 @@ use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding as _;
 
 use margaret_jwks_keygen::curve::Curve;
+use margaret_jwks_keygen::ec_jwk_public::EcJwkPublic;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
-use margaret_jwks_keygen::jwk_public::JwkPublic;
 use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
-use margaret_jwks_keygen::key_type::KeyType;
 use margaret_jwks_keygen::key_use::KeyUse;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
@@ -38,10 +37,9 @@ async fn verify_rejects_coordinates_of_the_wrong_length() -> Result<()> {
 
     assert_eq!(shifted_x.len() + shifted_y.len(), x.len() + y.len());
 
-    let mis_split_public_key = JwkPublic {
+    let mis_split_public_key = EcJwkPublic {
         crv: Curve::P256,
         kid: "kid".to_string(),
-        kty: KeyType::Ec,
         use_: KeyUse::Signature,
         x: Base64UrlUnpadded::encode_string(&shifted_x),
         y: Base64UrlUnpadded::encode_string(&shifted_y),

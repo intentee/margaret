@@ -26,6 +26,7 @@ use margaret_http_uploaded_file::upload_config::UploadConfig;
 use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
+use crate::body_intake::BodyIntake;
 use crate::body_limit::BodyLimit;
 use crate::drive_connection::drive_connection;
 use crate::forward_targets::ForwardTargets;
@@ -159,6 +160,7 @@ async fn complete_request(
         RequestRoute::Handler {
             handler,
             path_params,
+            ..
         } => respond_recursively(
             forward_targets,
             request.with_path_params(path_params),
@@ -244,8 +246,13 @@ async fn dispatch(
         }
         RouteResolution::Request(route) => {
             let body = incoming.map_err(std::io::Error::other).boxed_unsync();
+            let body_intake = match &route {
+                RequestRoute::Handler { body_intake, .. } => *body_intake,
+                RequestRoute::MethodNotAllowed | RequestRoute::NotFound => BodyIntake::Discarded,
+            };
 
-            match RequestInputs::parse(server, body, &body_limit, &upload_config).await {
+            match RequestInputs::parse(server, body, body_intake, &body_limit, &upload_config).await
+            {
                 Ok(RequestOutcome::Parsed(inputs)) => {
                     complete_request(
                         route,
@@ -437,6 +444,7 @@ mod tests {
     use super::accept_outcome;
     use super::error_response;
     use super::report_connection_task_outcome;
+    use crate::body_intake::BodyIntake;
     use crate::body_limit::BodyLimit;
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
@@ -490,7 +498,11 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/upload",
-                vec![MethodHandler::anonymous("POST", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    "POST",
+                    BodyIntake::Discarded,
+                    Arc::new(PlainOk),
+                )],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -507,6 +519,7 @@ mod tests {
                 "/files/{name}",
                 vec![MethodHandler::anonymous(
                     "GET",
+                    BodyIntake::Discarded,
                     Arc::new(EchoesTheNameParameter),
                 )],
             )])
@@ -523,7 +536,11 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    "GET",
+                    BodyIntake::Discarded,
+                    Arc::new(PlainOk),
+                )],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -538,7 +555,11 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/articles/{article}",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    "GET",
+                    BodyIntake::Discarded,
+                    Arc::new(PlainOk),
+                )],
             )])
             .expect("the route paths do not conflict"),
         )]))
@@ -575,11 +596,19 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/items/{id}",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    "GET",
+                    BodyIntake::Discarded,
+                    Arc::new(PlainOk),
+                )],
             ),
             RouteEntry::new(
                 "/items/{name}",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    "GET",
+                    BodyIntake::Discarded,
+                    Arc::new(PlainOk),
+                )],
             ),
         ]);
 
@@ -591,7 +620,11 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/x/{id}",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    "GET",
+                    BodyIntake::Discarded,
+                    Arc::new(PlainOk),
+                )],
             ),
             RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade), Vec::new()),
         ]);

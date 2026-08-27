@@ -7,12 +7,11 @@ use p256::pkcs8::LineEnding;
 use zeroize::Zeroizing;
 
 use crate::curve::Curve;
+use crate::ec_jwk_public::EcJwkPublic;
 use crate::generate_keypair_params::GenerateKeypairParams;
 use crate::jwk_pair::JwkPair;
-use crate::jwk_public::JwkPublic;
 use crate::jwk_signing::JwkSigning;
 use crate::jwks_key_error::JwksKeyError;
-use crate::key_type::KeyType;
 use crate::key_use::KeyUse;
 
 fn build_jwk_pair(
@@ -25,10 +24,9 @@ fn build_jwk_pair(
     let pem = pem?;
 
     Ok(JwkPair {
-        public: JwkPublic {
+        public: EcJwkPublic {
             crv,
             kid: kid.clone(),
-            kty: KeyType::Ec,
             use_: KeyUse::Signature,
             x: encode_coordinate(x, "x")?,
             y: encode_coordinate(y, "y")?,

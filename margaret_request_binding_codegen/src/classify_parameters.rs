@@ -26,6 +26,7 @@ use crate::form_request_extraction::FormRequestExtraction;
 use crate::injects_views::injects_views;
 use crate::request_binding::RequestBinding;
 use crate::request_binding_error::RequestBindingError;
+use crate::request_body_type::request_body_type;
 use crate::request_injectable::RequestInjectable;
 use crate::request_input_source::RequestInputSource;
 use crate::route_parameter_arguments::RouteParameterArguments;
@@ -248,8 +249,9 @@ fn classify_form_request(
         };
 
         match source {
-            RequestInputSource::Form => return Err(unavailable("Form")),
-            RequestInputSource::Json => return Err(unavailable("Json")),
+            RequestInputSource::Form | RequestInputSource::Json => {
+                return Err(unavailable(source.written()));
+            }
             RequestInputSource::Cookie | RequestInputSource::Query => {}
         }
     }
@@ -264,6 +266,34 @@ fn classify_form_request(
     };
 
     Ok(RequestBinding::FormRequest { source, extraction })
+}
+
+fn classify_request_body(
+    context: &BindingContext,
+    declared: &Type,
+    resolved: Option<&CanonicalPath>,
+    position: usize,
+) -> Result<RequestBinding, RequestBindingError> {
+    let subject = context.subject();
+
+    if let BindingContext::AuthenticatedUserProvider { .. }
+    | BindingContext::Handshake { .. }
+    | BindingContext::Middleware { .. } = context
+    {
+        return Err(RequestBindingError::RequestBodyOutsideResponder {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if !matches!(declared, Type::Reference(_)) || resolved != Some(&request_body_type()) {
+        return Err(RequestBindingError::RequestBodyType {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    Ok(RequestBinding::RequestBody)
 }
 
 fn classify_route_parameter(
@@ -333,6 +363,39 @@ fn classify_route_parameter(
     }
 }
 
+fn verify_single_request_body(
+    bound: &[BoundParameter],
+    subject: &str,
+) -> Result<(), RequestBindingError> {
+    let request_body_count = bound
+        .iter()
+        .filter(|parameter| matches!(parameter.binding, RequestBinding::RequestBody))
+        .count();
+
+    if request_body_count == 0 {
+        return Ok(());
+    }
+
+    if request_body_count > 1 {
+        return Err(RequestBindingError::MultipleRequestBodyParameters {
+            subject: subject.to_string(),
+        });
+    }
+
+    for parameter in bound {
+        if let RequestBinding::FormRequest { source, .. } = &parameter.binding
+            && let RequestInputSource::Form | RequestInputSource::Json = source
+        {
+            return Err(RequestBindingError::ConflictingRequestBodyAndFormRequest {
+                subject: subject.to_string(),
+                input_source: source.written().to_string(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 fn verify_single_inference(
     bound: &[BoundParameter],
     subject: &str,
@@ -356,6 +419,7 @@ fn verify_single_inference(
 struct ParameterMarkers<'marker> {
     authenticated_user: Option<&'marker IndexedAttribute>,
     form_request: Option<&'marker IndexedAttribute>,
+    request_body: Option<&'marker IndexedAttribute>,
     route_parameter: Option<&'marker IndexedAttribute>,
 }
 
@@ -372,6 +436,7 @@ fn parameter_markers<'marker>(
     };
     let authenticated_user = marker(FrameworkAttribute::AuthenticatedUser);
     let form_request = marker(FrameworkAttribute::FormRequest);
+    let request_body = marker(FrameworkAttribute::RequestBody);
     let route_parameter = marker(FrameworkAttribute::RouteParameter);
 
     if route_parameter.is_some() && form_request.is_some() {
@@ -388,8 +453,20 @@ fn parameter_markers<'marker>(
         });
     }
 
+    if request_body.is_some()
+        && (authenticated_user.is_some() || form_request.is_some() || route_parameter.is_some())
+    {
+        return Err(RequestBindingError::ConflictingRequestBodyMarkers {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
     if is_peer_spiffe_id
-        && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
+        && (authenticated_user.is_some()
+            || form_request.is_some()
+            || request_body.is_some()
+            || route_parameter.is_some())
     {
         return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
             subject: subject.to_string(),
@@ -400,6 +477,7 @@ fn parameter_markers<'marker>(
     Ok(ParameterMarkers {
         authenticated_user,
         form_request,
+        request_body,
         route_parameter,
     })
 }
@@ -432,6 +510,7 @@ pub fn classify_parameters(
         let ParameterMarkers {
             authenticated_user,
             form_request,
+            request_body,
             route_parameter,
         } = parameter_markers(attributes, subject, position, is_peer_spiffe_id)?;
 
@@ -446,6 +525,8 @@ pub fn classify_parameters(
             )?
         } else if let Some(attribute) = form_request {
             classify_form_request(index, item, attribute, declared, context, position)?
+        } else if request_body.is_some() {
+            classify_request_body(context, declared, resolved.as_ref(), position)?
         } else if let Some(attribute) = route_parameter {
             classify_route_parameter(
                 context,
@@ -515,6 +596,7 @@ pub fn classify_parameters(
         });
     }
 
+    verify_single_request_body(&bound, subject)?;
     verify_single_inference(&bound, subject)?;
 
     Ok(bound)

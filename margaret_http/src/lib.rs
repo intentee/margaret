@@ -1,4 +1,5 @@
 pub(crate) mod body_class;
+pub mod body_intake;
 pub mod body_limit;
 pub mod bound_server;
 pub mod build_url;
@@ -62,4 +63,5 @@ pub mod web_socket_driver_sender;
 pub mod web_socket_upgrade;
 pub(crate) mod web_socket_upgrade_terminal;
 
+pub use bytes;
 pub use matchit;

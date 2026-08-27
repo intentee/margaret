@@ -28,6 +28,7 @@ pub enum RequestBinding {
     },
     Next,
     PeerSpiffeId,
+    RequestBody,
     RouteParameterValue {
         path_key: String,
     },

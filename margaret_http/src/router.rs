@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use matchit::InsertError;
 
-use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
 use crate::method_handler::MethodHandler;
 use crate::request_route::RequestRoute;
@@ -13,7 +12,7 @@ use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
 enum RouteTarget {
-    Http(HashMap<&'static str, Arc<dyn Handler>>),
+    Http(HashMap<&'static str, MethodHandler>),
     WebSocket {
         middleware: Vec<Arc<dyn HttpMiddleware>>,
         upgrade: Arc<dyn WebSocketUpgrade>,
@@ -39,11 +38,7 @@ impl Router {
                         RouteTarget::Http(
                             handlers
                                 .into_iter()
-                                .map(
-                                    |MethodHandler {
-                                         handler, method, ..
-                                     }| (method, handler),
-                                )
+                                .map(|method_handler| (method_handler.method, method_handler))
                                 .collect(),
                         ),
                     )?;
@@ -82,7 +77,12 @@ impl Router {
 
         match matched.value {
             RouteTarget::Http(handlers) => match handlers.get(method) {
-                Some(handler) => RouteResolution::Request(RequestRoute::Handler {
+                Some(MethodHandler {
+                    body_intake,
+                    handler,
+                    ..
+                }) => RouteResolution::Request(RequestRoute::Handler {
+                    body_intake: *body_intake,
                     handler: handler.clone(),
                     path_params,
                 }),

@@ -5,6 +5,7 @@ use rustls::ServerConfig;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+use margaret_http::body_intake::BodyIntake;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
@@ -37,7 +38,11 @@ impl RunningJwksServer {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 WELL_KNOWN_JWKS_PATH,
-                vec![MethodHandler::anonymous("GET", handler)],
+                vec![MethodHandler::anonymous(
+                    "GET",
+                    BodyIntake::Discarded,
+                    handler,
+                )],
             )])
             .expect("the well known jwks route registers cleanly"),
         );

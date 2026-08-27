@@ -50,6 +50,7 @@ fn serve_registration(http_servers: &[HttpServer], serve_inputs: &[ServeInput]) 
     let service_arguments = serve_inputs.iter().map(serve_input_registration);
     let http_server_arguments = http_servers.iter().map(|server| {
         let address_argument = server.address_argument();
+        let body_limit_argument = server.body_limit_argument();
         let url_argument = server.url_argument();
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
@@ -58,6 +59,12 @@ fn serve_registration(http_servers: &[HttpServer], serve_inputs: &[ServeInput]) 
 
         quote! {
             .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
+            .arg(
+                clap::Arg::new(#body_limit_argument)
+                    .long(#body_limit_argument)
+                    .required(false)
+                    .value_parser(clap::value_parser!(usize))
+            )
             .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
             .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
             .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))

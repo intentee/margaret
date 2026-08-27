@@ -29,6 +29,7 @@ pub fn binding_serve_inputs(
         | RequestBinding::Forwarder
         | RequestBinding::Next
         | RequestBinding::PeerSpiffeId
+        | RequestBinding::RequestBody
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
         | RequestBinding::Views => Vec::new(),

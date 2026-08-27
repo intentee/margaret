@@ -198,6 +198,7 @@ fn server_registration(
         let function_name = server.function_name();
         let name = server.name();
         let address_argument = server.address_argument();
+        let body_limit_argument = server.body_limit_argument();
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
         let transport = transport_expression(server, activation.server_active);
@@ -208,6 +209,7 @@ fn server_registration(
         quote! {
             margaret::framework::service::server_assembly::ServerAssembly {
                 address_argument: #address_argument,
+                body_limit_argument: #body_limit_argument,
                 name: #name,
                 routes: #routes,
                 transport: #transport,

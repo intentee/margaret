@@ -5,8 +5,8 @@ use serde::Serializer;
 use zeroize::Zeroizing;
 
 use crate::curve::Curve;
+use crate::ec_jwk_public::EcJwkPublic;
 use crate::jwk_pair::JwkPair;
-use crate::jwk_public::JwkPublic;
 use crate::jwk_signing::JwkSigning;
 use crate::jwks_secret::JwksSecret;
 
@@ -40,7 +40,7 @@ impl Serialize for PersistedJwksSecret {
 
         #[derive(Serialize)]
         struct PairWire<'material> {
-            public: &'material JwkPublic,
+            public: &'material EcJwkPublic,
             signing: SigningWire<'material>,
         }
 
@@ -85,7 +85,7 @@ impl<'wire> Deserialize<'wire> for PersistedJwksSecret {
 
         #[derive(Deserialize)]
         struct PairWire {
-            public: JwkPublic,
+            public: EcJwkPublic,
             signing: SigningWire,
         }
 

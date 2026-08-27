@@ -2052,6 +2052,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_codegen_request_body_route_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "margaret",
+ "maud",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "validator",
+]
+
+[[package]]
 name = "margaret_codegen_route_parameter_values_fixture"
 version = "0.1.0"
 dependencies = [
@@ -2316,6 +2334,7 @@ dependencies = [
  "margaret_request_binding_codegen",
  "margaret_route_parameter_codegen",
  "margaret_serve_input_codegen",
+ "margaret_tag_codegen",
  "matchit",
  "proc-macro2",
  "quote",
@@ -2510,6 +2529,7 @@ dependencies = [
  "margaret_sync_holder",
  "p256",
  "p384",
+ "ring",
  "serde",
  "serde_json",
  "thiserror",
@@ -2527,6 +2547,7 @@ dependencies = [
  "margaret_jwks_keygen",
  "p256",
  "p384",
+ "ring",
  "serde",
  "serde_json",
  "tokio",

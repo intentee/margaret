@@ -16,6 +16,7 @@ pub fn binding_root(binding: &RequestBinding) -> Option<&CanonicalPath> {
         | RequestBinding::Forwarder
         | RequestBinding::Next
         | RequestBinding::PeerSpiffeId
+        | RequestBinding::RequestBody
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
         | RequestBinding::Views => None,

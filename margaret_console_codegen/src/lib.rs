@@ -9,6 +9,12 @@ pub mod render_console;
 
 #[cfg(test)]
 mod tests {
+    use std::mem::discriminant;
+
+    use margaret_injection_codegen::injection_error::InjectionError;
+
+    use margaret_attributes::attribute_error::AttributeError;
+
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
@@ -155,8 +161,8 @@ impl Farewell {
             .expect_err("the console source fails to generate")
     }
 
-    fn error_for(lib_source: &str) -> String {
-        rejection_for(lib_source).to_string()
+    fn any_text() -> String {
+        "any".to_string()
     }
 
     #[test]
@@ -236,6 +242,9 @@ impl Farewell {
         assert!(
             source.contains(r#"clap::Arg::new("public-addr").long("public-addr").required(true)"#)
         );
+        assert!(source.contains(
+            r#"clap::Arg::new("public-body-limit").long("public-body-limit").required(false).value_parser(clap::value_parser!(usize))"#
+        ));
         assert!(
             source.contains(r#"clap::Arg::new("public-url").long("public-url").required(true)"#)
         );
@@ -339,6 +348,12 @@ impl Farewell {
                 r#"clap::Arg::new("internal-addr").long("internal-addr").required(true)"#
             )
         );
+        assert!(source.contains(
+            r#"clap::Arg::new("public-body-limit").long("public-body-limit").required(false).value_parser(clap::value_parser!(usize))"#
+        ));
+        assert!(source.contains(
+            r#"clap::Arg::new("internal-body-limit").long("internal-body-limit").required(false).value_parser(clap::value_parser!(usize))"#
+        ));
     }
 
     #[test]
@@ -475,41 +490,60 @@ impl Farewell {
 
     #[test]
     fn rejects_console_command_on_a_non_struct() {
-        let message = error_for("#[console_command(name = \"bad\")]\nenum Bad {}\n");
-
-        assert!(message.contains("#[console_command]"));
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[console_command(name = \"bad\")]\nenum Bad {}\n"
+            )),
+            discriminant(&ConsoleCodegenError::ConsoleCommandNotOnStruct { target: any_text() })
+        );
     }
 
     #[test]
     fn requires_a_command_name() {
-        let message = error_for("#[console_command]\nstruct Bad;\n");
-
-        assert!(message.contains("missing the 'name'"));
+        assert_eq!(
+            discriminant(&rejection_for("#[console_command]\nstruct Bad;\n")),
+            discriminant(&ConsoleCodegenError::MissingCommandName {
+                command: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_two_commands_registering_the_same_name() {
-        let message = error_for(
-            "#[singleton]\n#[console_command(name = \"greet\")]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"greet\")]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[singleton]\n#[console_command(name = \"greet\")]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"greet\")]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            )),
+            discriminant(&ConsoleCodegenError::DuplicateCommandName {
+                command: any_text(),
+                existing_command: any_text(),
+                name: any_text()
+            })
         );
-
-        assert!(message.contains("already registered"));
     }
 
     #[test]
     fn rejects_a_console_command_that_injects_the_spiffe_http_client() {
-        let message = error_for(
-            "use reqwest::Client;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "use reqwest::Client;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            )),
+            discriminant(
+                &ConsoleCodegenError::ConsoleCommandInjectsSpiffeHttpClient {
+                    command: any_text()
+                }
+            )
         );
-
-        assert!(message.contains("injects the #[spiffe_http_client]"));
     }
 
     #[test]
     fn propagates_malformed_command_arguments() {
-        let message = error_for("#[console_command(= 5)]\nstruct Bad;\n");
-
-        assert!(message.contains("failed to index"));
+        assert_eq!(
+            discriminant(&rejection_for("#[console_command(= 5)]\nstruct Bad;\n")),
+            discriminant(&ConsoleCodegenError::Index {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
+        );
     }
 
     #[test]
@@ -561,28 +595,41 @@ impl Farewell {
 
     #[test]
     fn reports_a_missing_command_runner() {
-        let message = error_for("#[console_command(name = \"bad\")]\nstruct Bad;\n");
-
-        assert!(message.contains("no #[process] method"));
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[console_command(name = \"bad\")]\nstruct Bad;\n"
+            )),
+            discriminant(&ConsoleCodegenError::Injection {
+                source: InjectionError::MissingProcessMethod { item: any_text() }
+            })
+        );
     }
 
     #[test]
     fn rejects_a_non_token_runner_parameter() {
-        let message = error_for(
-            "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            )),
+            discriminant(&ConsoleCodegenError::ConsoleCommandRunnerArgument {
+                command: any_text(),
+                parameter: any_text()
+            })
         );
-
-        assert!(message.contains("may only take &self and an optional CancellationToken"));
     }
 
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
-        let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = Query)] token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        assert_eq!(
+            discriminant(&rejection_for(
+                "use tokio_util::sync::CancellationToken;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = Query)] token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            )),
+            discriminant(&ConsoleCodegenError::ConsoleCommandRunnerRequestBinding {
+                command: any_text(),
+                marker: any_text(),
+                parameter: any_text()
+            })
         );
-
-        assert!(message.contains("carries #[form_request]"));
-        assert!(message.contains("only available in an HTTP responder"));
     }
 
     #[test]

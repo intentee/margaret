@@ -12,6 +12,7 @@ mod render;
 mod render_forwarders;
 pub mod render_http;
 mod render_routes;
+mod route_body_intake;
 mod route_group;
 mod server_route_group;
 mod server_serve_inputs;
@@ -20,6 +21,19 @@ pub mod serves_spiffe;
 
 #[cfg(test)]
 mod tests {
+    use std::mem::discriminant;
+
+    use margaret_injection_codegen::injection_error::InjectionError;
+    use margaret_tag_codegen::tag_error::TagError;
+
+    use margaret_container::container_error::ContainerError;
+
+    use margaret_attributes::attribute_error::AttributeError;
+
+    use http::method::InvalidMethod;
+
+    use http::Method;
+
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
@@ -92,7 +106,7 @@ mod tests {
             .expect("the binding registries are collected")
     }
 
-    fn error_with_container_source(source: &str, container_source: &str) -> String {
+    fn rejection_with_container_source(source: &str, container_source: &str) -> HttpCodegenError {
         let index = index_for(source);
         let registries = registries_for(&index, false);
         let plans =
@@ -111,7 +125,6 @@ mod tests {
         )
         .map(drop)
         .expect_err("the HTTP plan and container plan must agree")
-        .to_string()
     }
 
     fn http_source(
@@ -210,7 +223,12 @@ impl GetUser {
 
     #[test]
     fn rejects_a_responder_absent_from_the_container_plan() {
-        assert!(error_with_container_source(ROUTE_PARAMETER, "").contains("crate::GetUser"));
+        assert_eq!(
+            discriminant(&rejection_with_container_source(ROUTE_PARAMETER, "")),
+            discriminant(&HttpCodegenError::Container {
+                source: ContainerError::MissingPlannedProvider { path: any_text() }
+            })
+        );
     }
 
     #[test]
@@ -226,9 +244,14 @@ impl GetUser {
 }
 "#;
 
-        assert!(
-            error_with_container_source(CONSOLE_ARGUMENT_BINDER, container_source)
-                .contains("crate::UserBinder")
+        assert_eq!(
+            discriminant(&rejection_with_container_source(
+                CONSOLE_ARGUMENT_BINDER,
+                container_source
+            )),
+            discriminant(&HttpCodegenError::Container {
+                source: ContainerError::MissingPlannedProvider { path: any_text() }
+            })
         );
     }
 
@@ -245,9 +268,14 @@ impl Resource {
 }
 "#;
 
-        assert!(
-            error_with_container_source(CONSOLE_ARGUMENT_MIDDLEWARE, container_source)
-                .contains("crate::Guard")
+        assert_eq!(
+            discriminant(&rejection_with_container_source(
+                CONSOLE_ARGUMENT_MIDDLEWARE,
+                container_source
+            )),
+            discriminant(&HttpCodegenError::Container {
+                source: ContainerError::MissingPlannedProvider { path: any_text() }
+            })
         );
     }
 
@@ -354,21 +382,21 @@ impl GetProfile {
 
     #[test]
     fn rejects_a_route_parameter_binder_that_is_not_a_singleton() {
-        assert!(
-            error_for(
+        assert_eq!(
+            discriminant(binding_rejection(&rejection_for(
                 "struct User;\n\n#[provides_route_parameter]\nstruct UserBinder;\nimpl HttpRouteParameterBinder for UserBinder {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n"
-            )
-            .contains("must also be declared as a #[singleton]")
+            )).expect("the responder is rejected by its request bindings")),
+            discriminant(&RequestBindingError::RouteParameterBinderRequiresSingleton { binder: any_text() })
         );
     }
 
     #[test]
     fn rejects_an_authenticated_user_in_a_middleware() {
-        assert!(
-            error_for(
+        assert_eq!(
+            discriminant(middleware_binding_rejection(middleware_rejection(&rejection_for(
                 "use margaret::framework::http::next::Next;\nuse margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;\n\nstruct User;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n\n#[singleton]\n#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\nimpl Guard {\n    #[process]\n    fn process(&self, #[authenticated_user] user: User, next: Next) -> anyhow::Result<ResponseContinuation> {}\n}\n"
-            )
-            .contains("only available in an HTTP responder")
+            )).expect("the responder is rejected by its middleware")).expect("the middleware is rejected by its request bindings")),
+            discriminant(&RequestBindingError::AuthenticatedUserUnavailable { subject: any_text(), parameter: any_text() })
         );
     }
 
@@ -689,8 +717,73 @@ impl Echo {
             .expect_err("the http source fails to generate")
     }
 
-    fn error_for(lib_source: &str) -> String {
-        rejection_for(lib_source).to_string()
+    fn any_text() -> String {
+        "any".to_string()
+    }
+
+    fn invalid_method() -> InvalidMethod {
+        Method::from_bytes(b"BAD METHOD").expect_err("the fixture is not a valid HTTP method")
+    }
+
+    fn binding_rejection(error: &HttpCodegenError) -> Option<&RequestBindingError> {
+        match error {
+            HttpCodegenError::Binding { source } => Some(source),
+            _ => None,
+        }
+    }
+
+    fn injection_rejection(error: &HttpCodegenError) -> Option<&InjectionError> {
+        match error {
+            HttpCodegenError::Injection { source } => Some(source),
+            _ => None,
+        }
+    }
+
+    fn middleware_rejection(error: &HttpCodegenError) -> Option<&MiddlewareCodegenError> {
+        match error {
+            HttpCodegenError::Middleware { source } => Some(source),
+            _ => None,
+        }
+    }
+
+    fn middleware_binding_rejection(
+        error: &MiddlewareCodegenError,
+    ) -> Option<&RequestBindingError> {
+        match error {
+            MiddlewareCodegenError::Binding { source } => Some(source),
+            _ => None,
+        }
+    }
+
+    fn middleware_injection_rejection(error: &MiddlewareCodegenError) -> Option<&InjectionError> {
+        match error {
+            MiddlewareCodegenError::Injection { source } => Some(source),
+            _ => None,
+        }
+    }
+
+    fn middleware_tag_rejection(error: &MiddlewareCodegenError) -> Option<&TagError> {
+        match error {
+            MiddlewareCodegenError::Tag { source } => Some(source),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn reads_no_wrapped_rejection_from_an_unrelated_error() {
+        let http = HttpCodegenError::MissingHttpServer {
+            responder: any_text(),
+        };
+        let middleware = MiddlewareCodegenError::MissingMiddlewareHandles {
+            middleware: any_text(),
+        };
+
+        assert!(binding_rejection(&http).is_none());
+        assert!(injection_rejection(&http).is_none());
+        assert!(middleware_rejection(&http).is_none());
+        assert!(middleware_binding_rejection(&middleware).is_none());
+        assert!(middleware_injection_rejection(&middleware).is_none());
+        assert!(middleware_tag_rejection(&middleware).is_none());
     }
 
     const VIEWS_INJECTION: &str = r#"
@@ -725,9 +818,18 @@ impl GetHealth {
 
     #[test]
     fn rejects_views_injection_without_declared_views() {
-        let message = error_for(VIEWS_INJECTION);
+        let rejection = rejection_for(VIEWS_INJECTION);
 
-        assert!(message.contains("requests the views, but this crate generates none"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::ViewsUnavailable {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     const HEALTH_RESPONDER: &str = r#"
@@ -997,74 +1099,132 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 
     #[test]
     fn rejects_a_user_type_named_routes_that_shadows_the_injectable() {
-        let message = error_for(
+        let rejection = rejection_for(
             "mod app {\n    pub struct Routes;\n}\n\nuse crate::app::Routes;\n\n#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, routes: &Routes) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("must be a route parameter"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::UnmarkedParameter {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_forwarder_imported_from_a_foreign_server() {
-        let message = error_for(
+        let rejection = rejection_for(
             "use crate::margaret::forwarders::public::Forwarder;\n\n#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("must be a route parameter"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::UnmarkedParameter {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_peer_spiffe_id_parameter_that_also_carries_a_marker() {
-        let message = error_for(
+        let rejection = rejection_for(
             "use spiffe::spiffe_id::SpiffeId;\n\n#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"id\")] peer: &SpiffeId) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("peer SPIFFE id and must not"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::MarkedPeerSpiffeIdParameter {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_responder_with_multiple_peer_spiffe_id_parameters() {
-        let message = error_for(
+        let rejection = rejection_for(
             "use spiffe::spiffe_id::SpiffeId;\n\n#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"internal\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, first: &SpiffeId, second: &SpiffeId) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("more than one peer SPIFFE id"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::MultiplePeerSpiffeIdParameters {
+                subject: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_route_name_that_is_not_an_identifier() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", name = \"not an identifier\", path = \"/x\", server = \"public\")]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("must be a snake_case identifier"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::InvalidRouteName {
+                name: any_text(),
+                responder: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_route_paths_that_conflict_on_the_same_server() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/articles/{article}\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = \"get\", path = \"/articles/{id}\", server = \"public\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("conflicts with"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::ConflictingRoutePaths {
+                conflicting_path: any_text(),
+                path: any_text(),
+                responder: any_text(),
+                server: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_two_responders_registering_the_same_method_and_path() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/articles\", server = \"public\")]\nstruct First;\nimpl First {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = \"get\", path = \"/articles\", server = \"public\")]\nstruct Second;\nimpl Second {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("already registered"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::DuplicateRoute {
+                existing_responder: any_text(),
+                method: any_text(),
+                path: any_text(),
+                responder: any_text(),
+                server: any_text()
+            })
+        );
     }
 
     #[test]
@@ -1195,11 +1355,20 @@ impl GetProject {
 
     #[test]
     fn rejects_a_route_parameter_taken_by_reference() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[route_parameter_value]\nstruct ProjectSlug(String);\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/projects/{slug}\", server = \"public\")]\nstruct GetProject;\nimpl GetProject {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"slug\")] slug: &ProjectSlug) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("is taken by reference"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::RouteParameterByReference {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
@@ -1289,95 +1458,174 @@ impl GetProject {
 
     #[test]
     fn reports_a_binder_without_a_model_associated_type() {
-        let message = error_for("#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n");
+        let rejection = rejection_for("#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n");
 
-        assert!(message.contains("type Model"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::RouteParameterBinderModel { binder: any_text() })
+        );
     }
 
     #[test]
     fn reports_a_binder_with_a_non_struct_model() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]\n#[provides_route_parameter]\nstruct UnitBinder;\nimpl HttpRouteParameterBinder for UnitBinder {\n    type Model = ();\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<()>> {}\n}\n",
         );
 
-        assert!(message.contains("type Model"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::RouteParameterBinderModel { binder: any_text() })
+        );
     }
 
     #[test]
     fn reports_a_binder_whose_model_resolves_to_a_non_struct() {
-        let message = error_for(
+        let rejection = rejection_for(
             "trait Marker {}\n\n#[singleton]\n#[provides_route_parameter]\nstruct MarkerBinder;\nimpl HttpRouteParameterBinder for MarkerBinder {\n    type Model = Marker;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Marker>> {}\n}\n",
         );
 
-        assert!(message.contains("type Model"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::RouteParameterBinderModel { binder: any_text() })
+        );
     }
 
     #[test]
     fn rejects_a_route_parameter_of_an_unknown_type() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"thing\")] thing: Unknown) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("neither declared as a #[route_parameter_value] nor provided by a #[provides_route_parameter]"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::MissingRouteParameterResolution {
+                subject: any_text(),
+                parameter: any_text(),
+                written: any_text()
+            })
+        );
     }
 
     #[test]
     fn propagates_malformed_route_parameter_arguments() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/things/{thing}\", server = \"public\")]\nstruct GetThing;\nimpl GetThing {\n    #[process]\n    fn respond(&self, #[route_parameter(= 5)] thing: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("failed to read a binding attribute"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::Attribute {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
+        );
     }
 
     #[test]
     fn rejects_two_binders_for_the_same_model() {
-        let message = error_for(
+        let rejection = rejection_for(
             "struct User;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\nimpl HttpRouteParameterBinder for First {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\nimpl HttpRouteParameterBinder for Second {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n",
         );
 
-        assert!(message.contains("more than one route parameter binder"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::AmbiguousRouteParameterBinder {
+                model: any_text(),
+                first: any_text(),
+                second: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_non_struct_route_parameter_binder() {
-        let message = error_for(
+        let rejection = rejection_for(
             "struct User;\n\n#[provides_route_parameter]\nenum Binder {}\nimpl HttpRouteParameterBinder for Binder {\n    type Model = User;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<User>> {}\n}\n",
         );
 
-        assert!(message.contains("is only supported on structs"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::RouteParameterBinderNotAStruct {
+                binder: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_model_parameter_without_a_binder() {
-        let message = error_for(
+        let rejection = rejection_for(
             "struct User;\n\n#[singleton]
 #[responds_to_http(method = \"get\", path = \"/users/{user}\", server = \"public\")]\nstruct GetUser;\nimpl GetUser {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"user\")] user: User) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("neither declared as a #[route_parameter_value] nor provided by a #[provides_route_parameter]"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::MissingRouteParameterResolution {
+                subject: any_text(),
+                parameter: any_text(),
+                written: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_responder_without_a_process_method() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Bare;\n",
         );
 
-        assert!(message.contains("no #[process] method"));
+        assert_eq!(
+            discriminant(
+                injection_rejection(&rejection)
+                    .expect("the responder is rejected by its #[process] runner")
+            ),
+            discriminant(&InjectionError::MissingProcessMethod { item: any_text() })
+        );
     }
 
     #[test]
     fn rejects_an_unmarked_responder_parameter() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self, id: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("must be a route parameter"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::UnmarkedParameter {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
@@ -1403,56 +1651,92 @@ impl GetProject {
 
     #[test]
     fn rejects_a_route_parameter_without_from() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self, #[route_parameter] id: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("must name the path parameter it binds"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::RouteParameterMissingFrom {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_route_parameter_absent_from_the_path() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/users/{id}\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"slug\")] slug: String) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("does not appear in the route path"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::RouteParameterNotInPath {
+                subject: any_text(),
+                parameter: any_text(),
+                path: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_malformed_route_path() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/users/{id\", server = \"public\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("malformed route path"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::InvalidRoutePath {
+                responder: any_text(),
+                path: any_text(),
+                source: matchit::InsertError::Conflict { with: any_text() }
+            })
+        );
     }
 
     #[test]
     fn propagates_an_index_failure() {
-        assert!(error_for("use other::*;\n").contains("failed to index"));
+        assert_eq!(
+            discriminant(&rejection_for("use other::*;\n")),
+            discriminant(&HttpCodegenError::Index {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
+        );
     }
 
     #[test]
     fn rejects_responds_to_http_on_a_non_struct() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nenum Bad {}\n",
         );
 
-        assert!(message.contains("#[responds_to_http]"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::RespondsToHttpNotOnStruct { target: any_text() })
+        );
     }
 
     #[test]
     fn propagates_malformed_responder_arguments() {
-        assert!(
-            error_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]
 #[responds_to_http(= 5, server = \"public\")]\nstruct Bad;\n"
-            )
-            .contains("failed to index")
+            )),
+            discriminant(&HttpCodegenError::Index {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
         );
     }
 
@@ -1477,12 +1761,19 @@ impl GetProject {
 
     #[test]
     fn rejects_a_malformed_method() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"in valid\", path = \"/x\", server = \"public\")]\nstruct Bad;\n",
         );
 
-        assert!(message.contains("invalid HTTP method"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::InvalidHttpMethod {
+                responder: any_text(),
+                method: any_text(),
+                source: invalid_method()
+            })
+        );
     }
 
     #[test]
@@ -1493,18 +1784,20 @@ impl GetProject {
         );
 
         assert!(source.contains(
-            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"QUERY\","
+            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"QUERY\",margaret::framework::http::body_intake::BodyIntake::Discarded,"
         ));
     }
 
     #[test]
     fn rejects_a_responder_without_a_method() {
-        assert!(
-            error_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]
 #[responds_to_http(path = \"/x\", server = \"public\")]\nstruct Bad;\n"
-            )
-            .contains("missing the 'method'")
+            )),
+            discriminant(&HttpCodegenError::MissingHttpMethod {
+                responder: any_text()
+            })
         );
     }
 
@@ -1529,35 +1822,60 @@ impl GetProject {
 
     #[test]
     fn rejects_a_responder_without_a_path() {
-        assert!(
-            error_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[singleton]
 #[responds_to_http(method = \"get\", server = \"public\")]\nstruct Bad;\n"
-            )
-            .contains("missing the 'path'")
+            )),
+            discriminant(&HttpCodegenError::MissingHttpPath {
+                responder: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_http_middleware_on_a_non_struct() {
-        let message = error_for("#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n");
+        let rejection =
+            rejection_for("#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n");
 
-        assert!(message.contains("#[handles_middleware_attribute]"));
+        assert_eq!(
+            discriminant(
+                middleware_rejection(&rejection)
+                    .expect("the responder is rejected by its middleware")
+            ),
+            discriminant(&MiddlewareCodegenError::MiddlewareHandlerNotOnStruct {
+                target: any_text()
+            })
+        );
     }
 
     #[test]
     fn propagates_malformed_middleware_arguments() {
-        assert!(
-            error_for("#[handles_middleware_attribute(= 5)]\nstruct Bad;\n")
-                .contains("failed to index")
+        assert_eq!(
+            discriminant(
+                middleware_rejection(&rejection_for(
+                    "#[handles_middleware_attribute(= 5)]\nstruct Bad;\n"
+                ))
+                .expect("the responder is rejected by its middleware")
+            ),
+            discriminant(&MiddlewareCodegenError::Index {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
         );
     }
 
     #[test]
     fn rejects_middleware_without_handles() {
-        assert!(
-            error_for("#[handles_middleware_attribute]\nstruct Bad;\n")
-                .contains("missing the 'attribute'")
+        assert_eq!(
+            discriminant(
+                middleware_rejection(&rejection_for(
+                    "#[handles_middleware_attribute]\nstruct Bad;\n"
+                ))
+                .expect("the responder is rejected by its middleware")
+            ),
+            discriminant(&MiddlewareCodegenError::MissingMiddlewareHandles {
+                middleware: any_text()
+            })
         );
     }
 
@@ -1582,49 +1900,96 @@ impl GetProject {
 
     #[test]
     fn rejects_a_middleware_without_a_process_method() {
-        let message =
-            error_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n");
+        let rejection =
+            rejection_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n");
 
-        assert!(message.contains("no #[process] method"));
+        assert_eq!(
+            discriminant(
+                middleware_injection_rejection(
+                    middleware_rejection(&rejection)
+                        .expect("the responder is rejected by its middleware")
+                )
+                .expect("the middleware is rejected by its #[process] runner")
+            ),
+            discriminant(&InjectionError::MissingProcessMethod { item: any_text() })
+        );
     }
 
     #[test]
     fn rejects_an_unclassifiable_middleware_parameter() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn process(&self, flag: bool) -> anyhow::Result<ResponseContinuation> {}\n}\n",
         );
 
-        assert!(message.contains("must be the current request, the next handler"));
+        assert_eq!(
+            discriminant(
+                middleware_binding_rejection(
+                    middleware_rejection(&rejection)
+                        .expect("the responder is rejected by its middleware")
+                )
+                .expect("the middleware is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::UnmarkedMiddlewareParameter {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_middleware_attribute_without_a_tag() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("must reference exactly one tag"));
+        assert_eq!(
+            discriminant(
+                middleware_tag_rejection(
+                    middleware_rejection(&rejection)
+                        .expect("the responder is rejected by its middleware")
+                )
+                .expect("the middleware is rejected by its tag")
+            ),
+            discriminant(&TagError::MalformedReference { site: any_text() })
+        );
     }
 
     #[test]
     fn rejects_an_unknown_middleware_tag() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(missing)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("no #[handles_middleware_attribute] handles it"));
+        assert_eq!(
+            discriminant(
+                middleware_rejection(&rejection)
+                    .expect("the responder is rejected by its middleware")
+            ),
+            discriminant(&MiddlewareCodegenError::UnknownMiddleware {
+                site: any_text(),
+                tag: any_text()
+            })
+        );
     }
 
     #[test]
     fn propagates_malformed_middleware_attribute_arguments() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(= 5)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("failed to index"));
+        assert_eq!(
+            discriminant(
+                middleware_rejection(&rejection)
+                    .expect("the responder is rejected by its middleware")
+            ),
+            discriminant(&MiddlewareCodegenError::Index {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
+        );
     }
 
     #[test]
@@ -1633,7 +1998,30 @@ impl GetProject {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"GET\","));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"GET\",margaret::framework::http::body_intake::BodyIntake::Discarded,"));
+    }
+
+    const REQUEST_BODY_ROUTE: &str = r#"
+use margaret::framework::http::bytes::Bytes;
+
+#[singleton]
+#[responds_to_http(method = "put", path = "/crates/new", server = "public")]
+struct PublishCrate;
+
+impl PublishCrate {
+    #[process]
+    fn respond(&self, #[request_body] body: &Bytes) -> anyhow::Result<Response> {}
+}
+"#;
+
+    #[test]
+    fn collects_the_body_only_for_a_route_that_declares_it() {
+        let source = source_for(REQUEST_BODY_ROUTE);
+
+        assert!(source.contains("letbody=&request.inputs.body;"));
+        assert!(source.contains(
+            "margaret::framework::http::method_handler::MethodHandler::anonymous(\"PUT\",margaret::framework::http::body_intake::BodyIntake::Collected,"
+        ));
     }
 
     const NAMED_ROUTE: &str = r#"
@@ -1658,27 +2046,39 @@ impl GetGreeting {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::named(\"GET\",\"get_greeting\","));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::named(\"GET\",margaret::framework::http::body_intake::BodyIntake::Discarded,\"get_greeting\","));
     }
 
     #[test]
     fn rejects_a_route_name_that_is_not_snake_case() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", name = \"getArticle\", path = \"/a\", server = \"public\")]\nstruct A;\nimpl A {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("must be a snake_case identifier"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::InvalidRouteName {
+                name: any_text(),
+                responder: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_server_name_that_is_not_snake_case() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/a\", server = \"PublicApi\")]\nstruct A;\nimpl A {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("must be a snake_case identifier"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::InvalidServerName {
+                responder: any_text(),
+                server: any_text()
+            })
+        );
     }
 
     #[test]
@@ -1726,13 +2126,20 @@ impl GetGreeting {
 
     #[test]
     fn rejects_two_routes_sharing_a_name() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", name = \"shared\", path = \"/a\", server = \"public\")]\nstruct A;\nimpl A {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n\n#[singleton]
 #[responds_to_http(method = \"get\", name = \"shared\", path = \"/b\", server = \"public\")]\nstruct B;\nimpl B {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("both declare the route name"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::DuplicateRouteName {
+                name: any_text(),
+                first: any_text(),
+                second: any_text()
+            })
+        );
     }
 
     #[test]
@@ -1792,12 +2199,17 @@ impl GetMetrics {
 
     #[test]
     fn rejects_a_route_without_a_server() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"get\", path = \"/\")]\nstruct GetIndex;\nimpl GetIndex {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("missing the 'server' argument"));
+        assert_eq!(
+            discriminant(&rejection),
+            discriminant(&HttpCodegenError::MissingHttpServer {
+                responder: any_text()
+            })
+        );
     }
 
     #[test]
@@ -1893,32 +2305,60 @@ impl GetMetrics {
 
     #[test]
     fn rejects_a_form_request_without_a_source() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("must name the request input source it validates"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::FormRequestMissingSource {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_a_form_request_with_an_unknown_source() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Headers)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("unknown request input source 'Headers'"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::UnknownRequestInput {
+                subject: any_text(),
+                parameter: any_text(),
+                written: any_text()
+            })
+        );
     }
 
     #[test]
     fn rejects_an_argument_with_conflicting_markers() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] #[form_request(from = Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("both #[route_parameter] and #[form_request]"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::ConflictingArgumentMarkers {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
@@ -1944,12 +2384,20 @@ impl GetMetrics {
 
     #[test]
     fn propagates_malformed_form_request_arguments() {
-        let message = error_for(
+        let rejection = rejection_for(
             "#[singleton]
 #[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(= 5)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("failed to read a binding attribute"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::Attribute {
+                source: AttributeError::GlobImport { file: any_text() }
+            })
+        );
     }
 
     #[test]
@@ -2006,7 +2454,7 @@ impl Tracer {
 
     #[test]
     fn rejects_middleware_view_injection_without_declared_views() {
-        let message = error_for(
+        let rejection = rejection_for(
             r#"
 use margaret::framework::http::next::Next;
 
@@ -2030,7 +2478,19 @@ impl Tracer {
 "#,
         );
 
-        assert!(message.contains("requests the views, but this crate generates none"));
+        assert_eq!(
+            discriminant(
+                middleware_binding_rejection(
+                    middleware_rejection(&rejection)
+                        .expect("the responder is rejected by its middleware")
+                )
+                .expect("the middleware is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::ViewsUnavailable {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     #[test]
@@ -2079,7 +2539,7 @@ impl Guard {
 
     #[test]
     fn rejects_the_next_handler_in_a_responder() {
-        let message = error_for(
+        let rejection = rejection_for(
             r#"
 use margaret::framework::http::next::Next;
 
@@ -2094,7 +2554,16 @@ impl GetX {
 "#,
         );
 
-        assert!(message.contains("only available inside an HTTP middleware"));
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection)
+                    .expect("the responder is rejected by its request bindings")
+            ),
+            discriminant(&RequestBindingError::NextOutsideMiddleware {
+                subject: any_text(),
+                parameter: any_text()
+            })
+        );
     }
 
     const CONSOLE_ARGUMENT_RESPONDER: &str = r#"

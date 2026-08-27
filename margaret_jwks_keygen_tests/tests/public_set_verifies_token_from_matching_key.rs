@@ -3,6 +3,7 @@ use anyhow::Result;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
+use margaret_jwks_keygen::jwk_public::JwkPublic;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
@@ -22,7 +23,7 @@ async fn public_set_verifies_token_from_matching_key() -> Result<()> {
 
     let token = keypair.signing.sign(&claims).await?;
     let set = PublicJwks {
-        keys: vec![keypair.public],
+        keys: vec![JwkPublic::Ec(keypair.public)],
     };
     let verified: TestClaims = set.verify(&token)?.verified().expect("the token verifies");
 

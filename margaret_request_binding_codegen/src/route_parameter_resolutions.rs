@@ -127,6 +127,8 @@ pub fn route_parameter_resolutions(
 
 #[cfg(test)]
 mod tests {
+    use std::mem::discriminant;
+
     use std::collections::HashMap;
     use std::fs;
 
@@ -167,11 +169,14 @@ mod tests {
         )
     }
 
-    fn rejection_for(lib_source: &str) -> String {
+    fn any_text() -> String {
+        "any".to_string()
+    }
+
+    fn rejection_for(lib_source: &str) -> RequestBindingError {
         resolutions_for(lib_source)
             .err()
             .expect("the crate is rejected")
-            .to_string()
     }
 
     fn resolved_by(lib_source: &str, segments: &[&str]) -> ResolvedBy {
@@ -239,67 +244,87 @@ mod tests {
 
     #[test]
     fn rejects_a_value_declaration_on_something_that_is_neither_a_struct_nor_an_enum() {
-        assert!(
-            rejection_for("#[route_parameter_value]\ntrait ArticleSlug {}\n")
-                .contains("is only supported on structs and enums")
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[route_parameter_value]\ntrait ArticleSlug {}\n"
+            )),
+            discriminant(&RequestBindingError::RouteParameterValueNotAStructOrEnum {
+                value_type: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_a_binder_whose_model_is_already_declared_as_a_value() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[route_parameter_value]\nstruct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
-            )
-            .contains("is both a #[route_parameter_value] and the model")
+            )),
+            discriminant(&RequestBindingError::ConflictingRouteParameterResolution {
+                value_type: any_text(),
+                binder: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_a_value_declaration_for_a_type_that_a_binder_already_provides() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "#[route_parameter_value]\nstruct Zebra;\n\n#[singleton]\n#[provides_route_parameter]\nstruct AardvarkStore;\n\nimpl HttpRouteParameterBinder for AardvarkStore {\n    type Model = Zebra;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Zebra>> {}\n}\n"
-            )
-            .contains("is both a #[route_parameter_value] and the model")
+            )),
+            discriminant(&RequestBindingError::ConflictingRouteParameterResolution {
+                value_type: any_text(),
+                binder: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_two_binders_for_the_same_model() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "struct Article;\n\n#[singleton]\n#[provides_route_parameter]\nstruct First;\n\nimpl HttpRouteParameterBinder for First {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n\n#[singleton]\n#[provides_route_parameter]\nstruct Second;\n\nimpl HttpRouteParameterBinder for Second {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
-            )
-            .contains("has more than one route parameter binder")
+            )),
+            discriminant(&RequestBindingError::AmbiguousRouteParameterBinder {
+                model: any_text(),
+                first: any_text(),
+                second: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_a_binder_that_is_not_a_struct() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "struct Article;\n\n#[provides_route_parameter]\nenum ArticleStore {}\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
-            )
-            .contains("is only supported on structs")
+            )),
+            discriminant(&RequestBindingError::RouteParameterBinderNotAStruct {
+                binder: any_text()
+            })
         );
     }
 
     #[test]
     fn rejects_a_binder_that_is_not_a_singleton() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            discriminant(&rejection_for(
                 "struct Article;\n\n#[provides_route_parameter]\nstruct ArticleStore;\n\nimpl HttpRouteParameterBinder for ArticleStore {\n    type Model = Article;\n    async fn bind(&self, value: String) -> anyhow::Result<RouteParameterBindingOutcome<Article>> {}\n}\n"
+            )),
+            discriminant(
+                &RequestBindingError::RouteParameterBinderRequiresSingleton { binder: any_text() }
             )
-            .contains("must also be declared as a #[singleton]")
         );
     }
 
     #[test]
     fn rejects_a_binder_without_a_model_that_resolves_to_a_struct() {
-        assert!(
-            rejection_for("#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n")
-                .contains("has no `type Model = <struct>` associated type")
+        assert_eq!(
+            discriminant(&rejection_for(
+                "#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n"
+            )),
+            discriminant(&RequestBindingError::RouteParameterBinderModel { binder: any_text() })
         );
     }
 }

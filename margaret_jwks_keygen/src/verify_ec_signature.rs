@@ -31,7 +31,7 @@ fn sec1_point(x: &str, y: &str, crv: Curve) -> Result<Vec<u8>, JwksKeyError> {
     Ok(sec1)
 }
 
-pub(crate) fn verify_signature(
+pub(crate) fn verify_ec_signature(
     signing_input: &str,
     signature_bytes: &[u8],
     x: &str,
@@ -99,7 +99,7 @@ mod tests {
     use base64ct::Base64UrlUnpadded;
     use base64ct::Encoding;
 
-    use super::verify_signature;
+    use super::verify_ec_signature;
     use crate::curve::Curve;
     use crate::generate_keypair::generate_keypair;
     use crate::generate_keypair_params::GenerateKeypairParams;
@@ -138,7 +138,7 @@ mod tests {
         keypair: &JwkPair,
         crv: Curve,
     ) -> Result<String, JwksKeyError> {
-        verify_signature(
+        verify_ec_signature(
             signing_input,
             signature_bytes,
             &keypair.public.x,
@@ -172,7 +172,7 @@ mod tests {
         let bad = Base64UrlUnpadded::encode_string(&[0xFFu8; 32]);
 
         assert_eq!(
-            verify_signature("header.payload", &[0u8; 64], &bad, &bad, Curve::P256)
+            verify_ec_signature("header.payload", &[0u8; 64], &bad, &bad, Curve::P256)
                 .err()
                 .unwrap()
                 .to_string(),
@@ -207,7 +207,7 @@ mod tests {
         let bad = Base64UrlUnpadded::encode_string(&[0xFFu8; 48]);
 
         assert_eq!(
-            verify_signature("header.payload", &[0u8; 96], &bad, &bad, Curve::P384)
+            verify_ec_signature("header.payload", &[0u8; 96], &bad, &bad, Curve::P384)
                 .err()
                 .unwrap()
                 .to_string(),
@@ -270,7 +270,7 @@ mod tests {
         let keypair = &*P256_KEYPAIR;
 
         assert_eq!(
-            verify_signature(
+            verify_ec_signature(
                 "header.payload",
                 &[0u8; 64],
                 &keypair.public.x,

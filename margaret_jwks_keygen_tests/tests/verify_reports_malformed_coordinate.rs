@@ -1,11 +1,10 @@
 use anyhow::Result;
 
 use margaret_jwks_keygen::curve::Curve;
+use margaret_jwks_keygen::ec_jwk_public::EcJwkPublic;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
-use margaret_jwks_keygen::jwk_public::JwkPublic;
 use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
-use margaret_jwks_keygen::key_type::KeyType;
 use margaret_jwks_keygen::key_use::KeyUse;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
@@ -24,10 +23,9 @@ async fn verify_reports_malformed_coordinate() -> Result<()> {
     };
     let token = keypair.signing.sign(&claims).await?;
 
-    let malformed_public_key = JwkPublic {
+    let malformed_public_key = EcJwkPublic {
         crv: Curve::P256,
         kid: "kid".to_string(),
-        kty: KeyType::Ec,
         use_: KeyUse::Signature,
         x: "not-valid-base64-@@@".to_string(),
         y: "not-valid-base64-@@@".to_string(),

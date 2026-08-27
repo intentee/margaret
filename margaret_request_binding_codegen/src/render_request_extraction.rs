@@ -94,6 +94,9 @@ pub fn render_request_extraction(
                 }
             }
         }
+        RequestBinding::RequestBody => quote! {
+            let #holder = &#request_local.inputs.body;
+        },
         RequestBinding::AssetBag => quote! {
             let #holder = ::margaret::framework::asset_bag::asset_bag::AssetBag::new();
         },
