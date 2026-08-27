@@ -1867,7 +1867,7 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "margaret"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "margaret_access_token_minter",
@@ -1908,7 +1908,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_access_token_minter"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "http",
@@ -1925,7 +1925,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_asset_bag"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dashmap",
  "maud",
@@ -1933,7 +1933,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_asset_bag_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "esbuild-metafile",
  "margaret_codegen_tokens",
@@ -1947,7 +1947,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_attribute_arguments"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -1956,7 +1956,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_attributes"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "heck",
  "margaret_attribute_arguments",
@@ -1968,7 +1968,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_asset_bag_codegen",
  "margaret_attribute_arguments",
@@ -2104,7 +2104,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_codegen_tokens"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attributes",
  "proc-macro2",
@@ -2140,7 +2140,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_console"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2148,7 +2148,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_console_argument_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2163,7 +2163,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_console_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2182,7 +2182,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_construction"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "thiserror",
@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_container"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "heck",
  "margaret_attribute_arguments",
@@ -2227,14 +2227,14 @@ dependencies = [
 
 [[package]]
 name = "margaret_environment_variable"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "margaret_environment_variable_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2273,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_generated_module"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -2285,7 +2285,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_http"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2320,7 +2320,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_http_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "http",
  "margaret_attribute_arguments",
@@ -2359,7 +2359,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_http_uploaded_file"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tempfile",
  "thiserror",
@@ -2368,7 +2368,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_http_validation"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "http",
  "margaret_http",
@@ -2380,7 +2380,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_identity"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2389,7 +2389,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_identity_session"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2401,7 +2401,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_injection_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attributes",
  "margaret_syn_type_peeling",
@@ -2414,7 +2414,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_input_weaving"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attributes",
  "margaret_codegen_tokens",
@@ -2428,7 +2428,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2476,7 +2476,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attributes",
  "margaret_generated_module",
@@ -2486,7 +2486,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_endpoint"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2497,7 +2497,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_file_secret_storage"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "margaret_jwks_keygen",
@@ -2522,7 +2522,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_keygen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64ct",
@@ -2556,7 +2556,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_roller"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "margaret_jwks_keygen",
@@ -2565,7 +2565,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_roller_server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2599,7 +2599,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_secret_storage_selection"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "margaret_jwks_file_secret_storage",
  "margaret_jwks_roller",
@@ -2620,7 +2620,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_jwks_secret_store"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "margaret_identity_session",
@@ -2634,7 +2634,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_macros"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2643,7 +2643,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_middleware_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "heck",
  "margaret_attribute_arguments",
@@ -2664,11 +2664,11 @@ dependencies = [
 
 [[package]]
 name = "margaret_model"
-version = "0.4.0"
+version = "0.5.0"
 
 [[package]]
 name = "margaret_model_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2685,7 +2685,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_peer_identity"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "log",
  "spiffe",
@@ -2704,7 +2704,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_request_binding_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "heck",
  "margaret_attribute_arguments",
@@ -2724,7 +2724,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_route_parameter_binding"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2734,11 +2734,11 @@ dependencies = [
 
 [[package]]
 name = "margaret_route_parameter_codegen"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "margaret_schema_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attributes",
  "margaret_codegen_tokens",
@@ -2752,7 +2752,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_schema_identifier_naming"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "thiserror",
 ]
@@ -2780,7 +2780,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_serve_input_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attributes",
  "margaret_codegen_tokens",
@@ -2797,7 +2797,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_service"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2813,7 +2813,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_service_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -2864,7 +2864,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_spiffe_svid"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2884,7 +2884,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_spiffe_svid_bundle"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2911,7 +2911,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_spiffe_svid_client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2962,7 +2962,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_spiffe_svid_server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3013,7 +3013,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_syn_type_peeling"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -3021,7 +3021,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_sync_holder"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tokio",
  "tokio-util",
@@ -3029,7 +3029,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_tag_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -3040,7 +3040,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_token_signer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3067,11 +3067,11 @@ dependencies = [
 
 [[package]]
 name = "margaret_toposort"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "margaret_validation"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3080,7 +3080,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_views"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "maud",
@@ -3088,7 +3088,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_views_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -3104,7 +3104,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_websocket"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3127,7 +3127,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_websocket_codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "margaret_attribute_arguments",
  "margaret_attributes",
@@ -3148,7 +3148,7 @@ dependencies = [
 
 [[package]]
 name = "margaret_websocket_session"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
