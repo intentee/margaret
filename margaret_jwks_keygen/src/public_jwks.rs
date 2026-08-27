@@ -1,8 +1,11 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use serde::Deserialize;
+use serde::Deserializer;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::de::Error as _;
 
 use crate::compact_jws::CompactJws;
 use crate::ec_jwk_public::EcJwkPublic;
@@ -14,9 +17,35 @@ use crate::token_malformation::TokenMalformation;
 use crate::token_verification::TokenVerification;
 use crate::verifies_token::VerifiesToken;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct PublicJwks {
     pub keys: Vec<JwkPublic>,
+}
+
+impl<'wire> Deserialize<'wire> for PublicJwks {
+    fn deserialize<Source>(deserializer: Source) -> Result<Self, Source::Error>
+    where
+        Source: Deserializer<'wire>,
+    {
+        #[derive(Deserialize)]
+        struct PublicJwksWire {
+            keys: Vec<JwkPublic>,
+        }
+
+        let PublicJwksWire { keys } = PublicJwksWire::deserialize(deserializer)?;
+        let mut seen: HashSet<&str> = HashSet::with_capacity(keys.len());
+
+        for key in &keys {
+            if !seen.insert(key.kid()) {
+                return Err(Source::Error::custom(format!(
+                    "the jwk set declares the key id '{}' more than once",
+                    key.kid()
+                )));
+            }
+        }
+
+        Ok(Self { keys })
+    }
 }
 
 impl PublicJwks {

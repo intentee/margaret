@@ -1,5 +1,6 @@
 use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 use margaret_jwks_keygen::key_use::KeyUse;
+use margaret_jwks_keygen::rsa_algorithm::RsaAlgorithm;
 use margaret_jwks_keygen::rsa_jwk_public::RsaJwkPublic;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
 use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
@@ -18,6 +19,7 @@ fn rsa_jwk_public_rejects_a_modulus_below_the_rs256_minimum() {
         },
     );
     let key = RsaJwkPublic {
+        alg: RsaAlgorithm::Rs256,
         e: RSA_TEST_KEY_EXPONENT.to_string(),
         kid: "rsa-kid".to_string(),
         n: SHORT_RSA_MODULUS.to_string(),

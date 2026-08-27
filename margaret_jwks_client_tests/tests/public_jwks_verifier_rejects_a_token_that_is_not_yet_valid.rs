@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use margaret_identity_session::claims_rejection::ClaimsRejection;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
 use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
@@ -11,20 +12,18 @@ use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_keygen::signs_claims::SignsClaims as _;
-use margaret_jwks_keygen::token_malformation::TokenMalformation;
 
 #[tokio::test]
-async fn public_jwks_verifier_rejects_a_token_signed_by_an_unrelated_key() {
-    let published = JwksSecret::fresh(Curve::P256).expect("a published secret");
-    let stranger = JwksSecret::fresh(Curve::P256).expect("an unrelated secret");
+async fn public_jwks_verifier_rejects_a_token_that_is_not_yet_valid() {
+    let secret = JwksSecret::fresh(Curve::P256).expect("a fresh secret");
     let claims = TestClaims {
         aud: TEST_AUDIENCE.to_string(),
-        exp: 1_700_000_060,
+        exp: 1_700_000_120,
         iss: TEST_ISSUER.to_string(),
-        nbf: 0,
+        nbf: 1_700_000_060,
         sub: "subject".to_string(),
     };
-    let token = stranger
+    let token = secret
         .current
         .signing
         .sign(&claims)
@@ -33,7 +32,7 @@ async fn public_jwks_verifier_rejects_a_token_signed_by_an_unrelated_key() {
 
     let holder = PublicJwksHolder::default();
 
-    holder.set(Some(Arc::new(PublicJwks::from(published))));
+    holder.set(Some(Arc::new(PublicJwks::from(secret))));
 
     let verification = PublicJwksVerifier::new(holder)
         .verify::<TestClaims>(&token, test_instant(1_700_000_000))
@@ -41,6 +40,6 @@ async fn public_jwks_verifier_rejects_a_token_signed_by_an_unrelated_key() {
 
     assert!(matches!(
         verification,
-        AccessTokenVerification::Malformed(TokenMalformation::UnknownKeyId { .. })
+        AccessTokenVerification::Rejected(ClaimsRejection::NotYetValid)
     ));
 }

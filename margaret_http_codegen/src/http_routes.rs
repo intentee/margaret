@@ -17,6 +17,7 @@ use crate::http_codegen_error::HttpCodegenError;
 use crate::http_responder_arguments::HttpResponderArguments;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
+use crate::route_request_body_intake::route_request_body_intake;
 
 pub(crate) fn http_routes(
     index: &AttributeIndex,
@@ -85,9 +86,12 @@ pub(crate) fn http_routes(
             seen_names.insert(name.clone(), responder.clone());
         }
 
+        let body_intake = route_request_body_intake(&arguments, &layers, registries, &subject)?;
+
         table.insert(
             route_path,
             HttpRoute {
+                body_intake,
                 is_async: handler_method.signature().asyncness.is_some(),
                 layers,
                 method,

@@ -12,8 +12,10 @@ use margaret_http_tests::mtls_fixture::MtlsFixture;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
 use margaret_jwks_client::jwks_client::JwksClient;
 use margaret_jwks_client_tests::running_jwks_server::RunningJwksServer;
+use margaret_jwks_client_tests::test_audience::TEST_AUDIENCE;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
+use margaret_jwks_client_tests::test_issuer::TEST_ISSUER;
 use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 use margaret_jwks_keygen::signs_claims::SignsClaims as _;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
@@ -55,7 +57,10 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
 
     let secret = jwks_secret_holder.get().expect("the first roll published");
     let claims = TestClaims {
+        aud: TEST_AUDIENCE.to_string(),
         exp: 1_700_000_060,
+        iss: TEST_ISSUER.to_string(),
+        nbf: 0,
         sub: "subject".to_string(),
     };
     let token = secret

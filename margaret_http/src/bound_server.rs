@@ -248,7 +248,7 @@ async fn dispatch(
             let body = incoming.map_err(std::io::Error::other).boxed_unsync();
             let body_intake = match &route {
                 RequestRoute::Handler { body_intake, .. } => *body_intake,
-                RequestRoute::MethodNotAllowed | RequestRoute::NotFound => BodyIntake::Discarded,
+                RequestRoute::MethodNotAllowed | RequestRoute::NotFound => BodyIntake::Ignored,
             };
 
             match RequestInputs::parse(server, body, body_intake, &body_limit, &upload_config).await
@@ -500,7 +500,7 @@ mod tests {
                 "/upload",
                 vec![MethodHandler::anonymous(
                     "POST",
-                    BodyIntake::Discarded,
+                    BodyIntake::Parsed,
                     Arc::new(PlainOk),
                 )],
             )])
@@ -519,7 +519,7 @@ mod tests {
                 "/files/{name}",
                 vec![MethodHandler::anonymous(
                     "GET",
-                    BodyIntake::Discarded,
+                    BodyIntake::Parsed,
                     Arc::new(EchoesTheNameParameter),
                 )],
             )])
@@ -536,11 +536,10 @@ mod tests {
             BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::anonymous(
-                    "GET",
-                    BodyIntake::Discarded,
-                    Arc::new(PlainOk),
-                )],
+                vec![
+                    MethodHandler::anonymous("GET", BodyIntake::Parsed, Arc::new(PlainOk)),
+                    MethodHandler::anonymous("POST", BodyIntake::Parsed, Arc::new(PlainOk)),
+                ],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -557,7 +556,7 @@ mod tests {
                 "/articles/{article}",
                 vec![MethodHandler::anonymous(
                     "GET",
-                    BodyIntake::Discarded,
+                    BodyIntake::Parsed,
                     Arc::new(PlainOk),
                 )],
             )])
@@ -598,7 +597,7 @@ mod tests {
                 "/items/{id}",
                 vec![MethodHandler::anonymous(
                     "GET",
-                    BodyIntake::Discarded,
+                    BodyIntake::Parsed,
                     Arc::new(PlainOk),
                 )],
             ),
@@ -606,7 +605,7 @@ mod tests {
                 "/items/{name}",
                 vec![MethodHandler::anonymous(
                     "GET",
-                    BodyIntake::Discarded,
+                    BodyIntake::Parsed,
                     Arc::new(PlainOk),
                 )],
             ),
@@ -622,7 +621,7 @@ mod tests {
                 "/x/{id}",
                 vec![MethodHandler::anonymous(
                     "GET",
-                    BodyIntake::Discarded,
+                    BodyIntake::Parsed,
                     Arc::new(PlainOk),
                 )],
             ),

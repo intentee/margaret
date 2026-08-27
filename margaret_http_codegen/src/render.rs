@@ -413,7 +413,7 @@ fn route_entries<'handler>(
                 .map(|(route, rendered_handler)| {
                     let function = &rendered_handler.function;
                     let method = &route.method;
-                    let body_intake = route_body_intake(route);
+                    let body_intake = route_body_intake(route.body_intake);
                     let handler_call = quote! {
                         #function(container, #routes_param, #views_argument)
                     };

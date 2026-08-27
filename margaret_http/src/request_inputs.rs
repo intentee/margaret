@@ -121,11 +121,17 @@ async fn parse_body(
     body_limit: &BodyLimit,
     upload_config: &UploadConfig,
 ) -> Result<RequestOutcome<ParsedBody>, UploadedFileError> {
-    if let BodyIntake::Collected = body_intake {
-        return Ok(match collect_limited(body, body_limit.max_bytes()).await {
-            RequestOutcome::Parsed(bytes) => RequestOutcome::Parsed(ParsedBody::collected(bytes)),
-            RequestOutcome::Rejected(rejection) => RequestOutcome::Rejected(rejection),
-        });
+    match body_intake {
+        BodyIntake::Collected => {
+            return Ok(match collect_limited(body, body_limit.max_bytes()).await {
+                RequestOutcome::Parsed(bytes) => {
+                    RequestOutcome::Parsed(ParsedBody::collected(bytes))
+                }
+                RequestOutcome::Rejected(rejection) => RequestOutcome::Rejected(rejection),
+            });
+        }
+        BodyIntake::Ignored => return Ok(RequestOutcome::Parsed(ParsedBody::empty())),
+        BodyIntake::Parsed => {}
     }
 
     let body_class = match BodyClass::from_server_params(server) {
@@ -445,11 +451,18 @@ mod tests {
         RequestInputs::parse(
             server_params(Method::POST, target, &headers),
             boxed(body),
-            BodyIntake::Discarded,
+            BodyIntake::Parsed,
             body_limit,
             upload_config,
         )
         .await
+    }
+
+    fn resolved(outcome: RequestOutcome<RequestInputs>) -> Result<RequestInputs, RequestRejection> {
+        match outcome {
+            RequestOutcome::Parsed(inputs) => Ok(inputs),
+            RequestOutcome::Rejected(rejection) => Err(rejection),
+        }
     }
 
     async fn outcome_with_limit(
@@ -459,13 +472,11 @@ mod tests {
         body_limit: &BodyLimit,
         upload_config: &UploadConfig,
     ) -> Result<RequestInputs, RequestRejection> {
-        match parse_inputs_with_limit(content_type, target, body, body_limit, upload_config)
-            .await
-            .expect("the request body is readable")
-        {
-            RequestOutcome::Parsed(inputs) => Ok(inputs),
-            RequestOutcome::Rejected(rejection) => Err(rejection),
-        }
+        resolved(
+            parse_inputs_with_limit(content_type, target, body, body_limit, upload_config)
+                .await
+                .expect("the request body is readable"),
+        )
     }
 
     async fn outcome(
@@ -539,7 +550,7 @@ mod tests {
                 &[synthetic_header(COOKIE.as_str(), value)],
             ),
             boxed(b""),
-            BodyIntake::Discarded,
+            BodyIntake::Parsed,
             &BodyLimit::default(),
             &UploadConfig::Disabled,
         )
@@ -621,7 +632,7 @@ mod tests {
             content_type.as_bytes(),
         )];
 
-        match RequestInputs::parse(
+        let outcome = RequestInputs::parse(
             server_params(Method::POST, "/crates/new", &headers),
             boxed(body),
             BodyIntake::Collected,
@@ -629,11 +640,9 @@ mod tests {
             &UploadConfig::Disabled,
         )
         .await
-        .expect("the request body is readable")
-        {
-            RequestOutcome::Parsed(inputs) => Ok(inputs),
-            RequestOutcome::Rejected(rejection) => Err(rejection),
-        }
+        .expect("the request body is readable");
+
+        resolved(outcome)
     }
 
     #[tokio::test]
@@ -693,6 +702,71 @@ mod tests {
             &upload_in(&directory),
         )
         .await;
+
+        assert!(inputs.body.is_empty());
+    }
+
+    async fn ignored(
+        content_type: &str,
+        body: &'static [u8],
+        upload_config: &UploadConfig,
+    ) -> RequestInputs {
+        let headers = [synthetic_header(
+            CONTENT_TYPE.as_str(),
+            content_type.as_bytes(),
+        )];
+
+        let outcome = RequestInputs::parse(
+            server_params(Method::POST, "/unrouted", &headers),
+            boxed(body),
+            BodyIntake::Ignored,
+            &BodyLimit::default(),
+            upload_config,
+        )
+        .await
+        .expect("the request body is readable");
+
+        resolved(outcome).expect("an ignored body is never rejected")
+    }
+
+    #[tokio::test]
+    async fn leaves_every_input_empty_when_the_body_is_ignored() {
+        let directory = tempdir().expect("a temporary directory");
+        let inputs = ignored(
+            "multipart/form-data; boundary=X",
+            MULTIPART,
+            &upload_in(&directory),
+        )
+        .await;
+
+        assert!(inputs.body.is_empty());
+        assert!(inputs.files.is_empty());
+        assert!(inputs.form.is_empty());
+        assert!(inputs.json.is_none());
+    }
+
+    #[tokio::test]
+    async fn writes_no_uploaded_file_when_the_body_is_ignored() {
+        let directory = tempdir().expect("a temporary directory");
+
+        ignored(
+            "multipart/form-data; boundary=X",
+            MULTIPART,
+            &upload_in(&directory),
+        )
+        .await;
+
+        assert_eq!(
+            std::fs::read_dir(directory.path())
+                .expect("the upload directory is readable")
+                .count(),
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn accepts_a_malformed_content_type_when_the_body_is_ignored() {
+        let inputs = ignored("not/a/media/type", b"", &UploadConfig::Disabled).await;
 
         assert!(inputs.body.is_empty());
     }

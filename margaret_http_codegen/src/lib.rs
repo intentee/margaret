@@ -14,6 +14,7 @@ pub mod render_http;
 mod render_routes;
 mod route_body_intake;
 mod route_group;
+mod route_request_body_intake;
 mod server_route_group;
 mod server_serve_inputs;
 pub mod server_transport_policy;
@@ -1784,7 +1785,7 @@ impl GetProject {
         );
 
         assert!(source.contains(
-            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"QUERY\",margaret::framework::http::body_intake::BodyIntake::Discarded,"
+            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"QUERY\",margaret::framework::http::body_intake::BodyIntake::Ignored,"
         ));
     }
 
@@ -1998,7 +1999,7 @@ impl GetProject {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"GET\",margaret::framework::http::body_intake::BodyIntake::Discarded,"));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"GET\",margaret::framework::http::body_intake::BodyIntake::Ignored,"));
     }
 
     const REQUEST_BODY_ROUTE: &str = r#"
@@ -2024,6 +2025,85 @@ impl PublishCrate {
         ));
     }
 
+    const BODY_INTAKE_CONFLICT_MIDDLEWARE: &str = r#"
+use margaret::framework::http::bytes::Bytes;
+use margaret::framework::http::next::Next;
+
+struct Credentials;
+
+#[singleton]
+#[handles_middleware_attribute(attribute = guard)]
+struct Guard;
+
+impl Guard {
+    #[process]
+    fn process(&self, next: Next, #[form_request(from = Json)] credentials: Credentials) -> anyhow::Result<ResponseContinuation> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "put", path = "/crates/new", server = "public")]
+#[middleware(guard)]
+struct PublishCrate;
+
+impl PublishCrate {
+    #[process]
+    fn respond(&self, #[request_body] body: &Bytes) -> anyhow::Result<Response> {}
+}
+"#;
+
+    const BODY_INTAKE_CONFLICT_PROVIDER: &str = r#"
+use margaret::framework::http::bytes::Bytes;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+
+struct Credentials;
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[infer_from_request]
+    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "put", path = "/crates/new", server = "public")]
+struct PublishCrate;
+
+impl PublishCrate {
+    #[process]
+    fn respond(&self, #[authenticated_user] user: User, #[request_body] body: &Bytes) -> anyhow::Result<Response> {}
+}
+"#;
+
+    #[test]
+    fn rejects_a_middleware_that_parses_a_body_the_route_collects() {
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection_for(BODY_INTAKE_CONFLICT_MIDDLEWARE))
+                    .expect("the responder is rejected by its request bindings"),
+            ),
+            discriminant(&RequestBindingError::ConflictingRequestBodyIntake {
+                subject: any_text()
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_that_parses_a_body_the_route_collects() {
+        assert_eq!(
+            discriminant(
+                binding_rejection(&rejection_for(BODY_INTAKE_CONFLICT_PROVIDER))
+                    .expect("the responder is rejected by its request bindings"),
+            ),
+            discriminant(&RequestBindingError::ConflictingRequestBodyIntake {
+                subject: any_text()
+            })
+        );
+    }
+
     const NAMED_ROUTE: &str = r#"
 #[singleton]
 #[responds_to_http(
@@ -2046,7 +2126,7 @@ impl GetGreeting {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::named(\"GET\",margaret::framework::http::body_intake::BodyIntake::Discarded,\"get_greeting\","));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::named(\"GET\",margaret::framework::http::body_intake::BodyIntake::Ignored,\"get_greeting\","));
     }
 
     #[test]

@@ -42,6 +42,7 @@ mod tests {
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::bound_parameter::BoundParameter;
     use margaret_request_binding_codegen::request_binding::RequestBinding;
+    use margaret_request_binding_codegen::request_body_intake::RequestBodyIntake;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use quote::format_ident;
 
@@ -371,6 +372,7 @@ impl RespondsToWebSocketNotification for Typist {
         let index = index_for("#[singleton]\nstruct Known;\n");
         let mut plan = empty_session_plan();
         plan.session.layers.push(LayerApplication {
+            body_intake: RequestBodyIntake::Ignored,
             concrete: missing_path(),
             field: format_ident!("missing"),
             injects_peer_spiffe_id: false,

@@ -134,12 +134,9 @@ pub enum RequestBindingError {
     ConflictingRequestBodyMarkers { subject: String, parameter: String },
 
     #[error(
-        "{subject} reads the request body through #[request_body] and also through #[form_request(from = {input_source})]; a route reads its body in exactly one way"
+        "{subject} collects the raw request body through #[request_body] and also parses it; a route reads its body in exactly one way"
     )]
-    ConflictingRequestBodyAndFormRequest {
-        subject: String,
-        input_source: String,
-    },
+    ConflictingRequestBodyIntake { subject: String },
 
     #[error("{subject} declares more than one #[request_body] argument")]
     MultipleRequestBodyParameters { subject: String },

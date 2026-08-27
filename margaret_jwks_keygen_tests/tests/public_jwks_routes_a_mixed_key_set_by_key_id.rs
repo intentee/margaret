@@ -6,6 +6,7 @@ use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
 use margaret_jwks_keygen::jwk_public::JwkPublic;
 use margaret_jwks_keygen::key_use::KeyUse;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
+use margaret_jwks_keygen::rsa_algorithm::RsaAlgorithm;
 use margaret_jwks_keygen::rsa_jwk_public::RsaJwkPublic;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
@@ -35,6 +36,7 @@ async fn public_jwks_routes_a_mixed_key_set_by_key_id() -> Result<()> {
         keys: vec![
             JwkPublic::Ec(ec_keypair.public),
             JwkPublic::Rsa(RsaJwkPublic {
+                alg: RsaAlgorithm::Rs256,
                 e: RSA_TEST_KEY_EXPONENT.to_string(),
                 kid: "rsa-kid".to_string(),
                 n: RSA_TEST_KEY_MODULUS.to_string(),

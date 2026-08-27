@@ -60,7 +60,7 @@ impl RunningMtlsServer {
                 "/",
                 vec![MethodHandler::anonymous(
                     "GET",
-                    BodyIntake::Discarded,
+                    BodyIntake::Parsed,
                     Arc::new(EchoPeer),
                 )],
             )])

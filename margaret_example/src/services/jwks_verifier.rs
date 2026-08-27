@@ -5,7 +5,9 @@ use chrono::Utc;
 use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 
-use margaret::framework::identity_session::is_expired::IsExpired;
+use margaret::framework::identity_session::accepts_claims::AcceptsClaims;
+use margaret::framework::identity_session::claims_acceptance::ClaimsAcceptance;
+use margaret::framework::identity_session::claims_rejection::ClaimsRejection;
 use margaret::framework::jwks_client::access_token_verification::AccessTokenVerification;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
@@ -14,14 +16,35 @@ use margaret::framework::macros::service;
 use crate::margaret::jwks::jwks_endpoint_jwks_endpoint::PublicJwksVerifier;
 use crate::system_clock::SystemClock;
 
+const ACCESS_TOKEN_AUDIENCE: &str = "margaret-example";
+const ACCESS_TOKEN_ISSUER: &str = "https://margaret-example.invalid";
+
 #[derive(Deserialize)]
 struct AccessClaims {
+    aud: String,
     exp: i64,
+    iss: String,
 }
 
-impl IsExpired for AccessClaims {
-    fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
-        Ok(self.exp < now.timestamp())
+impl AcceptsClaims for AccessClaims {
+    fn accepts(&self, now: DateTime<Utc>) -> anyhow::Result<ClaimsAcceptance> {
+        if self.iss != ACCESS_TOKEN_ISSUER {
+            return Ok(ClaimsAcceptance::Rejected(
+                ClaimsRejection::UnexpectedIssuer,
+            ));
+        }
+
+        if self.aud != ACCESS_TOKEN_AUDIENCE {
+            return Ok(ClaimsAcceptance::Rejected(
+                ClaimsRejection::UnexpectedAudience,
+            ));
+        }
+
+        if self.exp < now.timestamp() {
+            return Ok(ClaimsAcceptance::Rejected(ClaimsRejection::Expired));
+        }
+
+        Ok(ClaimsAcceptance::Accepted)
     }
 }
 
@@ -55,8 +78,8 @@ impl JwksVerifier {
             Ok(AccessTokenVerification::Verified(_)) => {
                 println!("the jwks verifier accepted the sample access token");
             }
-            Ok(AccessTokenVerification::Expired) => {
-                println!("the sample access token is expired");
+            Ok(AccessTokenVerification::Rejected(rejection)) => {
+                println!("the sample access token was rejected: {rejection:?}");
             }
             Ok(AccessTokenVerification::Malformed(malformation)) => {
                 println!("the sample access token is malformed: {malformation}");

@@ -17,6 +17,7 @@ mod jws_header;
 pub mod key_use;
 pub mod persisted_jwks_secret;
 pub mod public_jwks;
+pub mod rsa_algorithm;
 pub mod rsa_jwk_public;
 mod sign_signing_input;
 pub(crate) mod signature_check;

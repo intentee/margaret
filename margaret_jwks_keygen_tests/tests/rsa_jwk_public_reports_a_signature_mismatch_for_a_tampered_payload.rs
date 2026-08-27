@@ -4,6 +4,7 @@ use base64ct::Encoding as _;
 use serde_json::to_vec;
 
 use margaret_jwks_keygen::key_use::KeyUse;
+use margaret_jwks_keygen::rsa_algorithm::RsaAlgorithm;
 use margaret_jwks_keygen::rsa_jwk_public::RsaJwkPublic;
 use margaret_jwks_keygen::token_verification::TokenVerification;
 use margaret_jwks_keygen::verifies_token::VerifiesToken;
@@ -30,6 +31,7 @@ fn rsa_jwk_public_reports_a_signature_mismatch_for_a_tampered_payload() -> Resul
     })?);
     let tampered = format!("{header_segment}.{tampered_payload}.{signature_segment}");
     let key = RsaJwkPublic {
+        alg: RsaAlgorithm::Rs256,
         e: RSA_TEST_KEY_EXPONENT.to_string(),
         kid: "rsa-kid".to_string(),
         n: RSA_TEST_KEY_MODULUS.to_string(),

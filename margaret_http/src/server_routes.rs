@@ -92,8 +92,8 @@ mod tests {
         let server_routes = ServerRoutes::build(Vec::from([RouteEntry::new(
             "/articles",
             Vec::from([
-                MethodHandler::named("GET", BodyIntake::Discarded, "get_articles", not_found()),
-                MethodHandler::anonymous("POST", BodyIntake::Discarded, not_found()),
+                MethodHandler::named("GET", BodyIntake::Parsed, "get_articles", not_found()),
+                MethodHandler::anonymous("POST", BodyIntake::Parsed, not_found()),
             ]),
         )]))
         .expect("the entries build a router");
@@ -107,7 +107,7 @@ mod tests {
             "/articles",
             Vec::from([MethodHandler::named(
                 "GET",
-                BodyIntake::Discarded,
+                BodyIntake::Parsed,
                 "get_articles",
                 not_found(),
             )]),
@@ -136,7 +136,7 @@ mod tests {
                     "/items/{id}",
                     Vec::from([MethodHandler::anonymous(
                         "GET",
-                        BodyIntake::Discarded,
+                        BodyIntake::Parsed,
                         not_found()
                     )]),
                 ),
@@ -144,7 +144,7 @@ mod tests {
                     "/items/{name}",
                     Vec::from([MethodHandler::anonymous(
                         "GET",
-                        BodyIntake::Discarded,
+                        BodyIntake::Parsed,
                         not_found()
                     )]),
                 ),

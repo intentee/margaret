@@ -26,6 +26,7 @@ use crate::form_request_extraction::FormRequestExtraction;
 use crate::injects_views::injects_views;
 use crate::request_binding::RequestBinding;
 use crate::request_binding_error::RequestBindingError;
+use crate::request_body_intake::RequestBodyIntake;
 use crate::request_body_type::request_body_type;
 use crate::request_injectable::RequestInjectable;
 use crate::request_input_source::RequestInputSource;
@@ -372,25 +373,10 @@ fn verify_single_request_body(
         .filter(|parameter| matches!(parameter.binding, RequestBinding::RequestBody))
         .count();
 
-    if request_body_count == 0 {
-        return Ok(());
-    }
-
     if request_body_count > 1 {
         return Err(RequestBindingError::MultipleRequestBodyParameters {
             subject: subject.to_string(),
         });
-    }
-
-    for parameter in bound {
-        if let RequestBinding::FormRequest { source, .. } = &parameter.binding
-            && let RequestInputSource::Form | RequestInputSource::Json = source
-        {
-            return Err(RequestBindingError::ConflictingRequestBodyAndFormRequest {
-                subject: subject.to_string(),
-                input_source: source.written().to_string(),
-            });
-        }
     }
 
     Ok(())
@@ -597,6 +583,7 @@ pub fn classify_parameters(
     }
 
     verify_single_request_body(&bound, subject)?;
+    RequestBodyIntake::declared_by(&bound, subject)?;
     verify_single_inference(&bound, subject)?;
 
     Ok(bound)

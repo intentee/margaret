@@ -3,8 +3,10 @@ use std::sync::Arc;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
 use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
+use margaret_jwks_client_tests::test_audience::TEST_AUDIENCE;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
+use margaret_jwks_client_tests::test_issuer::TEST_ISSUER;
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
@@ -28,7 +30,10 @@ async fn public_jwks_verifier_reports_a_signature_mismatch() {
     let token = signing_keypair
         .signing
         .sign(&TestClaims {
+            aud: TEST_AUDIENCE.to_string(),
             exp: 2_000_000_000,
+            iss: TEST_ISSUER.to_string(),
+            nbf: 0,
             sub: "subject".to_string(),
         })
         .await

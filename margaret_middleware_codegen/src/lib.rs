@@ -16,6 +16,7 @@ mod tests {
     use margaret_tag_codegen::tag_error::TagError;
 
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+    use margaret_request_binding_codegen::request_body_intake::RequestBodyIntake;
 
     use margaret_injection_codegen::injection_error::InjectionError;
 
@@ -385,6 +386,7 @@ impl Guard {
 
     fn plain_layer(field: &str, wrapper: &str) -> LayerApplication {
         LayerApplication {
+            body_intake: RequestBodyIntake::Ignored,
             concrete: CanonicalPath::new(vec!["crate".to_string(), wrapper.to_string()]),
             field: format_ident!("{field}"),
             injects_peer_spiffe_id: false,
@@ -433,6 +435,7 @@ impl Guard {
     #[test]
     fn builds_a_declaration_ordered_vector_of_boxed_middleware() {
         let routed = LayerApplication {
+            body_intake: RequestBodyIntake::Ignored,
             concrete: CanonicalPath::new(vec!["crate".to_string(), "Tracer".to_string()]),
             field: format_ident!("tracer"),
             injects_peer_spiffe_id: false,

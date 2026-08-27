@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use tempfile::tempdir;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
@@ -56,7 +57,7 @@ async fn exchange(
             "/submit",
             vec![MethodHandler::anonymous(
                 "POST",
-                BodyIntake::Discarded,
+                BodyIntake::Parsed,
                 Arc::new(Accepts),
             )],
         ),
@@ -64,7 +65,7 @@ async fn exchange(
             "/search",
             vec![MethodHandler::anonymous(
                 "QUERY",
-                BodyIntake::Discarded,
+                BodyIntake::Parsed,
                 Arc::new(Accepts),
             )],
         ),
@@ -212,4 +213,24 @@ async fn rejects_a_declared_binary_body_that_exceeds_the_limit() {
     .await;
 
     assert!(response.contains(" 413 "));
+}
+
+#[tokio::test]
+async fn answers_an_unknown_path_without_reading_its_body() {
+    let uploads = tempdir().expect("a temporary upload directory");
+    let response = exchange(
+        b"POST /nowhere HTTP/1.1\r\nHost: test\r\nContent-Type: multipart/form-data; boundary=X\r\nContent-Length: 74\r\nConnection: close\r\n\r\n--X\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a\"\r\n\r\nDATA\r\n--X--\r\n",
+        BodyLimit::default(),
+        UploadConfig::enabled(uploads.path().to_path_buf()),
+        false,
+    )
+    .await;
+
+    assert!(response.contains(" 404 "));
+    assert_eq!(
+        std::fs::read_dir(uploads.path())
+            .expect("the upload directory is readable")
+            .count(),
+        0
+    );
 }

@@ -24,6 +24,7 @@ pub mod render_bound_request_extractions;
 pub mod render_request_extraction;
 pub mod request_binding;
 pub mod request_binding_error;
+pub mod request_body_intake;
 mod request_body_type;
 pub mod request_injectable;
 pub mod request_input_source;
@@ -64,6 +65,7 @@ mod tests {
     use crate::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
     use crate::request_binding::RequestBinding;
     use crate::request_binding_error::RequestBindingError;
+    use crate::request_body_intake::RequestBodyIntake;
     use crate::views_availability::ViewsAvailability;
     use quote::format_ident;
 
@@ -432,6 +434,64 @@ impl SessionUserProvider {
             .count()
     }
 
+    fn responder_intake(declaration: &str) -> RequestBodyIntake {
+        RequestBodyIntake::declared_by(
+            &responder_binding("Page", declaration).expect("the responder binds"),
+            "responder 'Page'",
+        )
+        .expect("the responder agrees on how the body is read")
+    }
+
+    #[test]
+    fn ignores_the_body_of_a_responder_that_declares_none() {
+        assert_eq!(
+            responder_intake(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n"
+            ),
+            RequestBodyIntake::Ignored
+        );
+    }
+
+    #[test]
+    fn ignores_the_body_of_a_responder_that_only_reads_the_query() {
+        assert_eq!(
+            responder_intake(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = Query)] form: User) -> anyhow::Result<Response> {}\n}\n"
+            ),
+            RequestBodyIntake::Ignored
+        );
+    }
+
+    #[test]
+    fn parses_the_body_of_a_responder_that_declares_a_form_request() {
+        assert_eq!(
+            responder_intake(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = Json)] form: User) -> anyhow::Result<Response> {}\n}\n"
+            ),
+            RequestBodyIntake::Parsed
+        );
+    }
+
+    #[test]
+    fn parses_the_body_of_a_responder_that_takes_the_whole_request() {
+        assert_eq!(
+            responder_intake(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, request: &Request) -> anyhow::Result<Response> {}\n}\n"
+            ),
+            RequestBodyIntake::Parsed
+        );
+    }
+
+    #[test]
+    fn collects_the_body_of_a_responder_that_declares_the_request_body() {
+        assert_eq!(
+            responder_intake(
+                "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[request_body] body: &Bytes) -> anyhow::Result<Response> {}\n}\n"
+            ),
+            RequestBodyIntake::Collected
+        );
+    }
+
     #[test]
     fn binds_a_declared_request_body() {
         assert_eq!(
@@ -482,14 +542,13 @@ impl SessionUserProvider {
     }
 
     #[test]
-    fn rejects_a_request_body_beside_a_form_request() {
+    fn rejects_a_request_body_beside_a_parsed_body() {
         assert_eq!(
             discriminant(&responder_rejection(
                 "struct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[request_body] body: &Bytes, #[form_request(from = Json)] form: User) -> anyhow::Result<Response> {}\n}\n"
             )),
-            discriminant(&RequestBindingError::ConflictingRequestBodyAndFormRequest {
-                subject: any_text(),
-                input_source: any_text()
+            discriminant(&RequestBindingError::ConflictingRequestBodyIntake {
+                subject: any_text()
             })
         );
     }

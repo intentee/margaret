@@ -2,7 +2,8 @@ use chrono::DateTime;
 use chrono::Utc;
 use serde::de::DeserializeOwned;
 
-use margaret_identity_session::is_expired::IsExpired;
+use margaret_identity_session::accepts_claims::AcceptsClaims;
+use margaret_identity_session::claims_acceptance::ClaimsAcceptance;
 use margaret_jwks_keygen::token_verification::TokenVerification;
 use margaret_jwks_keygen::verifies_token::VerifiesToken as _;
 
@@ -22,8 +23,8 @@ impl PublicJwksVerifier {
 
     /// # Errors
     ///
-    /// Returns `JwksClientError::NotReady` or `JwksClientError::TokenVerification` or `JwksClientError::TokenExpiry`.
-    pub fn verify<TClaims: DeserializeOwned + IsExpired>(
+    /// Returns `JwksClientError::TokenVerification` or `JwksClientError::ClaimsAcceptance`.
+    pub fn verify<TClaims: AcceptsClaims + DeserializeOwned>(
         &self,
         token: &str,
         now: DateTime<Utc>,
@@ -45,13 +46,14 @@ impl PublicJwksVerifier {
             TokenVerification::Verified(claims) => claims,
         };
 
-        if claims
-            .is_expired(now)
-            .map_err(|source| JwksClientError::TokenExpiry { source })?
+        match claims
+            .accepts(now)
+            .map_err(|source| JwksClientError::ClaimsAcceptance { source })?
         {
-            return Ok(AccessTokenVerification::Expired);
+            ClaimsAcceptance::Accepted => Ok(AccessTokenVerification::Verified(claims)),
+            ClaimsAcceptance::Rejected(rejection) => {
+                Ok(AccessTokenVerification::Rejected(rejection))
+            }
         }
-
-        Ok(AccessTokenVerification::Verified(claims))
     }
 }

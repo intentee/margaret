@@ -5,6 +5,7 @@ use margaret_jwks_keygen::generate_keypair::generate_keypair;
 use margaret_jwks_keygen::generate_keypair_params::GenerateKeypairParams;
 use margaret_jwks_keygen::jws_algorithm::JwsAlgorithm;
 use margaret_jwks_keygen::key_use::KeyUse;
+use margaret_jwks_keygen::rsa_algorithm::RsaAlgorithm;
 use margaret_jwks_keygen::rsa_jwk_public::RsaJwkPublic;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen::token_malformation::TokenMalformation;
@@ -29,6 +30,7 @@ async fn rsa_jwk_public_rejects_an_es256_token() -> Result<()> {
         })
         .await?;
     let key = RsaJwkPublic {
+        alg: RsaAlgorithm::Rs256,
         e: RSA_TEST_KEY_EXPONENT.to_string(),
         kid: "rsa-kid".to_string(),
         n: RSA_TEST_KEY_MODULUS.to_string(),

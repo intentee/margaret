@@ -3,9 +3,11 @@ use proc_macro2::Ident;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_middleware_codegen::layer_application::LayerApplication;
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
+use margaret_request_binding_codegen::request_body_intake::RequestBodyIntake;
 
 pub(crate) struct HttpRoute {
     pub(crate) arguments: Vec<BoundParameter>,
+    pub(crate) body_intake: RequestBodyIntake,
     pub(crate) is_async: bool,
     pub(crate) layers: Vec<LayerApplication>,
     pub(crate) method: String,

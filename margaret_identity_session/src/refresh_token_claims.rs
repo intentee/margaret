@@ -4,9 +4,11 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
+use crate::accepts_claims::AcceptsClaims;
 use crate::access_token_claims::AccessTokenClaims;
 use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
-use crate::is_expired::IsExpired;
+use crate::claims_acceptance::ClaimsAcceptance;
+use crate::claims_rejection::ClaimsRejection;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct RefreshTokenClaims {
@@ -16,9 +18,13 @@ pub struct RefreshTokenClaims {
     pub sub: Uuid,
 }
 
-impl IsExpired for RefreshTokenClaims {
-    fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
-        Ok(self.is_expired_at(now))
+impl AcceptsClaims for RefreshTokenClaims {
+    fn accepts(&self, now: DateTime<Utc>) -> anyhow::Result<ClaimsAcceptance> {
+        if self.is_expired_at(now) {
+            return Ok(ClaimsAcceptance::Rejected(ClaimsRejection::Expired));
+        }
+
+        Ok(ClaimsAcceptance::Accepted)
     }
 }
 
@@ -47,8 +53,10 @@ mod tests {
     use uuid::Uuid;
 
     use super::RefreshTokenClaims;
+    use crate::accepts_claims::AcceptsClaims;
     use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
-    use crate::is_expired::IsExpired;
+    use crate::claims_acceptance::ClaimsAcceptance;
+    use crate::claims_rejection::ClaimsRejection;
 
     fn at(secs: i64) -> DateTime<Utc> {
         DateTime::from_timestamp(secs, 0).expect("a valid timestamp")
@@ -65,9 +73,18 @@ mod tests {
 
     #[test]
     fn reports_expiry_relative_to_now() {
-        assert_eq!(claims(101).is_expired(at(100)).ok(), Some(false));
-        assert_eq!(claims(99).is_expired(at(100)).ok(), Some(true));
-        assert_eq!(claims(100).is_expired(at(100)).ok(), Some(false));
+        assert_eq!(
+            claims(101).accepts(at(100)).ok(),
+            Some(ClaimsAcceptance::Accepted)
+        );
+        assert_eq!(
+            claims(99).accepts(at(100)).ok(),
+            Some(ClaimsAcceptance::Rejected(ClaimsRejection::Expired))
+        );
+        assert_eq!(
+            claims(100).accepts(at(100)).ok(),
+            Some(ClaimsAcceptance::Accepted)
+        );
     }
 
     #[test]
