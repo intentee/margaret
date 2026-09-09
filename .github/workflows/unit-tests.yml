@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  coverage:
+    name: coverage
+    runs-on: ovh-linux-x64-b3-16
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+
+      - name: install nextest and llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.137,cargo-llvm-cov@0.8.7
+
+      - name: run coverage
+        run: make coverage
+
+  clippy:
+    name: clippy
+    runs-on: ovh-linux-x64-b3-16
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: run clippy
+        run: make clippy
