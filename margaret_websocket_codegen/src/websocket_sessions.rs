@@ -7,6 +7,7 @@ use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+use margaret_request_binding_codegen::classified_parameters::ClassifiedParameters;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
@@ -36,7 +37,7 @@ pub(crate) fn websocket_sessions(
 
         let route_path = RoutePath::parse(&path);
         let subject = format!("session '{session}'");
-        let parameters = classify_parameters(
+        let ClassifiedParameters { parameters, .. } = classify_parameters(
             index,
             item,
             method,

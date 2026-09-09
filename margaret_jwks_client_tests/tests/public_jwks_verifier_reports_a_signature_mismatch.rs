@@ -40,9 +40,10 @@ async fn public_jwks_verifier_reports_a_signature_mismatch() {
         .expect("the claims are signed");
     let holder = PublicJwksHolder::default();
 
-    holder.set(Some(Arc::new(PublicJwks {
-        keys: vec![JwkPublic::Ec(published_keypair.public)],
-    })));
+    holder.set(Some(Arc::new(
+        PublicJwks::new(vec![JwkPublic::Ec(published_keypair.public)])
+            .expect("the key set has unique key ids"),
+    )));
 
     let verification = PublicJwksVerifier::new(holder)
         .verify::<TestClaims>(&token, test_instant(1_700_000_000))

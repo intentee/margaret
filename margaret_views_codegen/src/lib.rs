@@ -11,7 +11,6 @@ mod views;
 
 #[cfg(test)]
 mod tests {
-    use std::mem::discriminant;
 
     use margaret_container::container_error::ContainerError;
 
@@ -81,18 +80,14 @@ mod tests {
             .expect_err("the invalid view is rejected")
     }
 
-    fn any_text() -> String {
-        "any".to_string()
-    }
-
     #[test]
     fn rejects_a_view_absent_from_the_container_plan() {
-        assert_eq!(
-            discriminant(&rejection_for(VALID_VIEW)),
-            discriminant(&ViewsCodegenError::Container {
-                source: ContainerError::MissingPlannedProvider { path: any_text() }
-            })
-        );
+        assert!(matches!(
+            rejection_for(VALID_VIEW),
+            ViewsCodegenError::Container {
+                source: ContainerError::MissingProviderServeInputs { ref path, .. }
+            } if path == "crate::CardLayout"
+        ));
     }
 
     fn formatted(
@@ -152,12 +147,10 @@ impl Banner {
 
     #[test]
     fn rejects_a_view_that_is_not_a_struct() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[renders_view(name = \"bad\")]\n#[singleton]\nenum Bad {}\n"
-            )),
-            discriminant(&ViewsCodegenError::ViewNotAStruct { view: any_text() })
-        );
+        assert!(matches!(
+            rejection_for("#[renders_view(name = \"bad\")]\n#[singleton]\nenum Bad {}\n"),
+            ViewsCodegenError::ViewNotAStruct { ref view, .. } if view == "crate::Bad"
+        ));
     }
 
     #[test]
@@ -171,61 +164,48 @@ impl Banner {
 
     #[test]
     fn rejects_a_struct_declaring_more_than_one_view() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[renders_view(name = \"one\")]\n#[renders_view(name = \"two\")]\n#[singleton]\nstruct Bad;\n"
-            )),
-            discriminant(&ViewsCodegenError::DuplicateViewDeclaration { view: any_text() })
-        );
+            ),
+            ViewsCodegenError::DuplicateViewDeclaration { ref view, .. } if view == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_a_view_without_a_name() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[renders_view]\n#[singleton]\nstruct Bad;\n"
-            )),
-            discriminant(&ViewsCodegenError::ViewMissingName { view: any_text() })
-        );
+        assert!(matches!(
+            rejection_for("#[renders_view]\n#[singleton]\nstruct Bad;\n"),
+            ViewsCodegenError::ViewMissingName { ref view, .. } if view == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_a_view_name_that_is_not_snake_case() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[renders_view(name = \"CardLayout\")]\n#[singleton]\nstruct Bad;\n"
-            )),
-            discriminant(&ViewsCodegenError::InvalidViewName {
-                view: any_text(),
-                name: any_text()
-            })
-        );
+        assert!(matches!(
+            rejection_for("#[renders_view(name = \"CardLayout\")]\n#[singleton]\nstruct Bad;\n"),
+            ViewsCodegenError::InvalidViewName { ref view, .. } if view == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_two_views_with_the_same_name() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[renders_view(name = \"card\")]\n#[singleton]\nstruct First;\n\n#[renders_view(name = \"card\")]\n#[singleton]\nstruct Second;\n"
-            )),
-            discriminant(&ViewsCodegenError::DuplicateViewName {
-                name: any_text(),
-                first: any_text(),
-                second: any_text()
-            })
-        );
+            ),
+            ViewsCodegenError::DuplicateViewName { ref name, .. } if name == "card"
+        ));
     }
 
     #[test]
     fn propagates_malformed_view_arguments() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[renders_view(= 5)]\n#[singleton]\nstruct Bad;\n"
-            )),
-            discriminant(&ViewsCodegenError::Index {
-                source: AttributeError::GlobImport { file: any_text() }
-            })
-        );
+        assert!(matches!(
+            rejection_for("#[renders_view(= 5)]\n#[singleton]\nstruct Bad;\n"),
+            ViewsCodegenError::Index {
+                source: AttributeError::Arguments(AttributeArgumentsError::Malformed { ref attribute_path, .. })
+            } if attribute_path == "renders_view"
+        ));
     }
 
     #[test]

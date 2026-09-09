@@ -52,6 +52,18 @@ impl HttpRouteTable {
         named
     }
 
+    /// # Errors
+    ///
+    /// Returns `HttpCodegenError::ConflictingForwardTargetBodyIntake` when a responder that
+    /// forwards cannot read the request body the way one of its forward targets does.
+    pub(crate) fn resolve_forward_target_body_intake(&mut self) -> Result<(), HttpCodegenError> {
+        for (server, group) in &mut self.servers {
+            group.resolve_forward_target_body_intake(server)?;
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn route_groups(&self, server: &str) -> impl Iterator<Item = &RouteGroup> {
         self.servers
             .get(server)

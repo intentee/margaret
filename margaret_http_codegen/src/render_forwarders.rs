@@ -6,6 +6,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
+use crate::is_forward_target::is_forward_target;
 use crate::named_route::NamedRoute;
 
 fn forward_method(named: &NamedRoute<'_>) -> TokenStream {
@@ -41,7 +42,7 @@ fn server_forwarder(table: &HttpRouteTable, server: &HttpServer) -> TokenStream 
     let methods: Vec<TokenStream> = table
         .named_routes(server.name())
         .iter()
-        .filter(|named| named.route.method == "GET")
+        .filter(|named| is_forward_target(named.route))
         .map(forward_method)
         .collect();
 

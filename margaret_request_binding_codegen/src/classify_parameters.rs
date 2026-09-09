@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use quote::ToTokens;
 use syn::Type;
@@ -10,6 +9,7 @@ use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
+use margaret_attributes::select_unique_framework_attribute::select_unique_framework_attribute;
 use margaret_container::injectable_resolution::InjectableResolution;
 use margaret_container::resolve_injectable::resolve_injectable;
 use margaret_injection_codegen::optional_parameter::OptionalParameter;
@@ -20,13 +20,13 @@ use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
 use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
-use crate::bound_parameter::BoundParameter;
+use crate::classified_parameters::ClassifiedParameters;
+use crate::classified_parameters_builder::ClassifiedParametersBuilder;
 use crate::form_request_arguments::FormRequestArguments;
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::injects_views::injects_views;
 use crate::request_binding::RequestBinding;
 use crate::request_binding_error::RequestBindingError;
-use crate::request_body_intake::RequestBodyIntake;
 use crate::request_body_type::request_body_type;
 use crate::request_injectable::RequestInjectable;
 use crate::request_input_source::RequestInputSource;
@@ -287,7 +287,14 @@ fn classify_request_body(
         });
     }
 
-    if !matches!(declared, Type::Reference(_)) || resolved != Some(&request_body_type()) {
+    let is_single_shared_path_reference = matches!(
+        declared,
+        Type::Reference(reference)
+            if reference.mutability.is_none()
+                && matches!(reference.elem.as_ref(), Type::Path(_))
+    );
+
+    if !is_single_shared_path_reference || resolved != Some(&request_body_type()) {
         return Err(RequestBindingError::RequestBodyType {
             subject: subject.to_string(),
             parameter: position.to_string(),
@@ -304,7 +311,6 @@ fn classify_route_parameter(
     resolved: Option<&CanonicalPath>,
     position: usize,
     resolutions: &HashMap<CanonicalPath, RouteParameterResolution>,
-    bound_route_parameters: &mut HashSet<String>,
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
 
@@ -328,13 +334,6 @@ fn classify_route_parameter(
             subject: subject.to_string(),
             parameter: from,
             path: route_path.pattern().to_string(),
-        });
-    }
-
-    if !bound_route_parameters.insert(from.clone()) {
-        return Err(RequestBindingError::MultipleRouteParameterBindings {
-            subject: subject.to_string(),
-            parameter: from,
         });
     }
 
@@ -364,49 +363,42 @@ fn classify_route_parameter(
     }
 }
 
-fn verify_single_request_body(
-    bound: &[BoundParameter],
-    subject: &str,
-) -> Result<(), RequestBindingError> {
-    let request_body_count = bound
-        .iter()
-        .filter(|parameter| matches!(parameter.binding, RequestBinding::RequestBody))
-        .count();
-
-    if request_body_count > 1 {
-        return Err(RequestBindingError::MultipleRequestBodyParameters {
-            subject: subject.to_string(),
-        });
-    }
-
-    Ok(())
-}
-
-fn verify_single_inference(
-    bound: &[BoundParameter],
-    subject: &str,
-) -> Result<(), RequestBindingError> {
-    let mut inferred: HashSet<&CanonicalPath> = HashSet::new();
-
-    for parameter in bound {
-        if let RequestBinding::AuthenticatedUser { application, .. } = &parameter.binding
-            && !inferred.insert(&application.model)
-        {
-            return Err(RequestBindingError::MultipleAuthenticatedUserParameters {
-                subject: subject.to_string(),
-                model: application.model.to_string(),
-            });
-        }
-    }
-
-    Ok(())
-}
-
 struct ParameterMarkers<'marker> {
     authenticated_user: Option<&'marker IndexedAttribute>,
     form_request: Option<&'marker IndexedAttribute>,
     request_body: Option<&'marker IndexedAttribute>,
     route_parameter: Option<&'marker IndexedAttribute>,
+}
+
+fn parameter_marker<'marker>(
+    attributes: &'marker [IndexedAttribute],
+    framework_attribute: FrameworkAttribute,
+    subject: &str,
+    position: usize,
+) -> Result<Option<&'marker IndexedAttribute>, RequestBindingError> {
+    select_unique_framework_attribute(attributes, framework_attribute, || {
+        format!("argument #{position} of {subject}")
+    })
+    .map_err(RequestBindingError::from)
+}
+
+fn require_bare_marker(
+    attribute: &IndexedAttribute,
+    marker: FrameworkAttribute,
+    subject: &str,
+    position: usize,
+) -> Result<(), RequestBindingError> {
+    attribute.args()?;
+
+    if attribute.is_bare() {
+        Ok(())
+    } else {
+        Err(RequestBindingError::RequestBindingMarkerTakesNoArguments {
+            marker: marker.name(),
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        })
+    }
 }
 
 fn parameter_markers<'marker>(
@@ -415,15 +407,47 @@ fn parameter_markers<'marker>(
     position: usize,
     is_peer_spiffe_id: bool,
 ) -> Result<ParameterMarkers<'marker>, RequestBindingError> {
-    let marker = |attribute: FrameworkAttribute| {
-        attributes
-            .iter()
-            .find(|candidate| candidate.framework_attribute() == Some(attribute))
-    };
-    let authenticated_user = marker(FrameworkAttribute::AuthenticatedUser);
-    let form_request = marker(FrameworkAttribute::FormRequest);
-    let request_body = marker(FrameworkAttribute::RequestBody);
-    let route_parameter = marker(FrameworkAttribute::RouteParameter);
+    let authenticated_user = parameter_marker(
+        attributes,
+        FrameworkAttribute::AuthenticatedUser,
+        subject,
+        position,
+    )?;
+    let form_request = parameter_marker(
+        attributes,
+        FrameworkAttribute::FormRequest,
+        subject,
+        position,
+    )?;
+    let request_body = parameter_marker(
+        attributes,
+        FrameworkAttribute::RequestBody,
+        subject,
+        position,
+    )?;
+    let route_parameter = parameter_marker(
+        attributes,
+        FrameworkAttribute::RouteParameter,
+        subject,
+        position,
+    )?;
+
+    if let Some(attribute) = authenticated_user {
+        require_bare_marker(
+            attribute,
+            FrameworkAttribute::AuthenticatedUser,
+            subject,
+            position,
+        )?;
+    }
+    if let Some(attribute) = request_body {
+        require_bare_marker(
+            attribute,
+            FrameworkAttribute::RequestBody,
+            subject,
+            position,
+        )?;
+    }
 
     if route_parameter.is_some() && form_request.is_some() {
         return Err(RequestBindingError::ConflictingArgumentMarkers {
@@ -477,10 +501,9 @@ pub fn classify_parameters(
     method: &IndexedMethod,
     context: &BindingContext,
     registries: &BindingRegistries,
-) -> Result<Vec<BoundParameter>, RequestBindingError> {
+) -> Result<ClassifiedParameters, RequestBindingError> {
     let subject = context.subject();
-    let mut bound = Vec::new();
-    let mut bound_route_parameters = HashSet::new();
+    let mut classified = ClassifiedParametersBuilder::new(subject);
 
     for ParameterView {
         attributes,
@@ -521,7 +544,6 @@ pub fn classify_parameters(
                 resolved.as_ref(),
                 position,
                 &registries.route_parameters,
-                &mut bound_route_parameters,
             )?
         } else if matches!(injectable, Some(RequestInjectable::Next)) {
             match context {
@@ -557,34 +579,8 @@ pub fn classify_parameters(
             )?
         };
 
-        bound.push(BoundParameter { binding, holder });
+        classified.push(binding, holder)?;
     }
 
-    let next_count = bound
-        .iter()
-        .filter(|parameter| matches!(parameter.binding, RequestBinding::Next))
-        .count();
-
-    if next_count > 1 {
-        return Err(RequestBindingError::MultipleNextParameters {
-            subject: subject.to_string(),
-        });
-    }
-
-    let peer_spiffe_id_count = bound
-        .iter()
-        .filter(|parameter| matches!(parameter.binding, RequestBinding::PeerSpiffeId))
-        .count();
-
-    if peer_spiffe_id_count > 1 {
-        return Err(RequestBindingError::MultiplePeerSpiffeIdParameters {
-            subject: subject.to_string(),
-        });
-    }
-
-    verify_single_request_body(&bound, subject)?;
-    RequestBodyIntake::declared_by(&bound, subject)?;
-    verify_single_inference(&bound, subject)?;
-
-    Ok(bound)
+    Ok(classified.finish())
 }

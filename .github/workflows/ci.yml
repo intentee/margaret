@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  SPIRE_VERSION: 1.14.5
+  SPIRE_SHA256: cacab9ff32b7a24714edcf4328c4ce27bddd38496b443e8750395883c72a3bfb
+
+jobs:
+  coverage:
+    name: coverage
+    runs-on: ovh-linux-x64-b3-16
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+
+      - name: install nextest and llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.137,cargo-llvm-cov@0.8.7
+
+      - name: install spire
+        run: |
+          set -euo pipefail
+          download="$(mktemp -d)"
+          curl --fail --location --silent --show-error \
+            --output "$download/spire.tar.gz" \
+            "https://github.com/spiffe/spire/releases/download/v${SPIRE_VERSION}/spire-${SPIRE_VERSION}-linux-amd64-musl.tar.gz"
+          echo "${SPIRE_SHA256}  $download/spire.tar.gz" | sha256sum --check --strict -
+          tar --extract --gzip --file "$download/spire.tar.gz" --directory "$download"
+          install -d "$HOME/.local/bin"
+          install --mode 0755 \
+            "$download/spire-${SPIRE_VERSION}/bin/spire-server" \
+            "$download/spire-${SPIRE_VERSION}/bin/spire-agent" \
+            "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: run coverage
+        run: make coverage
+
+  clippy:
+    name: clippy
+    runs-on: ovh-linux-x64-b3-16
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: run clippy
+        run: make clippy

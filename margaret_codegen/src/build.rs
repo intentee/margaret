@@ -167,15 +167,15 @@ fn render_role_modules(
     }
 
     let console_roots = if features.contains(GeneratedFeature::Console) {
-        let plan = margaret_console_codegen::console_plan::ConsolePlan::build(index, bindings)?;
-        let console = margaret_console_codegen::render_console::render_console(
-            &plan,
+        let plan = margaret_console_codegen::console_plan::ConsolePlan::build(
+            index,
+            bindings,
             features.contains(GeneratedFeature::Serves),
             features.contains(GeneratedFeature::Models),
             servers,
             &serve_inputs,
-            bindings,
-        );
+        )?;
+        let console = margaret_console_codegen::render_console::render_console(&plan, bindings);
         modules.extend(console.modules);
 
         console.construction_roots
@@ -305,6 +305,7 @@ mod tests {
 
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
     use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 
     use super::build;
@@ -478,6 +479,21 @@ struct Room;
         assert!(module(&code, "routes").contains("pub struct Routes"));
         assert!(module(&code, "container").contains("struct Container"));
         assert!(module(&code, "run").contains("\"serve\""));
+    }
+
+    #[test]
+    fn rejects_a_serve_input_that_collides_with_a_generated_server_argument() {
+        let error = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct Config;\n\nimpl Config {\n    #[constructor]\n    fn create(#[console_argument(from = \"public-body-limit\")] limit: usize) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/\", server = \"public\")]\nstruct Page { config: std::sync::Arc<Config> }\n\nimpl Page {\n    #[constructor]\n    fn create(config: std::sync::Arc<Config>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
+        )
+        .expect_err("the colliding serve input is rejected during generation");
+
+        assert!(matches!(
+            error,
+            CodegenError::Console {
+                source: ConsoleCodegenError::ServeArgumentNameCollision { ref name, .. },
+            } if name == "public-body-limit"
+        ));
     }
 
     #[test]

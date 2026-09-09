@@ -6,6 +6,7 @@ use margaret_attributes::tag::Tag;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+use margaret_request_binding_codegen::classified_parameters::ClassifiedParameters;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
 
 use crate::middleware_attribute_arguments::MiddlewareAttributeArguments;
@@ -39,7 +40,10 @@ pub fn middleware_plans(
         };
         let method = process_method(item)?;
         let subject = format!("middleware '{middleware}'");
-        let parameters = classify_parameters(
+        let ClassifiedParameters {
+            body_intake,
+            parameters,
+        } = classify_parameters(
             index,
             item,
             method,
@@ -48,6 +52,7 @@ pub fn middleware_plans(
         )?;
 
         plans.push(MiddlewarePlan {
+            body_intake,
             concrete: item.canonical_path().clone(),
             field: format_ident!("{}", identifier.field()),
             is_async: method.signature().asyncness.is_some(),

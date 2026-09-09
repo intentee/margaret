@@ -10,12 +10,13 @@ use margaret_request_binding_codegen::request_body_intake::RequestBodyIntake;
 /// Returns `RequestBindingError::ConflictingRequestBodyIntake` when the responder, its middleware
 /// and its authenticated user provider do not agree on how the body is read.
 pub(crate) fn route_request_body_intake(
+    declared: RequestBodyIntake,
     arguments: &[BoundParameter],
     layers: &[LayerApplication],
     registries: &BindingRegistries,
     subject: &str,
 ) -> Result<RequestBodyIntake, RequestBindingError> {
-    let mut intake = RequestBodyIntake::of(arguments);
+    let mut intake = declared;
 
     for layer in layers {
         intake = intake.combine(layer.body_intake, subject)?;
@@ -25,7 +26,7 @@ pub(crate) fn route_request_body_intake(
         if let RequestBinding::AuthenticatedUser { application, .. } = &argument.binding
             && let Some(provider) = registries.authenticated_users.get(&application.model)
         {
-            intake = intake.combine(RequestBodyIntake::of(&provider.parameters), subject)?;
+            intake = intake.combine(provider.body_intake, subject)?;
         }
     }
 

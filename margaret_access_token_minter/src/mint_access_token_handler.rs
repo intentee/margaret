@@ -68,6 +68,7 @@ mod tests {
     use serde_json::json;
 
     use margaret_http::request::Request;
+    use margaret_http::request_body_inputs::RequestBodyInputs;
     use margaret_jwks_keygen::jwks_secret::JwksSecret;
     use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
     use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
@@ -89,7 +90,7 @@ mod tests {
     fn request_with_body(body: serde_json::Value) -> Request {
         let mut request = Request::new(Method::POST, "/mint".to_string());
 
-        request.inputs.json = Some(body);
+        request.inputs.body = RequestBodyInputs::Json(body);
 
         request
     }

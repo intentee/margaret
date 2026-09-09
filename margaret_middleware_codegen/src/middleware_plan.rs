@@ -9,6 +9,7 @@ use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_request_binding_codegen::request_body_intake::RequestBodyIntake;
 
 pub struct MiddlewarePlan {
+    pub body_intake: RequestBodyIntake,
     pub concrete: CanonicalPath,
     pub(crate) field: Ident,
     pub(crate) is_async: bool,
@@ -18,11 +19,6 @@ pub struct MiddlewarePlan {
 }
 
 impl MiddlewarePlan {
-    #[must_use]
-    pub fn body_intake(&self) -> RequestBodyIntake {
-        RequestBodyIntake::of(&self.parameters)
-    }
-
     #[must_use]
     pub fn injects_peer_spiffe_id(&self) -> bool {
         self.parameters

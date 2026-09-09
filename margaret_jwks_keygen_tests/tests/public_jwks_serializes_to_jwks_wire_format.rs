@@ -15,9 +15,8 @@ fn public_jwks_serializes_to_jwks_wire_format() -> Result<()> {
     })?;
     let expected_x = keypair.public.x.clone();
     let expected_y = keypair.public.y.clone();
-    let set = PublicJwks {
-        keys: vec![JwkPublic::Ec(keypair.public)],
-    };
+    let set = PublicJwks::new(vec![JwkPublic::Ec(keypair.public)])
+        .expect("the key set has unique key ids");
 
     let serialized = to_value(&set)?;
     let key = &serialized["keys"][0];

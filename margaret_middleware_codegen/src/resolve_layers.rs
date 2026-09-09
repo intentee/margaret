@@ -27,7 +27,7 @@ pub fn resolve_layers(
         };
 
         layers.push(LayerApplication {
-            body_intake: plan.body_intake(),
+            body_intake: plan.body_intake,
             concrete: plan.concrete.clone(),
             field: plan.field.clone(),
             injects_peer_spiffe_id: plan.injects_peer_spiffe_id(),

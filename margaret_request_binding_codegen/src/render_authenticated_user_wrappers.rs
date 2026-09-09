@@ -34,6 +34,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
         is_async,
         method_name,
         parameters,
+        ..
     } = provider;
     let AuthenticatedUserApplication {
         concrete,

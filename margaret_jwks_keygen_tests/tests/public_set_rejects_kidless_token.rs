@@ -28,9 +28,8 @@ fn public_set_rejects_kidless_token() -> Result<()> {
     let payload = Base64UrlUnpadded::encode_string(&serde_json::to_vec(&claims)?);
     let kidless = format!("{header}.{payload}.c2lnbmF0dXJl");
 
-    let set = PublicJwks {
-        keys: vec![JwkPublic::Ec(keypair.public)],
-    };
+    let set = PublicJwks::new(vec![JwkPublic::Ec(keypair.public)])
+        .expect("the key set has unique key ids");
     let result = set.verify::<TestClaims>(&kidless);
 
     assert!(matches!(

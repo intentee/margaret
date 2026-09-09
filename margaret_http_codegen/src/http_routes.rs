@@ -10,6 +10,7 @@ use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+use margaret_request_binding_codegen::classified_parameters::ClassifiedParameters;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
@@ -55,7 +56,10 @@ pub(crate) fn http_routes(
         let layers = resolve_layers(item, middleware_plans, &subject)?;
         let route_path = RoutePath::parse(&path);
         let handler_method = process_method(item)?;
-        let arguments = classify_parameters(
+        let ClassifiedParameters {
+            body_intake: declared_body_intake,
+            parameters: arguments,
+        } = classify_parameters(
             index,
             item,
             handler_method,
@@ -86,7 +90,13 @@ pub(crate) fn http_routes(
             seen_names.insert(name.clone(), responder.clone());
         }
 
-        let body_intake = route_request_body_intake(&arguments, &layers, registries, &subject)?;
+        let body_intake = route_request_body_intake(
+            declared_body_intake,
+            &arguments,
+            &layers,
+            registries,
+            &subject,
+        )?;
 
         table.insert(
             route_path,
@@ -104,6 +114,8 @@ pub(crate) fn http_routes(
             },
         )?;
     }
+
+    table.resolve_forward_target_body_intake()?;
 
     Ok(table)
 }

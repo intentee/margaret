@@ -6,7 +6,7 @@ use margaret_jwks_keygen_tests::test_claims::TestClaims;
 
 #[test]
 fn public_set_rejects_malformed_token() {
-    let set = PublicJwks { keys: Vec::new() };
+    let set = PublicJwks::new(Vec::new()).expect("an empty key set has unique key ids");
 
     let result = set.verify::<TestClaims>("garbage");
 

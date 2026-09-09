@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -10,10 +11,12 @@ use tokio_util::sync::CancellationToken;
 use margaret_http::body_intake::BodyIntake;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
+use margaret_http::forward::Forward;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::handler::Handler;
 use margaret_http::handler_error::HandlerError;
 use margaret_http::method_handler::MethodHandler;
+use margaret_http::named_handler::NamedHandler;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
@@ -33,6 +36,18 @@ impl Handler for Accepts {
     }
 }
 
+struct ForwardsToTheArchive;
+
+#[async_trait]
+impl Handler for ForwardsToTheArchive {
+    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        Ok(ResponseContinuation::Forward(Forward::new(
+            "get_archive",
+            HashMap::new(),
+        )))
+    }
+}
+
 struct EchoesBody;
 
 #[async_trait]
@@ -41,7 +56,7 @@ impl Handler for EchoesBody {
         Ok(ResponseContinuation::Done(Response::bytes(
             200,
             "application/octet-stream",
-            request.inputs.body.clone(),
+            request.inputs.body.collected().clone(),
         )))
     }
 }
@@ -77,6 +92,23 @@ async fn exchange(
                 Arc::new(EchoesBody),
             )],
         ),
+        RouteEntry::new(
+            "/archive",
+            vec![MethodHandler::named(
+                "GET",
+                BodyIntake::Collected,
+                "get_archive",
+                Arc::new(EchoesBody),
+            )],
+        ),
+        RouteEntry::new(
+            "/welcome",
+            vec![MethodHandler::anonymous(
+                "GET",
+                BodyIntake::Collected,
+                Arc::new(ForwardsToTheArchive),
+            )],
+        ),
     ])
     .expect("the route entries register cleanly");
     let server_registry = Arc::new(ServerRegistry::new(vec![Server::new(
@@ -87,7 +119,10 @@ async fn exchange(
         body_limit,
         router,
     )]));
-    let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
+    let forward_targets = Arc::new(ForwardTargets::new(vec![NamedHandler::new(
+        "get_archive",
+        Arc::new(EchoesBody),
+    )]));
     let bound = BoundServer::bind(server_registry, forward_targets, Arc::from("public"))
         .await
         .expect("the server binds");
@@ -233,4 +268,18 @@ async fn answers_an_unknown_path_without_reading_its_body() {
             .count(),
         0
     );
+}
+
+#[tokio::test]
+async fn reads_the_body_before_forwarding_to_a_route_that_collects_it() {
+    let response = exchange(
+        b"GET /welcome HTTP/1.1\r\nHost: test\r\nContent-Type: application/octet-stream\r\nContent-Length: 9\r\nConnection: close\r\n\r\n\x04\x00\x00\x00cargo",
+        BodyLimit::default(),
+        UploadConfig::Disabled,
+        false,
+    )
+    .await;
+
+    assert!(response.contains(" 200 "));
+    assert!(response.ends_with("\u{4}\u{0}\u{0}\u{0}cargo"));
 }

@@ -46,6 +46,17 @@ pub enum HttpCodegenError {
         source: MiddlewareCodegenError,
     },
 
+    #[error(
+        "responder '{responder}' forwards on server '{server}' to '{target}', which reads the request body in a conflicting way: {source}"
+    )]
+    ConflictingForwardTargetBodyIntake {
+        responder: String,
+        server: String,
+        #[source]
+        source: Box<RequestBindingError>,
+        target: String,
+    },
+
     #[error("#[responds_to_http] is only supported on structs, but '{target}' is not a struct")]
     RespondsToHttpNotOnStruct { target: String },
 

@@ -147,7 +147,6 @@ impl TagPool {
 
 #[cfg(test)]
 mod tests {
-    use std::mem::discriminant;
 
     use margaret_attributes::attribute_error::AttributeError;
 
@@ -194,10 +193,6 @@ mod tests {
         pool_for(lib_source)
             .err()
             .expect("the pool fails to collect")
-    }
-
-    fn any_text() -> String {
-        "any".to_string()
     }
 
     #[test]
@@ -312,55 +307,45 @@ mod tests {
 
     #[test]
     fn rejects_a_tag_declared_by_both_a_jwks_endpoint_and_a_middleware() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[provides_jwks_endpoint(shared)]\nstruct Endpoint;\n\n#[handles_middleware_attribute(attribute = shared)]\nstruct Handler;\n",
-            )),
-            discriminant(&TagError::DuplicateTag {
-                tag: any_text(),
-                first: any_text(),
-                second: any_text()
-            })
-        );
+            ),
+            TagError::DuplicateTag { ref tag, .. } if tag == "shared"
+        ));
     }
 
     #[test]
     fn rejects_a_jwks_endpoint_without_a_tag() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[provides_jwks_endpoint]\nstruct JwksEndpoint;\n"
-            )),
-            discriminant(&TagError::MissingTag {
-                concrete: any_text(),
-                kind: TagKind::Middleware
-            })
-        );
+        assert!(matches!(
+            rejection_for("#[provides_jwks_endpoint]\nstruct JwksEndpoint;\n"),
+            TagError::MissingTag {
+                ref concrete,
+                kind: TagKind::JwksClient,
+            } if concrete == "crate::JwksEndpoint"
+        ));
     }
 
     #[test]
     fn rejects_a_middleware_handler_without_a_tag() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[handles_middleware_attribute]\nstruct RequestLog;\n"
-            )),
-            discriminant(&TagError::MissingTag {
-                concrete: any_text(),
-                kind: TagKind::Middleware
-            })
-        );
+        assert!(matches!(
+            rejection_for("#[handles_middleware_attribute]\nstruct RequestLog;\n"),
+            TagError::MissingTag {
+                ref concrete,
+                kind: TagKind::Middleware,
+            } if concrete == "crate::RequestLog"
+        ));
     }
 
     #[test]
     fn rejects_a_tag_that_is_not_a_plain_name() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[provides_jwks_endpoint(endpoints::jwks)]\nstruct JwksEndpoint;\n"
-            )),
-            discriminant(&TagError::MalformedTag {
-                concrete: any_text(),
-                kind: TagKind::Middleware
-            })
-        );
+        assert!(matches!(
+            rejection_for("#[provides_jwks_endpoint(endpoints::jwks)]\nstruct JwksEndpoint;\n"),
+            TagError::MalformedTag {
+                ref concrete,
+                kind: TagKind::JwksClient,
+            } if concrete == "crate::JwksEndpoint"
+        ));
     }
 
     #[test]
@@ -383,13 +368,11 @@ mod tests {
 
     #[test]
     fn reports_unparseable_attribute_arguments() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[provides_jwks_endpoint(= 5)]\nstruct JwksEndpoint;\n"
-            )),
-            discriminant(&TagError::Index {
-                source: AttributeError::GlobImport { file: any_text() }
-            })
-        );
+        assert!(matches!(
+            rejection_for("#[provides_jwks_endpoint(= 5)]\nstruct JwksEndpoint;\n"),
+            TagError::Index {
+                source: AttributeError::Arguments(AttributeArgumentsError::Malformed { ref attribute_path, .. })
+            } if attribute_path == "provides_jwks_endpoint"
+        ));
     }
 }

@@ -28,9 +28,8 @@ async fn public_set_reports_unknown_key_id() -> Result<()> {
     };
 
     let token = absent_keypair.signing.sign(&claims).await?;
-    let set = PublicJwks {
-        keys: vec![JwkPublic::Ec(present_keypair.public)],
-    };
+    let set = PublicJwks::new(vec![JwkPublic::Ec(present_keypair.public)])
+        .expect("the key set has unique key ids");
     let result = set.verify::<TestClaims>(&token);
 
     assert!(matches!(

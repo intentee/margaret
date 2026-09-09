@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use bytes::Bytes;
 use cookie::Cookie;
 use http::Method;
 use http::header::COOKIE;
@@ -17,6 +16,7 @@ use crate::form_field::FormField;
 use crate::form_fields::form_fields;
 use crate::multipart_body::MultipartBody;
 use crate::request_body::RequestBody;
+use crate::request_body_inputs::RequestBodyInputs;
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
 use crate::server_params::ServerParams;
@@ -87,50 +87,23 @@ fn parse_query(server: &ServerParams) -> RequestOutcome<HashMap<String, String>>
     })
 }
 
-struct ParsedBody {
-    body: Bytes,
-    files: HashMap<String, UploadedFile>,
-    form: HashMap<String, String>,
-    json: Option<serde_json::Value>,
-}
-
-impl ParsedBody {
-    fn collected(body: Bytes) -> Self {
-        Self {
-            body,
-            files: HashMap::new(),
-            form: HashMap::new(),
-            json: None,
-        }
-    }
-
-    fn empty() -> Self {
-        Self {
-            body: Bytes::new(),
-            files: HashMap::new(),
-            form: HashMap::new(),
-            json: None,
-        }
-    }
-}
-
 async fn parse_body(
     server: &ServerParams,
     body: RequestBody,
     body_intake: BodyIntake,
     body_limit: &BodyLimit,
     upload_config: &UploadConfig,
-) -> Result<RequestOutcome<ParsedBody>, UploadedFileError> {
+) -> Result<RequestOutcome<RequestBodyInputs>, UploadedFileError> {
     match body_intake {
         BodyIntake::Collected => {
             return Ok(match collect_limited(body, body_limit.max_bytes()).await {
                 RequestOutcome::Parsed(bytes) => {
-                    RequestOutcome::Parsed(ParsedBody::collected(bytes))
+                    RequestOutcome::Parsed(RequestBodyInputs::Collected(bytes))
                 }
                 RequestOutcome::Rejected(rejection) => RequestOutcome::Rejected(rejection),
             });
         }
-        BodyIntake::Ignored => return Ok(RequestOutcome::Parsed(ParsedBody::empty())),
+        BodyIntake::Ignored => return Ok(RequestOutcome::Parsed(RequestBodyInputs::Empty)),
         BodyIntake::Parsed => {}
     }
 
@@ -165,11 +138,9 @@ async fn parse_body(
                     }
                 };
 
-            Ok(RequestOutcome::Parsed(ParsedBody {
-                body: Bytes::new(),
+            Ok(RequestOutcome::Parsed(RequestBodyInputs::Multipart {
                 files,
                 form,
-                json: None,
             }))
         }
         BodyClass::UrlEncoded => {
@@ -183,12 +154,9 @@ async fn parse_body(
             match index_fields(form_fields(&bytes), |name| {
                 RequestRejection::DuplicateFormField { name }
             }) {
-                RequestOutcome::Parsed(form) => Ok(RequestOutcome::Parsed(ParsedBody {
-                    body: Bytes::new(),
-                    files: HashMap::new(),
-                    form,
-                    json: None,
-                })),
+                RequestOutcome::Parsed(form) => {
+                    Ok(RequestOutcome::Parsed(RequestBodyInputs::UrlEncoded(form)))
+                }
                 RequestOutcome::Rejected(rejection) => Ok(RequestOutcome::Rejected(rejection)),
             }
         }
@@ -201,27 +169,19 @@ async fn parse_body(
             };
 
             match serde_json::from_slice(&bytes) {
-                Ok(json) => Ok(RequestOutcome::Parsed(ParsedBody {
-                    body: Bytes::new(),
-                    files: HashMap::new(),
-                    form: HashMap::new(),
-                    json: Some(json),
-                })),
+                Ok(json) => Ok(RequestOutcome::Parsed(RequestBodyInputs::Json(json))),
                 Err(source) => Ok(RequestOutcome::Rejected(RequestRejection::MalformedJson {
                     source,
                 })),
             }
         }
-        BodyClass::Other => Ok(RequestOutcome::Parsed(ParsedBody::empty())),
+        BodyClass::Other => Ok(RequestOutcome::Parsed(RequestBodyInputs::Empty)),
     }
 }
 
 pub struct RequestInputs {
-    pub body: Bytes,
+    pub body: RequestBodyInputs,
     pub cookies: HashMap<String, String>,
-    pub files: HashMap<String, UploadedFile>,
-    pub json: Option<serde_json::Value>,
-    pub form: HashMap<String, String>,
     pub query: HashMap<String, String>,
     pub server: ServerParams,
 }
@@ -238,11 +198,8 @@ impl RequestInputs {
         };
 
         RequestOutcome::Parsed(Self {
-            body: Bytes::new(),
+            body: RequestBodyInputs::Empty,
             cookies,
-            files: HashMap::new(),
-            json: None,
-            form: HashMap::new(),
             query,
             server,
         })
@@ -263,29 +220,16 @@ impl RequestInputs {
             RequestOutcome::Parsed(query) => query,
             RequestOutcome::Rejected(rejection) => return Ok(RequestOutcome::Rejected(rejection)),
         };
-        let ParsedBody {
-            body,
-            files,
-            form,
-            json,
-        } = {
-            let parsed_body =
-                parse_body(&server, body, body_intake, body_limit, upload_config).await?;
-
-            match parsed_body {
-                RequestOutcome::Parsed(parsed) => parsed,
-                RequestOutcome::Rejected(rejection) => {
-                    return Ok(RequestOutcome::Rejected(rejection));
-                }
+        let body = match parse_body(&server, body, body_intake, body_limit, upload_config).await? {
+            RequestOutcome::Parsed(parsed) => parsed,
+            RequestOutcome::Rejected(rejection) => {
+                return Ok(RequestOutcome::Rejected(rejection));
             }
         };
 
         Ok(RequestOutcome::Parsed(Self {
             body,
             cookies,
-            files,
-            json,
-            form,
             query,
             server,
         }))
@@ -293,11 +237,8 @@ impl RequestInputs {
 
     pub(crate) fn synthetic(method: Method, path: String) -> Self {
         Self {
-            body: Bytes::new(),
+            body: RequestBodyInputs::Empty,
             cookies: HashMap::new(),
-            files: HashMap::new(),
-            json: None,
-            form: HashMap::new(),
             query: HashMap::new(),
             server: ServerParams::synthetic(method, path),
         }
@@ -578,9 +519,9 @@ mod tests {
         assert_eq!(inputs.query.get("room").map(String::as_str), Some("lobby"));
         assert_eq!(inputs.server.path(), "/socket");
         assert_eq!(inputs.server.query_string(), "room=lobby");
-        assert!(inputs.form.is_empty());
-        assert!(inputs.files.is_empty());
-        assert!(inputs.json.is_none());
+        assert!(inputs.body.form().is_empty());
+        assert!(inputs.body.files().is_empty());
+        assert!(inputs.body.json().is_none());
     }
 
     #[test]
@@ -655,10 +596,10 @@ mod tests {
         .await
         .expect("the request is unambiguous");
 
-        assert_eq!(inputs.body.as_ref(), b"\x04\x00\x00\x00cargo");
-        assert!(inputs.form.is_empty());
-        assert!(inputs.files.is_empty());
-        assert!(inputs.json.is_none());
+        assert_eq!(inputs.body.collected().as_ref(), b"\x04\x00\x00\x00cargo");
+        assert!(inputs.body.form().is_empty());
+        assert!(inputs.body.files().is_empty());
+        assert!(inputs.body.json().is_none());
     }
 
     #[tokio::test]
@@ -671,8 +612,8 @@ mod tests {
         .await
         .expect("the request is unambiguous");
 
-        assert_eq!(inputs.body.as_ref(), b"username=margaret");
-        assert!(inputs.form.is_empty());
+        assert_eq!(inputs.body.collected().as_ref(), b"username=margaret");
+        assert!(inputs.body.form().is_empty());
     }
 
     #[tokio::test]
@@ -703,7 +644,7 @@ mod tests {
         )
         .await;
 
-        assert!(inputs.body.is_empty());
+        assert!(inputs.body.collected().is_empty());
     }
 
     async fn ignored(
@@ -739,10 +680,10 @@ mod tests {
         )
         .await;
 
-        assert!(inputs.body.is_empty());
-        assert!(inputs.files.is_empty());
-        assert!(inputs.form.is_empty());
-        assert!(inputs.json.is_none());
+        assert!(inputs.body.collected().is_empty());
+        assert!(inputs.body.files().is_empty());
+        assert!(inputs.body.form().is_empty());
+        assert!(inputs.body.json().is_none());
     }
 
     #[tokio::test]
@@ -768,7 +709,7 @@ mod tests {
     async fn accepts_a_malformed_content_type_when_the_body_is_ignored() {
         let inputs = ignored("not/a/media/type", b"", &UploadConfig::Disabled).await;
 
-        assert!(inputs.body.is_empty());
+        assert!(inputs.body.collected().is_empty());
     }
 
     #[tokio::test]
@@ -840,7 +781,7 @@ mod tests {
 
         assert_eq!(inputs.query.get("term").map(String::as_str), Some("rust"));
         assert_eq!(inputs.server.query_string(), "term=rust&page=2");
-        assert!(inputs.json.is_none());
+        assert!(inputs.body.json().is_none());
     }
 
     #[tokio::test]
@@ -865,7 +806,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            inputs.form.get("username").map(String::as_str),
+            inputs.body.form().get("username").map(String::as_str),
             Some("margaret")
         );
     }
@@ -899,7 +840,7 @@ mod tests {
         )
         .await;
 
-        assert!(inputs.json == Some(serde_json::json!({ "title": "hello" })));
+        assert!(inputs.body.json() == Some(&serde_json::json!({ "title": "hello" })));
     }
 
     #[tokio::test]
@@ -912,7 +853,7 @@ mod tests {
         )
         .await;
 
-        assert!(inputs.json == Some(serde_json::json!({ "title": "hello" })));
+        assert!(inputs.body.json() == Some(&serde_json::json!({ "title": "hello" })));
     }
 
     #[tokio::test]
@@ -926,11 +867,11 @@ mod tests {
         )
         .await;
 
-        assert!(provided.json == Some(serde_json::Value::Null));
+        assert!(provided.body.json() == Some(&serde_json::Value::Null));
 
         let absent = parsed(None, "/", b"", &upload_in(&directory)).await;
 
-        assert!(absent.json.is_none());
+        assert!(absent.body.json().is_none());
     }
 
     #[tokio::test]
@@ -965,11 +906,15 @@ mod tests {
         )
         .await;
 
-        assert_eq!(inputs.form.get("title").map(String::as_str), Some("hello"));
-        assert_eq!(inputs.files.len(), 2);
+        assert_eq!(
+            inputs.body.form().get("title").map(String::as_str),
+            Some("hello")
+        );
+        assert_eq!(inputs.body.files().len(), 2);
 
         let avatar = inputs
-            .files
+            .body
+            .files()
             .get("avatar")
             .expect("the avatar file is present");
         assert_eq!(avatar.file_name(), "face.png");
@@ -980,7 +925,11 @@ mod tests {
             b"PNG"
         );
 
-        let raw = inputs.files.get("raw").expect("the raw file is present");
+        let raw = inputs
+            .body
+            .files()
+            .get("raw")
+            .expect("the raw file is present");
         assert_eq!(raw.content_type(), "application/octet-stream");
         assert_eq!(
             std::fs::read(raw.path()).expect("the temp file is readable"),
@@ -1000,7 +949,8 @@ mod tests {
         .await;
 
         let avatar = inputs
-            .files
+            .body
+            .files()
             .get("avatar")
             .expect("the avatar file is present");
 
@@ -1134,9 +1084,9 @@ mod tests {
         let directory = tempdir().expect("a temporary directory");
         let inputs = parsed(Some("text/plain"), "/", b"whatever", &upload_in(&directory)).await;
 
-        assert!(inputs.form.is_empty());
-        assert!(inputs.files.is_empty());
-        assert!(inputs.json.is_none());
+        assert!(inputs.body.form().is_empty());
+        assert!(inputs.body.files().is_empty());
+        assert!(inputs.body.json().is_none());
     }
 
     #[tokio::test]
@@ -1204,7 +1154,8 @@ mod tests {
         )
         .await;
         let path = inputs
-            .files
+            .body
+            .files()
             .values()
             .next()
             .expect("an uploaded file is present")

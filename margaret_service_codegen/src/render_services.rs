@@ -177,7 +177,7 @@ fn server_registration(
         let origin_variable = format_ident!("origin_{}", server.name());
         let origin_read = required_flag_read(
             &quote! { String },
-            &server.url_argument(),
+            server.url_argument(),
             &quote! { value.clone().into() },
             &failed_registration(),
         );

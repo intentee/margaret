@@ -6,10 +6,10 @@ mod console_commands;
 pub mod console_plan;
 mod render;
 pub mod render_console;
+mod serve_command;
 
 #[cfg(test)]
 mod tests {
-    use std::mem::discriminant;
 
     use margaret_injection_codegen::injection_error::InjectionError;
 
@@ -23,12 +23,14 @@ mod tests {
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+    use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_serve_input_codegen::serve_input::ServeInput;
 
     use crate::console_artifacts::ConsoleArtifacts;
     use crate::console_codegen_error::ConsoleCodegenError;
@@ -113,16 +115,16 @@ impl Farewell {
         serve_inputs: &[margaret_serve_input_codegen::serve_input::ServeInput],
         bindings: &ContainerBindings,
     ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
-        let plan = ConsolePlan::build(index, bindings)?;
-
-        Ok(render_console(
-            &plan,
+        let plan = ConsolePlan::build(
+            index,
+            bindings,
             serves,
             has_models,
             http_servers,
             serve_inputs,
-            bindings,
-        ))
+        )?;
+
+        Ok(render_console(&plan, bindings))
     }
 
     fn source_for(lib_source: &str, has_http: bool) -> String {
@@ -137,9 +139,10 @@ impl Farewell {
         };
 
         let bindings = bindings(&index);
-        let plan = ConsolePlan::build(&index, &bindings).expect("the console is planned");
+        let plan = ConsolePlan::build(&index, &bindings, has_http, false, &http_servers, &[])
+            .expect("the console is planned");
 
-        render_console(&plan, has_http, false, &http_servers, &[], &bindings)
+        render_console(&plan, &bindings)
             .modules
             .into_iter()
             .map(|module| {
@@ -161,8 +164,20 @@ impl Farewell {
             .expect_err("the console source fails to generate")
     }
 
-    fn any_text() -> String {
-        "any".to_string()
+    fn flag(name: &str) -> ServeInput {
+        let source = format!(
+            "#[singleton]\nstruct Input;\n\nimpl Input {{\n    #[constructor]\n    fn create(#[console_argument(from = \"{name}\")] value: bool) -> Self {{}}\n}}\n"
+        );
+        let index = index_for(&source);
+        let declared = scan(&index).expect("the console argument is scanned");
+
+        declared
+            .input(
+                &CanonicalPath::new(vec!["crate".to_string(), "Input".to_string()]),
+                0,
+            )
+            .expect("the console argument is declared")
+            .clone()
     }
 
     #[test]
@@ -357,6 +372,120 @@ impl Farewell {
     }
 
     #[test]
+    fn rejects_every_consumer_collision_with_an_active_generated_serve_argument() {
+        let index = index_for("struct App;\n");
+        let bindings = bindings(&index);
+        let server = HttpServer::new(
+            "public".to_string(),
+            ServerTransportPolicy::PinnedSpiffeMtls,
+        );
+
+        for name in [
+            "public-addr",
+            "public-body-limit",
+            "public-url",
+            "public-uploads",
+            "public-upload-dir",
+            "public-transport",
+            "spiffe-trust-domain",
+            "spire-agent-addr",
+        ] {
+            let error = render_planned_console(
+                &index,
+                true,
+                false,
+                std::slice::from_ref(&server),
+                &[flag(name)],
+                &bindings,
+            )
+            .map(drop)
+            .expect_err("the duplicate serve argument is rejected");
+
+            assert!(matches!(
+                error,
+                ConsoleCodegenError::ServeArgumentNameCollision {
+                    name: ref collision,
+                    ..
+                } if collision == name
+            ));
+        }
+    }
+
+    #[test]
+    fn reserves_spiffe_arguments_for_an_outbound_spiffe_client() {
+        let index = index_for("struct App;\n");
+        let error = render_planned_console(
+            &index,
+            true,
+            false,
+            &[],
+            &[ServeInput::SpiffeHttpClient, flag("spiffe-trust-domain")],
+            &bindings(&index),
+        )
+        .map(drop)
+        .expect_err("the SPIFFE client argument collision is rejected");
+
+        assert!(matches!(
+            error,
+            ConsoleCodegenError::ServeArgumentNameCollision { ref name, .. }
+                if name == "spiffe-trust-domain"
+        ));
+    }
+
+    #[test]
+    fn keeps_console_command_arguments_in_their_subcommand_namespace() {
+        let index = index_for(
+            "#[singleton]\n#[console_command(name = \"configure\")]\nstruct Configure { limit: bool }\n\nimpl Configure {\n    #[constructor]\n    fn create(#[console_argument(from = \"public-body-limit\")] limit: bool) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        );
+        let bindings = bindings(&index);
+        let server = HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable);
+
+        render_planned_console(&index, true, false, &[server], &[], &bindings)
+            .expect("the names belong to distinct Clap command namespaces");
+    }
+
+    #[test]
+    fn rejects_a_console_command_named_after_the_active_serve_command() {
+        let index = index_for(
+            "#[singleton]\n#[console_command(name = \"serve\")]\nstruct Serve;\n\nimpl Serve {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        );
+
+        assert!(matches!(
+            render_planned_console(&index, true, false, &[], &[], &bindings(&index)),
+            Err(ConsoleCodegenError::GeneratedCommandNameCollision {
+                ref command,
+                name: "serve",
+            }) if command == "crate::Serve"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_console_command_named_after_the_active_schema_command() {
+        let index = index_for(
+            "#[singleton]\n#[console_command(name = \"schema\")]\nstruct Schema;\n\nimpl Schema {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        );
+
+        assert!(matches!(
+            render_planned_console(&index, false, true, &[], &[], &bindings(&index)),
+            Err(ConsoleCodegenError::GeneratedCommandNameCollision {
+                ref command,
+                name: "schema",
+            }) if command == "crate::Schema"
+        ));
+    }
+
+    #[test]
+    fn accepts_generated_command_names_when_the_generated_commands_are_inactive() {
+        let source = source_for(
+            "#[singleton]\n#[console_command(name = \"serve\")]\nstruct Serve;\n\nimpl Serve {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"schema\")]\nstruct Schema;\n\nimpl Schema {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            false,
+        );
+
+        assert!(source.contains(r#"Some(("serve",_matches))=>{"#));
+        assert!(source.contains(r#"Some(("schema",_matches))=>{"#));
+    }
+
+    #[test]
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
         let index = index_for("struct App;\n");
         let source: String =
@@ -490,60 +619,48 @@ impl Farewell {
 
     #[test]
     fn rejects_console_command_on_a_non_struct() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[console_command(name = \"bad\")]\nenum Bad {}\n"
-            )),
-            discriminant(&ConsoleCodegenError::ConsoleCommandNotOnStruct { target: any_text() })
-        );
+        assert!(matches!(
+            rejection_for("#[console_command(name = \"bad\")]\nenum Bad {}\n"),
+            ConsoleCodegenError::ConsoleCommandNotOnStruct { ref target, .. } if target == "crate::Bad"
+        ));
     }
 
     #[test]
     fn requires_a_command_name() {
-        assert_eq!(
-            discriminant(&rejection_for("#[console_command]\nstruct Bad;\n")),
-            discriminant(&ConsoleCodegenError::MissingCommandName {
-                command: any_text()
-            })
-        );
+        assert!(matches!(
+            rejection_for("#[console_command]\nstruct Bad;\n"),
+            ConsoleCodegenError::MissingCommandName { ref command, .. } if command == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_two_commands_registering_the_same_name() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[singleton]\n#[console_command(name = \"greet\")]\nstruct First;\n\nimpl First {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n\n#[singleton]\n#[console_command(name = \"greet\")]\nstruct Second;\n\nimpl Second {\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            )),
-            discriminant(&ConsoleCodegenError::DuplicateCommandName {
-                command: any_text(),
-                existing_command: any_text(),
-                name: any_text()
-            })
-        );
+            ),
+            ConsoleCodegenError::DuplicateCommandName { ref command, .. } if command == "crate::Second"
+        ));
     }
 
     #[test]
     fn rejects_a_console_command_that_injects_the_spiffe_http_client() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "use reqwest::Client;\n\n#[singleton]\nstruct OutboundCaller {\n    client: Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"call\")]\nstruct Call {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Call {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            )),
-            discriminant(
-                &ConsoleCodegenError::ConsoleCommandInjectsSpiffeHttpClient {
-                    command: any_text()
-                }
-            )
-        );
+            ),
+            ConsoleCodegenError::ConsoleCommandInjectsSpiffeHttpClient { ref command, .. } if command == "crate::Call"
+        ));
     }
 
     #[test]
     fn propagates_malformed_command_arguments() {
-        assert_eq!(
-            discriminant(&rejection_for("#[console_command(= 5)]\nstruct Bad;\n")),
-            discriminant(&ConsoleCodegenError::Index {
-                source: AttributeError::GlobImport { file: any_text() }
-            })
-        );
+        assert!(matches!(
+            rejection_for("#[console_command(= 5)]\nstruct Bad;\n"),
+            ConsoleCodegenError::Index {
+                source: AttributeError::Arguments(AttributeArgumentsError::Malformed { ref attribute_path, .. })
+            } if attribute_path == "console_command"
+        ));
     }
 
     #[test]
@@ -595,41 +712,33 @@ impl Farewell {
 
     #[test]
     fn reports_a_missing_command_runner() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[console_command(name = \"bad\")]\nstruct Bad;\n"
-            )),
-            discriminant(&ConsoleCodegenError::Injection {
-                source: InjectionError::MissingProcessMethod { item: any_text() }
-            })
-        );
+        assert!(matches!(
+            rejection_for("#[console_command(name = \"bad\")]\nstruct Bad;\n"),
+            ConsoleCodegenError::Injection {
+                source: InjectionError::MissingProcessMethod { ref item, .. },
+                ..
+            } if item == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_a_non_token_runner_parameter() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            )),
-            discriminant(&ConsoleCodegenError::ConsoleCommandRunnerArgument {
-                command: any_text(),
-                parameter: any_text()
-            })
-        );
+            ),
+            ConsoleCodegenError::ConsoleCommandRunnerArgument { ref command, .. } if command == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "use tokio_util::sync::CancellationToken;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = Query)] token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
-            )),
-            discriminant(&ConsoleCodegenError::ConsoleCommandRunnerRequestBinding {
-                command: any_text(),
-                marker: any_text(),
-                parameter: any_text()
-            })
-        );
+            ),
+            ConsoleCodegenError::ConsoleCommandRunnerRequestBinding { ref marker, .. } if marker == "form_request"
+        ));
     }
 
     #[test]

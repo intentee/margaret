@@ -61,28 +61,28 @@ impl Request {
 mod tests {
     use std::collections::HashMap;
 
-    use bytes::Bytes;
     use http::Method;
 
     use super::Request;
+    use crate::request_body_inputs::RequestBodyInputs;
     use crate::request_inputs::RequestInputs;
     use crate::server_params::ServerParams;
 
     #[test]
     fn exposes_its_inputs_and_path_parameters() {
         let request = Request::from_inputs(RequestInputs {
-            body: Bytes::new(),
+            body: RequestBodyInputs::UrlEncoded(HashMap::from([(
+                "title".to_string(),
+                "hello".to_string(),
+            )])),
             cookies: HashMap::new(),
-            files: HashMap::new(),
-            json: None,
-            form: HashMap::from([("title".to_string(), "hello".to_string())]),
             query: HashMap::from([("page".to_string(), "2".to_string())]),
             server: ServerParams::synthetic(Method::POST, "/articles".to_string()),
         })
         .with_path_params(HashMap::from([("id".to_string(), "42".to_string())]));
 
         assert_eq!(
-            request.inputs.form.get("title").map(String::as_str),
+            request.inputs.body.form().get("title").map(String::as_str),
             Some("hello")
         );
         assert_eq!(

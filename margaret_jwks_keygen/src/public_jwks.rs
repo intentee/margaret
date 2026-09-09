@@ -19,7 +19,42 @@ use crate::verifies_token::VerifiesToken;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct PublicJwks {
-    pub keys: Vec<JwkPublic>,
+    keys: Vec<JwkPublic>,
+}
+
+impl PublicJwks {
+    /// # Errors
+    ///
+    /// Returns `JwksKeyError::DuplicateKeyId` when two keys share a key id.
+    pub fn new(keys: Vec<JwkPublic>) -> Result<Self, JwksKeyError> {
+        let mut seen: HashSet<&str> = HashSet::with_capacity(keys.len());
+
+        for key in &keys {
+            if !seen.insert(key.kid()) {
+                return Err(JwksKeyError::DuplicateKeyId {
+                    kid: key.kid().to_string(),
+                });
+            }
+        }
+
+        Ok(Self { keys })
+    }
+
+    #[must_use]
+    pub fn find_by_kid(&self, kid: &str) -> Option<&JwkPublic> {
+        self.keys.iter().find(|key| key.kid() == kid)
+    }
+
+    #[must_use]
+    pub fn keys(&self) -> &[JwkPublic] {
+        &self.keys
+    }
+
+    fn publish(&mut self, jwk_public: &EcJwkPublic) {
+        if self.find_by_kid(&jwk_public.kid).is_none() {
+            self.keys.push(JwkPublic::from(jwk_public.clone()));
+        }
+    }
 }
 
 impl<'wire> Deserialize<'wire> for PublicJwks {
@@ -33,31 +68,8 @@ impl<'wire> Deserialize<'wire> for PublicJwks {
         }
 
         let PublicJwksWire { keys } = PublicJwksWire::deserialize(deserializer)?;
-        let mut seen: HashSet<&str> = HashSet::with_capacity(keys.len());
 
-        for key in &keys {
-            if !seen.insert(key.kid()) {
-                return Err(Source::Error::custom(format!(
-                    "the jwk set declares the key id '{}' more than once",
-                    key.kid()
-                )));
-            }
-        }
-
-        Ok(Self { keys })
-    }
-}
-
-impl PublicJwks {
-    #[must_use]
-    pub fn find_by_kid(&self, kid: &str) -> Option<&JwkPublic> {
-        self.keys.iter().find(|key| key.kid() == kid)
-    }
-
-    fn publish(&mut self, jwk_public: &EcJwkPublic) {
-        if self.find_by_kid(&jwk_public.kid).is_none() {
-            self.keys.push(JwkPublic::from(jwk_public.clone()));
-        }
+        Self::new(keys).map_err(Source::Error::custom)
     }
 }
 

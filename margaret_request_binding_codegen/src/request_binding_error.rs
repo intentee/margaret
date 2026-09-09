@@ -134,6 +134,15 @@ pub enum RequestBindingError {
     ConflictingRequestBodyMarkers { subject: String, parameter: String },
 
     #[error(
+        "argument #{parameter} of {subject} carries arguments on #[{marker}], which is a bare marker"
+    )]
+    RequestBindingMarkerTakesNoArguments {
+        marker: &'static str,
+        subject: String,
+        parameter: String,
+    },
+
+    #[error(
         "{subject} collects the raw request body through #[request_body] and also parses it; a route reads its body in exactly one way"
     )]
     ConflictingRequestBodyIntake { subject: String },

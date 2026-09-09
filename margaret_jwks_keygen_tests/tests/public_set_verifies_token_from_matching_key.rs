@@ -22,9 +22,8 @@ async fn public_set_verifies_token_from_matching_key() -> Result<()> {
     };
 
     let token = keypair.signing.sign(&claims).await?;
-    let set = PublicJwks {
-        keys: vec![JwkPublic::Ec(keypair.public)],
-    };
+    let set = PublicJwks::new(vec![JwkPublic::Ec(keypair.public)])
+        .expect("the key set has unique key ids");
     let verified: TestClaims = set.verify(&token)?.verified().expect("the token verifies");
 
     assert_eq!(verified, claims);

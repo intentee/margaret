@@ -34,6 +34,9 @@ pub enum JwksKeyError {
         source: p256::pkcs8::Error,
     },
 
+    #[error("the jwk set declares the key id '{kid}' more than once")]
+    DuplicateKeyId { kid: String },
+
     #[error("the jwk rsa public exponent is not valid base64url: {source}")]
     RsaExponentBase64 {
         #[source]

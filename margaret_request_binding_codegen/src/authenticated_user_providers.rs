@@ -15,6 +15,7 @@ use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
+use crate::classified_parameters::ClassifiedParameters;
 use crate::classify_parameters::classify_parameters;
 use crate::infers_authenticated_user_arguments::InfersAuthenticatedUserArguments;
 use crate::injects_routes::injects_routes;
@@ -94,7 +95,10 @@ pub fn authenticated_user_providers(
         let method = infer_from_request_method(item, &provider)?;
 
         let subject = format!("authenticated user provider '{provider}'");
-        let parameters = classify_parameters(
+        let ClassifiedParameters {
+            body_intake,
+            parameters,
+        } = classify_parameters(
             index,
             item,
             method,
@@ -125,6 +129,7 @@ pub fn authenticated_user_providers(
             model,
             AuthenticatedUserProvider {
                 application,
+                body_intake,
                 is_async,
                 method_name,
                 parameters,

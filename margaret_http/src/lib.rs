@@ -28,6 +28,7 @@ pub(crate) mod one_shot_layer;
 pub mod redirect;
 pub mod request;
 pub(crate) mod request_body;
+pub mod request_body_inputs;
 pub(crate) mod request_headers;
 pub(crate) mod request_inputs;
 pub(crate) mod request_outcome;

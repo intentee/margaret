@@ -14,7 +14,6 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
-    use std::mem::discriminant;
 
     use margaret_injection_codegen::injection_error::InjectionError;
 
@@ -124,17 +123,6 @@ mod tests {
             .expect("the services source fails to generate")
     }
 
-    fn any_text() -> String {
-        "any".to_string()
-    }
-
-    fn injection_rejection(error: &ServiceCodegenError) -> Option<&InjectionError> {
-        match error {
-            ServiceCodegenError::Injection { source } => Some(source),
-            _ => None,
-        }
-    }
-
     fn public() -> Vec<HttpServer> {
         vec![HttpServer::new(
             "public".to_string(),
@@ -225,30 +213,30 @@ impl Flusher {
 
     #[test]
     fn rejects_an_unresolvable_ticker_interval_path() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[scheduled_with_tick_timer(interval = PERIOD)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
-            )),
-            discriminant(&ServiceCodegenError::UnresolvedTickerPath {
-                ticker: any_text(),
-                argument: "any",
-                path: any_text()
-            })
-        );
+            ),
+            ServiceCodegenError::UnresolvedTickerPath {
+                argument: "interval",
+                ref path,
+                ..
+            } if path == "PERIOD"
+        ));
     }
 
     #[test]
     fn rejects_an_unresolvable_ticker_behavior_path() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[scheduled_with_tick_timer(interval = crate::PERIOD, behavior = Delay)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
-            )),
-            discriminant(&ServiceCodegenError::UnresolvedTickerPath {
-                ticker: any_text(),
-                argument: "any",
-                path: any_text()
-            })
-        );
+            ),
+            ServiceCodegenError::UnresolvedTickerPath {
+                argument: "behavior",
+                ref path,
+                ..
+            } if path == "Delay"
+        ));
     }
 
     fn canonical(segments: &[&str]) -> CanonicalPath {
@@ -604,12 +592,12 @@ impl Flusher {
 
     #[test]
     fn rejects_a_ticker_conflicting_with_a_command() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[scheduled_with_tick_timer(interval = crate::P)]\n#[console_command(name = \"x\")]\nstruct Bad;\n",
-            )),
-            discriminant(&ServiceCodegenError::ConflictingRoles { path: any_text() })
-        );
+            ),
+            ServiceCodegenError::ConflictingRoles { ref path, .. } if path == "crate::Bad"
+        ));
     }
 
     #[test]
@@ -650,112 +638,90 @@ impl Flusher {
 
     #[test]
     fn rejects_a_service_on_a_non_struct() {
-        assert_eq!(
-            discriminant(&rejection_for("#[service]\nenum Bad {}\n")),
-            discriminant(&ServiceCodegenError::ServiceNotAStruct { path: any_text() })
-        );
+        assert!(matches!(
+            rejection_for("#[service]\nenum Bad {}\n"),
+            ServiceCodegenError::ServiceNotAStruct { ref path, .. } if path == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_a_ticker_on_a_non_struct() {
-        assert_eq!(
-            discriminant(&rejection_for(
-                "#[scheduled_with_tick_timer(interval = crate::P)]\nenum Bad {}\n"
-            )),
-            discriminant(&ServiceCodegenError::TickerNotAStruct { path: any_text() })
-        );
+        assert!(matches!(
+            rejection_for("#[scheduled_with_tick_timer(interval = crate::P)]\nenum Bad {}\n"),
+            ServiceCodegenError::TickerNotAStruct { ref path, .. } if path == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_conflicting_roles() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[service]\n#[scheduled_with_tick_timer(interval = crate::P)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
-            )),
-            discriminant(&ServiceCodegenError::ConflictingRoles { path: any_text() })
-        );
-    }
-
-    #[test]
-    fn reads_no_injection_rejection_from_an_unrelated_service_error() {
-        assert!(
-            injection_rejection(&ServiceCodegenError::ServiceNotAStruct { path: any_text() })
-                .is_none()
-        );
+            ),
+            ServiceCodegenError::ConflictingRoles { ref path, .. } if path == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_a_unit_without_a_runner() {
-        assert_eq!(
-            discriminant(
-                injection_rejection(&rejection_for("#[service]\nstruct Bad;\n"))
-                    .expect("the unit is rejected by its #[process] runner"),
-            ),
-            discriminant(&InjectionError::MissingProcessMethod { item: any_text() })
-        );
+        assert!(matches!(
+            rejection_for("#[service]\nstruct Bad;\n"),
+            ServiceCodegenError::Injection {
+                source: InjectionError::MissingProcessMethod { ref item, .. }
+            } if item == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_an_ambiguous_runner() {
-        assert_eq!(
-            discriminant(
-                injection_rejection(&rejection_for(
-            "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> anyhow::Result<()> {}\n    #[process]\n    fn b(&self) -> anyhow::Result<()> {}\n}\n",
-        ))
-                    .expect("the unit is rejected by its #[process] runner"),
+        assert!(matches!(
+            rejection_for(
+                "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn a(&self) -> anyhow::Result<()> {}\n    #[process]\n    fn b(&self) -> anyhow::Result<()> {}\n}\n",
             ),
-            discriminant(&InjectionError::AmbiguousProcessMethod { item: any_text(), methods: any_text() })
-        );
+            ServiceCodegenError::Injection {
+                source: InjectionError::AmbiguousProcessMethod { ref item, .. }
+            } if item == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_a_ticker_without_an_interval() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[scheduled_with_tick_timer]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
-            )),
-            discriminant(&ServiceCodegenError::TickerMissingInterval { ticker: any_text() })
-        );
+            ),
+            ServiceCodegenError::TickerMissingInterval { ref ticker, .. } if ticker == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_an_unmarked_runner_parameter() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, value: String) -> anyhow::Result<()> {}\n}\n",
-            )),
-            discriminant(&ServiceCodegenError::RunnerArgument {
-                path: any_text(),
-                parameter: any_text()
-            })
-        );
+            ),
+            ServiceCodegenError::RunnerArgument { ref path, .. } if path == "crate::Bad"
+        ));
     }
 
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[authenticated_user] token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
-            )),
-            discriminant(&ServiceCodegenError::RunnerRequestBinding {
-                path: any_text(),
-                marker: any_text(),
-                parameter: any_text()
-            })
-        );
+            ),
+            ServiceCodegenError::RunnerRequestBinding { ref marker, .. } if marker == "authenticated_user"
+        ));
     }
 
     #[test]
     fn rejects_a_cancellation_token_passed_by_reference() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, token: &CancellationToken) -> anyhow::Result<()> {}\n}\n",
-            )),
-            discriminant(&ServiceCodegenError::RunnerArgument {
-                path: any_text(),
-                parameter: any_text()
-            })
-        );
+            ),
+            ServiceCodegenError::RunnerArgument { ref path, .. } if path == "crate::Bad"
+        ));
     }
 
     #[test]
@@ -941,13 +907,13 @@ impl Second {
 
     #[test]
     fn propagates_malformed_ticker_arguments() {
-        assert_eq!(
-            discriminant(&rejection_for(
+        assert!(matches!(
+            rejection_for(
                 "#[scheduled_with_tick_timer(= 5)]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n",
-            )),
-            discriminant(&ServiceCodegenError::Index {
-                source: AttributeError::GlobImport { file: any_text() }
-            })
-        );
+            ),
+            ServiceCodegenError::Index {
+                source: AttributeError::Arguments(AttributeArgumentsError::Malformed { ref attribute_path, .. })
+            } if attribute_path == "scheduled_with_tick_timer"
+        ));
     }
 }

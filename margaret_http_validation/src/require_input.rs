@@ -31,6 +31,7 @@ mod tests {
     use http::Method;
 
     use margaret_http::request::Request;
+    use margaret_http::request_body_inputs::RequestBodyInputs;
 
     use super::require_input;
     use crate::request_input::RequestInput;
@@ -43,7 +44,7 @@ mod tests {
 
     fn request_with_form(form: HashMap<String, String>) -> Request {
         let mut request = Request::new(Method::POST, "/".to_string());
-        request.inputs.form = form;
+        request.inputs.body = RequestBodyInputs::UrlEncoded(form);
         request
     }
 

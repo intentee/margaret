@@ -71,4 +71,18 @@ pub enum ConsoleCodegenError {
         existing_command: String,
         name: String,
     },
+
+    #[error(
+        "the generated command '{name}' collides with console command '{command}' in the root CLI namespace"
+    )]
+    GeneratedCommandNameCollision { command: String, name: &'static str },
+
+    #[error(
+        "the serve argument '{name}' declared by {owner} collides with the argument declared by {first_owner}"
+    )]
+    ServeArgumentNameCollision {
+        first_owner: String,
+        name: String,
+        owner: String,
+    },
 }

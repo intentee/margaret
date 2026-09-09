@@ -32,18 +32,16 @@ async fn public_jwks_routes_a_mixed_key_set_by_key_id() -> Result<()> {
     };
     let ec_token = ec_keypair.signing.sign(&ec_claims).await?;
     let rsa_token = sign_rs256_token("rsa-kid", &rsa_claims);
-    let public_jwks = PublicJwks {
-        keys: vec![
-            JwkPublic::Ec(ec_keypair.public),
-            JwkPublic::Rsa(RsaJwkPublic {
-                alg: RsaAlgorithm::Rs256,
-                e: RSA_TEST_KEY_EXPONENT.to_string(),
-                kid: "rsa-kid".to_string(),
-                n: RSA_TEST_KEY_MODULUS.to_string(),
-                use_: KeyUse::Signature,
-            }),
-        ],
-    };
+    let public_jwks = PublicJwks::new(vec![
+        JwkPublic::Ec(ec_keypair.public),
+        JwkPublic::Rsa(RsaJwkPublic {
+            alg: RsaAlgorithm::Rs256,
+            e: RSA_TEST_KEY_EXPONENT.to_string(),
+            kid: "rsa-kid".to_string(),
+            n: RSA_TEST_KEY_MODULUS.to_string(),
+            use_: KeyUse::Signature,
+        }),
+    ])?;
 
     assert_eq!(
         public_jwks.verify::<TestClaims>(&ec_token)?.verified(),

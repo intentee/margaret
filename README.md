@@ -49,7 +49,8 @@ make test.unit
 make clippy
 ```
 
-The complete integration and coverage gates require Docker and the project development dependencies:
+The complete integration and coverage gates additionally require Docker, Node.js, and the SPIRE
+`spire-server` and `spire-agent` binaries on `PATH`:
 
 ```console
 make test.integration

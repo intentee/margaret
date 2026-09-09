@@ -13,10 +13,10 @@ where
 {
     match source {
         RequestInput::Cookie => margaret_validation::validate::validate(&request.inputs.cookies),
-        RequestInput::Form => margaret_validation::validate::validate(&request.inputs.form),
+        RequestInput::Form => margaret_validation::validate::validate(request.inputs.body.form()),
         RequestInput::Query => margaret_validation::validate::validate(&request.inputs.query),
         RequestInput::Json => {
-            margaret_validation::validate_json::validate_json(request.inputs.json.as_ref())
+            margaret_validation::validate_json::validate_json(request.inputs.body.json())
         }
     }
 }
@@ -29,6 +29,7 @@ mod tests {
     use serde_json::json;
 
     use margaret_http::request::Request;
+    use margaret_http::request_body_inputs::RequestBodyInputs;
     use margaret_validation::validation_result::ValidationResult;
 
     use super::validate_input;
@@ -54,7 +55,10 @@ mod tests {
     #[test]
     fn validates_the_form_source() {
         let mut request = request();
-        request.inputs.form = HashMap::from([("value".to_string(), "formed".to_string())]);
+        request.inputs.body = RequestBodyInputs::UrlEncoded(HashMap::from([(
+            "value".to_string(),
+            "formed".to_string(),
+        )]));
 
         assert_eq!(
             value(validate_input(&request, RequestInput::Form)),
@@ -87,7 +91,7 @@ mod tests {
     #[test]
     fn validates_the_json_source() {
         let mut request = request();
-        request.inputs.json = Some(json!({ "value": "jsoned" }));
+        request.inputs.body = RequestBodyInputs::Json(json!({ "value": "jsoned" }));
 
         assert_eq!(
             value(validate_input(&request, RequestInput::Json)),
@@ -98,7 +102,8 @@ mod tests {
     #[test]
     fn reports_invalid_source_data() {
         let mut request = request();
-        request.inputs.form = HashMap::from([("value".to_string(), String::new())]);
+        request.inputs.body =
+            RequestBodyInputs::UrlEncoded(HashMap::from([("value".to_string(), String::new())]));
 
         assert_eq!(value(validate_input(&request, RequestInput::Form)), None);
     }

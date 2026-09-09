@@ -16,8 +16,8 @@ impl MintAccessTokenRequest {
     pub fn from_request(request: &Request) -> Result<Self, MintAccessTokenError> {
         let body = request
             .inputs
-            .json
-            .as_ref()
+            .body
+            .json()
             .ok_or(MintAccessTokenError::MissingBody)?;
 
         Self::deserialize(body).map_err(|source| MintAccessTokenError::MalformedRequest { source })

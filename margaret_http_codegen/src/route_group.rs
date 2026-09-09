@@ -21,6 +21,10 @@ impl RouteGroup {
         self.methods.values()
     }
 
+    pub(crate) fn method_routes_mut(&mut self) -> impl Iterator<Item = &mut HttpRoute> {
+        self.methods.values_mut()
+    }
+
     pub(crate) fn path(&self) -> &RoutePath {
         &self.path
     }

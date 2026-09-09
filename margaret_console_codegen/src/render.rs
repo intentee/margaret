@@ -6,13 +6,13 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::serve_input_binding::ServeInputBinding;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
-use margaret_http_codegen::serves_spiffe::serves_spiffe;
-use margaret_serve_input_codegen::has_spiffe_http_client::has_spiffe_http_client;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 use margaret_serve_input_codegen::serve_input_read::serve_input_read;
 use margaret_serve_input_codegen::serve_input_registration::serve_input_registration;
 
 use crate::console_command::ConsoleCommand;
+use crate::console_plan::ConsolePlan;
+use crate::serve_command::ServeCommand;
 
 fn transport_argument_registration(server: &HttpServer) -> TokenStream {
     let transport_argument = server.transport_argument();
@@ -44,18 +44,17 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
     }
 }
 
-fn serve_registration(http_servers: &[HttpServer], serve_inputs: &[ServeInput]) -> TokenStream {
-    let spiffe_secured = serves_spiffe(http_servers);
-    let svid_active = spiffe_secured || has_spiffe_http_client(serve_inputs);
-    let service_arguments = serve_inputs.iter().map(serve_input_registration);
-    let http_server_arguments = http_servers.iter().map(|server| {
+fn serve_registration(command: &ServeCommand) -> TokenStream {
+    let service_arguments = command.serve_inputs.iter().map(serve_input_registration);
+    let http_server_arguments = command.http_servers.iter().map(|server| {
         let address_argument = server.address_argument();
         let body_limit_argument = server.body_limit_argument();
         let url_argument = server.url_argument();
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
-        let transport_argument =
-            spiffe_secured.then(|| transport_argument_registration(server));
+        let transport_argument = command
+            .registers_transport_arguments
+            .then(|| transport_argument_registration(server));
 
         quote! {
             .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
@@ -71,7 +70,7 @@ fn serve_registration(http_servers: &[HttpServer], serve_inputs: &[ServeInput]) 
             #transport_argument
         }
     });
-    let spiffe_arguments = svid_active.then(|| {
+    let spiffe_arguments = command.registers_spiffe_arguments.then(|| {
         quote! {
             .arg(clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true))
             .arg(clap::Arg::new("spire-agent-addr").long("spire-agent-addr").required(true))
@@ -186,15 +185,9 @@ fn schema_tokens(has_models: bool) -> SchemaTokens {
     SchemaTokens { arm, registration }
 }
 
-pub(crate) fn render(
-    commands: &[ConsoleCommand],
-    serves: bool,
-    has_models: bool,
-    http_servers: &[HttpServer],
-    serve_inputs: &[ServeInput],
-    bindings: &ContainerBindings,
-) -> RenderedConsole {
-    let dispatches_asynchronously = serves
+pub(crate) fn render(plan: &ConsolePlan, bindings: &ContainerBindings) -> RenderedConsole {
+    let commands = &plan.commands;
+    let dispatches_asynchronously = plan.serve.is_some()
         || commands.iter().any(|command| {
             command.takes_token
                 || command.is_async
@@ -214,15 +207,14 @@ pub(crate) fn render(
     let SchemaTokens {
         arm: schema_arm,
         registration: schema_registration,
-    } = schema_tokens(has_models);
+    } = schema_tokens(plan.has_models);
 
-    let serve_registration = if serves {
-        serve_registration(http_servers, serve_inputs)
-    } else {
-        quote! {}
+    let serve_registration = match &plan.serve {
+        Some(command) => serve_registration(command),
+        None => quote! {},
     };
 
-    let serve_arm = if serves {
+    let serve_arm = if plan.serve.is_some() {
         quote! {
             Some(("serve", matches)) => {
                 margaret::framework::service::dispatch_serve::dispatch_serve(

@@ -9,9 +9,9 @@ use margaret_jwks_keygen_tests::github_jwks_document::GITHUB_JWKS_DOCUMENT;
 fn public_jwks_reads_the_github_oidc_document() -> Result<()> {
     let public_jwks: PublicJwks = from_str(GITHUB_JWKS_DOCUMENT)?;
 
-    assert!(!public_jwks.keys.is_empty());
+    assert!(!public_jwks.keys().is_empty());
 
-    for key in &public_jwks.keys {
+    for key in public_jwks.keys() {
         assert!(matches!(key, JwkPublic::Rsa(_)));
         assert!(public_jwks.find_by_kid(key.kid()).is_some());
     }
