@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -52,7 +51,7 @@ fn framework_providers(
 struct ServingModules {
     http_roots: Vec<CanonicalPath>,
     modules: Vec<GeneratedModuleTokens>,
-    servers: Vec<margaret_http_codegen::http_server::HttpServer>,
+    servers: Vec<margaret_server_codegen::http_server::HttpServer>,
     view_roots: Vec<CanonicalPath>,
     websocket_roots: Vec<CanonicalPath>,
 }
@@ -66,7 +65,7 @@ fn render_serving_modules(
 ) -> Result<ServingModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
-    let (websocket_roots, websocket_servers, websocket_server_serve_inputs) =
+    let (websocket_roots, websocket_server_contributions) =
         if features.contains(GeneratedFeature::Websockets) {
             let plan = margaret_websocket_codegen::web_socket_plan::WebSocketPlan::build(
                 index,
@@ -78,13 +77,9 @@ fn render_serving_modules(
                 margaret_websocket_codegen::render_websocket::render_websocket(plan, bindings);
             modules.extend(artifacts.modules);
 
-            (
-                artifacts.retained_roots,
-                artifacts.servers,
-                artifacts.server_serve_inputs,
-            )
+            (artifacts.retained_roots, artifacts.server_contributions)
         } else {
-            (Vec::new(), Vec::new(), BTreeMap::new())
+            (Vec::new(), Vec::new())
         };
 
     let view_roots = if features.contains(GeneratedFeature::Views) {
@@ -103,16 +98,19 @@ fn render_serving_modules(
         let plan = margaret_http_codegen::http_plan::HttpPlan::build(
             index,
             features.contains(GeneratedFeature::Views),
-            &websocket_servers,
             middleware_plans,
-            bindings,
-            &websocket_server_serve_inputs,
             registries,
+            bindings,
         )?;
-        let artifacts = margaret_http_codegen::render_http::render_http(plan, bindings);
+        let mut contributions = plan.server_contributions().to_vec();
+
+        contributions.extend(websocket_server_contributions);
+
+        let servers = margaret_server_codegen::assemble_servers::assemble_servers(&contributions);
+        let artifacts = margaret_http_codegen::render_http::render_http(plan, &servers, bindings);
         modules.extend(artifacts.modules);
 
-        (artifacts.retained_roots, artifacts.servers)
+        (artifacts.retained_roots, servers)
     } else {
         (Vec::new(), Vec::new())
     };
@@ -137,7 +135,7 @@ fn render_role_modules(
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
     jwks_services: &[margaret_service_codegen::framework_service::FrameworkService],
-    servers: &[margaret_http_codegen::http_server::HttpServer],
+    servers: &[margaret_server_codegen::http_server::HttpServer],
 ) -> Result<RoleModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 

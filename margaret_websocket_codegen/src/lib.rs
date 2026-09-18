@@ -1,8 +1,3 @@
-pub mod render_websocket;
-pub mod web_socket_artifacts;
-pub mod web_socket_codegen_error;
-pub mod web_socket_plan;
-
 mod build_for_session_method;
 mod build_websocket_plan;
 mod built_websocket_plan;
@@ -15,12 +10,17 @@ mod message_kind;
 mod render_messages;
 mod render_server_routes;
 mod render_sessions;
-mod server_serve_inputs;
+pub mod render_websocket;
+mod resolve_session_providers;
 mod session_arguments;
 mod session_handler_plan;
 mod session_plan;
 mod session_serve_inputs;
+pub mod web_socket_artifacts;
+pub mod web_socket_codegen_error;
 mod web_socket_message;
+pub mod web_socket_plan;
+mod web_socket_server_contributions;
 mod web_socket_session;
 mod websocket_handlers;
 mod websocket_messages;
@@ -46,7 +46,9 @@ mod tests {
     use quote::format_ident;
 
     use crate::handler_binding::HandlerBinding;
-    use crate::server_serve_inputs::server_serve_inputs;
+    use margaret_server_codegen::server_name::ServerName;
+
+    use crate::resolve_session_providers::resolve_session_providers;
     use crate::session_plan::SessionPlan;
     use crate::session_serve_inputs::session_serve_inputs;
     use crate::web_socket_codegen_error::WebSocketCodegenError;
@@ -190,7 +192,7 @@ impl RespondsToWebSocketNotification for Typist {
                 module_name: "room".to_string(),
                 parameters: Vec::new(),
                 path: "/room".to_string(),
-                server: "public".to_string(),
+                server: ServerName::parse("public".to_string()).expect("the fixture name is snake_case"),
                 session_path: margaret_attributes::canonical_path::CanonicalPath::new(vec![
                     "crate".to_string(),
                     "Room".to_string(),
@@ -341,7 +343,7 @@ impl RespondsToWebSocketNotification for Typist {
 
         assert!(error.to_string().contains("crate::Missing"));
 
-        let error = server_serve_inputs(&[&plan], &bindings(&index))
+        let error = resolve_session_providers(&plan, &bindings(&index))
             .expect_err("a server cannot include an unplanned handler");
 
         assert!(error.to_string().contains("crate::Missing"));
@@ -379,7 +381,7 @@ impl RespondsToWebSocketNotification for Typist {
             wrapper: format_ident!("Missing"),
         });
 
-        let error = server_serve_inputs(&[&plan], &bindings(&index))
+        let error = resolve_session_providers(&plan, &bindings(&index))
             .expect_err("an unplanned middleware layer has no console arguments");
 
         assert!(error.to_string().contains("crate::Missing"));
@@ -915,7 +917,7 @@ impl Guard {
         assert!(
             error(r#"#[websocket_session(path = "/x", server = "Public")] struct Bad;"#)
                 .to_string()
-                .contains("has server")
+                .contains("must be a snake_case identifier")
         );
     }
 

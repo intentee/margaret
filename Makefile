@@ -54,6 +54,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_schema_postgres_tests \
 	-p margaret_service \
 	-p margaret_serve_input_codegen \
+	-p margaret_server_codegen \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
 	-p margaret_spiffe_svid \
@@ -148,6 +149,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_schema_identifier_naming \
 	-p margaret_service \
 	-p margaret_serve_input_codegen \
+	-p margaret_server_codegen \
 	-p margaret_service_codegen \
 	-p margaret_spiffe_svid \
 	-p margaret_spiffe_svid_bundle \
@@ -266,6 +268,7 @@ coverage: node_modules postgres-image
 		--gated margaret_schema_postgres_tests=100 \
 		--gated margaret_service=100 \
 		--gated margaret_serve_input_codegen=100 \
+		--gated margaret_server_codegen=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
 		--gated margaret_spiffe_svid=100 \

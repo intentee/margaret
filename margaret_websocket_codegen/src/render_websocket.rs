@@ -57,7 +57,6 @@ pub fn render_websocket(plan: WebSocketPlan, bindings: &ContainerBindings) -> We
     WebSocketArtifacts {
         modules,
         retained_roots: plan.retained_roots,
-        server_serve_inputs: plan.server_serve_inputs,
-        servers: plan.servers,
+        server_contributions: plan.server_contributions,
     }
 }

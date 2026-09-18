@@ -21,6 +21,7 @@ margaret_injection_codegen = { workspace = true }
 margaret_middleware_codegen = { workspace = true }
 margaret_request_binding_codegen = { workspace = true }
 margaret_route_parameter_codegen = { workspace = true }
+margaret_server_codegen = { workspace = true }
 http = { workspace = true }
 matchit = { workspace = true }
 proc-macro2 = { workspace = true }

@@ -4,11 +4,12 @@ use quote::quote;
 
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_vec_tokens::middleware_vec_tokens;
+use margaret_server_codegen::server_name::ServerName;
 
 use crate::session_plan::SessionPlan;
 
 pub(crate) fn render_server_routes(
-    server: &str,
+    server: &ServerName,
     sessions: &[&SessionPlan],
     bindings: &ContainerBindings,
 ) -> TokenStream {

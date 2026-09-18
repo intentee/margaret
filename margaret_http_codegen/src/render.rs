@@ -26,7 +26,7 @@ use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
-use crate::http_server::HttpServer;
+use margaret_server_codegen::http_server::HttpServer;
 use crate::route_group::RouteGroup;
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
@@ -371,12 +371,11 @@ fn render_handler(
 }
 
 fn server_router(
-    has_websocket_routes: bool,
     server: &HttpServer,
     routes_param: &Ident,
     route_entries: &TokenStream,
 ) -> TokenStream {
-    if has_websocket_routes {
+    if server.serves_web_socket_routes() {
         let websocket_routes = format_ident!("{}_routes", server.name());
         let websocket_call = quote! {
             super::super::websocket::#websocket_routes(container, #routes_param)
@@ -447,7 +446,6 @@ fn server_module(
     table: &HttpRouteTable,
     server: &HttpServer,
     has_views: bool,
-    has_websocket_routes: bool,
     bindings: &ContainerBindings,
 ) -> TokenStream {
     let function_name = server.function_name();
@@ -485,7 +483,7 @@ fn server_module(
         &mut rendered_handler_entries,
     );
     let route_entries = vec_literal_tokens(route_entries);
-    let router = server_router(has_websocket_routes, server, &routes_param, &route_entries);
+    let router = server_router(server, &routes_param, &route_entries);
 
     let inner_return = quote! {
         ::std::result::Result<
@@ -513,7 +511,6 @@ pub(crate) fn render(
     table: &HttpRouteTable,
     servers: &[HttpServer],
     has_views: bool,
-    websocket_servers: &[String],
     bindings: &ContainerBindings,
 ) -> Vec<GeneratedModuleTokens> {
     let server_declarations = servers.iter().map(|server| {
@@ -531,12 +528,9 @@ pub(crate) fn render(
 
     let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];
     for server in servers {
-        let has_websocket_routes = websocket_servers
-            .iter()
-            .any(|websocket_server| websocket_server == server.name());
         modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
-            server_module(table, server, has_views, has_websocket_routes, bindings),
+            server_module(table, server, has_views, bindings),
         ));
     }
 

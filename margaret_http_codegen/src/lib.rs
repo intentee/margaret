@@ -1,4 +1,3 @@
-mod active_servers;
 pub mod http_artifacts;
 pub mod http_codegen_error;
 pub mod http_plan;
@@ -6,7 +5,7 @@ mod http_responder_arguments;
 mod http_route;
 mod http_route_table;
 mod http_routes;
-pub mod http_server;
+mod http_server_contributions;
 mod named_route;
 mod render;
 mod render_forwarders;
@@ -14,16 +13,12 @@ pub mod render_http;
 mod render_routes;
 mod route_group;
 mod server_route_group;
-mod server_serve_inputs;
-pub mod server_transport_policy;
-pub mod serves_spiffe;
 
 #[cfg(test)]
 mod tests {
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
-    use std::collections::BTreeMap;
     use std::fs;
     use std::path::Path;
 
@@ -33,18 +28,41 @@ mod tests {
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
-    use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_serve_input_codegen::serve_input::ServeInput;
 
+    use margaret_server_codegen::assemble_servers::assemble_servers;
+    use margaret_server_codegen::http_server::HttpServer;
+    use margaret_server_codegen::server_contribution::ServerContribution;
+    use margaret_server_codegen::server_name::ServerName;
+    use margaret_server_codegen::server_route_source::ServerRouteSource;
+    use margaret_server_codegen::server_transport_requirement::ServerTransportRequirement;
+    use margaret_server_codegen::serves_spiffe::serves_spiffe;
+
+    use crate::http_artifacts::HttpArtifacts;
     use crate::http_codegen_error::HttpCodegenError;
     use crate::http_plan::HttpPlan;
-    use crate::serves_spiffe::serves_spiffe;
+
+    struct RenderedHttp {
+        artifacts: HttpArtifacts,
+        servers: Vec<HttpServer>,
+    }
+
+    fn web_socket_contributions(servers: &[String]) -> Vec<ServerContribution> {
+        servers
+            .iter()
+            .map(|name| ServerContribution {
+                routes: ServerRouteSource::WebSocket,
+                server: ServerName::parse(name.clone())
+                    .expect("the fixture server name is snake_case"),
+                transport_requirement: ServerTransportRequirement::Negotiable,
+            })
+            .collect()
+    }
 
     fn render_http(
         index: &AttributeIndex,
@@ -52,19 +70,17 @@ mod tests {
         websocket_servers: &[String],
         middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
         bindings: &ContainerBindings,
-        websocket_server_serve_inputs: &BTreeMap<String, Vec<ServeInput>>,
         registries: &BindingRegistries,
-    ) -> Result<crate::http_artifacts::HttpArtifacts, HttpCodegenError> {
-        HttpPlan::build(
-            index,
-            has_views,
-            websocket_servers,
-            middleware_plans,
-            bindings,
-            websocket_server_serve_inputs,
-            registries,
-        )
-        .map(|plan| crate::render_http::render_http(plan, bindings))
+    ) -> Result<RenderedHttp, HttpCodegenError> {
+        let plan = HttpPlan::build(index, has_views, middleware_plans, registries, bindings)?;
+        let mut contributions = plan.server_contributions().to_vec();
+
+        contributions.extend(web_socket_contributions(websocket_servers));
+
+        let servers = assemble_servers(&contributions);
+        let artifacts = crate::render_http::render_http(plan, &servers, bindings);
+
+        Ok(RenderedHttp { artifacts, servers })
     }
 
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
@@ -73,10 +89,6 @@ mod tests {
         render_container(index, &registry, &[])
             .expect("the container renders")
             .bindings
-    }
-
-    fn no_websocket_arguments() -> BTreeMap<String, Vec<ServeInput>> {
-        BTreeMap::new()
     }
 
     fn views_availability(has_views: bool) -> ViewsAvailability {
@@ -106,7 +118,6 @@ mod tests {
             &[],
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )
         .map(drop)
@@ -132,9 +143,9 @@ mod tests {
             &[],
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )?
+        .artifacts
         .into_modules()
         .into_iter()
         .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
@@ -249,32 +260,6 @@ impl Resource {
             error_with_container_source(CONSOLE_ARGUMENT_MIDDLEWARE, container_source)
                 .contains("crate::Guard")
         );
-    }
-
-    #[test]
-    fn rejects_websocket_arguments_absent_from_the_container_plan() {
-        let index = index_for("");
-        let bindings = bindings_for(&index);
-        let registries = registries_for(&index, false);
-        let websocket_arguments = BTreeMap::from([(
-            "public".to_string(),
-            vec![ServeInput::ConsoleArgument(ConsoleArgument::Flag {
-                name: "missing".to_string(),
-            })],
-        )]);
-        let error = render_http(
-            &index,
-            false,
-            &["public".to_string()],
-            &[],
-            &bindings,
-            &websocket_arguments,
-            &registries,
-        )
-        .map(drop)
-        .expect_err("websocket arguments must belong to the same container plan");
-
-        assert!(error.to_string().contains("missing"));
     }
 
     const AUTHENTICATED_RESPONDER: &str = r#"
@@ -762,10 +747,10 @@ impl Health {
             websocket_servers,
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )
         .expect("the http source is generated")
+        .artifacts
         .into_modules()
         .into_iter()
         .filter(|module| module.name().starts_with("http/"))
@@ -822,10 +807,10 @@ impl Health {
             &[],
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )
         .expect("the http source is generated")
+        .artifacts
         .into_modules()
         .into_iter()
         .filter(|module| module.name() == "routes" || module.name().starts_with("routes/"))
@@ -2069,12 +2054,11 @@ impl Guard {
             &[],
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )
         .expect("the http source is generated");
 
-        assert!(serves_spiffe(artifacts.servers()));
+        assert!(serves_spiffe(&artifacts.servers));
     }
 
     #[test]

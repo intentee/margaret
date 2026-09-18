@@ -65,6 +65,7 @@ members = [
     "margaret_schema_codegen",
     "margaret_schema_identifier_naming",
     "margaret_schema_postgres_tests",
+    "margaret_server_codegen",
     "margaret_service",
     "margaret_serve_input_codegen",
     "margaret_service_codegen",
@@ -202,6 +203,7 @@ margaret_route_parameter_binding = { path = "margaret_route_parameter_binding", 
 margaret_route_parameter_codegen = { path = "margaret_route_parameter_codegen", version = "0.1.0" }
 margaret_schema_codegen = { path = "margaret_schema_codegen", version = "0.4.0" }
 margaret_schema_identifier_naming = { path = "margaret_schema_identifier_naming", version = "0.4.0" }
+margaret_server_codegen = { path = "margaret_server_codegen", version = "0.4.0" }
 margaret_service = { path = "margaret_service", version = "0.1.0" }
 margaret_serve_input_codegen = { path = "margaret_serve_input_codegen", version = "0.4.0" }
 margaret_service_codegen = { path = "margaret_service_codegen", version = "0.4.0" }

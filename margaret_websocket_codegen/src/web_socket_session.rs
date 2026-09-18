@@ -8,6 +8,7 @@ use margaret_request_binding_codegen::authenticated_user_application::Authentica
 use margaret_request_binding_codegen::bound_parameter::BoundParameter;
 use margaret_request_binding_codegen::injects_routes::injects_routes;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
+use margaret_server_codegen::server_name::ServerName;
 
 pub(crate) struct WebSocketSession {
     pub(crate) layers: Vec<LayerApplication>,
@@ -15,7 +16,7 @@ pub(crate) struct WebSocketSession {
     pub(crate) module_name: String,
     pub(crate) parameters: Vec<BoundParameter>,
     pub(crate) path: String,
-    pub(crate) server: String,
+    pub(crate) server: ServerName,
     pub(crate) session_path: CanonicalPath,
 }
 

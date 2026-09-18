@@ -7,6 +7,7 @@ use margaret_container::container_error::ContainerError;
 use margaret_injection_codegen::injection_error::InjectionError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+use margaret_server_codegen::server_codegen_error::ServerCodegenError;
 
 #[derive(Debug, Error)]
 pub enum HttpCodegenError {
@@ -108,8 +109,10 @@ pub enum HttpCodegenError {
     #[error("responder '{responder}' is missing the 'server' argument")]
     MissingHttpServer { responder: String },
 
-    #[error(
-        "responder '{responder}' names the server '{server}', which must be a snake_case identifier usable as a `routes` accessor"
-    )]
-    InvalidServerName { responder: String, server: String },
+    #[error("responder '{responder}' cannot address a server: {source}")]
+    InvalidServerName {
+        responder: String,
+        #[source]
+        source: ServerCodegenError,
+    },
 }

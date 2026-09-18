@@ -9,8 +9,29 @@ pub mod render_console;
 
 #[cfg(test)]
 mod tests {
+    use margaret_server_codegen::assemble_servers::assemble_servers;
+    use margaret_server_codegen::server_contribution::ServerContribution;
+    use margaret_server_codegen::server_name::ServerName;
+    use margaret_server_codegen::server_route_source::ServerRouteSource;
+    use margaret_server_codegen::server_transport_requirement::ServerTransportRequirement;
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
+
+    fn negotiable(name: &str) -> ServerContribution {
+        ServerContribution {
+            routes: ServerRouteSource::Http,
+            server: ServerName::parse(name.to_string()).expect("the fixture name is snake_case"),
+            transport_requirement: ServerTransportRequirement::Negotiable,
+        }
+    }
+
+    fn pinned(name: &str) -> ServerContribution {
+        ServerContribution {
+            routes: ServerRouteSource::Http,
+            server: ServerName::parse(name.to_string()).expect("the fixture name is snake_case"),
+            transport_requirement: ServerTransportRequirement::VerifiedPeerIdentity,
+        }
+    }
 
     use tempfile::TempDir;
     use tempfile::tempdir;
@@ -20,8 +41,7 @@ mod tests {
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
-    use margaret_http_codegen::http_server::HttpServer;
-    use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
+    use margaret_server_codegen::http_server::HttpServer;
     use margaret_serve_input_codegen::scan::scan;
 
     use crate::console_artifacts::ConsoleArtifacts;
@@ -122,10 +142,7 @@ impl Farewell {
     fn source_for(lib_source: &str, has_http: bool) -> String {
         let index = index_for(lib_source);
         let http_servers = if has_http {
-            vec![HttpServer::new(
-                "public".to_string(),
-                ServerTransportPolicy::Negotiable,
-            )]
+            assemble_servers(&[negotiable("public")])
         } else {
             Vec::new()
         };
@@ -257,13 +274,7 @@ impl Farewell {
             &index,
             true,
             false,
-            &[
-                HttpServer::new(
-                    "internal".to_string(),
-                    ServerTransportPolicy::PinnedSpiffeMtls,
-                ),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-            ],
+            &assemble_servers(&[pinned("internal"), negotiable("public")]),
             &[],
             &bindings(&index),
         )
@@ -310,10 +321,7 @@ impl Farewell {
             &index,
             true,
             false,
-            &[
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
-            ],
+            &assemble_servers(&[negotiable("public"), negotiable("internal")]),
             &[],
             &bindings(&index),
         )

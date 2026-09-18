@@ -1983,6 +1983,7 @@ dependencies = [
  "margaret_request_binding_codegen",
  "margaret_schema_codegen",
  "margaret_serve_input_codegen",
+ "margaret_server_codegen",
  "margaret_service_codegen",
  "margaret_tag_codegen",
  "margaret_views_codegen",
@@ -2155,6 +2156,7 @@ dependencies = [
  "margaret_http_codegen",
  "margaret_injection_codegen",
  "margaret_serve_input_codegen",
+ "margaret_server_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2316,6 +2318,7 @@ dependencies = [
  "margaret_request_binding_codegen",
  "margaret_route_parameter_codegen",
  "margaret_serve_input_codegen",
+ "margaret_server_codegen",
  "matchit",
  "proc-macro2",
  "quote",
@@ -2775,6 +2778,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_server_codegen"
+version = "0.4.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_middleware_codegen",
+ "margaret_request_binding_codegen",
+ "proc-macro2",
+ "quote",
+ "thiserror",
+]
+
+[[package]]
 name = "margaret_service"
 version = "0.1.0"
 dependencies = [
@@ -2804,6 +2819,7 @@ dependencies = [
  "margaret_injection_codegen",
  "margaret_input_weaving",
  "margaret_serve_input_codegen",
+ "margaret_server_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -3118,6 +3134,7 @@ dependencies = [
  "margaret_request_binding_codegen",
  "margaret_route_parameter_codegen",
  "margaret_serve_input_codegen",
+ "margaret_server_codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.119",

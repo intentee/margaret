@@ -6,14 +6,16 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::binding_root::binding_root;
-use margaret_serve_input_codegen::serve_input::ServeInput;
+use margaret_server_codegen::server_contribution::ServerContribution;
+use margaret_server_codegen::server_name::ServerName;
 
 use crate::build_websocket_plan::build_websocket_plan;
 use crate::built_websocket_plan::BuiltWebSocketPlan;
-use crate::server_serve_inputs::server_serve_inputs;
+use crate::resolve_session_providers::resolve_session_providers;
 use crate::session_plan::SessionPlan;
 use crate::web_socket_codegen_error::WebSocketCodegenError;
 use crate::web_socket_message::WebSocketMessage;
+use crate::web_socket_server_contributions::web_socket_server_contributions;
 
 fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
     let mut roots = std::collections::BTreeSet::new();
@@ -44,10 +46,9 @@ fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
 pub struct WebSocketPlan {
     pub(crate) messages: Vec<WebSocketMessage>,
     pub(crate) retained_roots: Vec<CanonicalPath>,
-    pub(crate) server_serve_inputs: BTreeMap<String, Vec<ServeInput>>,
-    pub(crate) servers: Vec<String>,
+    pub(crate) server_contributions: Vec<ServerContribution>,
     pub(crate) sessions: Vec<SessionPlan>,
-    pub(crate) sessions_by_server: BTreeMap<String, Vec<usize>>,
+    pub(crate) sessions_by_server: BTreeMap<ServerName, Vec<usize>>,
 }
 
 impl WebSocketPlan {
@@ -62,35 +63,23 @@ impl WebSocketPlan {
     ) -> Result<Self, WebSocketCodegenError> {
         let BuiltWebSocketPlan { messages, sessions } =
             build_websocket_plan(index, bindings, middleware_plans, registries)?;
-        let mut sessions_by_server: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+        let mut sessions_by_server: BTreeMap<ServerName, Vec<usize>> = BTreeMap::new();
 
         for (position, session_plan) in sessions.iter().enumerate() {
+            resolve_session_providers(session_plan, bindings)?;
             sessions_by_server
                 .entry(session_plan.session.server.clone())
                 .or_default()
                 .push(position);
         }
 
-        let server_serve_inputs = sessions_by_server
-            .iter()
-            .map(|(server, positions)| {
-                let sessions = positions
-                    .iter()
-                    .map(|position| &sessions[*position])
-                    .collect::<Vec<_>>();
-
-                server_serve_inputs(&sessions, bindings)
-                    .map(|arguments| (server.clone(), arguments))
-            })
-            .collect::<Result<_, _>>()?;
-        let servers = sessions_by_server.keys().cloned().collect();
+        let server_contributions = web_socket_server_contributions(&sessions);
         let retained_roots = retained_roots(&sessions);
 
         Ok(Self {
             messages,
             retained_roots,
-            server_serve_inputs,
-            servers,
+            server_contributions,
             sessions,
             sessions_by_server,
         })

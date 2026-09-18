@@ -1,11 +1,11 @@
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
-use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_server_codegen::server_name::ServerName;
 
 use crate::web_socket_codegen_error::WebSocketCodegenError;
 
 pub(crate) struct SessionArguments {
     pub(crate) path: String,
-    pub(crate) server: String,
+    pub(crate) server: ServerName,
 }
 
 impl SessionArguments {
@@ -24,13 +24,12 @@ impl SessionArguments {
                     session: session.to_string(),
                 }
             })?;
-
-            if !is_snake_case_identifier(&server) {
-                return Err(WebSocketCodegenError::InvalidSessionServer {
+            let server = ServerName::parse(server).map_err(|source| {
+                WebSocketCodegenError::InvalidSessionServer {
                     session: session.to_string(),
-                    server,
-                });
-            }
+                    source,
+                }
+            })?;
 
             Ok(Self { path, server })
         })

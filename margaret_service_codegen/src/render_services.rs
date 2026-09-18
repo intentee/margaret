@@ -11,9 +11,9 @@ use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-use margaret_http_codegen::http_server::HttpServer;
-use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
-use margaret_http_codegen::serves_spiffe::serves_spiffe;
+use margaret_server_codegen::http_server::HttpServer;
+use margaret_server_codegen::server_transport_policy::ServerTransportPolicy;
+use margaret_server_codegen::serves_spiffe::serves_spiffe;
 
 use crate::service_kind::ServiceKind;
 use crate::service_plan::ServicePlan;
@@ -196,7 +196,7 @@ fn server_registration(
     let views_argument = has_views.then(|| quote! { , &views });
     let assemblies = servers.iter().map(|server| {
         let function_name = server.function_name();
-        let name = server.name();
+        let name = server.name().as_str();
         let address_argument = server.address_argument();
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();

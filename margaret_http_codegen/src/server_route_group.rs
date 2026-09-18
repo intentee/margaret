@@ -5,6 +5,7 @@ use matchit::InsertError;
 use matchit::Router;
 
 use margaret_route_parameter_codegen::route_path::RoutePath;
+use margaret_server_codegen::server_name::ServerName;
 
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
@@ -25,7 +26,7 @@ impl ServerRouteGroup {
 
     pub(crate) fn insert(
         &mut self,
-        server: &str,
+        server: &ServerName,
         path: RoutePath,
         method: String,
         route: HttpRoute,
@@ -45,7 +46,7 @@ impl ServerRouteGroup {
                             conflicting_path,
                             path: pattern.clone(),
                             responder: responder.clone(),
-                            server: server.to_owned(),
+                            server: server.to_string(),
                         },
                         source => HttpCodegenError::InvalidRoutePath {
                             path: pattern.clone(),
@@ -64,7 +65,7 @@ impl ServerRouteGroup {
                 method,
                 path: pattern,
                 responder,
-                server: server.to_owned(),
+                server: server.to_string(),
             }),
             None => Ok(()),
         }

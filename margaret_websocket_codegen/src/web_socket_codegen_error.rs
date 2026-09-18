@@ -5,6 +5,7 @@ use margaret_attributes::attribute_error::AttributeError;
 use margaret_container::container_error::ContainerError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+use margaret_server_codegen::server_codegen_error::ServerCodegenError;
 
 #[derive(Debug, Error)]
 pub enum WebSocketCodegenError {
@@ -71,8 +72,12 @@ pub enum WebSocketCodegenError {
     #[error("session '{session}' is missing the required 'server' argument")]
     MissingSessionServer { session: String },
 
-    #[error("session '{session}' has server '{server}', which is not a snake_case identifier")]
-    InvalidSessionServer { session: String, server: String },
+    #[error("session '{session}' cannot address a server: {source}")]
+    InvalidSessionServer {
+        session: String,
+        #[source]
+        source: ServerCodegenError,
+    },
 
     #[error("session '{session}' has no #[build_for_session] method")]
     SessionMissingBuildForSession { session: String },

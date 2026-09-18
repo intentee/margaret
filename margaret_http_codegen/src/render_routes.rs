@@ -5,10 +5,11 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_server_codegen::http_server::HttpServer;
 use margaret_route_parameter_codegen::url_segment::UrlSegment;
 
 use crate::http_route_table::HttpRouteTable;
-use crate::http_server::HttpServer;
+
 use crate::named_route::NamedRoute;
 
 struct ServerLayout<'server> {
@@ -48,7 +49,7 @@ fn server_layouts<'server>(
         .iter()
         .map(|server| {
             let struct_ident =
-                format_ident!("{}", type_allocator.allocate(server.name()).type_name());
+                format_ident!("{}", type_allocator.allocate(server.name().as_str()).type_name());
             let named = table.named_routes(server.name());
 
             let mut field_allocator = NameAllocator::new();

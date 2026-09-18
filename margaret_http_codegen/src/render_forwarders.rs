@@ -3,9 +3,10 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_server_codegen::http_server::HttpServer;
 
 use crate::http_route_table::HttpRouteTable;
-use crate::http_server::HttpServer;
+
 use crate::named_route::NamedRoute;
 
 fn forward_method(named: &NamedRoute<'_>) -> TokenStream {

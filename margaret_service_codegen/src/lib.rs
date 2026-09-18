@@ -14,9 +14,30 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
+    use margaret_server_codegen::assemble_servers::assemble_servers;
+    use margaret_server_codegen::server_contribution::ServerContribution;
+    use margaret_server_codegen::server_name::ServerName;
+    use margaret_server_codegen::server_route_source::ServerRouteSource;
+    use margaret_server_codegen::server_transport_requirement::ServerTransportRequirement;
     use crate::service_codegen_error::ServiceCodegenError;
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
+
+    fn negotiable(name: &str) -> ServerContribution {
+        ServerContribution {
+            routes: ServerRouteSource::Http,
+            server: ServerName::parse(name.to_string()).expect("the fixture name is snake_case"),
+            transport_requirement: ServerTransportRequirement::Negotiable,
+        }
+    }
+
+    fn pinned(name: &str) -> ServerContribution {
+        ServerContribution {
+            routes: ServerRouteSource::Http,
+            server: ServerName::parse(name.to_string()).expect("the fixture name is snake_case"),
+            transport_requirement: ServerTransportRequirement::VerifiedPeerIdentity,
+        }
+    }
 
     use tempfile::TempDir;
     use tempfile::tempdir;
@@ -29,8 +50,7 @@ mod tests {
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
-    use margaret_http_codegen::http_server::HttpServer;
-    use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
+    use margaret_server_codegen::http_server::HttpServer;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
 
@@ -123,10 +143,7 @@ mod tests {
     }
 
     fn public() -> Vec<HttpServer> {
-        vec![HttpServer::new(
-            "public".to_string(),
-            ServerTransportPolicy::Negotiable,
-        )]
+        assemble_servers(&[negotiable("public")])
     }
 
     const SERVICE: &str = "use tokio_util::sync::CancellationToken;\n\n#[service]\nstruct Pump;\n\nimpl Pump {\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
@@ -429,13 +446,7 @@ impl Flusher {
     fn wires_the_spiffe_bundle_and_pins_transports_when_a_server_is_pinned() {
         let source = rendered(
             SERVICE,
-            &[
-                HttpServer::new(
-                    "internal".to_string(),
-                    ServerTransportPolicy::PinnedSpiffeMtls,
-                ),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-            ],
+            &assemble_servers(&[pinned("internal"), negotiable("public")]),
         );
 
         assert!(source.contains(
@@ -507,10 +518,7 @@ impl Flusher {
     fn shares_the_svid_bundle_when_a_pinned_server_and_a_client_are_active() {
         let source = rendered(
             SPIFFE_CLIENT,
-            &[HttpServer::new(
-                "internal".to_string(),
-                ServerTransportPolicy::PinnedSpiffeMtls,
-            )],
+            &assemble_servers(&[pinned("internal")]),
         );
 
         assert!(source.contains(
@@ -538,10 +546,7 @@ impl Flusher {
     fn builds_the_routes_once_and_weaves_them_into_the_server_builders() {
         let source = rendered(
             SERVICE,
-            &[
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-            ],
+            &assemble_servers(&[negotiable("internal"), negotiable("public")]),
         );
 
         assert!(source.contains(
@@ -558,10 +563,7 @@ impl Flusher {
     fn registers_one_server_service_per_active_server() {
         let source = rendered(
             SERVICE,
-            &[
-                HttpServer::new("public".to_string(), ServerTransportPolicy::Negotiable),
-                HttpServer::new("internal".to_string(), ServerTransportPolicy::Negotiable),
-            ],
+            &assemble_servers(&[negotiable("public"), negotiable("internal")]),
         );
 
         assert!(source.contains(

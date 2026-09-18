@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use margaret_route_parameter_codegen::route_path::RoutePath;
+use margaret_server_codegen::server_name::ServerName;
 
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
@@ -9,7 +10,7 @@ use crate::route_group::RouteGroup;
 use crate::server_route_group::ServerRouteGroup;
 
 pub(crate) struct HttpRouteTable {
-    servers: BTreeMap<String, ServerRouteGroup>,
+    servers: BTreeMap<ServerName, ServerRouteGroup>,
 }
 
 impl HttpRouteTable {
@@ -33,7 +34,7 @@ impl HttpRouteTable {
             .insert(&server, path, method, route)
     }
 
-    pub(crate) fn named_routes(&self, server: &str) -> Vec<NamedRoute<'_>> {
+    pub(crate) fn named_routes(&self, server: &ServerName) -> Vec<NamedRoute<'_>> {
         let mut named: Vec<NamedRoute<'_>> = self
             .route_groups(server)
             .flat_map(|group| {
@@ -52,7 +53,7 @@ impl HttpRouteTable {
         named
     }
 
-    pub(crate) fn route_groups(&self, server: &str) -> impl Iterator<Item = &RouteGroup> {
+    pub(crate) fn route_groups(&self, server: &ServerName) -> impl Iterator<Item = &RouteGroup> {
         self.servers
             .get(server)
             .into_iter()
