@@ -18,12 +18,14 @@ trzcina = { workspace = true }
 [dev-dependencies]
 margaret_spiffe_svid = { workspace = true }
 margaret_sync_holder = { workspace = true }
+margaret_websocket_client = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
-
-[lints]
-workspace = true
+url = { workspace = true }
 
 [[test]]
 name = "integration"
 path = "tests/main.rs"
+
+[lints]
+workspace = true

@@ -112,17 +112,10 @@ mod tests {
         let container_index = index_for(container_source);
         let bindings = bindings_for(&container_index);
 
-        render_http(
-            &index,
-            false,
-            &[],
-            &plans,
-            &bindings,
-            &registries,
-        )
-        .map(drop)
-        .expect_err("the HTTP plan and container plan must agree")
-        .to_string()
+        render_http(&index, false, &[], &plans, &bindings, &registries)
+            .map(drop)
+            .expect_err("the HTTP plan and container plan must agree")
+            .to_string()
     }
 
     fn http_source(
@@ -137,27 +130,22 @@ mod tests {
         let plans = middleware_plans(&index, &registries)?;
         let bindings = bindings_for(&index);
 
-        Ok(render_http(
-            &index,
-            has_views,
-            &[],
-            &plans,
-            &bindings,
-            &registries,
-        )?
-        .artifacts
-        .into_modules()
-        .into_iter()
-        .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
-        .map(|module| {
-            module
-                .format()
-                .expect("the module formats")
-                .source()
-                .to_string()
-        })
-        .collect::<Vec<String>>()
-        .join("\n"))
+        Ok(
+            render_http(&index, has_views, &[], &plans, &bindings, &registries)?
+                .artifacts
+                .into_modules()
+                .into_iter()
+                .filter(|module| module.name() == "http" || module.name().starts_with("http/"))
+                .map(|module| {
+                    module
+                        .format()
+                        .expect("the module formats")
+                        .source()
+                        .to_string()
+                })
+                .collect::<Vec<String>>()
+                .join("\n"),
+        )
     }
 
     fn generate_http_source(
@@ -801,30 +789,23 @@ impl Health {
             middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
-        render_http(
-            &index,
-            false,
-            &[],
-            &plans,
-            &bindings,
-            &registries,
-        )
-        .expect("the http source is generated")
-        .artifacts
-        .into_modules()
-        .into_iter()
-        .filter(|module| module.name() == "routes" || module.name().starts_with("routes/"))
-        .map(|module| {
-            module
-                .format()
-                .expect("the module formats")
-                .source()
-                .to_string()
-        })
-        .collect::<Vec<String>>()
-        .join("\n")
-        .split_whitespace()
-        .collect()
+        render_http(&index, false, &[], &plans, &bindings, &registries)
+            .expect("the http source is generated")
+            .artifacts
+            .into_modules()
+            .into_iter()
+            .filter(|module| module.name() == "routes" || module.name().starts_with("routes/"))
+            .map(|module| {
+                module
+                    .format()
+                    .expect("the module formats")
+                    .source()
+                    .to_string()
+            })
+            .collect::<Vec<String>>()
+            .join("\n")
+            .split_whitespace()
+            .collect()
     }
 
     const ROUTES_FIXTURE: &str = r#"
@@ -2048,15 +2029,8 @@ impl Guard {
         let plans =
             middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
-        let artifacts = render_http(
-            &index,
-            false,
-            &[],
-            &plans,
-            &bindings,
-            &registries,
-        )
-        .expect("the http source is generated");
+        let artifacts = render_http(&index, false, &[], &plans, &bindings, &registries)
+            .expect("the http source is generated");
 
         assert!(serves_spiffe(&artifacts.servers));
     }

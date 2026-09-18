@@ -236,7 +236,8 @@ fn server_registration(
         }
     });
 
-    let register_server = gated_registration(&quote! { server_service }, activation.client_active());
+    let register_server =
+        gated_registration(&quote! { server_service }, activation.client_active());
 
     quote! {
         #(#origins)*

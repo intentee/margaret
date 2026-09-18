@@ -9,12 +9,12 @@ pub mod render_console;
 
 #[cfg(test)]
 mod tests {
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_server_codegen::assemble_servers::assemble_servers;
     use margaret_server_codegen::server_contribution::ServerContribution;
     use margaret_server_codegen::server_name::ServerName;
     use margaret_server_codegen::server_route_source::ServerRouteSource;
     use margaret_server_codegen::server_transport_requirement::ServerTransportRequirement;
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     fn negotiable(name: &str) -> ServerContribution {
@@ -41,8 +41,8 @@ mod tests {
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
-    use margaret_server_codegen::http_server::HttpServer;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_server_codegen::http_server::HttpServer;
 
     use crate::console_artifacts::ConsoleArtifacts;
     use crate::console_codegen_error::ConsoleCodegenError;

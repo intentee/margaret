@@ -71,12 +71,11 @@ pub(crate) fn http_routes(
             server,
         } = HttpResponderArguments::parse(matched.args()?, &responder)?;
 
-        let server = ServerName::parse(server).map_err(|source| {
-            HttpCodegenError::InvalidServerName {
+        let server =
+            ServerName::parse(server).map_err(|source| HttpCodegenError::InvalidServerName {
                 responder: responder.clone(),
                 source,
-            }
-        })?;
+            })?;
 
         let subject = format!("responder '{responder}'");
         let layers = resolve_layers(item, middleware_plans, &subject)?;

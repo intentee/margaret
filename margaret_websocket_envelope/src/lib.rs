@@ -1,6 +1,7 @@
 pub mod client_sent_frame;
 pub mod envelope_error;
 pub mod envelope_error_code;
+pub mod envelopes_web_socket_request;
 pub mod notification_envelope;
 pub mod outbound_error;
 pub mod outbound_response;

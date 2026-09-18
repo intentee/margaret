@@ -20,7 +20,9 @@ mod tests {
     use crate::server_route_source::ServerRouteSource;
     use crate::server_transport_requirement::ServerTransportRequirement;
 
-    fn servers_requiring(transport_requirement: ServerTransportRequirement) -> Vec<ServerContribution> {
+    fn servers_requiring(
+        transport_requirement: ServerTransportRequirement,
+    ) -> Vec<ServerContribution> {
         vec![ServerContribution {
             routes: ServerRouteSource::Http,
             server: ServerName::parse("public".to_string())

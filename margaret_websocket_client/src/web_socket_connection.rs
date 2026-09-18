@@ -8,8 +8,8 @@ use futures_util::stream::SplitSink;
 use futures_util::stream::SplitStream;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use tokio::sync::Mutex;
 use serde_json::Value;
+use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio_tungstenite::tungstenite::Message;
@@ -209,6 +209,11 @@ mod tests {
     use futures_util::SinkExt;
     use futures_util::StreamExt;
     use futures_util::stream::SplitStream;
+    use margaret_websocket_envelope::web_socket_notification_message::WebSocketNotificationMessage;
+    use margaret_websocket_envelope::web_socket_request_message::WebSocketRequestMessage;
+    use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseMessage;
+    use serde::Deserialize;
+    use serde::Serialize;
     use tokio::io::duplex;
     use tokio::sync::Mutex;
     use tokio_tungstenite::WebSocketStream;
@@ -219,8 +224,10 @@ mod tests {
     use super::ClientSink;
     use super::ClientStream;
     use super::PendingResponses;
+    use super::WebSocketConnection;
     use super::read_server_frames;
     use crate::client_io::ClientIo;
+    use crate::response_item::ResponseItem;
 
     /// The duplex buffer the framework's own websocket harness serves connections over.
     const DUPLEX_CAPACITY: usize = 65536;
@@ -252,13 +259,7 @@ mod tests {
     ) -> PendingResponses {
         let pending = PendingResponses::default();
 
-        read_server_frames(
-            CancellationToken::new(),
-            source,
-            pending.clone(),
-            sink,
-        )
-        .await;
+        read_server_frames(CancellationToken::new(), source, pending.clone(), sink).await;
 
         pending
     }
@@ -299,11 +300,7 @@ mod tests {
 
     #[tokio::test]
     async fn stops_reading_when_the_connection_is_cancelled() {
-        let Halves {
-            peer,
-            sink,
-            source,
-        } = halves().await;
+        let Halves { peer, sink, source } = halves().await;
         let cancellation_token = CancellationToken::new();
 
         cancellation_token.cancel();
@@ -317,5 +314,94 @@ mod tests {
         .await;
 
         drop(peer);
+    }
+
+    #[derive(Serialize)]
+    struct Echo {
+        label: String,
+    }
+
+    impl WebSocketRequestMessage for Echo {
+        const METHOD: &'static str = "echo";
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Echoed {
+        label: String,
+    }
+
+    impl WebSocketResponseMessage for Echoed {
+        const METHOD: &'static str = "echoed";
+    }
+
+    #[derive(Serialize)]
+    struct Waved;
+
+    impl WebSocketNotificationMessage for Waved {
+        const METHOD: &'static str = "waved";
+    }
+
+    async fn connected() -> (WebSocketConnection, ClientStream) {
+        let (client_io, peer_io) = duplex(DUPLEX_CAPACITY);
+        let client: Box<dyn ClientIo> = Box::new(client_io);
+        let peer: Box<dyn ClientIo> = Box::new(peer_io);
+
+        (
+            WebSocketConnection::new(
+                WebSocketStream::from_raw_socket(client, Role::Client, None).await,
+                "wss://peer.test/ws".to_string(),
+            ),
+            WebSocketStream::from_raw_socket(peer, Role::Server, None).await,
+        )
+    }
+
+    async fn next_text(peer: &mut ClientStream) -> String {
+        peer.next()
+            .await
+            .expect("the peer receives a frame")
+            .expect("the frame reads cleanly")
+            .into_text()
+            .expect("the frame carries text")
+            .to_string()
+    }
+
+    #[tokio::test]
+    async fn carries_a_request_and_reads_the_answer_back() {
+        let (connection, mut peer) = connected().await;
+        let mut responses = connection
+            .request::<Echo, Echoed>(Echo {
+                label: "here".to_string(),
+            })
+            .await
+            .expect("the request is sent");
+
+        assert!(next_text(&mut peer).await.contains("\"echo\""));
+
+        peer.send(Message::text(
+            r#"{"id":0,"done":true,"method":"echoed","result":{"label":"here"}}"#,
+        ))
+        .await
+        .expect("the peer answers");
+
+        let answer = responses
+            .next()
+            .await
+            .expect("the answer arrives")
+            .expect("the answer reads as the requested payload");
+
+        assert!(matches!(answer, ResponseItem::Payload(echoed) if echoed.label == "here"));
+        assert!(responses.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn carries_a_notification() {
+        let (connection, mut peer) = connected().await;
+
+        connection
+            .notify(Waved)
+            .await
+            .expect("the notification is sent");
+
+        assert!(next_text(&mut peer).await.contains("\"waved\""));
     }
 }

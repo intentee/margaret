@@ -44,7 +44,9 @@ fn render_request_message(
     quote! {
         impl margaret::framework::websocket_envelope::web_socket_request_message::WebSocketRequestMessage for #message {
             const METHOD: &'static str = #method;
+        }
 
+        impl margaret::framework::websocket_envelope::envelopes_web_socket_request::EnvelopesWebSocketRequest for #message {
             type Envelope = #envelope;
 
             fn envelope(
@@ -69,9 +71,7 @@ fn render_response_message(path: &CanonicalPath, method: &str) -> TokenStream {
 
 pub(crate) fn render_messages(messages: &[WebSocketMessage]) -> TokenStream {
     let implementations = messages.iter().map(|message| match &message.kind {
-        MessageKind::Notification { method } => {
-            render_notification_message(&message.path, method)
-        }
+        MessageKind::Notification { method } => render_notification_message(&message.path, method),
         MessageKind::Request {
             cardinality,
             method,

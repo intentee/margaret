@@ -7,8 +7,8 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::service;
 
 use crate::identity_client::IdentityClient;
-use crate::relay_client::RelayClient;
 use crate::margaret::asset_bag::asset;
+use crate::relay_client::RelayClient;
 
 #[service]
 pub struct Heartbeat {

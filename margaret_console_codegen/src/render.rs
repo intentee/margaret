@@ -4,13 +4,13 @@ use quote::quote;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::serve_input_binding::ServeInputBinding;
-use margaret_server_codegen::http_server::HttpServer;
-use margaret_server_codegen::server_transport_policy::ServerTransportPolicy;
-use margaret_server_codegen::serves_spiffe::serves_spiffe;
-use margaret_serve_input_codegen::spiffe_client_kinds::spiffe_client_kinds;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 use margaret_serve_input_codegen::serve_input_read::serve_input_read;
 use margaret_serve_input_codegen::serve_input_registration::serve_input_registration;
+use margaret_serve_input_codegen::spiffe_client_kinds::spiffe_client_kinds;
+use margaret_server_codegen::http_server::HttpServer;
+use margaret_server_codegen::server_transport_policy::ServerTransportPolicy;
+use margaret_server_codegen::serves_spiffe::serves_spiffe;
 
 use crate::console_command::ConsoleCommand;
 

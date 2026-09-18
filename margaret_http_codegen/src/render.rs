@@ -26,8 +26,8 @@ use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
-use margaret_server_codegen::http_server::HttpServer;
 use crate::route_group::RouteGroup;
+use margaret_server_codegen::http_server::HttpServer;
 
 fn responder_injects_routes(route: &HttpRoute) -> bool {
     injects_routes(&route.arguments)

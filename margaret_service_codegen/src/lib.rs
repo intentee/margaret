@@ -14,13 +14,13 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
+    use crate::service_codegen_error::ServiceCodegenError;
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_server_codegen::assemble_servers::assemble_servers;
     use margaret_server_codegen::server_contribution::ServerContribution;
     use margaret_server_codegen::server_name::ServerName;
     use margaret_server_codegen::server_route_source::ServerRouteSource;
     use margaret_server_codegen::server_transport_requirement::ServerTransportRequirement;
-    use crate::service_codegen_error::ServiceCodegenError;
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     fn negotiable(name: &str) -> ServerContribution {
@@ -50,9 +50,9 @@ mod tests {
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
-    use margaret_server_codegen::http_server::HttpServer;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
+    use margaret_server_codegen::http_server::HttpServer;
 
     use crate::framework_service::FrameworkService;
     use crate::framework_service_kind::FrameworkServiceKind;
@@ -516,10 +516,7 @@ impl Flusher {
 
     #[test]
     fn shares_the_svid_bundle_when_a_pinned_server_and_a_client_are_active() {
-        let source = rendered(
-            SPIFFE_CLIENT,
-            &assemble_servers(&[pinned("internal")]),
-        );
+        let source = rendered(SPIFFE_CLIENT, &assemble_servers(&[pinned("internal")]));
 
         assert!(source.contains(
             "letspiffe_bundle=margaret::framework::spiffe_svid_bundle::svid_bundle::SvidBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"

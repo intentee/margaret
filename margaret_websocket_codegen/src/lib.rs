@@ -192,7 +192,8 @@ impl RespondsToWebSocketNotification for Typist {
                 module_name: "room".to_string(),
                 parameters: Vec::new(),
                 path: "/room".to_string(),
-                server: ServerName::parse("public".to_string()).expect("the fixture name is snake_case"),
+                server: ServerName::parse("public".to_string())
+                    .expect("the fixture name is snake_case"),
                 session_path: margaret_attributes::canonical_path::CanonicalPath::new(vec![
                     "crate".to_string(),
                     "Room".to_string(),

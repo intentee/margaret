@@ -26,12 +26,17 @@ fn binds_the_spiffe_http_client_alongside_the_websocket_client() {
     let source = module(&generated(), "serve");
 
     assert!(source.contains("letspiffe_http_client=matchspiffe_bundle.reqwest_client()"));
-    assert!(source.contains("margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle"));
+    assert!(
+        source.contains(
+            "margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle"
+        )
+    );
 }
 
 #[test]
 fn weaves_the_websocket_client_into_the_container_bootstrap() {
-    assert!(module(&generated(), "container/build/serve_arguments").contains(
-        "margaret::framework::websocket_client::web_socket_client::WebSocketClient"
-    ));
+    assert!(
+        module(&generated(), "container/build/serve_arguments")
+            .contains("margaret::framework::websocket_client::web_socket_client::WebSocketClient")
+    );
 }

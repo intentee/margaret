@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use tokio_util::sync::CancellationToken;
 
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
-use margaret_websocket_envelope::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret_websocket::web_socket::WebSocket;
+use margaret_websocket_envelope::streaming_request_envelope::StreamingRequestEnvelope;
 
 use crate::conversation_message::ConversationMessage;
 use crate::failing_chunk::FailingChunk;

@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use validator::Validate;
 
+use margaret_websocket_envelope::envelopes_web_socket_request::EnvelopesWebSocketRequest;
 use margaret_websocket_envelope::request_id::RequestId;
 use margaret_websocket_envelope::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret_websocket_envelope::web_socket_request_message::WebSocketRequestMessage;
@@ -14,7 +15,9 @@ pub struct ConversationMessage {
 
 impl WebSocketRequestMessage for ConversationMessage {
     const METHOD: &'static str = "conversation_message";
+}
 
+impl EnvelopesWebSocketRequest for ConversationMessage {
     type Envelope = StreamingRequestEnvelope<Self>;
 
     fn envelope(id: RequestId, message: Self) -> Self::Envelope {

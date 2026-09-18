@@ -87,9 +87,7 @@ impl ServeInput {
         match self {
             ServeInput::ConsoleArgument(argument) => argument.weaving(),
             ServeInput::EnvironmentVariable(variable) => variable.value.weaving.clone(),
-            ServeInput::SpiffeHttpClient | ServeInput::SpiffeWebSocketClient => {
-                WeavingKind::Cloned
-            }
+            ServeInput::SpiffeHttpClient | ServeInput::SpiffeWebSocketClient => WeavingKind::Cloned,
         }
     }
 }
@@ -194,6 +192,21 @@ mod tests {
         assert!(input.is_shareable());
         assert!(!input.reads_clap_matches());
         assert_eq!(input.slot_key(), ServeInputKey::SpiffeHttpClient);
+    }
+
+    #[test]
+    fn a_spiffe_websocket_client_is_a_cloned_framework_client() {
+        let input = ServeInput::SpiffeWebSocketClient;
+
+        assert_eq!(
+            collapsed(&input.field_type()),
+            "margaret::framework::websocket_client::web_socket_client::WebSocketClient"
+        );
+        assert_eq!(input.name(), "spiffe_websocket_client");
+        assert_eq!(input.weaving(), WeavingKind::Cloned);
+        assert!(input.is_shareable());
+        assert!(!input.reads_clap_matches());
+        assert_eq!(input.slot_key(), ServeInputKey::SpiffeWebSocketClient);
     }
 
     #[test]

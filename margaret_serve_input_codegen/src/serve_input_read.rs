@@ -80,6 +80,14 @@ mod tests {
     }
 
     #[test]
+    fn a_spiffe_websocket_client_reads_a_clone_of_the_bundled_client() {
+        assert_eq!(
+            collapsed(&ServeInput::SpiffeWebSocketClient),
+            "spiffe_websocket_client.clone()"
+        );
+    }
+
+    #[test]
     fn a_spiffe_http_client_clones_the_serve_local() {
         assert_eq!(
             collapsed(&ServeInput::SpiffeHttpClient),
