@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use rustls::ServerConfig;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -36,11 +37,13 @@ impl RunningWebSocketServer {
     async fn start_from(
         upgrade: Arc<dyn WebSocketUpgrade>,
         middleware: Vec<Arc<dyn HttpMiddleware>>,
+        address: &str,
+        transport: TransportConfig,
     ) -> Self {
         let server = Server::new(
             "public",
-            "127.0.0.1:0".to_string(),
-            TransportConfig::Plain,
+            address.to_string(),
+            transport,
             UploadConfig::Disabled,
             BodyLimit::default(),
             ServerRoutes::build(vec![RouteEntry::web_socket("/ws", upgrade, middleware)])
@@ -72,6 +75,8 @@ impl RunningWebSocketServer {
                 test_dispatch_table(),
             )),
             middleware,
+            "127.0.0.1:0",
+            TransportConfig::Plain,
         )
         .await
     }
@@ -83,6 +88,27 @@ impl RunningWebSocketServer {
         Self::start_from(
             Arc::new(WebSocketUpgradeEntry::new(factory, test_dispatch_table())),
             Vec::new(),
+            "127.0.0.1:0",
+            TransportConfig::Plain,
+        )
+        .await
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
+    pub async fn start_mutually_authenticated<Factory>(
+        factory: Factory,
+        server_config: Arc<ServerConfig>,
+    ) -> Self
+    where
+        Factory: WebSocketSessionFactory<Session = TestSession> + 'static,
+    {
+        Self::start_from(
+            Arc::new(WebSocketUpgradeEntry::new(factory, test_dispatch_table())),
+            Vec::new(),
+            "localhost:0",
+            TransportConfig::MutualTls { server_config },
         )
         .await
     }

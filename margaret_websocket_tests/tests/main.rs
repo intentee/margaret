@@ -1,3 +1,5 @@
 mod applies_middleware_before_upgrading;
+mod connects_over_mutual_tls;
 mod serves_web_socket_connections;
+mod survives_a_peer_that_goes_away;
 mod upgrades_web_socket_connections;

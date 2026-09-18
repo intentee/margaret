@@ -1,3 +1,5 @@
+mod client_io;
+mod client_stream;
 mod connect_tls_stream;
 mod pending_responses;
 mod route_server_frame;

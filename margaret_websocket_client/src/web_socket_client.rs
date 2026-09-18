@@ -4,6 +4,7 @@ use rustls::ClientConfig;
 use tokio_rustls::TlsConnector;
 use url::Url;
 
+use crate::client_io::ClientIo;
 use crate::connect_tls_stream::connect_tls_stream;
 use crate::web_socket_client_error::WebSocketClientError;
 use crate::web_socket_connection::WebSocketConnection;
@@ -26,7 +27,8 @@ impl WebSocketClient {
     /// Returns `WebSocketClientError` when the connection cannot be established.
     pub async fn connect(&self, url: &Url) -> Result<WebSocketConnection, WebSocketClientError> {
         let tls_stream = connect_tls_stream(&self.connector, url).await?;
-        let (stream, _response) = tokio_tungstenite::client_async(url.as_str(), tls_stream)
+        let transport: Box<dyn ClientIo> = Box::new(tls_stream);
+        let (stream, _response) = tokio_tungstenite::client_async(url.as_str(), transport)
             .await
             .map_err(|source| WebSocketClientError::WebSocketHandshake {
                 source,

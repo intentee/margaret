@@ -9,11 +9,14 @@ autotests = false
 margaret_spiffe_svid = { workspace = true }
 margaret_spiffe_svid_bundle = { workspace = true }
 margaret_spiffe_svid_tests = { path = "../margaret_spiffe_svid_tests" }
+margaret_websocket_client = { workspace = true }
+margaret_websocket_tests = { path = "../margaret_websocket_tests" }
 rustls = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
+url = { workspace = true }
 
 [features]
 tests_that_use_spire = []

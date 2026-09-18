@@ -14,6 +14,10 @@ pub(crate) struct PendingResponses {
 }
 
 impl PendingResponses {
+    pub(crate) fn clear(&self) {
+        self.senders.clear();
+    }
+
     pub(crate) fn forget(&self, id: &RequestId) {
         self.senders.remove(id);
     }

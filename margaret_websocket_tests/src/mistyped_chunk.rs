@@ -1,13 +1,12 @@
 use serde::Deserialize;
-use serde::Serialize;
 
 use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseMessage;
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ResponseChunk {
-    pub text: String,
+#[derive(Debug, Deserialize)]
+pub struct MistypedChunk {
+    pub text: u64,
 }
 
-impl WebSocketResponseMessage for ResponseChunk {
+impl WebSocketResponseMessage for MistypedChunk {
     const METHOD: &'static str = "response_chunk";
 }

@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering;
 
@@ -7,11 +8,10 @@ use futures_util::stream::SplitSink;
 use futures_util::stream::SplitStream;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use tokio::net::TcpStream;
 use tokio::sync::Mutex;
+use serde_json::Value;
 use tokio::sync::mpsc;
-use tokio_rustls::client::TlsStream;
-use tokio_tungstenite::WebSocketStream;
+use tokio::sync::mpsc::Receiver;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
@@ -22,20 +22,28 @@ use margaret_websocket_envelope::web_socket_notification_message::WebSocketNotif
 use margaret_websocket_envelope::web_socket_request_message::WebSocketRequestMessage;
 use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseMessage;
 
+use crate::client_stream::ClientStream;
 use crate::pending_responses::PendingResponses;
 use crate::response_stream::ResponseStream;
 use crate::route_server_frame::route_server_frame;
 use crate::web_socket_client_error::WebSocketClientError;
 
-type ClientStream = WebSocketStream<TlsStream<TcpStream>>;
-
 /// One in-flight frame per exchange, matching the outbound buffer the server serves with.
 const RESPONSE_BUFFER_CAPACITY: usize = 1;
+
+type ClientSink = Arc<Mutex<SplitSink<ClientStream, Message>>>;
+
+async fn answer_close(sink: &ClientSink) {
+    if let Err(error) = sink.lock().await.close().await {
+        eprintln!("margaret_websocket_client: the closing handshake failed: {error}");
+    }
+}
 
 async fn read_server_frames(
     cancellation_token: CancellationToken,
     mut source: SplitStream<ClientStream>,
     pending: PendingResponses,
+    sink: ClientSink,
 ) {
     loop {
         tokio::select! {
@@ -52,6 +60,7 @@ async fn read_server_frames(
                         }
                     }
                 }
+                Some(Ok(Message::Close(_))) => answer_close(&sink).await,
                 Some(Ok(_)) => {}
                 Some(Err(error)) => {
                     eprintln!("margaret_websocket_client: the connection failed: {error}");
@@ -62,13 +71,15 @@ async fn read_server_frames(
             },
         }
     }
+
+    pending.clear();
 }
 
 pub struct WebSocketConnection {
     cancellation_token: CancellationToken,
     next_request_id: AtomicI64,
     pending: PendingResponses,
-    sink: Mutex<SplitSink<ClientStream, Message>>,
+    sink: ClientSink,
     url: String,
 }
 
@@ -77,18 +88,20 @@ impl WebSocketConnection {
         let (sink, source) = stream.split();
         let cancellation_token = CancellationToken::new();
         let pending = PendingResponses::default();
+        let sink = Arc::new(Mutex::new(sink));
 
         drop(tokio::spawn(read_server_frames(
             cancellation_token.clone(),
             source,
             pending.clone(),
+            sink.clone(),
         )));
 
         Self {
             cancellation_token,
             next_request_id: AtomicI64::new(0),
             pending,
-            sink: Mutex::new(sink),
+            sink,
             url,
         }
     }
@@ -103,14 +116,8 @@ impl WebSocketConnection {
     where
         Notification: Serialize + WebSocketNotificationMessage,
     {
-        let params = serde_json::to_value(notification)
-            .map_err(|source| WebSocketClientError::SerializeFrame { source })?;
-
-        self.send_frame(&ClientSentFrame::Notification {
-            method: Notification::METHOD.to_string(),
-            params,
-        })
-        .await
+        self.send_notification(Notification::METHOD, serde_json::to_value(notification))
+            .await
     }
 
     /// # Errors
@@ -124,9 +131,21 @@ impl WebSocketConnection {
         Request: Serialize + WebSocketRequestMessage,
         Payload: DeserializeOwned + WebSocketResponseMessage,
     {
-        let params = serde_json::to_value(request)
-            .map_err(|source| WebSocketClientError::SerializeFrame { source })?;
         let id = RequestId::Number(self.next_request_id.fetch_add(1, Ordering::Relaxed));
+        let pending = self.pending.clone();
+
+        self.open_exchange(id.clone(), Request::METHOD, serde_json::to_value(request))
+            .await
+            .map(|receiver| ResponseStream::new(id, pending, receiver))
+    }
+
+    async fn open_exchange(
+        &self,
+        id: RequestId,
+        method: &'static str,
+        params: Result<Value, serde_json::Error>,
+    ) -> Result<Receiver<ServerSentFrame>, WebSocketClientError> {
+        let params = params.map_err(|source| WebSocketClientError::SerializeFrame { source })?;
         let (sender, receiver) = mpsc::channel(RESPONSE_BUFFER_CAPACITY);
 
         self.pending.remember(id.clone(), sender);
@@ -134,7 +153,7 @@ impl WebSocketConnection {
         if let Err(error) = self
             .send_frame(&ClientSentFrame::Request {
                 id: id.clone(),
-                method: Request::METHOD.to_string(),
+                method: method.to_string(),
                 params,
             })
             .await
@@ -144,7 +163,21 @@ impl WebSocketConnection {
             return Err(error);
         }
 
-        Ok(ResponseStream::new(id, self.pending.clone(), receiver))
+        Ok(receiver)
+    }
+
+    async fn send_notification(
+        &self,
+        method: &'static str,
+        params: Result<Value, serde_json::Error>,
+    ) -> Result<(), WebSocketClientError> {
+        let params = params.map_err(|source| WebSocketClientError::SerializeFrame { source })?;
+
+        self.send_frame(&ClientSentFrame::Notification {
+            method: method.to_string(),
+            params,
+        })
+        .await
     }
 
     async fn send_frame(&self, frame: &ClientSentFrame) -> Result<(), WebSocketClientError> {
@@ -166,5 +199,123 @@ impl WebSocketConnection {
 impl Drop for WebSocketConnection {
     fn drop(&mut self) {
         self.cancellation_token.cancel();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use futures_util::SinkExt;
+    use futures_util::StreamExt;
+    use futures_util::stream::SplitStream;
+    use tokio::io::duplex;
+    use tokio::sync::Mutex;
+    use tokio_tungstenite::WebSocketStream;
+    use tokio_tungstenite::tungstenite::Message;
+    use tokio_tungstenite::tungstenite::protocol::Role;
+    use tokio_util::sync::CancellationToken;
+
+    use super::ClientSink;
+    use super::ClientStream;
+    use super::PendingResponses;
+    use super::read_server_frames;
+    use crate::client_io::ClientIo;
+
+    /// The duplex buffer the framework's own websocket harness serves connections over.
+    const DUPLEX_CAPACITY: usize = 65536;
+
+    struct Halves {
+        peer: ClientStream,
+        sink: ClientSink,
+        source: SplitStream<ClientStream>,
+    }
+
+    async fn halves() -> Halves {
+        let (client_io, peer_io) = duplex(DUPLEX_CAPACITY);
+        let client: Box<dyn ClientIo> = Box::new(client_io);
+        let peer: Box<dyn ClientIo> = Box::new(peer_io);
+        let (sink, source) = WebSocketStream::from_raw_socket(client, Role::Client, None)
+            .await
+            .split();
+
+        Halves {
+            peer: WebSocketStream::from_raw_socket(peer, Role::Server, None).await,
+            sink: Arc::new(Mutex::new(sink)),
+            source,
+        }
+    }
+
+    async fn read_until_the_peer_is_gone(
+        sink: ClientSink,
+        source: SplitStream<ClientStream>,
+    ) -> PendingResponses {
+        let pending = PendingResponses::default();
+
+        read_server_frames(
+            CancellationToken::new(),
+            source,
+            pending.clone(),
+            sink,
+        )
+        .await;
+
+        pending
+    }
+
+    #[tokio::test]
+    async fn stops_reading_when_the_peer_completes_the_closing_handshake() {
+        let Halves {
+            mut peer,
+            sink,
+            source,
+        } = halves().await;
+
+        peer.send(Message::Close(None))
+            .await
+            .expect("the peer sends a close frame");
+
+        tokio::join!(read_until_the_peer_is_gone(sink, source), async move {
+            while peer.next().await.is_some() {}
+        });
+    }
+
+    #[tokio::test]
+    async fn reports_a_closing_handshake_the_peer_will_not_receive() {
+        let Halves {
+            mut peer,
+            sink,
+            source,
+        } = halves().await;
+
+        peer.send(Message::Close(None))
+            .await
+            .expect("the peer sends a close frame");
+
+        drop(peer);
+
+        read_until_the_peer_is_gone(sink, source).await;
+    }
+
+    #[tokio::test]
+    async fn stops_reading_when_the_connection_is_cancelled() {
+        let Halves {
+            peer,
+            sink,
+            source,
+        } = halves().await;
+        let cancellation_token = CancellationToken::new();
+
+        cancellation_token.cancel();
+
+        read_server_frames(
+            cancellation_token,
+            source,
+            PendingResponses::default(),
+            sink,
+        )
+        .await;
+
+        drop(peer);
     }
 }

@@ -40,16 +40,10 @@ pub enum WebSocketClientError {
         source: rustls::pki_types::InvalidDnsNameError,
     },
 
-    #[error("the url '{url}' carries no host to connect to")]
-    UrlWithoutHost { url: String },
-
-    #[error("the url '{url}' carries no port to connect to")]
-    UrlWithoutPort { url: String },
-
     #[error(
-        "the url '{url}' uses the scheme '{scheme}', but a mutually authenticated websocket client only speaks 'wss'"
+        "'{url}' does not address a secure websocket endpoint; a mutually authenticated client needs a 'wss' url carrying a host and a port"
     )]
-    UnsupportedUrlScheme { scheme: String, url: String },
+    UnusableUrl { url: String },
 
     #[error("failed to serialize an outbound websocket frame: {source}")]
     SerializeFrame {

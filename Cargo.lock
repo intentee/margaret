@@ -2953,11 +2953,14 @@ dependencies = [
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_bundle",
  "margaret_spiffe_svid_tests",
+ "margaret_websocket_client",
+ "margaret_websocket_tests",
  "rustls",
  "tempfile",
  "tokio",
  "tokio-util",
  "trzcina",
+ "url",
 ]
 
 [[package]]
@@ -3193,16 +3196,21 @@ dependencies = [
  "async-trait",
  "futures-util",
  "margaret_http",
+ "margaret_http_tests",
  "margaret_http_uploaded_file",
  "margaret_http_validation",
  "margaret_websocket",
+ "margaret_websocket_client",
  "margaret_websocket_envelope",
  "margaret_websocket_session",
+ "rustls",
  "serde",
  "serde_json",
  "tokio",
+ "tokio-rustls",
  "tokio-tungstenite",
  "tokio-util",
+ "url",
  "validator",
 ]
 
