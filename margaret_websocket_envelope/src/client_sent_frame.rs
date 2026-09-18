@@ -6,14 +6,14 @@ use crate::request_id::RequestId;
 
 #[derive(Deserialize, Serialize)]
 #[serde(untagged)]
-pub enum ClientSentFrame {
+pub enum ClientSentFrame<Params = Value> {
     Request {
         id: RequestId,
         method: String,
-        params: Value,
+        params: Params,
     },
     Notification {
         method: String,
-        params: Value,
+        params: Params,
     },
 }

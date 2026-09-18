@@ -8,7 +8,6 @@ use futures_util::stream::SplitSink;
 use futures_util::stream::SplitStream;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
@@ -116,8 +115,11 @@ impl WebSocketConnection {
     where
         Notification: Serialize + WebSocketNotificationMessage,
     {
-        self.send_notification(Notification::METHOD, serde_json::to_value(notification))
-            .await
+        self.send_serialization(serde_json::to_string(&ClientSentFrame::Notification {
+            method: Notification::METHOD.to_string(),
+            params: notification,
+        }))
+        .await
     }
 
     /// # Errors
@@ -133,8 +135,13 @@ impl WebSocketConnection {
     {
         let id = RequestId::Number(self.next_request_id.fetch_add(1, Ordering::Relaxed));
         let pending = self.pending.clone();
+        let serialized = serde_json::to_string(&ClientSentFrame::Request {
+            id: id.clone(),
+            method: Request::METHOD.to_string(),
+            params: request,
+        });
 
-        self.open_exchange(id.clone(), Request::METHOD, serde_json::to_value(request))
+        self.open_exchange(id.clone(), serialized)
             .await
             .map(|receiver| ResponseStream::new(id, pending, receiver))
     }
@@ -142,22 +149,13 @@ impl WebSocketConnection {
     async fn open_exchange(
         &self,
         id: RequestId,
-        method: &'static str,
-        params: Result<Value, serde_json::Error>,
+        serialized: Result<String, serde_json::Error>,
     ) -> Result<Receiver<ServerSentFrame>, WebSocketClientError> {
-        let params = params.map_err(|source| WebSocketClientError::SerializeFrame { source })?;
         let (sender, receiver) = mpsc::channel(RESPONSE_BUFFER_CAPACITY);
 
         self.pending.remember(id.clone(), sender);
 
-        if let Err(error) = self
-            .send_frame(&ClientSentFrame::Request {
-                id: id.clone(),
-                method: method.to_string(),
-                params,
-            })
-            .await
-        {
+        if let Err(error) = self.send_serialization(serialized).await {
             self.pending.forget(&id);
 
             return Err(error);
@@ -166,23 +164,11 @@ impl WebSocketConnection {
         Ok(receiver)
     }
 
-    async fn send_notification(
+    async fn send_serialization(
         &self,
-        method: &'static str,
-        params: Result<Value, serde_json::Error>,
+        serialized: Result<String, serde_json::Error>,
     ) -> Result<(), WebSocketClientError> {
-        let params = params.map_err(|source| WebSocketClientError::SerializeFrame { source })?;
-
-        self.send_frame(&ClientSentFrame::Notification {
-            method: method.to_string(),
-            params,
-        })
-        .await
-    }
-
-    async fn send_frame(&self, frame: &ClientSentFrame) -> Result<(), WebSocketClientError> {
-        let text = serde_json::to_string(frame)
-            .map_err(|source| WebSocketClientError::SerializeFrame { source })?;
+        let text = serialized.map_err(|source| WebSocketClientError::SerializeFrame { source })?;
 
         self.sink
             .lock()
@@ -228,6 +214,7 @@ mod tests {
     use super::read_server_frames;
     use crate::client_io::ClientIo;
     use crate::response_item::ResponseItem;
+    use crate::web_socket_client_error::WebSocketClientError;
 
     /// The duplex buffer the framework's own websocket harness serves connections over.
     const DUPLEX_CAPACITY: usize = 65536;
@@ -341,6 +328,28 @@ mod tests {
         const METHOD: &'static str = "waved";
     }
 
+    struct Unserializable;
+
+    impl Serialize for Unserializable {
+        fn serialize<Serializer>(
+            &self,
+            _serializer: Serializer,
+        ) -> Result<Serializer::Ok, Serializer::Error>
+        where
+            Serializer: serde::Serializer,
+        {
+            Err(serde::ser::Error::custom("this payload never serializes"))
+        }
+    }
+
+    impl WebSocketNotificationMessage for Unserializable {
+        const METHOD: &'static str = "unserializable";
+    }
+
+    impl WebSocketRequestMessage for Unserializable {
+        const METHOD: &'static str = "unserializable";
+    }
+
     async fn connected() -> (WebSocketConnection, ClientStream) {
         let (client_io, peer_io) = duplex(DUPLEX_CAPACITY);
         let client: Box<dyn ClientIo> = Box::new(client_io);
@@ -391,6 +400,36 @@ mod tests {
 
         assert!(matches!(answer, ResponseItem::Payload(echoed) if echoed.label == "here"));
         assert!(responses.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn reports_a_notification_that_cannot_be_serialized() {
+        let (connection, _peer) = connected().await;
+
+        let refused = connection
+            .notify(Unserializable)
+            .await
+            .expect_err("an unserializable payload never reaches the peer");
+
+        assert!(matches!(
+            refused,
+            WebSocketClientError::SerializeFrame { source } if source.is_data()
+        ));
+    }
+
+    #[tokio::test]
+    async fn reports_a_request_that_cannot_be_serialized() {
+        let (connection, _peer) = connected().await;
+        let refused = connection
+            .request::<Unserializable, Echoed>(Unserializable)
+            .await
+            .map(drop)
+            .expect_err("an unserializable payload never reaches the peer");
+
+        assert!(matches!(
+            refused,
+            WebSocketClientError::SerializeFrame { source } if source.is_data()
+        ));
     }
 
     #[tokio::test]
