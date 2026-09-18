@@ -15,6 +15,7 @@ async-trait = { workspace = true }
 margaret_spiffe_svid = { workspace = true }
 margaret_spiffe_svid_client = { workspace = true }
 margaret_spiffe_svid_server = { workspace = true }
+margaret_websocket_client = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 trzcina = { workspace = true }

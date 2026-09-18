@@ -1,5 +1,6 @@
+mod declared_serve_input_kind;
+mod serve_input_source;
 pub mod declared_serve_inputs;
-pub mod has_spiffe_http_client;
 pub mod registered_serve_input;
 pub mod scan;
 pub mod serve_input;
@@ -9,4 +10,5 @@ pub mod serve_input_read;
 pub mod serve_input_registration;
 pub mod serve_input_registry;
 pub mod serve_input_slots;
-mod serve_input_source;
+pub mod spiffe_client_kind;
+pub mod spiffe_client_kinds;

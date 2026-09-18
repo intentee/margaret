@@ -9,7 +9,9 @@ use crate::serve_input::ServeInput;
 pub fn serve_input_registration(input: &ServeInput) -> TokenStream {
     match input {
         ServeInput::ConsoleArgument(argument) => console_argument_registration(argument),
-        ServeInput::EnvironmentVariable(_) | ServeInput::SpiffeHttpClient => quote! {},
+        ServeInput::EnvironmentVariable(_)
+        | ServeInput::SpiffeHttpClient
+        | ServeInput::SpiffeWebSocketClient => quote! {},
     }
 }
 
@@ -70,5 +72,10 @@ mod tests {
     #[test]
     fn a_spiffe_http_client_registers_nothing() {
         assert!(collapsed(&ServeInput::SpiffeHttpClient).is_empty());
+    }
+
+    #[test]
+    fn a_spiffe_websocket_client_registers_nothing() {
+        assert!(collapsed(&ServeInput::SpiffeWebSocketClient).is_empty());
     }
 }

@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
+use margaret_codegen_tokens::spiffe_web_socket_client_ident::spiffe_web_socket_client_ident;
 use margaret_console_argument_codegen::console_argument_read::console_argument_read;
 use margaret_environment_variable_codegen::environment_variable_read::environment_variable_read;
 
@@ -16,6 +17,11 @@ pub fn serve_input_read(input: &ServeInput) -> TokenStream {
             let spiffe_http_client = spiffe_http_client_ident();
 
             quote! { #spiffe_http_client.clone() }
+        }
+        ServeInput::SpiffeWebSocketClient => {
+            let spiffe_web_socket_client = spiffe_web_socket_client_ident();
+
+            quote! { #spiffe_web_socket_client.clone() }
         }
     }
 }

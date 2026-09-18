@@ -1903,6 +1903,7 @@ dependencies = [
  "margaret_validation",
  "margaret_views",
  "margaret_websocket",
+ "margaret_websocket_client",
  "margaret_websocket_envelope",
  "margaret_websocket_session",
 ]
@@ -2845,7 +2846,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "margaret_spiffe_http_client_fixture"
+name = "margaret_spiffe_clients_fixture"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2856,6 +2857,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trzcina",
+ "url",
 ]
 
 [[package]]
@@ -2887,6 +2889,7 @@ dependencies = [
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_client",
  "margaret_spiffe_svid_server",
+ "margaret_websocket_client",
  "reqwest",
  "rustls",
  "trzcina",
@@ -2914,6 +2917,7 @@ dependencies = [
  "log",
  "margaret_spiffe_svid",
  "margaret_sync_holder",
+ "margaret_websocket_client",
  "reqwest",
  "rustls",
  "rustls-webpki",
@@ -3120,6 +3124,24 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "validator",
+]
+
+[[package]]
+name = "margaret_websocket_client"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "futures-util",
+ "margaret_websocket_envelope",
+ "rustls",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-rustls",
+ "tokio-tungstenite",
+ "tokio-util",
+ "url",
 ]
 
 [[package]]

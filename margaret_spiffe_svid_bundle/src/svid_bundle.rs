@@ -13,6 +13,7 @@ use margaret_spiffe_svid_client::svid_client_readiness::SvidClientReadiness;
 use margaret_spiffe_svid_client::svid_client_side::SvidClientSide;
 use margaret_spiffe_svid_client::svid_error::SvidError;
 use margaret_spiffe_svid_server::svid_server_side::SvidServerSide;
+use margaret_websocket_client::web_socket_client::WebSocketClient;
 
 pub struct SvidBundle {
     client_side: SvidClientSide,
@@ -62,6 +63,11 @@ impl SvidBundle {
     /// Returns `SvidError` propagated from the work it performs.
     pub fn reqwest_client(&self) -> Result<Client, SvidError> {
         self.client_side.reqwest_client()
+    }
+
+    #[must_use]
+    pub fn web_socket_client(&self) -> WebSocketClient {
+        self.client_side.web_socket_client()
     }
 
     #[must_use]

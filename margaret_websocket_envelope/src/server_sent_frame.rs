@@ -20,3 +20,20 @@ pub enum ServerSentFrame {
         id: RequestId,
     },
 }
+
+impl ServerSentFrame {
+    #[must_use]
+    pub fn id(&self) -> &RequestId {
+        match self {
+            Self::Response { id, .. } | Self::Error { id, .. } => id,
+        }
+    }
+
+    #[must_use]
+    pub fn is_final(&self) -> bool {
+        match self {
+            Self::Response { is_done, .. } => *is_done,
+            Self::Error { .. } => true,
+        }
+    }
+}

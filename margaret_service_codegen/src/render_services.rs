@@ -6,6 +6,7 @@ use quote::quote;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_codegen_tokens::spiffe_http_client_ident::spiffe_http_client_ident;
+use margaret_codegen_tokens::spiffe_web_socket_client_ident::spiffe_web_socket_client_ident;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_codegen_tokens::vec_literal_tokens::vec_literal_tokens;
 use margaret_console_argument_codegen::required_flag_read::required_flag_read;
@@ -19,6 +20,8 @@ use crate::service_kind::ServiceKind;
 use crate::service_plan::ServicePlan;
 use crate::service_unit::ServiceUnit;
 use crate::service_unit_origin::ServiceUnitOrigin;
+use margaret_serve_input_codegen::spiffe_client_kind::SpiffeClientKind;
+
 use crate::spiffe_activation::SpiffeActivation;
 
 fn failed_outcome() -> TokenStream {
@@ -64,12 +67,32 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
     }
 }
 
-fn svid_identity_prelude(
-    SpiffeActivation {
-        client_active,
-        server_active,
-    }: SpiffeActivation,
-) -> TokenStream {
+fn spiffe_client_binding(kind: SpiffeClientKind) -> TokenStream {
+    match kind {
+        SpiffeClientKind::Http => {
+            let spiffe_http_client = spiffe_http_client_ident();
+
+            quote! {
+                let #spiffe_http_client = match spiffe_bundle.reqwest_client() {
+                    Ok(client) => client,
+                    Err(error) => return margaret::framework::console::report_failure::report_failure(error),
+                };
+            }
+        }
+        SpiffeClientKind::WebSocket => {
+            let spiffe_web_socket_client = spiffe_web_socket_client_ident();
+
+            quote! {
+                let #spiffe_web_socket_client = spiffe_bundle.web_socket_client();
+            }
+        }
+    }
+}
+
+fn svid_identity_prelude(activation: &SpiffeActivation) -> TokenStream {
+    let client_active = activation.client_active();
+    let server_active = activation.server_active;
+
     if !server_active && !client_active {
         return quote! {};
     }
@@ -107,16 +130,10 @@ fn svid_identity_prelude(
         }
     });
 
-    let http_client = client_active.then(|| {
-        let spiffe_http_client = spiffe_http_client_ident();
-
-        quote! {
-            let #spiffe_http_client = match spiffe_bundle.reqwest_client() {
-                Ok(client) => client,
-                Err(error) => return margaret::framework::console::report_failure::report_failure(error),
-            };
-        }
-    });
+    let client_bindings = activation
+        .spiffe_clients
+        .iter()
+        .map(|kind| spiffe_client_binding(*kind));
 
     quote! {
         margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
@@ -130,7 +147,7 @@ fn svid_identity_prelude(
 
         #server_config
         #client_readiness
-        #http_client
+        #(#client_bindings)*
     }
 }
 
@@ -151,13 +168,8 @@ fn gated_registration(inner: &TokenStream, client_active: bool) -> TokenStream {
     }
 }
 
-fn bundle_registration(
-    SpiffeActivation {
-        client_active,
-        server_active,
-    }: SpiffeActivation,
-) -> TokenStream {
-    if !server_active && !client_active {
+fn bundle_registration(activation: &SpiffeActivation) -> TokenStream {
+    if !activation.server_active && !activation.client_active() {
         return quote! {};
     }
 
@@ -171,7 +183,7 @@ fn bundle_registration(
 fn server_registration(
     servers: &[HttpServer],
     has_views: bool,
-    activation: SpiffeActivation,
+    activation: &SpiffeActivation,
 ) -> TokenStream {
     let origins = servers.iter().map(|server| {
         let origin_variable = format_ident!("origin_{}", server.name());
@@ -224,7 +236,7 @@ fn server_registration(
         }
     });
 
-    let register_server = gated_registration(&quote! { server_service }, activation.client_active);
+    let register_server = gated_registration(&quote! { server_service }, activation.client_active());
 
     quote! {
         #(#origins)*
@@ -387,7 +399,7 @@ fn adapter_ident(unit: &ServiceUnit) -> Ident {
 fn register_servers_definition(
     servers: &[HttpServer],
     has_views: bool,
-    activation: SpiffeActivation,
+    activation: &SpiffeActivation,
 ) -> TokenStream {
     if servers.is_empty() {
         return TokenStream::new();
@@ -397,7 +409,7 @@ fn register_servers_definition(
     let spiffe_server_parameter = activation
         .server_active
         .then(|| quote! { spiffe_server_config: &::std::sync::Arc<margaret::framework::spiffe_svid::rustls::ServerConfig>, });
-    let spiffe_client_parameter = activation.client_active.then(|| {
+    let spiffe_client_parameter = activation.client_active().then(|| {
         quote! {
             spiffe_client_readiness: &margaret::framework::spiffe_svid_client::svid_client_readiness::SvidClientReadiness,
         }
@@ -423,7 +435,7 @@ fn register_servers_definition(
 
 fn register_servers_invocation(
     servers: &[HttpServer],
-    activation: SpiffeActivation,
+    activation: &SpiffeActivation,
 ) -> TokenStream {
     if servers.is_empty() {
         return TokenStream::new();
@@ -433,7 +445,7 @@ fn register_servers_invocation(
         .server_active
         .then(|| quote! { &spiffe_server_config, });
     let spiffe_client_argument = activation
-        .client_active
+        .client_active()
         .then(|| quote! { &spiffe_client_readiness, });
 
     quote! {
@@ -456,7 +468,7 @@ pub fn render_services(
     bindings: &ContainerBindings,
 ) -> GeneratedModuleTokens {
     let activation = SpiffeActivation {
-        client_active: plan.has_spiffe_http_client,
+        spiffe_clients: plan.spiffe_clients.clone(),
         server_active: serves_spiffe(servers),
     };
 
@@ -464,11 +476,11 @@ pub fn render_services(
     let unit_registrations = plan
         .units
         .iter()
-        .map(|unit| registration(unit, bindings, activation.client_active));
-    let identity_prelude = svid_identity_prelude(activation);
-    let bundle_registration = bundle_registration(activation);
-    let register_servers = register_servers_definition(servers, has_views, activation);
-    let server_registration = register_servers_invocation(servers, activation);
+        .map(|unit| registration(unit, bindings, activation.client_active()));
+    let identity_prelude = svid_identity_prelude(&activation);
+    let bundle_registration = bundle_registration(&activation);
+    let register_servers = register_servers_definition(servers, has_views, &activation);
+    let server_registration = register_servers_invocation(servers, &activation);
     let construction_invocation = bindings.serve_invocation(&plan.construction_arguments);
     let construction = quote! {
         let container = match #construction_invocation {
@@ -480,7 +492,7 @@ pub fn render_services(
         let container = &container;
     };
     let matches_binding =
-        if servers.is_empty() && !activation.client_active && !plan.reads_clap_matches {
+        if servers.is_empty() && !activation.client_active() && !plan.reads_clap_matches {
             quote! { _matches }
         } else {
             quote! { matches }

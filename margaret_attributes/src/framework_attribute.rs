@@ -30,13 +30,14 @@ pub enum FrameworkAttribute {
     Service,
     Singleton,
     SpiffeHttpClient,
+    SpiffeWebsocketClient,
     Unique,
     WebsocketMessage,
     WebsocketSession,
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 32] = [
         Self::AuthenticatedUser,
         Self::BuildForSession,
         Self::Column,
@@ -65,6 +66,7 @@ impl FrameworkAttribute {
         Self::Service,
         Self::Singleton,
         Self::SpiffeHttpClient,
+        Self::SpiffeWebsocketClient,
         Self::Unique,
         Self::WebsocketMessage,
         Self::WebsocketSession,
@@ -112,6 +114,7 @@ impl FrameworkAttribute {
             "service" => Some(Self::Service),
             "singleton" => Some(Self::Singleton),
             "spiffe_http_client" => Some(Self::SpiffeHttpClient),
+            "spiffe_websocket_client" => Some(Self::SpiffeWebsocketClient),
             "unique" => Some(Self::Unique),
             "websocket_message" => Some(Self::WebsocketMessage),
             "websocket_session" => Some(Self::WebsocketSession),
@@ -150,6 +153,7 @@ impl FrameworkAttribute {
             Self::Service => "service",
             Self::Singleton => "singleton",
             Self::SpiffeHttpClient => "spiffe_http_client",
+            Self::SpiffeWebsocketClient => "spiffe_websocket_client",
             Self::Unique => "unique",
             Self::WebsocketMessage => "websocket_message",
             Self::WebsocketSession => "websocket_session",

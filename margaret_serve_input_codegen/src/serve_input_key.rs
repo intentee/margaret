@@ -3,4 +3,5 @@ pub enum ServeInputKey {
     ConsoleArgument { name: String },
     EnvironmentVariable { name: String },
     SpiffeHttpClient,
+    SpiffeWebSocketClient,
 }

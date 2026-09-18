@@ -7,11 +7,13 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::service;
 
 use crate::identity_client::IdentityClient;
+use crate::relay_client::RelayClient;
 use crate::margaret::asset_bag::asset;
 
 #[service]
 pub struct Heartbeat {
     identity_client: Arc<IdentityClient>,
+    relay_client: Arc<RelayClient>,
 }
 
 impl Heartbeat {
@@ -19,8 +21,14 @@ impl Heartbeat {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(identity_client: Arc<IdentityClient>) -> anyhow::Result<Self> {
-        Ok(Self { identity_client })
+    pub fn create(
+        identity_client: Arc<IdentityClient>,
+        relay_client: Arc<RelayClient>,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
+            identity_client,
+            relay_client,
+        })
     }
 
     /// # Errors
@@ -30,6 +38,7 @@ impl Heartbeat {
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         let _asset = asset!("resources/ts/app.ts");
         let _http_client = self.identity_client.http_client();
+        let _websocket_client = self.relay_client.websocket_client();
 
         cancellation_token.cancelled().await;
 

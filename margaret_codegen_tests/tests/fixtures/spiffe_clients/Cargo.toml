@@ -1,5 +1,5 @@
 [package]
-name = "margaret_spiffe_http_client_fixture"
+name = "margaret_spiffe_clients_fixture"
 version = "0.1.0"
 edition = "2024"
 publish = false
@@ -10,6 +10,7 @@ async-trait = { workspace = true }
 clap = { workspace = true }
 margaret = { workspace = true, features = ["runtime"] }
 reqwest = { workspace = true }
+url = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }

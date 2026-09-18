@@ -7,7 +7,7 @@ use margaret_container::serve_input_binding::ServeInputBinding;
 use margaret_server_codegen::http_server::HttpServer;
 use margaret_server_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_server_codegen::serves_spiffe::serves_spiffe;
-use margaret_serve_input_codegen::has_spiffe_http_client::has_spiffe_http_client;
+use margaret_serve_input_codegen::spiffe_client_kinds::spiffe_client_kinds;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 use margaret_serve_input_codegen::serve_input_read::serve_input_read;
 use margaret_serve_input_codegen::serve_input_registration::serve_input_registration;
@@ -46,7 +46,7 @@ fn subcommand_registration(command: &ConsoleCommand) -> TokenStream {
 
 fn serve_registration(http_servers: &[HttpServer], serve_inputs: &[ServeInput]) -> TokenStream {
     let spiffe_secured = serves_spiffe(http_servers);
-    let svid_active = spiffe_secured || has_spiffe_http_client(serve_inputs);
+    let svid_active = spiffe_secured || !spiffe_client_kinds(serve_inputs).is_empty();
     let service_arguments = serve_inputs.iter().map(serve_input_registration);
     let http_server_arguments = http_servers.iter().map(|server| {
         let address_argument = server.address_argument();

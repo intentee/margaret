@@ -6,12 +6,14 @@ use margaret_environment_variable_codegen::environment_variable::EnvironmentVari
 use margaret_input_weaving::weaving_kind::WeavingKind;
 
 use crate::serve_input_key::ServeInputKey;
+use crate::spiffe_client_kind::SpiffeClientKind;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ServeInput {
     ConsoleArgument(ConsoleArgument),
     EnvironmentVariable(EnvironmentVariable),
     SpiffeHttpClient,
+    SpiffeWebSocketClient,
 }
 
 impl ServeInput {
@@ -21,6 +23,9 @@ impl ServeInput {
             ServeInput::ConsoleArgument(argument) => argument.field_type(),
             ServeInput::EnvironmentVariable(variable) => variable.value.field_type(),
             ServeInput::SpiffeHttpClient => quote! { reqwest::Client },
+            ServeInput::SpiffeWebSocketClient => {
+                quote! { margaret::framework::websocket_client::web_socket_client::WebSocketClient }
+            }
         }
     }
 
@@ -28,7 +33,9 @@ impl ServeInput {
     pub fn is_shareable(&self) -> bool {
         match self {
             ServeInput::ConsoleArgument(argument) => argument.is_shareable(),
-            ServeInput::EnvironmentVariable(_) | ServeInput::SpiffeHttpClient => true,
+            ServeInput::EnvironmentVariable(_)
+            | ServeInput::SpiffeHttpClient
+            | ServeInput::SpiffeWebSocketClient => true,
         }
     }
 
@@ -38,6 +45,7 @@ impl ServeInput {
             ServeInput::ConsoleArgument(argument) => argument.name(),
             ServeInput::EnvironmentVariable(variable) => variable.name.as_str(),
             ServeInput::SpiffeHttpClient => "spiffe_http_client",
+            ServeInput::SpiffeWebSocketClient => "spiffe_websocket_client",
         }
     }
 
@@ -45,7 +53,9 @@ impl ServeInput {
     pub fn reads_clap_matches(&self) -> bool {
         match self {
             ServeInput::ConsoleArgument(_) => true,
-            ServeInput::EnvironmentVariable(_) | ServeInput::SpiffeHttpClient => false,
+            ServeInput::EnvironmentVariable(_)
+            | ServeInput::SpiffeHttpClient
+            | ServeInput::SpiffeWebSocketClient => false,
         }
     }
 
@@ -59,6 +69,16 @@ impl ServeInput {
                 name: variable.name.as_str().to_string(),
             },
             ServeInput::SpiffeHttpClient => ServeInputKey::SpiffeHttpClient,
+            ServeInput::SpiffeWebSocketClient => ServeInputKey::SpiffeWebSocketClient,
+        }
+    }
+
+    #[must_use]
+    pub fn spiffe_client_kind(&self) -> Option<SpiffeClientKind> {
+        match self {
+            ServeInput::ConsoleArgument(_) | ServeInput::EnvironmentVariable(_) => None,
+            ServeInput::SpiffeHttpClient => Some(SpiffeClientKind::Http),
+            ServeInput::SpiffeWebSocketClient => Some(SpiffeClientKind::WebSocket),
         }
     }
 
@@ -67,7 +87,9 @@ impl ServeInput {
         match self {
             ServeInput::ConsoleArgument(argument) => argument.weaving(),
             ServeInput::EnvironmentVariable(variable) => variable.value.weaving.clone(),
-            ServeInput::SpiffeHttpClient => WeavingKind::Cloned,
+            ServeInput::SpiffeHttpClient | ServeInput::SpiffeWebSocketClient => {
+                WeavingKind::Cloned
+            }
         }
     }
 }

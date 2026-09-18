@@ -76,6 +76,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_views \
 	-p margaret_views_codegen \
 	-p margaret_websocket \
+	-p margaret_websocket_client \
 	-p margaret_websocket_codegen \
 	-p margaret_websocket_envelope \
 	-p margaret_websocket_session \
@@ -91,7 +92,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_websocket_fixture \
 	--exclude-from-report margaret_composite_foreign_key_model_fixture \
 	--exclude-from-report margaret_self_referential_model_fixture \
-	--exclude-from-report margaret_spiffe_http_client_fixture
+	--exclude-from-report margaret_spiffe_clients_fixture
 GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_collisions_and_diamonds_fixture \
 	-p margaret_codegen_copy_console_arguments_fixture \
@@ -103,7 +104,7 @@ GENERATED_CODE_PACKAGES := \
 	-p margaret_example \
 	-p margaret_composite_foreign_key_model_fixture \
 	-p margaret_self_referential_model_fixture \
-	-p margaret_spiffe_http_client_fixture
+	-p margaret_spiffe_clients_fixture
 RUNTIME_PACKAGES := \
 	-p margaret \
 	-p margaret_access_token_minter \
@@ -165,6 +166,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_views \
 	-p margaret_views_codegen \
 	-p margaret_websocket \
+	-p margaret_websocket_client \
 	-p margaret_websocket_codegen \
 	-p margaret_websocket_envelope \
 	-p margaret_websocket_session
@@ -292,6 +294,7 @@ coverage: node_modules postgres-image
 		--gated margaret_views=100 \
 		--gated margaret_views_codegen=100 \
 		--gated margaret_websocket=100 \
+		--gated margaret_websocket_client=100 \
 		--gated margaret_websocket_codegen=100 \
 		--gated margaret_websocket_envelope=100 \
 		--gated margaret_websocket_session=100 \

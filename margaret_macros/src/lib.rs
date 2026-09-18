@@ -78,6 +78,7 @@ pub fn constructor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
             "environment_variable",
             "jwks_secret_store",
             "spiffe_http_client",
+            "spiffe_websocket_client",
         ],
     )
 }

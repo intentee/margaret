@@ -8,6 +8,7 @@ use trzcina::ServiceBundle;
 use margaret_spiffe_svid::svid_service::SvidService;
 use margaret_spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams;
 use margaret_spiffe_svid::svid_side_params::SvidSideParams;
+use margaret_websocket_client::web_socket_client::WebSocketClient;
 
 use crate::svid_client_readiness::SvidClientReadiness;
 use crate::svid_client_side::SvidClientSide;
@@ -54,6 +55,11 @@ impl SvidClientBundle {
     /// Returns `SvidError` propagated from the work it performs.
     pub fn reqwest_client(&self) -> Result<Client, SvidError> {
         self.svid_client_side.reqwest_client()
+    }
+
+    #[must_use]
+    pub fn web_socket_client(&self) -> WebSocketClient {
+        self.svid_client_side.web_socket_client()
     }
 }
 

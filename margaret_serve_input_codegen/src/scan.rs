@@ -11,6 +11,7 @@ use margaret_environment_variable_codegen::read_environment_variable::read_envir
 use margaret_injection_codegen::parameters::parameters;
 use margaret_input_weaving::constructor_parameter::ConstructorParameter;
 
+use crate::declared_serve_input_kind::DeclaredServeInputKind;
 use crate::declared_serve_inputs::DeclaredServeInputs;
 use crate::serve_input::ServeInput;
 use crate::serve_input_codegen_error::ServeInputCodegenError;
@@ -63,15 +64,27 @@ fn scan_item(
         let arguments = attribute.args()?;
 
         let input = match declared_by {
-            FrameworkAttribute::ConsoleArgument => ServeInput::ConsoleArgument(
+            DeclaredServeInputKind::ConsoleArgument => ServeInput::ConsoleArgument(
                 read_console_argument(index, item, arguments, view.declared, &site, scope)?,
             ),
-            FrameworkAttribute::EnvironmentVariable => ServeInput::EnvironmentVariable(
+            DeclaredServeInputKind::EnvironmentVariable => ServeInput::EnvironmentVariable(
                 read_environment_variable(index, item, arguments, view.declared, &site)?,
             ),
-            _ if attribute.is_bare() => ServeInput::SpiffeHttpClient,
-            _ => {
-                return Err(ServeInputCodegenError::SpiffeHttpClientTakesNoArguments { site });
+            DeclaredServeInputKind::SpiffeHttpClient => {
+                if !attribute.is_bare() {
+                    return Err(ServeInputCodegenError::SpiffeHttpClientTakesNoArguments { site });
+                }
+
+                ServeInput::SpiffeHttpClient
+            }
+            DeclaredServeInputKind::SpiffeWebSocketClient => {
+                if !attribute.is_bare() {
+                    return Err(
+                        ServeInputCodegenError::SpiffeWebSocketClientTakesNoArguments { site },
+                    );
+                }
+
+                ServeInput::SpiffeWebSocketClient
             }
         };
 
@@ -162,6 +175,7 @@ mod tests {
                 variable.value.value_type
             ),
             ServeInput::SpiffeHttpClient => "spiffe_http_client".to_string(),
+            ServeInput::SpiffeWebSocketClient => "spiffe_websocket_client".to_string(),
         }
     }
 
@@ -294,6 +308,28 @@ mod tests {
             )
             .contains("a constructor parameter is fed by exactly one serve input")
         );
+    }
+
+    #[test]
+    fn scans_a_spiffe_websocket_client() {
+        assert_eq!(
+            describe(
+                "#[singleton]\nstruct Relay;\n\nimpl Relay {\n    #[constructor]\n    fn create(#[spiffe_websocket_client] client: WebSocketClient) -> anyhow::Result<Self> {}\n}\n",
+                "Relay",
+                0,
+            ),
+            "spiffe_websocket_client"
+        );
+    }
+
+    #[test]
+    fn rejects_a_spiffe_websocket_client_that_carries_arguments() {
+        let error = scanned(
+            "#[singleton]\nstruct Relay;\n\nimpl Relay {\n    #[constructor]\n    fn create(#[spiffe_websocket_client(from = \"x\")] client: WebSocketClient) -> anyhow::Result<Self> {}\n}\n",
+        )
+        .expect_err("the marker takes no arguments");
+
+        assert!(error.to_string().contains("#[spiffe_websocket_client]"));
     }
 
     #[test]

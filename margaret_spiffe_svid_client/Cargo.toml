@@ -17,6 +17,7 @@ log = { workspace = true }
 margaret_spiffe_svid = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types"] }
 margaret_sync_holder = { workspace = true }
+margaret_websocket_client = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 rustls-webpki = { workspace = true }

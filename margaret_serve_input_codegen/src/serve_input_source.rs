@@ -1,31 +1,25 @@
-use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_input_weaving::constructor_parameter::ConstructorParameter;
 
+use crate::declared_serve_input_kind::DeclaredServeInputKind;
 use crate::serve_input_codegen_error::ServeInputCodegenError;
-
-const SERVE_INPUT_ATTRIBUTES: [FrameworkAttribute; 3] = [
-    FrameworkAttribute::ConsoleArgument,
-    FrameworkAttribute::EnvironmentVariable,
-    FrameworkAttribute::SpiffeHttpClient,
-];
 
 pub(crate) struct DeclaredServeInputSource<'attributes> {
     pub(crate) attribute: &'attributes IndexedAttribute,
-    pub(crate) declared_by: FrameworkAttribute,
+    pub(crate) declared_by: DeclaredServeInputKind,
 }
 
 pub(crate) fn serve_input_source<'attributes>(
     attributes: &'attributes [IndexedAttribute],
     site: &ConstructorParameter,
 ) -> Result<Option<DeclaredServeInputSource<'attributes>>, ServeInputCodegenError> {
-    let mut declared = SERVE_INPUT_ATTRIBUTES.into_iter().filter_map(|marker| {
+    let mut declared = DeclaredServeInputKind::ALL.into_iter().filter_map(|kind| {
         attributes
             .iter()
-            .find(|attribute| attribute.framework_attribute() == Some(marker))
+            .find(|attribute| attribute.framework_attribute() == Some(kind.attribute()))
             .map(|attribute| DeclaredServeInputSource {
                 attribute,
-                declared_by: marker,
+                declared_by: kind,
             })
     });
 
@@ -48,10 +42,10 @@ mod tests {
     use syn::parse_quote;
 
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::framework_attribute::FrameworkAttribute;
     use margaret_attributes::indexed_attribute::IndexedAttribute;
     use margaret_input_weaving::constructor_parameter::ConstructorParameter;
 
+    use crate::declared_serve_input_kind::DeclaredServeInputKind;
     use crate::serve_input_codegen_error::ServeInputCodegenError;
 
     use super::serve_input_source;
@@ -63,13 +57,13 @@ mod tests {
         }
     }
 
-    fn declared_by(attributes: &[IndexedAttribute]) -> Option<FrameworkAttribute> {
+    fn declared_by(attributes: &[IndexedAttribute]) -> Option<DeclaredServeInputKind> {
         describe(attributes).expect("a single source is read")
     }
 
     fn describe(
         attributes: &[IndexedAttribute],
-    ) -> Result<Option<FrameworkAttribute>, ServeInputCodegenError> {
+    ) -> Result<Option<DeclaredServeInputKind>, ServeInputCodegenError> {
         serve_input_source(attributes, &site()).map(|read| read.map(|source| source.declared_by))
     }
 
@@ -89,7 +83,7 @@ mod tests {
             declared_by(&[IndexedAttribute::new(
                 &parse_quote!(#[console_argument(from = "label")]),
             )]),
-            Some(FrameworkAttribute::ConsoleArgument)
+            Some(DeclaredServeInputKind::ConsoleArgument)
         );
     }
 
@@ -99,7 +93,7 @@ mod tests {
             declared_by(&[IndexedAttribute::new(
                 &parse_quote!(#[environment_variable(from = "DATABASE_URL")]),
             )]),
-            Some(FrameworkAttribute::EnvironmentVariable)
+            Some(DeclaredServeInputKind::EnvironmentVariable)
         );
     }
 
@@ -107,7 +101,17 @@ mod tests {
     fn finds_the_spiffe_http_client_source() {
         assert_eq!(
             declared_by(&[IndexedAttribute::new(&parse_quote!(#[spiffe_http_client]),)]),
-            Some(FrameworkAttribute::SpiffeHttpClient)
+            Some(DeclaredServeInputKind::SpiffeHttpClient)
+        );
+    }
+
+    #[test]
+    fn finds_the_spiffe_websocket_client_source() {
+        assert_eq!(
+            declared_by(&[IndexedAttribute::new(
+                &parse_quote!(#[spiffe_websocket_client]),
+            )]),
+            Some(DeclaredServeInputKind::SpiffeWebSocketClient)
         );
     }
 

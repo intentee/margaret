@@ -6,6 +6,7 @@ use rustls::ClientConfig;
 
 use margaret_spiffe_svid::root_cert_store_holder::RootCertStoreHolder;
 use margaret_spiffe_svid::svid_side_params::SvidSideParams;
+use margaret_websocket_client::web_socket_client::WebSocketClient;
 
 use crate::build_reqwest_client::build_reqwest_client;
 use crate::svid_client_readiness::SvidClientReadiness;
@@ -61,6 +62,11 @@ impl SvidClientSide {
             spiffe_trust_domain: self.spiffe_trust_domain,
             svid_server_cert_verifier_facade: self.svid_server_cert_verifier_facade,
         }
+    }
+
+    #[must_use]
+    pub fn web_socket_client(&self) -> WebSocketClient {
+        WebSocketClient::new(self.client_config())
     }
 
     /// # Errors

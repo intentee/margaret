@@ -56,4 +56,9 @@ pub enum ServeInputCodegenError {
         "{site} carries arguments on #[spiffe_http_client]; the injected client takes no arguments"
     )]
     SpiffeHttpClientTakesNoArguments { site: ConstructorParameter },
+
+    #[error(
+        "{site} carries arguments on #[spiffe_websocket_client]; the injected client takes no arguments"
+    )]
+    SpiffeWebSocketClientTakesNoArguments { site: ConstructorParameter },
 }
