@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tokio_util::sync::CancellationToken;
 
-use margaret_websocket::request_envelope::RequestEnvelope;
+use margaret_websocket_envelope::request_envelope::RequestEnvelope;
 use margaret_websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret_websocket::web_socket::WebSocket;
 

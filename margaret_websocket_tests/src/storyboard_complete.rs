@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use margaret_websocket::web_socket_response_message::WebSocketResponseMessage;
+use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseMessage;
 
 #[derive(Serialize)]
 pub struct StoryboardComplete {

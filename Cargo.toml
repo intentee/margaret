@@ -90,6 +90,7 @@ members = [
     "margaret_views_codegen",
     "margaret_websocket",
     "margaret_websocket_codegen",
+    "margaret_websocket_envelope",
     "margaret_websocket_session",
     "margaret_websocket_tests",
 ]
@@ -221,6 +222,7 @@ margaret_views = { path = "margaret_views", version = "0.1.0" }
 margaret_views_codegen = { path = "margaret_views_codegen", version = "0.4.0" }
 margaret_websocket = { path = "margaret_websocket", version = "0.1.0" }
 margaret_websocket_codegen = { path = "margaret_websocket_codegen", version = "0.4.0" }
+margaret_websocket_envelope = { path = "margaret_websocket_envelope", version = "0.1.0" }
 margaret_websocket_session = { path = "margaret_websocket_session", version = "0.1.0" }
 
 [workspace.lints.clippy]

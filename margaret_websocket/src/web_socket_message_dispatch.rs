@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 
-use crate::request_id::RequestId;
+use margaret_websocket_envelope::request_id::RequestId;
 use crate::web_socket::WebSocket;
 
 #[async_trait]

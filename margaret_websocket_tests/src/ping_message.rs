@@ -1,9 +1,9 @@
 use serde::Deserialize;
 use validator::Validate;
 
-use margaret_websocket::request_envelope::RequestEnvelope;
-use margaret_websocket::request_id::RequestId;
-use margaret_websocket::web_socket_request_message::WebSocketRequestMessage;
+use margaret_websocket_envelope::request_envelope::RequestEnvelope;
+use margaret_websocket_envelope::request_id::RequestId;
+use margaret_websocket_envelope::web_socket_request_message::WebSocketRequestMessage;
 
 #[derive(Deserialize, Validate)]
 pub struct PingMessage {
@@ -12,6 +12,8 @@ pub struct PingMessage {
 }
 
 impl WebSocketRequestMessage for PingMessage {
+    const METHOD: &'static str = "ping";
+
     type Envelope = RequestEnvelope<Self>;
 
     fn envelope(id: RequestId, message: Self) -> Self::Envelope {

@@ -1,0 +1,17 @@
+[package]
+name = "margaret_websocket_envelope"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "WebSocket envelope protocol shared by the Margaret application framework's servers and clients."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

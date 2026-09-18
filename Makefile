@@ -77,6 +77,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_views_codegen \
 	-p margaret_websocket \
 	-p margaret_websocket_codegen \
+	-p margaret_websocket_envelope \
 	-p margaret_websocket_session \
 	-p margaret_websocket_tests
 COVERAGE_EXCLUDED_PACKAGES := \
@@ -165,6 +166,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_views_codegen \
 	-p margaret_websocket \
 	-p margaret_websocket_codegen \
+	-p margaret_websocket_envelope \
 	-p margaret_websocket_session
 RUNTIME_LINTS := \
 	-D unsafe-code \
@@ -291,6 +293,7 @@ coverage: node_modules postgres-image
 		--gated margaret_views_codegen=100 \
 		--gated margaret_websocket=100 \
 		--gated margaret_websocket_codegen=100 \
+		--gated margaret_websocket_envelope=100 \
 		--gated margaret_websocket_session=100 \
 		--gated margaret_websocket_tests=100
 

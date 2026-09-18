@@ -46,6 +46,7 @@ margaret_token_signer = { workspace = true, optional = true }
 margaret_validation = { workspace = true, optional = true }
 margaret_views = { workspace = true, optional = true }
 margaret_websocket = { workspace = true, optional = true }
+margaret_websocket_envelope = { workspace = true, optional = true }
 margaret_websocket_session = { workspace = true, optional = true }
 
 [features]
@@ -85,6 +86,7 @@ runtime = [
     "dep:margaret_validation",
     "dep:margaret_views",
     "dep:margaret_websocket",
+    "dep:margaret_websocket_envelope",
     "dep:margaret_websocket_session",
 ]
 

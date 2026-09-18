@@ -281,7 +281,7 @@ fn render_request_dispatch(binding: &HandlerBinding, session_path: &TokenStream)
                 &self,
                 cancellation_token: tokio_util::sync::CancellationToken,
                 session: ::std::sync::Arc<#session_path>,
-                id: margaret::framework::websocket::request_id::RequestId,
+                id: margaret::framework::websocket_envelope::request_id::RequestId,
                 params: serde_json::Value,
                 socket: margaret::framework::websocket::web_socket::WebSocket,
             ) {
@@ -340,14 +340,15 @@ fn dispatch_insert(
     map: &Ident,
     container: &Ident,
     bindings: &ContainerBindings,
+    message_trait: &TokenStream,
 ) -> TokenStream {
     let dispatch = dispatch_struct_ident(binding);
-    let method = &binding.method;
+    let message = path_tokens(&binding.message_path);
     let handler = bindings.accessor_invocation(container, &binding.handler_field);
 
     quote! {
         #map.insert(
-            #method.to_string(),
+            <#message as #message_trait>::METHOD.to_string(),
             ::std::sync::Arc::new(#dispatch {
                 handler: #handler,
             }),
@@ -378,11 +379,27 @@ fn render_dispatch_table(
     let request_inserts = plan
         .request_handlers
         .iter()
-        .map(|binding| dispatch_insert(binding, &requests, &container, bindings));
+        .map(|binding| {
+            dispatch_insert(
+                binding,
+                &requests,
+                &container,
+                bindings,
+                &quote! { margaret::framework::websocket_envelope::web_socket_request_message::WebSocketRequestMessage },
+            )
+        });
     let notification_inserts = plan
         .notification_handlers
         .iter()
-        .map(|binding| dispatch_insert(binding, &notifications, &container, bindings));
+        .map(|binding| {
+            dispatch_insert(
+                binding,
+                &notifications,
+                &container,
+                bindings,
+                &quote! { margaret::framework::websocket_envelope::web_socket_notification_message::WebSocketNotificationMessage },
+            )
+        });
 
     let requests_mutability = mutability(!plan.request_handlers.is_empty());
     let notifications_mutability = mutability(!plan.notification_handlers.is_empty());

@@ -16,8 +16,8 @@ use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
-use crate::envelope_error_code::EnvelopeErrorCode;
-use crate::inbound_frame::InboundFrame;
+use margaret_websocket_envelope::envelope_error_code::EnvelopeErrorCode;
+use margaret_websocket_envelope::client_sent_frame::ClientSentFrame;
 use crate::report_send_failure::report_send_failure;
 use crate::web_socket::WebSocket;
 use crate::web_socket_dispatch_table::WebSocketDispatchTable;
@@ -51,12 +51,12 @@ async fn dispatch_frame<Session>(
     dispatch_table: &Arc<WebSocketDispatchTable<Session>>,
     socket: &WebSocket,
     pending: &mut FuturesUnordered<BoxFuture<'static, ()>>,
-    frame: InboundFrame,
+    frame: ClientSentFrame,
 ) where
     Session: Send + Sync + 'static,
 {
     match frame {
-        InboundFrame::Request { id, method, params } => match dispatch_table.request(&method) {
+        ClientSentFrame::Request { id, method, params } => match dispatch_table.request(&method) {
             Some(dispatch) => {
                 let dispatch = dispatch.clone();
                 let cancellation_token = cancellation_token.child_token();
@@ -85,7 +85,7 @@ async fn dispatch_frame<Session>(
                 );
             }
         },
-        InboundFrame::Notification { method, params } => {
+        ClientSentFrame::Notification { method, params } => {
             if let Some(dispatch) = dispatch_table.notification(&method) {
                 let dispatch = dispatch.clone();
                 let cancellation_token = cancellation_token.child_token();
@@ -123,7 +123,7 @@ async fn run_source<Io, Session>(
             () = cancellation_token.cancelled() => break,
             Some(()) = pending.next(), if !pending.is_empty() => {}
             inbound = source.next() => match inbound {
-                Some(Ok(Message::Text(text))) => match serde_json::from_str::<InboundFrame>(text.as_str()) {
+                Some(Ok(Message::Text(text))) => match serde_json::from_str::<ClientSentFrame>(text.as_str()) {
                     Ok(frame) => {
                         dispatch_frame(
                             &cancellation_token,

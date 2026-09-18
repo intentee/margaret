@@ -3,11 +3,11 @@ use serde_json::Value;
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::envelope_error::EnvelopeError;
-use crate::envelope_error_code::EnvelopeErrorCode;
-use crate::outbound_error::OutboundError;
-use crate::outbound_response::OutboundResponse;
-use crate::request_id::RequestId;
+use margaret_websocket_envelope::envelope_error::EnvelopeError;
+use margaret_websocket_envelope::envelope_error_code::EnvelopeErrorCode;
+use margaret_websocket_envelope::outbound_error::OutboundError;
+use margaret_websocket_envelope::outbound_response::OutboundResponse;
+use margaret_websocket_envelope::request_id::RequestId;
 use crate::web_socket_error::WebSocketError;
 
 #[derive(Clone)]
@@ -73,8 +73,8 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::WebSocket;
-    use crate::outbound_response::OutboundResponse;
-    use crate::request_id::RequestId;
+    use margaret_websocket_envelope::outbound_response::OutboundResponse;
+    use margaret_websocket_envelope::request_id::RequestId;
 
     #[tokio::test]
     async fn reports_a_closed_outbound_channel() {

@@ -206,7 +206,7 @@ impl RespondsToWebSocketNotification for Typist {
             dispatch_ident: "MissingDispatch".to_string(),
             handler_field: "missing".to_string(),
             handler_path: missing_path(),
-            method: "missing".to_string(),
+            message_path: missing_path(),
         }
     }
 
@@ -756,8 +756,12 @@ impl Guard {
         assert!(source.contains("TypingDispatch"));
         assert!(source.contains("dispatch_request::dispatch_request"));
         assert!(source.contains("dispatch_notification::dispatch_notification"));
-        assert!(source.contains("requests.insert(\"say\""));
-        assert!(source.contains("notifications.insert(\"typing\""));
+        assert!(source.contains(
+            "requests.insert(<crate::Sayasmargaret::framework::websocket_envelope::web_socket_request_message::WebSocketRequestMessage>::METHOD.to_string()"
+        ));
+        assert!(source.contains(
+            "notifications.insert(<crate::Typingasmargaret::framework::websocket_envelope::web_socket_notification_message::WebSocketNotificationMessage>::METHOD.to_string()"
+        ));
         assert!(source.contains("container.speaker()"));
     }
 
@@ -1744,13 +1748,20 @@ mod second_notification {
         assert!(source.contains("crate::second_request::Handler"));
         assert!(source.contains("crate::first_notification::Handler"));
         assert!(source.contains("crate::second_notification::Handler"));
-        assert_eq!(source.matches("\"shared_request\".to_string()").count(), 2);
         assert_eq!(
             source
-                .matches("\"shared_notification\".to_string()")
+                .matches("<crate::SharedRequestasmargaret::framework::websocket_envelope::web_socket_request_message::WebSocketRequestMessage>::METHOD.to_string()")
                 .count(),
             2
         );
+        assert_eq!(
+            source
+                .matches("<crate::SharedNotificationasmargaret::framework::websocket_envelope::web_socket_notification_message::WebSocketNotificationMessage>::METHOD.to_string()")
+                .count(),
+            2
+        );
+        assert_eq!(source.matches("\"shared_request\"").count(), 1);
+        assert_eq!(source.matches("\"shared_notification\"").count(), 1);
         assert_eq!(
             source
                 .matches("WebSocketRequestMessageforcrate::SharedRequest")

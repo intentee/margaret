@@ -1903,6 +1903,7 @@ dependencies = [
  "margaret_validation",
  "margaret_views",
  "margaret_websocket",
+ "margaret_websocket_envelope",
  "margaret_websocket_session",
 ]
 
@@ -3110,6 +3111,7 @@ dependencies = [
  "margaret_http",
  "margaret_route_parameter_binding",
  "margaret_validation",
+ "margaret_websocket_envelope",
  "margaret_websocket_session",
  "serde",
  "serde_json",
@@ -3143,6 +3145,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_websocket_envelope"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "margaret_websocket_session"
 version = "0.1.0"
 dependencies = [
@@ -3164,6 +3174,7 @@ dependencies = [
  "margaret_http_uploaded_file",
  "margaret_http_validation",
  "margaret_websocket",
+ "margaret_websocket_envelope",
  "margaret_websocket_session",
  "serde",
  "serde_json",

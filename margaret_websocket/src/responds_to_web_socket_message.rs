@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tokio_util::sync::CancellationToken;
 
 use crate::web_socket::WebSocket;
-use crate::web_socket_request_message::WebSocketRequestMessage;
+use margaret_websocket_envelope::web_socket_request_message::WebSocketRequestMessage;
 
 #[async_trait]
 pub trait RespondsToWebSocketMessage: Send + Sync {

@@ -2,7 +2,7 @@ use serde::Serialize;
 use serde::Serializer;
 use serde::ser::Error;
 
-use margaret_websocket::web_socket_response_message::WebSocketResponseMessage;
+use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseMessage;
 
 pub struct FailingChunk;
 

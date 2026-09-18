@@ -69,6 +69,8 @@ pub use margaret_views as views;
 #[cfg(feature = "runtime")]
 pub use margaret_websocket as websocket;
 #[cfg(feature = "runtime")]
+pub use margaret_websocket_envelope as websocket_envelope;
+#[cfg(feature = "runtime")]
 pub use margaret_websocket_session as websocket_session;
 
 #[cfg(all(test, feature = "runtime"))]

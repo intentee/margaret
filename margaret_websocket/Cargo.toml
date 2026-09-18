@@ -18,6 +18,7 @@ hyper = { workspace = true, features = ["http1"] }
 hyper-util = { workspace = true, features = ["tokio"] }
 margaret_http = { workspace = true }
 margaret_route_parameter_binding = { workspace = true }
+margaret_websocket_envelope = { workspace = true }
 margaret_validation = { workspace = true }
 margaret_websocket_session = { workspace = true }
 serde = { workspace = true }

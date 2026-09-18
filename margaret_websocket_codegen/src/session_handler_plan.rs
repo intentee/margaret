@@ -91,7 +91,7 @@ impl SessionHandlerPlan {
             dispatch_ident,
             handler_field: handler.handler_field.clone(),
             handler_path: handler.handler_path.clone(),
-            method: method.clone(),
+            message_path: message.path.clone(),
         };
 
         self.handler_by_method

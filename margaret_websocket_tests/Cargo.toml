@@ -13,6 +13,7 @@ margaret_http = { workspace = true }
 margaret_http_uploaded_file = { workspace = true }
 margaret_http_validation = { workspace = true }
 margaret_websocket = { workspace = true }
+margaret_websocket_envelope = { workspace = true }
 margaret_websocket_session = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
