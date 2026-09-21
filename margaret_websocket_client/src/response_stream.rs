@@ -81,7 +81,7 @@ where
                 ..
             } => {
                 if !is_done {
-                    self.exchange.replenish().await;
+                    self.exchange.report_consumed();
                 }
 
                 Some(read_response(&method, payload))

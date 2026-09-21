@@ -8,6 +8,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::UnboundedSender;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
@@ -21,10 +23,11 @@ use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseM
 use crate::client_stream::ClientStream;
 use crate::exchange_interruption::ExchangeInterruption;
 use crate::exchange_outcome::ExchangeOutcome;
-use crate::exchange_queue_capacity::EXCHANGE_QUEUE_CAPACITY;
 use crate::exchange_registration::ExchangeRegistration;
 use crate::exchange_registry::ExchangeRegistry;
+use crate::exchange_signal::ExchangeSignal;
 use crate::exchange_termination::ExchangeTermination;
+use crate::granted_credit::GrantedCredit;
 use crate::open_exchange::OpenExchange;
 use crate::outbound_frames::OutboundFrames;
 use crate::pending_exchange::PendingExchange;
@@ -38,11 +41,13 @@ async fn read_server_frames(
     mut source: SplitStream<ClientStream>,
     exchanges: ExchangeRegistry,
     frames: OutboundFrames,
+    mut signals: UnboundedReceiver<ExchangeSignal>,
 ) {
     let interruption = loop {
         tokio::select! {
             biased;
             () = cancellation_token.cancelled() => break ExchangeInterruption::ConnectionDropped,
+            Some(signal) = signals.recv() => frames.report_exchange_signal(signal).await,
             message = source.next() => match message {
                 Some(Ok(Message::Text(text))) => {
                     match serde_json::from_str::<ServerSentFrame>(&text) {
@@ -84,6 +89,7 @@ pub struct WebSocketConnection {
     exchanges: ExchangeRegistry,
     frames: OutboundFrames,
     next_request_id: AtomicI64,
+    signals: UnboundedSender<ExchangeSignal>,
     url: Arc<str>,
 }
 
@@ -93,12 +99,14 @@ impl WebSocketConnection {
         let cancellation_token = CancellationToken::new();
         let exchanges = ExchangeRegistry::default();
         let frames = OutboundFrames::new(Arc::new(Mutex::new(sink)), url.clone());
+        let (signals, reported_signals) = mpsc::unbounded_channel();
 
         drop(tokio::spawn(read_server_frames(
             cancellation_token.clone(),
             source,
             exchanges.clone(),
             frames.clone(),
+            reported_signals,
         )));
 
         Self {
@@ -106,6 +114,7 @@ impl WebSocketConnection {
             exchanges,
             frames,
             next_request_id: AtomicI64::new(0),
+            signals,
             url,
         }
     }
@@ -167,19 +176,22 @@ impl WebSocketConnection {
         id: RequestId,
         serialized: Result<String, serde_json::Error>,
     ) -> Result<OpenExchange, WebSocketClientError> {
-        let (sender, receiver) = mpsc::channel(EXCHANGE_QUEUE_CAPACITY);
+        let (sender, receiver) = mpsc::unbounded_channel();
+        let granted = GrantedCredit::new(RESPONSE_CREDIT_WINDOW);
         let termination = ExchangeTermination::default();
         let exchange = OpenExchange::new(
-            self.frames.clone(),
+            granted.clone(),
             id.clone(),
             receiver,
             self.exchanges.clone(),
+            self.signals.clone(),
             termination.clone(),
         );
 
         if let ExchangeRegistration::Refused(interruption) = self.exchanges.register(
             &id,
             PendingExchange {
+                granted,
                 sender,
                 termination,
             },
@@ -215,6 +227,7 @@ mod tests {
     use serde::Serialize;
     use tokio::io::duplex;
     use tokio::sync::Mutex;
+    use tokio::sync::mpsc;
     use tokio_tungstenite::WebSocketStream;
     use tokio_tungstenite::tungstenite::Message;
     use tokio_tungstenite::tungstenite::protocol::Role;
@@ -264,7 +277,16 @@ mod tests {
     ) -> ExchangeRegistry {
         let exchanges = ExchangeRegistry::default();
 
-        read_server_frames(CancellationToken::new(), source, exchanges.clone(), frames).await;
+        let (_signals, reported_signals) = mpsc::unbounded_channel();
+
+        read_server_frames(
+            CancellationToken::new(),
+            source,
+            exchanges.clone(),
+            frames,
+            reported_signals,
+        )
+        .await;
 
         exchanges
     }
@@ -314,11 +336,14 @@ mod tests {
 
         cancellation_token.cancel();
 
+        let (_signals, reported_signals) = mpsc::unbounded_channel();
+
         read_server_frames(
             cancellation_token,
             source,
             ExchangeRegistry::default(),
             frames,
+            reported_signals,
         )
         .await;
 

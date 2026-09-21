@@ -6,6 +6,7 @@ use margaret_websocket_envelope::outbound_response::OutboundResponse;
 use margaret_websocket_envelope::request_id::RequestId;
 
 use crate::exchange_flow_control::ExchangeFlowControl;
+use crate::exchange_state::ExchangeState;
 use crate::outbound_frames::OutboundFrames;
 use crate::web_socket_error::WebSocketError;
 
@@ -39,7 +40,10 @@ impl WebSocket {
         message: String,
         details: Value,
     ) -> Result<(), WebSocketError> {
-        self.frames.send_error(id, code, message, details).await
+        match self.credit.exchange_state() {
+            ExchangeState::Finished => Ok(()),
+            ExchangeState::Open => self.frames.send_error(id, code, message, details).await,
+        }
     }
 }
 
@@ -53,12 +57,23 @@ mod tests {
     use margaret_websocket_envelope::outbound_response::OutboundResponse;
     use margaret_websocket_envelope::request_id::RequestId;
 
+    use super::EnvelopeErrorCode;
     use super::ExchangeFlowControl;
     use super::OutboundFrames;
+    use super::Value;
     use super::WebSocket;
     use super::WebSocketError;
 
     const ONE_FRAME: usize = 1;
+
+    fn rejection(socket: &WebSocket) -> impl Future<Output = Result<(), WebSocketError>> {
+        socket.send_error(
+            RequestId::Number(1),
+            EnvelopeErrorCode::InternalError,
+            "Internal error".to_string(),
+            Value::Null,
+        )
+    }
 
     #[tokio::test]
     async fn reports_a_response_the_finished_exchange_can_no_longer_carry() {
@@ -85,5 +100,39 @@ mod tests {
             refused,
             WebSocketError::ExchangeFinished { .. } if credit.is_closed()
         ));
+    }
+
+    #[tokio::test]
+    async fn keeps_a_rejection_off_an_exchange_that_already_ended() {
+        let (sender, mut receiver) = mpsc::channel(ONE_FRAME);
+        let credit = Arc::new(Semaphore::new(ONE_FRAME));
+
+        credit.close();
+
+        let socket = WebSocket::new(
+            ExchangeFlowControl::Metered(credit),
+            OutboundFrames::new(sender),
+        );
+
+        rejection(&socket)
+            .await
+            .expect("an exchange that ended reports nothing");
+
+        assert!(receiver.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn carries_a_rejection_while_the_exchange_is_open() {
+        let (sender, mut receiver) = mpsc::channel(ONE_FRAME);
+        let socket = WebSocket::new(
+            ExchangeFlowControl::Metered(Arc::new(Semaphore::new(ONE_FRAME))),
+            OutboundFrames::new(sender),
+        );
+
+        rejection(&socket)
+            .await
+            .expect("an open exchange carries a rejection");
+
+        assert!(receiver.try_recv().is_ok());
     }
 }

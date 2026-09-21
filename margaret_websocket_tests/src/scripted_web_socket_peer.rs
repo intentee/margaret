@@ -12,6 +12,7 @@ use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::Message;
 
 use margaret_websocket_envelope::client_sent_frame::ClientSentFrame;
+use margaret_websocket_envelope::request_id::RequestId;
 
 use crate::scripted_peer_closing::ScriptedPeerClosing;
 use crate::scripted_peer_step::ScriptedPeerStep;
@@ -67,6 +68,20 @@ impl ScriptedWebSocketPeer {
 
             for step in script {
                 match step {
+                    ScriptedPeerStep::AwaitClientCancel => {
+                        let frame = await_client_frame(&mut web_socket).await;
+
+                        assert!(
+                            matches!(
+                                serde_json::from_str::<ClientSentFrame>(
+                                    frame.to_text().expect("the client frame carries text")
+                                ),
+                                Ok(ClientSentFrame::Cancel { ref id })
+                                    if *id == RequestId::Number(0)
+                            ),
+                            "an abandoned exchange is cancelled on the wire"
+                        );
+                    }
                     ScriptedPeerStep::AwaitClientCredit => {
                         let frame = await_client_frame(&mut web_socket).await;
 
@@ -75,7 +90,7 @@ impl ScriptedWebSocketPeer {
                                 serde_json::from_str::<ClientSentFrame>(
                                     frame.to_text().expect("the client frame carries text")
                                 ),
-                                Ok(ClientSentFrame::Credit { credit, .. }) if credit > 0
+                                Ok(ClientSentFrame::Credit { credit, .. }) if credit.frames() > 0
                             ),
                             "the client replenishes the window as its consumer drains"
                         );

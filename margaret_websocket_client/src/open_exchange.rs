@@ -1,38 +1,39 @@
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::UnboundedSender;
 
-use margaret_websocket_envelope::client_sent_frame::ClientSentFrame;
 use margaret_websocket_envelope::request_id::RequestId;
 use margaret_websocket_envelope::server_sent_frame::ServerSentFrame;
 
 use crate::exchange_outcome::ExchangeOutcome;
 use crate::exchange_registry::ExchangeRegistry;
+use crate::exchange_signal::ExchangeSignal;
 use crate::exchange_termination::ExchangeTermination;
-use crate::outbound_frames::OutboundFrames;
-
-/// One consumed response frame frees exactly one frame of the window.
-const REPLENISHED_BY_ONE_FRAME: usize = 1;
+use crate::granted_credit::GrantedCredit;
 
 pub(crate) struct OpenExchange {
-    frames: OutboundFrames,
+    granted: GrantedCredit,
     id: RequestId,
-    receiver: Receiver<ServerSentFrame>,
+    receiver: UnboundedReceiver<ServerSentFrame>,
     registry: ExchangeRegistry,
+    signals: UnboundedSender<ExchangeSignal>,
     termination: ExchangeTermination,
 }
 
 impl OpenExchange {
     pub(crate) fn new(
-        frames: OutboundFrames,
+        granted: GrantedCredit,
         id: RequestId,
-        receiver: Receiver<ServerSentFrame>,
+        receiver: UnboundedReceiver<ServerSentFrame>,
         registry: ExchangeRegistry,
+        signals: UnboundedSender<ExchangeSignal>,
         termination: ExchangeTermination,
     ) -> Self {
         Self {
-            frames,
+            granted,
             id,
             receiver,
             registry,
+            signals,
             termination,
         }
     }
@@ -45,24 +46,19 @@ impl OpenExchange {
         self.receiver.recv().await
     }
 
-    pub(crate) async fn replenish(&self) {
-        if let Err(error) = self
-            .frames
-            .send_serialization(serde_json::to_string(&ClientSentFrame::<()>::Credit {
-                credit: REPLENISHED_BY_ONE_FRAME,
-                id: self.id.clone(),
-            }))
-            .await
-        {
-            eprintln!(
-                "margaret_websocket_client: the exchange window could not be replenished: {error}"
-            );
-        }
+    pub(crate) fn report_consumed(&self) {
+        self.granted.grant_one_frame();
+        self.report(ExchangeSignal::Consumed(self.id.clone()));
+    }
+
+    fn report(&self, signal: ExchangeSignal) {
+        drop(self.signals.send(signal));
     }
 }
 
 impl Drop for OpenExchange {
     fn drop(&mut self) {
         self.registry.forget(&self.id);
+        self.report(ExchangeSignal::Cancelled(self.id.clone()));
     }
 }

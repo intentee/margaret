@@ -19,6 +19,7 @@ use tokio_util::sync::CancellationToken;
 use margaret_websocket_envelope::client_sent_frame::ClientSentFrame;
 use margaret_websocket_envelope::envelope_error_code::EnvelopeErrorCode;
 
+use crate::credit_grant_outcome::CreditGrantOutcome;
 use crate::exchange_admission::ExchangeAdmission;
 use crate::exchange_credit::ExchangeCredit;
 use crate::exchange_flow_control::ExchangeFlowControl;
@@ -62,52 +63,71 @@ async fn dispatch_frame<Session>(
     Session: Send + Sync + 'static,
 {
     match frame {
+        ClientSentFrame::Cancel { id } => credit.cancel(&id),
         ClientSentFrame::Credit {
             credit: granted,
             id,
-        } => credit.grant(&id, granted),
+        } => match credit.grant(&id, granted) {
+            CreditGrantOutcome::ExchangeIsOver | CreditGrantOutcome::Granted => {}
+            CreditGrantOutcome::WindowExceeded => {
+                credit.cancel(&id);
+                report_send_failure(
+                    frames
+                        .send_error(
+                            id,
+                            EnvelopeErrorCode::CreditWindowExceeded,
+                            "the grant would take this exchange past the credit window the protocol allows"
+                                .to_string(),
+                            Value::Null,
+                        )
+                        .await,
+                );
+            }
+        },
         ClientSentFrame::Request {
             credit: granted,
             id,
             method,
             params,
         } => match dispatch_table.request(&method) {
-            Some(dispatch) => match credit.open(id.clone(), granted) {
-                ExchangeAdmission::Admitted(granted_credit) => {
-                    let dispatch = dispatch.clone();
-                    let cancellation_token = cancellation_token.child_token();
-                    let session = session.clone();
-                    let socket = WebSocket::new(
-                        ExchangeFlowControl::Metered(granted_credit.clone()),
-                        frames.clone(),
-                    );
-                    let credit = credit.clone();
+            Some(dispatch) => {
+                let exchange_token = cancellation_token.child_token();
 
-                    pending.push(
-                        async move {
-                            dispatch
-                                .dispatch(cancellation_token, session, id.clone(), params, socket)
-                                .await;
-                            granted_credit.close();
-                            credit.forget(&id);
-                        }
-                        .boxed(),
-                    );
+                match credit.open(id.clone(), granted, exchange_token.clone()) {
+                    ExchangeAdmission::Admitted(exchange) => {
+                        let dispatch = dispatch.clone();
+                        let session = session.clone();
+                        let socket = WebSocket::new(
+                            ExchangeFlowControl::Metered(exchange.credit.clone()),
+                            frames.clone(),
+                        );
+                        let credit = credit.clone();
+
+                        pending.push(
+                            async move {
+                                dispatch
+                                    .dispatch(exchange_token, session, id.clone(), params, socket)
+                                    .await;
+                                credit.complete(&id, &exchange);
+                            }
+                            .boxed(),
+                        );
+                    }
+                    ExchangeAdmission::AlreadyOpen => {
+                        report_send_failure(
+                            frames
+                                .send_error(
+                                    id,
+                                    EnvelopeErrorCode::DuplicateRequestId,
+                                    "another exchange is already open under this request id"
+                                        .to_string(),
+                                    Value::Null,
+                                )
+                                .await,
+                        );
+                    }
                 }
-                ExchangeAdmission::AlreadyOpen => {
-                    report_send_failure(
-                        frames
-                            .send_error(
-                                id,
-                                EnvelopeErrorCode::DuplicateRequestId,
-                                "another exchange is already open under this request id"
-                                    .to_string(),
-                                Value::Null,
-                            )
-                            .await,
-                    );
-                }
-            },
+            }
             None => {
                 report_send_failure(
                     frames

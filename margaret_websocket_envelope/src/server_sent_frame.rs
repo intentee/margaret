@@ -36,4 +36,14 @@ impl ServerSentFrame {
             Self::Error { .. } => true,
         }
     }
+
+    /// Flow control meters response frames only. A rejection must stay deliverable once the
+    /// window is spent, as HTTP/2 exempts `RST_STREAM`.
+    #[must_use]
+    pub fn is_metered(&self) -> bool {
+        match self {
+            Self::Response { .. } => true,
+            Self::Error { .. } => false,
+        }
+    }
 }

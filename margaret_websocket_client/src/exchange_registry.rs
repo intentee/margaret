@@ -71,15 +71,17 @@ mod tests {
     use crate::exchange_interruption::ExchangeInterruption;
     use crate::exchange_registration::ExchangeRegistration;
     use crate::exchange_termination::ExchangeTermination;
+    use crate::granted_credit::GrantedCredit;
     use crate::pending_exchange::PendingExchange;
     use crate::response_credit_window::RESPONSE_CREDIT_WINDOW;
 
     fn exchange() -> PendingExchange {
-        let (sender, receiver) = mpsc::channel(RESPONSE_CREDIT_WINDOW);
+        let (sender, receiver) = mpsc::unbounded_channel();
 
         drop(receiver);
 
         PendingExchange {
+            granted: GrantedCredit::new(RESPONSE_CREDIT_WINDOW),
             sender,
             termination: ExchangeTermination::default(),
         }

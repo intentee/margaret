@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::Semaphore;
 
+use crate::exchange_state::ExchangeState;
 use crate::web_socket_error::WebSocketError;
 
 #[derive(Clone)]
@@ -11,6 +12,13 @@ pub(crate) enum ExchangeFlowControl {
 }
 
 impl ExchangeFlowControl {
+    pub(crate) fn exchange_state(&self) -> ExchangeState {
+        match self {
+            Self::Metered(credit) if credit.is_closed() => ExchangeState::Finished,
+            Self::Metered(_) | Self::Unmetered => ExchangeState::Open,
+        }
+    }
+
     pub(crate) async fn spend_one_frame(&self) -> Result<(), WebSocketError> {
         match self {
             Self::Metered(credit) => credit

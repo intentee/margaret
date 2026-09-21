@@ -1,4 +1,6 @@
 mod applies_middleware_before_upgrading;
+mod bounds_the_credit_window;
+mod cancels_an_abandoned_exchange;
 mod connects_over_mutual_tls;
 mod multiplexes_exchanges_over_one_connection;
 mod reports_a_peer_that_breaks_the_protocol;

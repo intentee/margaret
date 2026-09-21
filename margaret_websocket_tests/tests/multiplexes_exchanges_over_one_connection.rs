@@ -1,4 +1,3 @@
-use margaret_websocket_client::exchange_queue_capacity::EXCHANGE_QUEUE_CAPACITY;
 use margaret_websocket_client::response_credit_window::RESPONSE_CREDIT_WINDOW;
 use margaret_websocket_client::response_item::ResponseItem;
 use margaret_websocket_client::response_stream::ResponseStream;
@@ -14,6 +13,7 @@ use margaret_websocket_tests::scripted_response_rejection::scripted_response_rej
 
 const FIRST_EXCHANGE: i64 = 0;
 const SECOND_EXCHANGE: i64 = 1;
+const WINDOW: usize = RESPONSE_CREDIT_WINDOW.frames();
 
 fn chunk(id: i64) -> ScriptedPeerStep {
     scripted_response_chunk(RequestId::Number(id), false, "chunk")
@@ -98,7 +98,7 @@ async fn delivers_a_burst_that_fills_the_whole_window() {
     let endpoint = endpoint(
         awaited_requests(1)
             .into_iter()
-            .chain((1..RESPONSE_CREDIT_WINDOW).map(|_| chunk(FIRST_EXCHANGE)))
+            .chain((1..WINDOW).map(|_| chunk(FIRST_EXCHANGE)))
             .chain([answer(FIRST_EXCHANGE)])
             .collect(),
     )
@@ -110,7 +110,7 @@ async fn delivers_a_burst_that_fills_the_whole_window() {
     } = drain(responses).await;
 
     assert!(interruption.is_none(), "{interruption:?}");
-    assert_eq!(delivered, RESPONSE_CREDIT_WINDOW);
+    assert_eq!(delivered, WINDOW);
 }
 
 #[tokio::test]
@@ -118,7 +118,7 @@ async fn delivers_a_rejection_that_arrives_once_the_window_is_spent() {
     let endpoint = endpoint(
         awaited_requests(1)
             .into_iter()
-            .chain((0..RESPONSE_CREDIT_WINDOW).map(|_| chunk(FIRST_EXCHANGE)))
+            .chain((0..WINDOW).map(|_| chunk(FIRST_EXCHANGE)))
             .chain([scripted_response_rejection(
                 RequestId::Number(FIRST_EXCHANGE),
                 "the handler gave up",
@@ -133,7 +133,7 @@ async fn delivers_a_rejection_that_arrives_once_the_window_is_spent() {
     } = drain(responses).await;
 
     assert!(interruption.is_none(), "{interruption:?}");
-    assert_eq!(delivered, EXCHANGE_QUEUE_CAPACITY);
+    assert_eq!(delivered, WINDOW + 1);
 }
 
 #[tokio::test]
@@ -162,7 +162,7 @@ async fn reports_a_peer_that_sends_past_the_window_it_was_granted() {
     let endpoint = endpoint(
         awaited_requests(2)
             .into_iter()
-            .chain((0..=EXCHANGE_QUEUE_CAPACITY).map(|_| chunk(FIRST_EXCHANGE)))
+            .chain((0..=WINDOW).map(|_| chunk(FIRST_EXCHANGE)))
             .chain([answer(SECOND_EXCHANGE)])
             .collect(),
     )
@@ -184,10 +184,9 @@ async fn reports_a_peer_that_sends_past_the_window_it_was_granted() {
         interruption,
     } = drain(stalled).await;
 
-    assert_eq!(delivered, EXCHANGE_QUEUE_CAPACITY);
+    assert_eq!(delivered, WINDOW);
     assert!(matches!(
         interruption.expect("a peer that overruns the window ends the exchange"),
-        WebSocketClientError::ExchangeCreditExceeded { credit, .. }
-            if credit == RESPONSE_CREDIT_WINDOW
+        WebSocketClientError::ExchangeCreditExceeded { credit, .. } if credit == WINDOW
     ));
 }

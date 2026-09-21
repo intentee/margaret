@@ -11,6 +11,8 @@ use crate::flood_dispatch::FloodDispatch;
 use crate::flood_handler::FloodHandler;
 use crate::ping_dispatch::PingDispatch;
 use crate::ping_handler::PingHandler;
+use crate::silent_dispatch::SilentDispatch;
+use crate::silent_handler::SilentHandler;
 use crate::storyboard_dispatch::StoryboardDispatch;
 use crate::storyboard_handler::StoryboardHandler;
 use crate::test_session::TestSession;
@@ -44,6 +46,13 @@ pub fn test_dispatch_table() -> Arc<WebSocketDispatchTable<TestSession>> {
         "flood".to_string(),
         Arc::new(FloodDispatch {
             handler: Arc::new(FloodHandler),
+        }),
+    );
+
+    requests.insert(
+        "silent".to_string(),
+        Arc::new(SilentDispatch {
+            handler: Arc::new(SilentHandler),
         }),
     );
 

@@ -1,4 +1,5 @@
 pub mod client_sent_frame;
+pub mod credit_grant;
 pub mod envelope_error;
 pub mod envelope_error_code;
 pub mod envelopes_web_socket_request;
@@ -9,6 +10,7 @@ pub mod request_envelope;
 pub mod request_id;
 pub mod server_sent_frame;
 pub mod streaming_request_envelope;
+pub mod web_socket_envelope_error;
 pub mod web_socket_notification_message;
 pub mod web_socket_request_message;
 pub mod web_socket_response_message;

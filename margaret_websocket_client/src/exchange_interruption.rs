@@ -22,7 +22,7 @@ impl ExchangeInterruption {
                 WebSocketClientError::ExchangeProtocolViolation { url }
             }
             Self::PeerExceededCredit => WebSocketClientError::ExchangeCreditExceeded {
-                credit: RESPONSE_CREDIT_WINDOW,
+                credit: RESPONSE_CREDIT_WINDOW.frames(),
                 url,
             },
         }

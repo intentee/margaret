@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
-use tokio::sync::Semaphore;
+use crate::served_exchange::ServedExchange;
 
 pub(crate) enum ExchangeAdmission {
-    Admitted(Arc<Semaphore>),
+    Admitted(ServedExchange),
     AlreadyOpen,
 }

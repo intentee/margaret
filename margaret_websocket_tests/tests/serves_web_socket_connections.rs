@@ -3,6 +3,7 @@ use serde_json::json;
 use tokio_tungstenite::tungstenite::Message;
 
 use margaret_websocket_client::response_credit_window::RESPONSE_CREDIT_WINDOW;
+use margaret_websocket_envelope::credit_grant::CreditGrant;
 use margaret_websocket_envelope::request_id::RequestId;
 use margaret_websocket_tests::client_notification_frame::client_notification_frame;
 use margaret_websocket_tests::client_request_frame::client_request_frame;
@@ -10,7 +11,7 @@ use margaret_websocket_tests::driver_harness::DriverHarness;
 use margaret_websocket_tests::test_dispatch_table::test_dispatch_table;
 
 /// A request that grants no window parks its handler before it emits a frame.
-const EXHAUSTED_WINDOW: usize = 0;
+const EXHAUSTED_WINDOW: CreditGrant = CreditGrant::from_frames(0);
 
 #[tokio::test]
 async fn streams_a_request_across_many_frames() {
