@@ -1,4 +1,4 @@
-use crate::response_backlog_limit::RESPONSE_BACKLOG_LIMIT;
+use crate::response_credit_window::RESPONSE_CREDIT_WINDOW;
 use crate::web_socket_client_error::WebSocketClientError;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -7,7 +7,7 @@ pub(crate) enum ExchangeInterruption {
     ConnectionFailed,
     PeerClosed,
     PeerSentUnreadableFrame,
-    ResponseBacklogExceeded,
+    PeerExceededCredit,
 }
 
 impl ExchangeInterruption {
@@ -21,8 +21,8 @@ impl ExchangeInterruption {
             Self::PeerSentUnreadableFrame => {
                 WebSocketClientError::ExchangeProtocolViolation { url }
             }
-            Self::ResponseBacklogExceeded => WebSocketClientError::ExchangeBacklogExceeded {
-                limit: RESPONSE_BACKLOG_LIMIT,
+            Self::PeerExceededCredit => WebSocketClientError::ExchangeCreditExceeded {
+                credit: RESPONSE_CREDIT_WINDOW,
                 url,
             },
         }

@@ -89,4 +89,10 @@ async fn refuses_new_work_once_the_peer_has_broken_the_protocol() {
         refused_request,
         WebSocketClientError::ExchangeProtocolViolation { .. }
     ));
+
+    let ScriptedPeerEndpoint { connection, peer } = endpoint;
+
+    drop(responses);
+    drop(connection);
+    peer.finish().await;
 }

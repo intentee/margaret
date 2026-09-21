@@ -12,6 +12,7 @@ publish.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+dashmap = { workspace = true }
 futures-util = { workspace = true }
 http = { workspace = true }
 hyper = { workspace = true, features = ["http1"] }

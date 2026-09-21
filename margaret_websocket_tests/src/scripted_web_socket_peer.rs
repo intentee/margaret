@@ -2,14 +2,31 @@ use std::net::SocketAddr;
 
 use futures_util::SinkExt;
 use futures_util::StreamExt;
+use tokio::io::AsyncRead;
+use tokio::io::AsyncWrite;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_rustls::TlsAcceptor;
+use tokio_tungstenite::WebSocketStream;
+use tokio_tungstenite::tungstenite::Message;
+
+use margaret_websocket_envelope::client_sent_frame::ClientSentFrame;
 
 use crate::scripted_peer_closing::ScriptedPeerClosing;
 use crate::scripted_peer_step::ScriptedPeerStep;
 use crate::scripted_web_socket_peer_params::ScriptedWebSocketPeerParams;
+
+async fn await_client_frame<Io>(web_socket: &mut WebSocketStream<Io>) -> Message
+where
+    Io: AsyncRead + AsyncWrite + Unpin,
+{
+    web_socket
+        .next()
+        .await
+        .expect("the client sends a frame")
+        .expect("the client frame reads cleanly")
+}
 
 pub struct ScriptedWebSocketPeer {
     address: SocketAddr,
@@ -50,12 +67,21 @@ impl ScriptedWebSocketPeer {
 
             for step in script {
                 match step {
+                    ScriptedPeerStep::AwaitClientCredit => {
+                        let frame = await_client_frame(&mut web_socket).await;
+
+                        assert!(
+                            matches!(
+                                serde_json::from_str::<ClientSentFrame>(
+                                    frame.to_text().expect("the client frame carries text")
+                                ),
+                                Ok(ClientSentFrame::Credit { credit, .. }) if credit > 0
+                            ),
+                            "the client replenishes the window as its consumer drains"
+                        );
+                    }
                     ScriptedPeerStep::AwaitClientFrame => {
-                        web_socket
-                            .next()
-                            .await
-                            .expect("the client sends a frame")
-                            .expect("the client frame reads cleanly");
+                        await_client_frame(&mut web_socket).await;
                     }
                     ScriptedPeerStep::Send(message) => {
                         web_socket

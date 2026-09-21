@@ -80,7 +80,7 @@ pub enum WebSocketClientError {
     ExchangeProtocolViolation { url: String },
 
     #[error(
-        "the exchange with '{url}' held {limit} unread responses, so its consumer is no longer draining them"
+        "the peer at '{url}' sent more than the {credit} response frames the exchange granted it"
     )]
-    ExchangeBacklogExceeded { limit: usize, url: String },
+    ExchangeCreditExceeded { credit: usize, url: String },
 }

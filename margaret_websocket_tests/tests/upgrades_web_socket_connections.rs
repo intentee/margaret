@@ -1,9 +1,13 @@
 use futures_util::SinkExt;
 use futures_util::StreamExt;
+use serde_json::json;
 use tokio::net::TcpStream;
 use tokio_tungstenite::client_async;
 use tokio_tungstenite::tungstenite::Message;
 
+use margaret_websocket_client::response_credit_window::RESPONSE_CREDIT_WINDOW;
+use margaret_websocket_envelope::request_id::RequestId;
+use margaret_websocket_tests::client_request_frame::client_request_frame;
 use margaret_websocket_tests::failing_session_factory::FailingSessionFactory;
 use margaret_websocket_tests::raw_http_exchange::raw_http_exchange;
 use margaret_websocket_tests::redirecting_session_factory::RedirectingSessionFactory;
@@ -23,9 +27,12 @@ async fn upgrades_a_connection_and_serves_a_request() {
         .expect("the websocket handshake succeeds");
 
     socket
-        .send(Message::text(
-            r#"{"id":1,"method":"ping","params":{"label":"here"}}"#.to_owned(),
-        ))
+        .send(Message::text(client_request_frame(
+            RESPONSE_CREDIT_WINDOW,
+            RequestId::Number(1),
+            "ping",
+            json!({"label": "here"}),
+        )))
         .await
         .expect("the client sends a request");
 

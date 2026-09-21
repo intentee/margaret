@@ -72,10 +72,10 @@ mod tests {
     use crate::exchange_registration::ExchangeRegistration;
     use crate::exchange_termination::ExchangeTermination;
     use crate::pending_exchange::PendingExchange;
-    use crate::response_backlog_limit::RESPONSE_BACKLOG_LIMIT;
+    use crate::response_credit_window::RESPONSE_CREDIT_WINDOW;
 
     fn exchange() -> PendingExchange {
-        let (sender, receiver) = mpsc::channel(RESPONSE_BACKLOG_LIMIT);
+        let (sender, receiver) = mpsc::channel(RESPONSE_CREDIT_WINDOW);
 
         drop(receiver);
 
@@ -92,9 +92,8 @@ mod tests {
 
         assert!(matches!(
             registry.register(&id, exchange()),
-            ExchangeRegistration::Registered
+            ExchangeRegistration::Registered if registry.peek(&id).is_some()
         ));
-        assert!(registry.peek(&id).is_some());
     }
 
     #[test]
@@ -106,7 +105,8 @@ mod tests {
 
         assert!(matches!(
             registry.register(&id, exchange()),
-            ExchangeRegistration::Refused(ExchangeInterruption::PeerSentUnreadableFrame)
+            ExchangeRegistration::Refused(interruption)
+                if interruption == ExchangeInterruption::PeerSentUnreadableFrame
         ));
         assert!(registry.peek(&id).is_none());
     }

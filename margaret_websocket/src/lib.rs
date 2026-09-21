@@ -1,5 +1,9 @@
 pub mod dispatch_notification;
 pub mod dispatch_request;
+mod exchange_admission;
+mod exchange_credit;
+mod exchange_flow_control;
+mod outbound_frames;
 pub mod report_send_failure;
 pub mod responds_to_web_socket_message;
 pub mod responds_to_web_socket_notification;

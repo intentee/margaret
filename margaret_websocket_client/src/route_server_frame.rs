@@ -23,7 +23,7 @@ pub(crate) fn route_server_frame(frame: ServerSentFrame, registry: &ExchangeRegi
         Err(TrySendError::Full(_)) => {
             exchange
                 .termination
-                .interrupt(ExchangeInterruption::ResponseBacklogExceeded);
+                .interrupt(ExchangeInterruption::PeerExceededCredit);
             registry.forget(&id);
         }
     }
@@ -38,11 +38,12 @@ mod tests {
     use margaret_websocket_envelope::server_sent_frame::ServerSentFrame;
 
     use super::route_server_frame;
+    use crate::exchange_interruption::ExchangeInterruption;
     use crate::exchange_outcome::ExchangeOutcome;
+    use crate::exchange_queue_capacity::EXCHANGE_QUEUE_CAPACITY;
     use crate::exchange_registry::ExchangeRegistry;
     use crate::exchange_termination::ExchangeTermination;
     use crate::pending_exchange::PendingExchange;
-    use crate::response_backlog_limit::RESPONSE_BACKLOG_LIMIT;
 
     fn response(id: RequestId) -> ServerSentFrame {
         ServerSentFrame::Response {
@@ -57,7 +58,7 @@ mod tests {
     fn forgets_an_exchange_whose_reader_is_gone() {
         let registry = ExchangeRegistry::default();
         let id = RequestId::Number(1);
-        let (sender, receiver) = mpsc::channel(RESPONSE_BACKLOG_LIMIT);
+        let (sender, receiver) = mpsc::channel(EXCHANGE_QUEUE_CAPACITY);
 
         registry.register(
             &id,
@@ -85,10 +86,10 @@ mod tests {
     }
 
     #[test]
-    fn interrupts_an_exchange_whose_consumer_stopped_draining() {
+    fn interrupts_an_exchange_whose_peer_ran_past_its_credit() {
         let registry = ExchangeRegistry::default();
         let id = RequestId::Number(2);
-        let (sender, _receiver) = mpsc::channel(RESPONSE_BACKLOG_LIMIT);
+        let (sender, _receiver) = mpsc::channel(EXCHANGE_QUEUE_CAPACITY);
         let termination = ExchangeTermination::default();
 
         registry.register(
@@ -99,7 +100,7 @@ mod tests {
             },
         );
 
-        for _ in 0..=RESPONSE_BACKLOG_LIMIT {
+        for _ in 0..=EXCHANGE_QUEUE_CAPACITY {
             route_server_frame(response(id.clone()), &registry);
         }
 
@@ -107,7 +108,7 @@ mod tests {
         assert!(matches!(
             termination.outcome(),
             ExchangeOutcome::Interrupted(interruption)
-                if interruption == crate::exchange_interruption::ExchangeInterruption::ResponseBacklogExceeded
+                if interruption == ExchangeInterruption::PeerExceededCredit
         ));
     }
 }

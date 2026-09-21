@@ -19,6 +19,10 @@ use tokio_util::sync::CancellationToken;
 use margaret_websocket_envelope::client_sent_frame::ClientSentFrame;
 use margaret_websocket_envelope::envelope_error_code::EnvelopeErrorCode;
 
+use crate::exchange_admission::ExchangeAdmission;
+use crate::exchange_credit::ExchangeCredit;
+use crate::exchange_flow_control::ExchangeFlowControl;
+use crate::outbound_frames::OutboundFrames;
 use crate::report_send_failure::report_send_failure;
 use crate::web_socket::WebSocket;
 use crate::web_socket_dispatch_table::WebSocketDispatchTable;
@@ -50,32 +54,63 @@ async fn dispatch_frame<Session>(
     cancellation_token: &CancellationToken,
     session: &Arc<Session>,
     dispatch_table: &Arc<WebSocketDispatchTable<Session>>,
-    socket: &WebSocket,
+    credit: &ExchangeCredit,
+    frames: &OutboundFrames,
     pending: &mut FuturesUnordered<BoxFuture<'static, ()>>,
     frame: ClientSentFrame,
 ) where
     Session: Send + Sync + 'static,
 {
     match frame {
-        ClientSentFrame::Request { id, method, params } => match dispatch_table.request(&method) {
-            Some(dispatch) => {
-                let dispatch = dispatch.clone();
-                let cancellation_token = cancellation_token.child_token();
-                let session = session.clone();
-                let socket = socket.clone();
+        ClientSentFrame::Credit {
+            credit: granted,
+            id,
+        } => credit.grant(&id, granted),
+        ClientSentFrame::Request {
+            credit: granted,
+            id,
+            method,
+            params,
+        } => match dispatch_table.request(&method) {
+            Some(dispatch) => match credit.open(id.clone(), granted) {
+                ExchangeAdmission::Admitted(granted_credit) => {
+                    let dispatch = dispatch.clone();
+                    let cancellation_token = cancellation_token.child_token();
+                    let session = session.clone();
+                    let socket = WebSocket::new(
+                        ExchangeFlowControl::Metered(granted_credit.clone()),
+                        frames.clone(),
+                    );
+                    let credit = credit.clone();
 
-                pending.push(
-                    async move {
-                        dispatch
-                            .dispatch(cancellation_token, session, id, params, socket)
-                            .await;
-                    }
-                    .boxed(),
-                );
-            }
+                    pending.push(
+                        async move {
+                            dispatch
+                                .dispatch(cancellation_token, session, id.clone(), params, socket)
+                                .await;
+                            granted_credit.close();
+                            credit.forget(&id);
+                        }
+                        .boxed(),
+                    );
+                }
+                ExchangeAdmission::AlreadyOpen => {
+                    report_send_failure(
+                        frames
+                            .send_error(
+                                id,
+                                EnvelopeErrorCode::DuplicateRequestId,
+                                "another exchange is already open under this request id"
+                                    .to_string(),
+                                Value::Null,
+                            )
+                            .await,
+                    );
+                }
+            },
             None => {
                 report_send_failure(
-                    socket
+                    frames
                         .send_error(
                             id,
                             EnvelopeErrorCode::UnknownMethod,
@@ -91,7 +126,7 @@ async fn dispatch_frame<Session>(
                 let dispatch = dispatch.clone();
                 let cancellation_token = cancellation_token.child_token();
                 let session = session.clone();
-                let socket = socket.clone();
+                let socket = WebSocket::new(ExchangeFlowControl::Unmetered, frames.clone());
 
                 pending.push(
                     async move {
@@ -110,7 +145,8 @@ async fn run_source<Io, Session>(
     cancellation_token: CancellationToken,
     session: Arc<Session>,
     dispatch_table: Arc<WebSocketDispatchTable<Session>>,
-    socket: WebSocket,
+    credit: ExchangeCredit,
+    frames: OutboundFrames,
     mut source: SplitStream<WebSocketStream<Io>>,
 ) where
     Io: AsyncRead + AsyncWrite + Unpin,
@@ -130,13 +166,18 @@ async fn run_source<Io, Session>(
                             &cancellation_token,
                             &session,
                             &dispatch_table,
-                            &socket,
+                            &credit,
+                            &frames,
                             &mut pending,
                             frame,
                         )
                             .await;
                     }
-                    Err(_) => break,
+                    Err(error) => {
+                        eprintln!("margaret_websocket: the client sent an unreadable frame: {error}");
+
+                        break;
+                    }
                 },
                 Some(Ok(Message::Close(_)) | Err(_)) | None => break,
                 Some(Ok(_)) => {}
@@ -162,7 +203,8 @@ pub async fn serve_web_socket_connection<Io, Session>(
             cancellation_token,
             session,
             dispatch_table,
-            WebSocket::new(outbound_sender),
+            ExchangeCredit::default(),
+            OutboundFrames::new(outbound_sender),
             source,
         ),
         drain_outbound(sink, outbound_receiver),

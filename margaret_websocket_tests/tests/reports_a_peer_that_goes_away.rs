@@ -2,18 +2,14 @@ use tokio_tungstenite::tungstenite::Message;
 
 use margaret_websocket_client::response_item::ResponseItem;
 use margaret_websocket_client::web_socket_client_error::WebSocketClientError;
+use margaret_websocket_envelope::request_id::RequestId;
 use margaret_websocket_tests::ping_message::PingMessage;
 use margaret_websocket_tests::response_chunk::ResponseChunk;
 use margaret_websocket_tests::scripted_peer_closing::ScriptedPeerClosing;
 use margaret_websocket_tests::scripted_peer_endpoint::ScriptedPeerEndpoint;
 use margaret_websocket_tests::scripted_peer_step::ScriptedPeerStep;
+use margaret_websocket_tests::scripted_response_chunk::scripted_response_chunk;
 use margaret_websocket_tests::typing_notification::TypingNotification;
-
-fn chunk(id: u8) -> ScriptedPeerStep {
-    ScriptedPeerStep::Send(Message::text(format!(
-        r#"{{"id":{id},"done":false,"method":"response_chunk","result":{{"text":"partial"}}}}"#
-    )))
-}
 
 async fn abandoned_exchange(
     closing: ScriptedPeerClosing,
@@ -67,7 +63,7 @@ async fn reports_a_truncated_stream_instead_of_a_clean_finish() {
         vec![
             ScriptedPeerStep::AwaitClientFrame,
             ScriptedPeerStep::Send(Message::binary(vec![0_u8])),
-            chunk(0),
+            scripted_response_chunk(RequestId::Number(0), false, "partial"),
         ],
     )
     .await;

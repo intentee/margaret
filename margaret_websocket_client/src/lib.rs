@@ -1,14 +1,17 @@
 mod client_io;
+mod client_sink;
 mod client_stream;
 mod connect_tls_stream;
 mod exchange_interruption;
 mod exchange_outcome;
+pub mod exchange_queue_capacity;
 mod exchange_registration;
 mod exchange_registry;
 mod exchange_termination;
 mod open_exchange;
+mod outbound_frames;
 mod pending_exchange;
-pub mod response_backlog_limit;
+pub mod response_credit_window;
 pub mod response_item;
 pub mod response_stream;
 mod response_stream_state;

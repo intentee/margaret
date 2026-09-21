@@ -1,56 +1,39 @@
-use tokio_tungstenite::tungstenite::Message;
-
-use margaret_websocket_client::response_backlog_limit::RESPONSE_BACKLOG_LIMIT;
+use margaret_websocket_client::exchange_queue_capacity::EXCHANGE_QUEUE_CAPACITY;
+use margaret_websocket_client::response_credit_window::RESPONSE_CREDIT_WINDOW;
 use margaret_websocket_client::response_item::ResponseItem;
+use margaret_websocket_client::response_stream::ResponseStream;
 use margaret_websocket_client::web_socket_client_error::WebSocketClientError;
+use margaret_websocket_envelope::request_id::RequestId;
 use margaret_websocket_tests::ping_message::PingMessage;
 use margaret_websocket_tests::response_chunk::ResponseChunk;
 use margaret_websocket_tests::scripted_peer_closing::ScriptedPeerClosing;
 use margaret_websocket_tests::scripted_peer_endpoint::ScriptedPeerEndpoint;
 use margaret_websocket_tests::scripted_peer_step::ScriptedPeerStep;
+use margaret_websocket_tests::scripted_response_chunk::scripted_response_chunk;
+use margaret_websocket_tests::scripted_response_rejection::scripted_response_rejection;
 
-const FIRST_EXCHANGE: u8 = 0;
-const SECOND_EXCHANGE: u8 = 1;
+const FIRST_EXCHANGE: i64 = 0;
+const SECOND_EXCHANGE: i64 = 1;
 
-fn chunk(id: u8) -> ScriptedPeerStep {
-    ScriptedPeerStep::Send(Message::text(format!(
-        r#"{{"id":{id},"done":false,"method":"response_chunk","result":{{"text":"chunk"}}}}"#
-    )))
+fn chunk(id: i64) -> ScriptedPeerStep {
+    scripted_response_chunk(RequestId::Number(id), false, "chunk")
 }
 
-fn answer(id: u8) -> ScriptedPeerStep {
-    ScriptedPeerStep::Send(Message::text(format!(
-        r#"{{"id":{id},"done":true,"method":"response_chunk","result":{{"text":"answered"}}}}"#
-    )))
+fn answer(id: i64) -> ScriptedPeerStep {
+    scripted_response_chunk(RequestId::Number(id), true, "answered")
 }
 
-fn script(chunks_for_the_first_exchange: usize) -> Vec<ScriptedPeerStep> {
-    let mut steps = vec![
-        ScriptedPeerStep::AwaitClientFrame,
-        ScriptedPeerStep::AwaitClientFrame,
-    ];
-
-    for _ in 0..chunks_for_the_first_exchange {
-        steps.push(chunk(FIRST_EXCHANGE));
-    }
-
-    steps.push(answer(SECOND_EXCHANGE));
-
-    steps
+fn awaited_requests(count: usize) -> Vec<ScriptedPeerStep> {
+    (0..count)
+        .map(|_| ScriptedPeerStep::AwaitClientFrame)
+        .collect()
 }
 
-async fn endpoint_with(chunks_for_the_first_exchange: usize) -> ScriptedPeerEndpoint {
-    ScriptedPeerEndpoint::start(
-        ScriptedPeerClosing::Cleanly,
-        script(chunks_for_the_first_exchange),
-    )
-    .await
+async fn endpoint(script: Vec<ScriptedPeerStep>) -> ScriptedPeerEndpoint {
+    ScriptedPeerEndpoint::start(ScriptedPeerClosing::Cleanly, script).await
 }
 
-async fn request(
-    endpoint: &ScriptedPeerEndpoint,
-    label: &str,
-) -> margaret_websocket_client::response_stream::ResponseStream<ResponseChunk> {
+async fn request(endpoint: &ScriptedPeerEndpoint, label: &str) -> ResponseStream<ResponseChunk> {
     endpoint
         .connection
         .request::<PingMessage, ResponseChunk>(PingMessage {
@@ -60,9 +43,43 @@ async fn request(
         .expect("the request reaches a peer that is still connected")
 }
 
+#[derive(Debug)]
+struct DrainedExchange {
+    delivered: usize,
+    interruption: Option<WebSocketClientError>,
+}
+
+async fn drain(mut responses: ResponseStream<ResponseChunk>) -> DrainedExchange {
+    let mut delivered = 0;
+
+    while let Some(item) = responses.next().await {
+        match item {
+            Ok(_) => delivered += 1,
+            Err(interruption) => {
+                return DrainedExchange {
+                    delivered,
+                    interruption: Some(interruption),
+                };
+            }
+        }
+    }
+
+    DrainedExchange {
+        delivered,
+        interruption: None,
+    }
+}
+
 #[tokio::test]
 async fn serves_an_exchange_while_another_stream_goes_unread() {
-    let endpoint = endpoint_with(2).await;
+    let endpoint = endpoint(
+        awaited_requests(2)
+            .into_iter()
+            .chain([chunk(FIRST_EXCHANGE), chunk(FIRST_EXCHANGE)])
+            .chain([answer(SECOND_EXCHANGE)])
+            .collect(),
+    )
+    .await;
     let _unread = request(&endpoint, "unread").await;
     let mut answered = request(&endpoint, "answered").await;
 
@@ -77,9 +94,80 @@ async fn serves_an_exchange_while_another_stream_goes_unread() {
 }
 
 #[tokio::test]
-async fn interrupts_only_the_exchange_whose_consumer_stopped_draining() {
-    let endpoint = endpoint_with(RESPONSE_BACKLOG_LIMIT + 1).await;
-    let mut stalled = request(&endpoint, "stalled").await;
+async fn delivers_a_burst_that_fills_the_whole_window() {
+    let endpoint = endpoint(
+        awaited_requests(1)
+            .into_iter()
+            .chain((1..RESPONSE_CREDIT_WINDOW).map(|_| chunk(FIRST_EXCHANGE)))
+            .chain([answer(FIRST_EXCHANGE)])
+            .collect(),
+    )
+    .await;
+    let responses = request(&endpoint, "burst").await;
+    let DrainedExchange {
+        delivered,
+        interruption,
+    } = drain(responses).await;
+
+    assert!(interruption.is_none(), "{interruption:?}");
+    assert_eq!(delivered, RESPONSE_CREDIT_WINDOW);
+}
+
+#[tokio::test]
+async fn delivers_a_rejection_that_arrives_once_the_window_is_spent() {
+    let endpoint = endpoint(
+        awaited_requests(1)
+            .into_iter()
+            .chain((0..RESPONSE_CREDIT_WINDOW).map(|_| chunk(FIRST_EXCHANGE)))
+            .chain([scripted_response_rejection(
+                RequestId::Number(FIRST_EXCHANGE),
+                "the handler gave up",
+            )])
+            .collect(),
+    )
+    .await;
+    let responses = request(&endpoint, "rejected").await;
+    let DrainedExchange {
+        delivered,
+        interruption,
+    } = drain(responses).await;
+
+    assert!(interruption.is_none(), "{interruption:?}");
+    assert_eq!(delivered, EXCHANGE_QUEUE_CAPACITY);
+}
+
+#[tokio::test]
+async fn replenishes_the_window_as_the_consumer_drains() {
+    let endpoint = endpoint(vec![
+        ScriptedPeerStep::AwaitClientFrame,
+        chunk(FIRST_EXCHANGE),
+        ScriptedPeerStep::AwaitClientCredit,
+        answer(FIRST_EXCHANGE),
+    ])
+    .await;
+    let responses = request(&endpoint, "drained").await;
+    let DrainedExchange {
+        delivered,
+        interruption,
+    } = drain(responses).await;
+
+    endpoint.peer.finish().await;
+
+    assert!(interruption.is_none(), "{interruption:?}");
+    assert_eq!(delivered, 2);
+}
+
+#[tokio::test]
+async fn reports_a_peer_that_sends_past_the_window_it_was_granted() {
+    let endpoint = endpoint(
+        awaited_requests(2)
+            .into_iter()
+            .chain((0..=EXCHANGE_QUEUE_CAPACITY).map(|_| chunk(FIRST_EXCHANGE)))
+            .chain([answer(SECOND_EXCHANGE)])
+            .collect(),
+    )
+    .await;
+    let stalled = request(&endpoint, "stalled").await;
     let mut answered = request(&endpoint, "answered").await;
 
     assert!(matches!(
@@ -91,18 +179,15 @@ async fn interrupts_only_the_exchange_whose_consumer_stopped_draining() {
         ResponseItem::Payload(_)
     ));
 
-    let mut backlog = 0;
-
-    let interruption = loop {
-        match stalled.next().await.expect("the stalled exchange ends") {
-            Ok(_) => backlog += 1,
-            Err(error) => break error,
-        }
-    };
-
-    assert_eq!(backlog, RESPONSE_BACKLOG_LIMIT);
-    assert!(matches!(
+    let DrainedExchange {
+        delivered,
         interruption,
-        WebSocketClientError::ExchangeBacklogExceeded { .. }
+    } = drain(stalled).await;
+
+    assert_eq!(delivered, EXCHANGE_QUEUE_CAPACITY);
+    assert!(matches!(
+        interruption.expect("a peer that overruns the window ends the exchange"),
+        WebSocketClientError::ExchangeCreditExceeded { credit, .. }
+            if credit == RESPONSE_CREDIT_WINDOW
     ));
 }

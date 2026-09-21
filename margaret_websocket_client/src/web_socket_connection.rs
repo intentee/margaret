@@ -2,9 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering;
 
-use futures_util::SinkExt;
 use futures_util::StreamExt;
-use futures_util::stream::SplitSink;
 use futures_util::stream::SplitStream;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -23,29 +21,23 @@ use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseM
 use crate::client_stream::ClientStream;
 use crate::exchange_interruption::ExchangeInterruption;
 use crate::exchange_outcome::ExchangeOutcome;
+use crate::exchange_queue_capacity::EXCHANGE_QUEUE_CAPACITY;
 use crate::exchange_registration::ExchangeRegistration;
 use crate::exchange_registry::ExchangeRegistry;
 use crate::exchange_termination::ExchangeTermination;
 use crate::open_exchange::OpenExchange;
+use crate::outbound_frames::OutboundFrames;
 use crate::pending_exchange::PendingExchange;
-use crate::response_backlog_limit::RESPONSE_BACKLOG_LIMIT;
+use crate::response_credit_window::RESPONSE_CREDIT_WINDOW;
 use crate::response_stream::ResponseStream;
 use crate::route_server_frame::route_server_frame;
 use crate::web_socket_client_error::WebSocketClientError;
-
-type ClientSink = Arc<Mutex<SplitSink<ClientStream, Message>>>;
-
-async fn answer_close(sink: &ClientSink) {
-    if let Err(error) = sink.lock().await.close().await {
-        eprintln!("margaret_websocket_client: the closing handshake failed: {error}");
-    }
-}
 
 async fn read_server_frames(
     cancellation_token: CancellationToken,
     mut source: SplitStream<ClientStream>,
     exchanges: ExchangeRegistry,
-    sink: ClientSink,
+    frames: OutboundFrames,
 ) {
     let interruption = loop {
         tokio::select! {
@@ -70,7 +62,7 @@ async fn read_server_frames(
                         () = cancellation_token.cancelled() => {
                             break ExchangeInterruption::ConnectionDropped;
                         }
-                        () = answer_close(&sink) => {}
+                        () = frames.answer_close() => {}
                     }
                 }
                 Some(Ok(_)) => {}
@@ -89,9 +81,9 @@ async fn read_server_frames(
 
 pub struct WebSocketConnection {
     cancellation_token: CancellationToken,
-    next_request_id: AtomicI64,
     exchanges: ExchangeRegistry,
-    sink: ClientSink,
+    frames: OutboundFrames,
+    next_request_id: AtomicI64,
     url: Arc<str>,
 }
 
@@ -100,20 +92,20 @@ impl WebSocketConnection {
         let (sink, source) = stream.split();
         let cancellation_token = CancellationToken::new();
         let exchanges = ExchangeRegistry::default();
-        let sink = Arc::new(Mutex::new(sink));
+        let frames = OutboundFrames::new(Arc::new(Mutex::new(sink)), url.clone());
 
         drop(tokio::spawn(read_server_frames(
             cancellation_token.clone(),
             source,
             exchanges.clone(),
-            sink.clone(),
+            frames.clone(),
         )));
 
         Self {
             cancellation_token,
-            next_request_id: AtomicI64::new(0),
             exchanges,
-            sink,
+            frames,
+            next_request_id: AtomicI64::new(0),
             url,
         }
     }
@@ -130,11 +122,12 @@ impl WebSocketConnection {
     {
         self.refuse_when_terminated()?;
 
-        self.send_serialization(serde_json::to_string(&ClientSentFrame::Notification {
-            method: Notification::METHOD.to_string(),
-            params: notification,
-        }))
-        .await
+        self.frames
+            .send_serialization(serde_json::to_string(&ClientSentFrame::Notification {
+                method: Notification::METHOD.to_string(),
+                params: notification,
+            }))
+            .await
     }
 
     /// # Errors
@@ -151,6 +144,7 @@ impl WebSocketConnection {
         let id = RequestId::Number(self.next_request_id.fetch_add(1, Ordering::Relaxed));
         let url = self.url.clone();
         let serialized = serde_json::to_string(&ClientSentFrame::Request {
+            credit: RESPONSE_CREDIT_WINDOW,
             id: id.clone(),
             method: Request::METHOD.to_string(),
             params: request,
@@ -168,34 +162,18 @@ impl WebSocketConnection {
         }
     }
 
-    async fn send_serialization(
-        &self,
-        serialized: Result<String, serde_json::Error>,
-    ) -> Result<(), WebSocketClientError> {
-        let text = serialized.map_err(|source| WebSocketClientError::SerializeFrame { source })?;
-
-        self.sink
-            .lock()
-            .await
-            .send(Message::text(text))
-            .await
-            .map_err(|source| WebSocketClientError::SendFrame {
-                source,
-                url: self.url.to_string(),
-            })
-    }
-
     async fn start_exchange(
         &self,
         id: RequestId,
         serialized: Result<String, serde_json::Error>,
     ) -> Result<OpenExchange, WebSocketClientError> {
-        let (sender, receiver) = mpsc::channel(RESPONSE_BACKLOG_LIMIT);
+        let (sender, receiver) = mpsc::channel(EXCHANGE_QUEUE_CAPACITY);
         let termination = ExchangeTermination::default();
         let exchange = OpenExchange::new(
+            self.frames.clone(),
             id.clone(),
-            self.exchanges.clone(),
             receiver,
+            self.exchanges.clone(),
             termination.clone(),
         );
 
@@ -209,7 +187,7 @@ impl WebSocketConnection {
             return Err(interruption.into_error(&self.url));
         }
 
-        self.send_serialization(serialized).await?;
+        self.frames.send_serialization(serialized).await?;
 
         Ok(exchange)
     }
@@ -242,9 +220,9 @@ mod tests {
     use tokio_tungstenite::tungstenite::protocol::Role;
     use tokio_util::sync::CancellationToken;
 
-    use super::ClientSink;
     use super::ClientStream;
     use super::ExchangeRegistry;
+    use super::OutboundFrames;
     use super::WebSocketConnection;
     use super::read_server_frames;
     use crate::client_io::ClientIo;
@@ -254,12 +232,14 @@ mod tests {
     /// The duplex buffer the framework's own websocket harness serves connections over.
     const DUPLEX_CAPACITY: usize = 65536;
 
+    const PEER_URL: &str = "wss://peer.test/ws";
+
     /// A duplex too small to accept a whole frame, so the write parks instead of completing.
     const PARKING_DUPLEX_CAPACITY: usize = 1;
 
     struct Halves {
+        frames: OutboundFrames,
         peer: ClientStream,
-        sink: ClientSink,
         source: SplitStream<ClientStream>,
     }
 
@@ -272,19 +252,19 @@ mod tests {
             .split();
 
         Halves {
+            frames: OutboundFrames::new(Arc::new(Mutex::new(sink)), Arc::from(PEER_URL)),
             peer: WebSocketStream::from_raw_socket(peer, Role::Server, None).await,
-            sink: Arc::new(Mutex::new(sink)),
             source,
         }
     }
 
     async fn read_until_the_peer_is_gone(
-        sink: ClientSink,
+        frames: OutboundFrames,
         source: SplitStream<ClientStream>,
     ) -> ExchangeRegistry {
         let exchanges = ExchangeRegistry::default();
 
-        read_server_frames(CancellationToken::new(), source, exchanges.clone(), sink).await;
+        read_server_frames(CancellationToken::new(), source, exchanges.clone(), frames).await;
 
         exchanges
     }
@@ -292,8 +272,8 @@ mod tests {
     #[tokio::test]
     async fn stops_reading_when_the_peer_completes_the_closing_handshake() {
         let Halves {
+            frames,
             mut peer,
-            sink,
             source,
         } = halves().await;
 
@@ -301,7 +281,7 @@ mod tests {
             .await
             .expect("the peer sends a close frame");
 
-        tokio::join!(read_until_the_peer_is_gone(sink, source), async move {
+        tokio::join!(read_until_the_peer_is_gone(frames, source), async move {
             while peer.next().await.is_some() {}
         });
     }
@@ -309,8 +289,8 @@ mod tests {
     #[tokio::test]
     async fn reports_a_closing_handshake_the_peer_will_not_receive() {
         let Halves {
+            frames,
             mut peer,
-            sink,
             source,
         } = halves().await;
 
@@ -320,12 +300,16 @@ mod tests {
 
         drop(peer);
 
-        read_until_the_peer_is_gone(sink, source).await;
+        read_until_the_peer_is_gone(frames, source).await;
     }
 
     #[tokio::test]
     async fn stops_reading_when_the_connection_is_cancelled() {
-        let Halves { peer, sink, source } = halves().await;
+        let Halves {
+            frames,
+            peer,
+            source,
+        } = halves().await;
         let cancellation_token = CancellationToken::new();
 
         cancellation_token.cancel();
@@ -334,7 +318,7 @@ mod tests {
             cancellation_token,
             source,
             ExchangeRegistry::default(),
-            sink,
+            frames,
         )
         .await;
 
@@ -405,7 +389,7 @@ mod tests {
         Connected {
             connection: WebSocketConnection::new(
                 WebSocketStream::from_raw_socket(client, Role::Client, None).await,
-                Arc::from("wss://peer.test/ws"),
+                Arc::from(PEER_URL),
             ),
             peer: WebSocketStream::from_raw_socket(peer, Role::Server, None).await,
         }
@@ -531,7 +515,7 @@ mod tests {
 
         assert!(matches!(
             interruption,
-            WebSocketClientError::ExchangeConnectionDropped { url } if url == "wss://peer.test/ws"
+            WebSocketClientError::ExchangeConnectionDropped { url } if url == PEER_URL
         ));
     }
 
@@ -541,26 +525,31 @@ mod tests {
             connection,
             mut peer,
         } = connected().await;
+        let mut answered = connection
+            .request::<Echo, Echoed>(Echo {
+                label: "answered".to_string(),
+            })
+            .await
+            .expect("the first request is sent");
         let mut responses = connection
             .request::<Echo, Echoed>(Echo {
                 label: "outstanding".to_string(),
             })
             .await
-            .expect("the request is sent");
-        let sink = connection.sink.clone();
+            .expect("the second request is sent");
+        let sink = connection.frames.sink.clone();
+        let held = sink.lock().await;
 
         peer.send(Message::text(
-            r#"{"id":0,"done":false,"method":"echoed","result":{"label":"first"}}"#,
+            r#"{"id":0,"done":true,"method":"echoed","result":{"label":"first"}}"#,
         ))
         .await
-        .expect("the peer streams a chunk");
+        .expect("the peer answers the first request");
         peer.send(Message::Close(None))
             .await
             .expect("the peer closes");
 
-        let held = sink.lock().await;
-
-        assert!(responses.next().await.is_some());
+        assert!(answered.next().await.is_some());
 
         drop(connection);
 
@@ -574,7 +563,7 @@ mod tests {
 
         assert!(matches!(
             interruption,
-            WebSocketClientError::ExchangeConnectionDropped { url } if url == "wss://peer.test/ws"
+            WebSocketClientError::ExchangeConnectionDropped { url } if url == PEER_URL
         ));
     }
 

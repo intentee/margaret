@@ -1,4 +1,6 @@
 pub mod blocking_middleware;
+pub mod client_notification_frame;
+pub mod client_request_frame;
 pub mod conversation_message;
 pub mod driver_harness;
 pub mod failing_chunk;
@@ -21,6 +23,8 @@ pub mod running_web_socket_server;
 pub mod scripted_peer_closing;
 pub mod scripted_peer_endpoint;
 pub mod scripted_peer_step;
+pub mod scripted_response_chunk;
+pub mod scripted_response_rejection;
 pub mod scripted_web_socket_peer;
 pub mod scripted_web_socket_peer_params;
 pub mod shared_session_factory;

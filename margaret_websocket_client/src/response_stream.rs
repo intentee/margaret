@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 
 use margaret_websocket_envelope::server_sent_frame::ServerSentFrame;
 use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseMessage;
@@ -12,28 +13,22 @@ use crate::response_item::ResponseItem;
 use crate::response_stream_state::ResponseStreamState;
 use crate::web_socket_client_error::WebSocketClientError;
 
-fn read_frame<Payload>(
-    frame: ServerSentFrame,
+fn read_response<Payload>(
+    method: &str,
+    payload: Value,
 ) -> Result<ResponseItem<Payload>, WebSocketClientError>
 where
     Payload: DeserializeOwned + WebSocketResponseMessage,
 {
-    match frame {
-        ServerSentFrame::Error { error, .. } => Ok(ResponseItem::Rejected(error)),
-        ServerSentFrame::Response {
-            method, payload, ..
-        } => {
-            if method == Payload::METHOD {
-                serde_json::from_value(payload)
-                    .map(ResponseItem::Payload)
-                    .map_err(|source| WebSocketClientError::DeserializeResponse { source })
-            } else {
-                Err(WebSocketClientError::UnexpectedResponseMethod {
-                    expected: Payload::METHOD,
-                    received: method,
-                })
-            }
-        }
+    if method == Payload::METHOD {
+        serde_json::from_value(payload)
+            .map(ResponseItem::Payload)
+            .map_err(|source| WebSocketClientError::DeserializeResponse { source })
+    } else {
+        Err(WebSocketClientError::UnexpectedResponseMethod {
+            expected: Payload::METHOD,
+            received: method.to_string(),
+        })
     }
 }
 
@@ -66,16 +61,30 @@ where
             return None;
         }
 
-        if let Some(frame) = self.exchange.receive().await {
-            return Some(read_frame(frame));
-        }
+        let Some(frame) = self.exchange.receive().await else {
+            self.state = ResponseStreamState::Ended;
 
-        self.state = ResponseStreamState::Ended;
+            return match self.exchange.outcome() {
+                ExchangeOutcome::Completed => None,
+                ExchangeOutcome::Interrupted(interruption) => {
+                    Some(Err(interruption.into_error(&self.url)))
+                }
+            };
+        };
 
-        match self.exchange.outcome() {
-            ExchangeOutcome::Completed => None,
-            ExchangeOutcome::Interrupted(interruption) => {
-                Some(Err(interruption.into_error(&self.url)))
+        match frame {
+            ServerSentFrame::Error { error, .. } => Some(Ok(ResponseItem::Rejected(error))),
+            ServerSentFrame::Response {
+                is_done,
+                method,
+                payload,
+                ..
+            } => {
+                if !is_done {
+                    self.exchange.replenish().await;
+                }
+
+                Some(read_response(&method, payload))
             }
         }
     }

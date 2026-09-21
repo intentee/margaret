@@ -1,9 +1,16 @@
 use thiserror::Error;
+use tokio::sync::AcquireError;
 use tokio::sync::mpsc::error::SendError;
 use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Debug, Error)]
 pub enum WebSocketError {
+    #[error("the exchange has finished and can no longer carry responses: {source}")]
+    ExchangeFinished {
+        #[source]
+        source: AcquireError,
+    },
+
     #[error(
         "the websocket connection is closed and can no longer accept outbound frames: {source}"
     )]
