@@ -24,10 +24,8 @@ impl ExchangeCredit {
     }
 
     pub(crate) fn complete(&self, id: &RequestId, exchange: &ServedExchange) {
-        drop(
-            self.exchanges
-                .remove_if(id, |_, open| open.is_same_exchange(exchange)),
-        );
+        self.exchanges
+            .remove_if(id, |_, open| open.is_same_exchange(exchange));
         exchange.end();
     }
 

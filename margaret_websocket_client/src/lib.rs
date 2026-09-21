@@ -7,6 +7,8 @@ mod exchange_outcome;
 mod exchange_registration;
 mod exchange_registry;
 mod exchange_signal;
+mod exchange_signal_report;
+mod exchange_signals;
 mod exchange_termination;
 mod granted_credit;
 mod granted_credit_outcome;

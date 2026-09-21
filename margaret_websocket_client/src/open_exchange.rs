@@ -1,12 +1,14 @@
 use tokio::sync::mpsc::UnboundedReceiver;
-use tokio::sync::mpsc::UnboundedSender;
 
 use margaret_websocket_envelope::request_id::RequestId;
 use margaret_websocket_envelope::server_sent_frame::ServerSentFrame;
 
+use crate::exchange_interruption::ExchangeInterruption;
 use crate::exchange_outcome::ExchangeOutcome;
 use crate::exchange_registry::ExchangeRegistry;
 use crate::exchange_signal::ExchangeSignal;
+use crate::exchange_signal_report::ExchangeSignalReport;
+use crate::exchange_signals::ExchangeSignals;
 use crate::exchange_termination::ExchangeTermination;
 use crate::granted_credit::GrantedCredit;
 
@@ -15,7 +17,7 @@ pub(crate) struct OpenExchange {
     id: RequestId,
     receiver: UnboundedReceiver<ServerSentFrame>,
     registry: ExchangeRegistry,
-    signals: UnboundedSender<ExchangeSignal>,
+    signals: ExchangeSignals,
     termination: ExchangeTermination,
 }
 
@@ -25,7 +27,7 @@ impl OpenExchange {
         id: RequestId,
         receiver: UnboundedReceiver<ServerSentFrame>,
         registry: ExchangeRegistry,
-        signals: UnboundedSender<ExchangeSignal>,
+        signals: ExchangeSignals,
         termination: ExchangeTermination,
     ) -> Self {
         Self {
@@ -52,7 +54,12 @@ impl OpenExchange {
     }
 
     fn report(&self, signal: ExchangeSignal) {
-        drop(self.signals.send(signal));
+        match self.signals.report(signal) {
+            ExchangeSignalReport::ConnectionStoppedReading => self
+                .termination
+                .interrupt(ExchangeInterruption::ConnectionDropped),
+            ExchangeSignalReport::Reported => {}
+        }
     }
 }
 
@@ -60,5 +67,60 @@ impl Drop for OpenExchange {
     fn drop(&mut self) {
         self.registry.forget(&self.id);
         self.report(ExchangeSignal::Cancelled(self.id.clone()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::sync::mpsc;
+
+    use margaret_websocket_envelope::request_id::RequestId;
+
+    use super::ExchangeInterruption;
+    use super::ExchangeOutcome;
+    use super::ExchangeRegistry;
+    use super::ExchangeSignals;
+    use super::ExchangeTermination;
+    use super::GrantedCredit;
+    use super::OpenExchange;
+    use crate::response_credit_window::RESPONSE_CREDIT_WINDOW;
+
+    fn exchange(signals: ExchangeSignals) -> OpenExchange {
+        let (_sender, receiver) = mpsc::unbounded_channel();
+
+        OpenExchange::new(
+            GrantedCredit::new(RESPONSE_CREDIT_WINDOW),
+            RequestId::Number(1),
+            receiver,
+            ExchangeRegistry::default(),
+            signals,
+            ExchangeTermination::default(),
+        )
+    }
+
+    #[test]
+    fn reports_a_consumed_frame_to_a_connection_that_still_reads() {
+        let (reporter, _signal_queue) = mpsc::unbounded_channel();
+        let exchange = exchange(ExchangeSignals::new(reporter));
+
+        exchange.report_consumed();
+
+        assert_eq!(exchange.outcome(), ExchangeOutcome::Completed);
+    }
+
+    #[test]
+    fn ends_an_exchange_the_connection_can_no_longer_report_for() {
+        let (reporter, signal_queue) = mpsc::unbounded_channel();
+
+        drop(signal_queue);
+
+        let exchange = exchange(ExchangeSignals::new(reporter));
+
+        exchange.report_consumed();
+
+        assert_eq!(
+            exchange.outcome(),
+            ExchangeOutcome::Interrupted(ExchangeInterruption::ConnectionDropped)
+        );
     }
 }

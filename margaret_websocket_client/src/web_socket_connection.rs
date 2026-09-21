@@ -9,7 +9,6 @@ use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedReceiver;
-use tokio::sync::mpsc::UnboundedSender;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
@@ -26,6 +25,7 @@ use crate::exchange_outcome::ExchangeOutcome;
 use crate::exchange_registration::ExchangeRegistration;
 use crate::exchange_registry::ExchangeRegistry;
 use crate::exchange_signal::ExchangeSignal;
+use crate::exchange_signals::ExchangeSignals;
 use crate::exchange_termination::ExchangeTermination;
 use crate::granted_credit::GrantedCredit;
 use crate::open_exchange::OpenExchange;
@@ -89,7 +89,7 @@ pub struct WebSocketConnection {
     exchanges: ExchangeRegistry,
     frames: OutboundFrames,
     next_request_id: AtomicI64,
-    signals: UnboundedSender<ExchangeSignal>,
+    signals: ExchangeSignals,
     url: Arc<str>,
 }
 
@@ -99,7 +99,7 @@ impl WebSocketConnection {
         let cancellation_token = CancellationToken::new();
         let exchanges = ExchangeRegistry::default();
         let frames = OutboundFrames::new(Arc::new(Mutex::new(sink)), url.clone());
-        let (signals, reported_signals) = mpsc::unbounded_channel();
+        let (reporter, reported_signals) = mpsc::unbounded_channel();
 
         drop(tokio::spawn(read_server_frames(
             cancellation_token.clone(),
@@ -114,7 +114,7 @@ impl WebSocketConnection {
             exchanges,
             frames,
             next_request_id: AtomicI64::new(0),
-            signals,
+            signals: ExchangeSignals::new(reporter),
             url,
         }
     }
