@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
+use margaret_container::container_error::ContainerError;
 use margaret_injection_codegen::injection_error::InjectionError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 use margaret_tag_codegen::tag_error::TagError;
@@ -12,6 +13,12 @@ pub enum MiddlewareCodegenError {
     AttributeArguments {
         #[from]
         source: AttributeArgumentsError,
+    },
+
+    #[error(transparent)]
+    Container {
+        #[from]
+        source: ContainerError,
     },
 
     #[error("failed to index the crate: {source}")]
@@ -37,11 +44,6 @@ pub enum MiddlewareCodegenError {
         #[from]
         source: TagError,
     },
-
-    #[error(
-        "#[handles_middleware_attribute] is only supported on structs, but '{target}' is not a struct"
-    )]
-    MiddlewareHandlerNotOnStruct { target: String },
 
     #[error("middleware '{middleware}' is missing the 'attribute' argument")]
     MissingMiddlewareHandles { middleware: String },

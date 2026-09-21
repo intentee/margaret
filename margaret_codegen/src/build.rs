@@ -233,7 +233,7 @@ pub fn build(
     } else {
         ViewsAvailability::Unavailable
     };
-    let registries = BindingRegistries::collect(&index, views_availability)?;
+    let registries = BindingRegistries::collect(&index, bindings, views_availability)?;
     if features.contains(GeneratedFeature::AuthenticatedUsers)
         && (features.contains(GeneratedFeature::Http)
             || features.contains(GeneratedFeature::Websockets))
@@ -241,8 +241,11 @@ pub fn build(
         module_tokens.extend(render_authenticated_user_wrappers(&registries.providers()));
     }
 
-    let middleware_plans =
-        margaret_middleware_codegen::middleware_plans::middleware_plans(&index, &registries)?;
+    let middleware_plans = margaret_middleware_codegen::middleware_plans::middleware_plans(
+        &index,
+        bindings,
+        &registries,
+    )?;
     if features.contains(GeneratedFeature::Middleware)
         && (features.contains(GeneratedFeature::Http)
             || features.contains(GeneratedFeature::Websockets))

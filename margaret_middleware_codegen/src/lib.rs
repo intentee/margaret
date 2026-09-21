@@ -69,15 +69,22 @@ mod tests {
         bindings_for(&index_for("#[singleton]\nstruct Config;\n"))
     }
 
-    fn registries_for(index: &AttributeIndex) -> BindingRegistries {
-        BindingRegistries::collect(index, ViewsAvailability::Available)
+    fn registries_for(index: &AttributeIndex, bindings: &ContainerBindings) -> BindingRegistries {
+        BindingRegistries::collect(index, bindings, ViewsAvailability::Available)
             .expect("the binding registries are collected")
+    }
+
+    fn plans_for(
+        index: &AttributeIndex,
+    ) -> Result<Vec<crate::middleware_plan::MiddlewarePlan>, MiddlewareCodegenError> {
+        let bindings = bindings_for(index);
+
+        middleware_plans(index, &bindings, &registries_for(index, &bindings))
     }
 
     fn wrappers_for(lib_source: &str) -> String {
         let index = index_for(lib_source);
-        let plans = middleware_plans(&index, &registries_for(&index))
-            .expect("the middleware plans are collected");
+        let plans = plans_for(&index).expect("the middleware plans are collected");
 
         render_middleware_wrappers(&plans)
             .into_iter()
@@ -90,7 +97,7 @@ mod tests {
     fn plans_rejection_for(lib_source: &str) -> MiddlewareCodegenError {
         let index = index_for(lib_source);
 
-        middleware_plans(&index, &registries_for(&index))
+        plans_for(&index)
             .err()
             .expect("the middleware plans fail to collect")
     }
@@ -101,7 +108,7 @@ mod tests {
 
     fn layers_for(lib_source: &str) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
         let index = index_for(lib_source);
-        let plans = middleware_plans(&index, &registries_for(&index))?;
+        let plans = plans_for(&index)?;
         let selected = index.select_framework_attribute(FrameworkAttribute::Middleware);
         let site = selected
             .into_iter()
@@ -209,11 +216,14 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_a_handler_on_a_non_struct() {
-        assert!(
-            plans_error_for("#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n")
-                .contains("#[handles_middleware_attribute]")
-        );
+    fn rejects_a_handler_absent_from_the_container_plan() {
+        let index = index_for(GUARD);
+        let bindings = empty_bindings();
+        let error = middleware_plans(&index, &bindings, &registries_for(&index, &bindings))
+            .err()
+            .expect("the middleware plans must come from the same container plan");
+
+        assert!(error.to_string().contains("crate::Guard"));
     }
 
     #[test]

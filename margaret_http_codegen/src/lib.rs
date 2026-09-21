@@ -100,19 +100,26 @@ mod tests {
     }
 
     fn registries_for(index: &AttributeIndex, has_views: bool) -> BindingRegistries {
-        BindingRegistries::collect(index, views_availability(has_views))
+        BindingRegistries::collect(index, &bindings_for(index), views_availability(has_views))
             .expect("the binding registries are collected")
+    }
+
+    fn plan_against_container(
+        index: &AttributeIndex,
+        bindings: &ContainerBindings,
+    ) -> Result<RenderedHttp, HttpCodegenError> {
+        let registries =
+            BindingRegistries::collect(index, bindings, ViewsAvailability::Unavailable)?;
+        let plans = middleware_plans(index, bindings, &registries)?;
+
+        render_http(index, false, &[], &plans, bindings, &registries)
     }
 
     fn error_with_container_source(source: &str, container_source: &str) -> String {
         let index = index_for(source);
-        let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let container_index = index_for(container_source);
-        let bindings = bindings_for(&container_index);
 
-        render_http(&index, false, &[], &plans, &bindings, &registries)
+        plan_against_container(&index, &bindings_for(&container_index))
             .map(drop)
             .expect_err("the HTTP plan and container plan must agree")
             .to_string()
@@ -126,9 +133,10 @@ mod tests {
         let index = AttributeIndexBuilder::new()
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
-        let registries = BindingRegistries::collect(&index, views_availability(has_views))?;
-        let plans = middleware_plans(&index, &registries)?;
         let bindings = bindings_for(&index);
+        let registries =
+            BindingRegistries::collect(&index, &bindings, views_availability(has_views))?;
+        let plans = middleware_plans(&index, &bindings, &registries)?;
 
         Ok(
             render_http(&index, has_views, &[], &plans, &bindings, &registries)?
@@ -724,10 +732,10 @@ impl Health {
         has_views: bool,
     ) -> String {
         let index = index_for(lib_source);
-        let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
+        let registries = registries_for(&index, false);
+        let plans = middleware_plans(&index, &bindings, &registries)
+            .expect("the middleware plans are collected");
 
         render_http(
             &index,
@@ -784,10 +792,10 @@ impl Health {
             .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
             .expect("the crate is indexed")
             .build();
-        let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
+        let registries = registries_for(&index, false);
+        let plans = middleware_plans(&index, &bindings, &registries)
+            .expect("the middleware plans are collected");
 
         render_http(&index, false, &[], &plans, &bindings, &registries)
             .expect("the http source is generated")
@@ -1403,15 +1411,6 @@ impl GetProject {
     }
 
     #[test]
-    fn rejects_responds_to_http_on_a_non_struct() {
-        let message = error_for(
-            "#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nenum Bad {}\n",
-        );
-
-        assert!(message.contains("#[responds_to_http]"));
-    }
-
-    #[test]
     fn propagates_malformed_responder_arguments() {
         assert!(
             error_for(
@@ -1502,13 +1501,6 @@ impl GetProject {
             )
             .contains("missing the 'path'")
         );
-    }
-
-    #[test]
-    fn rejects_http_middleware_on_a_non_struct() {
-        let message = error_for("#[handles_middleware_attribute(attribute = x)]\nenum Bad {}\n");
-
-        assert!(message.contains("#[handles_middleware_attribute]"));
     }
 
     #[test]
@@ -2025,10 +2017,10 @@ impl Guard {
 }
 "#,
         );
-        let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
+        let registries = registries_for(&index, false);
+        let plans = middleware_plans(&index, &bindings, &registries)
+            .expect("the middleware plans are collected");
         let artifacts = render_http(&index, false, &[], &plans, &bindings, &registries)
             .expect("the http source is generated");
 

@@ -2,6 +2,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_trait_impl::IndexedTraitImpl;
+use margaret_container::container_bindings::ContainerBindings;
 
 use crate::discovered_handler::DiscoveredHandler;
 use crate::handler_kind::HandlerKind;
@@ -58,6 +59,7 @@ fn associated(
 
 pub(crate) fn websocket_handlers(
     index: &AttributeIndex,
+    bindings: &ContainerBindings,
 ) -> Result<Vec<DiscoveredHandler>, WebSocketCodegenError> {
     let mut handlers = Vec::new();
 
@@ -72,15 +74,14 @@ pub(crate) fn websocket_handlers(
                 return Err(WebSocketCodegenError::HandlerNotSingleton { handler });
             }
 
-            let Some(identifier) = index.struct_identifier(item.canonical_path()) else {
-                return Err(WebSocketCodegenError::HandlerNotAStruct { handler });
-            };
-
             let session_path = associated(index, trait_impl, "Session", &handler)?;
             let message_path = associated(index, trait_impl, "Message", &handler)?;
 
             handlers.push(DiscoveredHandler {
-                handler_field: identifier.field().to_string(),
+                handler_field: bindings
+                    .provider_binding(item.canonical_path())?
+                    .field_name
+                    .clone(),
                 handler_path: item.canonical_path().clone(),
                 kind,
                 message_path,

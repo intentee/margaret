@@ -105,8 +105,8 @@ pub enum ContainerError {
     #[error("the container plan does not contain provider '{path}'")]
     MissingPlannedProvider { path: String },
 
-    #[error("the container plan does not contain the serve inputs of '{path}'")]
-    MissingProviderServeInputs { path: String },
+    #[error("the container plan does not contain a binding for '{path}'")]
+    MissingProviderBinding { path: String },
 
     #[error("the container plan does not contain serve input slot '{key}'")]
     MissingServeInputSlot { key: String },

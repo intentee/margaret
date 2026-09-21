@@ -163,11 +163,6 @@ pub enum RequestBindingError {
     #[error("#[provides_route_parameter] '{binder}' must also be declared as a #[singleton]")]
     RouteParameterBinderRequiresSingleton { binder: String },
 
-    #[error(
-        "#[infers_authenticated_user] is only supported on structs, but '{provider}' is not a struct"
-    )]
-    AuthenticatedUserProviderNotAStruct { provider: String },
-
     #[error("#[infers_authenticated_user] '{provider}' must also be declared as a #[singleton]")]
     AuthenticatedUserProviderRequiresSingleton { provider: String },
 

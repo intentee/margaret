@@ -93,9 +93,6 @@ pub enum WebSocketCodegenError {
     #[error("'{handler}' implements a websocket handler trait but is not a #[singleton]")]
     HandlerNotSingleton { handler: String },
 
-    #[error("'{handler}' implements a websocket handler trait but is not a struct")]
-    HandlerNotAStruct { handler: String },
-
     #[error("'{handler}' is missing the '{associated_type}' associated type")]
     HandlerMissingAssociatedType {
         handler: String,

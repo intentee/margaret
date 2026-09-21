@@ -50,7 +50,7 @@ pub(crate) fn build_websocket_plan(
     reject_duplicate_response_methods(&messages)?;
 
     let sessions = websocket_sessions(index, bindings, middleware_plans, registries)?;
-    let handlers = websocket_handlers(index)?;
+    let handlers = websocket_handlers(index, bindings)?;
     let message_by_path: HashMap<&CanonicalPath, &WebSocketMessage> = messages
         .iter()
         .map(|message| (&message.path, message))

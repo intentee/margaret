@@ -47,9 +47,6 @@ pub enum HttpCodegenError {
         source: MiddlewareCodegenError,
     },
 
-    #[error("#[responds_to_http] is only supported on structs, but '{target}' is not a struct")]
-    RespondsToHttpNotOnStruct { target: String },
-
     #[error("responder '{responder}' is missing the 'method' argument")]
     MissingHttpMethod { responder: String },
 

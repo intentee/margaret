@@ -32,13 +32,13 @@ fn unifies_serve_inputs_across_roots() {
 
     assert_eq!(
         bindings
-            .provider_serve_inputs(&path("Config"))
+            .provider_binding(&path("Config"))
             .expect("Config has planned serve inputs")
             .inputs
             .len(),
         1
     );
-    assert!(bindings.provider_serve_inputs(&path("Absent")).is_err());
+    assert!(bindings.provider_binding(&path("Absent")).is_err());
 
     let path_slot = bindings
         .serve_input_slot(&console_key("path"))

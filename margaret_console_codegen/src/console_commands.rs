@@ -72,7 +72,7 @@ pub(crate) fn console_commands(
 
         validate_runner(index, item, runner, &command)?;
 
-        let provided = bindings.provider_serve_inputs(item.canonical_path())?;
+        let provided = bindings.provider_binding(item.canonical_path())?;
         let serve_inputs = provided.inputs.to_vec();
         let serve_input_slots = provided.slots.to_vec();
 

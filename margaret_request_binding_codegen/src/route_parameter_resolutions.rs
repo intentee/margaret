@@ -4,6 +4,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
+use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::is_singleton::is_singleton;
 
 use crate::request_binding_error::RequestBindingError;
@@ -32,15 +33,17 @@ fn string_path() -> CanonicalPath {
 
 fn insert_binder(
     index: &AttributeIndex,
+    bindings: &ContainerBindings,
     item: &IndexedItem,
     resolutions: &mut HashMap<CanonicalPath, RouteParameterResolution>,
 ) -> Result<(), RequestBindingError> {
     let provider = item.canonical_path().clone();
-    let Some(identifier) = index.struct_identifier(&provider) else {
+
+    if index.struct_identifier(&provider).is_none() {
         return Err(RequestBindingError::RouteParameterBinderNotAStruct {
             binder: provider.to_string(),
         });
-    };
+    }
 
     if !is_singleton(item) {
         return Err(RequestBindingError::RouteParameterBinderRequiresSingleton {
@@ -48,7 +51,7 @@ fn insert_binder(
         });
     }
 
-    let field = identifier.field().to_string();
+    let field = bindings.provider_binding(&provider)?.field_name.clone();
     let model = associated_model(index, item).ok_or_else(|| {
         RequestBindingError::RouteParameterBinderModel {
             binder: provider.to_string(),
@@ -109,12 +112,13 @@ fn insert_value(
 /// Returns `RequestBindingError` propagated from the work it performs.
 pub fn route_parameter_resolutions(
     index: &AttributeIndex,
+    bindings: &ContainerBindings,
 ) -> Result<HashMap<CanonicalPath, RouteParameterResolution>, RequestBindingError> {
     let mut resolutions = HashMap::from([(string_path(), RouteParameterResolution::Value)]);
 
     for item in index.items() {
         if item.has_framework_attribute(FrameworkAttribute::ProvidesRouteParameter) {
-            insert_binder(index, item, &mut resolutions)?;
+            insert_binder(index, bindings, item, &mut resolutions)?;
         }
 
         if item.has_framework_attribute(FrameworkAttribute::RouteParameterValue) {
@@ -135,6 +139,8 @@ mod tests {
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_container::render_container::render_container;
+    use margaret_serve_input_codegen::scan::scan;
 
     use super::route_parameter_resolutions;
     use crate::request_binding_error::RequestBindingError;
@@ -159,12 +165,16 @@ mod tests {
         fs::create_dir(&source_directory).expect("the src directory is created");
         fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
 
-        route_parameter_resolutions(
-            &AttributeIndexBuilder::new()
-                .index_crate(&CrateRoot::new("crate", source_directory))
-                .expect("the crate is indexed")
-                .build(),
-        )
+        let index = AttributeIndexBuilder::new()
+            .index_crate(&CrateRoot::new("crate", source_directory))
+            .expect("the crate is indexed")
+            .build();
+        let registry = scan(&index).expect("the console arguments are scanned");
+        let bindings = render_container(&index, &registry, &[])
+            .expect("the container renders")
+            .bindings;
+
+        route_parameter_resolutions(&index, &bindings)
     }
 
     fn rejection_for(lib_source: &str) -> String {
@@ -273,6 +283,30 @@ mod tests {
             )
             .contains("has more than one route parameter binder")
         );
+    }
+
+    #[test]
+    fn rejects_a_binder_absent_from_the_container_plan() {
+        let directory = tempdir().expect("a temporary crate directory is created");
+        let source_directory = directory.path().join("src");
+
+        fs::create_dir(&source_directory).expect("the src directory is created");
+        fs::write(source_directory.join("lib.rs"), BINDER).expect("lib.rs is written");
+
+        let index = AttributeIndexBuilder::new()
+            .index_crate(&CrateRoot::new("crate", source_directory))
+            .expect("the crate is indexed")
+            .build();
+        let empty = AttributeIndexBuilder::new().build();
+        let registry = scan(&empty).expect("the console arguments are scanned");
+        let bindings = render_container(&empty, &registry, &[])
+            .expect("the container renders")
+            .bindings;
+        let error = route_parameter_resolutions(&index, &bindings)
+            .err()
+            .expect("the binder must belong to the same container plan");
+
+        assert!(error.to_string().contains("crate::ArticleStore"));
     }
 
     #[test]

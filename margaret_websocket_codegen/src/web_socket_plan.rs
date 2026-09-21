@@ -11,7 +11,6 @@ use margaret_server_codegen::server_name::ServerName;
 
 use crate::build_websocket_plan::build_websocket_plan;
 use crate::built_websocket_plan::BuiltWebSocketPlan;
-use crate::resolve_session_providers::resolve_session_providers;
 use crate::session_plan::SessionPlan;
 use crate::web_socket_codegen_error::WebSocketCodegenError;
 use crate::web_socket_message::WebSocketMessage;
@@ -66,7 +65,6 @@ impl WebSocketPlan {
         let mut sessions_by_server: BTreeMap<ServerName, Vec<usize>> = BTreeMap::new();
 
         for (position, session_plan) in sessions.iter().enumerate() {
-            resolve_session_providers(session_plan, bindings)?;
             sessions_by_server
                 .entry(session_plan.session.server.clone())
                 .or_default()

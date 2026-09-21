@@ -18,9 +18,7 @@ use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
-use crate::injected_dependency::InjectedDependency;
 use crate::provider_binding::ProviderBinding;
-use crate::provider_serve_inputs::ProviderServeInputs;
 use crate::serve_input_binding::ServeInputBinding;
 
 fn bootstrap_arguments_path(function: &Ident) -> TokenStream {
@@ -37,7 +35,7 @@ struct SlottedServeInput {
 
 pub struct ContainerBindings {
     asynchronous_constructions: BTreeSet<String>,
-    concrete_providers: BTreeMap<CanonicalPath, ProviderServeInputs>,
+    injectable: BTreeSet<CanonicalPath>,
     inputs: Arc<[ServeInput]>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
     slots: Arc<BTreeMap<ServeInputKey, usize>>,
@@ -47,7 +45,7 @@ impl ContainerBindings {
     pub(crate) fn from_plan(plan: &ContainerPlan) -> Self {
         let mut providers = BTreeMap::new();
         let mut asynchronous_constructions = BTreeSet::new();
-        let mut concrete_providers = BTreeMap::new();
+        let mut injectable = BTreeSet::new();
 
         for entry in plan.planned_entries() {
             if entry.is_async {
@@ -55,26 +53,23 @@ impl ContainerBindings {
             }
 
             if plan.injectable(&entry.key) {
-                providers.insert(
-                    entry.key.clone(),
-                    ProviderBinding {
-                        field_name: entry.provider.field_name.clone(),
-                        type_name: entry.provider.type_name.clone(),
-                    },
-                );
+                injectable.insert(entry.key.clone());
             }
-            concrete_providers.insert(
+
+            providers.insert(
                 entry.provider.concrete_path.clone(),
-                ProviderServeInputs {
+                ProviderBinding {
+                    field_name: entry.provider.field_name.clone(),
                     inputs: Arc::clone(&entry.serve_inputs),
                     slots: Arc::clone(&entry.serve_input_slots),
+                    type_name: entry.provider.type_name.clone(),
                 },
             );
         }
 
         Self {
             asynchronous_constructions,
-            concrete_providers,
+            injectable,
             inputs: plan.inputs(),
             providers,
             slots: plan.slots(),
@@ -95,16 +90,16 @@ impl ContainerBindings {
 
     /// # Errors
     ///
-    /// Returns `ContainerError::MissingProviderServeInputs`.
-    pub fn provider_serve_inputs(
+    /// Returns `ContainerError::MissingProviderBinding`.
+    pub fn provider_binding(
         &self,
         concrete_path: &CanonicalPath,
-    ) -> Result<&ProviderServeInputs, ContainerError> {
-        self.concrete_providers.get(concrete_path).ok_or_else(|| {
-            ContainerError::MissingProviderServeInputs {
+    ) -> Result<&ProviderBinding, ContainerError> {
+        self.providers
+            .get(concrete_path)
+            .ok_or_else(|| ContainerError::MissingProviderBinding {
                 path: concrete_path.to_string(),
-            }
-        })
+            })
     }
 
     /// # Errors
@@ -177,27 +172,18 @@ impl ContainerBindings {
         self.asynchronous_constructions.contains(field_name)
     }
 
-    /// # Errors
-    ///
-    /// Returns `ContainerError` propagated from the work it performs.
-    pub fn injected_serve_inputs(
-        &self,
-        dependency: &InjectedDependency,
-    ) -> Result<Vec<ServeInput>, ContainerError> {
-        Ok(self
-            .provider_serve_inputs(&dependency.concrete)?
-            .inputs
-            .to_vec())
-    }
-
     #[must_use]
     pub fn provider(&self, provider_key: &CanonicalPath) -> Option<&ProviderBinding> {
-        self.providers.get(provider_key)
+        if self.injectable.contains(provider_key) {
+            self.providers.get(provider_key)
+        } else {
+            None
+        }
     }
 
     #[must_use]
     pub fn provides(&self, provider_key: &CanonicalPath) -> bool {
-        self.providers.contains_key(provider_key)
+        self.injectable.contains(provider_key)
     }
 
     /// # Errors
@@ -211,7 +197,7 @@ impl ContainerBindings {
         let mut collected: Vec<ServeInput> = Vec::new();
 
         for root in roots {
-            collected.extend_from_slice(&self.provider_serve_inputs(root)?.inputs);
+            collected.extend_from_slice(&self.provider_binding(root)?.inputs);
         }
 
         collected.extend_from_slice(woven);
