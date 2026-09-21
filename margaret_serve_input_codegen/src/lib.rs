@@ -5,6 +5,7 @@ pub mod scan;
 pub mod serve_input;
 pub mod serve_input_codegen_error;
 pub mod serve_input_key;
+pub mod serve_input_provisioning;
 pub mod serve_input_read;
 pub mod serve_input_registration;
 pub mod serve_input_registry;

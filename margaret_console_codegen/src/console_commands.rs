@@ -11,7 +11,7 @@ use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_injection_codegen::request_binding_marker::request_binding_marker;
-use margaret_serve_input_codegen::serve_input::ServeInput;
+use margaret_serve_input_codegen::serve_input_provisioning::ServeInputProvisioning;
 
 use crate::console_codegen_error::ConsoleCodegenError;
 use crate::console_command::ConsoleCommand;
@@ -76,11 +76,14 @@ pub(crate) fn console_commands(
         let serve_inputs = provided.inputs.to_vec();
         let serve_input_slots = provided.slots.to_vec();
 
-        if serve_inputs
+        if let Some(serve_only) = serve_inputs
             .iter()
-            .any(|input| matches!(input, ServeInput::SpiffeHttpClient))
+            .find(|input| input.provisioning() == ServeInputProvisioning::ServeCommandOnly)
         {
-            return Err(ConsoleCodegenError::ConsoleCommandInjectsSpiffeHttpClient { command });
+            return Err(ConsoleCodegenError::ConsoleCommandInjectsServeOnlyInput {
+                command,
+                input: serve_only.name().to_string(),
+            });
         }
 
         let existing = commands.insert(

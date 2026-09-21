@@ -6,6 +6,7 @@ use margaret_environment_variable_codegen::environment_variable::EnvironmentVari
 use margaret_input_weaving::weaving_kind::WeavingKind;
 
 use crate::serve_input_key::ServeInputKey;
+use crate::serve_input_provisioning::ServeInputProvisioning;
 use crate::spiffe_client_kind::SpiffeClientKind;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,6 +47,18 @@ impl ServeInput {
             ServeInput::EnvironmentVariable(variable) => variable.name.as_str(),
             ServeInput::SpiffeHttpClient => "spiffe_http_client",
             ServeInput::SpiffeWebSocketClient => "spiffe_websocket_client",
+        }
+    }
+
+    #[must_use]
+    pub fn provisioning(&self) -> ServeInputProvisioning {
+        match self {
+            ServeInput::ConsoleArgument(_) | ServeInput::EnvironmentVariable(_) => {
+                ServeInputProvisioning::EveryCommand
+            }
+            ServeInput::SpiffeHttpClient | ServeInput::SpiffeWebSocketClient => {
+                ServeInputProvisioning::ServeCommandOnly
+            }
         }
     }
 
@@ -102,6 +115,7 @@ mod tests {
     use margaret_input_weaving::weaving_kind::WeavingKind;
 
     use crate::serve_input_key::ServeInputKey;
+    use crate::serve_input_provisioning::ServeInputProvisioning;
 
     use super::ServeInput;
 
@@ -144,6 +158,7 @@ mod tests {
         assert_eq!(input.weaving(), WeavingKind::BorrowedStr);
         assert!(input.is_shareable());
         assert!(input.reads_clap_matches());
+        assert_eq!(input.provisioning(), ServeInputProvisioning::EveryCommand);
         assert_eq!(
             input.slot_key(),
             ServeInputKey::ConsoleArgument {
@@ -174,6 +189,7 @@ mod tests {
         assert_eq!(input.weaving(), WeavingKind::Cloned);
         assert!(input.is_shareable());
         assert!(!input.reads_clap_matches());
+        assert_eq!(input.provisioning(), ServeInputProvisioning::EveryCommand);
         assert_eq!(
             input.slot_key(),
             ServeInputKey::EnvironmentVariable {
@@ -191,6 +207,10 @@ mod tests {
         assert_eq!(input.weaving(), WeavingKind::Cloned);
         assert!(input.is_shareable());
         assert!(!input.reads_clap_matches());
+        assert_eq!(
+            input.provisioning(),
+            ServeInputProvisioning::ServeCommandOnly
+        );
         assert_eq!(input.slot_key(), ServeInputKey::SpiffeHttpClient);
     }
 
@@ -206,6 +226,10 @@ mod tests {
         assert_eq!(input.weaving(), WeavingKind::Cloned);
         assert!(input.is_shareable());
         assert!(!input.reads_clap_matches());
+        assert_eq!(
+            input.provisioning(),
+            ServeInputProvisioning::ServeCommandOnly
+        );
         assert_eq!(input.slot_key(), ServeInputKey::SpiffeWebSocketClient);
     }
 

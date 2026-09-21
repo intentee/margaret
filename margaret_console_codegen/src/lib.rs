@@ -514,6 +514,15 @@ impl Farewell {
     }
 
     #[test]
+    fn rejects_a_console_command_that_injects_the_spiffe_websocket_client() {
+        let message = error_for(
+            "use margaret::framework::websocket_client::web_socket_client::WebSocketClient;\nuse std::sync::Arc;\n\n#[singleton]\nstruct RelayClient {\n    client: WebSocketClient,\n}\n\nimpl RelayClient {\n    #[constructor]\n    fn create(#[spiffe_websocket_client] client: WebSocketClient) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"relay\")]\nstruct Relay {\n    relay: Arc<RelayClient>,\n}\n\nimpl Relay {\n    #[constructor]\n    fn create(relay: Arc<RelayClient>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        );
+
+        assert!(message.contains("injects the #[spiffe_websocket_client]"));
+    }
+
+    #[test]
     fn propagates_malformed_command_arguments() {
         let message = error_for("#[console_command(= 5)]\nstruct Bad;\n");
 

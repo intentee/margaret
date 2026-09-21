@@ -59,9 +59,9 @@ pub enum ConsoleCodegenError {
     MissingCommandName { command: String },
 
     #[error(
-        "console command '{command}' injects the #[spiffe_http_client], which is only provisioned while serving; a console command cannot use the SPIFFE HTTP client"
+        "console command '{command}' injects the #[{input}], which is only provisioned while serving; a console command cannot use it"
     )]
-    ConsoleCommandInjectsSpiffeHttpClient { command: String },
+    ConsoleCommandInjectsServeOnlyInput { command: String, input: String },
 
     #[error(
         "command '{command}' registers the console command name '{name}', which is already registered by command '{existing_command}'"

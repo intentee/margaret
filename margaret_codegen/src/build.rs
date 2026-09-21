@@ -913,6 +913,17 @@ impl GetIdentity {
     }
 
     #[test]
+    fn rejects_a_console_command_that_injects_the_spiffe_websocket_client() {
+        let error = generate(
+            "use margaret::framework::websocket_client::web_socket_client::WebSocketClient;\nuse std::sync::Arc;\n\n#[singleton]\nstruct RelayClient {\n    client: WebSocketClient,\n}\n\nimpl RelayClient {\n    #[constructor]\n    fn create(#[spiffe_websocket_client] client: WebSocketClient) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\n#[console_command(name = \"relay\")]\nstruct Relay {\n    relay: Arc<RelayClient>,\n}\n\nimpl Relay {\n    #[constructor]\n    fn create(relay: Arc<RelayClient>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {}\n}\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(error.contains("injects the #[spiffe_websocket_client]"));
+    }
+
+    #[test]
     fn allows_a_serve_input_named_after_the_spiffe_http_client() {
         let code = generate(
             "use reqwest::Client;\nuse std::sync::Arc;\nuse tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct IdentityClient {\n    client: Client,\n}\n\nimpl IdentityClient {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: Client) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct Labeled {\n    label: String,\n}\n\nimpl Labeled {\n    #[constructor]\n    fn create(#[console_argument(from = \"spiffe_http_client\")] label: String) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    client: Arc<IdentityClient>,\n    labeled: Arc<Labeled>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(client: Arc<IdentityClient>, labeled: Arc<Labeled>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n",
