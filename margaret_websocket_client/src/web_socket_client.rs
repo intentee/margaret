@@ -35,6 +35,6 @@ impl WebSocketClient {
                 url: url.to_string(),
             })?;
 
-        Ok(WebSocketConnection::new(stream, url.to_string()))
+        Ok(WebSocketConnection::new(stream, Arc::from(url.as_str())))
     }
 }

@@ -1,36 +1,39 @@
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use tokio::sync::mpsc::Sender;
 
 use margaret_websocket_envelope::request_id::RequestId;
-use margaret_websocket_envelope::server_sent_frame::ServerSentFrame;
 
-pub(crate) type PendingResponse = Sender<ServerSentFrame>;
+use crate::exchange_interruption::ExchangeInterruption;
+use crate::pending_exchange::PendingExchange;
 
 #[derive(Clone, Default)]
 pub(crate) struct PendingResponses {
-    senders: Arc<DashMap<RequestId, PendingResponse>>,
+    exchanges: Arc<DashMap<RequestId, PendingExchange>>,
 }
 
 impl PendingResponses {
-    pub(crate) fn clear(&self) {
-        self.senders.clear();
-    }
-
     pub(crate) fn forget(&self, id: &RequestId) {
-        self.senders.remove(id);
+        self.exchanges.remove(id);
     }
 
-    pub(crate) fn peek(&self, id: &RequestId) -> Option<PendingResponse> {
-        self.senders.get(id).map(|entry| entry.value().clone())
+    pub(crate) fn interrupt_all(&self, interruption: ExchangeInterruption) {
+        for exchange in self.exchanges.iter() {
+            exchange.value().termination.interrupt(interruption);
+        }
+
+        self.exchanges.clear();
     }
 
-    pub(crate) fn remember(&self, id: RequestId, sender: PendingResponse) {
-        self.senders.insert(id, sender);
+    pub(crate) fn peek(&self, id: &RequestId) -> Option<PendingExchange> {
+        self.exchanges.get(id).map(|entry| entry.value().clone())
     }
 
-    pub(crate) fn take(&self, id: &RequestId) -> Option<PendingResponse> {
-        self.senders.remove(id).map(|(_, sender)| sender)
+    pub(crate) fn remember(&self, id: RequestId, exchange: PendingExchange) {
+        self.exchanges.insert(id, exchange);
+    }
+
+    pub(crate) fn take(&self, id: &RequestId) -> Option<PendingExchange> {
+        self.exchanges.remove(id).map(|(_, exchange)| exchange)
     }
 }

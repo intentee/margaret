@@ -1,9 +1,16 @@
 mod client_io;
 mod client_stream;
 mod connect_tls_stream;
+mod exchange_interruption;
+mod exchange_outcome;
+mod exchange_termination;
+mod open_exchange;
+mod pending_exchange;
 mod pending_responses;
+pub mod response_backlog_limit;
 pub mod response_item;
 pub mod response_stream;
+mod response_stream_state;
 mod route_server_frame;
 pub mod web_socket_client;
 pub mod web_socket_client_error;

@@ -64,4 +64,23 @@ pub enum WebSocketClientError {
         expected: &'static str,
         received: String,
     },
+
+    #[error("the connection to '{url}' was dropped before the exchange completed")]
+    ExchangeConnectionDropped { url: String },
+
+    #[error("the connection to '{url}' failed before the exchange completed")]
+    ExchangeConnectionFailed { url: String },
+
+    #[error("the peer at '{url}' closed the connection before the exchange completed")]
+    ExchangePeerClosed { url: String },
+
+    #[error(
+        "the peer at '{url}' sent a frame that is not a websocket envelope, so the exchange cannot continue"
+    )]
+    ExchangeProtocolViolation { url: String },
+
+    #[error(
+        "the exchange with '{url}' held {limit} unread responses, so its consumer is no longer draining them"
+    )]
+    ExchangeBacklogExceeded { limit: usize, url: String },
 }

@@ -1,13 +1,15 @@
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use futures_util::SinkExt;
 use futures_util::StreamExt;
-use rustls::ServerConfig;
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_rustls::TlsAcceptor;
-use tokio_tungstenite::tungstenite::Message;
+
+use crate::scripted_peer_closing::ScriptedPeerClosing;
+use crate::scripted_peer_step::ScriptedPeerStep;
+use crate::scripted_web_socket_peer_params::ScriptedWebSocketPeerParams;
 
 pub struct ScriptedWebSocketPeer {
     address: SocketAddr,
@@ -18,7 +20,13 @@ impl ScriptedWebSocketPeer {
     /// # Panics
     ///
     /// Panics when the fixture it builds cannot be prepared.
-    pub async fn start(server_config: Arc<ServerConfig>, script: Vec<Message>) -> Self {
+    pub async fn start(
+        ScriptedWebSocketPeerParams {
+            closing,
+            script,
+            server_config,
+        }: ScriptedWebSocketPeerParams,
+    ) -> Self {
         let listener = TcpListener::bind("localhost:0")
             .await
             .expect("the scripted peer binds");
@@ -28,6 +36,10 @@ impl ScriptedWebSocketPeer {
         let acceptor = TlsAcceptor::from(server_config);
         let join_handle = tokio::spawn(async move {
             let (stream, _remote) = listener.accept().await.expect("a client connects");
+
+            stream
+                .set_nodelay(true)
+                .expect("the scripted peer answers without waiting on Nagle");
             let tls_stream = acceptor
                 .accept(stream)
                 .await
@@ -36,19 +48,41 @@ impl ScriptedWebSocketPeer {
                 .await
                 .expect("the client completes the websocket handshake");
 
-            for message in script {
-                web_socket
-                    .send(message)
-                    .await
-                    .expect("the scripted message is sent");
+            for step in script {
+                match step {
+                    ScriptedPeerStep::AwaitClientFrame => {
+                        web_socket
+                            .next()
+                            .await
+                            .expect("the client sends a frame")
+                            .expect("the client frame reads cleanly");
+                    }
+                    ScriptedPeerStep::Send(message) => {
+                        web_socket
+                            .send(message)
+                            .await
+                            .expect("the scripted message is sent");
+                    }
+                }
             }
 
-            web_socket
-                .close(None)
-                .await
-                .expect("the scripted peer closes cleanly");
+            match closing {
+                ScriptedPeerClosing::Abruptly => drop(web_socket),
+                ScriptedPeerClosing::Cleanly => {
+                    web_socket
+                        .close(None)
+                        .await
+                        .expect("the scripted peer closes cleanly");
 
-            while web_socket.next().await.is_some() {}
+                    while web_socket.next().await.is_some() {}
+
+                    web_socket
+                        .get_mut()
+                        .shutdown()
+                        .await
+                        .expect("the scripted peer shuts the tls session down cleanly");
+                }
+            }
         });
 
         Self {

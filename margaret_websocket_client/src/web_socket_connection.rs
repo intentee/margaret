@@ -10,7 +10,6 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::Receiver;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
@@ -22,13 +21,15 @@ use margaret_websocket_envelope::web_socket_request_message::WebSocketRequestMes
 use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseMessage;
 
 use crate::client_stream::ClientStream;
+use crate::exchange_interruption::ExchangeInterruption;
+use crate::exchange_termination::ExchangeTermination;
+use crate::open_exchange::OpenExchange;
+use crate::pending_exchange::PendingExchange;
 use crate::pending_responses::PendingResponses;
+use crate::response_backlog_limit::RESPONSE_BACKLOG_LIMIT;
 use crate::response_stream::ResponseStream;
 use crate::route_server_frame::route_server_frame;
 use crate::web_socket_client_error::WebSocketClientError;
-
-/// One in-flight frame per exchange, matching the outbound buffer the server serves with.
-const RESPONSE_BUFFER_CAPACITY: usize = 1;
 
 type ClientSink = Arc<Mutex<SplitSink<ClientStream, Message>>>;
 
@@ -44,34 +45,44 @@ async fn read_server_frames(
     pending: PendingResponses,
     sink: ClientSink,
 ) {
-    loop {
+    let interruption = loop {
         tokio::select! {
             biased;
-            () = cancellation_token.cancelled() => break,
+            () = cancellation_token.cancelled() => break ExchangeInterruption::ConnectionDropped,
             message = source.next() => match message {
                 Some(Ok(Message::Text(text))) => {
                     match serde_json::from_str::<ServerSentFrame>(&text) {
-                        Ok(frame) => route_server_frame(frame, &pending).await,
+                        Ok(frame) => route_server_frame(frame, &pending),
                         Err(error) => {
                             eprintln!(
                                 "margaret_websocket_client: the peer sent an unreadable frame: {error}"
                             );
+
+                            break ExchangeInterruption::PeerSentUnreadableFrame;
                         }
                     }
                 }
-                Some(Ok(Message::Close(_))) => answer_close(&sink).await,
+                Some(Ok(Message::Close(_))) => {
+                    tokio::select! {
+                        biased;
+                        () = cancellation_token.cancelled() => {
+                            break ExchangeInterruption::ConnectionDropped;
+                        }
+                        () = answer_close(&sink) => {}
+                    }
+                }
                 Some(Ok(_)) => {}
                 Some(Err(error)) => {
                     eprintln!("margaret_websocket_client: the connection failed: {error}");
 
-                    break;
+                    break ExchangeInterruption::ConnectionFailed;
                 }
-                None => break,
+                None => break ExchangeInterruption::PeerClosed,
             },
         }
-    }
+    };
 
-    pending.clear();
+    pending.interrupt_all(interruption);
 }
 
 pub struct WebSocketConnection {
@@ -79,11 +90,11 @@ pub struct WebSocketConnection {
     next_request_id: AtomicI64,
     pending: PendingResponses,
     sink: ClientSink,
-    url: String,
+    url: Arc<str>,
 }
 
 impl WebSocketConnection {
-    pub(crate) fn new(stream: ClientStream, url: String) -> Self {
+    pub(crate) fn new(stream: ClientStream, url: Arc<str>) -> Self {
         let (sink, source) = stream.split();
         let cancellation_token = CancellationToken::new();
         let pending = PendingResponses::default();
@@ -134,34 +145,16 @@ impl WebSocketConnection {
         Payload: DeserializeOwned + WebSocketResponseMessage,
     {
         let id = RequestId::Number(self.next_request_id.fetch_add(1, Ordering::Relaxed));
-        let pending = self.pending.clone();
+        let url = self.url.clone();
         let serialized = serde_json::to_string(&ClientSentFrame::Request {
             id: id.clone(),
             method: Request::METHOD.to_string(),
             params: request,
         });
 
-        self.open_exchange(id.clone(), serialized)
+        self.start_exchange(id, serialized)
             .await
-            .map(|receiver| ResponseStream::new(id, pending, receiver))
-    }
-
-    async fn open_exchange(
-        &self,
-        id: RequestId,
-        serialized: Result<String, serde_json::Error>,
-    ) -> Result<Receiver<ServerSentFrame>, WebSocketClientError> {
-        let (sender, receiver) = mpsc::channel(RESPONSE_BUFFER_CAPACITY);
-
-        self.pending.remember(id.clone(), sender);
-
-        if let Err(error) = self.send_serialization(serialized).await {
-            self.pending.forget(&id);
-
-            return Err(error);
-        }
-
-        Ok(receiver)
+            .map(|exchange| ResponseStream::new(exchange, url))
     }
 
     async fn send_serialization(
@@ -177,8 +170,35 @@ impl WebSocketConnection {
             .await
             .map_err(|source| WebSocketClientError::SendFrame {
                 source,
-                url: self.url.clone(),
+                url: self.url.to_string(),
             })
+    }
+
+    async fn start_exchange(
+        &self,
+        id: RequestId,
+        serialized: Result<String, serde_json::Error>,
+    ) -> Result<OpenExchange, WebSocketClientError> {
+        let (sender, receiver) = mpsc::channel(RESPONSE_BACKLOG_LIMIT);
+        let termination = ExchangeTermination::default();
+        let exchange = OpenExchange::new(
+            id.clone(),
+            self.pending.clone(),
+            receiver,
+            termination.clone(),
+        );
+
+        self.pending.remember(
+            id,
+            PendingExchange {
+                sender,
+                termination,
+            },
+        );
+
+        self.send_serialization(serialized).await?;
+
+        Ok(exchange)
     }
 }
 
@@ -192,9 +212,11 @@ impl Drop for WebSocketConnection {
 mod tests {
     use std::sync::Arc;
 
+    use futures_util::FutureExt;
     use futures_util::SinkExt;
     use futures_util::StreamExt;
     use futures_util::stream::SplitStream;
+    use margaret_websocket_envelope::request_id::RequestId;
     use margaret_websocket_envelope::web_socket_notification_message::WebSocketNotificationMessage;
     use margaret_websocket_envelope::web_socket_request_message::WebSocketRequestMessage;
     use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseMessage;
@@ -218,6 +240,9 @@ mod tests {
 
     /// The duplex buffer the framework's own websocket harness serves connections over.
     const DUPLEX_CAPACITY: usize = 65536;
+
+    /// A duplex too small to accept a whole frame, so the write parks instead of completing.
+    const PARKING_DUPLEX_CAPACITY: usize = 1;
 
     struct Halves {
         peer: ClientStream,
@@ -350,18 +375,27 @@ mod tests {
         const METHOD: &'static str = "unserializable";
     }
 
-    async fn connected() -> (WebSocketConnection, ClientStream) {
-        let (client_io, peer_io) = duplex(DUPLEX_CAPACITY);
+    struct Connected {
+        connection: WebSocketConnection,
+        peer: ClientStream,
+    }
+
+    async fn connected() -> Connected {
+        connected_over(DUPLEX_CAPACITY).await
+    }
+
+    async fn connected_over(capacity: usize) -> Connected {
+        let (client_io, peer_io) = duplex(capacity);
         let client: Box<dyn ClientIo> = Box::new(client_io);
         let peer: Box<dyn ClientIo> = Box::new(peer_io);
 
-        (
-            WebSocketConnection::new(
+        Connected {
+            connection: WebSocketConnection::new(
                 WebSocketStream::from_raw_socket(client, Role::Client, None).await,
-                "wss://peer.test/ws".to_string(),
+                Arc::from("wss://peer.test/ws"),
             ),
-            WebSocketStream::from_raw_socket(peer, Role::Server, None).await,
-        )
+            peer: WebSocketStream::from_raw_socket(peer, Role::Server, None).await,
+        }
     }
 
     async fn next_text(peer: &mut ClientStream) -> String {
@@ -376,7 +410,10 @@ mod tests {
 
     #[tokio::test]
     async fn carries_a_request_and_reads_the_answer_back() {
-        let (connection, mut peer) = connected().await;
+        let Connected {
+            connection,
+            mut peer,
+        } = connected().await;
         let mut responses = connection
             .request::<Echo, Echoed>(Echo {
                 label: "here".to_string(),
@@ -404,7 +441,10 @@ mod tests {
 
     #[tokio::test]
     async fn reports_a_notification_that_cannot_be_serialized() {
-        let (connection, _peer) = connected().await;
+        let Connected {
+            connection,
+            peer: _peer,
+        } = connected().await;
 
         let refused = connection
             .notify(Unserializable)
@@ -419,7 +459,10 @@ mod tests {
 
     #[tokio::test]
     async fn reports_a_request_that_cannot_be_serialized() {
-        let (connection, _peer) = connected().await;
+        let Connected {
+            connection,
+            peer: _peer,
+        } = connected().await;
         let refused = connection
             .request::<Unserializable, Echoed>(Unserializable)
             .await
@@ -433,8 +476,101 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn forgets_an_exchange_whose_request_was_abandoned_mid_flight() {
+        let Connected {
+            connection,
+            peer: _peer,
+        } = connected_over(PARKING_DUPLEX_CAPACITY).await;
+
+        let abandoned = RequestId::Number(0);
+
+        assert!(
+            connection
+                .request::<Echo, Echoed>(Echo {
+                    label: "abandoned".to_string(),
+                })
+                .now_or_never()
+                .is_none()
+        );
+        assert!(connection.pending.peek(&abandoned).is_none());
+    }
+
+    #[tokio::test]
+    async fn reports_a_connection_that_was_dropped_mid_exchange() {
+        let Connected {
+            connection,
+            peer: _peer,
+        } = connected().await;
+        let mut responses = connection
+            .request::<Echo, Echoed>(Echo {
+                label: "dropped".to_string(),
+            })
+            .await
+            .expect("the request is sent");
+
+        drop(connection);
+
+        let interruption = responses
+            .next()
+            .await
+            .expect("a dropped connection reports why the exchange ended")
+            .expect_err("the connection was dropped before the peer answered");
+
+        assert!(matches!(
+            interruption,
+            WebSocketClientError::ExchangeConnectionDropped { url } if url == "wss://peer.test/ws"
+        ));
+    }
+
+    #[tokio::test]
+    async fn stops_answering_a_close_when_the_connection_is_dropped() {
+        let Connected {
+            connection,
+            mut peer,
+        } = connected().await;
+        let mut responses = connection
+            .request::<Echo, Echoed>(Echo {
+                label: "outstanding".to_string(),
+            })
+            .await
+            .expect("the request is sent");
+        let sink = connection.sink.clone();
+
+        peer.send(Message::text(
+            r#"{"id":0,"done":false,"method":"echoed","result":{"label":"first"}}"#,
+        ))
+        .await
+        .expect("the peer streams a chunk");
+        peer.send(Message::Close(None))
+            .await
+            .expect("the peer closes");
+
+        let held = sink.lock().await;
+
+        assert!(responses.next().await.is_some());
+
+        drop(connection);
+
+        let interruption = responses
+            .next()
+            .await
+            .expect("a dropped connection reports why the exchange ended")
+            .expect_err("the connection was dropped while the close was being answered");
+
+        drop(held);
+
+        assert!(matches!(
+            interruption,
+            WebSocketClientError::ExchangeConnectionDropped { url } if url == "wss://peer.test/ws"
+        ));
+    }
+
+    #[tokio::test]
     async fn carries_a_notification() {
-        let (connection, mut peer) = connected().await;
+        let Connected {
+            connection,
+            mut peer,
+        } = connected().await;
 
         connection
             .notify(Waved)
