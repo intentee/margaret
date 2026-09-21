@@ -10,7 +10,7 @@ use margaret_codegen::generated_code::GeneratedCode;
 /// Returns `CodegenError` propagated from the work it performs.
 pub fn generate_fixture(name: &str) -> Result<GeneratedCode, CodegenError> {
     let source_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures")
+        .join("../margaret_codegen_fixtures")
         .join(name)
         .join("src");
     let assets_directory = source_directory.join("assets");

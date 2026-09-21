@@ -6,8 +6,8 @@ use margaret_codegen::generated_code::GeneratedCode;
 use margaret_codegen_tests::generated_module_source::generated_module_source;
 
 fn generated() -> GeneratedCode {
-    let source_directory =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fallible_roles/src");
+    let source_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../margaret_codegen_fixtures/fallible_roles/src");
     let assets_directory = source_directory.join("assets");
 
     build(
