@@ -122,11 +122,10 @@ mod tests {
         }
 
         assert!(registry.peek(&id).is_none());
-        assert!(matches!(
+        assert_eq!(
             termination.outcome(),
-            ExchangeOutcome::Interrupted(interruption)
-                if interruption == ExchangeInterruption::PeerExceededCredit
-        ));
+            ExchangeOutcome::Interrupted(ExchangeInterruption::PeerExceededCredit)
+        );
     }
 
     #[test]
@@ -154,6 +153,6 @@ mod tests {
         let delivered = std::iter::from_fn(|| receiver.try_recv().ok()).count();
 
         assert_eq!(delivered, RESPONSE_CREDIT_WINDOW.frames() + 1);
-        assert!(matches!(termination.outcome(), ExchangeOutcome::Completed));
+        assert_eq!(termination.outcome(), ExchangeOutcome::Completed);
     }
 }
