@@ -2,4 +2,5 @@
 pub enum ScriptedPeerClosing {
     Abruptly,
     Cleanly,
+    StaysOpen,
 }

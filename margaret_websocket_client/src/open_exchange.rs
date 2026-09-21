@@ -4,12 +4,12 @@ use margaret_websocket_envelope::request_id::RequestId;
 use margaret_websocket_envelope::server_sent_frame::ServerSentFrame;
 
 use crate::exchange_outcome::ExchangeOutcome;
+use crate::exchange_registry::ExchangeRegistry;
 use crate::exchange_termination::ExchangeTermination;
-use crate::pending_responses::PendingResponses;
 
 pub(crate) struct OpenExchange {
     id: RequestId,
-    pending: PendingResponses,
+    registry: ExchangeRegistry,
     receiver: Receiver<ServerSentFrame>,
     termination: ExchangeTermination,
 }
@@ -17,13 +17,13 @@ pub(crate) struct OpenExchange {
 impl OpenExchange {
     pub(crate) fn new(
         id: RequestId,
-        pending: PendingResponses,
+        registry: ExchangeRegistry,
         receiver: Receiver<ServerSentFrame>,
         termination: ExchangeTermination,
     ) -> Self {
         Self {
             id,
-            pending,
+            registry,
             receiver,
             termination,
         }
@@ -40,6 +40,6 @@ impl OpenExchange {
 
 impl Drop for OpenExchange {
     fn drop(&mut self) {
-        self.pending.forget(&self.id);
+        self.registry.forget(&self.id);
     }
 }

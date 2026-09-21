@@ -22,10 +22,12 @@ use margaret_websocket_envelope::web_socket_response_message::WebSocketResponseM
 
 use crate::client_stream::ClientStream;
 use crate::exchange_interruption::ExchangeInterruption;
+use crate::exchange_outcome::ExchangeOutcome;
+use crate::exchange_registration::ExchangeRegistration;
+use crate::exchange_registry::ExchangeRegistry;
 use crate::exchange_termination::ExchangeTermination;
 use crate::open_exchange::OpenExchange;
 use crate::pending_exchange::PendingExchange;
-use crate::pending_responses::PendingResponses;
 use crate::response_backlog_limit::RESPONSE_BACKLOG_LIMIT;
 use crate::response_stream::ResponseStream;
 use crate::route_server_frame::route_server_frame;
@@ -42,7 +44,7 @@ async fn answer_close(sink: &ClientSink) {
 async fn read_server_frames(
     cancellation_token: CancellationToken,
     mut source: SplitStream<ClientStream>,
-    pending: PendingResponses,
+    exchanges: ExchangeRegistry,
     sink: ClientSink,
 ) {
     let interruption = loop {
@@ -52,7 +54,7 @@ async fn read_server_frames(
             message = source.next() => match message {
                 Some(Ok(Message::Text(text))) => {
                     match serde_json::from_str::<ServerSentFrame>(&text) {
-                        Ok(frame) => route_server_frame(frame, &pending),
+                        Ok(frame) => route_server_frame(frame, &exchanges),
                         Err(error) => {
                             eprintln!(
                                 "margaret_websocket_client: the peer sent an unreadable frame: {error}"
@@ -82,13 +84,13 @@ async fn read_server_frames(
         }
     };
 
-    pending.interrupt_all(interruption);
+    exchanges.interrupt_all(interruption);
 }
 
 pub struct WebSocketConnection {
     cancellation_token: CancellationToken,
     next_request_id: AtomicI64,
-    pending: PendingResponses,
+    exchanges: ExchangeRegistry,
     sink: ClientSink,
     url: Arc<str>,
 }
@@ -97,20 +99,20 @@ impl WebSocketConnection {
     pub(crate) fn new(stream: ClientStream, url: Arc<str>) -> Self {
         let (sink, source) = stream.split();
         let cancellation_token = CancellationToken::new();
-        let pending = PendingResponses::default();
+        let exchanges = ExchangeRegistry::default();
         let sink = Arc::new(Mutex::new(sink));
 
         drop(tokio::spawn(read_server_frames(
             cancellation_token.clone(),
             source,
-            pending.clone(),
+            exchanges.clone(),
             sink.clone(),
         )));
 
         Self {
             cancellation_token,
             next_request_id: AtomicI64::new(0),
-            pending,
+            exchanges,
             sink,
             url,
         }
@@ -126,6 +128,8 @@ impl WebSocketConnection {
     where
         Notification: Serialize + WebSocketNotificationMessage,
     {
+        self.refuse_when_terminated()?;
+
         self.send_serialization(serde_json::to_string(&ClientSentFrame::Notification {
             method: Notification::METHOD.to_string(),
             params: notification,
@@ -157,6 +161,13 @@ impl WebSocketConnection {
             .map(|exchange| ResponseStream::new(exchange, url))
     }
 
+    fn refuse_when_terminated(&self) -> Result<(), WebSocketClientError> {
+        match self.exchanges.outcome() {
+            ExchangeOutcome::Completed => Ok(()),
+            ExchangeOutcome::Interrupted(interruption) => Err(interruption.into_error(&self.url)),
+        }
+    }
+
     async fn send_serialization(
         &self,
         serialized: Result<String, serde_json::Error>,
@@ -183,18 +194,20 @@ impl WebSocketConnection {
         let termination = ExchangeTermination::default();
         let exchange = OpenExchange::new(
             id.clone(),
-            self.pending.clone(),
+            self.exchanges.clone(),
             receiver,
             termination.clone(),
         );
 
-        self.pending.remember(
-            id,
+        if let ExchangeRegistration::Refused(interruption) = self.exchanges.register(
+            &id,
             PendingExchange {
                 sender,
                 termination,
             },
-        );
+        ) {
+            return Err(interruption.into_error(&self.url));
+        }
 
         self.send_serialization(serialized).await?;
 
@@ -231,7 +244,7 @@ mod tests {
 
     use super::ClientSink;
     use super::ClientStream;
-    use super::PendingResponses;
+    use super::ExchangeRegistry;
     use super::WebSocketConnection;
     use super::read_server_frames;
     use crate::client_io::ClientIo;
@@ -268,12 +281,12 @@ mod tests {
     async fn read_until_the_peer_is_gone(
         sink: ClientSink,
         source: SplitStream<ClientStream>,
-    ) -> PendingResponses {
-        let pending = PendingResponses::default();
+    ) -> ExchangeRegistry {
+        let exchanges = ExchangeRegistry::default();
 
-        read_server_frames(CancellationToken::new(), source, pending.clone(), sink).await;
+        read_server_frames(CancellationToken::new(), source, exchanges.clone(), sink).await;
 
-        pending
+        exchanges
     }
 
     #[tokio::test]
@@ -320,7 +333,7 @@ mod tests {
         read_server_frames(
             cancellation_token,
             source,
-            PendingResponses::default(),
+            ExchangeRegistry::default(),
             sink,
         )
         .await;
@@ -492,7 +505,7 @@ mod tests {
                 .now_or_never()
                 .is_none()
         );
-        assert!(connection.pending.peek(&abandoned).is_none());
+        assert!(connection.exchanges.peek(&abandoned).is_none());
     }
 
     #[tokio::test]

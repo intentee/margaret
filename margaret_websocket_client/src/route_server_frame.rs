@@ -3,14 +3,14 @@ use tokio::sync::mpsc::error::TrySendError;
 use margaret_websocket_envelope::server_sent_frame::ServerSentFrame;
 
 use crate::exchange_interruption::ExchangeInterruption;
-use crate::pending_responses::PendingResponses;
+use crate::exchange_registry::ExchangeRegistry;
 
-pub(crate) fn route_server_frame(frame: ServerSentFrame, pending: &PendingResponses) {
+pub(crate) fn route_server_frame(frame: ServerSentFrame, registry: &ExchangeRegistry) {
     let id = frame.id().clone();
     let exchange = if frame.is_final() {
-        pending.take(&id)
+        registry.take(&id)
     } else {
-        pending.peek(&id)
+        registry.peek(&id)
     };
 
     let Some(exchange) = exchange else {
@@ -19,12 +19,12 @@ pub(crate) fn route_server_frame(frame: ServerSentFrame, pending: &PendingRespon
 
     match exchange.sender.try_send(frame) {
         Ok(()) => {}
-        Err(TrySendError::Closed(_)) => pending.forget(&id),
+        Err(TrySendError::Closed(_)) => registry.forget(&id),
         Err(TrySendError::Full(_)) => {
             exchange
                 .termination
                 .interrupt(ExchangeInterruption::ResponseBacklogExceeded);
-            pending.forget(&id);
+            registry.forget(&id);
         }
     }
 }
@@ -39,9 +39,9 @@ mod tests {
 
     use super::route_server_frame;
     use crate::exchange_outcome::ExchangeOutcome;
+    use crate::exchange_registry::ExchangeRegistry;
     use crate::exchange_termination::ExchangeTermination;
     use crate::pending_exchange::PendingExchange;
-    use crate::pending_responses::PendingResponses;
     use crate::response_backlog_limit::RESPONSE_BACKLOG_LIMIT;
 
     fn response(id: RequestId) -> ServerSentFrame {
@@ -55,12 +55,12 @@ mod tests {
 
     #[test]
     fn forgets_an_exchange_whose_reader_is_gone() {
-        let pending = PendingResponses::default();
+        let registry = ExchangeRegistry::default();
         let id = RequestId::Number(1);
         let (sender, receiver) = mpsc::channel(RESPONSE_BACKLOG_LIMIT);
 
-        pending.remember(
-            id.clone(),
+        registry.register(
+            &id,
             PendingExchange {
                 sender,
                 termination: ExchangeTermination::default(),
@@ -68,31 +68,31 @@ mod tests {
         );
         drop(receiver);
 
-        route_server_frame(response(id.clone()), &pending);
+        route_server_frame(response(id.clone()), &registry);
 
-        assert!(pending.peek(&id).is_none());
+        assert!(registry.peek(&id).is_none());
     }
 
     #[test]
     fn drops_a_frame_that_belongs_to_no_exchange() {
-        let pending = PendingResponses::default();
+        let registry = ExchangeRegistry::default();
 
         let absent = RequestId::Number(7);
 
-        route_server_frame(response(absent.clone()), &pending);
+        route_server_frame(response(absent.clone()), &registry);
 
-        assert!(pending.peek(&absent).is_none());
+        assert!(registry.peek(&absent).is_none());
     }
 
     #[test]
     fn interrupts_an_exchange_whose_consumer_stopped_draining() {
-        let pending = PendingResponses::default();
+        let registry = ExchangeRegistry::default();
         let id = RequestId::Number(2);
         let (sender, _receiver) = mpsc::channel(RESPONSE_BACKLOG_LIMIT);
         let termination = ExchangeTermination::default();
 
-        pending.remember(
-            id.clone(),
+        registry.register(
+            &id,
             PendingExchange {
                 sender,
                 termination: termination.clone(),
@@ -100,10 +100,10 @@ mod tests {
         );
 
         for _ in 0..=RESPONSE_BACKLOG_LIMIT {
-            route_server_frame(response(id.clone()), &pending);
+            route_server_frame(response(id.clone()), &registry);
         }
 
-        assert!(pending.peek(&id).is_none());
+        assert!(registry.peek(&id).is_none());
         assert!(matches!(
             termination.outcome(),
             ExchangeOutcome::Interrupted(interruption)

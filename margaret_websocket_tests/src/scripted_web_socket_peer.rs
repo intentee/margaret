@@ -68,6 +68,7 @@ impl ScriptedWebSocketPeer {
 
             match closing {
                 ScriptedPeerClosing::Abruptly => drop(web_socket),
+                ScriptedPeerClosing::StaysOpen => while web_socket.next().await.is_some() {},
                 ScriptedPeerClosing::Cleanly => {
                     web_socket
                         .close(None)
