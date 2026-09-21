@@ -9,6 +9,7 @@ mod outbound_frames;
 pub mod report_send_failure;
 pub mod responds_to_web_socket_message;
 pub mod responds_to_web_socket_notification;
+mod serialize_frame;
 pub mod serve_web_socket_connection;
 mod served_exchange;
 pub mod web_socket;

@@ -8,6 +8,7 @@ use margaret_websocket_envelope::request_id::RequestId;
 use crate::exchange_flow_control::ExchangeFlowControl;
 use crate::exchange_state::ExchangeState;
 use crate::outbound_frames::OutboundFrames;
+use crate::serialize_frame::serialize_frame;
 use crate::web_socket_error::WebSocketError;
 
 #[derive(Clone)]
@@ -28,9 +29,11 @@ impl WebSocket {
         &self,
         response: OutboundResponse<Payload>,
     ) -> Result<(), WebSocketError> {
+        let frame = serialize_frame(&response)?;
+
         self.credit.spend_one_frame().await?;
 
-        self.frames.send_serializable(&response).await
+        self.frames.send_frame(frame).await
     }
 
     pub(crate) async fn send_error(
@@ -51,6 +54,8 @@ impl WebSocket {
 mod tests {
     use std::sync::Arc;
 
+    use serde::Serialize;
+    use serde::Serializer;
     use tokio::sync::Semaphore;
     use tokio::sync::mpsc;
 
@@ -65,6 +70,26 @@ mod tests {
     use super::WebSocketError;
 
     const ONE_FRAME: usize = 1;
+
+    struct Unserializable;
+
+    impl Serialize for Unserializable {
+        fn serialize<Target>(&self, _target: Target) -> Result<Target::Ok, Target::Error>
+        where
+            Target: Serializer,
+        {
+            Err(serde::ser::Error::custom("this payload never serializes"))
+        }
+    }
+
+    fn response<Payload>(payload: Payload) -> OutboundResponse<Payload> {
+        OutboundResponse {
+            id: RequestId::Number(1),
+            is_done: true,
+            method: "response_chunk",
+            payload,
+        }
+    }
 
     fn rejection(socket: &WebSocket) -> impl Future<Output = Result<(), WebSocketError>> {
         socket.send_error(
@@ -87,12 +112,7 @@ mod tests {
             OutboundFrames::new(sender),
         );
         let refused = socket
-            .send(OutboundResponse {
-                id: RequestId::Number(1),
-                is_done: true,
-                method: "response_chunk",
-                payload: "late",
-            })
+            .send(response("late"))
             .await
             .expect_err("a finished exchange carries no response");
 
@@ -100,6 +120,33 @@ mod tests {
             refused,
             WebSocketError::ExchangeFinished { .. } if credit.is_closed()
         ));
+    }
+
+    #[tokio::test]
+    async fn keeps_the_window_intact_when_a_response_cannot_be_written() {
+        let (sender, mut receiver) = mpsc::channel(ONE_FRAME);
+        let credit = Arc::new(Semaphore::new(ONE_FRAME));
+        let socket = WebSocket::new(
+            ExchangeFlowControl::Metered(credit.clone()),
+            OutboundFrames::new(sender),
+        );
+        let refused = socket
+            .send(response(Unserializable))
+            .await
+            .expect_err("a payload that never serializes never reaches the peer");
+
+        assert!(matches!(
+            refused,
+            WebSocketError::SerializeResponse { ref source } if source.is_data()
+        ));
+        assert_eq!(credit.available_permits(), ONE_FRAME);
+
+        socket
+            .send(response("the fallback"))
+            .await
+            .expect("the window still carries the response the handler falls back to");
+
+        assert!(receiver.try_recv().is_ok());
     }
 
     #[tokio::test]

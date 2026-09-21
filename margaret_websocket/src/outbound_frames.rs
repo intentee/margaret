@@ -8,6 +8,7 @@ use margaret_websocket_envelope::envelope_error_code::EnvelopeErrorCode;
 use margaret_websocket_envelope::outbound_error::OutboundError;
 use margaret_websocket_envelope::request_id::RequestId;
 
+use crate::serialize_frame::serialize_frame;
 use crate::web_socket_error::WebSocketError;
 
 #[derive(Clone)]
@@ -38,23 +39,18 @@ impl OutboundFrames {
         .await
     }
 
+    pub(crate) async fn send_frame(&self, frame: String) -> Result<(), WebSocketError> {
+        self.sender
+            .send(Message::text(frame))
+            .await
+            .map_err(|source| WebSocketError::Send { source })
+    }
+
     pub(crate) async fn send_serializable<WireFrame: Serialize>(
         &self,
         frame: &WireFrame,
     ) -> Result<(), WebSocketError> {
-        self.send_serialization(serde_json::to_string(frame)).await
-    }
-
-    async fn send_serialization(
-        &self,
-        serialized: Result<String, serde_json::Error>,
-    ) -> Result<(), WebSocketError> {
-        let text = serialized.map_err(|source| WebSocketError::SerializeResponse { source })?;
-
-        self.sender
-            .send(Message::text(text))
-            .await
-            .map_err(|source| WebSocketError::Send { source })
+        self.send_frame(serialize_frame(frame)?).await
     }
 }
 
