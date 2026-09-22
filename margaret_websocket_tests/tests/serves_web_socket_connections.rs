@@ -260,6 +260,7 @@ async fn continues_when_a_handler_fails_to_serialize_a_response() {
     assert_eq!(
         response,
         json!({
+            "kind": "error",
             "error": {
                 "code": "internal_error",
                 "details": null,
@@ -316,6 +317,7 @@ async fn reports_a_request_id_that_is_already_open() {
     assert_eq!(
         response,
         json!({
+            "kind": "error",
             "error": {
                 "code": "duplicate_request_id",
                 "details": null,

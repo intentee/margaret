@@ -54,6 +54,7 @@ async fn reclaims_the_request_id_of_a_cancelled_exchange() {
     assert_eq!(
         refused,
         json!({
+            "kind": "error",
             "error": {
                 "code": "duplicate_request_id",
                 "details": null,

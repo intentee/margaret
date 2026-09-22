@@ -446,7 +446,7 @@ mod tests {
         assert!(next_text(&mut peer).await.contains("\"echo\""));
 
         peer.send(Message::text(
-            r#"{"id":0,"done":true,"method":"echoed","result":{"label":"here"}}"#,
+            r#"{"kind":"response","id":0,"done":true,"method":"echoed","result":{"label":"here"}}"#,
         ))
         .await
         .expect("the peer answers");
@@ -566,7 +566,7 @@ mod tests {
         let held = sink.lock().await;
 
         peer.send(Message::text(
-            r#"{"id":0,"done":true,"method":"echoed","result":{"label":"first"}}"#,
+            r#"{"kind":"response","id":0,"done":true,"method":"echoed","result":{"label":"first"}}"#,
         ))
         .await
         .expect("the peer answers the first request");

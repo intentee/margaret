@@ -56,6 +56,8 @@ impl OutboundFrames {
 
 #[cfg(test)]
 mod tests {
+    use serde::Serialize;
+    use serde::Serializer;
     use tokio::sync::mpsc;
 
     use margaret_websocket_envelope::outbound_response::OutboundResponse;
@@ -65,6 +67,17 @@ mod tests {
     use super::WebSocketError;
 
     const ONE_FRAME: usize = 1;
+
+    struct Unserializable;
+
+    impl Serialize for Unserializable {
+        fn serialize<Target>(&self, _target: Target) -> Result<Target::Ok, Target::Error>
+        where
+            Target: Serializer,
+        {
+            Err(serde::ser::Error::custom("this frame never serializes"))
+        }
+    }
 
     #[tokio::test]
     async fn reports_a_frame_the_closed_connection_can_no_longer_drain() {
@@ -86,5 +99,20 @@ mod tests {
             refused,
             WebSocketError::Send { ref source } if source.0.is_text()
         ));
+    }
+
+    #[tokio::test]
+    async fn keeps_a_frame_that_cannot_be_written_out_of_the_connection() {
+        let (sender, mut receiver) = mpsc::channel(ONE_FRAME);
+        let refused = OutboundFrames::new(sender)
+            .send_serializable(&Unserializable)
+            .await
+            .expect_err("a frame that never serializes never reaches the connection");
+
+        assert!(matches!(
+            refused,
+            WebSocketError::SerializeResponse { ref source } if source.is_data()
+        ));
+        assert!(receiver.try_recv().is_err());
     }
 }

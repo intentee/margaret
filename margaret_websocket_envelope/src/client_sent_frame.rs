@@ -6,7 +6,7 @@ use crate::credit_grant::CreditGrant;
 use crate::request_id::RequestId;
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "snake_case", tag = "kind")]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "kind")]
 pub enum ClientSentFrame<Params = Value> {
     Cancel {
         id: RequestId,

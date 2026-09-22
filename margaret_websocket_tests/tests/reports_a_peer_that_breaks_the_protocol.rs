@@ -1,3 +1,4 @@
+use serde_json::json;
 use tokio_tungstenite::tungstenite::Message;
 
 use margaret_websocket_client::web_socket_client_error::WebSocketClientError;
@@ -32,6 +33,48 @@ async fn fails_an_outstanding_exchange_when_the_peer_sends_an_unreadable_frame()
             .await
             .expect("a protocol violation ends the exchange instead of leaving it hanging")
             .expect_err("the peer sent a frame that is not an envelope"),
+        WebSocketClientError::ExchangeProtocolViolation { .. }
+    ));
+}
+
+#[tokio::test]
+async fn fails_an_outstanding_exchange_when_the_peer_sends_an_ambiguous_frame() {
+    let endpoint = ScriptedPeerEndpoint::start(
+        ScriptedPeerClosing::Abruptly,
+        vec![
+            ScriptedPeerStep::AwaitClientFrame,
+            ScriptedPeerStep::Send(Message::text(
+                json!({
+                    "kind": "response",
+                    "id": 0,
+                    "done": true,
+                    "method": "response_chunk",
+                    "result": {"text": "answered"},
+                    "error": {
+                        "code": "internal_error",
+                        "details": null,
+                        "message": "the handler gave up",
+                    },
+                })
+                .to_string(),
+            )),
+        ],
+    )
+    .await;
+    let mut responses = endpoint
+        .connection
+        .request::<PingMessage, ResponseChunk>(PingMessage {
+            label: "outstanding".to_string(),
+        })
+        .await
+        .expect("the request reaches a peer that is still connected");
+
+    assert!(matches!(
+        responses
+            .next()
+            .await
+            .expect("an ambiguous frame ends the exchange instead of arriving as an answer")
+            .expect_err("the peer sent a frame carrying both a result and an error"),
         WebSocketClientError::ExchangeProtocolViolation { .. }
     ));
 }

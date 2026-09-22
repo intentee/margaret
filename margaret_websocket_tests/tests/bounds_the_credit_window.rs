@@ -42,6 +42,7 @@ async fn reports_a_grant_that_would_pass_the_credit_window() {
     assert_eq!(
         refused,
         json!({
+            "kind": "error",
             "error": {
                 "code": "credit_window_exceeded",
                 "details": null,
