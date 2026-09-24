@@ -18,6 +18,7 @@ members = [
     "margaret_codegen_tests/tests/fixtures/self_referential_model",
     "margaret_codegen_tests/tests/fixtures/spiffe_http_client",
     "margaret_codegen_tests/tests/fixtures/websocket_console_argument_provider",
+    "margaret_codegen_tests/tests/fixtures/websocket_peer_identity",
     "margaret_codegen_tokens",
     "margaret_console",
     "margaret_console_argument_codegen",

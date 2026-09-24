@@ -1,34 +1,26 @@
 use std::collections::BTreeMap;
 
-use margaret_request_binding_codegen::request_binding::RequestBinding;
-
-use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::server_transport_policy::ServerTransportPolicy;
+use crate::web_socket_server_requirements::WebSocketServerRequirements;
 
-fn requires_peer_spiffe_id(route: &HttpRoute) -> bool {
-    route
-        .arguments
+pub(crate) fn active_servers(
+    table: &HttpRouteTable,
+    websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
+) -> Vec<HttpServer> {
+    let mut policies: BTreeMap<&str, ServerTransportPolicy> = websocket_servers
         .iter()
-        .any(|argument| matches!(argument.binding, RequestBinding::PeerSpiffeId))
-        || route
-            .layers
-            .iter()
-            .any(|layer| layer.injects_peer_spiffe_id)
-}
-
-pub(crate) fn active_servers(table: &HttpRouteTable) -> Vec<HttpServer> {
-    let mut policies: BTreeMap<&str, ServerTransportPolicy> = BTreeMap::new();
+        .map(|(name, requirements)| (name.as_str(), requirements.transport_policy))
+        .collect();
 
     for route in table.routes() {
-        let policy = policies
-            .entry(route.server.as_str())
-            .or_insert(ServerTransportPolicy::Negotiable);
+        let required = ServerTransportPolicy::required_by(&route.arguments, &route.layers);
 
-        if requires_peer_spiffe_id(route) {
-            *policy = ServerTransportPolicy::PinnedSpiffeMtls;
-        }
+        policies
+            .entry(route.server.as_str())
+            .and_modify(|policy| *policy = policy.combined_with(required))
+            .or_insert(required);
     }
 
     policies

@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -513,7 +515,7 @@ pub(crate) fn render(
     table: &HttpRouteTable,
     servers: &[HttpServer],
     has_views: bool,
-    websocket_servers: &[String],
+    websocket_servers: &BTreeSet<String>,
     bindings: &ContainerBindings,
 ) -> Vec<GeneratedModuleTokens> {
     let server_declarations = servers.iter().map(|server| {
@@ -531,9 +533,7 @@ pub(crate) fn render(
 
     let mut modules = vec![GeneratedModuleTokens::new("http", http_tokens)];
     for server in servers {
-        let has_websocket_routes = websocket_servers
-            .iter()
-            .any(|websocket_server| websocket_server == server.name());
+        let has_websocket_routes = websocket_servers.contains(server.name());
         modules.push(GeneratedModuleTokens::new(
             format!("http/{}", server.function_name()),
             server_module(table, server, has_views, has_websocket_routes, bindings),

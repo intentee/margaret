@@ -30,19 +30,20 @@ fn middleware_argument_value(parameter: &BoundParameter, next_binding: &Ident) -
 }
 
 fn middleware_wrapper(plan: &MiddlewarePlan) -> TokenStream {
-    let injects_routes = plan.injects_routes();
-    let injects_views = plan.injects_views();
     let MiddlewarePlan {
         concrete,
+        injections,
         parameters,
         wrapper,
         ..
     } = plan;
     let concrete = path_tokens(concrete);
-    let routes_field = injects_routes
+    let routes_field = injections
+        .routes
         .then(|| quote! { pub routes: std::sync::Arc<super::super::routes::Routes>, });
-    let views_field =
-        injects_views.then(|| quote! { pub views: std::sync::Arc<super::super::views::Views>, });
+    let views_field = injections
+        .views
+        .then(|| quote! { pub views: std::sync::Arc<super::super::views::Views>, });
 
     let mut allocator = NameAllocator::new();
 

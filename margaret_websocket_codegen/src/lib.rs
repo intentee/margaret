@@ -28,6 +28,7 @@ mod websocket_sessions;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::fs;
 
     use tempfile::tempdir;
@@ -37,6 +38,7 @@ mod tests {
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_middleware_codegen::layer_application::LayerApplication;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
@@ -637,8 +639,9 @@ impl Room {
 
         assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::web_socket("));
         assert!(source.contains(
-            "middleware.push(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard()"
+            "=[std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard()"
         ));
+        assert!(source.contains("::std::vec::Vec::from(middleware)"));
         assert!(!source.contains("GatedWebSocketUpgrade"));
     }
 
@@ -1944,5 +1947,114 @@ impl Bad {
         );
 
         assert!(error(&source).to_string().contains("more than once"));
+    }
+
+    fn transport_policies(source: &str) -> BTreeMap<String, ServerTransportPolicy> {
+        let index = index_for(source);
+        let registries = registries_for(&index);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+
+        render_websocket(&index, &bindings(&index), &plans, &registries)
+            .expect("the websocket module is generated")
+            .servers
+            .into_iter()
+            .map(|(server, requirements)| (server, requirements.transport_policy))
+            .collect()
+    }
+
+    #[test]
+    fn pins_only_the_server_whose_session_builder_reads_the_peer_spiffe_id() {
+        let policies = transport_policies(
+            r#"
+use spiffe::spiffe_id::SpiffeId;
+
+#[websocket_session(path = "/peer", server = "mesh")]
+struct PeerSession;
+
+impl PeerSession {
+    #[build_for_session]
+    fn build(peer: &SpiffeId) -> anyhow::Result<Self> {}
+}
+
+#[websocket_session(path = "/room", server = "public")]
+struct Room;
+
+impl Room {
+    #[build_for_session]
+    fn build() -> anyhow::Result<Self> {}
+}
+"#,
+        );
+
+        assert_eq!(
+            policies,
+            BTreeMap::from([
+                ("mesh".to_string(), ServerTransportPolicy::PinnedSpiffeMtls),
+                ("public".to_string(), ServerTransportPolicy::Negotiable),
+            ])
+        );
+    }
+
+    #[test]
+    fn pins_the_server_whose_session_middleware_reads_the_peer_spiffe_id() {
+        let policies = transport_policies(
+            r#"
+use margaret::framework::http::next::Next;
+use spiffe::spiffe_id::SpiffeId;
+
+#[websocket_session(path = "/peer", server = "mesh")]
+#[middleware(verified)]
+struct PeerSession;
+
+impl PeerSession {
+    #[build_for_session]
+    fn build() -> anyhow::Result<Self> {}
+}
+
+#[handles_middleware_attribute(attribute = verified)]
+struct Verifier;
+
+impl Verifier {
+    #[process]
+    fn process(&self, peer: &SpiffeId, next: Next) -> anyhow::Result<ResponseContinuation> {}
+}
+"#,
+        );
+
+        assert_eq!(
+            policies,
+            BTreeMap::from([("mesh".to_string(), ServerTransportPolicy::PinnedSpiffeMtls)])
+        );
+    }
+
+    #[test]
+    fn pins_a_server_when_any_of_its_sessions_reads_the_peer_spiffe_id() {
+        let policies = transport_policies(
+            r#"
+use spiffe::spiffe_id::SpiffeId;
+
+#[websocket_session(path = "/open", server = "mesh")]
+struct OpenSession;
+
+impl OpenSession {
+    #[build_for_session]
+    fn build() -> anyhow::Result<Self> {}
+}
+
+#[websocket_session(path = "/peer", server = "mesh")]
+struct PeerSession;
+
+impl PeerSession {
+    #[build_for_session]
+    fn build(peer: &SpiffeId) -> anyhow::Result<Self> {}
+}
+"#,
+        );
+
+        assert_eq!(
+            policies,
+            BTreeMap::from([("mesh".to_string(), ServerTransportPolicy::PinnedSpiffeMtls)])
+        );
     }
 }

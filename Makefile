@@ -87,6 +87,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
 	--exclude-from-report margaret_codegen_route_parameter_values_fixture \
 	--exclude-from-report margaret_codegen_websocket_fixture \
+	--exclude-from-report margaret_codegen_websocket_peer_identity_fixture \
 	--exclude-from-report margaret_composite_foreign_key_model_fixture \
 	--exclude-from-report margaret_self_referential_model_fixture \
 	--exclude-from-report margaret_spiffe_http_client_fixture
@@ -98,6 +99,7 @@ GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_linear_construction_future_fixture \
 	-p margaret_codegen_route_parameter_values_fixture \
 	-p margaret_codegen_websocket_fixture \
+	-p margaret_codegen_websocket_peer_identity_fixture \
 	-p margaret_example \
 	-p margaret_composite_foreign_key_model_fixture \
 	-p margaret_self_referential_model_fixture \

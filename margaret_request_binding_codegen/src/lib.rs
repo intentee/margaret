@@ -17,6 +17,7 @@ pub mod extraction_context;
 mod form_request_arguments;
 pub mod form_request_extraction;
 mod infers_authenticated_user_arguments;
+pub mod injects_peer_spiffe_id;
 pub mod injects_routes;
 pub mod injects_views;
 pub mod render_authenticated_user_wrappers;
@@ -144,6 +145,25 @@ impl SessionUserProvider {
             "SessionUserProvider"
         );
         assert_eq!(providers[0].method_name.to_string(), "infer");
+    }
+
+    #[test]
+    fn flags_only_a_provider_that_reads_the_peer_spiffe_id() {
+        let peer_reading = registries_for(
+            "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, peer: &spiffe::spiffe_id::SpiffeId) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+        );
+        let request_reading = registries_for(SESSION_PROVIDER);
+
+        assert!(
+            peer_reading.providers()[0]
+                .application
+                .injects_peer_spiffe_id
+        );
+        assert!(
+            !request_reading.providers()[0]
+                .application
+                .injects_peer_spiffe_id
+        );
     }
 
     #[test]
@@ -507,6 +527,7 @@ impl SessionUserProvider {
             application: AuthenticatedUserApplication {
                 concrete: missing_path(),
                 field: "missing".to_string(),
+                injects_peer_spiffe_id: false,
                 injects_routes: false,
                 injects_views: false,
                 model: missing_path(),

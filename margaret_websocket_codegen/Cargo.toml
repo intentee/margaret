@@ -16,6 +16,7 @@ margaret_codegen_tokens = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
 margaret_container = { workspace = true }
 margaret_generated_module = { workspace = true }
+margaret_http_codegen = { workspace = true }
 margaret_injection_codegen = { workspace = true }
 margaret_middleware_codegen = { workspace = true }
 margaret_request_binding_codegen = { workspace = true }

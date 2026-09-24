@@ -9,6 +9,7 @@ use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
 use crate::route_group::RouteGroup;
+use crate::web_socket_server_requirements::WebSocketServerRequirements;
 
 fn server_routes<'table>(table: &'table HttpRouteTable, server: &str) -> Vec<&'table HttpRoute> {
     table
@@ -46,7 +47,7 @@ pub(crate) fn server_serve_inputs(
     table: &HttpRouteTable,
     servers: &[HttpServer],
     bindings: &ContainerBindings,
-    websocket_server_serve_inputs: &BTreeMap<String, Vec<ServeInput>>,
+    websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
 ) -> Result<BTreeMap<String, Vec<ServeInput>>, HttpCodegenError> {
     servers
         .iter()
@@ -54,8 +55,8 @@ pub(crate) fn server_serve_inputs(
             let routes = server_routes(table, server.name());
             let mut collected = responder_and_binder_arguments(&routes, bindings)?;
 
-            if let Some(websocket_inputs) = websocket_server_serve_inputs.get(server.name()) {
-                collected.extend_from_slice(websocket_inputs);
+            if let Some(requirements) = websocket_servers.get(server.name()) {
+                collected.extend_from_slice(&requirements.serve_inputs);
             }
 
             Ok((

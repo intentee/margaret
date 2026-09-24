@@ -3,10 +3,11 @@ use std::collections::BTreeMap;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
+use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
+use margaret_http_codegen::web_socket_server_requirements::WebSocketServerRequirements;
 use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::binding_root::binding_root;
-use margaret_serve_input_codegen::serve_input::ServeInput;
 
 use crate::build_websocket_plan::build_websocket_plan;
 use crate::built_websocket_plan::BuiltWebSocketPlan;
@@ -44,8 +45,7 @@ fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
 pub struct WebSocketPlan {
     pub(crate) messages: Vec<WebSocketMessage>,
     pub(crate) retained_roots: Vec<CanonicalPath>,
-    pub(crate) server_serve_inputs: BTreeMap<String, Vec<ServeInput>>,
-    pub(crate) servers: Vec<String>,
+    pub(crate) servers: BTreeMap<String, WebSocketServerRequirements>,
     pub(crate) sessions: Vec<SessionPlan>,
     pub(crate) sessions_by_server: BTreeMap<String, Vec<usize>>,
 }
@@ -71,25 +71,42 @@ impl WebSocketPlan {
                 .push(position);
         }
 
-        let server_serve_inputs = sessions_by_server
+        let servers = sessions_by_server
             .iter()
             .map(|(server, positions)| {
                 let sessions = positions
                     .iter()
                     .map(|position| &sessions[*position])
                     .collect::<Vec<_>>();
+                let transport_policy = sessions
+                    .iter()
+                    .map(|session_plan| {
+                        ServerTransportPolicy::required_by(
+                            &session_plan.session.parameters,
+                            &session_plan.session.layers,
+                        )
+                    })
+                    .fold(
+                        ServerTransportPolicy::Negotiable,
+                        ServerTransportPolicy::combined_with,
+                    );
 
-                server_serve_inputs(&sessions, bindings)
-                    .map(|arguments| (server.clone(), arguments))
+                server_serve_inputs(&sessions, bindings).map(|serve_inputs| {
+                    (
+                        server.clone(),
+                        WebSocketServerRequirements {
+                            serve_inputs,
+                            transport_policy,
+                        },
+                    )
+                })
             })
             .collect::<Result<_, _>>()?;
-        let servers = sessions_by_server.keys().cloned().collect();
         let retained_roots = retained_roots(&sessions);
 
         Ok(Self {
             messages,
             retained_roots,
-            server_serve_inputs,
             servers,
             sessions,
             sessions_by_server,
