@@ -17,6 +17,7 @@ use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
 use crate::classify_parameters::classify_parameters;
 use crate::infers_authenticated_user_arguments::InfersAuthenticatedUserArguments;
+use crate::injects_peer_spiffe_id::injects_peer_spiffe_id;
 use crate::injects_routes::injects_routes;
 use crate::injects_views::injects_views;
 use crate::request_binding_error::RequestBindingError;
@@ -113,6 +114,7 @@ pub fn authenticated_user_providers(
         let application = AuthenticatedUserApplication {
             concrete,
             field: identifier.field().to_string(),
+            injects_peer_spiffe_id: injects_peer_spiffe_id(&parameters),
             injects_routes: injects_routes(&parameters),
             injects_views: injects_views(&parameters),
             model: model.clone(),

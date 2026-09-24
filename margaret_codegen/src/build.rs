@@ -66,26 +66,21 @@ fn render_serving_modules(
 ) -> Result<ServingModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
-    let (websocket_roots, websocket_servers, websocket_server_serve_inputs) =
-        if features.contains(GeneratedFeature::Websockets) {
-            let plan = margaret_websocket_codegen::web_socket_plan::WebSocketPlan::build(
-                index,
-                bindings,
-                middleware_plans,
-                registries,
-            )?;
-            let artifacts =
-                margaret_websocket_codegen::render_websocket::render_websocket(plan, bindings);
-            modules.extend(artifacts.modules);
+    let (websocket_roots, websocket_servers) = if features.contains(GeneratedFeature::Websockets) {
+        let plan = margaret_websocket_codegen::web_socket_plan::WebSocketPlan::build(
+            index,
+            bindings,
+            middleware_plans,
+            registries,
+        )?;
+        let artifacts =
+            margaret_websocket_codegen::render_websocket::render_websocket(plan, bindings);
+        modules.extend(artifacts.modules);
 
-            (
-                artifacts.retained_roots,
-                artifacts.servers,
-                artifacts.server_serve_inputs,
-            )
-        } else {
-            (Vec::new(), Vec::new(), BTreeMap::new())
-        };
+        (artifacts.retained_roots, artifacts.servers)
+    } else {
+        (Vec::new(), BTreeMap::new())
+    };
 
     let view_roots = if features.contains(GeneratedFeature::Views) {
         let plan = margaret_views_codegen::views_plan::ViewsPlan::build(index, bindings)?;
@@ -106,7 +101,6 @@ fn render_serving_modules(
             &websocket_servers,
             middleware_plans,
             bindings,
-            &websocket_server_serve_inputs,
             registries,
         )?;
         let artifacts = margaret_http_codegen::render_http::render_http(plan, bindings);

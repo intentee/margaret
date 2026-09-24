@@ -36,11 +36,12 @@ impl RunningWebSocketServer {
     async fn start_from(
         upgrade: Arc<dyn WebSocketUpgrade>,
         middleware: Vec<Arc<dyn HttpMiddleware>>,
+        transport: TransportConfig,
     ) -> Self {
         let server = Server::new(
             "public",
             "127.0.0.1:0".to_string(),
-            TransportConfig::Plain,
+            transport,
             UploadConfig::Disabled,
             BodyLimit::default(),
             ServerRoutes::build(vec![RouteEntry::web_socket("/ws", upgrade, middleware)])
@@ -72,6 +73,7 @@ impl RunningWebSocketServer {
                 test_dispatch_table(),
             )),
             middleware,
+            TransportConfig::Plain,
         )
         .await
     }
@@ -80,9 +82,17 @@ impl RunningWebSocketServer {
     where
         Factory: WebSocketSessionFactory<Session = TestSession> + 'static,
     {
+        Self::start_with_transport(factory, TransportConfig::Plain).await
+    }
+
+    pub async fn start_with_transport<Factory>(factory: Factory, transport: TransportConfig) -> Self
+    where
+        Factory: WebSocketSessionFactory<Session = TestSession> + 'static,
+    {
         Self::start_from(
             Arc::new(WebSocketUpgradeEntry::new(factory, test_dispatch_table())),
             Vec::new(),
+            transport,
         )
         .await
     }

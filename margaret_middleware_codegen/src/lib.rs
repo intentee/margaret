@@ -2,6 +2,7 @@ pub mod fold_layers;
 pub mod layer_application;
 mod middleware_attribute_arguments;
 pub mod middleware_codegen_error;
+mod middleware_injections;
 mod middleware_instance_tokens;
 pub mod middleware_plan;
 pub mod middleware_plans;
@@ -388,14 +389,9 @@ impl Guard {
         .collect::<String>();
 
         assert!(vector.contains(
-            "letmutmiddleware:::std::vec::Vec<::std::sync::Arc<dynmargaret::framework::http::http_middleware::HttpMiddleware>,>=::std::vec::Vec::new();"
+            "letmiddleware:[::std::sync::Arc<dynmargaret::framework::http::http_middleware::HttpMiddleware>;_]=[std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer(),routes:routes.clone()}),std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard()})];"
         ));
-        assert!(vector.contains(
-            "middleware.push(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer(),routes:routes.clone()}));"
-        ));
-        assert!(vector.contains(
-            "middleware.push(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard()}));"
-        ));
+        assert!(vector.contains("::std::vec::Vec::from(middleware)"));
 
         let tracer = vector
             .find("Tracer")

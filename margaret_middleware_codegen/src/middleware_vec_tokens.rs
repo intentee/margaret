@@ -12,21 +12,18 @@ pub fn middleware_vec_tokens(
     module_path: &TokenStream,
     bindings: &ContainerBindings,
 ) -> TokenStream {
-    let pushes = layers.iter().map(|application| {
-        let element = middleware_instance_tokens(application, module_path, bindings);
-
-        quote! { middleware.push(#element); }
-    });
+    let elements = layers
+        .iter()
+        .map(|application| middleware_instance_tokens(application, module_path, bindings));
 
     quote! {
         {
-            let mut middleware: ::std::vec::Vec<
-                ::std::sync::Arc<dyn margaret::framework::http::http_middleware::HttpMiddleware>,
-            > = ::std::vec::Vec::new();
+            let middleware: [
+                ::std::sync::Arc<dyn margaret::framework::http::http_middleware::HttpMiddleware>;
+                _
+            ] = [#(#elements),*];
 
-            #(#pushes)*
-
-            middleware
+            ::std::vec::Vec::from(middleware)
         }
     }
 }

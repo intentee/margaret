@@ -17,6 +17,7 @@ mod server_route_group;
 mod server_serve_inputs;
 pub mod server_transport_policy;
 pub mod serves_spiffe;
+pub mod web_socket_server_requirements;
 
 #[cfg(test)]
 mod tests {
@@ -44,15 +45,16 @@ mod tests {
 
     use crate::http_codegen_error::HttpCodegenError;
     use crate::http_plan::HttpPlan;
+    use crate::server_transport_policy::ServerTransportPolicy;
     use crate::serves_spiffe::serves_spiffe;
+    use crate::web_socket_server_requirements::WebSocketServerRequirements;
 
     fn render_http(
         index: &AttributeIndex,
         has_views: bool,
-        websocket_servers: &[String],
+        websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
         middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
         bindings: &ContainerBindings,
-        websocket_server_serve_inputs: &BTreeMap<String, Vec<ServeInput>>,
         registries: &BindingRegistries,
     ) -> Result<crate::http_artifacts::HttpArtifacts, HttpCodegenError> {
         HttpPlan::build(
@@ -61,7 +63,6 @@ mod tests {
             websocket_servers,
             middleware_plans,
             bindings,
-            websocket_server_serve_inputs,
             registries,
         )
         .map(|plan| crate::render_http::render_http(plan, bindings))
@@ -75,8 +76,21 @@ mod tests {
             .bindings
     }
 
-    fn no_websocket_arguments() -> BTreeMap<String, Vec<ServeInput>> {
+    fn no_websocket_servers() -> BTreeMap<String, WebSocketServerRequirements> {
         BTreeMap::new()
+    }
+
+    fn websocket_server(
+        name: &str,
+        transport_policy: ServerTransportPolicy,
+    ) -> BTreeMap<String, WebSocketServerRequirements> {
+        BTreeMap::from([(
+            name.to_string(),
+            WebSocketServerRequirements {
+                serve_inputs: Vec::new(),
+                transport_policy,
+            },
+        )])
     }
 
     fn views_availability(has_views: bool) -> ViewsAvailability {
@@ -103,10 +117,9 @@ mod tests {
         render_http(
             &index,
             false,
-            &[],
+            &no_websocket_servers(),
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )
         .map(drop)
@@ -129,10 +142,9 @@ mod tests {
         Ok(render_http(
             &index,
             has_views,
-            &[],
+            &no_websocket_servers(),
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )?
         .into_modules()
@@ -256,19 +268,21 @@ impl Resource {
         let index = index_for("");
         let bindings = bindings_for(&index);
         let registries = registries_for(&index, false);
-        let websocket_arguments = BTreeMap::from([(
+        let websocket_servers = BTreeMap::from([(
             "public".to_string(),
-            vec![ServeInput::ConsoleArgument(ConsoleArgument::Flag {
-                name: "missing".to_string(),
-            })],
+            WebSocketServerRequirements {
+                serve_inputs: vec![ServeInput::ConsoleArgument(ConsoleArgument::Flag {
+                    name: "missing".to_string(),
+                })],
+                transport_policy: ServerTransportPolicy::Negotiable,
+            },
         )]);
         let error = render_http(
             &index,
             false,
-            &["public".to_string()],
+            &websocket_servers,
             &[],
             &bindings,
-            &websocket_arguments,
             &registries,
         )
         .map(drop)
@@ -741,13 +755,13 @@ impl Health {
 }
 "#;
 
-    fn websocket_http_source(lib_source: &str, websocket_servers: &[String]) -> String {
-        websocket_http_source_with_views(lib_source, websocket_servers, false)
+    fn websocket_http_source(lib_source: &str, websocket_server_name: &str) -> String {
+        websocket_http_source_with_views(lib_source, websocket_server_name, false)
     }
 
     fn websocket_http_source_with_views(
         lib_source: &str,
-        websocket_servers: &[String],
+        websocket_server_name: &str,
         has_views: bool,
     ) -> String {
         let index = index_for(lib_source);
@@ -759,10 +773,9 @@ impl Health {
         render_http(
             &index,
             has_views,
-            websocket_servers,
+            &websocket_server(websocket_server_name, ServerTransportPolicy::Negotiable),
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )
         .expect("the http source is generated")
@@ -783,14 +796,14 @@ impl Health {
 
     #[test]
     fn splices_websocket_routes_into_a_server_with_http_routes() {
-        let source = websocket_http_source(HEALTH_RESPONDER, &["public".to_string()]);
+        let source = websocket_http_source(HEALTH_RESPONDER, "public");
 
         assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
     }
 
     #[test]
     fn generates_a_server_module_for_a_websocket_only_server() {
-        let source = websocket_http_source(HEALTH_RESPONDER, &["realtime".to_string()]);
+        let source = websocket_http_source(HEALTH_RESPONDER, "realtime");
 
         assert!(source.contains("pub(crate)fnserver_realtime"));
         assert!(source.contains("super::super::websocket::realtime_routes(container,routes)"));
@@ -798,11 +811,109 @@ impl Health {
 
     #[test]
     fn keeps_the_views_out_of_the_websocket_routes_of_a_server_with_views() {
-        let source =
-            websocket_http_source_with_views(HEALTH_RESPONDER, &["public".to_string()], true);
+        let source = websocket_http_source_with_views(HEALTH_RESPONDER, "public", true);
 
         assert!(source.contains("super::super::websocket::public_routes(container,routes)"));
         assert!(source.contains("_views:&::std::sync::Arc<super::super::views::Views>"));
+    }
+
+    fn transport_policies(
+        lib_source: &str,
+        websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
+    ) -> BTreeMap<String, ServerTransportPolicy> {
+        let index = index_for(lib_source);
+        let registries = registries_for(&index, false);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let bindings = bindings_for(&index);
+
+        render_http(
+            &index,
+            false,
+            websocket_servers,
+            &plans,
+            &bindings,
+            &registries,
+        )
+        .expect("the http source is generated")
+        .servers()
+        .iter()
+        .map(|server| (server.name().to_string(), server.transport_policy()))
+        .collect()
+    }
+
+    #[test]
+    fn pins_a_websocket_only_server_whose_sessions_read_the_peer_spiffe_id() {
+        let policies = transport_policies(
+            HEALTH_RESPONDER,
+            &websocket_server("realtime", ServerTransportPolicy::PinnedSpiffeMtls),
+        );
+
+        assert_eq!(
+            policies,
+            BTreeMap::from([
+                ("public".to_string(), ServerTransportPolicy::Negotiable),
+                (
+                    "realtime".to_string(),
+                    ServerTransportPolicy::PinnedSpiffeMtls
+                ),
+            ])
+        );
+    }
+
+    #[test]
+    fn pins_a_shared_server_whose_sessions_read_the_peer_spiffe_id() {
+        let policies = transport_policies(
+            HEALTH_RESPONDER,
+            &websocket_server("public", ServerTransportPolicy::PinnedSpiffeMtls),
+        );
+
+        assert_eq!(
+            policies,
+            BTreeMap::from([(
+                "public".to_string(),
+                ServerTransportPolicy::PinnedSpiffeMtls
+            )])
+        );
+    }
+
+    #[test]
+    fn pins_a_server_whose_route_infers_the_user_from_the_peer_spiffe_id() {
+        let policies = transport_policies(
+            r#"
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use spiffe::spiffe_id::SpiffeId;
+
+struct Workload;
+
+#[singleton]
+#[infers_authenticated_user(user_model = Workload)]
+struct WorkloadProvider;
+
+impl WorkloadProvider {
+    #[infer_from_request]
+    fn infer(&self, peer: &SpiffeId) -> anyhow::Result<AuthenticatedUserOutcome<Workload>> {}
+}
+
+#[singleton]
+#[responds_to_http(method = "get", path = "/workload", server = "internal")]
+struct GetWorkload;
+
+impl GetWorkload {
+    #[process]
+    fn respond(&self, #[authenticated_user] workload: Workload) -> anyhow::Result<Response> {}
+}
+"#,
+            &no_websocket_servers(),
+        );
+
+        assert_eq!(
+            policies,
+            BTreeMap::from([(
+                "internal".to_string(),
+                ServerTransportPolicy::PinnedSpiffeMtls
+            )])
+        );
     }
 
     fn routes_source_for(lib_source: &str) -> String {
@@ -819,10 +930,9 @@ impl Health {
         render_http(
             &index,
             false,
-            &[],
+            &no_websocket_servers(),
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )
         .expect("the http source is generated")
@@ -2066,10 +2176,9 @@ impl Guard {
         let artifacts = render_http(
             &index,
             false,
-            &[],
+            &no_websocket_servers(),
             &plans,
             &bindings,
-            &no_websocket_arguments(),
             &registries,
         )
         .expect("the http source is generated");

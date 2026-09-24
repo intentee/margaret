@@ -2,6 +2,7 @@ mod canonicalizes_serve_input_types;
 mod compiles_result_aliases;
 mod generates_fallible_role_assembly;
 mod keeps_construction_futures_linear;
+mod pins_websocket_servers_to_mutual_tls;
 mod reads_environment_variables_by_type;
 mod rejects_invalid_serve_input_value_types;
 mod weaves_copy_serve_inputs_without_cloning;

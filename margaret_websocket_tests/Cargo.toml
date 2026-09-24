@@ -21,6 +21,9 @@ tokio-tungstenite = { workspace = true }
 tokio-util = { workspace = true }
 validator = { workspace = true, features = ["derive"] }
 
+[dev-dependencies]
+margaret_http_tests = { path = "../margaret_http_tests" }
+
 [[test]]
 name = "main"
 path = "tests/main.rs"

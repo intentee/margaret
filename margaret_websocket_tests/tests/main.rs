@@ -1,3 +1,4 @@
 mod applies_middleware_before_upgrading;
 mod serves_web_socket_connections;
 mod upgrades_web_socket_connections;
+mod upgrades_web_socket_connections_over_spiffe_mtls;

@@ -29,9 +29,9 @@ pub fn resolve_layers(
         layers.push(LayerApplication {
             concrete: plan.concrete.clone(),
             field: plan.field.clone(),
-            injects_peer_spiffe_id: plan.injects_peer_spiffe_id(),
-            injects_routes: plan.injects_routes(),
-            injects_views: plan.injects_views(),
+            injects_peer_spiffe_id: plan.injections.peer_spiffe_id,
+            injects_routes: plan.injections.routes,
+            injects_views: plan.injections.views,
             wrapper: plan.wrapper.clone(),
         });
     }
