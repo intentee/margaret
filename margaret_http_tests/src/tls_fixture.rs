@@ -21,8 +21,6 @@ impl TlsFixture {
     /// Panics when the fixture it builds cannot be prepared.
     #[must_use]
     pub fn generate() -> Self {
-        let _already_installed = aws_lc_rs::default_provider().install_default();
-
         let server_name = "localhost".to_string();
         let certificate_authority = FixtureCertificateAuthority::generate();
         let IssuedCertificate {
@@ -35,10 +33,13 @@ impl TlsFixture {
                     .expect("the server name is a valid IA5 string"),
             ),
         );
-        let server_config = ServerConfig::builder()
-            .with_no_client_auth()
-            .with_single_cert(vec![certificate_der], private_key)
-            .expect("the server config builds");
+        let server_config =
+            ServerConfig::builder_with_provider(Arc::new(aws_lc_rs::default_provider()))
+                .with_safe_default_protocol_versions()
+                .expect("the default provider supports the safe protocol versions")
+                .with_no_client_auth()
+                .with_single_cert(vec![certificate_der], private_key)
+                .expect("the server config builds");
 
         Self {
             certificate_authority,

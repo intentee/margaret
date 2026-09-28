@@ -5,6 +5,7 @@ use rcgen::string::Ia5String;
 use rustls::ClientConfig;
 use rustls::RootCertStore;
 use rustls::ServerConfig;
+use rustls::crypto::CryptoProvider;
 use rustls::crypto::aws_lc_rs;
 use rustls::server::WebPkiClientVerifier;
 
@@ -12,6 +13,7 @@ use crate::fixture_certificate_authority::FixtureCertificateAuthority;
 use crate::issued_certificate::IssuedCertificate;
 
 fn client_config_for(
+    provider: &Arc<CryptoProvider>,
     roots: &Arc<RootCertStore>,
     certificate_authority: &FixtureCertificateAuthority,
     subject_alt_name: SanType,
@@ -22,7 +24,9 @@ fn client_config_for(
     } = certificate_authority.issue("margaret fixture client", subject_alt_name);
 
     Arc::new(
-        ClientConfig::builder()
+        ClientConfig::builder_with_provider(Arc::clone(provider))
+            .with_safe_default_protocol_versions()
+            .expect("the default provider supports the safe protocol versions")
             .with_root_certificates(RootCertStore::clone(roots))
             .with_client_auth_cert(vec![certificate_der], private_key)
             .expect("the client config builds"),
@@ -43,8 +47,7 @@ impl MtlsFixture {
     /// Panics when the fixture it builds cannot be prepared.
     #[must_use]
     pub fn new() -> Self {
-        let _already_installed = aws_lc_rs::default_provider().install_default();
-
+        let provider = Arc::new(aws_lc_rs::default_provider());
         let server_name = "localhost".to_string();
         let client_spiffe_id = "spiffe://example.org/test-client".to_string();
         let certificate_authority = FixtureCertificateAuthority::generate();
@@ -59,14 +62,18 @@ impl MtlsFixture {
             ),
         );
         let roots = Arc::new(certificate_authority.root_store());
-        let client_verifier = WebPkiClientVerifier::builder(roots.clone())
-            .build()
-            .expect("the client verifier builds");
-        let server_config = ServerConfig::builder()
+        let client_verifier =
+            WebPkiClientVerifier::builder_with_provider(roots.clone(), Arc::clone(&provider))
+                .build()
+                .expect("the client verifier builds");
+        let server_config = ServerConfig::builder_with_provider(Arc::clone(&provider))
+            .with_safe_default_protocol_versions()
+            .expect("the default provider supports the safe protocol versions")
             .with_client_cert_verifier(client_verifier)
             .with_single_cert(vec![certificate_der], private_key)
             .expect("the server config builds");
         let client_config = client_config_for(
+            &provider,
             &roots,
             &certificate_authority,
             SanType::URI(
@@ -75,6 +82,7 @@ impl MtlsFixture {
             ),
         );
         let client_config_without_spiffe_id = client_config_for(
+            &provider,
             &roots,
             &certificate_authority,
             SanType::DnsName(
