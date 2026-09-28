@@ -4,11 +4,11 @@ use std::fmt::Result;
 
 use reqwest::StatusCode;
 
-use margaret_jws_verification::key_set_rejection::KeySetRejection;
+use margaret_jws_verification::key_set_document_rejection::KeySetDocumentRejection;
 
 #[derive(Debug)]
 pub enum KeySetPollFailure<TLocationFailure> {
-    DocumentRejected(KeySetRejection),
+    DocumentRejected(KeySetDocumentRejection),
     DocumentStatus(StatusCode),
     DocumentTransport(reqwest::Error),
     Location(TLocationFailure),
@@ -40,14 +40,14 @@ mod tests {
     use reqwest::Client;
     use reqwest::StatusCode;
 
-    use margaret_jws_verification::key_set_rejection::KeySetRejection;
+    use margaret_jws_verification::key_set_document_rejection::KeySetDocumentRejection;
 
     use super::KeySetPollFailure;
 
     #[test]
     fn describes_every_failure() {
         let described = [
-            KeySetPollFailure::DocumentRejected(KeySetRejection::Malformed {
+            KeySetPollFailure::DocumentRejected(KeySetDocumentRejection::Malformed {
                 source: serde_json::from_str::<u8>("x").expect_err("not json"),
             }),
             KeySetPollFailure::DocumentStatus(StatusCode::SERVICE_UNAVAILABLE),

@@ -5,8 +5,9 @@ use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen_tests::published_key_set::published_key_set;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
+use margaret_jws_verification::accepted_key_set_document::AcceptedKeySetDocument;
 use margaret_jws_verification::jws_rejection::JwsRejection;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_document_parsing::KeySetDocumentParsing;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_registered_claims::numeric_date::NumericDate;
 
@@ -18,7 +19,9 @@ fn bearer_token_verifier_rejects_a_token_signed_by_an_unrelated_key() {
         sub: "subject".to_string(),
     }
     .signed_by(unrelated.current());
-    let KeySetParsing::Accepted(key_set) = published_key_set(&published) else {
+    let KeySetDocumentParsing::Accepted(AcceptedKeySetDocument { key_set, .. }) =
+        published_key_set(&published)
+    else {
         panic!("the published key set is accepted");
     };
 

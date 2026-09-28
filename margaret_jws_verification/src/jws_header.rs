@@ -1,13 +1,15 @@
 use serde::Deserialize;
 use serde::de::IgnoredAny;
 
-use crate::header_algorithm::HeaderAlgorithm;
+use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
+
 use crate::header_type::HeaderType;
 use crate::key_id::KeyId;
+use crate::parameter_value::ParameterValue;
 
 #[derive(Deserialize)]
 pub(crate) struct JwsHeader {
-    pub(crate) alg: HeaderAlgorithm,
+    pub(crate) alg: ParameterValue<JwsAlgorithm>,
     #[serde(default)]
     pub(crate) crit: Option<IgnoredAny>,
     #[serde(default)]

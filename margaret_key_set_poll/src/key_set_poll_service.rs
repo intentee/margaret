@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use log::debug;
 use log::error;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
@@ -12,7 +13,8 @@ use trzcina::Ticker;
 use margaret_issuer_document_fetch::issuer_document_client::IssuerDocumentClient;
 use margaret_issuer_document_fetch::issuer_document_fetch::IssuerDocumentFetch;
 use margaret_issuer_document_fetch::issuer_document_request::IssuerDocumentRequest;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::accepted_key_set_document::AcceptedKeySetDocument;
+use margaret_jws_verification::key_set_document_parsing::KeySetDocumentParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 
 use crate::key_set_location::KeySetLocation;
@@ -63,8 +65,8 @@ impl<TLocator: LocatesKeySet> KeySetPollService<TLocator> {
         {
             IssuerDocumentFetch::Cancelled => KeySetPoll::Cancelled,
             IssuerDocumentFetch::Fetched(document) => match VerificationKeySet::parse(&document) {
-                KeySetParsing::Accepted(key_set) => KeySetPoll::Fetched(key_set),
-                KeySetParsing::Rejected(rejection) => {
+                KeySetDocumentParsing::Accepted(accepted) => KeySetPoll::Fetched(accepted),
+                KeySetDocumentParsing::Rejected(rejection) => {
                     KeySetPoll::Failed(KeySetPollFailure::DocumentRejected(rejection))
                 }
             },
@@ -105,7 +107,14 @@ impl<TLocator: LocatesKeySet> Ticker for KeySetPollService<TLocator> {
             KeySetPoll::Failed(failure) => {
                 error!("Unable to poll the key set of the issuer: {failure}");
             }
-            KeySetPoll::Fetched(key_set) => {
+            KeySetPoll::Fetched(AcceptedKeySetDocument {
+                ignored_keys,
+                key_set,
+            }) => {
+                for ignored_key in ignored_keys {
+                    debug!("Ignoring a key of the issuer's key set: {ignored_key}");
+                }
+
                 self.verification_key_set_holder
                     .set(Some(Arc::new(key_set)));
             }

@@ -30,9 +30,6 @@ pub enum JwkRejection {
     InvalidRsaKey {
         source: KeyRejected,
     },
-    Malformed {
-        source: serde_json::Error,
-    },
     MissingKeyId,
     ModulusBase64 {
         source: base64ct::Error,
@@ -71,9 +68,6 @@ impl Display for JwkRejection {
             ),
             Self::InvalidRsaKey { source } => {
                 write!(formatter, "the key is not a valid rsa public key: {source}")
-            }
-            Self::Malformed { source } => {
-                write!(formatter, "the key is not a supported jwk: {source}")
             }
             Self::MissingKeyId => write!(formatter, "the key has no key id"),
             Self::ModulusBase64 { source } => {
@@ -136,9 +130,6 @@ mod tests {
                 source: ParsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, b"not der")
                     .expect_err("not an rsa key"),
             },
-            JwkRejection::Malformed {
-                source: serde_json::from_str::<u8>("x").expect_err("not json"),
-            },
             JwkRejection::MissingKeyId,
             JwkRejection::ModulusBase64 {
                 source: base64_error(),
@@ -158,11 +149,10 @@ mod tests {
         assert!(described[3].contains("exponent is not valid base64url"));
         assert!(described[4].contains("not a point on the curve"));
         assert!(described[5].contains("not a valid rsa public key"));
-        assert!(described[6].contains("not a supported jwk"));
-        assert_eq!(described[7], "the key has no key id");
-        assert!(described[8].contains("modulus is not valid base64url"));
-        assert!(described[9].contains("1024 bits"));
-        assert!(described[10].contains("not a minimal unsigned integer"));
-        assert_eq!(described[11], "the key is not meant for signatures");
+        assert_eq!(described[6], "the key has no key id");
+        assert!(described[7].contains("modulus is not valid base64url"));
+        assert!(described[8].contains("1024 bits"));
+        assert!(described[9].contains("not a minimal unsigned integer"));
+        assert_eq!(described[10], "the key is not meant for signatures");
     }
 }

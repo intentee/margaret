@@ -1,10 +1,11 @@
 use serde_json::Value;
 use serde_json::json;
 
+use margaret_jws_verification::accepted_key_set_document::AcceptedKeySetDocument;
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::jws_verification::JwsVerification;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_document_parsing::KeySetDocumentParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_rsa_key::FixtureRsaKey;
 
@@ -20,7 +21,7 @@ fn verifies_an_rs256_token_of_a_key_set_with_certificate_members() {
         Value::String("dGh1bWJwcmludA".to_string()),
     );
 
-    let KeySetParsing::Accepted(key_set) =
+    let KeySetDocumentParsing::Accepted(AcceptedKeySetDocument { key_set, .. }) =
         VerificationKeySet::parse(json!({ "keys": [published] }).to_string().as_bytes())
     else {
         panic!("the key set is accepted");

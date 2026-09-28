@@ -6,8 +6,9 @@ use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen_tests::published_key_set::published_key_set;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
+use margaret_jws_verification::accepted_key_set_document::AcceptedKeySetDocument;
 use margaret_jws_verification::header_type::HeaderType;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_document_parsing::KeySetDocumentParsing;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::type_rejection::TypeRejection;
 use margaret_registered_claims::numeric_date::NumericDate;
@@ -19,7 +20,9 @@ fn id_token_verifier_rejects_an_access_token() {
         sub: "subject".to_string(),
     }
     .signed_by(secret.current());
-    let KeySetParsing::Accepted(key_set) = published_key_set(&secret) else {
+    let KeySetDocumentParsing::Accepted(AcceptedKeySetDocument { key_set, .. }) =
+        published_key_set(&secret)
+    else {
         panic!("the published key set is accepted");
     };
 

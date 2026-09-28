@@ -14,9 +14,6 @@ pub enum KeySetRejection {
         index: usize,
         rejection: JwkRejection,
     },
-    Malformed {
-        source: serde_json::Error,
-    },
 }
 
 impl Display for KeySetRejection {
@@ -31,9 +28,6 @@ impl Display for KeySetRejection {
                     formatter,
                     "the key at index {index} is rejected: {rejection}"
                 )
-            }
-            Self::Malformed { source } => {
-                write!(formatter, "the document is not a jwk set: {source}")
             }
         }
     }
@@ -55,9 +49,6 @@ mod tests {
                 index: 2,
                 rejection: JwkRejection::MissingKeyId,
             },
-            KeySetRejection::Malformed {
-                source: serde_json::from_str::<u8>("x").expect_err("not json"),
-            },
         ]
         .map(|rejection| rejection.to_string());
 
@@ -66,6 +57,5 @@ mod tests {
             described[1],
             "the key at index 2 is rejected: the key has no key id"
         );
-        assert!(described[2].contains("not a jwk set"));
     }
 }
