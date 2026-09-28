@@ -102,9 +102,20 @@ mod tests {
         }
     }
 
+    fn collect_registries(
+        index: &AttributeIndex,
+        has_views: bool,
+    ) -> Result<BindingRegistries, RequestBindingError> {
+        BindingRegistries::collect(
+            index,
+            views_availability(has_views),
+            &TagPool::collect(index).expect("the tags are collected"),
+            &bindings_for(&IndexedSource::new("").index),
+        )
+    }
+
     fn registries_for(index: &AttributeIndex, has_views: bool) -> BindingRegistries {
-        BindingRegistries::collect(index, views_availability(has_views))
-            .expect("the binding registries are collected")
+        collect_registries(index, has_views).expect("the binding registries are collected")
     }
 
     fn error_with_container_source(source: &str, container_source: &str) -> String {
@@ -131,7 +142,7 @@ mod tests {
 
     fn http_source(lib_source: &str, has_views: bool) -> Result<String, HttpCodegenError> {
         let index = IndexedSource::try_new(lib_source)?.index;
-        let registries = BindingRegistries::collect(&index, views_availability(has_views))?;
+        let registries = collect_registries(&index, has_views)?;
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)?;
         let bindings = bindings_for(&index);

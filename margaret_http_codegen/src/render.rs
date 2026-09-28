@@ -278,7 +278,8 @@ fn capture_binding(
             let construction = render_authenticated_user_wrapper_construction(
                 application,
                 &quote! { super::super::authenticated_users },
-                &bindings.accessor_invocation(&container, kind.accessor()),
+                &container,
+                bindings,
             );
 
             quote! { let #local = #construction; }

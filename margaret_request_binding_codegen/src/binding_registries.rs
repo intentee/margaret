@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_container::container_bindings::ContainerBindings;
+use margaret_tag_codegen::tag_pool::TagPool;
 
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::authenticated_user_providers::authenticated_user_providers;
@@ -23,6 +25,8 @@ impl BindingRegistries {
     pub fn collect(
         index: &AttributeIndex,
         views: ViewsAvailability,
+        tags: &TagPool,
+        container_bindings: &ContainerBindings,
     ) -> Result<Self, RequestBindingError> {
         let mut registries = Self {
             authenticated_users: HashMap::new(),
@@ -30,7 +34,8 @@ impl BindingRegistries {
             views,
         };
 
-        registries.authenticated_users = authenticated_user_providers(index, &registries)?;
+        registries.authenticated_users =
+            authenticated_user_providers(index, &registries, tags, container_bindings)?;
 
         Ok(registries)
     }

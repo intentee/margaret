@@ -1,4 +1,5 @@
-mod compact_jws;
+pub mod compact_jws;
+pub mod compact_jws_parsing;
 pub mod ec_jwk;
 mod header_algorithm;
 pub mod header_type;

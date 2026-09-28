@@ -18,6 +18,7 @@ use margaret_macros::build_for_session;
 use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
+use margaret_macros::infer_from_request;
 use margaret_macros::infers_authenticated_user;
 use margaret_macros::issues_tokens;
 use margaret_macros::middleware;
@@ -102,6 +103,13 @@ struct Worker;
 #[infers_authenticated_user(user_model = Account)]
 struct AccountProvider;
 
+impl AccountProvider {
+    #[infer_from_request]
+    fn infer(&self, #[oidc_token(issuer = github)] token: &str) -> String {
+        format!("verified {token}")
+    }
+}
+
 #[model(table = "records")]
 #[primary_key(columns = [id, label])]
 #[unique(columns = [label, id])]
@@ -152,6 +160,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(size_of::<GithubIssuer>(), 0);
     assert_eq!(size_of::<Worker>(), 0);
     assert_eq!(size_of_val(&AccountProvider), 0);
+    assert_eq!(AccountProvider.infer("bearer"), "verified bearer");
     assert_eq!(size_of_val(&Account), 0);
 
     let record = Record {

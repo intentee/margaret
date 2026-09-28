@@ -3,6 +3,7 @@ use std::ops::ControlFlow;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
+use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification::verified_jws::VerifiedJws;
@@ -26,7 +27,7 @@ struct JwtPayload<TClaims> {
 #[must_use]
 pub fn verify_jwt<TClaims: DeserializeOwned>(
     key_set: &VerificationKeySet,
-    token: &str,
+    jws: &CompactJws,
     JwtExpectation {
         audience,
         issuer,
@@ -34,7 +35,7 @@ pub fn verify_jwt<TClaims: DeserializeOwned>(
     }: &JwtExpectation,
     now: NumericDate,
 ) -> JwtVerification<TClaims> {
-    let VerifiedJws { kid, payload, typ } = match key_set.verify(token) {
+    let VerifiedJws { kid, payload, typ } = match key_set.verify(jws) {
         JwsVerification::Rejected(rejection) => {
             return JwtVerification::Rejected(JwtRejection::Jws(rejection));
         }
@@ -45,7 +46,7 @@ pub fn verify_jwt<TClaims: DeserializeOwned>(
         return JwtVerification::Rejected(JwtRejection::Type(rejection));
     }
 
-    let JwtPayload { registered, claims } = match serde_json::from_slice(&payload) {
+    let JwtPayload { registered, claims } = match serde_json::from_slice(payload) {
         Ok(payload) => payload,
         Err(source) => {
             return JwtVerification::Rejected(JwtRejection::Claims(ClaimsRejection::Malformed {
@@ -88,7 +89,7 @@ pub fn verify_jwt<TClaims: DeserializeOwned>(
 
     JwtVerification::Verified(VerifiedJwt {
         claims,
-        kid,
+        kid: kid.clone(),
         registered,
     })
 }

@@ -449,7 +449,7 @@ fn resolve_target(
         .map(|framework_provider| &framework_provider.injection);
 
     match restricted_role {
-        Some(FrameworkInjectionRole::FrameworkOnly) => Err(ContainerError::FrameworkOnlyProvider {
+        Some(FrameworkInjectionRole::OidcClient(_)) => Err(ContainerError::FrameworkOnlyProvider {
             parameter: parameter.to_string(),
             provider: resolved.to_string(),
             singleton: concrete_path.to_string(),
@@ -742,7 +742,7 @@ fn is_framework_path_referenced(drafts: &[Draft], path: &CanonicalPath) -> bool 
 
 fn is_framework_role_referenced(drafts: &[Draft], role: &FrameworkInjectionRole) -> bool {
     match role {
-        FrameworkInjectionRole::FrameworkOnly | FrameworkInjectionRole::Unmarked => false,
+        FrameworkInjectionRole::OidcClient(_) | FrameworkInjectionRole::Unmarked => false,
         FrameworkInjectionRole::JwksClientStore(_) | FrameworkInjectionRole::JwksServerStore => {
             drafts
                 .iter()

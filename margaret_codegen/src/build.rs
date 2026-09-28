@@ -244,7 +244,7 @@ pub fn build(
     } else {
         ViewsAvailability::Unavailable
     };
-    let registries = BindingRegistries::collect(&index, views_availability)?;
+    let registries = BindingRegistries::collect(&index, views_availability, &tags, bindings)?;
     if features.contains(GeneratedFeature::AuthenticatedUsers)
         && (features.contains(GeneratedFeature::Http)
             || features.contains(GeneratedFeature::Websockets))
@@ -1086,8 +1086,63 @@ impl Page {
         assert!(serve.contains("impltrzcina::ServiceforMargaretOidcSecondIssuerOidcClient"));
     }
 
+    const OIDC_BEARER_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::oidc_client::oidc_token_verification::OidcTokenVerification;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+#[singleton]
+#[trusts_oidc_issuer(github)]
+struct Issuer;
+
+impl DeclaresTokenTrust for Issuer {}
+
+struct Claims;
+
+struct Runner;
+
+#[singleton]
+#[infers_authenticated_user(user_model = Runner)]
+struct RunnerProvider;
+
+impl RunnerProvider {
+    #[infer_from_request]
+    fn infer(&self, #[oidc_token(issuer = github)] verification: OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<Runner>> {}
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/runner\", server = \"public\")]
+struct RunnerPage;
+
+impl RunnerPage {
+    #[process]
+    fn respond(&self, #[authenticated_user] runner: Runner) -> anyhow::Result<Response> {}
+}
+";
+
     #[test]
-    fn rejects_the_oidc_verifier_injected_by_path() {
+    fn hands_the_wrapper_of_a_bearer_route_the_verifier_of_its_issuer() {
+        let code = generate(OIDC_BEARER_CRATE).expect("the build succeeds");
+        let server: String = module(&code, "http/server_public")
+            .split_whitespace()
+            .collect();
+
+        assert!(server.contains(
+            "oidc_token_verifier:container.margaret_oidc_issuer_oidc_client().verifier(),"
+        ));
+        assert!(server.contains(
+            "margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user("
+        ));
+        assert!(
+            module(&code, "container").contains("pub(crate) fn margaret_oidc_issuer_oidc_client(")
+        );
+    }
+
+    #[test]
+    fn rejects_the_oidc_client_injected_by_path() {
         let error = generate(
             "\
 #[rustfmt::skip]
@@ -1103,16 +1158,16 @@ impl DeclaresTokenTrust for Issuer {}
 
 #[singleton]
 struct Consumer {
-    verifier: std::sync::Arc<crate::margaret::oidc::issuer::OidcTokenVerifier>,
+    client: std::sync::Arc<crate::margaret::oidc::issuer::OidcClient>,
 }
 
 impl Consumer {
     #[constructor]
-    fn create(verifier: std::sync::Arc<crate::margaret::oidc::issuer::OidcTokenVerifier>) -> anyhow::Result<Self> {}
+    fn create(client: std::sync::Arc<crate::margaret::oidc::issuer::OidcClient>) -> anyhow::Result<Self> {}
 }
 ",
         )
-        .expect_err("the verifier is framework-only")
+        .expect_err("the client is framework-only")
         .to_string();
 
         assert!(error.contains("which only the framework may inject"));

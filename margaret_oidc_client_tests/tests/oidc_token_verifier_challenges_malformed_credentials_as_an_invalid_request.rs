@@ -7,6 +7,7 @@ use margaret_http::request_authorization::RequestAuthorization;
 use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_oidc_client::oidc_token_verification::OidcTokenVerification;
 use margaret_oidc_client::oidc_token_verifier::OidcTokenVerifier;
+use margaret_oidc_client::presented_bearer::PresentedBearer;
 use margaret_oidc_client_tests::localhost_trust::localhost_trust;
 
 #[test]
@@ -16,9 +17,13 @@ fn oidc_token_verifier_challenges_malformed_credentials_as_an_invalid_request() 
         VerificationKeySetHolder::default(),
     );
 
+    let authorization = RequestAuthorization::parse(Some("Bearer ab=c"));
+    let presented =
+        PresentedBearer::read(&authorization).expect("the system clock reads as a numeric date");
+
     assert!(matches!(
-        verifier.verify_authorization::<Value>(&RequestAuthorization::parse(Some("Bearer ab=c"))),
-        Ok(OidcTokenVerification::Rejected(rejection))
+        verifier.verify::<Value>(&presented),
+        OidcTokenVerification::Rejected(rejection)
             if rejection.challenge() == BearerChallenge::InvalidRequest
     ));
 }

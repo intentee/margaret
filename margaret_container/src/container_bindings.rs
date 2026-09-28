@@ -8,6 +8,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_attributes::tag::Tag;
 use margaret_codegen_tokens::serve_input_ident::serve_input_ident;
 use margaret_input_weaving::owned_weave::owned_weave;
 use margaret_serve_input_codegen::serve_input::ServeInput;
@@ -18,6 +19,7 @@ use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
+use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::injected_dependency::InjectedDependency;
 use crate::provider_binding::ProviderBinding;
 use crate::provider_serve_inputs::ProviderServeInputs;
@@ -189,6 +191,22 @@ impl ContainerBindings {
             .provider_serve_inputs(&dependency.concrete)?
             .inputs
             .to_vec())
+    }
+
+    #[must_use]
+    pub fn oidc_client(&self, issuer: &Tag) -> Option<InjectedDependency> {
+        self.providers
+            .iter()
+            .find(|(_, binding)| {
+                matches!(
+                    &binding.injection,
+                    FrameworkInjectionRole::OidcClient(client_issuer) if client_issuer == issuer
+                )
+            })
+            .map(|(provided, binding)| InjectedDependency {
+                concrete: provided.clone(),
+                field: binding.field_name.clone(),
+            })
     }
 
     #[must_use]

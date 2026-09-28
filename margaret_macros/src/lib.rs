@@ -12,8 +12,12 @@ use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsE
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 use margaret_item_naming_argument::render_item_references::render_item_references;
 
-const REQUEST_BINDING_MARKERS: [&str; 3] =
-    ["authenticated_user", "route_parameter", "form_request"];
+const REQUEST_BINDING_MARKERS: [&str; 4] = [
+    "authenticated_user",
+    "route_parameter",
+    "form_request",
+    "oidc_token",
+];
 
 fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {
     attributes.retain(|attribute| {

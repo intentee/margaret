@@ -1,6 +1,7 @@
 pub mod jwks_secret_store_target;
 pub mod read_jwks_secret_store_target;
 pub mod read_middleware_attribute;
+pub mod read_oidc_token_issuer;
 pub mod read_reference_tag;
 pub mod segmented_tag_binding;
 pub mod tag_error;

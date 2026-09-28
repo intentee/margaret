@@ -1,6 +1,8 @@
 use serde_json::json;
 
 use margaret_jose_parameters::curve::Curve;
+use margaret_jws_verification::compact_jws::CompactJws;
+use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::jws_rejection::JwsRejection;
 use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
@@ -15,8 +17,12 @@ fn rejects_a_token_of_an_unknown_key_id() {
     };
 
     let token = key.token(&json!({ "alg": "ES256", "kid": "absent" }), &json!({}));
+    let CompactJwsParsing::Parsed(jws) = CompactJws::parse(&token) else {
+        panic!("the token parses");
+    };
+
     assert!(matches!(
-        key_set.verify(&token),
+        key_set.verify(&jws),
         JwsVerification::Rejected(JwsRejection::UnknownKeyId { kid }) if kid.as_str() == "absent"
     ));
 }

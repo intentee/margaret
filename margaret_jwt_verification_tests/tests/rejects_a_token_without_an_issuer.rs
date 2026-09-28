@@ -9,7 +9,7 @@ use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
-use margaret_jwt_verification::verify_jwt::verify_jwt;
+use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_jwt_verification_tests::signed_claims::SignedClaims;
 use margaret_registered_claims::numeric_date::NumericDate;
@@ -26,7 +26,7 @@ fn rejects_a_token_without_an_issuer() {
     };
 
     assert!(matches!(
-        verify_jwt::<Map<String, Value>>(
+        verify_serialized_jwt::<Map<String, Value>>(
             &key_set,
             &token,
             &JwtExpectation {

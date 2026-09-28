@@ -2,6 +2,8 @@ use p256::ecdsa::Signature;
 use serde_json::json;
 
 use margaret_jose_parameters::curve::Curve;
+use margaret_jws_verification::compact_jws::CompactJws;
+use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
@@ -24,8 +26,10 @@ fn accepts_a_high_s_signature() {
     let high_s = Signature::from_scalars(r, -s).expect("negating s yields a signature");
 
     assert!(high_s.normalize_s().is_some());
-    assert!(matches!(
-        key_set.verify(&signed_token(&signing_input, &high_s.to_bytes())),
-        JwsVerification::Verified(_)
-    ));
+    let token = signed_token(&signing_input, &high_s.to_bytes());
+    let CompactJwsParsing::Parsed(jws) = CompactJws::parse(&token) else {
+        panic!("the token parses");
+    };
+
+    assert!(matches!(key_set.verify(&jws), JwsVerification::Verified(_)));
 }

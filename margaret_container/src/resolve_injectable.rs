@@ -25,7 +25,15 @@ fn resolved_single(
             concrete: provider_key,
             field: field_name.clone(),
         }),
-        Some(_) => InjectableResolution::JwksSecretStoreByPath,
+        Some(ProviderBinding {
+            injection:
+                FrameworkInjectionRole::JwksClientStore(_) | FrameworkInjectionRole::JwksServerStore,
+            ..
+        }) => InjectableResolution::JwksSecretStoreByPath,
+        Some(ProviderBinding {
+            injection: FrameworkInjectionRole::OidcClient(_),
+            ..
+        }) => InjectableResolution::FrameworkOnly,
     }
 }
 

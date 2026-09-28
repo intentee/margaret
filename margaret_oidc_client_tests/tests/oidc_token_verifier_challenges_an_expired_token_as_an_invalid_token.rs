@@ -14,6 +14,7 @@ use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder
 use margaret_oidc_client::oidc_token_rejection::OidcTokenRejection;
 use margaret_oidc_client::oidc_token_verification::OidcTokenVerification;
 use margaret_oidc_client::oidc_token_verifier::OidcTokenVerifier;
+use margaret_oidc_client::presented_bearer::PresentedBearer;
 use margaret_oidc_client_tests::localhost_trust::localhost_trust;
 use margaret_oidc_client_tests::signed_id_token::SignedIdToken;
 
@@ -36,9 +37,10 @@ fn oidc_token_verifier_challenges_an_expired_token_as_an_invalid_token() {
     }
     .signed_by(&key, &trust);
 
-    let Ok(OidcTokenVerification::Rejected(rejection)) = verifier.verify_authorization::<Value>(
-        &RequestAuthorization::parse(Some(&format!("Bearer {token}"))),
-    ) else {
+    let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
+    let presented =
+        PresentedBearer::read(&authorization).expect("the system clock reads as a numeric date");
+    let OidcTokenVerification::Rejected(rejection) = verifier.verify::<Value>(&presented) else {
         panic!("the expired token is rejected");
     };
 

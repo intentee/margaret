@@ -113,7 +113,8 @@ fn factory_initializers(
                 let construction = render_authenticated_user_wrapper_construction(
                     application,
                     &quote! { super::super::super::authenticated_users },
-                    &bindings.accessor_invocation(&container, kind.accessor()),
+                    &container,
+                    bindings,
                 );
 
                 quote! { #local: #construction, }

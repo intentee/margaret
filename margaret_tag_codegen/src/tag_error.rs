@@ -52,4 +52,7 @@ pub enum TagError {
 
     #[error("{site} must be either `server` or `client = <tag>`")]
     MalformedJwksSecretStore { site: String },
+
+    #[error("{site} must be `issuer = <tag>`")]
+    MalformedOidcToken { site: String },
 }

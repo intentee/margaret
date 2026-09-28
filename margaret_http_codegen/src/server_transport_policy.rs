@@ -48,6 +48,7 @@ mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_middleware_codegen::layer_application::LayerApplication;
     use margaret_request_binding_codegen::authenticated_user_application::AuthenticatedUserApplication;
+    use margaret_request_binding_codegen::authenticated_user_challenge::AuthenticatedUserChallenge;
     use margaret_request_binding_codegen::authenticated_user_requirement::AuthenticatedUserRequirement;
     use margaret_request_binding_codegen::bound_parameter::BoundParameter;
     use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -68,12 +69,14 @@ mod tests {
     fn authenticated_user(injects_peer_spiffe_id: bool) -> BoundParameter {
         parameter(RequestBinding::AuthenticatedUser {
             application: AuthenticatedUserApplication {
+                challenge: AuthenticatedUserChallenge::Unchallenged,
                 concrete: path("PeerUserProvider"),
                 field: "peer_user_provider".to_string(),
                 injects_peer_spiffe_id,
                 injects_routes: false,
                 injects_views: false,
                 model: path("User"),
+                oidc_token_verifiers: Vec::new(),
                 wrapper: format_ident!("PeerUserProvider"),
             },
             requirement: AuthenticatedUserRequirement::Required,

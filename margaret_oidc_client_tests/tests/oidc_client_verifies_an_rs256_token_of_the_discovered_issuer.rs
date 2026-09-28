@@ -9,6 +9,7 @@ use margaret_http_tests::static_handler::StaticHandler;
 use margaret_jws_verification_tests::fixture_rsa_key::FixtureRsaKey;
 use margaret_oidc_client::oidc_client::OidcClient;
 use margaret_oidc_client::oidc_token_verification::OidcTokenVerification;
+use margaret_oidc_client::presented_bearer::PresentedBearer;
 use margaret_oidc_client_tests::fixture_issuer_routes::FixtureIssuerRoutes;
 use margaret_oidc_client_tests::localhost_trust::localhost_trust;
 use margaret_oidc_client_tests::running_fixture_issuer::RunningFixtureIssuer;
@@ -55,9 +56,10 @@ async fn oidc_client_verifies_an_rs256_token_of_the_discovered_issuer() {
         typ: "JWT",
     }
     .signed_by(&key, &trust);
-    let Ok(OidcTokenVerification::Verified(identity)) = verifier.verify_authorization::<Value>(
-        &RequestAuthorization::parse(Some(&format!("Bearer {token}"))),
-    ) else {
+    let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
+    let presented =
+        PresentedBearer::read(&authorization).expect("the system clock reads as a numeric date");
+    let OidcTokenVerification::Verified(identity) = verifier.verify::<Value>(&presented) else {
         panic!("the token of the discovered issuer verifies");
     };
 

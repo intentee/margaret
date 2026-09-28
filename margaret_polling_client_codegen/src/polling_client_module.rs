@@ -1,5 +1,6 @@
+use proc_macro2::TokenStream;
+
 pub struct PollingClientModule {
-    pub has_client: bool,
-    pub has_verifier: bool,
+    pub exports: TokenStream,
     pub segment: String,
 }

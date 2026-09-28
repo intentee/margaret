@@ -1999,7 +1999,6 @@ dependencies = [
  "margaret_middleware_codegen",
  "margaret_model_codegen",
  "margaret_oidc_codegen",
- "margaret_polling_client_codegen",
  "margaret_request_binding_codegen",
  "margaret_schema_codegen",
  "margaret_serve_input_codegen",
@@ -2086,6 +2085,22 @@ dependencies = [
  "anyhow",
  "clap",
  "margaret",
+]
+
+[[package]]
+name = "margaret_codegen_oidc_bearer_identity_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "margaret",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "validator",
 ]
 
 [[package]]
@@ -2439,6 +2454,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "margaret_http",
+ "margaret_http_tests",
+ "reqwest",
+ "tokio",
 ]
 
 [[package]]
@@ -3020,6 +3038,7 @@ dependencies = [
  "margaret_item_naming_argument",
  "margaret_route_parameter_codegen",
  "margaret_serve_input_codegen",
+ "margaret_syn_type_peeling",
  "margaret_tag_codegen",
  "proc-macro2",
  "quote",

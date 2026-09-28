@@ -47,6 +47,7 @@ mod tests {
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::bound_parameter::BoundParameter;
     use margaret_request_binding_codegen::request_binding::RequestBinding;
+    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_tag_codegen::tag_pool::TagPool;
@@ -167,9 +168,19 @@ impl RespondsToWebSocketNotification for Typist {
         .bindings
     }
 
+    fn collect_registries(
+        index: &AttributeIndex,
+    ) -> Result<BindingRegistries, RequestBindingError> {
+        BindingRegistries::collect(
+            index,
+            ViewsAvailability::Available,
+            &TagPool::collect(index).expect("the tags are collected"),
+            &bindings(&IndexedSource::new("").index),
+        )
+    }
+
     fn registries_for(index: &AttributeIndex) -> BindingRegistries {
-        BindingRegistries::collect(index, ViewsAvailability::Available)
-            .expect("the binding registries are collected")
+        collect_registries(index).expect("the binding registries are collected")
     }
 
     fn missing_path() -> CanonicalPath {
@@ -225,7 +236,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     fn error(source: &str) -> WebSocketCodegenError {
         let index = IndexedSource::new(source).index;
-        let registries = match BindingRegistries::collect(&index, ViewsAvailability::Available) {
+        let registries = match collect_registries(&index) {
             Ok(registries) => registries,
             Err(rejection) => return WebSocketCodegenError::from(rejection),
         };

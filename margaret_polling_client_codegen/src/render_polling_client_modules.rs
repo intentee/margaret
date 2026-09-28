@@ -4,35 +4,19 @@ use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
-use crate::polling_client_exports::PollingClientExports;
 use crate::polling_client_module::PollingClientModule;
 
 #[must_use]
 pub fn render_polling_client_modules(
     module_name: &str,
     root_exports: &TokenStream,
-    clients: &[PollingClientModule],
-    PollingClientExports { client, verifier }: &PollingClientExports,
+    clients: Vec<PollingClientModule>,
 ) -> Vec<GeneratedModuleTokens> {
-    let mut submodule_declarations = Vec::new();
-    let mut submodules = Vec::new();
-
-    for polling_client in clients {
-        if !polling_client.has_client && !polling_client.has_verifier {
-            continue;
-        }
-
+    let submodule_declarations = clients.iter().map(|polling_client| {
         let segment = format_ident!("{}", polling_client.segment);
-        let client_export = polling_client.has_client.then_some(client);
-        let verifier_export = polling_client.has_verifier.then_some(verifier);
 
-        submodule_declarations.push(quote! { pub mod #segment; });
-        submodules.push(GeneratedModuleTokens::new(
-            format!("{module_name}/{}", polling_client.segment),
-            quote! { #client_export #verifier_export },
-        ));
-    }
-
+        quote! { pub mod #segment; }
+    });
     let mut modules = vec![GeneratedModuleTokens::new(
         module_name,
         quote! {
@@ -41,7 +25,13 @@ pub fn render_polling_client_modules(
         },
     )];
 
-    modules.extend(submodules);
+    modules.extend(
+        clients
+            .into_iter()
+            .map(|PollingClientModule { exports, segment }| {
+                GeneratedModuleTokens::new(format!("{module_name}/{segment}"), exports)
+            }),
+    );
 
     modules
 }
@@ -54,26 +44,17 @@ mod tests {
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
     use super::render_polling_client_modules;
-    use crate::polling_client_exports::PollingClientExports;
     use crate::polling_client_module::PollingClientModule;
 
-    fn exports() -> PollingClientExports {
-        PollingClientExports {
-            client: quote! { pub use framework::Client; },
-            verifier: quote! { pub use framework::Verifier; },
-        }
-    }
-
-    fn client(segment: &str, has_client: bool, has_verifier: bool) -> PollingClientModule {
+    fn client(segment: &str) -> PollingClientModule {
         PollingClientModule {
-            has_client,
-            has_verifier,
+            exports: quote! { pub use framework::Client; },
             segment: segment.to_string(),
         }
     }
 
-    fn render(clients: &[PollingClientModule]) -> Vec<GeneratedModuleTokens> {
-        render_polling_client_modules("clients", &TokenStream::new(), clients, &exports())
+    fn render(clients: Vec<PollingClientModule>) -> Vec<GeneratedModuleTokens> {
+        render_polling_client_modules("clients", &TokenStream::new(), clients)
     }
 
     fn module_source(modules: Vec<GeneratedModuleTokens>, name: &str) -> String {
@@ -95,14 +76,12 @@ mod tests {
     }
 
     #[test]
-    fn re_exports_a_per_tag_client_and_verifier_in_a_submodule() {
-        let clients = [client("auth", true, true)];
-        let root = module_source(render(&clients), "clients");
-        let submodule = module_source(render(&clients), "clients/auth");
+    fn re_exports_the_exports_of_a_client_in_its_submodule() {
+        let root = module_source(render(vec![client("auth")]), "clients");
+        let submodule = module_source(render(vec![client("auth")]), "clients/auth");
 
         assert!(root.contains("pub mod auth;"));
         assert!(submodule.contains("pub use framework::Client;"));
-        assert!(submodule.contains("pub use framework::Verifier;"));
     }
 
     #[test]
@@ -111,8 +90,7 @@ mod tests {
             render_polling_client_modules(
                 "clients",
                 &quote! { pub use framework::Server; },
-                &[],
-                &exports(),
+                Vec::new(),
             ),
             "clients",
         );
@@ -123,31 +101,12 @@ mod tests {
     #[test]
     fn renders_two_independent_clients_in_separate_submodules() {
         assert_eq!(
-            module_names(&render(&[
-                client("auth", true, true),
-                client("partner", true, false)
-            ])),
+            module_names(&render(vec![client("auth"), client("partner")])),
             vec![
                 "clients".to_string(),
                 "clients/auth".to_string(),
                 "clients/partner".to_string(),
             ]
         );
-    }
-
-    #[test]
-    fn omits_the_verifier_when_only_the_client_is_used() {
-        let submodule = module_source(render(&[client("auth", true, false)]), "clients/auth");
-
-        assert!(submodule.contains("pub use framework::Client;"));
-        assert!(!submodule.contains("Verifier"));
-    }
-
-    #[test]
-    fn omits_a_client_submodule_that_provides_nothing() {
-        let modules = render(&[client("auth", false, false)]);
-
-        assert_eq!(module_names(&modules), vec!["clients".to_string()]);
-        assert!(!module_source(modules, "clients").contains("pub mod auth;"));
     }
 }

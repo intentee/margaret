@@ -12,10 +12,18 @@ pub fn binding_serve_inputs(
     bindings: &ContainerBindings,
 ) -> Result<Vec<ServeInput>, ContainerError> {
     Ok(match binding {
-        RequestBinding::AuthenticatedUser { application, .. } => bindings
-            .provider_serve_inputs(&application.concrete)?
-            .inputs
-            .to_vec(),
+        RequestBinding::AuthenticatedUser { application, .. } => {
+            let mut inputs = bindings
+                .provider_serve_inputs(&application.concrete)?
+                .inputs
+                .to_vec();
+
+            for verifier in &application.oidc_token_verifiers {
+                inputs.extend(bindings.injected_serve_inputs(&verifier.client)?);
+            }
+
+            inputs
+        }
         RequestBinding::BoundRouteParameter {
             binder_provider, ..
         } => bindings
@@ -28,6 +36,7 @@ pub fn binding_serve_inputs(
         | RequestBinding::FormRequest { .. }
         | RequestBinding::Forwarder
         | RequestBinding::Next
+        | RequestBinding::OidcToken { .. }
         | RequestBinding::PeerSpiffeId
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes

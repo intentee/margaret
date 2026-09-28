@@ -1,5 +1,7 @@
 use serde_json::json;
 
+use margaret_jws_verification::compact_jws::CompactJws;
+use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::jws_rejection::JwsRejection;
 use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
@@ -17,8 +19,13 @@ fn rejects_an_rs256_signature_over_another_input() {
     let signed = signing_input(&key.header(), &json!({ "sub": "signed" }));
     let presented = signing_input(&key.header(), &json!({ "sub": "presented" }));
 
+    let token = signed_token(&presented, &key.signature(&signed));
+    let CompactJwsParsing::Parsed(jws) = CompactJws::parse(&token) else {
+        panic!("the token parses");
+    };
+
     assert!(matches!(
-        key_set.verify(&signed_token(&presented, &key.signature(&signed))),
+        key_set.verify(&jws),
         JwsVerification::Rejected(JwsRejection::RsaSignatureMismatch { .. })
     ));
 }

@@ -1,6 +1,8 @@
 use serde_json::json;
 
 use margaret_jose_parameters::curve::Curve;
+use margaret_jws_verification::compact_jws::CompactJws;
+use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
@@ -13,9 +15,12 @@ fn verifies_a_token_of_a_published_key() {
         panic!("the fixture key set is accepted");
     };
 
-    let JwsVerification::Verified(verified) =
-        key_set.verify(&key.token(&key.header(), &json!({ "sub": "subject" })))
-    else {
+    let token = key.token(&key.header(), &json!({ "sub": "subject" }));
+    let CompactJwsParsing::Parsed(jws) = CompactJws::parse(&token) else {
+        panic!("the token parses");
+    };
+
+    let JwsVerification::Verified(verified) = key_set.verify(&jws) else {
         panic!("the token verifies");
     };
 
