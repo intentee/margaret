@@ -5,7 +5,6 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_polling_client_codegen::polling_client_module::PollingClientModule;
 use margaret_polling_client_codegen::render_polling_client_modules::render_polling_client_modules;
 
-use crate::jwks_client_module::JwksClientModule;
 use crate::jwks_module_name::JWKS_MODULE_NAME;
 use crate::jwks_server_module::JwksServerModule;
 use crate::jwks_server_part::JwksServerPart;
@@ -35,39 +34,20 @@ fn server_root_tokens(server: &JwksServerModule) -> TokenStream {
     quote! { #roller #handler #secret_store #minter }
 }
 
-fn client_module(
-    JwksClientModule {
-        has_client,
-        has_verifier,
-        segment,
-    }: &JwksClientModule,
-) -> Option<PollingClientModule> {
-    let client = has_client.then(|| {
-        quote! {
-            pub use margaret::framework::jwks_client::jwks_client::JwksClient;
-        }
-    });
-    let verifier = has_verifier.then(|| {
-        quote! {
-            pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;
-        }
-    });
-
-    (*has_client || *has_verifier).then(|| PollingClientModule {
-        exports: quote! { #client #verifier },
-        segment: segment.clone(),
-    })
-}
-
 #[must_use]
-pub fn render_jwks(
-    server: &JwksServerModule,
-    clients: &[JwksClientModule],
-) -> Vec<GeneratedModuleTokens> {
+pub fn render_jwks(server: &JwksServerModule, segments: &[&str]) -> Vec<GeneratedModuleTokens> {
     render_polling_client_modules(
         JWKS_MODULE_NAME,
         &server_root_tokens(server),
-        clients.iter().filter_map(client_module).collect(),
+        segments
+            .iter()
+            .map(|segment| PollingClientModule {
+                exports: quote! {
+                    pub use margaret::framework::jwks_client::jwks_client::JwksClient;
+                },
+                segment: (*segment).to_string(),
+            })
+            .collect(),
     )
 }
 
@@ -76,7 +56,6 @@ mod tests {
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
     use super::render_jwks;
-    use crate::jwks_client_module::JwksClientModule;
     use crate::jwks_server_module::JwksServerModule;
     use crate::jwks_server_part::JwksServerPart;
 
@@ -97,14 +76,6 @@ mod tests {
         }
 
         server
-    }
-
-    fn client(segment: &str, has_client: bool, has_verifier: bool) -> JwksClientModule {
-        JwksClientModule {
-            has_client,
-            has_verifier,
-            segment: segment.to_string(),
-        }
     }
 
     fn module_source(modules: Vec<GeneratedModuleTokens>, name: &str) -> String {
@@ -150,43 +121,15 @@ mod tests {
     }
 
     #[test]
-    fn re_exports_a_per_tag_client_and_verifier_in_a_submodule() {
-        let modules = render_jwks(&no_server(), &[client("auth", true, true)]);
-        let root = module_source(
-            render_jwks(&no_server(), &[client("auth", true, true)]),
-            "jwks",
-        );
+    fn re_exports_a_per_tag_client_in_a_submodule() {
+        let modules = render_jwks(&no_server(), &["auth"]);
+        let root = module_source(render_jwks(&no_server(), &["auth"]), "jwks");
         let submodule = module_source(modules, "jwks/auth");
 
         assert!(root.contains("pub mod auth;"));
-        assert!(
-            submodule
-                .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;")
+        assert_eq!(
+            submodule.trim(),
+            "pub use margaret::framework::jwks_client::jwks_client::JwksClient;"
         );
-        assert!(submodule.contains(
-            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
-        ));
-    }
-
-    #[test]
-    fn omits_the_verifier_when_only_the_client_is_used() {
-        let submodule = module_source(
-            render_jwks(&no_server(), &[client("auth", true, false)]),
-            "jwks/auth",
-        );
-
-        assert!(
-            submodule
-                .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;")
-        );
-        assert!(!submodule.contains("PublicJwksVerifier"));
-    }
-
-    #[test]
-    fn omits_a_client_submodule_that_provides_nothing() {
-        let modules = render_jwks(&no_server(), &[client("auth", false, false)]);
-
-        assert!(modules.iter().all(|module| module.name() != "jwks/auth"));
-        assert!(!module_source(modules, "jwks").contains("pub mod auth;"));
     }
 }

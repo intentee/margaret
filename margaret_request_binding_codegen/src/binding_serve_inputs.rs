@@ -2,6 +2,7 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::container_error::ContainerError;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 
+use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::request_binding::RequestBinding;
 
 /// # Errors
@@ -18,8 +19,8 @@ pub fn binding_serve_inputs(
                 .inputs
                 .to_vec();
 
-            for verifier in &application.oidc_token_verifiers {
-                inputs.extend(bindings.injected_serve_inputs(&verifier.client)?);
+            if let AuthenticatedUserChallenge::Bearer { issuer_client } = &application.challenge {
+                inputs.extend(bindings.injected_serve_inputs(issuer_client)?);
             }
 
             inputs
@@ -36,7 +37,7 @@ pub fn binding_serve_inputs(
         | RequestBinding::FormRequest { .. }
         | RequestBinding::Forwarder
         | RequestBinding::Next
-        | RequestBinding::OidcToken { .. }
+        | RequestBinding::BearerToken { .. }
         | RequestBinding::PeerSpiffeId
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes

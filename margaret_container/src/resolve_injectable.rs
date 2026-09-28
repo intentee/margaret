@@ -26,12 +26,7 @@ fn resolved_single(
             field: field_name.clone(),
         }),
         Some(ProviderBinding {
-            injection:
-                FrameworkInjectionRole::JwksClientStore(_) | FrameworkInjectionRole::JwksServerStore,
-            ..
-        }) => InjectableResolution::JwksSecretStoreByPath,
-        Some(ProviderBinding {
-            injection: FrameworkInjectionRole::OidcClient(_),
+            injection: FrameworkInjectionRole::TokenIssuerClient(_),
             ..
         }) => InjectableResolution::FrameworkOnly,
     }

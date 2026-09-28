@@ -31,7 +31,7 @@ fn provider_kind(binding: &RequestBinding) -> Option<CapturedProviderKind> {
         | RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
         | RequestBinding::Next
-        | RequestBinding::OidcToken { .. }
+        | RequestBinding::BearerToken { .. }
         | RequestBinding::PeerSpiffeId
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes

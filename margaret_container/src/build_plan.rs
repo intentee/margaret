@@ -18,9 +18,6 @@ use margaret_input_weaving::input_value::InputValue;
 use margaret_input_weaving::weaving_kind::WeavingKind;
 use margaret_serve_input_codegen::declared_serve_inputs::DeclaredServeInputs;
 use margaret_serve_input_codegen::serve_input::ServeInput;
-use margaret_tag_codegen::jwks_secret_store_target::JwksSecretStoreTarget;
-use margaret_tag_codegen::tag_kind::TagKind;
-use margaret_tag_codegen::tag_pool::TagPool;
 
 use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
@@ -34,7 +31,6 @@ use crate::framework_dependency::FrameworkDependency;
 use crate::framework_enablement::FrameworkEnablement;
 use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::framework_provider::FrameworkProvider;
-use crate::jwks_store_marking::JwksStoreMarking;
 use crate::parameter_target::ParameterTarget;
 use crate::path_text::path_text;
 use crate::provided_type::ProvidedType;
@@ -178,7 +174,7 @@ fn build_provider_draft<'index>(
 
     let field_name = identifier.field().to_string();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
-    let parameters = read_draft_parameters(index, item, &construction, &concrete_path)?;
+    let parameters = read_draft_parameters(index, item, &construction);
 
     Ok(Draft {
         concrete_path: concrete_path.clone(),
@@ -231,7 +227,7 @@ fn build_construction_draft<'index>(
 
     let concrete_path = item.canonical_path().clone();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
-    let parameters = read_draft_parameters(index, item, &construction, &concrete_path)?;
+    let parameters = read_draft_parameters(index, item, &construction);
 
     Ok(Draft {
         concrete_path: concrete_path.clone(),
@@ -247,16 +243,15 @@ fn read_draft_parameters<'index>(
     index: &AttributeIndex,
     item: &IndexedItem,
     construction: &ConstructionSource<'index>,
-    concrete_path: &CanonicalPath,
-) -> Result<Vec<DraftParameter<'index>>, ContainerError> {
+) -> Vec<DraftParameter<'index>> {
     let ConstructionSource::Constructor(constructor) = construction else {
-        return Ok(Vec::new());
+        return Vec::new();
     };
 
     constructor
         .parameters()
         .iter()
-        .map(|parameter| DraftParameter::read(index, item, parameter, concrete_path))
+        .map(|parameter| DraftParameter::read(index, item, parameter))
         .collect()
 }
 
@@ -279,7 +274,6 @@ struct DependencyResolver<'resolver> {
     framework_providers: &'resolver [FrameworkProvider],
     provided_keys: &'resolver HashMap<CanonicalPath, CanonicalPath>,
     serve_inputs: &'resolver DeclaredServeInputs,
-    tags: &'resolver TagPool<'resolver>,
 }
 
 impl DependencyResolver<'_> {
@@ -299,66 +293,36 @@ impl DependencyResolver<'_> {
             });
         }
 
-        for DraftParameter {
-            indexed,
-            jwks_store,
-            target,
-        } in parameters
-        {
+        for DraftParameter { indexed, target } in parameters {
             let parameter = indexed.diagnostic_name().to_string();
-            let serve_input = self.serve_inputs.input(concrete_path, indexed.position());
 
-            dependencies.push(match (serve_input, jwks_store) {
-                (Some(_), JwksStoreMarking::Marked(_)) => {
-                    return Err(ContainerError::AmbiguousServeInputAndJwksSecretStore {
-                        parameter,
-                        singleton: concrete_path.to_string(),
-                    });
-                }
-                (Some(input), JwksStoreMarking::Unmarked) => DependencyKind::ServeInput {
-                    input: Box::new(input.clone()),
+            dependencies.push(
+                match self.serve_inputs.input(concrete_path, indexed.position()) {
+                    Some(input) => DependencyKind::ServeInput {
+                        input: Box::new(input.clone()),
+                    },
+                    None => match target {
+                        ParameterTarget::Resolved { resolved, written } => resolve_target(
+                            resolved,
+                            written,
+                            concrete_path,
+                            &parameter,
+                            self.provided_keys,
+                            self.framework_providers,
+                        )?,
+                        ParameterTarget::Unresolved { written } => {
+                            return Err(missing_provider(concrete_path, &parameter, written));
+                        }
+                        ParameterTarget::UnsupportedShape => {
+                            return Err(ContainerError::UnsupportedParameterShape {
+                                singleton: concrete_path.to_string(),
+                                parameter,
+                                written: type_text(indexed.declared()),
+                            });
+                        }
+                    },
                 },
-                (None, JwksStoreMarking::Marked(jwks_target)) => {
-                    let provider_key = resolve_jwks_secret_store(
-                        concrete_path,
-                        &parameter,
-                        jwks_target,
-                        self.framework_providers,
-                        self.tags,
-                    )?;
-
-                    if !target.resolves_to(&provider_key) {
-                        return Err(ContainerError::MismatchedJwksSecretStoreType {
-                            expected: provider_key.to_string(),
-                            site: format!("parameter '{parameter}' of singleton '{concrete_path}'"),
-                            target: jwks_store_target_description(jwks_target),
-                            written: type_text(indexed.declared()),
-                        });
-                    }
-
-                    DependencyKind::Single { provider_key }
-                }
-                (None, JwksStoreMarking::Unmarked) => match target {
-                    ParameterTarget::Resolved { resolved, written } => resolve_target(
-                        resolved,
-                        written,
-                        concrete_path,
-                        &parameter,
-                        self.provided_keys,
-                        self.framework_providers,
-                    )?,
-                    ParameterTarget::Unresolved { written } => {
-                        return Err(missing_provider(concrete_path, &parameter, written));
-                    }
-                    ParameterTarget::UnsupportedShape => {
-                        return Err(ContainerError::UnsupportedParameterShape {
-                            singleton: concrete_path.to_string(),
-                            parameter,
-                            written: type_text(indexed.declared()),
-                        });
-                    }
-                },
-            });
+            );
         }
 
         Ok(dependencies)
@@ -388,47 +352,6 @@ impl DependencyResolver<'_> {
     }
 }
 
-fn resolve_jwks_secret_store(
-    concrete_path: &CanonicalPath,
-    parameter: &str,
-    target: &JwksSecretStoreTarget,
-    framework_providers: &[FrameworkProvider],
-    tags: &TagPool,
-) -> Result<CanonicalPath, ContainerError> {
-    let site = format!("parameter '{parameter}' of singleton '{concrete_path}'");
-
-    if let JwksSecretStoreTarget::Client(tag) = target {
-        tags.resolve(tag, TagKind::JwksClient, &site)?;
-    }
-
-    framework_providers
-        .iter()
-        .find(|provider| injection_matches_target(&provider.injection, target))
-        .map(|provider| provider.provided.clone())
-        .ok_or_else(|| ContainerError::UnknownJwksSecretStore {
-            site,
-            target: jwks_store_target_description(target),
-        })
-}
-
-fn injection_matches_target(role: &FrameworkInjectionRole, target: &JwksSecretStoreTarget) -> bool {
-    match (role, target) {
-        (FrameworkInjectionRole::JwksServerStore, JwksSecretStoreTarget::Server) => true,
-        (
-            FrameworkInjectionRole::JwksClientStore(role_tag),
-            JwksSecretStoreTarget::Client(target_tag),
-        ) => role_tag == target_tag,
-        _ => false,
-    }
-}
-
-fn jwks_store_target_description(target: &JwksSecretStoreTarget) -> String {
-    match target {
-        JwksSecretStoreTarget::Server => "the server".to_string(),
-        JwksSecretStoreTarget::Client(tag) => format!("client '{tag}'"),
-    }
-}
-
 fn resolve_target(
     resolved: &CanonicalPath,
     written: &Path,
@@ -449,18 +372,13 @@ fn resolve_target(
         .map(|framework_provider| &framework_provider.injection);
 
     match restricted_role {
-        Some(FrameworkInjectionRole::OidcClient(_)) => Err(ContainerError::FrameworkOnlyProvider {
-            parameter: parameter.to_string(),
-            provider: resolved.to_string(),
-            singleton: concrete_path.to_string(),
-        }),
-        Some(
-            FrameworkInjectionRole::JwksClientStore(_) | FrameworkInjectionRole::JwksServerStore,
-        ) => Err(ContainerError::JwksSecretStoreInjectedByPath {
-            parameter: parameter.to_string(),
-            provider: resolved.to_string(),
-            singleton: concrete_path.to_string(),
-        }),
+        Some(FrameworkInjectionRole::TokenIssuerClient(_)) => {
+            Err(ContainerError::FrameworkOnlyProvider {
+                parameter: parameter.to_string(),
+                provider: resolved.to_string(),
+                singleton: concrete_path.to_string(),
+            })
+        }
         Some(FrameworkInjectionRole::Unmarked) | None => {
             Err(missing_provider(concrete_path, parameter, written))
         }
@@ -728,8 +646,6 @@ fn is_directly_triggered(
         FrameworkEnablement::WhenReferenced => {
             is_framework_path_referenced(provider_drafts, &framework_provider.provided)
                 || is_framework_path_referenced(construction_drafts, &framework_provider.provided)
-                || is_framework_role_referenced(provider_drafts, &framework_provider.injection)
-                || is_framework_role_referenced(construction_drafts, &framework_provider.injection)
         }
     }
 }
@@ -740,17 +656,6 @@ fn is_framework_path_referenced(drafts: &[Draft], path: &CanonicalPath) -> bool 
         .any(|draft| draft_references_path(draft, path))
 }
 
-fn is_framework_role_referenced(drafts: &[Draft], role: &FrameworkInjectionRole) -> bool {
-    match role {
-        FrameworkInjectionRole::OidcClient(_) | FrameworkInjectionRole::Unmarked => false,
-        FrameworkInjectionRole::JwksClientStore(_) | FrameworkInjectionRole::JwksServerStore => {
-            drafts
-                .iter()
-                .any(|draft| draft_references_role(draft, role))
-        }
-    }
-}
-
 fn draft_references_path(draft: &Draft, path: &CanonicalPath) -> bool {
     draft
         .parameters
@@ -758,20 +663,10 @@ fn draft_references_path(draft: &Draft, path: &CanonicalPath) -> bool {
         .any(|parameter| parameter.target.resolves_to(path))
 }
 
-fn draft_references_role(draft: &Draft, role: &FrameworkInjectionRole) -> bool {
-    draft.parameters.iter().any(|parameter| {
-        matches!(
-            &parameter.jwks_store,
-            JwksStoreMarking::Marked(target) if injection_matches_target(role, target)
-        )
-    })
-}
-
 pub(crate) fn build_plan(
     index: &AttributeIndex,
     serve_inputs: &DeclaredServeInputs,
     framework_providers: &[FrameworkProvider],
-    tags: &TagPool,
 ) -> Result<ContainerPlan, ContainerError> {
     let mut drafted = build_drafts(index)?;
     let resolved_framework_providers =
@@ -786,7 +681,6 @@ pub(crate) fn build_plan(
         framework_providers,
         provided_keys: &provided_keys,
         serve_inputs,
-        tags,
     };
 
     let mut providers = BTreeMap::new();

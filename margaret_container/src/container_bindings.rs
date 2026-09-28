@@ -194,13 +194,13 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn oidc_client(&self, issuer: &Tag) -> Option<InjectedDependency> {
+    pub fn token_issuer_client(&self, issuer: &Tag) -> Option<InjectedDependency> {
         self.providers
             .iter()
             .find(|(_, binding)| {
                 matches!(
                     &binding.injection,
-                    FrameworkInjectionRole::OidcClient(client_issuer) if client_issuer == issuer
+                    FrameworkInjectionRole::TokenIssuerClient(client_issuer) if client_issuer == issuer
                 )
             })
             .map(|(provided, binding)| InjectedDependency {

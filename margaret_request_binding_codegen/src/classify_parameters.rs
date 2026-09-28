@@ -11,16 +11,14 @@ use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
-use margaret_attributes::name_allocator::NameAllocator;
-use margaret_attributes::tag::Tag;
 use margaret_container::injectable_resolution::InjectableResolution;
 use margaret_container::resolve_injectable::resolve_injectable;
 use margaret_injection_codegen::optional_parameter::OptionalParameter;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
-use margaret_tag_codegen::read_oidc_token_issuer::read_oidc_token_issuer;
-use margaret_tag_codegen::tag_kind::TagKind;
+use margaret_tag_codegen::read_bearer_token_issuer::read_bearer_token_issuer;
+use margaret_tag_codegen::tag_expectation::TagExpectation;
 
 use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
@@ -31,7 +29,6 @@ use crate::bound_parameter::BoundParameter;
 use crate::form_request_arguments::FormRequestArguments;
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::injects_views::injects_views;
-use crate::oidc_token_verifier_field::OidcTokenVerifierField;
 use crate::request_binding::RequestBinding;
 use crate::request_binding_error::RequestBindingError;
 use crate::request_injectable::RequestInjectable;
@@ -224,12 +221,6 @@ fn classify_context_specific(
                         parameter: position.to_string(),
                     })
                 }
-                InjectableResolution::JwksSecretStoreByPath => {
-                    Err(RequestBindingError::JwksSecretStoreInjectedByPath {
-                        subject: subject.to_string(),
-                        parameter: position.to_string(),
-                    })
-                }
                 InjectableResolution::FrameworkOnly => {
                     Err(RequestBindingError::FrameworkOnlyProviderInjected {
                         subject: subject.to_string(),
@@ -372,7 +363,7 @@ fn verify_single_inference(
             });
         }
 
-        if application.challenge == AuthenticatedUserChallenge::Bearer {
+        if let AuthenticatedUserChallenge::Bearer { .. } = application.challenge {
             bearer_inferences += 1;
         }
     }
@@ -415,7 +406,7 @@ fn verify_single_request_parameters(
     verify_single_inference(bound, subject)
 }
 
-fn oidc_token_claims_path(claims: &Type) -> Option<&TypePath> {
+fn bearer_token_claims_path(claims: &Type) -> Option<&TypePath> {
     let Type::Path(claims_path) = claims else {
         return None;
     };
@@ -429,14 +420,14 @@ fn oidc_token_claims_path(claims: &Type) -> Option<&TypePath> {
     .then_some(claims_path)
 }
 
-fn classify_oidc_token(
+fn classify_bearer_token(
     index: &AttributeIndex,
     item: &IndexedItem,
     attribute: &IndexedAttribute,
     declared: &Type,
     context: &BindingContext,
     position: usize,
-    bound: &mut BoundOidcTokens,
+    slot: &mut BearerTokenSlot,
 ) -> Result<RequestBinding, RequestBindingError> {
     let subject = context.subject();
     let BindingContext::AuthenticatedUserProvider {
@@ -445,23 +436,27 @@ fn classify_oidc_token(
         ..
     } = context
     else {
-        return Err(RequestBindingError::OidcTokenUnavailable {
+        return Err(RequestBindingError::BearerTokenUnavailable {
             subject: subject.to_string(),
             parameter: position.to_string(),
         });
     };
     let site = format!("argument #{position} of {subject}");
-    let issuer = read_oidc_token_issuer(attribute.args()?, &site)?;
+    let issuer = read_bearer_token_issuer(attribute.args()?, &site)?;
 
-    tags.resolve(&issuer, TagKind::OidcIssuer, &site)?;
+    tags.resolve(&issuer, TagExpectation::TokenIssuer, &site)?;
 
-    let written = || declared.to_token_stream().to_string();
-    let claims = match declared {
-        Type::Path(declared_path)
-            if RequestInjectable::OidcTokenVerification
-                .matches(index.resolve_item_type(item, declared).as_ref(), false) =>
+    let OptionalParameter {
+        required,
+        value_type,
+    } = OptionalParameter::from_type(index, item, declared);
+    let claims = match &value_type {
+        Type::Path(verified_path)
+            if !required
+                && RequestInjectable::VerifiedJwt
+                    .matches(index.resolve_item_type(item, &value_type).as_ref(), false) =>
         {
-            declared_path
+            verified_path
                 .path
                 .segments
                 .last()
@@ -469,14 +464,14 @@ fn classify_oidc_token(
         }
         _ => None,
     }
-    .ok_or_else(|| RequestBindingError::OidcTokenTypeMismatch {
+    .ok_or_else(|| RequestBindingError::BearerTokenTypeMismatch {
         subject: subject.to_string(),
         parameter: position.to_string(),
-        written: written(),
+        written: declared.to_token_stream().to_string(),
     })?;
     let claims_written = || claims.to_token_stream().to_string();
-    let claims_path = oidc_token_claims_path(claims).ok_or_else(|| {
-        RequestBindingError::UnsupportedOidcTokenClaims {
+    let claims_path = bearer_token_claims_path(claims).ok_or_else(|| {
+        RequestBindingError::UnsupportedBearerTokenClaims {
             subject: subject.to_string(),
             parameter: position.to_string(),
             written: claims_written(),
@@ -484,37 +479,31 @@ fn classify_oidc_token(
     })?;
     let claims = index
         .resolve_item_path(item, &claims_path.path)
-        .ok_or_else(|| RequestBindingError::UnknownOidcTokenClaims {
+        .ok_or_else(|| RequestBindingError::UnknownBearerTokenClaims {
             subject: subject.to_string(),
             parameter: position.to_string(),
             written: claims_written(),
         })?;
 
-    if !bound.issuers.insert(issuer.clone()) {
-        return Err(RequestBindingError::MultipleOidcTokenParameters {
+    if let BearerTokenSlot::Bound = slot {
+        return Err(RequestBindingError::MultipleBearerTokenParameters {
             subject: subject.to_string(),
-            issuer: issuer.to_string(),
         });
     }
 
-    let client = container_bindings.oidc_client(&issuer).ok_or_else(|| {
-        RequestBindingError::UnplannedOidcClient {
+    *slot = BearerTokenSlot::Bound;
+
+    let issuer_client = container_bindings
+        .token_issuer_client(&issuer)
+        .ok_or_else(|| RequestBindingError::UnplannedTokenIssuerClient {
             subject: subject.to_string(),
             parameter: position.to_string(),
             issuer: issuer.to_string(),
-        }
-    })?;
+        })?;
 
-    Ok(RequestBinding::OidcToken {
+    Ok(RequestBinding::BearerToken {
         claims,
-        verifier: OidcTokenVerifierField {
-            client,
-            field: bound
-                .verifier_fields
-                .allocate("oidc_token_verifier")
-                .field()
-                .to_string(),
-        },
+        issuer_client,
     })
 }
 
@@ -531,7 +520,7 @@ fn parameter_marker<'marker>(
     };
     let authenticated_user = marker(FrameworkAttribute::AuthenticatedUser);
     let form_request = marker(FrameworkAttribute::FormRequest);
-    let oidc_token = marker(FrameworkAttribute::OidcToken);
+    let bearer_token = marker(FrameworkAttribute::BearerToken);
     let route_parameter = marker(FrameworkAttribute::RouteParameter);
 
     if route_parameter.is_some() && form_request.is_some() {
@@ -548,10 +537,10 @@ fn parameter_marker<'marker>(
         });
     }
 
-    if oidc_token.is_some()
+    if bearer_token.is_some()
         && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
     {
-        return Err(RequestBindingError::ConflictingOidcTokenMarkers {
+        return Err(RequestBindingError::ConflictingBearerTokenMarkers {
             subject: subject.to_string(),
             parameter: position.to_string(),
         });
@@ -561,7 +550,7 @@ fn parameter_marker<'marker>(
         && (authenticated_user.is_some()
             || route_parameter.is_some()
             || form_request.is_some()
-            || oidc_token.is_some())
+            || bearer_token.is_some())
     {
         return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
             subject: subject.to_string(),
@@ -573,28 +562,27 @@ fn parameter_marker<'marker>(
         match (
             authenticated_user,
             form_request,
-            oidc_token,
+            bearer_token,
             route_parameter,
         ) {
             (Some(_), _, _, _) => ParameterMarker::AuthenticatedUser,
             (None, Some(attribute), _, _) => ParameterMarker::FormRequest(attribute),
-            (None, None, Some(attribute), _) => ParameterMarker::OidcToken(attribute),
+            (None, None, Some(attribute), _) => ParameterMarker::BearerToken(attribute),
             (None, None, None, Some(attribute)) => ParameterMarker::RouteParameter(attribute),
             (None, None, None, None) => ParameterMarker::Unmarked,
         },
     )
 }
 
-#[derive(Default)]
-struct BoundOidcTokens {
-    issuers: HashSet<Tag>,
-    verifier_fields: NameAllocator,
+enum BearerTokenSlot {
+    Bound,
+    Vacant,
 }
 
 enum ParameterMarker<'marker> {
     AuthenticatedUser,
+    BearerToken(&'marker IndexedAttribute),
     FormRequest(&'marker IndexedAttribute),
-    OidcToken(&'marker IndexedAttribute),
     RouteParameter(&'marker IndexedAttribute),
     Unmarked,
 }
@@ -611,7 +599,7 @@ pub fn classify_parameters(
 ) -> Result<Vec<BoundParameter>, RequestBindingError> {
     let subject = context.subject();
     let mut bound = Vec::new();
-    let mut bound_oidc_tokens = BoundOidcTokens::default();
+    let mut bearer_token_slot = BearerTokenSlot::Vacant;
     let mut bound_route_parameters = HashSet::new();
 
     for ParameterView {
@@ -634,18 +622,18 @@ pub fn classify_parameters(
                 position,
                 &registries.authenticated_users,
             )?,
-            ParameterMarker::FormRequest(attribute) => {
-                classify_form_request(index, item, attribute, declared, context, position)?
-            }
-            ParameterMarker::OidcToken(attribute) => classify_oidc_token(
+            ParameterMarker::BearerToken(attribute) => classify_bearer_token(
                 index,
                 item,
                 attribute,
                 declared,
                 context,
                 position,
-                &mut bound_oidc_tokens,
+                &mut bearer_token_slot,
             )?,
+            ParameterMarker::FormRequest(attribute) => {
+                classify_form_request(index, item, attribute, declared, context, position)?
+            }
             ParameterMarker::RouteParameter(attribute) => classify_route_parameter(
                 context,
                 attribute,

@@ -23,7 +23,6 @@ use crate::infers_authenticated_user_arguments::InfersAuthenticatedUserArguments
 use crate::injects_peer_spiffe_id::injects_peer_spiffe_id;
 use crate::injects_routes::injects_routes;
 use crate::injects_views::injects_views;
-use crate::oidc_token_verifier_fields::oidc_token_verifier_fields;
 use crate::request_binding_error::RequestBindingError;
 
 fn infer_from_request_method<'index>(
@@ -129,7 +128,6 @@ pub fn authenticated_user_providers(
             injects_routes: injects_routes(&parameters),
             injects_views: injects_views(&parameters),
             model: model.clone(),
-            oidc_token_verifiers: oidc_token_verifier_fields(&parameters),
             wrapper: format_ident!("{}", identifier.type_name()),
         };
         let is_async = method.signature().asyncness.is_some();

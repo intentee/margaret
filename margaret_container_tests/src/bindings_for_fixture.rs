@@ -5,7 +5,6 @@ use margaret_attributes::crate_root::CrateRoot;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::render_container::render_container;
 use margaret_serve_input_codegen::scan::scan;
-use margaret_tag_codegen::tag_pool::TagPool;
 
 #[must_use]
 /// # Panics
@@ -18,12 +17,7 @@ pub fn bindings_for_fixture(crate_name: &str, source_directory: &Path) -> Contai
         .build();
     let registry = scan(&index).expect("the console arguments are scanned");
 
-    render_container(
-        &index,
-        &registry,
-        &[],
-        &TagPool::collect(&index).expect("the tags are collected"),
-    )
-    .expect("the fixture renders")
-    .bindings
+    render_container(&index, &registry, &[])
+        .expect("the fixture renders")
+        .bindings
 }

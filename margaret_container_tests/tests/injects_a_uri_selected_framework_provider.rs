@@ -10,7 +10,6 @@ use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container_tests::container_module_source::container_module_source;
 use margaret_serve_input_codegen::scan::scan;
-use margaret_tag_codegen::tag_pool::TagPool;
 
 fn uri_selected_provider() -> FrameworkProvider {
     FrameworkProvider {
@@ -39,14 +38,9 @@ fn render_with_provider(fixture: &str) -> String {
     let registry = scan(&index).expect("the console arguments are scanned");
 
     container_module_source(
-        render_container(
-            &index,
-            &registry,
-            &[uri_selected_provider()],
-            &TagPool::collect(&index).expect("the tags are collected"),
-        )
-        .expect("the fixture renders")
-        .modules,
+        render_container(&index, &registry, &[uri_selected_provider()])
+            .expect("the fixture renders")
+            .modules,
     )
     .split_whitespace()
     .collect()

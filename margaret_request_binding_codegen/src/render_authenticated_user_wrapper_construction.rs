@@ -6,14 +6,16 @@ use quote::quote;
 use margaret_container::container_bindings::ContainerBindings;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
+use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
+use crate::bearer_token_verifier_field::BEARER_TOKEN_VERIFIER_FIELD;
 
 #[must_use]
 pub fn render_authenticated_user_wrapper_construction(
     AuthenticatedUserApplication {
+        challenge,
         field,
         injects_routes,
         injects_views,
-        oidc_token_verifiers,
         wrapper,
         ..
     }: &AuthenticatedUserApplication,
@@ -24,12 +26,15 @@ pub fn render_authenticated_user_wrapper_construction(
     let inner = bindings.accessor_invocation(container, field);
     let routes_init = injects_routes.then(|| quote! { routes: routes.clone(), });
     let views_init = injects_views.then(|| quote! { views: views.clone(), });
-    let verifier_inits = oidc_token_verifiers.iter().map(|verifier| {
-        let verifier_field = format_ident!("{}", verifier.field);
-        let client = bindings.accessor_invocation(container, &verifier.client.field);
+    let verifier_init = match challenge {
+        AuthenticatedUserChallenge::Bearer { issuer_client } => {
+            let verifier_field = format_ident!("{BEARER_TOKEN_VERIFIER_FIELD}");
+            let client = bindings.accessor_invocation(container, &issuer_client.field);
 
-        quote! { #verifier_field: #client.verifier(), }
-    });
+            quote! { #verifier_field: #client.verifier(), }
+        }
+        AuthenticatedUserChallenge::Unchallenged => TokenStream::new(),
+    };
 
     quote! {
         ::std::sync::Arc::new(
@@ -37,7 +42,7 @@ pub fn render_authenticated_user_wrapper_construction(
                 inner: #inner,
                 #routes_init
                 #views_init
-                #(#verifier_inits)*
+                #verifier_init
             },
         )
     }
@@ -54,31 +59,28 @@ mod tests {
     use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_tag_codegen::tag_pool::TagPool;
 
     use super::render_authenticated_user_wrapper_construction;
     use crate::authenticated_user_application::AuthenticatedUserApplication;
     use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
-    use crate::oidc_token_verifier_field::OidcTokenVerifierField;
 
     fn path(name: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
     }
 
     fn application(
+        challenge: AuthenticatedUserChallenge,
         injects_routes: bool,
         injects_views: bool,
-        oidc_token_verifiers: Vec<OidcTokenVerifierField>,
     ) -> AuthenticatedUserApplication {
         AuthenticatedUserApplication {
-            challenge: AuthenticatedUserChallenge::Unchallenged,
+            challenge,
             concrete: path("Provider"),
             field: "provider".to_string(),
             injects_peer_spiffe_id: false,
             injects_routes,
             injects_views,
             model: path("User"),
-            oidc_token_verifiers,
             wrapper: format_ident!("Provider"),
         }
     }
@@ -90,7 +92,6 @@ mod tests {
             &index,
             &scan(&index).expect("the serve inputs are scanned"),
             &[],
-            &TagPool::collect(&index).expect("the tags are collected"),
         )
         .expect("the container renders")
         .bindings
@@ -110,7 +111,11 @@ mod tests {
     #[test]
     fn hands_the_wrapper_only_its_inner_provider() {
         assert_eq!(
-            construction(&application(false, false, Vec::new())),
+            construction(&application(
+                AuthenticatedUserChallenge::Unchallenged,
+                false,
+                false
+            )),
             "::std::sync::Arc::new(super::authenticated_users::Provider{inner:container.provider(),},)"
         );
     }
@@ -118,26 +123,29 @@ mod tests {
     #[test]
     fn hands_the_wrapper_the_routes_and_views_its_provider_reads() {
         assert_eq!(
-            construction(&application(true, true, Vec::new())),
+            construction(&application(
+                AuthenticatedUserChallenge::Unchallenged,
+                true,
+                true
+            )),
             "::std::sync::Arc::new(super::authenticated_users::Provider{inner:container.provider(),routes:routes.clone(),views:views.clone(),},)"
         );
     }
 
     #[test]
-    fn hands_the_wrapper_a_verifier_of_each_oidc_client_its_provider_reads() {
+    fn hands_the_wrapper_the_verifier_of_the_token_issuer_its_provider_reads() {
         assert_eq!(
             construction(&application(
-                false,
-                false,
-                vec![OidcTokenVerifierField {
-                    client: InjectedDependency {
+                AuthenticatedUserChallenge::Bearer {
+                    issuer_client: InjectedDependency {
                         concrete: path("Client"),
                         field: "partner_client".to_string(),
                     },
-                    field: "oidc_token_verifier".to_string(),
-                }],
+                },
+                false,
+                false,
             )),
-            "::std::sync::Arc::new(super::authenticated_users::Provider{inner:container.provider(),oidc_token_verifier:container.partner_client().verifier(),},)"
+            "::std::sync::Arc::new(super::authenticated_users::Provider{inner:container.provider(),bearer_token_verifier:container.partner_client().verifier(),},)"
         );
     }
 }

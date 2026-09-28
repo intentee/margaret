@@ -60,11 +60,6 @@ pub enum RequestBindingError {
     MissingProvider { subject: String, parameter: String },
 
     #[error(
-        "parameter '{parameter}' of {subject} injects a jwks secret store by its path; it is available only through #[jwks_secret_store(...)] on a constructor parameter"
-    )]
-    JwksSecretStoreInjectedByPath { subject: String, parameter: String },
-
-    #[error(
         "parameter '{parameter}' of {subject} injects a provider by its path, which only the framework may inject"
     )]
     FrameworkOnlyProviderInjected { subject: String, parameter: String },
@@ -146,7 +141,7 @@ pub enum RequestBindingError {
     ConflictingArgumentMarkers { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} is the peer SPIFFE id and must not also carry #[authenticated_user], #[route_parameter], #[form_request], or #[oidc_token]"
+        "argument #{parameter} of {subject} is the peer SPIFFE id and must not also carry #[authenticated_user], #[route_parameter], #[form_request], or #[bearer_token]"
     )]
     MarkedPeerSpiffeIdParameter { subject: String, parameter: String },
 
@@ -269,56 +264,56 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "parameter '{parameter}' of {subject} must be the current request, a form request, an OIDC token, the peer SPIFFE id, the views, an asset bag, or the routes"
+        "parameter '{parameter}' of {subject} must be the current request, a form request, a bearer token, the peer SPIFFE id, the views, an asset bag, or the routes"
     )]
     UnmarkedProviderParameter { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} carries #[oidc_token], which is only available in an #[infer_from_request] method of an #[infers_authenticated_user] provider"
+        "argument #{parameter} of {subject} carries #[bearer_token], which is only available in an #[infer_from_request] method of an #[infers_authenticated_user] provider"
     )]
-    OidcTokenUnavailable { subject: String, parameter: String },
+    BearerTokenUnavailable { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} carries #[oidc_token] together with #[authenticated_user], #[route_parameter], or #[form_request]; an argument may use at most one"
+        "argument #{parameter} of {subject} carries #[bearer_token] together with #[authenticated_user], #[route_parameter], or #[form_request]; an argument may use at most one"
     )]
-    ConflictingOidcTokenMarkers { subject: String, parameter: String },
+    ConflictingBearerTokenMarkers { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} carries #[oidc_token] on '{written}'; it must be margaret::framework::oidc_client::oidc_token_verification::OidcTokenVerification<Claims> taken by value"
+        "argument #{parameter} of {subject} carries #[bearer_token] on '{written}'; it must be Option<margaret::framework::jwt_verification::verified_jwt::VerifiedJwt<Claims>> taken by value"
     )]
-    OidcTokenTypeMismatch {
+    BearerTokenTypeMismatch {
         subject: String,
         parameter: String,
         written: String,
     },
 
     #[error(
-        "argument #{parameter} of {subject} verifies OIDC tokens into the claims '{written}', which is not a named type without generic arguments"
+        "argument #{parameter} of {subject} verifies the bearer token into the claims '{written}', which is not a named type without generic arguments"
     )]
-    UnsupportedOidcTokenClaims {
+    UnsupportedBearerTokenClaims {
         subject: String,
         parameter: String,
         written: String,
     },
 
     #[error(
-        "argument #{parameter} of {subject} verifies OIDC tokens into the claims '{written}', which matches no type in scope"
+        "argument #{parameter} of {subject} verifies the bearer token into the claims '{written}', which matches no type in scope"
     )]
-    UnknownOidcTokenClaims {
+    UnknownBearerTokenClaims {
         subject: String,
         parameter: String,
         written: String,
     },
 
     #[error(
-        "{subject} requests the OIDC token of the issuer '{issuer}' more than once; a request verifies it exactly once"
+        "{subject} reads the bearer token more than once; a request presents exactly one bearer token"
     )]
-    MultipleOidcTokenParameters { subject: String, issuer: String },
+    MultipleBearerTokenParameters { subject: String },
 
     #[error(
-        "argument #{parameter} of {subject} verifies OIDC tokens of the issuer '{issuer}', whose client the container does not plan"
+        "argument #{parameter} of {subject} verifies the bearer token of the token issuer '{issuer}', whose client the container does not plan"
     )]
-    UnplannedOidcClient {
+    UnplannedTokenIssuerClient {
         subject: String,
         parameter: String,
         issuer: String,

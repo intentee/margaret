@@ -4,10 +4,10 @@ pub enum RequestInjectable {
     AssetBag,
     CurrentRequest,
     Next,
-    OidcTokenVerification,
     PeerSpiffeId,
     Routes,
     ValidationResult,
+    VerifiedJwt,
     Views,
 }
 
@@ -18,10 +18,10 @@ impl RequestInjectable {
             Self::AssetBag,
             Self::CurrentRequest,
             Self::Next,
-            Self::OidcTokenVerification,
             Self::PeerSpiffeId,
             Self::Routes,
             Self::ValidationResult,
+            Self::VerifiedJwt,
             Self::Views,
         ]
         .into_iter()
@@ -56,13 +56,6 @@ impl RequestInjectable {
                 "next".to_string(),
                 "Next".to_string(),
             ]),
-            Self::OidcTokenVerification => CanonicalPath::new(vec![
-                "margaret".to_string(),
-                "framework".to_string(),
-                "oidc_client".to_string(),
-                "oidc_token_verification".to_string(),
-                "OidcTokenVerification".to_string(),
-            ]),
             Self::PeerSpiffeId => CanonicalPath::new(vec![
                 "spiffe".to_string(),
                 "spiffe_id".to_string(),
@@ -81,6 +74,13 @@ impl RequestInjectable {
                 "validation_result".to_string(),
                 "ValidationResult".to_string(),
             ]),
+            Self::VerifiedJwt => CanonicalPath::new(vec![
+                "margaret".to_string(),
+                "framework".to_string(),
+                "jwt_verification".to_string(),
+                "verified_jwt".to_string(),
+                "VerifiedJwt".to_string(),
+            ]),
             Self::Views => CanonicalPath::new(vec![
                 "crate".to_string(),
                 "margaret".to_string(),
@@ -93,9 +93,7 @@ impl RequestInjectable {
     fn requires_reference(&self) -> bool {
         match self {
             Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes | Self::Views => true,
-            Self::AssetBag | Self::Next | Self::OidcTokenVerification | Self::ValidationResult => {
-                false
-            }
+            Self::AssetBag | Self::Next | Self::ValidationResult | Self::VerifiedJwt => false,
         }
     }
 }

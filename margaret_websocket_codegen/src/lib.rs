@@ -34,6 +34,7 @@ mod tests {
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::canonical_path::CanonicalPath;
+    use margaret_attributes::tag::Tag;
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::framework_construction::FrameworkConstruction;
@@ -158,14 +159,9 @@ impl RespondsToWebSocketNotification for Typist {
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(
-            index,
-            &registry,
-            &[],
-            &TagPool::collect(index).expect("the tags are collected"),
-        )
-        .expect("the container renders")
-        .bindings
+        render_container(index, &registry, &[])
+            .expect("the container renders")
+            .bindings
     }
 
     fn collect_registries(
@@ -1017,19 +1013,19 @@ impl Bad {
     }
 
     #[test]
-    fn rejects_a_session_parameter_that_injects_a_jwks_secret_store_by_path() {
+    fn rejects_a_session_parameter_that_injects_a_token_issuer_client_by_path() {
         let index = IndexedSource::new(
             r#"
 use std::sync::Arc;
 
-use crate::ServerStore;
+use crate::IssuerClient;
 
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(store: Arc<ServerStore>) -> anyhow::Result<Self> {}
+    fn build(client: Arc<IssuerClient>) -> anyhow::Result<Self> {}
 }
 "#,
         )
@@ -1045,19 +1041,21 @@ impl Bad {
             &[FrameworkProvider {
                 construction: FrameworkConstruction::Unit,
                 enablement: FrameworkEnablement::Always,
-                injection: FrameworkInjectionRole::JwksServerStore,
-                provided: CanonicalPath::new(vec!["crate".to_string(), "ServerStore".to_string()]),
+                injection: FrameworkInjectionRole::TokenIssuerClient(
+                    Tag::from_path(&syn::parse_str("auth").expect("the tag path parses"))
+                        .expect("the tag is a plain name"),
+                ),
+                provided: CanonicalPath::new(vec!["crate".to_string(), "IssuerClient".to_string()]),
             }],
-            &TagPool::collect(&index).expect("the tags are collected"),
         )
         .expect("the container renders")
         .bindings;
 
         assert!(
             render_websocket(&index, &bindings, &plans, &registries)
-                .expect_err("a jwks secret store is not injectable by path")
+                .expect_err("a token issuer client is not injectable by path")
                 .to_string()
-                .contains("injects a jwks secret store by its path")
+                .contains("which only the framework may inject")
         );
     }
 

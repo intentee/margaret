@@ -13,7 +13,6 @@ use margaret_container::render_container::render_container;
 use margaret_container::rendered_container::RenderedContainer;
 use margaret_container_tests::container_module_source::container_module_source;
 use margaret_serve_input_codegen::scan::scan;
-use margaret_tag_codegen::tag_pool::TagPool;
 
 fn issued_token_store() -> FrameworkProvider {
     FrameworkProvider {
@@ -38,12 +37,7 @@ fn render(fixture: &str) -> Result<RenderedContainer, ContainerError> {
         .build();
     let serve_inputs = scan(&index).expect("the serve inputs are scanned");
 
-    render_container(
-        &index,
-        &serve_inputs,
-        &[issued_token_store()],
-        &TagPool::collect(&index).expect("the tags are collected"),
-    )
+    render_container(&index, &serve_inputs, &[issued_token_store()])
 }
 
 #[test]

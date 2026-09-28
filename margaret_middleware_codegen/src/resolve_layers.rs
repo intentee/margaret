@@ -2,7 +2,7 @@ use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_tag_codegen::read_reference_tag::read_reference_tag;
-use margaret_tag_codegen::tag_kind::TagKind;
+use margaret_tag_codegen::tag_expectation::TagExpectation;
 
 use crate::layer_application::LayerApplication;
 use crate::middleware_codegen_error::MiddlewareCodegenError;
@@ -20,7 +20,7 @@ pub fn resolve_layers(
 
     for matched in AttributeQuery::new(item).find_all_framework(FrameworkAttribute::Middleware) {
         let tag = read_reference_tag(matched.args()?, site)?;
-        let handler = tags.resolve(&tag, TagKind::Middleware, site)?;
+        let handler = tags.resolve(&tag, TagExpectation::Middleware, site)?;
         let Some(plan) = plans
             .iter()
             .find(|plan| plan.concrete == *handler.canonical_path())

@@ -16,6 +16,7 @@ use margaret_model_codegen::model_codegen_error::ModelCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 use margaret_serve_input_codegen::serve_input_codegen_error::ServeInputCodegenError;
 use margaret_service_codegen::service_codegen_error::ServiceCodegenError;
+use margaret_tag_codegen::tag_error::TagError;
 use margaret_views_codegen::views_codegen_error::ViewsCodegenError;
 use margaret_websocket_codegen::web_socket_codegen_error::WebSocketCodegenError;
 
@@ -48,6 +49,12 @@ pub enum CodegenError {
         "a module imports the asset macro, but no esbuild metafile was found at the workspace root"
     )]
     AssetMacroWithoutMetafile,
+
+    #[error("failed to collect the tags: {source}")]
+    Tag {
+        #[from]
+        source: TagError,
+    },
 
     #[error("failed to generate the dependency container: {source}")]
     Container {

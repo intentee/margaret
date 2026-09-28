@@ -3,6 +3,7 @@ use thiserror::Error;
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 
+use crate::tag_expectation::TagExpectation;
 use crate::tag_kind::TagKind;
 
 #[derive(Debug, Error)]
@@ -36,23 +37,20 @@ pub enum TagError {
     UnknownTag {
         site: String,
         tag: String,
-        kind: TagKind,
+        kind: TagExpectation,
     },
 
     #[error("{site} references the tag '{tag}', which is a {found}, not a {expected}")]
     WrongKind {
         site: String,
         tag: String,
-        expected: TagKind,
+        expected: TagExpectation,
         found: TagKind,
     },
 
     #[error("{site} must reference exactly one tag by its plain name")]
     MalformedReference { site: String },
 
-    #[error("{site} must be either `server` or `client = <tag>`")]
-    MalformedJwksSecretStore { site: String },
-
     #[error("{site} must be `issuer = <tag>`")]
-    MalformedOidcToken { site: String },
+    MalformedBearerToken { site: String },
 }

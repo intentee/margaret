@@ -9,7 +9,6 @@ use margaret_attributes::crate_root::CrateRoot;
 use margaret_console_codegen::console_plan::ConsolePlan;
 use margaret_console_codegen::render_console::render_console;
 use margaret_container::container_bindings::ContainerBindings;
-use margaret_container::container_error::ContainerError;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
@@ -213,11 +212,11 @@ pub fn build(
         .build();
     let mut features = GeneratedFeatures::from_index(&index);
     let registry = scan(&index)?;
-    let tags = TagPool::collect(&index).map_err(ContainerError::from)?;
+    let tags = TagPool::collect(&index)?;
     let client_bindings = tags.segmented_bindings(TagKind::JwksClient);
     let issuer_bindings = tags.segmented_bindings(TagKind::OidcIssuer);
     let framework_providers = framework_providers(&client_bindings, &issuer_bindings);
-    let planned_container = plan_container(&index, &registry, &framework_providers, &tags)?;
+    let planned_container = plan_container(&index, &registry, &framework_providers)?;
     let bindings = planned_container.bindings();
     let application_roots = planned_container.roots();
     let mut module_tokens = asset_bag_modules(
@@ -704,18 +703,9 @@ impl DeclaresTokenTrust for PartnerJwksEndpoint {}
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
-struct GetVerify {
-    auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
-    partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
-}
+struct GetVerify;
 
 impl GetVerify {
-    #[constructor]
-    fn create(
-        #[jwks_secret_store(client = auth)] auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
-        #[jwks_secret_store(client = partner)] partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
-    ) -> anyhow::Result<Self> {}
-
     #[process]
     fn respond(&self) -> anyhow::Result<Response> {}
 }
@@ -744,7 +734,7 @@ impl PostMint {
     #[constructor]
     fn create(
         minter: std::sync::Arc<crate::margaret::jwks::MintAccessTokenHandler>,
-        #[jwks_secret_store(server)] store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>,
+        store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>,
     ) -> anyhow::Result<Self> {}
 
     #[process]
@@ -1014,7 +1004,6 @@ impl GetIdentity {
         assert!(serve.contains(
             "margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"
         ));
-        assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
 
     #[test]
@@ -1028,12 +1017,10 @@ impl GetIdentity {
             module(&code, "jwks/auth_jwks_endpoint")
                 .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;")
         );
-        assert!(module(&code, "jwks/auth_jwks_endpoint").contains(
-            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
-        ));
-        assert!(module(&code, "jwks/partner_jwks_endpoint").contains(
-            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
-        ));
+        assert!(
+            module(&code, "jwks/partner_jwks_endpoint")
+                .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;")
+        );
 
         let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
@@ -1074,7 +1061,6 @@ impl GetIdentity {
         assert!(construction.contains("crate::margaret::jwks::JwksSecretStore::create("));
         assert!(construction.contains("::std::sync::Arc::<crate::Issuer>::clone(&issuer)"));
         assert!(construction.contains("crate::margaret::jwks::MintAccessTokenHandler::create("));
-        assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
 
     const OIDC_ISSUERS_CRATE: &str = "\
@@ -1122,7 +1108,6 @@ impl Page {
             module(&code, "oidc/first_issuer")
                 .contains("pub use margaret::framework::oidc_client::oidc_client::OidcClient;")
         );
-        assert!(!concatenated(&code).contains("OidcTokenVerifier"));
     }
 
     #[test]
@@ -1154,7 +1139,7 @@ impl Page {
 pub mod margaret;
 
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret::framework::oidc_client::oidc_token_verification::OidcTokenVerification;
+use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
@@ -1173,7 +1158,7 @@ struct RunnerProvider;
 
 impl RunnerProvider {
     #[infer_from_request]
-    fn infer(&self, #[oidc_token(issuer = partner)] verification: OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<Runner>> {}
+    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<Runner>> {}
 }
 
 #[singleton]
@@ -1194,7 +1179,7 @@ impl RunnerPage {
             .collect();
 
         assert!(server.contains(
-            "oidc_token_verifier:container.margaret_oidc_issuer_oidc_client().verifier(),"
+            "bearer_token_verifier:container.margaret_oidc_issuer_oidc_client().verifier(),"
         ));
         assert!(server.contains(
             "margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user("
@@ -1236,11 +1221,13 @@ impl Consumer {
         assert!(error.contains("which only the framework may inject"));
     }
 
-    const JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE: &str = "\
+    const JWKS_BEARER_CRATE: &str = "\
 #[rustfmt::skip]
 pub mod margaret;
 
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
@@ -1256,36 +1243,75 @@ impl ProvidesEndpoint for AuthJwksEndpoint {}
 
 impl DeclaresTokenTrust for AuthJwksEndpoint {}
 
+struct Claims;
+
+struct Holder;
+
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
-struct GetVerify {
-    verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
+#[infers_authenticated_user(user_model = Holder)]
+struct HolderProvider;
+
+impl HolderProvider {
+    #[infer_from_request]
+    fn infer(&self, #[bearer_token(issuer = auth)] token: Option<VerifiedJwt<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<Holder>> {}
 }
 
-impl GetVerify {
-    #[constructor]
-    fn create(#[jwks_secret_store(client = auth)] verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>) -> anyhow::Result<Self> {}
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/holder\", server = \"public\")]
+struct HolderPage;
 
+impl HolderPage {
     #[process]
-    fn respond(&self) -> anyhow::Result<Response> {}
+    fn respond(&self, #[authenticated_user] holder: Holder) -> anyhow::Result<Response> {}
 }
 ";
 
     #[test]
-    fn weaves_a_serve_input_from_the_jwks_endpoint_through_the_verifier_accessor() {
-        let code = generate(JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE).expect("the build succeeds");
-
-        let construction: String = module(&code, "container/build/serve")
+    fn hands_the_wrapper_of_a_bearer_route_the_verifier_of_its_jwks_endpoint() {
+        let code = generate(JWKS_BEARER_CRATE).expect("the build succeeds");
+        let server: String = module(&code, "http/server_public")
             .split_whitespace()
             .collect();
-        assert!(construction.contains(".verifier()"));
-        assert!(!construction.contains(".await?.verifier()"));
-        assert!(
-            construction.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
-        );
 
-        let run = module(&code, "run");
-        assert!(run.contains(r#"clap::Arg::new("issuer-url")"#));
+        assert!(server.contains(
+            "bearer_token_verifier:container.margaret_jwks_auth_jwks_endpoint_jwks_client().verifier(),"
+        ));
+        assert!(module(&code, "run").contains(r#"clap::Arg::new("issuer-url")"#));
+    }
+
+    #[test]
+    fn rejects_the_jwks_client_injected_by_path() {
+        let error = generate(
+            "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+#[singleton]
+#[provides_jwks_endpoint(auth)]
+struct AuthJwksEndpoint;
+
+impl ProvidesEndpoint for AuthJwksEndpoint {}
+
+impl DeclaresTokenTrust for AuthJwksEndpoint {}
+
+#[singleton]
+struct Consumer {
+    client: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::JwksClient>,
+}
+
+impl Consumer {
+    #[constructor]
+    fn create(client: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::JwksClient>) -> anyhow::Result<Self> {}
+}
+",
+        )
+        .expect_err("the client is framework-only")
+        .to_string();
+
+        assert!(error.contains("which only the framework may inject"));
     }
 
     const JWKS_NAME_COLLISION_CRATE: &str = "\
@@ -1370,17 +1396,15 @@ impl GetJwks {
     }
 
     #[test]
-    fn rejects_a_client_store_referencing_an_unknown_tag() {
-        let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]\nstruct GetVerify {\n    verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>,\n}\n\nimpl GetVerify {\n    #[constructor]\n    fn create(#[jwks_secret_store(client = missing)] verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
-        )
-        .expect_err("a client store without a matching jwks endpoint is rejected")
+    fn rejects_a_bearer_token_referencing_an_unknown_issuer() {
+        let message = generate(&JWKS_BEARER_CRATE.replace(
+            "#[bearer_token(issuer = auth)]",
+            "#[bearer_token(issuer = missing)]",
+        ))
+        .expect_err("a bearer token without a matching token issuer is rejected")
         .to_string();
 
-        assert!(
-            message
-                .contains("references the tag 'missing', which no jwks endpoint provider declares")
-        );
+        assert!(message.contains("references the tag 'missing', which no token issuer declares"));
     }
 
     const JWKS_DUPLICATE_ENDPOINT_TAG_CRATE: &str = "\

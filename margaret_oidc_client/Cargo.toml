@@ -12,18 +12,14 @@ publish.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-margaret_http = { workspace = true }
+margaret_bearer_token_verification = { workspace = true }
 margaret_issuer_document_fetch = { workspace = true }
-margaret_jose_parameters = { workspace = true }
 margaret_jws_verification = { workspace = true }
-margaret_jwt_verification = { workspace = true }
 margaret_key_set_poll = { workspace = true }
 margaret_oidc_discovery = { workspace = true }
-margaret_registered_claims = { workspace = true }
 margaret_sync_holder = { workspace = true }
 margaret_token_trust = { workspace = true }
 reqwest = { workspace = true }
-serde = { workspace = true }
 tokio-util = { workspace = true }
 url = { workspace = true }
 

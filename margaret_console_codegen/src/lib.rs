@@ -18,7 +18,6 @@ mod tests {
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
-    use margaret_tag_codegen::tag_pool::TagPool;
 
     use crate::console_artifacts::ConsoleArtifacts;
     use crate::console_codegen_error::ConsoleCodegenError;
@@ -71,14 +70,9 @@ impl Farewell {
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(
-            index,
-            &registry,
-            &[],
-            &TagPool::collect(index).expect("the tags are collected"),
-        )
-        .expect("the container renders")
-        .bindings
+        render_container(index, &registry, &[])
+            .expect("the container renders")
+            .bindings
     }
 
     fn render_planned_console(

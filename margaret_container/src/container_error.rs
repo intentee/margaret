@@ -3,7 +3,6 @@ use thiserror::Error;
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_serve_input_codegen::serve_input_codegen_error::ServeInputCodegenError;
-use margaret_tag_codegen::tag_error::TagError;
 
 #[derive(Debug, Error)]
 pub enum ContainerError {
@@ -23,12 +22,6 @@ pub enum ContainerError {
     ServeInput {
         #[from]
         source: ServeInputCodegenError,
-    },
-
-    #[error(transparent)]
-    Tag {
-        #[from]
-        source: TagError,
     },
 
     #[error("#[{attribute}] is only supported on structs, but '{path}' is not a struct")]
@@ -67,42 +60,12 @@ pub enum ContainerError {
     )]
     MissingTokenIssuance { provider: String },
 
-    #[error("{site} references a jwks secret store that is not available: {target}")]
-    UnknownJwksSecretStore { site: String, target: String },
-
-    #[error(
-        "{site} marks the jwks secret store of {target}, which provides '{expected}', but the parameter is declared as '{written}'"
-    )]
-    MismatchedJwksSecretStoreType {
-        expected: String,
-        site: String,
-        target: String,
-        written: String,
-    },
-
-    #[error(
-        "parameter '{parameter}' of singleton '{singleton}' injects '{provider}' by its path; it is available only through #[jwks_secret_store(...)]"
-    )]
-    JwksSecretStoreInjectedByPath {
-        parameter: String,
-        provider: String,
-        singleton: String,
-    },
-
     #[error(
         "parameter '{parameter}' of singleton '{singleton}' injects '{provider}', which only the framework may inject"
     )]
     FrameworkOnlyProvider {
         parameter: String,
         provider: String,
-        singleton: String,
-    },
-
-    #[error(
-        "parameter '{parameter}' of singleton '{singleton}' carries a serve input together with #[jwks_secret_store]; a parameter must resolve to exactly one source"
-    )]
-    AmbiguousServeInputAndJwksSecretStore {
-        parameter: String,
         singleton: String,
     },
 

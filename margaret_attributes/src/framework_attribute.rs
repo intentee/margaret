@@ -3,6 +3,7 @@ use crate::canonical_path::CanonicalPath;
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FrameworkAttribute {
     AuthenticatedUser,
+    BearerToken,
     BuildForSession,
     Column,
     ConsoleArgument,
@@ -16,10 +17,8 @@ pub enum FrameworkAttribute {
     InferFromRequest,
     InfersAuthenticatedUser,
     IssuesTokens,
-    JwksSecretStore,
     Middleware,
     Model,
-    OidcToken,
     PrimaryKey,
     Process,
     ProvidesJwksEndpoint,
@@ -39,8 +38,9 @@ pub enum FrameworkAttribute {
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 34] = [
+    pub const ALL: [Self; 33] = [
         Self::AuthenticatedUser,
+        Self::BearerToken,
         Self::BuildForSession,
         Self::Column,
         Self::ConsoleArgument,
@@ -54,10 +54,8 @@ impl FrameworkAttribute {
         Self::InferFromRequest,
         Self::InfersAuthenticatedUser,
         Self::IssuesTokens,
-        Self::JwksSecretStore,
         Self::Middleware,
         Self::Model,
-        Self::OidcToken,
         Self::PrimaryKey,
         Self::Process,
         Self::ProvidesJwksEndpoint,
@@ -91,6 +89,7 @@ impl FrameworkAttribute {
 
         match name {
             "authenticated_user" => Some(Self::AuthenticatedUser),
+            "bearer_token" => Some(Self::BearerToken),
             "build_for_session" => Some(Self::BuildForSession),
             "column" => Some(Self::Column),
             "console_argument" => Some(Self::ConsoleArgument),
@@ -104,10 +103,8 @@ impl FrameworkAttribute {
             "infer_from_request" => Some(Self::InferFromRequest),
             "infers_authenticated_user" => Some(Self::InfersAuthenticatedUser),
             "issues_tokens" => Some(Self::IssuesTokens),
-            "jwks_secret_store" => Some(Self::JwksSecretStore),
             "middleware" => Some(Self::Middleware),
             "model" => Some(Self::Model),
-            "oidc_token" => Some(Self::OidcToken),
             "primary_key" => Some(Self::PrimaryKey),
             "process" => Some(Self::Process),
             "provides_jwks_endpoint" => Some(Self::ProvidesJwksEndpoint),
@@ -132,6 +129,7 @@ impl FrameworkAttribute {
     pub const fn name(self) -> &'static str {
         match self {
             Self::AuthenticatedUser => "authenticated_user",
+            Self::BearerToken => "bearer_token",
             Self::BuildForSession => "build_for_session",
             Self::Column => "column",
             Self::ConsoleArgument => "console_argument",
@@ -145,10 +143,8 @@ impl FrameworkAttribute {
             Self::InferFromRequest => "infer_from_request",
             Self::InfersAuthenticatedUser => "infers_authenticated_user",
             Self::IssuesTokens => "issues_tokens",
-            Self::JwksSecretStore => "jwks_secret_store",
             Self::Middleware => "middleware",
             Self::Model => "model",
-            Self::OidcToken => "oidc_token",
             Self::PrimaryKey => "primary_key",
             Self::Process => "process",
             Self::ProvidesJwksEndpoint => "provides_jwks_endpoint",

@@ -1,3 +1,4 @@
+pub mod access_token_holder;
 pub mod article;
 pub mod article_status;
 pub mod article_translation;

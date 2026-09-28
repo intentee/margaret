@@ -3,8 +3,8 @@ use margaret_attributes::indexed_attribute::IndexedAttribute;
 
 const REQUEST_BINDING_MARKERS: [FrameworkAttribute; 4] = [
     FrameworkAttribute::AuthenticatedUser,
+    FrameworkAttribute::BearerToken,
     FrameworkAttribute::FormRequest,
-    FrameworkAttribute::OidcToken,
     FrameworkAttribute::RouteParameter,
 ];
 
@@ -49,14 +49,14 @@ mod tests {
     }
 
     #[test]
-    fn finds_the_oidc_token_marker() {
+    fn finds_the_bearer_token_marker() {
         let attributes = vec![IndexedAttribute::new(
-            &parse_quote!(#[oidc_token(issuer = partner)]),
+            &parse_quote!(#[bearer_token(issuer = partner)]),
         )];
 
         assert_eq!(
             request_binding_marker(&attributes),
-            Some(FrameworkAttribute::OidcToken)
+            Some(FrameworkAttribute::BearerToken)
         );
     }
 

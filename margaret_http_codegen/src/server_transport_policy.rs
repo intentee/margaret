@@ -76,7 +76,6 @@ mod tests {
                 injects_routes: false,
                 injects_views: false,
                 model: path("User"),
-                oidc_token_verifiers: Vec::new(),
                 wrapper: format_ident!("PeerUserProvider"),
             },
             requirement: AuthenticatedUserRequirement::Required,

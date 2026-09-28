@@ -25,7 +25,7 @@ struct JwtPayload<TClaims> {
 }
 
 #[must_use]
-pub fn verify_jwt<TClaims: DeserializeOwned>(
+pub(crate) fn verify_jwt<TClaims: DeserializeOwned>(
     key_set: &VerificationKeySet,
     jws: &CompactJws,
     JwtExpectation {

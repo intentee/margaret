@@ -10,11 +10,11 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use crate::authenticated_user_application::AuthenticatedUserApplication;
 use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
+use crate::bearer_token_verifier_field::BEARER_TOKEN_VERIFIER_FIELD;
 use crate::binding_reads_request::binding_reads_request;
 use crate::binding_shadows_request::binding_shadows_request;
 use crate::bound_parameter::BoundParameter;
 use crate::extraction_context::ExtractionContext;
-use crate::render_oidc_token_extractions::render_oidc_token_extractions;
 use crate::render_request_extraction::render_request_extraction;
 use crate::request_binding::RequestBinding;
 
@@ -32,10 +32,10 @@ fn provider_argument_value(parameter: &BoundParameter) -> TokenStream {
 
 fn wrapper_struct(
     AuthenticatedUserApplication {
+        challenge,
         concrete,
         injects_routes,
         injects_views,
-        oidc_token_verifiers,
         wrapper,
         ..
     }: &AuthenticatedUserApplication,
@@ -45,20 +45,23 @@ fn wrapper_struct(
         .then(|| quote! { pub routes: std::sync::Arc<super::super::routes::Routes>, });
     let views_field =
         injects_views.then(|| quote! { pub views: std::sync::Arc<super::super::views::Views>, });
-    let verifier_fields = oidc_token_verifiers.iter().map(|verifier| {
-        let field = format_ident!("{}", verifier.field);
+    let verifier_field = match challenge {
+        AuthenticatedUserChallenge::Bearer { .. } => {
+            let field = format_ident!("{BEARER_TOKEN_VERIFIER_FIELD}");
 
-        quote! {
-            pub #field: std::sync::Arc<margaret::framework::oidc_client::oidc_token_verifier::OidcTokenVerifier>,
+            quote! {
+                pub #field: std::sync::Arc<margaret::framework::bearer_token_verification::bearer_token_verifier::BearerTokenVerifier>,
+            }
         }
-    });
+        AuthenticatedUserChallenge::Unchallenged => TokenStream::new(),
+    };
 
     quote! {
         pub struct #wrapper {
             pub inner: std::sync::Arc<#concrete>,
             #routes_field
             #views_field
-            #(#verifier_fields)*
+            #verifier_field
         }
     }
 }
@@ -70,12 +73,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
         method_name,
         parameters,
     } = provider;
-    let AuthenticatedUserApplication {
-        challenge,
-        model,
-        wrapper,
-        ..
-    } = application;
+    let AuthenticatedUserApplication { model, wrapper, .. } = application;
     let wrapper_struct = wrapper_struct(application);
     let model = path_tokens(model);
     let mut allocator = NameAllocator::new();
@@ -110,15 +108,6 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
         )
     };
     let error_return = quote! { return ::std::result::Result::Err(error) };
-    let oidc_token_extractions = match challenge {
-        AuthenticatedUserChallenge::Bearer => render_oidc_token_extractions(
-            parameters,
-            &format_ident!("{}", allocator.allocate("presented_bearer").field()),
-            &request_binding,
-            &error_return,
-        ),
-        AuthenticatedUserChallenge::Unchallenged => TokenStream::new(),
-    };
     let provider_access = TokenStream::new();
     let extractions = parameters.iter().map(|parameter| {
         render_request_extraction(
@@ -153,7 +142,6 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
             ) -> margaret::framework::anyhow::Result<
                 margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome<Self::User>,
             > {
-                #oidc_token_extractions
                 #(#extractions)*
                 #infer_call
             }

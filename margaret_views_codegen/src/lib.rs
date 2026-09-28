@@ -18,7 +18,6 @@ mod tests {
     use margaret_container::render_container::render_container;
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
     use margaret_serve_input_codegen::scan::scan;
-    use margaret_tag_codegen::tag_pool::TagPool;
 
     use crate::render_views::render_views;
     use crate::views_artifacts::ViewsArtifacts;
@@ -28,14 +27,9 @@ mod tests {
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(
-            index,
-            &registry,
-            &[],
-            &TagPool::collect(index).expect("the tags are collected"),
-        )
-        .expect("the container renders")
-        .bindings
+        render_container(index, &registry, &[])
+            .expect("the container renders")
+            .bindings
     }
 
     fn empty_bindings() -> ContainerBindings {

@@ -1,20 +1,17 @@
-use std::iter;
-
 use margaret_attributes::canonical_path::CanonicalPath;
 
+use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::request_binding::RequestBinding;
 
 #[must_use]
 pub fn binding_roots(binding: &RequestBinding) -> Vec<&CanonicalPath> {
     match binding {
-        RequestBinding::AuthenticatedUser { application, .. } => iter::once(&application.concrete)
-            .chain(
-                application
-                    .oidc_token_verifiers
-                    .iter()
-                    .map(|verifier| &verifier.client.concrete),
-            )
-            .collect(),
+        RequestBinding::AuthenticatedUser { application, .. } => match &application.challenge {
+            AuthenticatedUserChallenge::Bearer { issuer_client } => {
+                vec![&application.concrete, &issuer_client.concrete]
+            }
+            AuthenticatedUserChallenge::Unchallenged => vec![&application.concrete],
+        },
         RequestBinding::BoundRouteParameter {
             binder_provider, ..
         } => vec![binder_provider],
@@ -24,7 +21,7 @@ pub fn binding_roots(binding: &RequestBinding) -> Vec<&CanonicalPath> {
         | RequestBinding::FormRequest { .. }
         | RequestBinding::Forwarder
         | RequestBinding::Next
-        | RequestBinding::OidcToken { .. }
+        | RequestBinding::BearerToken { .. }
         | RequestBinding::PeerSpiffeId
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
@@ -43,7 +40,6 @@ mod tests {
     use crate::authenticated_user_application::AuthenticatedUserApplication;
     use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
-    use crate::oidc_token_verifier_field::OidcTokenVerifierField;
     use crate::request_binding::RequestBinding;
 
     fn path(name: &str) -> CanonicalPath {
@@ -77,23 +73,21 @@ mod tests {
     }
 
     #[test]
-    fn retains_the_oidc_clients_an_authenticated_user_provider_verifies_with() {
+    fn retains_the_token_issuer_client_an_authenticated_user_provider_verifies_with() {
         let binding = RequestBinding::AuthenticatedUser {
             application: AuthenticatedUserApplication {
-                challenge: AuthenticatedUserChallenge::Bearer,
+                challenge: AuthenticatedUserChallenge::Bearer {
+                    issuer_client: InjectedDependency {
+                        concrete: path("Client"),
+                        field: "client".to_string(),
+                    },
+                },
                 concrete: path("RunnerProvider"),
                 field: "runner_provider".to_string(),
                 injects_peer_spiffe_id: false,
                 injects_routes: false,
                 injects_views: false,
                 model: path("Runner"),
-                oidc_token_verifiers: vec![OidcTokenVerifierField {
-                    client: InjectedDependency {
-                        concrete: path("Client"),
-                        field: "client".to_string(),
-                    },
-                    field: "oidc_token_verifier".to_string(),
-                }],
                 wrapper: format_ident!("RunnerProvider"),
             },
             requirement: AuthenticatedUserRequirement::Required,

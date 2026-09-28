@@ -10,7 +10,6 @@ use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_serve_input_codegen::scan::scan;
-use margaret_tag_codegen::tag_pool::TagPool;
 
 #[test]
 fn reports_a_framework_provider_colliding_with_a_user_singleton() {
@@ -28,14 +27,9 @@ fn reports_a_framework_provider_colliding_with_a_user_singleton() {
         provided: CanonicalPath::new(vec!["crate".to_string(), "Widget".to_string()]),
     }];
 
-    let error = render_container(
-        &index,
-        &registry,
-        &framework_providers,
-        &TagPool::collect(&index).expect("the tags are collected"),
-    )
-    .err()
-    .expect("a framework provider colliding with a user singleton must be rejected");
+    let error = render_container(&index, &registry, &framework_providers)
+        .err()
+        .expect("a framework provider colliding with a user singleton must be rejected");
 
     assert!(matches!(
         error,

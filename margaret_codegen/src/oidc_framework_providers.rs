@@ -17,7 +17,7 @@ pub(crate) fn oidc_framework_providers(
                 vec![FrameworkDependency::SingletonView(
                     binding.declaring.clone(),
                 )],
-                FrameworkInjectionRole::OidcClient(binding.tag.clone()),
+                FrameworkInjectionRole::TokenIssuerClient(binding.tag.clone()),
             )
         })
         .collect()

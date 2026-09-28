@@ -6,6 +6,7 @@ use reqwest::ClientBuilder;
 use tokio_util::sync::CancellationToken;
 use url::Url;
 
+use margaret_bearer_token_verification::bearer_token_verifier::BearerTokenVerifier;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_key_set_poll::poll_key_set::poll_key_set;
 use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder;
@@ -14,7 +15,6 @@ use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 use margaret_token_trust::declares_token_trust::DeclaresTokenTrust;
 
 use crate::discovery_key_set_locator::DiscoveryKeySetLocator;
-use crate::oidc_token_verifier::OidcTokenVerifier;
 
 pub struct OidcClient {
     discovery_url: Url,
@@ -66,8 +66,8 @@ impl OidcClient {
     }
 
     #[must_use]
-    pub fn verifier(&self) -> Arc<OidcTokenVerifier> {
-        Arc::new(OidcTokenVerifier::new(
+    pub fn verifier(&self) -> Arc<BearerTokenVerifier> {
+        Arc::new(BearerTokenVerifier::new_for_id_tokens(
             self.token_trust.clone(),
             self.verification_key_set_holder.clone(),
         ))

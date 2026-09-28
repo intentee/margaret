@@ -13,6 +13,7 @@ use margaret_attributes::tag::Tag;
 use crate::read_middleware_attribute::read_middleware_attribute;
 use crate::segmented_tag_binding::SegmentedTagBinding;
 use crate::tag_error::TagError;
+use crate::tag_expectation::TagExpectation;
 use crate::tag_kind::TagKind;
 use crate::tagged_item::TaggedItem;
 
@@ -127,7 +128,7 @@ impl<'index> TagPool<'index> {
     pub fn resolve(
         &self,
         tag: &Tag,
-        expected: TagKind,
+        expected: TagExpectation,
         site: &str,
     ) -> Result<&'index IndexedItem, TagError> {
         match self.entries.get(tag) {
@@ -136,7 +137,7 @@ impl<'index> TagPool<'index> {
                 tag: tag.to_string(),
                 kind: expected,
             }),
-            Some(entry) if entry.kind == expected => Ok(entry.item),
+            Some(entry) if expected.admits(entry.kind) => Ok(entry.item),
             Some(entry) => Err(TagError::WrongKind {
                 site: site.to_string(),
                 tag: tag.to_string(),
@@ -173,6 +174,7 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
 
     use crate::tag_error::TagError;
+    use crate::tag_expectation::TagExpectation;
     use crate::tag_kind::TagKind;
     use crate::tag_pool::TagPool;
 
@@ -303,7 +305,7 @@ mod tests {
         let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         assert_eq!(
-            pool.resolve(&tag("logged"), TagKind::Middleware, "the site")
+            pool.resolve(&tag("logged"), TagExpectation::Middleware, "the site")
                 .expect("the tag resolves")
                 .canonical_path()
                 .to_string(),
@@ -333,16 +335,44 @@ mod tests {
     }
 
     #[test]
+    fn resolves_a_jwks_endpoint_tag_as_a_token_issuer() {
+        let indexed = IndexedSource::new("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n");
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
+
+        assert_eq!(
+            pool.resolve(&tag("jwks"), TagExpectation::TokenIssuer, "the site")
+                .expect("the tag resolves")
+                .canonical_path()
+                .to_string(),
+            "crate::JwksEndpoint"
+        );
+    }
+
+    #[test]
+    fn resolves_an_oidc_issuer_tag_as_a_token_issuer() {
+        let indexed = IndexedSource::new("#[trusts_oidc_issuer(partner)]\nstruct Issuer;\n");
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
+
+        assert_eq!(
+            pool.resolve(&tag("partner"), TagExpectation::TokenIssuer, "the site")
+                .expect("the tag resolves")
+                .canonical_path()
+                .to_string(),
+            "crate::Issuer"
+        );
+    }
+
+    #[test]
     fn reports_an_unknown_tag() {
         let indexed = IndexedSource::new("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n");
         let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         assert!(
-            pool.resolve(&tag("missing"), TagKind::JwksClient, "the site")
+            pool.resolve(&tag("missing"), TagExpectation::TokenIssuer, "the site")
                 .err()
                 .expect("the tag is unknown")
                 .to_string()
-                .contains("no jwks endpoint provider declares")
+                .contains("no token issuer declares")
         );
     }
 
@@ -352,7 +382,7 @@ mod tests {
         let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         assert!(
-            pool.resolve(&tag("jwks"), TagKind::Middleware, "the site")
+            pool.resolve(&tag("jwks"), TagExpectation::Middleware, "the site")
                 .err()
                 .expect("the tag is the wrong kind")
                 .to_string()

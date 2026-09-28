@@ -3,6 +3,7 @@ pub mod authenticated_user_challenge;
 pub mod authenticated_user_provider;
 pub mod authenticated_user_providers;
 pub mod authenticated_user_requirement;
+mod bearer_token_verifier_field;
 pub mod binding_context;
 pub mod binding_reads_request;
 pub mod binding_registries;
@@ -21,12 +22,9 @@ mod infers_authenticated_user_arguments;
 pub mod injects_peer_spiffe_id;
 pub mod injects_routes;
 pub mod injects_views;
-pub mod oidc_token_verifier_field;
-pub mod oidc_token_verifier_fields;
 pub mod render_authenticated_user_wrapper_construction;
 pub mod render_authenticated_user_wrappers;
 pub mod render_bound_request_extractions;
-pub mod render_oidc_token_extractions;
 pub mod render_request_extraction;
 pub mod request_binding;
 pub mod request_binding_error;
@@ -69,7 +67,6 @@ mod tests {
     use crate::bound_parameter::BoundParameter;
     use crate::classify_parameters::classify_parameters;
     use crate::extraction_context::ExtractionContext;
-    use crate::oidc_token_verifier_field::OidcTokenVerifierField;
     use crate::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
     use crate::render_request_extraction::render_request_extraction;
     use crate::request_binding::RequestBinding;
@@ -92,47 +89,46 @@ struct User;
         let index = IndexedSource::new("").index;
         let registry = scan(&index).expect("the empty console argument registry is scanned");
 
-        render_container(
-            &index,
-            &registry,
-            &[],
-            &TagPool::collect(&index).expect("the tags are collected"),
-        )
-        .expect("the empty container is rendered")
-        .bindings
+        render_container(&index, &registry, &[])
+            .expect("the empty container is rendered")
+            .bindings
     }
 
     fn missing_path() -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
     }
 
-    fn oidc_client(issuer: &str) -> FrameworkProvider {
-        let path: Path = syn::parse_str(issuer).expect("the tag path parses");
+    fn token_issuer_client(tag: &str, provided: &[&str]) -> FrameworkProvider {
+        let path: Path = syn::parse_str(tag).expect("the tag path parses");
 
         FrameworkProvider {
             construction: FrameworkConstruction::Unit,
             enablement: FrameworkEnablement::Always,
-            injection: FrameworkInjectionRole::OidcClient(
+            injection: FrameworkInjectionRole::TokenIssuerClient(
                 Tag::from_path(&path).expect("the tag is a plain name"),
             ),
-            provided: CanonicalPath::new(vec![
-                "crate".to_string(),
-                "margaret".to_string(),
-                "oidc".to_string(),
-                issuer.to_string(),
-                "OidcClient".to_string(),
-            ]),
+            provided: CanonicalPath::new(provided.iter().map(ToString::to_string).collect()),
         }
     }
 
-    fn oidc_client_bindings() -> ContainerBindings {
+    fn oidc_client(issuer: &str) -> FrameworkProvider {
+        token_issuer_client(issuer, &["crate", "margaret", "oidc", issuer, "OidcClient"])
+    }
+
+    fn token_issuer_client_bindings() -> ContainerBindings {
         let index = IndexedSource::new("").index;
 
         render_container(
             &index,
             &scan(&index).expect("the serve inputs are scanned"),
-            &[oidc_client("partner"), oidc_client("upstream")],
-            &TagPool::collect(&index).expect("the tags are collected"),
+            &[
+                oidc_client("partner"),
+                oidc_client("upstream"),
+                token_issuer_client(
+                    "auth",
+                    &["crate", "margaret", "jwks", "auth_endpoint", "JwksClient"],
+                ),
+            ],
         )
         .expect("the container renders")
         .bindings
@@ -146,7 +142,7 @@ struct User;
             index,
             views,
             &TagPool::collect(index).expect("the tags are collected"),
-            &oidc_client_bindings(),
+            &token_issuer_client_bindings(),
         )
     }
 
@@ -613,14 +609,9 @@ impl SessionUserProvider {
     fn collects_the_console_arguments_a_binding_pulls_in() {
         let index = IndexedSource::new(&provider_source(CONSOLE_ARGUMENT_PROVIDER)).index;
         let registry = scan(&index).expect("the console arguments are scanned");
-        let bindings = render_container(
-            &index,
-            &registry,
-            &[],
-            &TagPool::collect(&index).expect("the tags are collected"),
-        )
-        .expect("the container renders")
-        .bindings;
+        let bindings = render_container(&index, &registry, &[])
+            .expect("the container renders")
+            .bindings;
         let registries = collect_registries(&index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let providers = registries.providers();
@@ -660,7 +651,6 @@ impl SessionUserProvider {
                 injects_routes: false,
                 injects_views: false,
                 model: missing_path(),
-                oidc_token_verifiers: Vec::new(),
                 wrapper: format_ident!("Missing"),
             },
             requirement: AuthenticatedUserRequirement::Required,
@@ -753,7 +743,7 @@ impl SessionUserProvider {
     }
 
     const PARTNER_ISSUER: &str = "\
-use margaret::framework::oidc_client::oidc_token_verification::OidcTokenVerification;
+use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 
 #[singleton]
 #[trusts_oidc_issuer(partner)]
@@ -762,14 +752,14 @@ struct PartnerIssuer;
 struct Claims;
 ";
 
-    fn oidc_provider(parameters: &str) -> String {
+    fn bearer_provider(parameters: &str) -> String {
         format!(
             "{PARTNER_ISSUER}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameters}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )
     }
 
-    fn oidc_rejection(parameters: &str) -> String {
-        rejection_for(&oidc_provider(parameters))
+    fn bearer_rejection(parameters: &str) -> String {
+        rejection_for(&bearer_provider(parameters))
     }
 
     fn wrapper_source(registries: &BindingRegistries) -> String {
@@ -781,114 +771,137 @@ struct Claims;
             .collect()
     }
 
+    fn verifies_with(registries: &BindingRegistries, client: &str) -> bool {
+        matches!(
+            &registries.providers()[0].application.challenge,
+            AuthenticatedUserChallenge::Bearer { issuer_client }
+                if issuer_client.concrete.to_string() == client
+        )
+    }
+
     const PARTNER_TOKEN: &str =
-        "#[oidc_token(issuer = partner)] verification: OidcTokenVerification<Claims>";
+        "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims>>";
 
     #[test]
-    fn binds_an_oidc_token_to_the_client_of_its_issuer() {
-        let registries = registries_for(&oidc_provider(PARTNER_TOKEN));
-        let verifiers: Vec<String> = registries.providers()[0]
-            .application
-            .oidc_token_verifiers
-            .iter()
-            .map(|verifier| format!("{} {}", verifier.client.concrete, verifier.field))
-            .collect();
+    fn binds_a_bearer_token_to_the_client_of_its_oidc_issuer() {
+        assert!(verifies_with(
+            &registries_for(&bearer_provider(PARTNER_TOKEN)),
+            "crate::margaret::oidc::partner::OidcClient"
+        ));
+    }
 
-        assert_eq!(
-            verifiers,
-            vec!["crate::margaret::oidc::partner::OidcClient oidc_token_verifier".to_string()]
+    #[test]
+    fn binds_a_bearer_token_to_the_client_of_its_jwks_endpoint() {
+        assert!(verifies_with(
+            &registries_for(&format!(
+                "#[singleton]\n#[provides_jwks_endpoint(auth)]\nstruct AuthEndpoint;\n\n{}",
+                bearer_provider(
+                    "#[bearer_token(issuer = auth)] token: Option<VerifiedJwt<Claims>>"
+                )
+            )),
+            "crate::margaret::jwks::auth_endpoint::JwksClient"
+        ));
+    }
+
+    #[test]
+    fn renders_no_bearer_token_verifier_for_a_provider_without_a_bearer_token() {
+        assert!(
+            !wrapper_source(&registries_for(SESSION_PROVIDER)).contains("bearer_token_verifier")
         );
     }
 
     #[test]
-    fn challenges_for_bearer_credentials_only_when_a_provider_reads_an_oidc_token() {
-        assert_eq!(
-            registries_for(&oidc_provider(PARTNER_TOKEN)).providers()[0]
-                .application
-                .challenge,
-            AuthenticatedUserChallenge::Bearer
-        );
-        assert_eq!(
-            registries_for(SESSION_PROVIDER).providers()[0]
-                .application
-                .challenge,
-            AuthenticatedUserChallenge::Unchallenged
-        );
-    }
-
-    #[test]
-    fn renders_a_wrapper_that_verifies_the_oidc_token_with_the_verifier_of_its_issuer() {
-        let source = wrapper_source(&registries_for(&oidc_provider(&format!(
+    fn renders_a_wrapper_that_admits_the_bearer_token_with_the_verifier_of_its_issuer() {
+        let source = wrapper_source(&registries_for(&bearer_provider(&format!(
             "request: &Request, {PARTNER_TOKEN}"
         ))));
 
         assert!(source.contains(
-            "puboidc_token_verifier:std::sync::Arc<margaret::framework::oidc_client::oidc_token_verifier::OidcTokenVerifier>,"
+            "pubbearer_token_verifier:std::sync::Arc<margaret::framework::bearer_token_verification::bearer_token_verifier::BearerTokenVerifier>,"
         ));
         assert!(source.contains(
-            "letpresented_bearer=matchmargaret::framework::oidc_client::presented_bearer::PresentedBearer::read(request.inputs.server.authorization(),).map_err(margaret::framework::anyhow::Error::from){::std::result::Result::Ok(presented_bearer)=>presented_bearer,::std::result::Result::Err(error)=>return::std::result::Result::Err(error),};letverification=self.oidc_token_verifier.verify::<crate::Claims>(&presented_bearer);"
+            "lettoken=matchmargaret::framework::bearer_token_verification::admit_bearer_token::admit_bearer_token::<crate::Claims>(&self.bearer_token_verifier,request.inputs.server.authorization(),).map_err(margaret::framework::anyhow::Error::from){::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Anonymous)=>::std::option::Option::None,::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Presented(token))=>::std::option::Option::Some(token),::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Refused(response))=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),::std::result::Result::Err(error)=>return::std::result::Result::Err(error),};"
         ));
-        assert!(source.contains("self.inner.infer(request,verification)"));
+        assert!(source.contains("self.inner.infer(request,token)"));
     }
 
     #[test]
-    fn resolves_the_oidc_token_type_and_claims_through_use_statements() {
+    fn resolves_the_bearer_token_type_and_claims_through_use_statements() {
         let source = wrapper_source(&registries_for(
-            "use margaret::framework::oidc_client::oidc_token_verification;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[oidc_token(issuer = partner)] verification: oidc_token_verification::OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::jwt_verification::verified_jwt;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<verified_jwt::VerifiedJwt<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         ));
 
-        assert!(source.contains("verify::<crate::ci::claims::Claims>(&presented_bearer)"));
+        assert!(source.contains("admit_bearer_token::<crate::ci::claims::Claims>("));
     }
 
     #[test]
-    fn rejects_an_oidc_token_without_an_issuer() {
+    fn rejects_a_bearer_token_without_an_issuer() {
         assert!(
-            oidc_rejection("#[oidc_token] verification: OidcTokenVerification<Claims>")
+            bearer_rejection("#[bearer_token] token: Option<VerifiedJwt<Claims>>")
                 .ends_with("must be `issuer = <tag>`")
         );
     }
 
     #[test]
-    fn propagates_malformed_oidc_token_arguments() {
+    fn propagates_malformed_bearer_token_arguments() {
         assert!(
-            oidc_rejection("#[oidc_token(= 5)] verification: OidcTokenVerification<Claims>")
+            bearer_rejection("#[bearer_token(= 5)] token: Option<VerifiedJwt<Claims>>")
                 .contains("could not be parsed")
         );
     }
 
     #[test]
-    fn rejects_an_oidc_token_of_an_undeclared_issuer() {
+    fn rejects_a_bearer_token_of_an_undeclared_issuer() {
         assert!(
-            oidc_rejection(
-                "#[oidc_token(issuer = undeclared)] verification: OidcTokenVerification<Claims>"
+            bearer_rejection(
+                "#[bearer_token(issuer = undeclared)] token: Option<VerifiedJwt<Claims>>"
             )
-            .ends_with("references the tag 'undeclared', which no oidc issuer declares")
+            .ends_with("references the tag 'undeclared', which no token issuer declares")
         );
     }
 
     #[test]
-    fn rejects_an_oidc_token_declared_as_another_type() {
+    fn rejects_a_bearer_token_of_a_tag_that_names_no_token_issuer() {
         assert!(
-            oidc_rejection("#[oidc_token(issuer = partner)] verification: String")
-                .contains("carries #[oidc_token] on 'String'")
+            rejection_for(&format!(
+                "#[singleton]\n#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n\n{}",
+                bearer_provider("#[bearer_token(issuer = logged)] token: Option<VerifiedJwt<Claims>>")
+            ))
+            .ends_with("references the tag 'logged', which is a middleware handler, not a token issuer")
         );
     }
 
     #[test]
-    fn rejects_an_oidc_token_verification_taken_by_reference() {
+    fn rejects_a_bearer_token_declared_as_another_type() {
         assert!(
-            oidc_rejection(
-                "#[oidc_token(issuer = partner)] verification: &OidcTokenVerification<Claims>"
+            bearer_rejection("#[bearer_token(issuer = partner)] token: String")
+                .contains("carries #[bearer_token] on 'String'")
+        );
+    }
+
+    #[test]
+    fn rejects_a_bearer_token_that_is_not_optional() {
+        assert!(
+            bearer_rejection("#[bearer_token(issuer = partner)] token: VerifiedJwt<Claims>")
+                .contains("carries #[bearer_token] on 'VerifiedJwt < Claims >'")
+        );
+    }
+
+    #[test]
+    fn rejects_a_bearer_token_taken_by_reference() {
+        assert!(
+            bearer_rejection(
+                "#[bearer_token(issuer = partner)] token: Option<&VerifiedJwt<Claims>>"
             )
             .contains("taken by value")
         );
     }
 
     #[test]
-    fn rejects_oidc_claims_with_generic_arguments() {
+    fn rejects_bearer_token_claims_with_generic_arguments() {
         assert!(
-            oidc_rejection(
-                "#[oidc_token(issuer = partner)] verification: OidcTokenVerification<Vec<Claims>>"
+            bearer_rejection(
+                "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Vec<Claims>>>"
             )
             .ends_with(
                 "into the claims 'Vec < Claims >', which is not a named type without generic arguments"
@@ -897,10 +910,10 @@ struct Claims;
     }
 
     #[test]
-    fn rejects_oidc_claims_that_are_not_a_named_type() {
+    fn rejects_bearer_token_claims_that_are_not_a_named_type() {
         assert!(
-            oidc_rejection(
-                "#[oidc_token(issuer = partner)] verification: OidcTokenVerification<(Claims, Claims)>"
+            bearer_rejection(
+                "#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<(Claims, Claims)>>"
             )
             .ends_with(
                 "into the claims '(Claims , Claims)', which is not a named type without generic arguments"
@@ -909,47 +922,50 @@ struct Claims;
     }
 
     #[test]
-    fn rejects_oidc_claims_that_match_no_type() {
+    fn rejects_bearer_token_claims_that_match_no_type() {
         assert!(
-            oidc_rejection(
-                "#[oidc_token(issuer = partner)] verification: OidcTokenVerification<Ghost>"
-            )
-            .ends_with("into the claims 'Ghost', which matches no type in scope")
+            bearer_rejection("#[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Ghost>>")
+                .ends_with("into the claims 'Ghost', which matches no type in scope")
         );
     }
 
     #[test]
-    fn rejects_the_oidc_token_of_one_issuer_requested_twice() {
+    fn rejects_a_provider_that_reads_the_bearer_token_twice() {
         assert!(
-            oidc_rejection(&format!(
-                "{PARTNER_TOKEN}, #[oidc_token(issuer = partner)] repeated: OidcTokenVerification<Claims>"
+            rejection_for(&format!(
+                "#[singleton]\n#[trusts_oidc_issuer(upstream)]\nstruct UpstreamIssuer;\n\n{}",
+                bearer_provider(&format!(
+                    "{PARTNER_TOKEN}, #[bearer_token(issuer = upstream)] upstream: Option<VerifiedJwt<Claims>>"
+                ))
             ))
             .ends_with(
-                "requests the OIDC token of the issuer 'partner' more than once; a request verifies it exactly once"
+                "reads the bearer token more than once; a request presents exactly one bearer token"
             )
         );
     }
 
     #[test]
-    fn rejects_an_oidc_token_that_also_carries_a_form_request() {
+    fn rejects_a_bearer_token_that_also_carries_a_form_request() {
         assert!(
-            oidc_rejection(
-                "#[oidc_token(issuer = partner)] #[form_request(from = RequestInput::Query)] verification: OidcTokenVerification<Claims>"
+            bearer_rejection(
+                "#[bearer_token(issuer = partner)] #[form_request(from = RequestInput::Query)] token: Option<VerifiedJwt<Claims>>"
             )
-            .contains("carries #[oidc_token] together with")
+            .contains("carries #[bearer_token] together with")
         );
     }
 
     #[test]
-    fn rejects_an_oidc_token_on_the_peer_spiffe_id() {
+    fn rejects_a_bearer_token_on_the_peer_spiffe_id() {
         assert!(
-            oidc_rejection("#[oidc_token(issuer = partner)] peer: &spiffe::spiffe_id::SpiffeId")
-                .contains("is the peer SPIFFE id and must not also carry")
+            bearer_rejection(
+                "#[bearer_token(issuer = partner)] peer: &spiffe::spiffe_id::SpiffeId"
+            )
+            .contains("is the peer SPIFFE id and must not also carry")
         );
     }
 
     #[test]
-    fn rejects_an_oidc_token_outside_an_inference_method() {
+    fn rejects_a_bearer_token_outside_an_inference_method() {
         assert!(
             responder_rejection(&format!(
                 "{PARTNER_ISSUER}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, {PARTNER_TOKEN}) -> anyhow::Result<Response> {{}}\n}}\n"
@@ -959,8 +975,8 @@ struct Claims;
     }
 
     #[test]
-    fn rejects_an_oidc_token_whose_client_the_container_does_not_plan() {
-        let index = IndexedSource::new(&provider_source(&oidc_provider(PARTNER_TOKEN))).index;
+    fn rejects_a_bearer_token_whose_client_the_container_does_not_plan() {
+        let index = IndexedSource::new(&provider_source(&bearer_provider(PARTNER_TOKEN))).index;
         let rejection = BindingRegistries::collect(
             &index,
             ViewsAvailability::Available,
@@ -972,15 +988,15 @@ struct Claims;
         .to_string();
 
         assert!(rejection.ends_with(
-            "verifies OIDC tokens of the issuer 'partner', whose client the container does not plan"
+            "verifies the bearer token of the token issuer 'partner', whose client the container does not plan"
         ));
     }
 
     #[test]
-    fn challenges_a_required_user_of_an_oidc_provider_for_bearer_credentials() {
+    fn challenges_a_required_user_of_a_bearer_provider_for_bearer_credentials() {
         let indexed = IndexedSource::new(&provider_source(&format!(
             "{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: User) -> anyhow::Result<Response> {{}}\n}}\n",
-            oidc_provider(PARTNER_TOKEN)
+            bearer_provider(PARTNER_TOKEN)
         )));
         let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
@@ -1024,13 +1040,13 @@ struct Claims;
     }
 
     #[test]
-    fn refuses_to_inject_an_oidc_client_into_a_handshake() {
+    fn refuses_to_inject_a_token_issuer_client_into_a_handshake() {
         let indexed = IndexedSource::new(
             "struct Room;\n\nimpl Room {\n    #[process]\n    fn build(client: std::sync::Arc<crate::margaret::oidc::partner::OidcClient>) -> anyhow::Result<Self> {}\n}\n",
         );
         let item = indexed.item("Room");
         let route_path = RoutePath::parse("/room");
-        let bindings = oidc_client_bindings();
+        let bindings = token_issuer_client_bindings();
         let rejection = classify_parameters(
             &indexed.index,
             item,
@@ -1055,35 +1071,20 @@ struct Claims;
     }
 
     #[test]
-    fn verifies_the_oidc_tokens_of_every_issuer_from_one_presented_bearer() {
-        let source = wrapper_source(&registries_for(&format!(
-            "#[singleton]\n#[trusts_oidc_issuer(upstream)]\nstruct UpstreamIssuer;\n\n{}",
-            oidc_provider(&format!(
-                "{PARTNER_TOKEN}, #[oidc_token(issuer = upstream)] upstream: OidcTokenVerification<Claims>"
-            ))
-        )));
-
-        assert_eq!(source.matches("PresentedBearer::read(").count(), 1);
-        assert!(source.contains(
-            "letverification=self.oidc_token_verifier.verify::<crate::Claims>(&presented_bearer);letupstream=self.oidc_token_verifier_2.verify::<crate::Claims>(&presented_bearer);"
-        ));
-    }
-
-    #[test]
     fn rejects_a_site_that_infers_two_users_from_the_bearer_token() {
         assert_eq!(
             responder_rejection(&format!(
-                "{}\nstruct Runner;\n\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct AdminProvider;\n\nimpl AdminProvider {{\n    #[infer_from_request]\n    fn infer(&self, #[oidc_token(issuer = partner)] verification: OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {{}}\n}}\n\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: Runner, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {{}}\n}}\n",
-                oidc_provider(PARTNER_TOKEN).replace("User", "Runner")
+                "{}\nstruct Runner;\n\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct AdminProvider;\n\nimpl AdminProvider {{\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {{}}\n}}\n\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: Runner, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {{}}\n}}\n",
+                bearer_provider(PARTNER_TOKEN).replace("User", "Runner")
             )),
             "responder 'Page' infers more than one authenticated user from the bearer token; a request presents one bearer credential, so exactly one #[infers_authenticated_user] provider verifies it"
         );
     }
 
     #[test]
-    fn collects_the_console_arguments_of_the_issuers_a_bearer_provider_verifies() {
+    fn collects_the_console_arguments_of_the_issuer_a_bearer_provider_verifies() {
         let index = IndexedSource::new(&provider_source(&format!(
-            "use margaret::framework::oidc_client::oidc_token_verification::OidcTokenVerification;\nuse margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;\n\nstruct Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\nimpl DeclaresTokenTrust for PartnerIssuer {{}}\n\nimpl PartnerIssuer {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+            "use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\nuse margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;\n\nstruct Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\nimpl DeclaresTokenTrust for PartnerIssuer {{}}\n\nimpl PartnerIssuer {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )))
         .index;
         let tags = TagPool::collect(&index).expect("the tags are collected");
@@ -1100,7 +1101,6 @@ struct Claims;
                 },
                 ..oidc_client("partner")
             }],
-            &tags,
         )
         .expect("the container renders")
         .bindings;
@@ -1114,7 +1114,7 @@ struct Claims;
             },
             &bindings,
         )
-        .expect("the oidc client has planned console arguments")
+        .expect("the token issuer client has planned console arguments")
         .iter()
         .map(|argument| argument.name().to_string())
         .collect();
@@ -1123,13 +1123,12 @@ struct Claims;
     }
 
     #[test]
-    fn rejects_an_oidc_client_absent_from_the_container_plan() {
+    fn rejects_a_token_issuer_client_absent_from_the_container_plan() {
         let index = IndexedSource::new(&provider_source(SESSION_PROVIDER)).index;
         let bindings = render_container(
             &index,
             &scan(&index).expect("the console arguments are scanned"),
             &[],
-            &TagPool::collect(&index).expect("the tags are collected"),
         )
         .expect("the container renders")
         .bindings;
@@ -1137,13 +1136,12 @@ struct Claims;
             .application
             .clone();
 
-        application.oidc_token_verifiers = vec![OidcTokenVerifierField {
-            client: InjectedDependency {
+        application.challenge = AuthenticatedUserChallenge::Bearer {
+            issuer_client: InjectedDependency {
                 concrete: missing_path(),
                 field: "missing".to_string(),
             },
-            field: "oidc_token_verifier".to_string(),
-        }];
+        };
 
         let error = binding_serve_inputs(
             &RequestBinding::AuthenticatedUser {
@@ -1152,7 +1150,7 @@ struct Claims;
             },
             &bindings,
         )
-        .expect_err("the oidc client must belong to the same container plan");
+        .expect_err("the token issuer client must belong to the same container plan");
 
         assert!(error.to_string().contains("crate::Missing"));
     }

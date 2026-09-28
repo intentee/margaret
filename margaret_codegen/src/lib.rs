@@ -23,7 +23,6 @@ mod oidc_framework_providers;
 mod polling_client_provider;
 mod polling_client_service;
 mod public_jwks_handler_canonical_path;
-mod public_jwks_verifier_canonical_path;
 mod serve_inputs;
 mod server_secret_store_canonical_path;
 mod umbrella;

@@ -16,7 +16,7 @@ const REQUEST_BINDING_MARKERS: [&str; 4] = [
     "authenticated_user",
     "route_parameter",
     "form_request",
-    "oidc_token",
+    "bearer_token",
 ];
 
 fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str]) {
@@ -176,7 +176,6 @@ pub fn constructor(_attributes: TokenStream, item: TokenStream) -> TokenStream {
         &[
             "console_argument",
             "environment_variable",
-            "jwks_secret_store",
             "spiffe_http_client",
         ],
     )
@@ -323,29 +322,6 @@ mod tests {
         assert!(stripped.contains("greeter"));
         assert!(stripped.contains("name"));
         assert!(stripped.contains("loud"));
-    }
-
-    #[test]
-    fn removes_jwks_secret_store_markers_from_parameters() {
-        let stripped = strip_or_compile_error(
-            quote! {
-                pub fn create(
-                    #[jwks_secret_store(server)] minter: Arc<JwksSecretStore>,
-                    #[jwks_secret_store(client = auth)] verifier: Arc<PublicJwksVerifier>,
-                    #[console_argument(from = "label")] label: String,
-                ) -> Self {
-                    Self { minter, verifier, label }
-                }
-            },
-            &["console_argument", "jwks_secret_store"],
-        )
-        .to_string();
-
-        assert!(!stripped.contains("jwks_secret_store"));
-        assert!(!stripped.contains("console_argument"));
-        assert!(stripped.contains("minter"));
-        assert!(stripped.contains("verifier"));
-        assert!(stripped.contains("label"));
     }
 
     #[test]

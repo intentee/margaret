@@ -11,7 +11,6 @@ use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container_tests::container_module_source::container_module_source;
 use margaret_serve_input_codegen::scan::scan;
-use margaret_tag_codegen::tag_pool::TagPool;
 
 fn jwks_client_provider() -> FrameworkProvider {
     let endpoint = CanonicalPath::new(vec!["crate".to_string(), "JwksEndpoint".to_string()]);
@@ -40,14 +39,9 @@ fn endpoints_container() -> String {
     let serve_inputs = scan(&index).expect("the serve inputs are scanned");
 
     container_module_source(
-        render_container(
-            &index,
-            &serve_inputs,
-            &[jwks_client_provider()],
-            &TagPool::collect(&index).expect("the tags are collected"),
-        )
-        .expect("the endpoint fixture renders")
-        .modules,
+        render_container(&index, &serve_inputs, &[jwks_client_provider()])
+            .expect("the endpoint fixture renders")
+            .modules,
     )
     .split_whitespace()
     .collect()

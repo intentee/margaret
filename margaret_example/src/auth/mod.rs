@@ -1,3 +1,4 @@
+pub mod access_token_holder_provider;
 pub mod ci_runner_provider;
 pub mod github_actions_claims;
 pub mod github_actions_issuer;

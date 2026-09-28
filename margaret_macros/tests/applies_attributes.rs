@@ -105,7 +105,7 @@ struct AccountProvider;
 
 impl AccountProvider {
     #[infer_from_request]
-    fn infer(&self, #[oidc_token(issuer = partner)] token: &str) -> String {
+    fn infer(&self, #[bearer_token(issuer = partner)] token: &str) -> String {
         format!("verified {token}")
     }
 }

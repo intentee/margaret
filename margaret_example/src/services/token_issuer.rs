@@ -29,7 +29,7 @@ impl TokenIssuer {
     #[constructor]
     pub fn create(
         clock: Arc<SystemClock>,
-        #[jwks_secret_store(server)] secret_store: Arc<JwksSecretStore>,
+        secret_store: Arc<JwksSecretStore>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             clock,

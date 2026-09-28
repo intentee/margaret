@@ -11,31 +11,17 @@ use crate::jwks_secret_storage_canonical_path::jwks_secret_storage_canonical_pat
 use crate::mint_access_token_handler_canonical_path::mint_access_token_handler_canonical_path;
 use crate::polling_client_provider::polling_client_provider;
 use crate::public_jwks_handler_canonical_path::public_jwks_handler_canonical_path;
-use crate::public_jwks_verifier_canonical_path::public_jwks_verifier_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
 
-fn client_providers(binding: &SegmentedTagBinding) -> [FrameworkProvider; 2] {
-    let client = jwks_client_canonical_path(&binding.module_segment);
-
-    [
-        polling_client_provider(
-            client.clone(),
-            vec![
-                FrameworkDependency::SingletonView(binding.declaring.clone()),
-                FrameworkDependency::SingletonView(binding.declaring.clone()),
-            ],
-            FrameworkInjectionRole::Unmarked,
-        ),
-        FrameworkProvider {
-            construction: FrameworkConstruction::Accessor {
-                accessor: "verifier".to_string(),
-                source: client,
-            },
-            enablement: FrameworkEnablement::WhenReferenced,
-            injection: FrameworkInjectionRole::JwksClientStore(binding.tag.clone()),
-            provided: public_jwks_verifier_canonical_path(&binding.module_segment),
-        },
-    ]
+fn client_provider(binding: &SegmentedTagBinding) -> FrameworkProvider {
+    polling_client_provider(
+        jwks_client_canonical_path(&binding.module_segment),
+        vec![
+            FrameworkDependency::SingletonView(binding.declaring.clone()),
+            FrameworkDependency::SingletonView(binding.declaring.clone()),
+        ],
+        FrameworkInjectionRole::TokenIssuerClient(binding.tag.clone()),
+    )
 }
 
 fn server_providers() -> [FrameworkProvider; 4] {
@@ -74,7 +60,7 @@ fn server_providers() -> [FrameworkProvider; 4] {
                 method: "create".to_string(),
             },
             enablement: FrameworkEnablement::WhenReferenced,
-            injection: FrameworkInjectionRole::JwksServerStore,
+            injection: FrameworkInjectionRole::Unmarked,
             provided: server_secret_store.clone(),
         },
         FrameworkProvider {
@@ -95,9 +81,7 @@ pub(crate) fn jwks_framework_providers(
 ) -> Vec<FrameworkProvider> {
     let mut providers = Vec::from(server_providers());
 
-    for binding in client_bindings {
-        providers.extend(client_providers(binding));
-    }
+    providers.extend(client_bindings.iter().map(client_provider));
 
     providers
 }

@@ -18,7 +18,6 @@ margaret_console_argument_codegen = { workspace = true }
 margaret_input_weaving = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
 margaret_generated_module = { workspace = true }
-margaret_tag_codegen = { workspace = true }
 margaret_toposort = { workspace = true }
 margaret_syn_type_peeling = { workspace = true }
 proc-macro2 = { workspace = true }
