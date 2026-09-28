@@ -4,6 +4,7 @@ pub enum RequestInjectable {
     AssetBag,
     CurrentRequest,
     Next,
+    OidcTokenVerification,
     PeerSpiffeId,
     Routes,
     ValidationResult,
@@ -17,6 +18,7 @@ impl RequestInjectable {
             Self::AssetBag,
             Self::CurrentRequest,
             Self::Next,
+            Self::OidcTokenVerification,
             Self::PeerSpiffeId,
             Self::Routes,
             Self::ValidationResult,
@@ -54,6 +56,13 @@ impl RequestInjectable {
                 "next".to_string(),
                 "Next".to_string(),
             ]),
+            Self::OidcTokenVerification => CanonicalPath::new(vec![
+                "margaret".to_string(),
+                "framework".to_string(),
+                "oidc_client".to_string(),
+                "oidc_token_verification".to_string(),
+                "OidcTokenVerification".to_string(),
+            ]),
             Self::PeerSpiffeId => CanonicalPath::new(vec![
                 "spiffe".to_string(),
                 "spiffe_id".to_string(),
@@ -84,7 +93,9 @@ impl RequestInjectable {
     fn requires_reference(&self) -> bool {
         match self {
             Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes | Self::Views => true,
-            Self::AssetBag | Self::Next | Self::ValidationResult => false,
+            Self::AssetBag | Self::Next | Self::OidcTokenVerification | Self::ValidationResult => {
+                false
+            }
         }
     }
 }

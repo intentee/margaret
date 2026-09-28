@@ -3,6 +3,7 @@ use std::ops::ControlFlow;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 
+use crate::compact_jws_parsing::CompactJwsParsing;
 use crate::jws_header::JwsHeader;
 use crate::jws_rejection::JwsRejection;
 
@@ -16,7 +17,7 @@ fn decoded(
     }
 }
 
-pub(crate) struct CompactJws<'token> {
+pub struct CompactJws<'token> {
     pub(crate) header: JwsHeader,
     pub(crate) payload: Vec<u8>,
     pub(crate) signature: Vec<u8>,
@@ -24,7 +25,15 @@ pub(crate) struct CompactJws<'token> {
 }
 
 impl<'token> CompactJws<'token> {
-    pub(crate) fn parse(token: &'token str) -> ControlFlow<JwsRejection, Self> {
+    #[must_use]
+    pub fn parse(token: &'token str) -> CompactJwsParsing<'token> {
+        match Self::parsed(token) {
+            ControlFlow::Continue(jws) => CompactJwsParsing::Parsed(jws),
+            ControlFlow::Break(rejection) => CompactJwsParsing::Rejected(rejection),
+        }
+    }
+
+    fn parsed(token: &'token str) -> ControlFlow<JwsRejection, Self> {
         let Some((signing_input, signature_segment)) = token.rsplit_once('.') else {
             return ControlFlow::Break(JwsRejection::NotCompactJws);
         };

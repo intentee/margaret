@@ -1,6 +1,8 @@
 use serde_json::Value;
 use serde_json::json;
 
+use margaret_jws_verification::compact_jws::CompactJws;
+use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
@@ -22,8 +24,10 @@ fn verifies_an_rs256_token_of_a_github_shaped_key_set() {
     };
     let header = json!({ "typ": "JWT", "alg": "RS256", "x5t": "cxjM2VNf", "kid": "38826b17" });
 
-    assert!(matches!(
-        key_set.verify(&key.token(&header, &json!({ "sub": "repo:octo-org/octo-repo" }))),
-        JwsVerification::Verified(_)
-    ));
+    let token = key.token(&header, &json!({ "sub": "repo:octo-org/octo-repo" }));
+    let CompactJwsParsing::Parsed(jws) = CompactJws::parse(&token) else {
+        panic!("the token parses");
+    };
+
+    assert!(matches!(key_set.verify(&jws), JwsVerification::Verified(_)));
 }

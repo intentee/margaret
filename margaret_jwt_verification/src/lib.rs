@@ -6,3 +6,4 @@ pub mod type_header_expectation;
 pub mod type_rejection;
 pub mod verified_jwt;
 pub mod verify_jwt;
+pub mod verify_serialized_jwt;

@@ -12,7 +12,7 @@ pub enum TypeHeaderExpectation {
 }
 
 impl TypeHeaderExpectation {
-    pub(crate) fn check(self, typ: Option<HeaderType>) -> ControlFlow<TypeRejection> {
+    pub(crate) fn check(self, typ: Option<&HeaderType>) -> ControlFlow<TypeRejection> {
         let (Self::Optional(expected) | Self::Required(expected)) = self;
 
         match typ {
@@ -20,8 +20,11 @@ impl TypeHeaderExpectation {
                 Self::Optional(_) => ControlFlow::Continue(()),
                 Self::Required(_) => ControlFlow::Break(TypeRejection::Missing { expected }),
             },
-            Some(HeaderType::Supported(found)) if found == expected => ControlFlow::Continue(()),
-            Some(found) => ControlFlow::Break(TypeRejection::Mismatch { expected, found }),
+            Some(HeaderType::Supported(found)) if *found == expected => ControlFlow::Continue(()),
+            Some(found) => ControlFlow::Break(TypeRejection::Mismatch {
+                expected,
+                found: found.clone(),
+            }),
         }
     }
 }

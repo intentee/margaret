@@ -51,8 +51,13 @@ mod tests {
     }
 
     fn registries_for(index: &AttributeIndex) -> BindingRegistries {
-        BindingRegistries::collect(index, ViewsAvailability::Available)
-            .expect("the binding registries are collected")
+        BindingRegistries::collect(
+            index,
+            ViewsAvailability::Available,
+            &TagPool::collect(index).expect("the tags are collected"),
+            &empty_bindings(),
+        )
+        .expect("the binding registries are collected")
     }
 
     fn wrappers_for(lib_source: &str) -> String {

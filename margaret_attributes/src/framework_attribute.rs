@@ -19,6 +19,7 @@ pub enum FrameworkAttribute {
     JwksSecretStore,
     Middleware,
     Model,
+    OidcToken,
     PrimaryKey,
     Process,
     ProvidesJwksEndpoint,
@@ -38,7 +39,7 @@ pub enum FrameworkAttribute {
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 34] = [
         Self::AuthenticatedUser,
         Self::BuildForSession,
         Self::Column,
@@ -56,6 +57,7 @@ impl FrameworkAttribute {
         Self::JwksSecretStore,
         Self::Middleware,
         Self::Model,
+        Self::OidcToken,
         Self::PrimaryKey,
         Self::Process,
         Self::ProvidesJwksEndpoint,
@@ -105,6 +107,7 @@ impl FrameworkAttribute {
             "jwks_secret_store" => Some(Self::JwksSecretStore),
             "middleware" => Some(Self::Middleware),
             "model" => Some(Self::Model),
+            "oidc_token" => Some(Self::OidcToken),
             "primary_key" => Some(Self::PrimaryKey),
             "process" => Some(Self::Process),
             "provides_jwks_endpoint" => Some(Self::ProvidesJwksEndpoint),
@@ -145,6 +148,7 @@ impl FrameworkAttribute {
             Self::JwksSecretStore => "jwks_secret_store",
             Self::Middleware => "middleware",
             Self::Model => "model",
+            Self::OidcToken => "oidc_token",
             Self::PrimaryKey => "primary_key",
             Self::Process => "process",
             Self::ProvidesJwksEndpoint => "provides_jwks_endpoint",

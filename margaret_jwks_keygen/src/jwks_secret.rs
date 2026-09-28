@@ -7,7 +7,7 @@ use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
-use margaret_jwt_verification::verify_jwt::verify_jwt;
+use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::ec_signing_key::EcSigningKey;
@@ -113,7 +113,7 @@ impl JwksSecret {
         expectation: &JwtExpectation,
         now: NumericDate,
     ) -> JwksSecretVerificationResult<TClaims> {
-        let verified = match verify_jwt(&self.key_set, token, expectation, now) {
+        let verified = match verify_serialized_jwt(&self.key_set, token, expectation, now) {
             JwtVerification::Rejected(rejection) => {
                 return JwksSecretVerificationResult::Rejected(rejection);
             }

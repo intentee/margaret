@@ -9,22 +9,33 @@ use crate::jwks_client_canonical_path::jwks_client_canonical_path;
 use crate::jwks_roller_canonical_path::jwks_roller_canonical_path;
 use crate::jwks_secret_storage_canonical_path::jwks_secret_storage_canonical_path;
 use crate::mint_access_token_handler_canonical_path::mint_access_token_handler_canonical_path;
-use crate::polling_client_wiring::PollingClientWiring;
+use crate::polling_client_provider::polling_client_provider;
 use crate::public_jwks_handler_canonical_path::public_jwks_handler_canonical_path;
 use crate::public_jwks_verifier_canonical_path::public_jwks_verifier_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
 
 fn client_providers(binding: &SegmentedTagBinding) -> [FrameworkProvider; 2] {
-    PollingClientWiring {
-        client: jwks_client_canonical_path(&binding.module_segment),
-        client_dependencies: vec![
-            FrameworkDependency::SingletonView(binding.declaring.clone()),
-            FrameworkDependency::SingletonView(binding.declaring.clone()),
-        ],
-        verifier: public_jwks_verifier_canonical_path(&binding.module_segment),
-        verifier_injection: FrameworkInjectionRole::JwksClientStore(binding.tag.clone()),
-    }
-    .providers()
+    let client = jwks_client_canonical_path(&binding.module_segment);
+
+    [
+        polling_client_provider(
+            client.clone(),
+            vec![
+                FrameworkDependency::SingletonView(binding.declaring.clone()),
+                FrameworkDependency::SingletonView(binding.declaring.clone()),
+            ],
+            FrameworkInjectionRole::Unmarked,
+        ),
+        FrameworkProvider {
+            construction: FrameworkConstruction::Accessor {
+                accessor: "verifier".to_string(),
+                source: client,
+            },
+            enablement: FrameworkEnablement::WhenReferenced,
+            injection: FrameworkInjectionRole::JwksClientStore(binding.tag.clone()),
+            provided: public_jwks_verifier_canonical_path(&binding.module_segment),
+        },
+    ]
 }
 
 fn server_providers() -> [FrameworkProvider; 4] {

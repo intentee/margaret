@@ -1,9 +1,10 @@
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
 
-const REQUEST_BINDING_MARKERS: [FrameworkAttribute; 3] = [
+const REQUEST_BINDING_MARKERS: [FrameworkAttribute; 4] = [
     FrameworkAttribute::AuthenticatedUser,
     FrameworkAttribute::FormRequest,
+    FrameworkAttribute::OidcToken,
     FrameworkAttribute::RouteParameter,
 ];
 
@@ -44,6 +45,18 @@ mod tests {
         assert_eq!(
             request_binding_marker(&attributes),
             Some(FrameworkAttribute::FormRequest)
+        );
+    }
+
+    #[test]
+    fn finds_the_oidc_token_marker() {
+        let attributes = vec![IndexedAttribute::new(
+            &parse_quote!(#[oidc_token(issuer = github)]),
+        )];
+
+        assert_eq!(
+            request_binding_marker(&attributes),
+            Some(FrameworkAttribute::OidcToken)
         );
     }
 

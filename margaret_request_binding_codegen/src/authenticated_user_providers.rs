@@ -9,9 +9,12 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
+use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::is_singleton::is_singleton;
+use margaret_tag_codegen::tag_pool::TagPool;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
+use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
@@ -20,6 +23,7 @@ use crate::infers_authenticated_user_arguments::InfersAuthenticatedUserArguments
 use crate::injects_peer_spiffe_id::injects_peer_spiffe_id;
 use crate::injects_routes::injects_routes;
 use crate::injects_views::injects_views;
+use crate::oidc_token_verifier_fields::oidc_token_verifier_fields;
 use crate::request_binding_error::RequestBindingError;
 
 fn infer_from_request_method<'index>(
@@ -56,6 +60,8 @@ fn infer_from_request_method<'index>(
 pub fn authenticated_user_providers(
     index: &AttributeIndex,
     registries: &BindingRegistries,
+    tags: &TagPool,
+    container_bindings: &ContainerBindings,
 ) -> Result<HashMap<CanonicalPath, AuthenticatedUserProvider>, RequestBindingError> {
     let mut registry: HashMap<CanonicalPath, AuthenticatedUserProvider> = HashMap::new();
 
@@ -99,7 +105,11 @@ pub fn authenticated_user_providers(
             index,
             item,
             method,
-            &BindingContext::AuthenticatedUserProvider { subject: &subject },
+            &BindingContext::AuthenticatedUserProvider {
+                container_bindings,
+                subject: &subject,
+                tags,
+            },
             registries,
         )?;
 
@@ -112,12 +122,14 @@ pub fn authenticated_user_providers(
         }
 
         let application = AuthenticatedUserApplication {
+            challenge: AuthenticatedUserChallenge::required_by(&parameters),
             concrete,
             field: identifier.field().to_string(),
             injects_peer_spiffe_id: injects_peer_spiffe_id(&parameters),
             injects_routes: injects_routes(&parameters),
             injects_views: injects_views(&parameters),
             model: model.clone(),
+            oidc_token_verifiers: oidc_token_verifier_fields(&parameters),
             wrapper: format_ident!("{}", identifier.type_name()),
         };
         let is_async = method.signature().asyncness.is_some();

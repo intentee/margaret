@@ -2,19 +2,28 @@ use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
 use crate::extraction_context::ExtractionContext;
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::request_binding::RequestBinding;
 
-fn authenticated_user_resolver(requirement: AuthenticatedUserRequirement) -> TokenStream {
-    match requirement {
-        AuthenticatedUserRequirement::Optional => quote! {
+fn authenticated_user_resolver(
+    requirement: AuthenticatedUserRequirement,
+    challenge: AuthenticatedUserChallenge,
+) -> TokenStream {
+    match (requirement, challenge) {
+        (AuthenticatedUserRequirement::Optional, _) => quote! {
             margaret::framework::identity::optional_authenticated_user::optional_authenticated_user
         },
-        AuthenticatedUserRequirement::Required => quote! {
-            margaret::framework::identity::require_authenticated_user::require_authenticated_user
+        (AuthenticatedUserRequirement::Required, AuthenticatedUserChallenge::Bearer) => quote! {
+            margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user
         },
+        (AuthenticatedUserRequirement::Required, AuthenticatedUserChallenge::Unchallenged) => {
+            quote! {
+                margaret::framework::identity::require_authenticated_user::require_authenticated_user
+            }
+        }
     }
 }
 
@@ -31,8 +40,11 @@ pub fn render_request_extraction(
     let error_return = context.response_return;
 
     match binding {
-        RequestBinding::AuthenticatedUser { requirement, .. } => {
-            let resolver = authenticated_user_resolver(*requirement);
+        RequestBinding::AuthenticatedUser {
+            application,
+            requirement,
+        } => {
+            let resolver = authenticated_user_resolver(*requirement, application.challenge);
 
             quote! {
                 let #holder = match margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser::infer(
@@ -101,6 +113,7 @@ pub fn render_request_extraction(
         | RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
         | RequestBinding::Next
+        | RequestBinding::OidcToken { .. }
         | RequestBinding::Routes
         | RequestBinding::Views => TokenStream::new(),
     }

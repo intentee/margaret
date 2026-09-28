@@ -8,7 +8,7 @@ use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
-use margaret_jwt_verification::verify_jwt::verify_jwt;
+use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
 use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_trust::declares_token_trust::DeclaresTokenTrust;
@@ -43,7 +43,7 @@ impl PublicJwksVerifier {
         };
         let token_trust = self.token_trust.token_trust();
 
-        match verify_jwt(
+        match verify_serialized_jwt(
             &key_set,
             token,
             &JwtExpectation {

@@ -15,6 +15,7 @@ members = [
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
     "margaret_codegen_tests/tests/fixtures/jwks_token_trust",
     "margaret_codegen_tests/tests/fixtures/linear_construction_future",
+    "margaret_codegen_tests/tests/fixtures/oidc_bearer_identity",
     "margaret_codegen_tests/tests/fixtures/oidc_issuers",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",
     "margaret_codegen_tests/tests/fixtures/composite_foreign_key_model",

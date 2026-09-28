@@ -1,8 +1,6 @@
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_oidc_codegen::oidc_client_canonical_path::oidc_client_canonical_path;
-use margaret_oidc_codegen::oidc_token_verifier_canonical_path::oidc_token_verifier_canonical_path;
 use margaret_oidc_codegen::render_oidc::render_oidc;
-use margaret_polling_client_codegen::polling_client_module::PollingClientModule;
 use margaret_tag_codegen::segmented_tag_binding::SegmentedTagBinding;
 
 use crate::framework_artifacts::FrameworkArtifacts;
@@ -12,14 +10,9 @@ pub(crate) fn build_oidc_artifacts(
     bindings: &ContainerBindings,
     issuer_bindings: &[SegmentedTagBinding],
 ) -> FrameworkArtifacts {
-    let clients: Vec<PollingClientModule> = issuer_bindings
+    let segments: Vec<&str> = issuer_bindings
         .iter()
-        .map(|binding| PollingClientModule {
-            has_client: bindings.provides(&oidc_client_canonical_path(&binding.module_segment)),
-            has_verifier: bindings
-                .provides(&oidc_token_verifier_canonical_path(&binding.module_segment)),
-            segment: binding.module_segment.clone(),
-        })
+        .map(|binding| binding.module_segment.as_str())
         .collect();
     let services = issuer_bindings
         .iter()
@@ -30,9 +23,9 @@ pub(crate) fn build_oidc_artifacts(
             )
         })
         .collect();
-    let enabled = !clients.is_empty();
+    let enabled = !segments.is_empty();
     let modules = if enabled {
-        render_oidc(&clients)
+        render_oidc(&segments)
     } else {
         Vec::new()
     };

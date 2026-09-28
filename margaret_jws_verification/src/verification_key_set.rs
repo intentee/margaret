@@ -81,15 +81,16 @@ impl VerificationKeySet {
     }
 
     #[must_use]
-    pub fn verify(&self, token: &str) -> JwsVerification {
-        match self.verified(token) {
+    pub fn verify<'jws>(&self, jws: &'jws CompactJws<'_>) -> JwsVerification<'jws> {
+        match self.verified(jws) {
             ControlFlow::Continue(verified) => JwsVerification::Verified(verified),
             ControlFlow::Break(rejection) => JwsVerification::Rejected(rejection),
         }
     }
 
-    fn verified(&self, token: &str) -> ControlFlow<JwsRejection, VerifiedJws> {
-        let CompactJws {
+    fn verified<'jws>(
+        &self,
+        CompactJws {
             header:
                 JwsHeader {
                     alg,
@@ -100,23 +101,23 @@ impl VerificationKeySet {
             payload,
             signature,
             signing_input,
-        } = CompactJws::parse(token)?;
-
+        }: &'jws CompactJws<'_>,
+    ) -> ControlFlow<JwsRejection, VerifiedJws<'jws>> {
         if crit.is_some() {
             return ControlFlow::Break(JwsRejection::CriticalHeader);
         }
 
         let algorithm = match alg {
-            HeaderAlgorithm::Supported(algorithm) => algorithm,
+            HeaderAlgorithm::Supported(algorithm) => *algorithm,
             HeaderAlgorithm::Unsupported(alg) => {
-                return ControlFlow::Break(JwsRejection::UnsupportedAlgorithm { alg });
+                return ControlFlow::Break(JwsRejection::UnsupportedAlgorithm { alg: alg.clone() });
             }
         };
         let Some(kid) = kid else {
             return ControlFlow::Break(JwsRejection::MissingKeyId);
         };
-        let Some(key) = self.keys.get(&kid) else {
-            return ControlFlow::Break(JwsRejection::UnknownKeyId { kid });
+        let Some(key) = self.keys.get(kid) else {
+            return ControlFlow::Break(JwsRejection::UnknownKeyId { kid: kid.clone() });
         };
 
         if key.algorithm != algorithm {
@@ -126,14 +127,18 @@ impl VerificationKeySet {
             });
         }
 
-        match key.material.check(signing_input.as_bytes(), &signature) {
+        match key.material.check(signing_input.as_bytes(), signature) {
             SignatureCheck::EcdsaMalformed(source) => {
                 ControlFlow::Break(JwsRejection::EcdsaSignatureMalformed { source })
             }
             SignatureCheck::EcdsaMismatch(source) => {
                 ControlFlow::Break(JwsRejection::EcdsaSignatureMismatch { source })
             }
-            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws { kid, payload, typ }),
+            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws {
+                kid,
+                payload,
+                typ: typ.as_ref(),
+            }),
             SignatureCheck::RsaMismatch(source) => {
                 ControlFlow::Break(JwsRejection::RsaSignatureMismatch { source })
             }
