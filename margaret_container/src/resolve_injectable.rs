@@ -28,7 +28,7 @@ pub fn resolve_injectable(
     declared: &Type,
     bindings: &ContainerBindings,
 ) -> InjectableResolution {
-    let Some(written) = peel_target(declared) else {
+    let Some(written) = peel_target(index, item, declared) else {
         return InjectableResolution::UnsupportedShape;
     };
 

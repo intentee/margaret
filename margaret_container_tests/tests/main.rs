@@ -29,6 +29,8 @@ mod rejects_conflicting_serve_inputs;
 mod rejects_non_struct_singleton;
 mod rejects_singleton_arguments;
 mod renders_async_construction_invocation;
+mod reports_a_foreign_arc_as_an_unsupported_parameter_shape;
+mod reports_a_foreign_constructor_attribute_as_a_missing_constructor;
 mod reports_a_framework_provider_colliding_with_a_user_singleton;
 mod reports_ambiguous_constructor;
 mod reports_dependency_cycle;

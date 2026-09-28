@@ -16,11 +16,13 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::select_framework_attributes::select_framework_attributes;
 use margaret_attributes::select_unique_framework_attribute::select_unique_framework_attribute;
+use margaret_attributes::standard_library_item::StandardLibraryItem;
 use margaret_model::column_default::ColumnDefault;
 use margaret_schema_identifier_naming::primary_key_index_name::primary_key_index_name;
 use margaret_schema_identifier_naming::schema_identifier::schema_identifier;
 use margaret_schema_identifier_naming::unique_index_name::unique_index_name;
 use margaret_schema_identifier_naming::validate_identifier_length::validate_identifier_length;
+use margaret_syn_type_peeling::peel_standard_wrapper::peel_standard_wrapper;
 use margaret_toposort::topological_order::topological_order;
 
 use crate::collected_model::CollectedModel;
@@ -36,7 +38,6 @@ use crate::foreign_key_target::ForeignKeyTarget;
 use crate::foreign_key_target_column::ForeignKeyTargetColumn;
 use crate::index_arguments::IndexArguments;
 use crate::index_redundancy::IndexRedundancy;
-use crate::indirection_inner::indirection_inner;
 use crate::infer_column::infer_column;
 use crate::inferred_column::InferredColumn;
 use crate::model::Model;
@@ -251,9 +252,14 @@ fn resolve_scalar_column(
 
     let column_name = register_column_name(column_name, model, seen_columns)?;
 
+    let declared_column_type = DeclaredColumnType::of(
+        column_type_context.attribute_index,
+        column_type_context.item,
+        field.ty(),
+    );
     let inferred = infer_column(
         &mut column_type_context,
-        &DeclaredColumnType::of(field.ty()),
+        &declared_column_type,
         &numeric_digits,
         model,
         &column_name,
@@ -332,9 +338,18 @@ fn defer_foreign_key(
         base: after_option,
         declared: _,
         nullable,
-    } = DeclaredColumnType::of(field.ty());
+    } = DeclaredColumnType::of(attribute_index, item, field.ty());
 
-    let (target_type, indirected) = match indirection_inner(after_option) {
+    let (target_type, indirected) = match peel_standard_wrapper(
+        attribute_index,
+        item,
+        after_option,
+        &[
+            StandardLibraryItem::Arc,
+            StandardLibraryItem::Box,
+            StandardLibraryItem::Rc,
+        ],
+    ) {
         Some(inner) => (inner, true),
         None => (after_option, false),
     };

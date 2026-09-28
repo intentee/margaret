@@ -319,7 +319,8 @@ impl DependencyResolver<'_> {
                     )?,
                 },
                 (None, None) => {
-                    let Some(written) = peel_target(indexed_parameter.declared()) else {
+                    let Some(written) = peel_target(self.index, item, indexed_parameter.declared())
+                    else {
                         return Err(ContainerError::UnsupportedParameterShape {
                             singleton: concrete_path.to_string(),
                             parameter,
@@ -712,7 +713,7 @@ fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &Canonical
 
     constructor.parameters().iter().any(|parameter| {
         matches!(
-            peel_target(parameter.declared()),
+            peel_target(index, draft.item, parameter.declared()),
             Some(written) if index.resolve_item_path(draft.item, &written).as_ref() == Some(path)
         )
     })

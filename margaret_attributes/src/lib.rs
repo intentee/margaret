@@ -40,6 +40,7 @@ mod scanned_method;
 mod scanned_parameter;
 pub mod select_framework_attributes;
 pub mod select_unique_framework_attribute;
+pub mod standard_library_item;
 pub mod struct_shape;
 pub mod tag;
 mod walk_output;

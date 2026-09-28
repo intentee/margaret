@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 #[singleton]
 struct Alpha;
 

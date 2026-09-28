@@ -1,0 +1,12 @@
+[package]
+name = "margaret_attributes_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+margaret_attributes = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

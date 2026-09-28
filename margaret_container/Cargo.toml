@@ -26,5 +26,8 @@ quote = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+margaret_attributes_tests = { path = "../margaret_attributes_tests" }
+
 [lints]
 workspace = true

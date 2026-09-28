@@ -7,7 +7,6 @@ use crate::column_type_context::ColumnTypeContext;
 use crate::column_type_source::ColumnTypeSource;
 use crate::declared_column_type::DeclaredColumnType;
 use crate::enum_column::enum_column;
-use crate::infer_column_type::infer_column_type;
 use crate::inferred_column::InferredColumn;
 use crate::model_codegen_error::ModelCodegenError;
 use crate::numeric_digits::NumericDigits;
@@ -68,8 +67,16 @@ pub(crate) fn infer_column(
                 rust_type: declared.to_token_stream().to_string(),
             })
         }
-        (ColumnTypeSource::DeclaredType, NumericDigits::NotDeclared) => {
-            infer_column_type(declared_column_type, model, column)
+        (ColumnTypeSource::Known(known), NumericDigits::NotDeclared) => Ok(InferredColumn {
+            nullable: *nullable,
+            ..known
+        }),
+        (ColumnTypeSource::Uninferrable, NumericDigits::NotDeclared) => {
+            Err(ModelCodegenError::UninferrableColumnType {
+                column: column.to_string(),
+                model: model.to_string(),
+                rust_type: declared.to_token_stream().to_string(),
+            })
         }
     }
 }
