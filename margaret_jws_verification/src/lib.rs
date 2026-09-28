@@ -9,6 +9,7 @@ pub mod jws_verification;
 pub mod key_id;
 pub mod key_set_parsing;
 pub mod key_set_rejection;
+pub mod rsa_jwk;
 mod signature_check;
 pub mod verification_key;
 pub mod verification_key_set;

@@ -17,6 +17,6 @@ fn rejects_a_signature_by_another_key() {
     let token = FixtureKey::generate(Curve::P256, "kid").token(&key.header(), &json!({}));
     assert!(matches!(
         key_set.verify(&token),
-        JwsVerification::Rejected(JwsRejection::SignatureMismatch { .. })
+        JwsVerification::Rejected(JwsRejection::EcdsaSignatureMismatch { .. })
     ));
 }

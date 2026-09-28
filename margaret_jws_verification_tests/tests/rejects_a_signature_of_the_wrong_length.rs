@@ -6,6 +6,7 @@ use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
+use margaret_jws_verification_tests::signing_input::signing_input;
 
 #[test]
 fn rejects_a_signature_of_the_wrong_length() {
@@ -14,12 +15,9 @@ fn rejects_a_signature_of_the_wrong_length() {
         panic!("the fixture key set is accepted");
     };
 
-    let token = format!(
-        "{}.AAAA",
-        FixtureKey::signing_input(&key.header(), &json!({}))
-    );
+    let token = format!("{}.AAAA", signing_input(&key.header(), &json!({})));
     assert!(matches!(
         key_set.verify(&token),
-        JwsVerification::Rejected(JwsRejection::SignatureMalformed { .. })
+        JwsVerification::Rejected(JwsRejection::EcdsaSignatureMalformed { .. })
     ));
 }

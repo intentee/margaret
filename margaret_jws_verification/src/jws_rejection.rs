@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
+use aws_lc_rs::error::Unspecified;
 use p256::ecdsa;
 
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
@@ -15,6 +16,12 @@ pub enum JwsRejection {
         token: JwsAlgorithm,
     },
     CriticalHeader,
+    EcdsaSignatureMalformed {
+        source: ecdsa::Error,
+    },
+    EcdsaSignatureMismatch {
+        source: ecdsa::Error,
+    },
     HeaderBase64 {
         source: base64ct::Error,
     },
@@ -26,14 +33,11 @@ pub enum JwsRejection {
     PayloadBase64 {
         source: base64ct::Error,
     },
+    RsaSignatureMismatch {
+        source: Unspecified,
+    },
     SignatureBase64 {
         source: base64ct::Error,
-    },
-    SignatureMalformed {
-        source: ecdsa::Error,
-    },
-    SignatureMismatch {
-        source: ecdsa::Error,
     },
     UnknownKeyId {
         kid: KeyId,
@@ -54,6 +58,14 @@ impl Display for JwsRejection {
                 formatter,
                 "the token requires header extensions that are not understood"
             ),
+            Self::EcdsaSignatureMalformed { source } => write!(
+                formatter,
+                "the token signature is not a valid ecdsa signature encoding: {source}"
+            ),
+            Self::EcdsaSignatureMismatch { source } => write!(
+                formatter,
+                "the token ecdsa signature does not match its key: {source}"
+            ),
             Self::HeaderBase64 { source } => write!(
                 formatter,
                 "the token header segment is not valid base64url: {source}"
@@ -72,17 +84,13 @@ impl Display for JwsRejection {
                 formatter,
                 "the token payload segment is not valid base64url: {source}"
             ),
+            Self::RsaSignatureMismatch { source } => write!(
+                formatter,
+                "the token rsa signature does not match its key: {source}"
+            ),
             Self::SignatureBase64 { source } => write!(
                 formatter,
                 "the token signature segment is not valid base64url: {source}"
-            ),
-            Self::SignatureMalformed { source } => write!(
-                formatter,
-                "the token signature is not a valid signature encoding: {source}"
-            ),
-            Self::SignatureMismatch { source } => write!(
-                formatter,
-                "the token signature does not match its key: {source}"
             ),
             Self::UnknownKeyId { kid } => {
                 write!(formatter, "no key in the set carries the key id '{kid}'")
@@ -96,6 +104,7 @@ impl Display for JwsRejection {
 
 #[cfg(test)]
 mod tests {
+    use aws_lc_rs::error::Unspecified;
     use base64ct::Base64UrlUnpadded;
     use base64ct::Encoding;
     use p256::ecdsa::Signature;
@@ -135,11 +144,14 @@ mod tests {
             JwsRejection::SignatureBase64 {
                 source: base64_error(),
             },
-            JwsRejection::SignatureMalformed {
+            JwsRejection::EcdsaSignatureMalformed {
                 source: signature_error(),
             },
-            JwsRejection::SignatureMismatch {
+            JwsRejection::EcdsaSignatureMismatch {
                 source: signature_error(),
+            },
+            JwsRejection::RsaSignatureMismatch {
+                source: Unspecified,
             },
             JwsRejection::UnknownKeyId {
                 kid: KeyId::new("absent".to_string()),
@@ -164,9 +176,10 @@ mod tests {
         );
         assert!(described[6].contains("payload segment is not valid base64url"));
         assert!(described[7].contains("signature segment is not valid base64url"));
-        assert!(described[8].contains("not a valid signature encoding"));
-        assert!(described[9].contains("does not match its key"));
-        assert!(described[10].contains("'absent'"));
-        assert!(described[11].contains("'none'"));
+        assert!(described[8].contains("not a valid ecdsa signature encoding"));
+        assert!(described[9].contains("ecdsa signature does not match its key"));
+        assert!(described[10].contains("rsa signature does not match its key"));
+        assert!(described[11].contains("'absent'"));
+        assert!(described[12].contains("'none'"));
     }
 }

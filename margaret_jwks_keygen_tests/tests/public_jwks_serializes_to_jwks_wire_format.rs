@@ -9,7 +9,9 @@ use margaret_jws_verification::jwk::Jwk;
 #[test]
 fn public_jwks_serializes_to_jwks_wire_format() -> Result<()> {
     let secret = JwksSecret::fresh(Curve::P256)?;
-    let Jwk::Ec(EcJwk { x, y, .. }) = secret.current().public_jwk().clone();
+    let Jwk::Ec(EcJwk { x, y, .. }) = secret.current().public_jwk().clone() else {
+        panic!("the pair publishes an ec key");
+    };
     let serialized = to_value(secret.public_jwks())?;
     let key = &serialized["keys"][0];
 

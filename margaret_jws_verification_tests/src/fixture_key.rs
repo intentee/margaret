@@ -12,6 +12,8 @@ use margaret_jws_verification::jwk::Jwk;
 use margaret_jws_verification::key_id::KeyId;
 
 use crate::fixture_material::FixtureMaterial;
+use crate::signed_token::signed_token;
+use crate::signing_input::signing_input;
 
 fn encoded(coordinate: Option<&[u8]>) -> String {
     Base64UrlUnpadded::encode_string(
@@ -89,20 +91,10 @@ impl FixtureKey {
     }
 
     #[must_use]
-    pub fn signing_input(header: &Value, claims: &Value) -> String {
-        format!(
-            "{}.{}",
-            Base64UrlUnpadded::encode_string(header.to_string().as_bytes()),
-            Base64UrlUnpadded::encode_string(claims.to_string().as_bytes()),
-        )
-    }
-
-    #[must_use]
     pub fn token(&self, header: &Value, claims: &Value) -> String {
-        let signing_input = Self::signing_input(header, claims);
-        let signature = Base64UrlUnpadded::encode_string(&self.signature(&signing_input));
+        let signing_input = signing_input(header, claims);
 
-        format!("{signing_input}.{signature}")
+        signed_token(&signing_input, &self.signature(&signing_input))
     }
 
     fn ec_jwk_of(&self, curve: Curve, x: Option<&[u8]>, y: Option<&[u8]>) -> EcJwk {

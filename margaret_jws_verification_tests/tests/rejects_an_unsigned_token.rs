@@ -6,6 +6,7 @@ use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
+use margaret_jws_verification_tests::signing_input::signing_input;
 
 #[test]
 fn rejects_an_unsigned_token() {
@@ -16,7 +17,7 @@ fn rejects_an_unsigned_token() {
 
     let token = format!(
         "{}.",
-        FixtureKey::signing_input(&json!({ "alg": "none", "kid": "kid" }), &json!({}))
+        signing_input(&json!({ "alg": "none", "kid": "kid" }), &json!({}))
     );
     assert!(matches!(
         key_set.verify(&token),

@@ -121,12 +121,15 @@ impl VerificationKeySet {
         }
 
         match key.material.check(signing_input.as_bytes(), &signature) {
-            SignatureCheck::Malformed(source) => {
-                ControlFlow::Break(JwsRejection::SignatureMalformed { source })
+            SignatureCheck::EcdsaMalformed(source) => {
+                ControlFlow::Break(JwsRejection::EcdsaSignatureMalformed { source })
+            }
+            SignatureCheck::EcdsaMismatch(source) => {
+                ControlFlow::Break(JwsRejection::EcdsaSignatureMismatch { source })
             }
             SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws { kid, payload }),
-            SignatureCheck::Mismatch(source) => {
-                ControlFlow::Break(JwsRejection::SignatureMismatch { source })
+            SignatureCheck::RsaMismatch(source) => {
+                ControlFlow::Break(JwsRejection::RsaSignatureMismatch { source })
             }
         }
     }

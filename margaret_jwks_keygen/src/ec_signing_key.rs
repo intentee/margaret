@@ -162,7 +162,6 @@ mod tests {
     use p256::pkcs8::DecodePrivateKey;
 
     use margaret_jose_parameters::curve::Curve;
-    use margaret_jws_verification::jwk::Jwk;
     use margaret_jws_verification::key_id::KeyId;
 
     use super::EcSigningKey;
@@ -178,12 +177,10 @@ mod tests {
     fn publishes_the_curve_of_a_generated_key() {
         let key = EcSigningKey::generate(Curve::P384).expect("the key generates");
 
-        assert_eq!(
-            key.public_jwk(&kid())
-                .map(|Jwk::Ec(published)| published.crv)
-                .expect("the generated key publishes"),
-            Curve::P384
-        );
+        let published = serde_json::to_value(key.public_jwk(&kid()).expect("the key publishes"))
+            .expect("the published key serializes");
+
+        assert_eq!(published["crv"], "P-384");
     }
 
     #[test]

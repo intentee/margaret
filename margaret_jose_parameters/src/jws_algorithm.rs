@@ -8,22 +8,24 @@ use serde::Serialize;
 use serde::Serializer;
 use serde::de::Error;
 
-const WIRE_NAMES: [&str; 2] = ["ES256", "ES384"];
+const WIRE_NAMES: [&str; 3] = ["ES256", "ES384", "RS256"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JwsAlgorithm {
     Es256,
     Es384,
+    Rs256,
 }
 
 impl JwsAlgorithm {
-    pub const ALL: [Self; 2] = [Self::Es256, Self::Es384];
+    pub const ALL: [Self; 3] = [Self::Es256, Self::Es384, Self::Rs256];
 
     #[must_use]
     pub fn wire_name(self) -> &'static str {
         match self {
             Self::Es256 => WIRE_NAMES[0],
             Self::Es384 => WIRE_NAMES[1],
+            Self::Rs256 => WIRE_NAMES[2],
         }
     }
 }

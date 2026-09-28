@@ -14,7 +14,10 @@ fn publishes_a_p256_key_as_an_es256_jwk() {
         kid,
         key_use,
         ..
-    }) = pair.public_jwk().clone();
+    }) = pair.public_jwk().clone()
+    else {
+        panic!("the pair publishes an ec key");
+    };
 
     assert_eq!(alg, Some(JwsAlgorithm::Es256));
     assert_eq!(crv, Curve::P256);
