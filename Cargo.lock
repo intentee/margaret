@@ -1968,6 +1968,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_attributes_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "tempfile",
+]
+
+[[package]]
 name = "margaret_codegen"
 version = "0.4.0"
 dependencies = [
@@ -2195,6 +2203,7 @@ dependencies = [
  "heck",
  "margaret_attribute_arguments",
  "margaret_attributes",
+ "margaret_attributes_tests",
  "margaret_codegen_tokens",
  "margaret_console_argument_codegen",
  "margaret_generated_module",
@@ -3027,6 +3036,8 @@ dependencies = [
 name = "margaret_syn_type_peeling"
 version = "0.1.0"
 dependencies = [
+ "margaret_attributes",
+ "margaret_attributes_tests",
  "quote",
  "syn 2.0.119",
 ]

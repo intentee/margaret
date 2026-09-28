@@ -84,7 +84,7 @@ fn classify_authenticated_user(
     let OptionalParameter {
         required,
         value_type,
-    } = OptionalParameter::from_type(declared);
+    } = OptionalParameter::from_type(index, item, declared);
 
     if matches!(value_type, Type::Reference(_)) {
         return Err(RequestBindingError::AuthenticatedUserByReference {

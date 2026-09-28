@@ -387,6 +387,16 @@ impl SessionUserProvider {
     }
 
     #[test]
+    fn rejects_a_user_defined_option_as_an_optional_authenticated_user() {
+        assert!(
+            responder_rejection(
+                "struct Option<Inner>(Inner);\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[authenticated_user] user: Option<User>) -> anyhow::Result<Response> {}\n}\n"
+            )
+            .contains("requests the authenticated user 'crate::Option'")
+        );
+    }
+
+    #[test]
     fn binds_an_authenticated_user_alongside_the_current_request() {
         assert_eq!(
             authenticated_user_requirements(

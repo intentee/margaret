@@ -5,15 +5,17 @@ use crate::copy_path::copy_path;
 use crate::is_copy_primitive::is_copy_primitive;
 use crate::item_paths::ItemPaths;
 use crate::module_imports::ModuleImports;
+use crate::standard_library_item::StandardLibraryItem;
 
 fn prelude_path(leaf: &str) -> Option<CanonicalPath> {
     match leaf {
+        "Box" => Some(StandardLibraryItem::Box.std_path()),
         "Copy" => Some(copy_path()),
-        "String" => Some(CanonicalPath::new(vec![
-            "std".to_string(),
-            "string".to_string(),
-            "String".to_string(),
-        ])),
+        "Option" => Some(StandardLibraryItem::Option.std_path()),
+        "Send" => Some(StandardLibraryItem::Send.std_path()),
+        "String" => Some(StandardLibraryItem::String.std_path()),
+        "Sync" => Some(StandardLibraryItem::Sync.std_path()),
+        "Vec" => Some(StandardLibraryItem::Vec.std_path()),
         primitive if is_copy_primitive(primitive) => {
             Some(CanonicalPath::new(vec![leaf.to_string()]))
         }

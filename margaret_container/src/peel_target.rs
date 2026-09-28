@@ -3,22 +3,39 @@ use syn::Type;
 use syn::TypeParamBound;
 use syn::TypeTraitObject;
 
-use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
+use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::indexed_item::IndexedItem;
+use margaret_attributes::standard_library_item::StandardLibraryItem;
+use margaret_syn_type_peeling::peel_standard_wrapper::peel_standard_wrapper;
 
-fn peel_arc_inner(inner: &Type) -> Option<Path> {
-    match inner {
+fn is_marker_trait(index: &AttributeIndex, item: &IndexedItem, path: &Path) -> bool {
+    matches!(
+        index
+            .resolve_item_path(item, path)
+            .as_ref()
+            .and_then(StandardLibraryItem::from_canonical),
+        Some(StandardLibraryItem::Send | StandardLibraryItem::Sync)
+    )
+}
+
+fn peel_pointee(index: &AttributeIndex, item: &IndexedItem, pointee: &Type) -> Option<Path> {
+    match pointee {
         Type::Path(type_path) => Some(type_path.path.clone()),
-        Type::TraitObject(trait_object) => single_trait_bound(trait_object),
+        Type::TraitObject(trait_object) => single_trait_bound(index, item, trait_object),
         _ => None,
     }
 }
 
-fn single_trait_bound(trait_object: &TypeTraitObject) -> Option<Path> {
+fn single_trait_bound(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    trait_object: &TypeTraitObject,
+) -> Option<Path> {
     let mut resolved: Option<Path> = None;
 
     for bound in &trait_object.bounds {
         if let TypeParamBound::Trait(trait_bound) = bound {
-            if is_marker_trait(&trait_bound.path) {
+            if is_marker_trait(index, item, &trait_bound.path) {
                 continue;
             }
             if resolved.is_some() {
@@ -31,33 +48,34 @@ fn single_trait_bound(trait_object: &TypeTraitObject) -> Option<Path> {
     resolved
 }
 
-fn is_marker_trait(path: &Path) -> bool {
-    path.is_ident("Send") || path.is_ident("Sync")
-}
-
-pub(crate) fn peel_target(parameter_type: &Type) -> Option<Path> {
-    let Type::Path(type_path) = parameter_type else {
-        return None;
-    };
-
-    match type_path.path.segments.last() {
-        Some(segment) if segment.ident == "Arc" || segment.ident == "Rc" => {
-            peel_arc_inner(single_generic_argument(segment)?)
-        }
-        _ => None,
-    }
+pub(crate) fn peel_target(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    parameter_type: &Type,
+) -> Option<Path> {
+    peel_standard_wrapper(
+        index,
+        item,
+        parameter_type,
+        &[StandardLibraryItem::Arc, StandardLibraryItem::Rc],
+    )
+    .and_then(|pointee| peel_pointee(index, item, pointee))
 }
 
 #[cfg(test)]
 mod tests {
     use syn::Type;
 
+    use margaret_attributes_tests::indexed_source::IndexedSource;
+
     use super::peel_target;
 
     fn label(parameter_type: &str) -> &'static str {
+        let indexed =
+            IndexedSource::new("use std::rc::Rc;\nuse std::sync::Arc;\n\nstruct Probe;\n");
         let parsed: Type = syn::parse_str(parameter_type).expect("a type fixture parses");
 
-        match peel_target(&parsed) {
+        match peel_target(&indexed.index, indexed.item("Probe"), &parsed) {
             Some(_) => "single",
             None => "none",
         }
@@ -81,6 +99,11 @@ mod tests {
     #[test]
     fn rejects_bare_type() {
         assert_eq!(label("Config"), "none");
+    }
+
+    #[test]
+    fn rejects_a_same_named_pointer_of_another_crate() {
+        assert_eq!(label("pointers::Arc<Config>"), "none");
     }
 
     #[test]

@@ -49,7 +49,7 @@ impl InputValue {
         let OptionalParameter {
             required,
             value_type,
-        } = OptionalParameter::from_type(declared);
+        } = OptionalParameter::from_type(index, item, declared);
 
         if has_generic_arguments(&value_type) {
             return Err(InputWeavingError::GenericValueType {
