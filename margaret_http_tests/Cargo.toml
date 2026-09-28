@@ -10,10 +10,12 @@ async-trait = { workspace = true }
 margaret_http = { workspace = true }
 margaret_http_uploaded_file = { workspace = true }
 rcgen = { workspace = true }
+reqwest = { workspace = true }
 rustls = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread"] }
 tokio-rustls = { workspace = true }
 tokio-util = { workspace = true }
+url = { workspace = true }
 
 [[test]]
 name = "main"

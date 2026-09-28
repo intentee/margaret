@@ -1,4 +1,13 @@
+pub mod echo_peer_route;
+pub mod fixture_certificate_authority;
+pub mod fixture_client_builder;
+pub mod hanging_handler;
+pub mod issued_certificate;
 pub mod mtls_client_request;
 pub mod mtls_connect;
 pub mod mtls_fixture;
-pub mod running_mtls_server;
+pub mod redirecting_handler;
+pub mod running_fixture_server;
+pub mod static_handler;
+pub mod tls_fixture;
+pub mod truncated_response_server;

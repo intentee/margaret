@@ -2363,10 +2363,12 @@ dependencies = [
  "margaret_http",
  "margaret_http_uploaded_file",
  "rcgen",
+ "reqwest",
  "rustls",
  "tokio",
  "tokio-rustls",
  "tokio-util",
+ "url",
 ]
 
 [[package]]
@@ -2439,6 +2441,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_issuer_document_fetch"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "margaret_http",
+ "margaret_http_tests",
+ "reqwest",
+ "rustls",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "url",
+]
+
+[[package]]
 name = "margaret_item_naming_argument"
 version = "0.4.0"
 dependencies = [
@@ -2457,6 +2474,7 @@ dependencies = [
  "chrono",
  "log",
  "margaret_identity_session",
+ "margaret_issuer_document_fetch",
  "margaret_jwks_endpoint",
  "margaret_jwks_keygen",
  "margaret_sync_holder",
@@ -2479,8 +2497,8 @@ dependencies = [
  "chrono",
  "margaret_http",
  "margaret_http_tests",
- "margaret_http_uploaded_file",
  "margaret_identity_session",
+ "margaret_issuer_document_fetch",
  "margaret_jwks_client",
  "margaret_jwks_endpoint",
  "margaret_jwks_keygen",
@@ -2488,7 +2506,6 @@ dependencies = [
  "margaret_jwks_roller_server",
  "margaret_sync_holder",
  "reqwest",
- "rustls",
  "serde",
  "tokio",
  "tokio-util",
