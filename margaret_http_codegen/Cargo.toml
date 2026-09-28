@@ -29,6 +29,7 @@ syn = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+margaret_tag_codegen = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

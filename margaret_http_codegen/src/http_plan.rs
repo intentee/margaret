@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
-use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::binding_root::binding_root;
 use margaret_serve_input_codegen::serve_input::ServeInput;
@@ -54,7 +54,7 @@ impl HttpPlan {
         index: &AttributeIndex,
         has_views: bool,
         websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
-        middleware_plans: &[MiddlewarePlan],
+        middleware_plans: &MiddlewarePlans,
         bindings: &ContainerBindings,
         registries: &BindingRegistries,
     ) -> Result<Self, HttpCodegenError> {

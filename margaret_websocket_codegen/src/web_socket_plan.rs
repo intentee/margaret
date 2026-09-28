@@ -6,7 +6,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::web_socket_server_requirements::WebSocketServerRequirements;
-use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::binding_root::binding_root;
 
@@ -58,7 +58,7 @@ impl WebSocketPlan {
     pub fn build(
         index: &AttributeIndex,
         bindings: &ContainerBindings,
-        middleware_plans: &[MiddlewarePlan],
+        middleware_plans: &MiddlewarePlans,
         registries: &BindingRegistries,
     ) -> Result<Self, WebSocketCodegenError> {
         let BuiltWebSocketPlan { messages, sessions } =

@@ -4,9 +4,9 @@ use syn::Path;
 
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_base::field_base;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
+use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_attributes::tag::Tag;
 
@@ -14,44 +14,40 @@ use crate::jwks_client_binding::JwksClientBinding;
 use crate::read_middleware_attribute::read_middleware_attribute;
 use crate::tag_error::TagError;
 use crate::tag_kind::TagKind;
+use crate::tagged_item::TaggedItem;
 
-struct TaggedEntry<'pool> {
-    entry: &'pool TagEntry,
-    tag: &'pool Tag,
-}
-
-struct TagEntry {
-    concrete: CanonicalPath,
+struct TagEntry<'index> {
+    item: &'index IndexedItem,
     kind: TagKind,
 }
 
-fn collect_kind(
-    index: &AttributeIndex,
+fn collect_kind<'index>(
+    index: &'index AttributeIndex,
     framework_attribute: FrameworkAttribute,
     kind: TagKind,
-    entries: &mut HashMap<Tag, TagEntry>,
+    entries: &mut HashMap<Tag, TagEntry<'index>>,
 ) -> Result<(), TagError> {
     for matched in index.select_framework_attribute(framework_attribute) {
-        let concrete = matched.item().canonical_path().clone();
+        let item = matched.item();
         let declared = declared_tag_path(matched.args()?, kind)?;
         let path = declared.ok_or_else(|| TagError::MissingTag {
-            concrete: concrete.to_string(),
+            concrete: item.canonical_path().to_string(),
             kind,
         })?;
         let tag = Tag::from_path(&path).ok_or_else(|| TagError::MalformedTag {
-            concrete: concrete.to_string(),
+            concrete: item.canonical_path().to_string(),
             kind,
         })?;
 
         if let Some(existing) = entries.get(&tag) {
             return Err(TagError::DuplicateTag {
                 tag: tag.to_string(),
-                first: existing.concrete.to_string(),
-                second: concrete.to_string(),
+                first: existing.item.canonical_path().to_string(),
+                second: item.canonical_path().to_string(),
             });
         }
 
-        entries.insert(tag, TagEntry { concrete, kind });
+        entries.insert(tag, TagEntry { item, kind });
     }
 
     Ok(())
@@ -66,16 +62,16 @@ fn declared_tag_path(args: &AttributeArgs, kind: TagKind) -> Result<Option<Path>
     }
 }
 
-pub struct TagPool {
-    entries: HashMap<Tag, TagEntry>,
+pub struct TagPool<'index> {
+    entries: HashMap<Tag, TagEntry<'index>>,
 }
 
-impl TagPool {
+impl<'index> TagPool<'index> {
     /// # Errors
     ///
     /// Returns `TagError` propagated from the work it performs.
-    pub fn collect(index: &AttributeIndex) -> Result<Self, TagError> {
-        let mut entries: HashMap<Tag, TagEntry> = HashMap::new();
+    pub fn collect(index: &'index AttributeIndex) -> Result<Self, TagError> {
+        let mut entries: HashMap<Tag, TagEntry<'index>> = HashMap::new();
 
         collect_kind(
             index,
@@ -95,28 +91,28 @@ impl TagPool {
 
     #[must_use]
     pub fn jwks_client_bindings(&self) -> Vec<JwksClientBinding> {
-        let mut entries: Vec<TaggedEntry<'_>> = self
-            .entries
-            .iter()
-            .filter(|(_, entry)| entry.kind == TagKind::JwksClient)
-            .map(|(tag, entry)| TaggedEntry { entry, tag })
-            .collect();
-
-        entries.sort_by_key(|tagged| tagged.tag.to_string());
-
         let mut allocator = NameAllocator::new();
 
-        entries
+        self.tagged_items(TagKind::JwksClient)
             .into_iter()
-            .map(|TaggedEntry { entry, tag }| JwksClientBinding {
-                endpoint: entry.concrete.clone(),
+            .map(|TaggedItem { item, tag }| JwksClientBinding {
+                endpoint: item.canonical_path().clone(),
                 module_segment: allocator
-                    .allocate(&field_base(&entry.concrete))
+                    .allocate(&field_base(item.canonical_path()))
                     .field()
                     .to_string(),
-                tag: tag.clone(),
+                tag,
             })
             .collect()
+    }
+
+    #[must_use]
+    pub fn middleware_handlers(&self) -> Vec<TaggedItem<'index>> {
+        let mut handlers = self.tagged_items(TagKind::Middleware);
+
+        handlers.sort_by(|left, right| left.item.canonical_path().cmp(right.item.canonical_path()));
+
+        handlers
     }
 
     /// # Errors
@@ -127,14 +123,14 @@ impl TagPool {
         tag: &Tag,
         expected: TagKind,
         site: &str,
-    ) -> Result<&CanonicalPath, TagError> {
+    ) -> Result<&'index IndexedItem, TagError> {
         match self.entries.get(tag) {
             None => Err(TagError::UnknownTag {
                 site: site.to_string(),
                 tag: tag.to_string(),
                 kind: expected,
             }),
-            Some(entry) if entry.kind == expected => Ok(&entry.concrete),
+            Some(entry) if entry.kind == expected => Ok(entry.item),
             Some(entry) => Err(TagError::WrongKind {
                 site: site.to_string(),
                 tag: tag.to_string(),
@@ -143,42 +139,36 @@ impl TagPool {
             }),
         }
     }
+
+    fn tagged_items(&self, kind: TagKind) -> Vec<TaggedItem<'index>> {
+        let mut tagged: Vec<TaggedItem<'index>> = self
+            .entries
+            .iter()
+            .filter(|(_, entry)| entry.kind == kind)
+            .map(|(tag, entry)| TaggedItem {
+                item: entry.item,
+                tag: tag.clone(),
+            })
+            .collect();
+
+        tagged.sort_by_key(|tagged_item| tagged_item.tag.to_string());
+
+        tagged
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use syn::Path;
     use syn::parse_str;
-    use tempfile::tempdir;
 
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
-    use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
     use margaret_attributes::tag::Tag;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
 
     use crate::tag_error::TagError;
     use crate::tag_kind::TagKind;
     use crate::tag_pool::TagPool;
-
-    fn index_for(lib_source: &str) -> AttributeIndex {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", source_directory))
-            .expect("the crate is indexed")
-            .build()
-    }
-
-    fn pool_for(lib_source: &str) -> Result<TagPool, TagError> {
-        TagPool::collect(&index_for(lib_source))
-    }
 
     fn tag(name: &str) -> Tag {
         let path: Path = parse_str(name).expect("the tag path parses");
@@ -187,7 +177,7 @@ mod tests {
     }
 
     fn rejection_for(lib_source: &str) -> TagError {
-        pool_for(lib_source)
+        TagPool::collect(&IndexedSource::new(lib_source).index)
             .err()
             .expect("the pool fails to collect")
     }
@@ -198,8 +188,8 @@ mod tests {
 
     #[test]
     fn binds_a_jwks_client_tag_to_its_endpoint() {
-        let pool = pool_for("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n")
-            .expect("the pool collects");
+        let indexed = IndexedSource::new("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n");
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
         let bindings = pool.jwks_client_bindings();
 
         assert_eq!(bindings.len(), 1);
@@ -210,8 +200,9 @@ mod tests {
 
     #[test]
     fn takes_a_raw_identifier_tag_verbatim_and_derives_the_segment_from_the_endpoint() {
-        let pool = pool_for("#[provides_jwks_endpoint(r#async)]\nstruct AsyncEndpoint;\n")
-            .expect("the pool collects");
+        let indexed =
+            IndexedSource::new("#[provides_jwks_endpoint(r#async)]\nstruct AsyncEndpoint;\n");
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
         let bindings = pool.jwks_client_bindings();
 
         assert_eq!(bindings.len(), 1);
@@ -221,10 +212,10 @@ mod tests {
 
     #[test]
     fn disambiguates_client_module_segments_that_collide() {
-        let pool = pool_for(
+        let indexed = IndexedSource::new(
             "mod outer {\n    pub mod inner {\n        #[provides_jwks_endpoint(first)]\n        pub struct AuthEndpoint;\n    }\n}\n\nmod outer_inner {\n    #[provides_jwks_endpoint(second)]\n    pub struct AuthEndpoint;\n}\n",
-        )
-        .expect("the pool collects");
+        );
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         let segments: Vec<String> = pool
             .jwks_client_bindings()
@@ -243,10 +234,10 @@ mod tests {
 
     #[test]
     fn lists_jwks_client_bindings_in_a_stable_order() {
-        let pool = pool_for(
+        let indexed = IndexedSource::new(
             "#[provides_jwks_endpoint(partner)]\nstruct PartnerEndpoint;\n\n#[provides_jwks_endpoint(auth)]\nstruct AuthEndpoint;\n",
-        )
-        .expect("the pool collects");
+        );
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         let tags: Vec<String> = pool
             .jwks_client_bindings()
@@ -259,35 +250,60 @@ mod tests {
 
     #[test]
     fn excludes_a_middleware_tag_from_jwks_client_bindings() {
-        let pool =
-            pool_for("#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n")
-                .expect("the pool collects");
+        let indexed = IndexedSource::new(
+            "#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n",
+        );
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         assert!(pool.jwks_client_bindings().is_empty());
     }
 
     #[test]
     fn resolves_a_middleware_tag_to_its_handler() {
-        let pool =
-            pool_for("#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n")
-                .expect("the pool collects");
+        let indexed = IndexedSource::new(
+            "#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n",
+        );
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         assert_eq!(
             pool.resolve(&tag("logged"), TagKind::Middleware, "the site")
                 .expect("the tag resolves")
+                .canonical_path()
                 .to_string(),
             "crate::RequestLog"
         );
     }
 
     #[test]
+    fn lists_middleware_handlers_with_their_tags_in_a_stable_order() {
+        let indexed = IndexedSource::new(
+            "#[handles_middleware_attribute(attribute = traced)]\nstruct Tracer;\n\n#[handles_middleware_attribute(attribute = logged)]\nstruct RequestLog;\n\n#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n",
+        );
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
+        let handlers: Vec<String> = pool
+            .middleware_handlers()
+            .iter()
+            .map(|handler| format!("{}={}", handler.tag, handler.item.canonical_path()))
+            .collect();
+
+        assert_eq!(
+            handlers,
+            vec![
+                "logged=crate::RequestLog".to_string(),
+                "traced=crate::Tracer".to_string(),
+            ]
+        );
+    }
+
+    #[test]
     fn reports_an_unknown_tag() {
-        let pool = pool_for("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n")
-            .expect("the pool collects");
+        let indexed = IndexedSource::new("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n");
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         assert!(
             pool.resolve(&tag("missing"), TagKind::JwksClient, "the site")
-                .expect_err("the tag is unknown")
+                .err()
+                .expect("the tag is unknown")
                 .to_string()
                 .contains("no jwks endpoint provider declares")
         );
@@ -295,12 +311,13 @@ mod tests {
 
     #[test]
     fn reports_a_tag_of_the_wrong_kind() {
-        let pool = pool_for("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n")
-            .expect("the pool collects");
+        let indexed = IndexedSource::new("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n");
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         assert!(
             pool.resolve(&tag("jwks"), TagKind::Middleware, "the site")
-                .expect_err("the tag is the wrong kind")
+                .err()
+                .expect("the tag is the wrong kind")
                 .to_string()
                 .contains("is a jwks endpoint provider, not a middleware handler")
         );
@@ -336,6 +353,14 @@ mod tests {
     fn rejects_a_tag_that_is_not_a_plain_name() {
         assert!(
             error_for("#[provides_jwks_endpoint(endpoints::jwks)]\nstruct JwksEndpoint;\n")
+                .contains("not a single plain name")
+        );
+    }
+
+    #[test]
+    fn rejects_a_middleware_tag_that_is_not_a_plain_name() {
+        assert!(
+            error_for("#[handles_middleware_attribute(attribute = tags::guard)]\nstruct Guard;\n")
                 .contains("not a single plain name")
         );
     }

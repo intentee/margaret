@@ -19,8 +19,7 @@ use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_plan::HttpPlan;
 use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::render_http::render_http;
-use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
-use margaret_middleware_codegen::middleware_plans::middleware_plans;
+use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers;
 use margaret_model_codegen::models::models;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
@@ -82,7 +81,7 @@ fn render_serving_modules(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
-    middleware_plans: &[MiddlewarePlan],
+    middleware_plans: &MiddlewarePlans,
     registries: &BindingRegistries,
 ) -> Result<ServingModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
@@ -207,11 +206,10 @@ pub fn build(
         .build();
     let mut features = GeneratedFeatures::from_index(&index);
     let registry = scan(&index)?;
-    let client_bindings = TagPool::collect(&index)
-        .map_err(ContainerError::from)?
-        .jwks_client_bindings();
+    let tags = TagPool::collect(&index).map_err(ContainerError::from)?;
+    let client_bindings = tags.jwks_client_bindings();
     let framework_providers = framework_providers(&client_bindings);
-    let planned_container = plan_container(&index, &registry, &framework_providers)?;
+    let planned_container = plan_container(&index, &registry, &framework_providers, &tags)?;
     let bindings = planned_container.bindings();
     let application_roots = planned_container.roots();
     features.enable_if(GeneratedFeature::AssetBag, metafile_contents.is_some());
@@ -241,12 +239,12 @@ pub fn build(
         module_tokens.extend(render_authenticated_user_wrappers(&registries.providers()));
     }
 
-    let middleware_plans = middleware_plans(&index, &registries)?;
+    let middleware_plans = MiddlewarePlans::collect(&index, &registries, &tags)?;
     if features.contains(GeneratedFeature::Middleware)
         && (features.contains(GeneratedFeature::Http)
             || features.contains(GeneratedFeature::Websockets))
     {
-        module_tokens.extend(render_middleware_wrappers(&middleware_plans));
+        module_tokens.extend(render_middleware_wrappers(&middleware_plans.plans));
     }
 
     let ServingModules {
@@ -1144,7 +1142,10 @@ impl GetJwks {
         .expect_err("a client store without a matching jwks endpoint is rejected")
         .to_string();
 
-        assert!(message.contains("client 'missing'"));
+        assert!(
+            message
+                .contains("references the tag 'missing', which no jwks endpoint provider declares")
+        );
     }
 
     const JWKS_DUPLICATE_ENDPOINT_TAG_CRATE: &str = "\

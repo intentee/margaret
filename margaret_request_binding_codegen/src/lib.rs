@@ -50,6 +50,7 @@ mod tests {
     use margaret_injection_codegen::process_method::process_method;
     use margaret_route_parameter_codegen::route_path::RoutePath;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_tag_codegen::tag_pool::TagPool;
 
     use crate::authenticated_user_application::AuthenticatedUserApplication;
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
@@ -92,9 +93,14 @@ struct User;
         let index = index_for("");
         let registry = scan(&index).expect("the empty console argument registry is scanned");
 
-        render_container(&index, &registry, &[])
-            .expect("the empty container is rendered")
-            .bindings
+        render_container(
+            &index,
+            &registry,
+            &[],
+            &TagPool::collect(&index).expect("the tags are collected"),
+        )
+        .expect("the empty container is rendered")
+        .bindings
     }
 
     fn missing_path() -> CanonicalPath {
@@ -530,9 +536,14 @@ impl SessionUserProvider {
     fn collects_the_console_arguments_a_binding_pulls_in() {
         let index = index_for(&provider_source(CONSOLE_ARGUMENT_PROVIDER));
         let registry = scan(&index).expect("the console arguments are scanned");
-        let bindings = render_container(&index, &registry, &[])
-            .expect("the container renders")
-            .bindings;
+        let bindings = render_container(
+            &index,
+            &registry,
+            &[],
+            &TagPool::collect(&index).expect("the tags are collected"),
+        )
+        .expect("the container renders")
+        .bindings;
         let registries = BindingRegistries::collect(&index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
         let providers = registries.providers();

@@ -3,7 +3,7 @@ use quote::format_ident;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_container::container_bindings::ContainerBindings;
-use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
@@ -18,7 +18,7 @@ use crate::web_socket_session::WebSocketSession;
 pub(crate) fn websocket_sessions(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
-    middleware_plans: &[MiddlewarePlan],
+    middleware_plans: &MiddlewarePlans,
     registries: &BindingRegistries,
 ) -> Result<Vec<WebSocketSession>, WebSocketCodegenError> {
     let mut sessions = Vec::new();

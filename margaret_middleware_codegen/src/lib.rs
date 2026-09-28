@@ -1,6 +1,5 @@
 pub mod fold_layers;
 pub mod layer_application;
-mod middleware_attribute_arguments;
 pub mod middleware_codegen_error;
 mod middleware_injections;
 mod middleware_instance_tokens;
@@ -19,7 +18,6 @@ mod tests {
     use tempfile::TempDir;
     use tempfile::tempdir;
 
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
@@ -30,11 +28,12 @@ mod tests {
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_tag_codegen::tag_pool::TagPool;
 
     use crate::fold_layers::fold_layers;
     use crate::layer_application::LayerApplication;
     use crate::middleware_codegen_error::MiddlewareCodegenError;
-    use crate::middleware_plans::middleware_plans;
+    use crate::middleware_plans::MiddlewarePlans;
     use crate::middleware_vec_tokens::middleware_vec_tokens;
     use crate::render_middleware_wrappers::render_middleware_wrappers;
     use crate::resolve_layers::resolve_layers;
@@ -61,9 +60,14 @@ mod tests {
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
-            .expect("the container renders")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &TagPool::collect(index).expect("the tags are collected"),
+        )
+        .expect("the container renders")
+        .bindings
     }
 
     fn empty_bindings() -> ContainerBindings {
@@ -77,10 +81,11 @@ mod tests {
 
     fn wrappers_for(lib_source: &str) -> String {
         let index = index_for(lib_source);
-        let plans = middleware_plans(&index, &registries_for(&index))
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
             .expect("the middleware plans are collected");
 
-        render_middleware_wrappers(&plans)
+        render_middleware_wrappers(&plans.plans)
             .into_iter()
             .map(|module| module.to_source())
             .collect::<String>()
@@ -91,9 +96,13 @@ mod tests {
     fn plans_rejection_for(lib_source: &str) -> MiddlewareCodegenError {
         let index = index_for(lib_source);
 
-        middleware_plans(&index, &registries_for(&index))
-            .err()
-            .expect("the middleware plans fail to collect")
+        MiddlewarePlans::collect(
+            &index,
+            &registries_for(&index),
+            &TagPool::collect(&index).expect("the tags are collected"),
+        )
+        .err()
+        .expect("the middleware plans fail to collect")
     }
 
     fn plans_error_for(lib_source: &str) -> String {
@@ -102,7 +111,9 @@ mod tests {
 
     fn layers_for(lib_source: &str) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
         let index = index_for(lib_source);
-        let plans = middleware_plans(&index, &registries_for(&index))?;
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
+            .expect("the middleware plans are collected");
         let selected = index.select_framework_attribute(FrameworkAttribute::Middleware);
         let site = selected
             .into_iter()
@@ -116,6 +127,16 @@ mod tests {
         let failure = layers_for(lib_source).err();
 
         failure.expect("the layers fail to resolve").to_string()
+    }
+
+    #[test]
+    fn rejects_a_middleware_reference_that_names_a_jwks_endpoint() {
+        assert!(
+            layers_error_for(
+                "#[singleton]\n#[provides_jwks_endpoint(auth)]\nstruct Endpoint;\n\n#[middleware(auth)]\nstruct Site;\n"
+            )
+            .contains("which is a jwks endpoint provider, not a middleware handler")
+        );
     }
 
     const GUARD: &str = r"
@@ -218,40 +239,6 @@ impl Guard {
     }
 
     #[test]
-    fn rejects_a_handler_without_the_attribute_argument() {
-        assert!(
-            plans_error_for("#[handles_middleware_attribute]\nstruct Bad;\n")
-                .contains("missing the 'attribute'")
-        );
-    }
-
-    #[test]
-    fn rejects_a_handler_with_a_non_path_attribute_argument() {
-        let error = plans_rejection_for(
-            "#[handles_middleware_attribute(attribute = \"x\")]\nstruct Bad;\n",
-        );
-
-        assert!(matches!(
-            error,
-            MiddlewareCodegenError::AttributeArguments {
-                source: AttributeArgumentsError::UnexpectedArgument {
-                    ref key,
-                    ref expected,
-                    ..
-                }
-            } if key == "attribute" && expected == "path"
-        ));
-    }
-
-    #[test]
-    fn propagates_malformed_handler_arguments() {
-        assert!(
-            plans_error_for("#[handles_middleware_attribute(= 5)]\nstruct Bad;\n")
-                .contains("failed to index")
-        );
-    }
-
-    #[test]
     fn rejects_a_handler_without_a_process_method() {
         assert!(
             plans_error_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n")
@@ -293,17 +280,7 @@ impl Guard {
     fn rejects_an_unknown_middleware_tag() {
         assert!(
             layers_error_for("#[middleware(missing)]\nstruct Site;\n")
-                .contains("no #[handles_middleware_attribute] handles it")
-        );
-    }
-
-    #[test]
-    fn rejects_a_handler_with_a_multi_segment_tag() {
-        assert!(
-            plans_error_for(
-                "#[handles_middleware_attribute(attribute = tags::guard)]\nstruct Guard;\n"
-            )
-            .contains("not a single plain name")
+                .contains("which no middleware handler declares")
         );
     }
 
@@ -313,13 +290,31 @@ impl Guard {
     }
 
     #[test]
-    fn propagates_a_plan_failure_while_resolving_layers() {
-        assert!(
-            layers_error_for(
-                "#[middleware(logged)]\nstruct Site;\n\n#[handles_middleware_attribute]\nstruct Bad;\n"
-            )
-            .contains("missing the 'attribute'")
+    fn reports_a_handler_that_has_no_plan() {
+        let index = index_for(
+            "#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\n#[middleware(guard)]\nstruct Site;\n",
         );
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let site = index
+            .select_framework_attribute(FrameworkAttribute::Middleware)
+            .next()
+            .expect("a site carrying a #[middleware] attribute");
+        let error = resolve_layers(
+            site.item(),
+            &MiddlewarePlans {
+                plans: Vec::new(),
+                tags: &tags,
+            },
+            "site 'Site'",
+        )
+        .err()
+        .expect("a handler without a plan cannot be layered");
+
+        assert!(matches!(
+            error,
+            MiddlewareCodegenError::UnplannedMiddlewareHandler { ref handler, .. }
+                if handler == "crate::Guard"
+        ));
     }
 
     fn plain_layer(field: &str, wrapper: &str) -> LayerApplication {

@@ -46,13 +46,13 @@ mod tests {
     use margaret_container::render_container::render_container;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_middleware_codegen::layer_application::LayerApplication;
-    use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
-    use margaret_middleware_codegen::middleware_plans::middleware_plans;
+    use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::bound_parameter::BoundParameter;
     use margaret_request_binding_codegen::request_binding::RequestBinding;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_tag_codegen::tag_pool::TagPool;
 
     use crate::handler_binding::HandlerBinding;
     use crate::render_websocket;
@@ -68,7 +68,7 @@ mod tests {
     fn render_websocket(
         index: &AttributeIndex,
         bindings: &ContainerBindings,
-        middleware_plans: &[MiddlewarePlan],
+        middleware_plans: &MiddlewarePlans,
         registries: &BindingRegistries,
     ) -> Result<WebSocketArtifacts, WebSocketCodegenError> {
         WebSocketPlan::build(index, bindings, middleware_plans, registries)
@@ -173,9 +173,14 @@ impl RespondsToWebSocketNotification for Typist {
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
-            .expect("the container renders")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &TagPool::collect(index).expect("the tags are collected"),
+        )
+        .expect("the container renders")
+        .bindings
     }
 
     fn registries_for(index: &AttributeIndex) -> BindingRegistries {
@@ -215,8 +220,9 @@ impl RespondsToWebSocketNotification for Typist {
     fn generated(source: &str) -> String {
         let index = index_for(source);
         let registries = registries_for(&index);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
 
         render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect("the websocket module is generated")
@@ -239,8 +245,9 @@ impl RespondsToWebSocketNotification for Typist {
             Ok(registries) => registries,
             Err(rejection) => return WebSocketCodegenError::from(rejection),
         };
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
 
         render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect_err("the websocket module is rejected")
@@ -416,8 +423,9 @@ impl RespondsToWebSocketMessage for Ponger {
 "#,
         );
         let registries = registries_for(&index);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let empty_index = index_for("");
         let error = render_websocket(&index, &bindings(&empty_index), &plans, &registries)
             .map(drop)
@@ -689,7 +697,7 @@ impl Guard {
                 "#[websocket_session(path = \"/room\", server = \"public\")]\n#[middleware(missing)]\nstruct Room;\n\nimpl Room {\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {}\n}\n"
             )
             .to_string()
-            .contains("no #[handles_middleware_attribute] handles it")
+            .contains("which no middleware handler declares")
         );
     }
 
@@ -1030,8 +1038,9 @@ impl Bad {
 "#,
         );
         let registries = registries_for(&index);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let registry = scan(&index).expect("the console arguments are scanned");
         let bindings = render_container(
             &index,
@@ -1042,6 +1051,7 @@ impl Bad {
                 injection: FrameworkInjectionRole::JwksServerStore,
                 provided: CanonicalPath::new(vec!["crate".to_string(), "ServerStore".to_string()]),
             }],
+            &TagPool::collect(&index).expect("the tags are collected"),
         )
         .expect("the container renders")
         .bindings;
@@ -2006,8 +2016,9 @@ impl Bad {
     fn transport_policies(source: &str) -> BTreeMap<String, ServerTransportPolicy> {
         let index = index_for(source);
         let registries = registries_for(&index);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
 
         render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect("the websocket module is generated")

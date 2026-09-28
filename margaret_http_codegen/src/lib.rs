@@ -35,14 +35,13 @@ mod tests {
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
-    use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
-    use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
-    use margaret_middleware_codegen::middleware_plans::middleware_plans;
+    use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
+    use margaret_tag_codegen::tag_pool::TagPool;
 
     use crate::http_artifacts::HttpArtifacts;
     use crate::http_codegen_error::HttpCodegenError;
@@ -56,7 +55,7 @@ mod tests {
         index: &AttributeIndex,
         has_views: bool,
         websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
-        middleware_plans: &[MiddlewarePlan],
+        middleware_plans: &MiddlewarePlans,
         bindings: &ContainerBindings,
         registries: &BindingRegistries,
     ) -> Result<HttpArtifacts, HttpCodegenError> {
@@ -74,9 +73,14 @@ mod tests {
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
-            .expect("the container renders")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &TagPool::collect(index).expect("the tags are collected"),
+        )
+        .expect("the container renders")
+        .bindings
     }
 
     fn no_websocket_servers() -> BTreeMap<String, WebSocketServerRequirements> {
@@ -112,8 +116,9 @@ mod tests {
     fn error_with_container_source(source: &str, container_source: &str) -> String {
         let index = index_for(source);
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let container_index = index_for(container_source);
         let bindings = bindings_for(&container_index);
 
@@ -139,7 +144,8 @@ mod tests {
             .index_crate(&CrateRoot::new(crate_name, source_directory))?
             .build();
         let registries = BindingRegistries::collect(&index, views_availability(has_views))?;
-        let plans = middleware_plans(&index, &registries)?;
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)?;
         let bindings = bindings_for(&index);
 
         Ok(render_http(
@@ -280,11 +286,14 @@ impl Resource {
                 transport_policy: ServerTransportPolicy::Negotiable,
             },
         )]);
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let middleware_plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let error = render_http(
             &index,
             false,
             &websocket_servers,
-            &[],
+            &middleware_plans,
             &bindings,
             &registries,
         )
@@ -771,8 +780,9 @@ impl Health {
     ) -> String {
         let index = index_for(lib_source);
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         render_http(
@@ -828,8 +838,9 @@ impl Health {
     ) -> BTreeMap<String, ServerTransportPolicy> {
         let index = index_for(lib_source);
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         render_http(
@@ -928,8 +939,9 @@ impl GetWorkload {
             .expect("the crate is indexed")
             .build();
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         render_http(
@@ -1661,41 +1673,6 @@ impl GetProject {
     }
 
     #[test]
-    fn propagates_malformed_middleware_arguments() {
-        assert!(
-            error_for("#[handles_middleware_attribute(= 5)]\nstruct Bad;\n")
-                .contains("failed to index")
-        );
-    }
-
-    #[test]
-    fn rejects_middleware_without_handles() {
-        assert!(
-            error_for("#[handles_middleware_attribute]\nstruct Bad;\n")
-                .contains("missing the 'attribute'")
-        );
-    }
-
-    #[test]
-    fn propagates_a_non_path_handles_argument() {
-        let error =
-            rejection_for("#[handles_middleware_attribute(attribute = \"x\")]\nstruct Bad;\n");
-
-        assert!(matches!(
-            error,
-            HttpCodegenError::Middleware {
-                source: MiddlewareCodegenError::AttributeArguments {
-                    source: AttributeArgumentsError::UnexpectedArgument {
-                        ref key,
-                        ref expected,
-                        ..
-                    }
-                }
-            } if key == "attribute" && expected == "path"
-        ));
-    }
-
-    #[test]
     fn rejects_a_middleware_without_a_process_method() {
         let message =
             error_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n");
@@ -1729,7 +1706,7 @@ impl GetProject {
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(missing)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("no #[handles_middleware_attribute] handles it"));
+        assert!(message.contains("which no middleware handler declares"));
     }
 
     #[test]
@@ -2175,8 +2152,9 @@ impl Guard {
 "#,
         );
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
         let artifacts = render_http(
             &index,

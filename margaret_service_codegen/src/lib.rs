@@ -32,6 +32,7 @@ mod tests {
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
+    use margaret_tag_codegen::tag_pool::TagPool;
 
     use crate::framework_service::FrameworkService;
     use crate::framework_service_kind::FrameworkServiceKind;
@@ -61,9 +62,14 @@ mod tests {
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
-            .expect("the container is rendered")
-            .bindings
+        render_container(
+            index,
+            &registry,
+            &[],
+            &TagPool::collect(index).expect("the tags are collected"),
+        )
+        .expect("the container is rendered")
+        .bindings
     }
 
     fn serve_roots(index: &AttributeIndex) -> Vec<CanonicalPath> {
