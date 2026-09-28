@@ -4,9 +4,9 @@ use std::collections::BTreeSet;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
-use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
-use margaret_request_binding_codegen::binding_root::binding_root;
+use margaret_request_binding_codegen::binding_roots::binding_roots;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 
 use crate::active_servers::active_servers;
@@ -28,9 +28,7 @@ fn retained_roots(table: &HttpRouteTable) -> Vec<CanonicalPath> {
         }
 
         for parameter in &route.arguments {
-            if let Some(root) = binding_root(&parameter.binding) {
-                roots.insert(root.clone());
-            }
+            roots.extend(binding_roots(&parameter.binding).into_iter().cloned());
         }
     }
 
@@ -54,7 +52,7 @@ impl HttpPlan {
         index: &AttributeIndex,
         has_views: bool,
         websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
-        middleware_plans: &[MiddlewarePlan],
+        middleware_plans: &MiddlewarePlans,
         bindings: &ContainerBindings,
         registries: &BindingRegistries,
     ) -> Result<Self, HttpCodegenError> {

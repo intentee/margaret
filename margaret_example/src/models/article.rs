@@ -1,5 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
+use rust_decimal::Decimal;
+use uuid::Uuid;
 
 use margaret::framework::macros::model;
 
@@ -10,7 +12,7 @@ use crate::models::author::Author;
 #[derive(Clone)]
 pub struct Article {
     #[column(primary_key)]
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     #[column]
     pub title: String,
     #[column]
@@ -20,7 +22,7 @@ pub struct Article {
     #[column]
     pub published: bool,
     #[column(precision = 12, scale = 2)]
-    pub price: rust_decimal::Decimal,
+    pub price: Decimal,
     #[column(minimum = 0)]
     pub reading_minutes: f64,
     #[column]

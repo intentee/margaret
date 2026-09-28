@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::url_segment::UrlSegment;
 
 #[must_use]
@@ -18,7 +20,7 @@ pub fn route_url_template(path: &str) -> Vec<UrlSegment> {
             }
             '{' => {
                 if !literal.is_empty() {
-                    segments.push(UrlSegment::Literal(std::mem::take(&mut literal)));
+                    segments.push(UrlSegment::Literal(mem::take(&mut literal)));
                 }
 
                 let mut name = String::new();

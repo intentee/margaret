@@ -8,7 +8,9 @@ use margaret_codegen_tokens::path_tokens::path_tokens;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
+use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
+use crate::bearer_token_verifier_field::BEARER_TOKEN_VERIFIER_FIELD;
 use crate::binding_reads_request::binding_reads_request;
 use crate::binding_shadows_request::binding_shadows_request;
 use crate::bound_parameter::BoundParameter;
@@ -28,6 +30,42 @@ fn provider_argument_value(parameter: &BoundParameter) -> TokenStream {
     }
 }
 
+fn wrapper_struct(
+    AuthenticatedUserApplication {
+        challenge,
+        concrete,
+        injects_routes,
+        injects_views,
+        wrapper,
+        ..
+    }: &AuthenticatedUserApplication,
+) -> TokenStream {
+    let concrete = path_tokens(concrete);
+    let routes_field = injects_routes
+        .then(|| quote! { pub routes: std::sync::Arc<super::super::routes::Routes>, });
+    let views_field =
+        injects_views.then(|| quote! { pub views: std::sync::Arc<super::super::views::Views>, });
+    let verifier_field = match challenge {
+        AuthenticatedUserChallenge::Bearer { .. } => {
+            let field = format_ident!("{BEARER_TOKEN_VERIFIER_FIELD}");
+
+            quote! {
+                pub #field: std::sync::Arc<margaret::framework::bearer_token_verification::bearer_token_verifier::BearerTokenVerifier>,
+            }
+        }
+        AuthenticatedUserChallenge::Unchallenged => TokenStream::new(),
+    };
+
+    quote! {
+        pub struct #wrapper {
+            pub inner: std::sync::Arc<#concrete>,
+            #routes_field
+            #views_field
+            #verifier_field
+        }
+    }
+}
+
 fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     let AuthenticatedUserProvider {
         application,
@@ -35,21 +73,9 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
         method_name,
         parameters,
     } = provider;
-    let AuthenticatedUserApplication {
-        concrete,
-        injects_routes,
-        injects_views,
-        model,
-        wrapper,
-        ..
-    } = application;
-    let concrete = path_tokens(concrete);
+    let AuthenticatedUserApplication { model, wrapper, .. } = application;
+    let wrapper_struct = wrapper_struct(application);
     let model = path_tokens(model);
-    let routes_field = injects_routes
-        .then(|| quote! { pub routes: std::sync::Arc<super::super::routes::Routes>, });
-    let views_field =
-        injects_views.then(|| quote! { pub views: std::sync::Arc<super::super::views::Views>, });
-
     let mut allocator = NameAllocator::new();
 
     for parameter in parameters {
@@ -104,11 +130,7 @@ fn provider_wrapper(provider: &AuthenticatedUserProvider) -> TokenStream {
     };
 
     quote! {
-        pub struct #wrapper {
-            pub inner: std::sync::Arc<#concrete>,
-            #routes_field
-            #views_field
-        }
+        #wrapper_struct
 
         #[async_trait::async_trait]
         impl margaret::framework::identity::infers_authenticated_user::InfersAuthenticatedUser for #wrapper {

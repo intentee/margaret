@@ -6,13 +6,19 @@ members = [
     "margaret_asset_bag_codegen",
     "margaret_attribute_arguments",
     "margaret_attributes",
+    "margaret_attributes_tests",
+    "margaret_bearer_token_verification",
+    "margaret_bearer_token_verification_tests",
     "margaret_codegen",
     "margaret_codegen_tests",
     "margaret_codegen_tests/tests/fixtures/collisions_and_diamonds",
     "margaret_codegen_tests/tests/fixtures/copy_console_arguments",
     "margaret_codegen_tests/tests/fixtures/environment_variable_inputs",
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
+    "margaret_codegen_tests/tests/fixtures/jwks_token_trust",
     "margaret_codegen_tests/tests/fixtures/linear_construction_future",
+    "margaret_codegen_tests/tests/fixtures/oidc_bearer_identity",
+    "margaret_codegen_tests/tests/fixtures/oidc_issuers",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",
     "margaret_codegen_tests/tests/fixtures/composite_foreign_key_model",
     "margaret_codegen_tests/tests/fixtures/self_referential_model",
@@ -40,6 +46,9 @@ members = [
     "margaret_identity_session",
     "margaret_injection_codegen",
     "margaret_input_weaving",
+    "margaret_issuer_document_fetch",
+    "margaret_item_naming_argument",
+    "margaret_jose_parameters",
     "margaret_jwks_client",
     "margaret_jwks_client_tests",
     "margaret_jwks_codegen",
@@ -53,13 +62,26 @@ members = [
     "margaret_jwks_secret_storage_selection",
     "margaret_jwks_secret_storage_selection_tests",
     "margaret_jwks_secret_store",
+    "margaret_jwks_secret_store_tests",
+    "margaret_jws_verification",
+    "margaret_jws_verification_tests",
+    "margaret_jwt_verification",
+    "margaret_jwt_verification_tests",
     "margaret",
+    "margaret_key_set_poll",
+    "margaret_key_set_poll_tests",
     "margaret_macros",
     "margaret_middleware_codegen",
     "margaret_model",
     "margaret_model_codegen",
+    "margaret_oidc_client",
+    "margaret_oidc_client_tests",
+    "margaret_oidc_codegen",
+    "margaret_oidc_discovery",
     "margaret_peer_identity",
     "margaret_peer_identity_tests",
+    "margaret_polling_client_codegen",
+    "margaret_registered_claims",
     "margaret_request_binding_codegen",
     "margaret_route_parameter_binding",
     "margaret_route_parameter_codegen",
@@ -82,9 +104,12 @@ members = [
     "margaret_syn_type_peeling",
     "margaret_sync_holder",
     "margaret_tag_codegen",
+    "margaret_token_issuance",
     "margaret_token_signer",
     "margaret_token_signer_tests",
+    "margaret_token_trust",
     "margaret_toposort",
+    "margaret_umbrella_path",
     "margaret_validation",
     "margaret_views",
     "margaret_views_codegen",
@@ -106,6 +131,7 @@ publish = ["crates-io"]
 [workspace.dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
+aws-lc-rs = { version = "1.17", default-features = false, features = ["aws-lc-sys", "prebuilt-nasm"] }
 base64ct = "1.8"
 bytes = "1.12"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
@@ -166,6 +192,7 @@ margaret_asset_bag = { path = "margaret_asset_bag", version = "0.1.0" }
 margaret_asset_bag_codegen = { path = "margaret_asset_bag_codegen", version = "0.4.0" }
 margaret_attribute_arguments = { path = "margaret_attribute_arguments", version = "0.4.0" }
 margaret_attributes = { path = "margaret_attributes", version = "0.4.0" }
+margaret_bearer_token_verification = { path = "margaret_bearer_token_verification", version = "0.1.0" }
 margaret_codegen = { path = "margaret_codegen", version = "0.4.0" }
 margaret_codegen_tokens = { path = "margaret_codegen_tokens", version = "0.4.0" }
 margaret_console = { path = "margaret_console", version = "0.1.0" }
@@ -184,6 +211,9 @@ margaret_identity = { path = "margaret_identity", version = "0.1.0" }
 margaret_identity_session = { path = "margaret_identity_session", version = "0.1.0" }
 margaret_injection_codegen = { path = "margaret_injection_codegen", version = "0.4.0" }
 margaret_input_weaving = { path = "margaret_input_weaving", version = "0.4.0" }
+margaret_issuer_document_fetch = { path = "margaret_issuer_document_fetch", version = "0.1.0" }
+margaret_item_naming_argument = { path = "margaret_item_naming_argument", version = "0.4.0" }
+margaret_jose_parameters = { path = "margaret_jose_parameters", version = "0.1.0" }
 margaret_jwks_client = { path = "margaret_jwks_client", version = "0.1.0" }
 margaret_jwks_codegen = { path = "margaret_jwks_codegen", version = "0.4.0" }
 margaret_jwks_endpoint = { path = "margaret_jwks_endpoint", version = "0.1.0" }
@@ -193,11 +223,19 @@ margaret_jwks_roller = { path = "margaret_jwks_roller", version = "0.1.0" }
 margaret_jwks_roller_server = { path = "margaret_jwks_roller_server", version = "0.1.0" }
 margaret_jwks_secret_storage_selection = { path = "margaret_jwks_secret_storage_selection", version = "0.1.0" }
 margaret_jwks_secret_store = { path = "margaret_jwks_secret_store", version = "0.1.0" }
+margaret_jws_verification = { path = "margaret_jws_verification", version = "0.1.0" }
+margaret_jwt_verification = { path = "margaret_jwt_verification", version = "0.1.0" }
+margaret_key_set_poll = { path = "margaret_key_set_poll", version = "0.1.0" }
 margaret_macros = { path = "margaret_macros", version = "0.4.0" }
 margaret_middleware_codegen = { path = "margaret_middleware_codegen", version = "0.4.0" }
 margaret_model = { path = "margaret_model", version = "0.4.0" }
 margaret_model_codegen = { path = "margaret_model_codegen", version = "0.4.0" }
+margaret_oidc_client = { path = "margaret_oidc_client", version = "0.1.0" }
+margaret_oidc_codegen = { path = "margaret_oidc_codegen", version = "0.1.0" }
+margaret_oidc_discovery = { path = "margaret_oidc_discovery", version = "0.1.0" }
 margaret_peer_identity = { path = "margaret_peer_identity", version = "0.1.0" }
+margaret_polling_client_codegen = { path = "margaret_polling_client_codegen", version = "0.1.0" }
+margaret_registered_claims = { path = "margaret_registered_claims", version = "0.1.0" }
 margaret_request_binding_codegen = { path = "margaret_request_binding_codegen", version = "0.4.0" }
 margaret_route_parameter_binding = { path = "margaret_route_parameter_binding", version = "0.1.0" }
 margaret_route_parameter_codegen = { path = "margaret_route_parameter_codegen", version = "0.1.0" }
@@ -213,8 +251,11 @@ margaret_spiffe_svid_server = { path = "margaret_spiffe_svid_server", version = 
 margaret_syn_type_peeling = { path = "margaret_syn_type_peeling", version = "0.1.0" }
 margaret_sync_holder = { path = "margaret_sync_holder", version = "0.1.0" }
 margaret_tag_codegen = { path = "margaret_tag_codegen", version = "0.4.0" }
+margaret_token_issuance = { path = "margaret_token_issuance", version = "0.1.0" }
 margaret_token_signer = { path = "margaret_token_signer", version = "0.1.0" }
+margaret_token_trust = { path = "margaret_token_trust", version = "0.1.0" }
 margaret_toposort = { path = "margaret_toposort", version = "0.1.0" }
+margaret_umbrella_path = { path = "margaret_umbrella_path", version = "0.1.0" }
 margaret_validation = { path = "margaret_validation", version = "0.1.0" }
 margaret_views = { path = "margaret_views", version = "0.1.0" }
 margaret_views_codegen = { path = "margaret_views_codegen", version = "0.4.0" }

@@ -1,9 +1,11 @@
 pub mod asset_bag_codegen_error;
+pub mod asset_bag_generation;
+pub mod asset_bag_module_name;
+pub mod asset_macro_canonical_suffix;
 pub mod asset_responder_canonical_suffix;
 pub mod render_asset_bag;
-pub mod responder_generation;
+pub mod served_assets;
 
-mod asset_arm;
 mod asset_slot;
 mod bundle_tokens;
 mod cache_policy;

@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use anyhow::anyhow;
 use spiffe::WorkloadApiClient;
+use tokio::time;
 use tokio::time::Instant;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -37,7 +38,7 @@ pub async fn wait_until_workload_api_ready(
             ));
         }
 
-        tokio::time::sleep(POLL_INTERVAL).await;
+        time::sleep(POLL_INTERVAL).await;
     }
 }
 

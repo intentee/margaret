@@ -1,3 +1,5 @@
+use syn::Path;
+
 use margaret_attribute_arguments::format_path::format_path;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -9,6 +11,7 @@ use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_injection_codegen::request_binding_marker::request_binding_marker;
+use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
@@ -25,7 +28,7 @@ enum Role {
 fn canonical_attribute_path(
     index: &AttributeIndex,
     item: &IndexedItem,
-    written: &syn::Path,
+    written: &Path,
     argument: &'static str,
 ) -> Result<CanonicalPath, ServiceCodegenError> {
     index.resolve_item_path(item, written).ok_or_else(|| {
@@ -94,9 +97,21 @@ fn build_unit(
                 TickTimerArguments::parse(matched.args()?, &path)?;
             let behavior = behavior
                 .as_ref()
-                .map(|written| canonical_attribute_path(index, item, written, "behavior"))
+                .map(|written| {
+                    canonical_attribute_path(
+                        index,
+                        item,
+                        written,
+                        ItemNamingArgument::TickBehavior.key(),
+                    )
+                })
                 .transpose()?;
-            let interval = canonical_attribute_path(index, item, &interval, "interval")?;
+            let interval = canonical_attribute_path(
+                index,
+                item,
+                &interval,
+                ItemNamingArgument::TickInterval.key(),
+            )?;
 
             ServiceKind::Ticker { behavior, interval }
         }

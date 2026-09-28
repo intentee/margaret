@@ -1,0 +1,9 @@
+mod accepts_the_discovery_specification_example_metadata;
+mod locates_the_discovery_document_at_the_issuer_root;
+mod locates_the_discovery_document_below_the_issuer_path;
+mod rejects_a_jwks_uri_that_is_not_a_url;
+mod rejects_a_plaintext_jwks_uri;
+mod rejects_an_issuer_that_differs_by_a_terminating_slash;
+mod rejects_metadata_of_another_issuer;
+mod rejects_metadata_without_a_jwks_uri;
+mod strips_one_terminating_slash_of_the_issuer_path;

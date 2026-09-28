@@ -1,5 +1,6 @@
 use chrono::DateTime;
 use chrono::Utc;
+use uuid::Uuid;
 
 use margaret::framework::macros::model;
 
@@ -8,7 +9,7 @@ use margaret::framework::macros::model;
 #[derive(Clone)]
 pub struct Author {
     #[column(primary_key)]
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     #[column(unique)]
     pub name: String,
     #[column(name = "is_active")]

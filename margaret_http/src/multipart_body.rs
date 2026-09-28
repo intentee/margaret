@@ -2,6 +2,7 @@ use std::path::Path;
 
 use http_body_util::BodyDataStream;
 use multer::Constraints;
+use multer::Error;
 use multer::Field;
 use multer::Multipart;
 use multer::SizeLimit;
@@ -17,9 +18,9 @@ use crate::request_body::RequestBody;
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
 
-fn reject_multipart(source: multer::Error) -> RequestRejection {
+fn reject_multipart(source: Error) -> RequestRejection {
     match source {
-        multer::Error::StreamSizeExceeded { limit } => RequestRejection::PayloadTooLarge { limit },
+        Error::StreamSizeExceeded { limit } => RequestRejection::PayloadTooLarge { limit },
         source => RequestRejection::MalformedMultipart { source },
     }
 }
@@ -135,6 +136,7 @@ impl MultipartBody {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Error;
     use std::mem::discriminant;
 
     use bytes::Bytes;
@@ -188,7 +190,7 @@ mod tests {
 
     fn upload_write() -> UploadedFileError {
         UploadedFileError::UploadWrite {
-            source: std::io::Error::other("the temporary file is full"),
+            source: Error::other("the temporary file is full"),
         }
     }
 

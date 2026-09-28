@@ -128,13 +128,9 @@ pub fn route_parameter_resolutions(
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::fs;
 
-    use tempfile::tempdir;
-
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
 
     use super::route_parameter_resolutions;
     use crate::request_binding_error::RequestBindingError;
@@ -153,18 +149,7 @@ mod tests {
     fn resolutions_for(
         lib_source: &str,
     ) -> Result<HashMap<CanonicalPath, RouteParameterResolution>, RequestBindingError> {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        route_parameter_resolutions(
-            &AttributeIndexBuilder::new()
-                .index_crate(&CrateRoot::new("crate", source_directory))
-                .expect("the crate is indexed")
-                .build(),
-        )
+        route_parameter_resolutions(&IndexedSource::new(lib_source).index)
     }
 
     fn rejection_for(lib_source: &str) -> String {
@@ -178,10 +163,7 @@ mod tests {
         let mut resolutions = resolutions_for(lib_source).expect("the crate is accepted");
 
         match resolutions.remove(&CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
+            segments.iter().map(ToString::to_string).collect(),
         )) {
             Some(RouteParameterResolution::Binder(RouteParameterBinder { provider, .. })) => {
                 ResolvedBy::Binder(provider.to_string())

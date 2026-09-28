@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::fmt::Result;
 
 #[derive(Debug)]
 pub enum Malformation {
@@ -8,7 +9,7 @@ pub enum Malformation {
 }
 
 impl Display for Malformation {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         let message = match self {
             Self::Absent => "the request input is absent",
             Self::Unreadable => "the request input could not be interpreted",

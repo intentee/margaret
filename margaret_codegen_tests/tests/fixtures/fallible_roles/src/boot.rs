@@ -1,5 +1,6 @@
 use anyhow::Result;
 use failures as anyhow;
+
 use margaret::framework::console::command_outcome::CommandOutcome;
 use margaret::framework::macros::console_command;
 use margaret::framework::macros::constructor;

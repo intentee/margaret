@@ -17,7 +17,10 @@ fn jwks_client_provider() -> FrameworkProvider {
 
     FrameworkProvider {
         construction: FrameworkConstruction::Constructor {
-            dependencies: vec![FrameworkDependency::Endpoint(endpoint)],
+            dependencies: vec![
+                FrameworkDependency::SingletonView(endpoint.clone()),
+                FrameworkDependency::SingletonView(endpoint),
+            ],
             is_async: true,
             method: "new".to_string(),
         },
@@ -45,11 +48,10 @@ fn endpoints_container() -> String {
 }
 
 #[test]
-fn drafts_a_jwks_endpoint_as_the_provides_endpoint_interface() {
-    assert!(
-        endpoints_container()
-            .contains("std::sync::Arc<dynmargaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint,>")
-    );
+fn stores_the_jwks_endpoint_as_its_concrete_singleton() {
+    assert!(endpoints_container().contains(
+        "letjwks_endpoint=margaret::framework::construct_singleton::construct_singleton(\"crate::JwksEndpoint\""
+    ));
 }
 
 #[test]
@@ -63,9 +65,9 @@ fn injects_the_endpoints_own_dependencies_and_console_argument() {
 fn injects_the_endpoint_into_the_framework_client_by_tag() {
     let source = endpoints_container();
 
-    assert!(source.contains("crate::JwksClientRuntime::new("));
-    assert!(source.contains("::std::sync::Arc::clone(&jwks_endpoint)"));
-    assert!(source.contains(".await"));
+    assert!(source.contains(
+        "crate::JwksClientRuntime::new(::std::sync::Arc::<crate::JwksEndpoint>::clone(&jwks_endpoint),::std::sync::Arc::<crate::JwksEndpoint>::clone(&jwks_endpoint),).await"
+    ));
 }
 
 #[test]

@@ -6,7 +6,6 @@ use syn::Path;
 
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_base::field_base;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
@@ -19,32 +18,27 @@ use margaret_input_weaving::input_value::InputValue;
 use margaret_input_weaving::weaving_kind::WeavingKind;
 use margaret_serve_input_codegen::declared_serve_inputs::DeclaredServeInputs;
 use margaret_serve_input_codegen::serve_input::ServeInput;
-use margaret_tag_codegen::jwks_secret_store_target::JwksSecretStoreTarget;
-use margaret_tag_codegen::read_jwks_secret_store_target::read_jwks_secret_store_target;
 
 use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
+use crate::declared_token_issuance::DeclaredTokenIssuance;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
+use crate::draft_parameter::DraftParameter;
 use crate::framework_construction::FrameworkConstruction;
 use crate::framework_dependency::FrameworkDependency;
 use crate::framework_enablement::FrameworkEnablement;
 use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::framework_provider::FrameworkProvider;
+use crate::parameter_target::ParameterTarget;
 use crate::path_text::path_text;
-use crate::peel_target::peel_target;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
-use crate::provides_endpoint_path::provides_endpoint_path;
 use crate::resolve_construction::resolve_construction;
+use crate::singleton_declaration::SingletonDeclaration;
 use crate::topological_order::topological_order;
 use crate::type_text::type_text;
-
-struct BuildableConstruction {
-    construction: DirectConstruction,
-    path: CanonicalPath,
-}
 
 fn concrete_roles() -> [FrameworkAttribute; 4] {
     [
@@ -55,22 +49,57 @@ fn concrete_roles() -> [FrameworkAttribute; 4] {
     ]
 }
 
+fn check_declared_item(
+    item: &IndexedItem,
+    declaration: SingletonDeclaration,
+) -> Result<(), ContainerError> {
+    let attribute = declaration.attribute().name();
+    let path = item.canonical_path().to_string();
+
+    if !matches!(item.kind(), ItemKind::Struct(_)) {
+        return Err(ContainerError::DeclarationNotAStruct { attribute, path });
+    }
+
+    if !item.has_framework_attribute(FrameworkAttribute::Singleton) {
+        return Err(ContainerError::DeclarationRequiresSingleton { attribute, path });
+    }
+
+    Ok(())
+}
+
+fn declared_token_issuance(
+    index: &AttributeIndex,
+) -> Result<DeclaredTokenIssuance, ContainerError> {
+    let issuers: Vec<CanonicalPath> = index
+        .select_framework_attribute(FrameworkAttribute::IssuesTokens)
+        .map(|matched| matched.item().canonical_path().clone())
+        .collect();
+
+    match issuers.as_slice() {
+        [] => Ok(DeclaredTokenIssuance::Absent),
+        [issuer] => Ok(DeclaredTokenIssuance::Declared(issuer.clone())),
+        _ => Err(ContainerError::AmbiguousTokenIssuance {
+            paths: issuers
+                .iter()
+                .map(CanonicalPath::to_string)
+                .collect::<Vec<String>>()
+                .join(", "),
+        }),
+    }
+}
+
 fn build_drafts(index: &AttributeIndex) -> Result<DraftedContainer<'_>, ContainerError> {
+    for declaration in SingletonDeclaration::ALL {
+        for matched in index.select_framework_attribute(declaration.attribute()) {
+            check_declared_item(matched.item(), declaration)?;
+        }
+    }
+
+    let token_issuance = declared_token_issuance(index)?;
     let mut provider_drafts: Vec<Draft> = Vec::new();
 
     for matched in index.select_framework_attribute(FrameworkAttribute::Singleton) {
-        if matched
-            .item()
-            .has_framework_attribute(FrameworkAttribute::ProvidesJwksEndpoint)
-        {
-            continue;
-        }
-
         provider_drafts.push(build_provider_draft(&matched, index)?);
-    }
-
-    for matched in index.select_framework_attribute(FrameworkAttribute::ProvidesJwksEndpoint) {
-        provider_drafts.push(build_endpoint_draft(&matched, index)?);
     }
 
     let mut provided_keys: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
@@ -103,6 +132,7 @@ fn build_drafts(index: &AttributeIndex) -> Result<DraftedContainer<'_>, Containe
         construction_drafts,
         provided_keys,
         provider_drafts,
+        token_issuance,
     })
 }
 
@@ -136,69 +166,51 @@ fn build_provider_draft<'index>(
 
     reject_singleton_arguments(matched.args()?, &concrete_path)?;
 
+    for declaration in SingletonDeclaration::ALL {
+        if item.has_framework_attribute(declaration.attribute()) {
+            check_declaration(index, item, declaration)?;
+        }
+    }
+
     let field_name = identifier.field().to_string();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
-    let jwks_targets = read_constructor_jwks_targets(&construction, &concrete_path)?;
+    let parameters = read_draft_parameters(index, item, &construction);
 
     Ok(Draft {
         concrete_path: concrete_path.clone(),
         construction,
         field_name,
-        item,
-        jwks_targets,
+        parameters,
         provided: ProvidedType::Concrete(concrete_path),
         type_name: identifier.type_name().to_string(),
     })
 }
 
-fn build_endpoint_draft<'index>(
-    matched: &MatchedAttribute<'index>,
+fn check_declaration(
     index: &AttributeIndex,
-) -> Result<Draft<'index>, ContainerError> {
-    let item = matched.item();
-    let (Some(identifier), ItemKind::Struct(shape)) =
-        (index.struct_identifier(item.canonical_path()), item.kind())
-    else {
-        return Err(ContainerError::NotAnEndpointStruct {
-            path: item.canonical_path().to_string(),
-        });
-    };
-
-    let concrete_path = item.canonical_path().clone();
-
-    let singletons = AttributeQuery::new(item).find_all_framework(FrameworkAttribute::Singleton);
-    let Some(singleton) = singletons.first() else {
-        return Err(ContainerError::EndpointProviderRequiresSingleton {
-            path: concrete_path.to_string(),
-        });
-    };
-
-    reject_singleton_arguments(singleton.args()?, &concrete_path)?;
+    item: &IndexedItem,
+    declaration: SingletonDeclaration,
+) -> Result<(), ContainerError> {
+    let attribute = declaration.attribute().name();
 
     if has_concrete_role(item) {
-        return Err(ContainerError::ConflictingEndpointRole {
-            path: concrete_path.to_string(),
+        return Err(ContainerError::ConflictingDeclarationRole {
+            attribute,
+            path: item.canonical_path().to_string(),
         });
     }
 
-    if !implements_provides_endpoint(index, item) {
-        return Err(ContainerError::EndpointProviderMissingTrait {
-            path: concrete_path.to_string(),
-        });
+    for required in declaration.required_traits() {
+        if !implements_trait(index, item, &required) {
+            return Err(ContainerError::DeclarationMissingTrait {
+                attribute,
+                path: item.canonical_path().to_string(),
+                required: required.to_string(),
+            });
+        }
     }
 
-    let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
-    let jwks_targets = read_constructor_jwks_targets(&construction, &concrete_path)?;
-
-    Ok(Draft {
-        concrete_path: concrete_path.clone(),
-        construction,
-        field_name: identifier.field().to_string(),
-        item,
-        jwks_targets,
-        provided: ProvidedType::Endpoint(concrete_path),
-        type_name: identifier.type_name().to_string(),
-    })
+    Ok(())
 }
 
 fn build_construction_draft<'index>(
@@ -215,42 +227,32 @@ fn build_construction_draft<'index>(
 
     let concrete_path = item.canonical_path().clone();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
-    let jwks_targets = read_constructor_jwks_targets(&construction, &concrete_path)?;
+    let parameters = read_draft_parameters(index, item, &construction);
 
     Ok(Draft {
         concrete_path: concrete_path.clone(),
         construction,
         field_name: identifier.field().to_string(),
-        item,
-        jwks_targets,
+        parameters,
         provided: ProvidedType::Concrete(concrete_path),
         type_name: identifier.type_name().to_string(),
     })
 }
 
-fn read_constructor_jwks_targets(
-    construction: &ConstructionSource<'_>,
-    concrete_path: &CanonicalPath,
-) -> Result<BTreeMap<usize, JwksSecretStoreTarget>, ContainerError> {
+fn read_draft_parameters<'index>(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    construction: &ConstructionSource<'index>,
+) -> Vec<DraftParameter<'index>> {
     let ConstructionSource::Constructor(constructor) = construction else {
-        return Ok(BTreeMap::new());
+        return Vec::new();
     };
-    let mut targets = BTreeMap::new();
 
-    for parameter in constructor.parameters() {
-        let Some(attribute) = parameter.framework_attribute(FrameworkAttribute::JwksSecretStore)
-        else {
-            continue;
-        };
-        let site = format!(
-            "parameter '{}' of singleton '{concrete_path}'",
-            parameter.diagnostic_name()
-        );
-        let target = read_jwks_secret_store_target(attribute.args()?, &site)?;
-        targets.insert(parameter.position(), target);
-    }
-
-    Ok(targets)
+    constructor
+        .parameters()
+        .iter()
+        .map(|parameter| DraftParameter::read(index, item, parameter))
+        .collect()
 }
 
 fn has_concrete_role(item: &IndexedItem) -> bool {
@@ -259,18 +261,17 @@ fn has_concrete_role(item: &IndexedItem) -> bool {
         .any(|role| item.has_framework_attribute(*role))
 }
 
-fn implements_provides_endpoint(index: &AttributeIndex, item: &IndexedItem) -> bool {
+fn implements_trait(index: &AttributeIndex, item: &IndexedItem, required: &CanonicalPath) -> bool {
     item.trait_impls().iter().any(|trait_impl| {
         index
             .resolve_module_path(trait_impl.module_path(), trait_impl.trait_path())
             .as_ref()
-            == Some(&provides_endpoint_path())
+            == Some(required)
     })
 }
 
 struct DependencyResolver<'resolver> {
     framework_providers: &'resolver [FrameworkProvider],
-    index: &'resolver AttributeIndex,
     provided_keys: &'resolver HashMap<CanonicalPath, CanonicalPath>,
     serve_inputs: &'resolver DeclaredServeInputs,
 }
@@ -278,10 +279,9 @@ struct DependencyResolver<'resolver> {
 impl DependencyResolver<'_> {
     fn resolve_dependencies(
         &self,
-        item: &IndexedItem,
         concrete_path: &CanonicalPath,
         constructor: &IndexedMethod,
-        jwks_targets: &BTreeMap<usize, JwksSecretStoreTarget>,
+        parameters: &[DraftParameter],
     ) -> Result<Vec<DependencyKind>, ContainerError> {
         let mut dependencies = Vec::new();
 
@@ -293,50 +293,36 @@ impl DependencyResolver<'_> {
             });
         }
 
-        for indexed_parameter in constructor.parameters() {
-            let parameter = indexed_parameter.diagnostic_name().to_string();
-            let serve_input = self
-                .serve_inputs
-                .input(concrete_path, indexed_parameter.position());
-            let jwks_target = jwks_targets.get(&indexed_parameter.position());
+        for DraftParameter { indexed, target } in parameters {
+            let parameter = indexed.diagnostic_name().to_string();
 
-            dependencies.push(match (serve_input, jwks_target) {
-                (Some(_), Some(_)) => {
-                    return Err(ContainerError::AmbiguousServeInputAndJwksSecretStore {
-                        parameter,
-                        singleton: concrete_path.to_string(),
-                    });
-                }
-                (Some(input), None) => DependencyKind::ServeInput {
-                    input: Box::new(input.clone()),
+            dependencies.push(
+                match self.serve_inputs.input(concrete_path, indexed.position()) {
+                    Some(input) => DependencyKind::ServeInput {
+                        input: Box::new(input.clone()),
+                    },
+                    None => match target {
+                        ParameterTarget::Resolved { resolved, written } => resolve_target(
+                            resolved,
+                            written,
+                            concrete_path,
+                            &parameter,
+                            self.provided_keys,
+                            self.framework_providers,
+                        )?,
+                        ParameterTarget::Unresolved { written } => {
+                            return Err(missing_provider(concrete_path, &parameter, written));
+                        }
+                        ParameterTarget::UnsupportedShape => {
+                            return Err(ContainerError::UnsupportedParameterShape {
+                                singleton: concrete_path.to_string(),
+                                parameter,
+                                written: type_text(indexed.declared()),
+                            });
+                        }
+                    },
                 },
-                (None, Some(target)) => DependencyKind::Single {
-                    provider_key: resolve_jwks_secret_store(
-                        concrete_path,
-                        &parameter,
-                        target,
-                        self.framework_providers,
-                    )?,
-                },
-                (None, None) => {
-                    let Some(written) = peel_target(indexed_parameter.declared()) else {
-                        return Err(ContainerError::UnsupportedParameterShape {
-                            singleton: concrete_path.to_string(),
-                            parameter,
-                            written: type_text(indexed_parameter.declared()),
-                        });
-                    };
-
-                    resolve_target(
-                        self.index,
-                        item,
-                        &written,
-                        concrete_path,
-                        &parameter,
-                        self.provided_keys,
-                    )?
-                }
-            });
+            );
         }
 
         Ok(dependencies)
@@ -344,15 +330,14 @@ impl DependencyResolver<'_> {
 
     fn resolve_direct(
         &self,
-        item: &IndexedItem,
         source: &ConstructionSource,
-        jwks_targets: &BTreeMap<usize, JwksSecretStoreTarget>,
+        parameters: &[DraftParameter],
         concrete_path: &CanonicalPath,
     ) -> Result<DirectConstruction, ContainerError> {
         match source {
             ConstructionSource::Constructor(constructor) => {
                 let dependencies =
-                    self.resolve_dependencies(item, concrete_path, constructor, jwks_targets)?;
+                    self.resolve_dependencies(concrete_path, constructor, parameters)?;
 
                 Ok(DirectConstruction::Constructor {
                     dependencies,
@@ -367,56 +352,37 @@ impl DependencyResolver<'_> {
     }
 }
 
-fn resolve_jwks_secret_store(
-    concrete_path: &CanonicalPath,
-    parameter: &str,
-    target: &JwksSecretStoreTarget,
-    framework_providers: &[FrameworkProvider],
-) -> Result<CanonicalPath, ContainerError> {
-    let site = format!("parameter '{parameter}' of singleton '{concrete_path}'");
-
-    framework_providers
-        .iter()
-        .find(|provider| injection_matches_target(&provider.injection, target))
-        .map(|provider| provider.provided.clone())
-        .ok_or_else(|| ContainerError::UnknownJwksSecretStore {
-            site,
-            target: jwks_store_target_description(target),
-        })
-}
-
-fn injection_matches_target(role: &FrameworkInjectionRole, target: &JwksSecretStoreTarget) -> bool {
-    match (role, target) {
-        (FrameworkInjectionRole::JwksServerStore, JwksSecretStoreTarget::Server) => true,
-        (
-            FrameworkInjectionRole::JwksClientStore(role_tag),
-            JwksSecretStoreTarget::Client(target_tag),
-        ) => role_tag == target_tag,
-        _ => false,
-    }
-}
-
-fn jwks_store_target_description(target: &JwksSecretStoreTarget) -> String {
-    match target {
-        JwksSecretStoreTarget::Server => "the server".to_string(),
-        JwksSecretStoreTarget::Client(tag) => format!("client '{tag}'"),
-    }
-}
-
 fn resolve_target(
-    index: &AttributeIndex,
-    item: &IndexedItem,
+    resolved: &CanonicalPath,
     written: &Path,
     concrete_path: &CanonicalPath,
     parameter: &str,
     provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
+    framework_providers: &[FrameworkProvider],
 ) -> Result<DependencyKind, ContainerError> {
-    let provider_key = index
-        .resolve_item_path(item, written)
-        .filter(|path| provided_keys.contains_key(path))
-        .ok_or_else(|| missing_provider(concrete_path, parameter, written))?;
+    if provided_keys.contains_key(resolved) {
+        return Ok(DependencyKind::Single {
+            provider_key: resolved.clone(),
+        });
+    }
 
-    Ok(DependencyKind::Single { provider_key })
+    let restricted_role = framework_providers
+        .iter()
+        .find(|framework_provider| &framework_provider.provided == resolved)
+        .map(|framework_provider| &framework_provider.injection);
+
+    match restricted_role {
+        Some(FrameworkInjectionRole::TokenIssuerClient(_)) => {
+            Err(ContainerError::FrameworkOnlyProvider {
+                parameter: parameter.to_string(),
+                provider: resolved.to_string(),
+                singleton: concrete_path.to_string(),
+            })
+        }
+        Some(FrameworkInjectionRole::Unmarked) | None => {
+            Err(missing_provider(concrete_path, parameter, written))
+        }
+    }
 }
 
 fn missing_provider(
@@ -435,8 +401,7 @@ struct Draft<'index> {
     concrete_path: CanonicalPath,
     construction: ConstructionSource<'index>,
     field_name: String,
-    item: &'index IndexedItem,
-    jwks_targets: BTreeMap<usize, JwksSecretStoreTarget>,
+    parameters: Vec<DraftParameter<'index>>,
     provided: ProvidedType,
     type_name: String,
 }
@@ -445,43 +410,45 @@ struct DraftedContainer<'index> {
     construction_drafts: Vec<Draft<'index>>,
     provided_keys: HashMap<CanonicalPath, CanonicalPath>,
     provider_drafts: Vec<Draft<'index>>,
+    token_issuance: DeclaredTokenIssuance,
 }
 
 fn resolve_framework_providers(
     index: &AttributeIndex,
-    provider_drafts: &[Draft],
-    construction_drafts: &[Draft],
-    provided_keys: &mut HashMap<CanonicalPath, CanonicalPath>,
+    drafted: &mut DraftedContainer,
     framework_providers: &[FrameworkProvider],
 ) -> Result<Vec<Provider>, ContainerError> {
-    let buildable = buildable_constructions(index, framework_providers);
+    let buildable = buildable_providers(framework_providers);
     let included = included_framework_providers(
-        index,
-        provider_drafts,
-        construction_drafts,
+        &drafted.provider_drafts,
+        &drafted.construction_drafts,
         framework_providers,
         &buildable,
     );
     let mut allocator = index.reserved_allocator();
     let mut providers = Vec::new();
-
-    let mut buildable: Vec<BuildableConstruction> = buildable
-        .into_iter()
-        .map(|(path, construction)| BuildableConstruction { construction, path })
+    let mut ordered: Vec<&FrameworkProvider> = buildable
+        .into_values()
+        .filter(|framework_provider| included.contains(&framework_provider.provided))
         .collect();
-    buildable.sort_by(|left, right| left.path.cmp(&right.path));
 
-    for BuildableConstruction { construction, path } in buildable {
-        if !included.contains(&path) {
-            continue;
-        }
+    ordered.sort_by(|left, right| left.provided.cmp(&right.provided));
 
-        if provided_keys.insert(path.clone(), path.clone()).is_some() {
+    for framework_provider in ordered {
+        let path = framework_provider.provided.clone();
+
+        if drafted.provided_keys.contains_key(&path) {
             return Err(ContainerError::AmbiguousFrameworkProvider {
                 path: path.to_string(),
             });
         }
 
+        if let FrameworkInjectionRole::Unmarked = framework_provider.injection {
+            drafted.provided_keys.insert(path.clone(), path.clone());
+        }
+
+        let construction =
+            resolve_framework_construction(index, framework_provider, &drafted.token_issuance)?;
         let identifier = allocator.allocate(&field_base(&path));
         let field_name = identifier.field().to_string();
         let type_name = identifier.type_name().to_string();
@@ -491,6 +458,7 @@ fn resolve_framework_providers(
             concrete_path: path,
             construction,
             field_name,
+            injection: framework_provider.injection.clone(),
             provided,
             type_name,
         });
@@ -510,27 +478,22 @@ fn framework_provided_type(construction: &DirectConstruction, path: CanonicalPat
     }
 }
 
-fn buildable_constructions(
-    index: &AttributeIndex,
+fn buildable_providers(
     framework_providers: &[FrameworkProvider],
-) -> HashMap<CanonicalPath, DirectConstruction> {
-    let mut resolved: HashMap<CanonicalPath, DirectConstruction> = HashMap::new();
-
-    for framework_provider in framework_providers {
-        resolved.insert(
-            framework_provider.provided.clone(),
-            resolve_framework_construction(index, &framework_provider.construction),
-        );
-    }
+) -> HashMap<CanonicalPath, &FrameworkProvider> {
+    let mut buildable: HashMap<CanonicalPath, &FrameworkProvider> = framework_providers
+        .iter()
+        .map(|framework_provider| (framework_provider.provided.clone(), framework_provider))
+        .collect();
 
     loop {
         let removable: Vec<CanonicalPath> = framework_providers
             .iter()
-            .filter(|framework_provider| resolved.contains_key(&framework_provider.provided))
+            .filter(|framework_provider| buildable.contains_key(&framework_provider.provided))
             .filter(|framework_provider| {
                 framework_provider_dependencies(&framework_provider.construction)
                     .iter()
-                    .any(|dependency| !resolved.contains_key(*dependency))
+                    .any(|dependency| !buildable.contains_key(*dependency))
             })
             .map(|framework_provider| framework_provider.provided.clone())
             .collect();
@@ -540,18 +503,44 @@ fn buildable_constructions(
         }
 
         for path in removable {
-            resolved.remove(&path);
+            buildable.remove(&path);
         }
     }
 
-    resolved
+    buildable
+}
+
+fn framework_dependency_kind(
+    dependency: &FrameworkDependency,
+    token_issuance: &DeclaredTokenIssuance,
+    provided: &CanonicalPath,
+) -> Result<DependencyKind, ContainerError> {
+    match dependency {
+        FrameworkDependency::Provider(provider_key)
+        | FrameworkDependency::SingletonView(provider_key) => Ok(DependencyKind::Single {
+            provider_key: provider_key.clone(),
+        }),
+        FrameworkDependency::TokenIssuance => match token_issuance {
+            DeclaredTokenIssuance::Absent => Err(ContainerError::MissingTokenIssuance {
+                provider: provided.to_string(),
+            }),
+            DeclaredTokenIssuance::Declared(issuer) => Ok(DependencyKind::Single {
+                provider_key: issuer.clone(),
+            }),
+        },
+    }
 }
 
 fn resolve_framework_construction(
     index: &AttributeIndex,
-    construction: &FrameworkConstruction,
-) -> DirectConstruction {
-    match construction {
+    FrameworkProvider {
+        construction,
+        provided,
+        ..
+    }: &FrameworkProvider,
+    token_issuance: &DeclaredTokenIssuance,
+) -> Result<DirectConstruction, ContainerError> {
+    Ok(match construction {
         FrameworkConstruction::Accessor { accessor, source } => {
             DirectConstruction::FrameworkAccessor {
                 accessor: accessor.clone(),
@@ -564,24 +553,14 @@ fn resolve_framework_construction(
             dependencies,
             is_async,
             method,
-        } => {
-            let mut resolved = Vec::new();
-
-            for dependency in dependencies {
-                let provider_key = match dependency {
-                    FrameworkDependency::Endpoint(endpoint_path) => endpoint_path.clone(),
-                    FrameworkDependency::Provider(provider_key) => provider_key.clone(),
-                };
-
-                resolved.push(DependencyKind::Single { provider_key });
-            }
-
-            DirectConstruction::FrameworkConstructor {
-                dependencies: resolved,
-                is_async: *is_async,
-                method: method.clone(),
-            }
-        }
+        } => DirectConstruction::FrameworkConstructor {
+            dependencies: dependencies
+                .iter()
+                .map(|dependency| framework_dependency_kind(dependency, token_issuance, provided))
+                .collect::<Result<Vec<DependencyKind>, ContainerError>>()?,
+            is_async: *is_async,
+            method: method.clone(),
+        },
         FrameworkConstruction::UriSelected {
             argument_name,
             resolver,
@@ -600,7 +579,7 @@ fn resolve_framework_construction(
             resolver: resolver.clone(),
         },
         FrameworkConstruction::Unit => DirectConstruction::FrameworkUnit,
-    }
+    })
 }
 
 fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<&CanonicalPath> {
@@ -610,7 +589,7 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
             .iter()
             .filter_map(|dependency| match dependency {
                 FrameworkDependency::Provider(provider_key) => Some(provider_key),
-                FrameworkDependency::Endpoint(_) => None,
+                FrameworkDependency::SingletonView(_) | FrameworkDependency::TokenIssuance => None,
             })
             .collect(),
         FrameworkConstruction::UriSelected { .. } | FrameworkConstruction::Unit => Vec::new(),
@@ -618,22 +597,16 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
 }
 
 fn included_framework_providers(
-    index: &AttributeIndex,
     provider_drafts: &[Draft],
     construction_drafts: &[Draft],
     framework_providers: &[FrameworkProvider],
-    buildable: &HashMap<CanonicalPath, DirectConstruction>,
+    buildable: &HashMap<CanonicalPath, &FrameworkProvider>,
 ) -> HashSet<CanonicalPath> {
     let mut triggered: HashSet<CanonicalPath> = HashSet::new();
 
     for framework_provider in framework_providers {
         if buildable.contains_key(&framework_provider.provided)
-            && is_directly_triggered(
-                index,
-                provider_drafts,
-                construction_drafts,
-                framework_provider,
-            )
+            && is_directly_triggered(provider_drafts, construction_drafts, framework_provider)
         {
             triggered.insert(framework_provider.provided.clone());
         }
@@ -663,7 +636,6 @@ fn included_framework_providers(
 }
 
 fn is_directly_triggered(
-    index: &AttributeIndex,
     provider_drafts: &[Draft],
     construction_drafts: &[Draft],
     framework_provider: &FrameworkProvider,
@@ -672,57 +644,23 @@ fn is_directly_triggered(
         FrameworkEnablement::Always => true,
         FrameworkEnablement::Dependency => false,
         FrameworkEnablement::WhenReferenced => {
-            is_framework_path_referenced(index, provider_drafts, &framework_provider.provided)
-                || is_framework_path_referenced(
-                    index,
-                    construction_drafts,
-                    &framework_provider.provided,
-                )
-                || is_framework_role_referenced(provider_drafts, &framework_provider.injection)
-                || is_framework_role_referenced(construction_drafts, &framework_provider.injection)
+            is_framework_path_referenced(provider_drafts, &framework_provider.provided)
+                || is_framework_path_referenced(construction_drafts, &framework_provider.provided)
         }
     }
 }
 
-fn is_framework_path_referenced(
-    index: &AttributeIndex,
-    drafts: &[Draft],
-    path: &CanonicalPath,
-) -> bool {
+fn is_framework_path_referenced(drafts: &[Draft], path: &CanonicalPath) -> bool {
     drafts
         .iter()
-        .any(|draft| draft_references_path(index, draft, path))
+        .any(|draft| draft_references_path(draft, path))
 }
 
-fn is_framework_role_referenced(drafts: &[Draft], role: &FrameworkInjectionRole) -> bool {
-    match role {
-        FrameworkInjectionRole::Unmarked => false,
-        FrameworkInjectionRole::JwksClientStore(_) | FrameworkInjectionRole::JwksServerStore => {
-            drafts
-                .iter()
-                .any(|draft| draft_references_role(draft, role))
-        }
-    }
-}
-
-fn draft_references_path(index: &AttributeIndex, draft: &Draft, path: &CanonicalPath) -> bool {
-    let ConstructionSource::Constructor(constructor) = &draft.construction else {
-        return false;
-    };
-
-    constructor.parameters().iter().any(|parameter| {
-        matches!(
-            peel_target(parameter.declared()),
-            Some(written) if index.resolve_item_path(draft.item, &written).as_ref() == Some(path)
-        )
-    })
-}
-
-fn draft_references_role(draft: &Draft, role: &FrameworkInjectionRole) -> bool {
+fn draft_references_path(draft: &Draft, path: &CanonicalPath) -> bool {
     draft
-        .jwks_targets
-        .values()
-        .any(|target| injection_matches_target(role, target))
+        .parameters
+        .iter()
+        .any(|parameter| parameter.target.resolves_to(path))
 }
 
 pub(crate) fn build_plan(
@@ -730,22 +668,17 @@ pub(crate) fn build_plan(
     serve_inputs: &DeclaredServeInputs,
     framework_providers: &[FrameworkProvider],
 ) -> Result<ContainerPlan, ContainerError> {
+    let mut drafted = build_drafts(index)?;
+    let resolved_framework_providers =
+        resolve_framework_providers(index, &mut drafted, framework_providers)?;
     let DraftedContainer {
         construction_drafts,
-        mut provided_keys,
+        provided_keys,
         provider_drafts,
-    } = build_drafts(index)?;
-
-    let resolved_framework_providers = resolve_framework_providers(
-        index,
-        &provider_drafts,
-        &construction_drafts,
-        &mut provided_keys,
-        framework_providers,
-    )?;
+        ..
+    } = drafted;
     let resolver = DependencyResolver {
         framework_providers,
-        index,
         provided_keys: &provided_keys,
         serve_inputs,
     };
@@ -758,16 +691,14 @@ pub(crate) fn build_plan(
             concrete_path,
             construction,
             field_name,
-            item,
-            jwks_targets,
+            parameters,
             provided,
             type_name,
         } = draft;
 
         let provider_key = provided.key().clone();
 
-        let construction =
-            resolver.resolve_direct(item, &construction, &jwks_targets, &concrete_path)?;
+        let construction = resolver.resolve_direct(&construction, &parameters, &concrete_path)?;
 
         providers.insert(
             provider_key,
@@ -775,6 +706,7 @@ pub(crate) fn build_plan(
                 concrete_path,
                 construction,
                 field_name,
+                injection: FrameworkInjectionRole::Unmarked,
                 provided,
                 type_name,
             },
@@ -786,14 +718,12 @@ pub(crate) fn build_plan(
             concrete_path,
             construction,
             field_name,
-            item,
-            jwks_targets,
+            parameters,
             provided,
             type_name,
         } = draft;
 
-        let construction =
-            resolver.resolve_direct(item, &construction, &jwks_targets, &concrete_path)?;
+        let construction = resolver.resolve_direct(&construction, &parameters, &concrete_path)?;
 
         constructions.insert(
             concrete_path.clone(),
@@ -801,6 +731,7 @@ pub(crate) fn build_plan(
                 concrete_path,
                 construction,
                 field_name,
+                injection: FrameworkInjectionRole::Unmarked,
                 provided,
                 type_name,
             },

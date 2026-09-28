@@ -3,6 +3,7 @@ use crate::canonical_path::CanonicalPath;
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FrameworkAttribute {
     AuthenticatedUser,
+    BearerToken,
     BuildForSession,
     Column,
     ConsoleArgument,
@@ -15,7 +16,7 @@ pub enum FrameworkAttribute {
     Index,
     InferFromRequest,
     InfersAuthenticatedUser,
-    JwksSecretStore,
+    IssuesTokens,
     Middleware,
     Model,
     PrimaryKey,
@@ -30,14 +31,16 @@ pub enum FrameworkAttribute {
     Service,
     Singleton,
     SpiffeHttpClient,
+    TrustsOidcIssuer,
     Unique,
     WebsocketMessage,
     WebsocketSession,
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 33] = [
         Self::AuthenticatedUser,
+        Self::BearerToken,
         Self::BuildForSession,
         Self::Column,
         Self::ConsoleArgument,
@@ -50,7 +53,7 @@ impl FrameworkAttribute {
         Self::Index,
         Self::InferFromRequest,
         Self::InfersAuthenticatedUser,
-        Self::JwksSecretStore,
+        Self::IssuesTokens,
         Self::Middleware,
         Self::Model,
         Self::PrimaryKey,
@@ -65,6 +68,7 @@ impl FrameworkAttribute {
         Self::Service,
         Self::Singleton,
         Self::SpiffeHttpClient,
+        Self::TrustsOidcIssuer,
         Self::Unique,
         Self::WebsocketMessage,
         Self::WebsocketSession,
@@ -85,6 +89,7 @@ impl FrameworkAttribute {
 
         match name {
             "authenticated_user" => Some(Self::AuthenticatedUser),
+            "bearer_token" => Some(Self::BearerToken),
             "build_for_session" => Some(Self::BuildForSession),
             "column" => Some(Self::Column),
             "console_argument" => Some(Self::ConsoleArgument),
@@ -97,7 +102,7 @@ impl FrameworkAttribute {
             "index" => Some(Self::Index),
             "infer_from_request" => Some(Self::InferFromRequest),
             "infers_authenticated_user" => Some(Self::InfersAuthenticatedUser),
-            "jwks_secret_store" => Some(Self::JwksSecretStore),
+            "issues_tokens" => Some(Self::IssuesTokens),
             "middleware" => Some(Self::Middleware),
             "model" => Some(Self::Model),
             "primary_key" => Some(Self::PrimaryKey),
@@ -112,6 +117,7 @@ impl FrameworkAttribute {
             "service" => Some(Self::Service),
             "singleton" => Some(Self::Singleton),
             "spiffe_http_client" => Some(Self::SpiffeHttpClient),
+            "trusts_oidc_issuer" => Some(Self::TrustsOidcIssuer),
             "unique" => Some(Self::Unique),
             "websocket_message" => Some(Self::WebsocketMessage),
             "websocket_session" => Some(Self::WebsocketSession),
@@ -123,6 +129,7 @@ impl FrameworkAttribute {
     pub const fn name(self) -> &'static str {
         match self {
             Self::AuthenticatedUser => "authenticated_user",
+            Self::BearerToken => "bearer_token",
             Self::BuildForSession => "build_for_session",
             Self::Column => "column",
             Self::ConsoleArgument => "console_argument",
@@ -135,7 +142,7 @@ impl FrameworkAttribute {
             Self::Index => "index",
             Self::InferFromRequest => "infer_from_request",
             Self::InfersAuthenticatedUser => "infers_authenticated_user",
-            Self::JwksSecretStore => "jwks_secret_store",
+            Self::IssuesTokens => "issues_tokens",
             Self::Middleware => "middleware",
             Self::Model => "model",
             Self::PrimaryKey => "primary_key",
@@ -150,6 +157,7 @@ impl FrameworkAttribute {
             Self::Service => "service",
             Self::Singleton => "singleton",
             Self::SpiffeHttpClient => "spiffe_http_client",
+            Self::TrustsOidcIssuer => "trusts_oidc_issuer",
             Self::Unique => "unique",
             Self::WebsocketMessage => "websocket_message",
             Self::WebsocketSession => "websocket_session",
@@ -159,17 +167,11 @@ impl FrameworkAttribute {
 
 #[cfg(test)]
 mod tests {
+    use super::FrameworkAttribute;
     use crate::canonical_path::CanonicalPath;
 
-    use super::FrameworkAttribute;
-
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
-        )
+        CanonicalPath::new(segments.iter().map(ToString::to_string).collect())
     }
 
     #[test]

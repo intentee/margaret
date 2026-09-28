@@ -8,6 +8,7 @@ autotests = false
 [dev-dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
+margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwks_roller = { workspace = true }
 margaret_jwks_secret_storage_selection = { workspace = true }

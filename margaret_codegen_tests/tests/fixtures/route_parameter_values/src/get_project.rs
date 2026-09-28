@@ -1,4 +1,5 @@
 use anyhow::Result;
+
 use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;

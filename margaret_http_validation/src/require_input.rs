@@ -29,13 +29,15 @@ mod tests {
     use std::collections::HashMap;
 
     use http::Method;
+    use serde::Deserialize;
+    use validator::Validate;
 
     use margaret_http::request::Request;
 
     use super::require_input;
     use crate::request_input::RequestInput;
 
-    #[derive(serde::Deserialize, validator::Validate)]
+    #[derive(Deserialize, Validate)]
     struct Sample {
         #[validate(length(min = 1))]
         value: String,

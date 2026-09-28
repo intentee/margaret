@@ -7,6 +7,7 @@ pub enum RequestInjectable {
     PeerSpiffeId,
     Routes,
     ValidationResult,
+    VerifiedJwt,
     Views,
 }
 
@@ -20,6 +21,7 @@ impl RequestInjectable {
             Self::PeerSpiffeId,
             Self::Routes,
             Self::ValidationResult,
+            Self::VerifiedJwt,
             Self::Views,
         ]
         .into_iter()
@@ -72,6 +74,13 @@ impl RequestInjectable {
                 "validation_result".to_string(),
                 "ValidationResult".to_string(),
             ]),
+            Self::VerifiedJwt => CanonicalPath::new(vec![
+                "margaret".to_string(),
+                "framework".to_string(),
+                "jwt_verification".to_string(),
+                "verified_jwt".to_string(),
+                "VerifiedJwt".to_string(),
+            ]),
             Self::Views => CanonicalPath::new(vec![
                 "crate".to_string(),
                 "margaret".to_string(),
@@ -84,7 +93,7 @@ impl RequestInjectable {
     fn requires_reference(&self) -> bool {
         match self {
             Self::CurrentRequest | Self::PeerSpiffeId | Self::Routes | Self::Views => true,
-            Self::AssetBag | Self::Next | Self::ValidationResult => false,
+            Self::AssetBag | Self::Next | Self::ValidationResult | Self::VerifiedJwt => false,
         }
     }
 }
@@ -96,12 +105,7 @@ mod tests {
     use super::RequestInjectable;
 
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
-        )
+        CanonicalPath::new(segments.iter().map(ToString::to_string).collect())
     }
 
     #[test]

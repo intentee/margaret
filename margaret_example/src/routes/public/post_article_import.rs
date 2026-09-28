@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use margaret::framework::http::response::Response;
+use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
@@ -31,7 +32,7 @@ impl PostArticleImport {
     #[process]
     pub fn respond(
         &self,
-        #[form_request(from = Json)] form: ValidationResult<PostArticleForm>,
+        #[form_request(from = RequestInput::Json)] form: ValidationResult<PostArticleForm>,
     ) -> anyhow::Result<Response> {
         Ok({
             let PostArticleForm {

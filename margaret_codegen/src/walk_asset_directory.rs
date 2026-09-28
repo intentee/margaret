@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs;
 use std::fs::FileType;
+use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -21,7 +22,7 @@ fn read_entries(directory: &Path) -> Result<Vec<AssetEntry>, CodegenError> {
                         })
                     })
                 })
-                .collect::<std::io::Result<Vec<AssetEntry>>>()
+                .collect::<io::Result<Vec<AssetEntry>>>()
         })
         .map_err(|source| CodegenError::ReadAssetDirectory {
             path: directory.to_path_buf(),

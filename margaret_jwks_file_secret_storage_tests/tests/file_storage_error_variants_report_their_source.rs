@@ -1,8 +1,10 @@
 use std::error::Error;
+use std::io;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage_error::FileJwksSecretStorageError;
+use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 
 fn invalid_json_error() -> serde_json::Error {
     serde_json::from_str::<serde_json::Value>("not json")
@@ -15,14 +17,14 @@ fn file_storage_error_variants_report_their_source() {
 
     let read = FileJwksSecretStorageError::Read {
         path: path.clone(),
-        source: std::io::Error::new(ErrorKind::PermissionDenied, "denied"),
+        source: io::Error::new(ErrorKind::PermissionDenied, "denied"),
     };
     assert!(read.to_string().contains("/secrets/jwks.json"));
     assert!(read.source().is_some());
 
     let write = FileJwksSecretStorageError::Write {
         path: path.clone(),
-        source: std::io::Error::new(ErrorKind::PermissionDenied, "denied"),
+        source: io::Error::new(ErrorKind::PermissionDenied, "denied"),
     };
     assert!(write.to_string().contains("/secrets/jwks.json"));
     assert!(write.source().is_some());
@@ -39,6 +41,13 @@ fn file_storage_error_variants_report_their_source() {
     };
     assert!(deserialize.to_string().contains("/secrets/jwks.json"));
     assert!(deserialize.source().is_some());
+
+    let restore = FileJwksSecretStorageError::Restore {
+        path: path.clone(),
+        source: JwksKeyError::MissingPublicKeyCoordinate { coordinate: "x" },
+    };
+    assert!(restore.to_string().contains("/secrets/jwks.json"));
+    assert!(restore.source().is_some());
 
     let serialize = FileJwksSecretStorageError::Serialize(invalid_json_error());
     assert!(serialize.to_string().contains("serialize"));

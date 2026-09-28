@@ -12,6 +12,7 @@ mod column_arguments;
 mod column_list_arity;
 mod column_type_context;
 mod column_type_source;
+mod date_time_canonical_path;
 mod decimal_canonical_path;
 mod declared_column_check;
 mod declared_column_type;
@@ -25,9 +26,8 @@ mod foreign_key_target;
 mod foreign_key_target_column;
 mod index_arguments;
 mod index_redundancy;
-mod indirection_inner;
 mod infer_column;
-mod infer_column_type;
+mod known_column_type;
 mod model_arguments;
 mod model_column_list;
 mod model_foreign_key_arguments;
@@ -39,21 +39,15 @@ mod on_delete_argument;
 mod redundant_index;
 mod resolve_declared_columns;
 mod scalar_column;
+mod uuid_canonical_path;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use std::path::Path;
-
-    use tempfile::TempDir;
-    use tempfile::tempdir;
-
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
-    use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_model::check_predicate::CheckPredicate;
     use margaret_model::column_check::ColumnCheck;
+    use margaret_model::column_default::ColumnDefault;
     use margaret_model::column_type::ColumnType;
     use margaret_model::on_delete::OnDelete;
 
@@ -70,27 +64,10 @@ struct Author {
 }
 ";
 
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source = directory.path().join("src");
-
-        fs::create_dir_all(&source).expect("the src directory exists");
-        fs::write(source.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        directory
-    }
-
-    fn index_of(directory: &Path) -> AttributeIndex {
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.join("src")))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn rejection_for(lib_source: &str) -> ModelCodegenError {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path())).expect_err("the models fail to resolve")
+        models(&indexed.index).expect_err("the models fail to resolve")
     }
 
     fn error_message(lib_source: &str) -> String {
@@ -287,6 +264,16 @@ struct S {
         assert!(
             error_message(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    value: u64,\n}\n"
+            )
+            .contains("cannot be mapped to an SQL type")
+        );
+    }
+
+    #[test]
+    fn rejects_a_foreign_type_named_after_a_known_column_type() {
+        assert!(
+            error_message(
+                "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    value: foreign::Uuid,\n}\n"
             )
             .contains("cannot be mapped to an SQL type")
         );
@@ -777,9 +764,9 @@ struct Book {
     }
 
     fn table_order(lib_source: &str) -> Vec<String> {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .map(|model| model.table)
@@ -787,9 +774,9 @@ struct Book {
     }
 
     fn resolved_index_columns(lib_source: &str) -> Vec<Vec<String>> {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .flat_map(|model| model.indexes)
@@ -828,9 +815,9 @@ struct Book {
     }
 
     fn resolved_model(lib_source: &str, table: &str) -> Model {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .find(|model| model.table == table)
@@ -838,9 +825,9 @@ struct Book {
     }
 
     fn inferred_column(lib_source: &str, table: &str, column: &str) -> InferredColumn {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .find(|model| model.table == table)
@@ -850,6 +837,146 @@ struct Book {
             .find(|resolved| resolved.name == column)
             .expect("the column resolves")
             .inferred
+    }
+
+    fn inferred_value(
+        lib_prelude: &str,
+        value_type: &str,
+    ) -> Result<InferredColumn, ModelCodegenError> {
+        let indexed = IndexedSource::new(&format!(
+            "{lib_prelude}\n#[model(table = \"values\")]\nstruct Values {{\n    #[column]\n    value: {value_type},\n}}\n"
+        ));
+
+        models(&indexed.index).map(|models| {
+            models
+                .into_iter()
+                .flat_map(|model| model.columns)
+                .find(|resolved| resolved.name == "value")
+                .expect("the value column resolves")
+                .inferred
+        })
+    }
+
+    fn value_column_type(value_type: &str) -> ColumnType {
+        inferred_value("", value_type)
+            .expect("the value type is inferable")
+            .column_type
+    }
+
+    #[test]
+    fn infers_a_uuid_column_with_a_v7_default() {
+        let inferred = inferred_value("", "uuid::Uuid").expect("a uuid is inferable");
+
+        assert_eq!(inferred.column_type, ColumnType::Uuid);
+        assert_eq!(inferred.default, ColumnDefault::UuidV7);
+        assert!(!inferred.nullable);
+    }
+
+    #[test]
+    fn infers_a_uuid_column_from_an_imported_uuid() {
+        assert_eq!(
+            inferred_value("use uuid::Uuid;", "Uuid")
+                .expect("an imported uuid is inferable")
+                .column_type,
+            ColumnType::Uuid
+        );
+    }
+
+    #[test]
+    fn infers_text_from_string() {
+        assert_eq!(value_column_type("String"), ColumnType::Text);
+    }
+
+    #[test]
+    fn infers_boolean_from_bool() {
+        assert_eq!(value_column_type("bool"), ColumnType::Boolean);
+    }
+
+    #[test]
+    fn infers_integer_from_i32() {
+        assert_eq!(value_column_type("i32"), ColumnType::Integer);
+    }
+
+    #[test]
+    fn infers_big_int_from_i64() {
+        assert_eq!(value_column_type("i64"), ColumnType::BigInt);
+    }
+
+    #[test]
+    fn infers_real_from_f32() {
+        assert_eq!(value_column_type("f32"), ColumnType::Real);
+    }
+
+    #[test]
+    fn infers_double_precision_from_f64() {
+        assert_eq!(value_column_type("f64"), ColumnType::DoublePrecision);
+    }
+
+    #[test]
+    fn infers_timestamptz_from_an_imported_datetime() {
+        let inferred = inferred_value("use chrono::DateTime;\nuse chrono::Utc;", "DateTime<Utc>")
+            .expect("a datetime is inferable");
+
+        assert_eq!(inferred.column_type, ColumnType::Timestamptz);
+        assert_eq!(inferred.default, ColumnDefault::NotSet);
+        assert!(!inferred.nullable);
+    }
+
+    #[test]
+    fn treats_an_option_as_a_nullable_column() {
+        let inferred =
+            inferred_value("", "Option<String>").expect("an optional string is inferable");
+
+        assert!(inferred.nullable);
+        assert_eq!(inferred.column_type, ColumnType::Text);
+        assert_eq!(inferred.default, ColumnDefault::NotSet);
+    }
+
+    #[test]
+    fn infers_bytea_from_a_byte_vector() {
+        let inferred = inferred_value("", "Vec<u8>").expect("a byte vector is inferable");
+
+        assert_eq!(inferred.column_type, ColumnType::Bytea);
+        assert!(!inferred.nullable);
+    }
+
+    #[test]
+    fn treats_an_optional_byte_vector_as_a_nullable_bytea_column() {
+        let inferred =
+            inferred_value("", "Option<Vec<u8>>").expect("an optional byte vector is inferable");
+
+        assert!(inferred.nullable);
+        assert_eq!(inferred.column_type, ColumnType::Bytea);
+    }
+
+    #[test]
+    fn rejects_a_vector_of_non_bytes() {
+        assert!(inferred_value("", "Vec<i32>").is_err());
+    }
+
+    #[test]
+    fn rejects_a_vector_of_a_non_path_element() {
+        assert!(inferred_value("", "Vec<[u8; 4]>").is_err());
+    }
+
+    #[test]
+    fn rejects_a_standard_library_type_that_is_not_a_column_type() {
+        assert!(inferred_value("use std::sync::Arc;", "Arc<String>").is_err());
+    }
+
+    #[test]
+    fn rejects_a_non_path_type() {
+        assert!(inferred_value("", "[u8; 4]").is_err());
+    }
+
+    #[test]
+    fn rejects_a_bare_option() {
+        assert!(inferred_value("", "Option").is_err());
+    }
+
+    #[test]
+    fn rejects_an_option_with_multiple_arguments() {
+        assert!(inferred_value("", "Option<i32, i64>").is_err());
     }
 
     #[test]
@@ -1007,9 +1134,9 @@ struct FragmentMetadata {
     }
 
     fn column_checks(lib_source: &str, table: &str, column: &str) -> Vec<ColumnCheck> {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .find(|model| model.table == table)
@@ -1095,13 +1222,23 @@ struct FragmentMetadata {
     }
 
     #[test]
+    fn resolves_a_foreign_key_target_imported_through_a_reexport() {
+        let source = "mod metadata {\n    mod fragment {\n        #[model(table = \"fragment_metadata\")]\n        pub struct FragmentMetadata {\n            #[column(primary_key)]\n            pub hash: Vec<u8>,\n        }\n    }\n\n    pub use fragment::FragmentMetadata;\n}\n\nuse crate::metadata::FragmentMetadata;\n\n#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert_eq!(
+            resolved_model(source, "fragment").foreign_keys[0].references_table,
+            "fragment_metadata"
+        );
+    }
+
+    #[test]
     fn orders_a_composite_foreign_key_target_before_the_model_that_references_it() {
         let source = with_fragment_metadata(
             "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
         );
-        let directory = crate_with(&source);
+        let indexed = IndexedSource::new(&source);
 
-        let tables: Vec<String> = models(&index_of(directory.path()))
+        let tables: Vec<String> = models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .map(|model| model.table)

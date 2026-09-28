@@ -3,6 +3,7 @@ use thiserror::Error;
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_container::container_error::ContainerError;
+use margaret_tag_codegen::tag_error::TagError;
 
 #[derive(Debug, Error)]
 pub enum RequestBindingError {
@@ -22,6 +23,12 @@ pub enum RequestBindingError {
     Attribute {
         #[from]
         source: AttributeError,
+    },
+
+    #[error(transparent)]
+    Tag {
+        #[from]
+        source: TagError,
     },
 
     #[error(
@@ -51,6 +58,11 @@ pub enum RequestBindingError {
         "parameter '{parameter}' of {subject} requests an injectable dependency, but no #[singleton] provides it"
     )]
     MissingProvider { subject: String, parameter: String },
+
+    #[error(
+        "parameter '{parameter}' of {subject} injects a provider by its path, which only the framework may inject"
+    )]
+    FrameworkOnlyProviderInjected { subject: String, parameter: String },
 
     #[error(
         "route parameter #{parameter} of {subject} is missing `from = \"...\"`; it must name the path parameter it binds"
@@ -106,7 +118,7 @@ pub enum RequestBindingError {
     FormRequestMissingSource { subject: String, parameter: String },
 
     #[error(
-        "form request argument #{parameter} of {subject} names an unknown request input source '{written}'; expected Form, Query, Json, or Cookie"
+        "form request argument #{parameter} of {subject} names an unknown request input source '{written}'; expected a variant of margaret::framework::http_validation::request_input::RequestInput"
     )]
     UnknownRequestInput {
         subject: String,
@@ -129,7 +141,7 @@ pub enum RequestBindingError {
     ConflictingArgumentMarkers { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} is the peer SPIFFE id and must not also carry #[authenticated_user], #[route_parameter], or #[form_request]"
+        "argument #{parameter} of {subject} is the peer SPIFFE id and must not also carry #[authenticated_user], #[route_parameter], #[form_request], or #[bearer_token]"
     )]
     MarkedPeerSpiffeIdParameter { subject: String, parameter: String },
 
@@ -232,6 +244,11 @@ pub enum RequestBindingError {
     MultipleAuthenticatedUserParameters { subject: String, model: String },
 
     #[error(
+        "{subject} infers more than one authenticated user from the bearer token; a request presents one bearer credential, so exactly one #[infers_authenticated_user] provider verifies it"
+    )]
+    MultipleBearerAuthenticatedUsers { subject: String },
+
+    #[error(
         "argument #{parameter} of {subject} carries #[authenticated_user], which is only available in an HTTP responder or a WebSocket session builder; let the provider return AuthenticatedUserOutcome::Interrupted to gate a request elsewhere"
     )]
     AuthenticatedUserUnavailable { subject: String, parameter: String },
@@ -247,9 +264,60 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "parameter '{parameter}' of {subject} must be the current request, a form request, the peer SPIFFE id, the views, an asset bag, or the routes"
+        "parameter '{parameter}' of {subject} must be the current request, a form request, a bearer token, the peer SPIFFE id, the views, an asset bag, or the routes"
     )]
     UnmarkedProviderParameter { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[bearer_token], which is only available in an #[infer_from_request] method of an #[infers_authenticated_user] provider"
+    )]
+    BearerTokenUnavailable { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[bearer_token] together with #[authenticated_user], #[route_parameter], or #[form_request]; an argument may use at most one"
+    )]
+    ConflictingBearerTokenMarkers { subject: String, parameter: String },
+
+    #[error(
+        "argument #{parameter} of {subject} carries #[bearer_token] on '{written}'; it must be Option<margaret::framework::jwt_verification::verified_jwt::VerifiedJwt<Claims>> taken by value"
+    )]
+    BearerTokenTypeMismatch {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "argument #{parameter} of {subject} verifies the bearer token into the claims '{written}', which is not a named type without generic arguments"
+    )]
+    UnsupportedBearerTokenClaims {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "argument #{parameter} of {subject} verifies the bearer token into the claims '{written}', which matches no type in scope"
+    )]
+    UnknownBearerTokenClaims {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "{subject} reads the bearer token more than once; a request presents exactly one bearer token"
+    )]
+    MultipleBearerTokenParameters { subject: String },
+
+    #[error(
+        "argument #{parameter} of {subject} verifies the bearer token of the token issuer '{issuer}', whose client the container does not plan"
+    )]
+    UnplannedTokenIssuerClient {
+        subject: String,
+        parameter: String,
+        issuer: String,
+    },
 
     #[error(
         "argument #{parameter} of {subject} requests the authenticated user from '{provider}', which renders the views, but a WebSocket upgrade handshake has no views"

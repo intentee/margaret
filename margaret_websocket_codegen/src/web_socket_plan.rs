@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::web_socket_server_requirements::WebSocketServerRequirements;
-use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
-use margaret_request_binding_codegen::binding_root::binding_root;
+use margaret_request_binding_codegen::binding_roots::binding_roots;
 
 use crate::build_websocket_plan::build_websocket_plan;
 use crate::built_websocket_plan::BuiltWebSocketPlan;
@@ -17,7 +18,7 @@ use crate::web_socket_codegen_error::WebSocketCodegenError;
 use crate::web_socket_message::WebSocketMessage;
 
 fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
-    let mut roots = std::collections::BTreeSet::new();
+    let mut roots = BTreeSet::new();
 
     for session_plan in sessions {
         for layer in &session_plan.session.layers {
@@ -25,9 +26,7 @@ fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
         }
 
         for parameter in &session_plan.session.parameters {
-            if let Some(root) = binding_root(&parameter.binding) {
-                roots.insert(root.clone());
-            }
+            roots.extend(binding_roots(&parameter.binding).into_iter().cloned());
         }
 
         for handler in session_plan
@@ -57,7 +56,7 @@ impl WebSocketPlan {
     pub fn build(
         index: &AttributeIndex,
         bindings: &ContainerBindings,
-        middleware_plans: &[MiddlewarePlan],
+        middleware_plans: &MiddlewarePlans,
         registries: &BindingRegistries,
     ) -> Result<Self, WebSocketCodegenError> {
         let BuiltWebSocketPlan { messages, sessions } =

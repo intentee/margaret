@@ -1,0 +1,22 @@
+[package]
+name = "margaret_jwt_verification_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+margaret_jose_parameters = { workspace = true }
+margaret_jws_verification = { workspace = true }
+margaret_jws_verification_tests = { path = "../margaret_jws_verification_tests" }
+margaret_jwt_verification = { workspace = true }
+margaret_registered_claims = { workspace = true }
+margaret_token_trust = { workspace = true }
+serde_json = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

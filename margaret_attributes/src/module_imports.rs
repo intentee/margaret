@@ -16,21 +16,19 @@ impl ModuleImports {
     pub(crate) fn insert(&mut self, name: String, path: CanonicalPath) {
         self.by_name.insert(name, path);
     }
+
+    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
+        self.by_name.keys().map(String::as_str)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::ModuleImports;
     use crate::canonical_path::CanonicalPath;
 
-    use super::ModuleImports;
-
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
-        )
+        CanonicalPath::new(segments.iter().map(ToString::to_string).collect())
     }
 
     #[test]

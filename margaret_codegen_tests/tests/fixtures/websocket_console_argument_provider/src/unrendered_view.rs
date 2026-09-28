@@ -4,7 +4,6 @@ use margaret::framework::views::maud::Markup;
 use margaret::framework::views::maud::html;
 use margaret::framework::views::renders_view::RendersView;
 
-use crate::margaret::asset_bag::asset;
 use crate::unrendered_view_props::UnrenderedViewProps;
 
 #[renders_view(name = "unrendered_view")]
@@ -15,10 +14,6 @@ impl RendersView for UnrenderedView {
     type Props<'props> = UnrenderedViewProps;
 
     fn render(&self, UnrenderedViewProps { label }: Self::Props<'_>) -> anyhow::Result<Markup> {
-        Ok({
-            let _ = asset!("resources/ts/app.ts");
-
-            html! { span { (label) } }
-        })
+        Ok(html! { span { (label) } })
     }
 }

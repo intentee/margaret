@@ -13,6 +13,7 @@ use tokio::io::AsyncWrite;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio_tungstenite::WebSocketStream;
+use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
@@ -24,7 +25,7 @@ use crate::web_socket_dispatch_table::WebSocketDispatchTable;
 
 const OUTBOUND_BUFFER_CAPACITY: usize = 1;
 
-fn report_close_failure(outcome: Result<(), tokio_tungstenite::tungstenite::Error>) {
+fn report_close_failure(outcome: Result<(), Error>) {
     if let Err(error) = outcome {
         eprintln!("margaret_websocket: unable to close a websocket connection: {error}");
     }

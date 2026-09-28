@@ -14,5 +14,14 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 margaret_http = { workspace = true }
 
+[dev-dependencies]
+margaret_http_tests = { path = "../margaret_http_tests" }
+reqwest = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
 [lints]
 workspace = true

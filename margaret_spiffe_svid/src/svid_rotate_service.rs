@@ -1,5 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use futures_util::stream::StreamExt;
 use log::error;
 use log::info;
 use spiffe::WorkloadApiClient;
@@ -29,10 +30,9 @@ impl SvidRotateService {
         info!("Connected to SPIRE agent");
 
         let x509_context_stream = client.stream_x509_contexts().await?;
-        let x509_context_stream =
-            futures_util::stream::StreamExt::map(x509_context_stream, |result| {
-                result.map_err(anyhow::Error::from)
-            });
+        let x509_context_stream = StreamExt::map(x509_context_stream, |result| {
+            result.map_err(anyhow::Error::from)
+        });
 
         svid_rotate_loop(
             Box::pin(x509_context_stream),

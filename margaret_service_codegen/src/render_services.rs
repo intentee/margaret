@@ -119,7 +119,11 @@ fn svid_identity_prelude(
     });
 
     quote! {
-        margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();
+        if let ::std::result::Result::Err(error) =
+            margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider()
+        {
+            return margaret::framework::console::report_failure::report_failure(error);
+        }
 
         let spiffe_bundle = #bundle_constructor::new(
             margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams {

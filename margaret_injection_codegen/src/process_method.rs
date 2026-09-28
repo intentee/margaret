@@ -34,41 +34,13 @@ pub fn process_method(item: &IndexedItem) -> Result<&IndexedMethod, InjectionErr
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
-    use tempfile::tempdir;
-
-    use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
-    use margaret_attributes::indexed_item::IndexedItem;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
 
     use super::process_method;
 
-    fn index_for(lib_source: &str) -> AttributeIndex {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", source_directory))
-            .expect("the crate is indexed")
-            .build()
-    }
-
-    fn item_named<'index>(index: &'index AttributeIndex, identifier: &str) -> &'index IndexedItem {
-        index
-            .items()
-            .iter()
-            .find(|item| item.identifier() == identifier)
-            .expect("the item is indexed")
-    }
-
     #[test]
     fn returns_the_single_process_method() {
-        let index = index_for(
+        let indexed = IndexedSource::new(
             r"
 #[singleton]
 struct One;
@@ -80,15 +52,14 @@ impl One {
 ",
         );
 
-        let method =
-            process_method(item_named(&index, "One")).expect("the process method is found");
+        let method = process_method(indexed.item("One")).expect("the process method is found");
 
         assert_eq!(method.identifier(), "run");
     }
 
     #[test]
     fn reports_a_missing_process_method() {
-        let index = index_for(
+        let indexed = IndexedSource::new(
             r"
 #[singleton]
 struct Bare;
@@ -100,7 +71,7 @@ impl Bare {
 ",
         );
 
-        let error = process_method(item_named(&index, "Bare"))
+        let error = process_method(indexed.item("Bare"))
             .err()
             .expect("the missing process method is reported");
 
@@ -109,7 +80,7 @@ impl Bare {
 
     #[test]
     fn reports_an_ambiguous_process_method() {
-        let index = index_for(
+        let indexed = IndexedSource::new(
             r"
 #[singleton]
 struct Two;
@@ -124,7 +95,7 @@ impl Two {
 ",
         );
 
-        let error = process_method(item_named(&index, "Two"))
+        let error = process_method(indexed.item("Two"))
             .err()
             .expect("the ambiguous process method is reported");
 

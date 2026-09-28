@@ -1,20 +1,18 @@
 use std::collections::BTreeSet;
-use std::collections::HashMap;
 
 use crate::attribute_error::AttributeError;
 use crate::attribute_index::AttributeIndex;
-use crate::canonical_path::CanonicalPath;
 use crate::crate_root::CrateRoot;
 use crate::indexed_item::IndexedItem;
-use crate::module_imports::ModuleImports;
 use crate::module_walker::ModuleWalker;
+use crate::path_resolver::PathResolver;
 use crate::walk_output::WalkOutput;
 
 #[derive(Default)]
 pub struct AttributeIndexBuilder {
     excluded_root_modules: BTreeSet<String>,
-    imports: HashMap<CanonicalPath, ModuleImports>,
     items: Vec<IndexedItem>,
+    resolver: PathResolver,
 }
 
 impl AttributeIndexBuilder {
@@ -25,7 +23,7 @@ impl AttributeIndexBuilder {
 
     #[must_use]
     pub fn build(self) -> AttributeIndex {
-        AttributeIndex::new(self.items, self.imports)
+        AttributeIndex::new(self.items, self.resolver)
     }
 
     #[must_use]
@@ -39,14 +37,14 @@ impl AttributeIndexBuilder {
     ///
     /// Returns `AttributeError` propagated from the work it performs.
     pub fn index_crate(mut self, crate_root: &CrateRoot) -> Result<Self, AttributeError> {
-        let WalkOutput { imports, items } = ModuleWalker::walk_crate(
+        let WalkOutput { items, resolver } = ModuleWalker::walk_crate(
             &crate_root.name,
             &crate_root.source_directory,
             &self.excluded_root_modules,
         )?;
 
-        self.imports.extend(imports);
         self.items.extend(items);
+        self.resolver.extend(resolver);
 
         Ok(self)
     }

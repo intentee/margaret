@@ -1,8 +1,9 @@
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
 
-const REQUEST_BINDING_MARKERS: [FrameworkAttribute; 3] = [
+const REQUEST_BINDING_MARKERS: [FrameworkAttribute; 4] = [
     FrameworkAttribute::AuthenticatedUser,
+    FrameworkAttribute::BearerToken,
     FrameworkAttribute::FormRequest,
     FrameworkAttribute::RouteParameter,
 ];
@@ -18,9 +19,10 @@ pub fn request_binding_marker(attributes: &[IndexedAttribute]) -> Option<Framewo
 
 #[cfg(test)]
 mod tests {
+    use syn::parse_quote;
+
     use margaret_attributes::framework_attribute::FrameworkAttribute;
     use margaret_attributes::indexed_attribute::IndexedAttribute;
-    use syn::parse_quote;
 
     use super::request_binding_marker;
 
@@ -37,12 +39,24 @@ mod tests {
     #[test]
     fn finds_the_form_request_marker() {
         let attributes = vec![IndexedAttribute::new(
-            &parse_quote!(#[form_request(from = Query)]),
+            &parse_quote!(#[form_request(from = RequestInput::Query)]),
         )];
 
         assert_eq!(
             request_binding_marker(&attributes),
             Some(FrameworkAttribute::FormRequest)
+        );
+    }
+
+    #[test]
+    fn finds_the_bearer_token_marker() {
+        let attributes = vec![IndexedAttribute::new(
+            &parse_quote!(#[bearer_token(issuer = partner)]),
+        )];
+
+        assert_eq!(
+            request_binding_marker(&attributes),
+            Some(FrameworkAttribute::BearerToken)
         );
     }
 

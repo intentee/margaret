@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::fmt::Result;
 use std::sync::Arc;
 
 use tokio::sync::watch;
@@ -36,7 +37,7 @@ impl<TItem> Clone for SyncHolder<TItem> {
 }
 
 impl<TItem> Debug for SyncHolder<TItem> {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         formatter.debug_struct("SyncHolder").finish_non_exhaustive()
     }
 }

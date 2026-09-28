@@ -2,6 +2,7 @@ use std::path::Path;
 
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_attributes::indexed_item::IndexedItem;
 
 #[test]
 fn skips_trait_impl_methods() {
@@ -13,7 +14,7 @@ fn skips_trait_impl_methods() {
     let has_trait_method = index
         .items()
         .iter()
-        .flat_map(margaret_attributes::indexed_item::IndexedItem::methods)
+        .flat_map(IndexedItem::methods)
         .any(|method| method.identifier() == "skipped_trait_method");
 
     assert!(!has_trait_method);

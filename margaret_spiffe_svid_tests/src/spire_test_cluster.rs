@@ -3,6 +3,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::Result;
+use tempfile::TempDir;
 use tokio::process::Child;
 
 use crate::spawn_test_subprocess::spawn_test_subprocess;
@@ -18,7 +19,7 @@ pub struct SpireTestCluster {
     agent_socket_path: PathBuf,
     server_socket_path: PathBuf,
     trust_domain: String,
-    _data_dir: tempfile::TempDir,
+    _data_dir: TempDir,
 }
 
 impl SpireTestCluster {
@@ -29,7 +30,7 @@ impl SpireTestCluster {
         agent_socket_path: PathBuf,
         server_socket_path: PathBuf,
         trust_domain: String,
-        data_dir: tempfile::TempDir,
+        data_dir: TempDir,
     ) -> Self {
         Self {
             _agent_child: agent_child,
@@ -45,7 +46,7 @@ impl SpireTestCluster {
     ///
     /// Returns an error propagated from the work it performs.
     pub async fn start(
-        data_dir: tempfile::TempDir,
+        data_dir: TempDir,
         SpireTestClusterParams {
             agent_binary_path,
             agent_socket_readiness_timeout,

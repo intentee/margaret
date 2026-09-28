@@ -1,49 +1,21 @@
-use chrono::DateTime;
-use chrono::Utc;
 use serde::Deserialize;
-use serde::Serialize;
+use serde_json::Value;
 use uuid::Uuid;
 
-use crate::is_expired::IsExpired;
+use crate::access_token_stamp::AccessTokenStamp;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize)]
 pub struct AccessTokenClaims {
     pub sub: Uuid,
-    pub exp: i64,
-    pub iat: i64,
 }
 
-impl IsExpired for AccessTokenClaims {
-    fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
-        Ok(self.exp < now.timestamp())
-    }
-}
+impl AccessTokenClaims {
+    #[must_use]
+    pub fn to_payload(&self, stamp: &AccessTokenStamp) -> Value {
+        let mut payload = stamp.to_json();
 
-#[cfg(test)]
-mod tests {
-    use chrono::DateTime;
-    use chrono::Utc;
-    use uuid::Uuid;
+        payload.insert("sub".to_string(), Value::String(self.sub.to_string()));
 
-    use super::AccessTokenClaims;
-    use crate::is_expired::IsExpired;
-
-    fn at(secs: i64) -> DateTime<Utc> {
-        DateTime::from_timestamp(secs, 0).expect("a valid timestamp")
-    }
-
-    fn claims(exp: i64) -> AccessTokenClaims {
-        AccessTokenClaims {
-            sub: Uuid::from_u128(1),
-            exp,
-            iat: 0,
-        }
-    }
-
-    #[test]
-    fn reports_expiry_relative_to_now() {
-        assert_eq!(claims(101).is_expired(at(100)).ok(), Some(false));
-        assert_eq!(claims(99).is_expired(at(100)).ok(), Some(true));
-        assert_eq!(claims(100).is_expired(at(100)).ok(), Some(false));
+        Value::Object(payload)
     }
 }

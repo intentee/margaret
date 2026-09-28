@@ -38,11 +38,10 @@ impl PostMintAccessToken {
     ///
     /// Returns an error propagated from the work it performs.
     #[process]
-    pub async fn respond(&self, request: &Request) -> anyhow::Result<Response> {
+    pub fn respond(&self, request: &Request) -> anyhow::Result<Response> {
         Ok({
             self.mint_access_token_handler
                 .respond(request, self.clock.now())
-                .await
         })
     }
 }

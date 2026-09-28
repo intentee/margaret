@@ -1,69 +1,131 @@
 use serde::de::DeserializeOwned;
+use uuid::Uuid;
 
-use crate::curve::Curve;
-use crate::generate_keypair_random_kid::generate_keypair_random_kid;
+use margaret_jose_parameters::curve::Curve;
+use margaret_jws_verification::key_id::KeyId;
+use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::verification_key_set::VerificationKeySet;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
+use margaret_jwt_verification::jwt_verification::JwtVerification;
+use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
+use margaret_registered_claims::numeric_date::NumericDate;
+
+use crate::ec_signing_key::EcSigningKey;
 use crate::jwk_pair::JwkPair;
 use crate::jwks_key_error::JwksKeyError;
 use crate::jwks_secret_verification_result::JwksSecretVerificationResult;
-use crate::token_verification::TokenVerification;
-use crate::verifies_any_token::VerifiesAnyToken;
-use crate::verifies_token::VerifiesToken;
+use crate::previous_key::PreviousKey;
+use crate::public_jwks::PublicJwks;
+
+fn random_pair(curve: Curve) -> Result<JwkPair, JwksKeyError> {
+    EcSigningKey::generate(curve)
+        .and_then(|signing_key| JwkPair::new(KeyId::new(Uuid::new_v4().to_string()), signing_key))
+}
 
 #[derive(Clone)]
 pub struct JwksSecret {
-    pub current: JwkPair,
-    pub next: JwkPair,
-    pub previous: JwkPair,
+    current: JwkPair,
+    key_set: VerificationKeySet,
+    next: JwkPair,
+    previous: PreviousKey,
+    public_jwks: PublicJwks,
 }
 
 impl JwksSecret {
     /// # Errors
     ///
-    /// Returns `JwksKeyError` propagated from the work it performs.
-    pub fn fresh(crv: Curve) -> Result<Self, JwksKeyError> {
-        generate_keypair_random_kid(crv).and_then(|current| {
-            generate_keypair_random_kid(crv).map(|next| Self {
-                current: current.clone(),
-                next,
-                previous: current,
-            })
+    /// Returns `JwksKeyError` when a key cannot be generated or the keys do not form a key set.
+    pub fn fresh(curve: Curve) -> Result<Self, JwksKeyError> {
+        random_pair(curve).and_then(|current| {
+            random_pair(curve).and_then(|next| Self::from_pairs(current, next, PreviousKey::Absent))
         })
     }
 
     /// # Errors
     ///
-    /// Returns `JwksKeyError` propagated from the work it performs.
-    pub fn rotate(&self) -> Result<Self, JwksKeyError> {
-        generate_keypair_random_kid(self.current.signing.crv).map(|next| Self {
-            current: self.next.clone(),
+    /// Returns `JwksKeyError::KeySetRejected` when the keys do not form a key set.
+    pub fn from_pairs(
+        current: JwkPair,
+        next: JwkPair,
+        previous: PreviousKey,
+    ) -> Result<Self, JwksKeyError> {
+        let mut keys = vec![current.public_jwk().clone()];
+
+        if let PreviousKey::Retired(retired) = &previous {
+            keys.push(retired.public_jwk().clone());
+        }
+
+        keys.push(next.public_jwk().clone());
+
+        let key_set = match VerificationKeySet::from_jwks(keys.clone()) {
+            KeySetParsing::Accepted(key_set) => key_set,
+            KeySetParsing::Rejected(rejection) => {
+                return Err(JwksKeyError::KeySetRejected { rejection });
+            }
+        };
+
+        Ok(Self {
+            current,
+            key_set,
             next,
-            previous: self.current.clone(),
+            previous,
+            public_jwks: PublicJwks::new(keys),
         })
     }
-}
 
-impl VerifiesAnyToken for JwksSecret {
-    fn verify_any<TClaims: DeserializeOwned>(
+    #[must_use]
+    pub fn current(&self) -> &JwkPair {
+        &self.current
+    }
+
+    #[must_use]
+    pub fn next(&self) -> &JwkPair {
+        &self.next
+    }
+
+    #[must_use]
+    pub fn previous(&self) -> &PreviousKey {
+        &self.previous
+    }
+
+    #[must_use]
+    pub fn public_jwks(&self) -> &PublicJwks {
+        &self.public_jwks
+    }
+
+    /// # Errors
+    ///
+    /// Returns `JwksKeyError` when the next key cannot be generated or the keys do not form a key set.
+    pub fn rotate(&self) -> Result<Self, JwksKeyError> {
+        random_pair(self.current.signing_key().curve()).and_then(|next| {
+            Self::from_pairs(
+                self.next.clone(),
+                next,
+                PreviousKey::Retired(Box::new(self.current.clone())),
+            )
+        })
+    }
+
+    #[must_use]
+    pub fn verify_jwt<TClaims: DeserializeOwned>(
         &self,
         token: &str,
-    ) -> Result<JwksSecretVerificationResult<TClaims>, JwksKeyError> {
-        match self.current.public.verify::<TClaims>(token)? {
-            TokenVerification::Malformed(malformation) => {
-                Ok(JwksSecretVerificationResult::Malformed(malformation))
+        expectation: &JwtExpectation,
+        now: NumericDate,
+    ) -> JwksSecretVerificationResult<TClaims> {
+        let verified = match verify_serialized_jwt(&self.key_set, token, expectation, now) {
+            JwtVerification::Rejected(rejection) => {
+                return JwksSecretVerificationResult::Rejected(rejection);
             }
-            TokenVerification::Verified(claims) => {
-                Ok(JwksSecretVerificationResult::SignedWithCurrent(claims))
-            }
-            TokenVerification::SignatureMismatch => {
-                match self.previous.public.verify::<TClaims>(token)? {
-                    TokenVerification::Verified(claims) => {
-                        Ok(JwksSecretVerificationResult::SignedWithPrevious(claims))
-                    }
-                    TokenVerification::Malformed(_) | TokenVerification::SignatureMismatch => {
-                        Ok(JwksSecretVerificationResult::Invalid)
-                    }
-                }
-            }
+            JwtVerification::Verified(verified) => verified,
+        };
+
+        if &verified.kid == self.current.kid() {
+            JwksSecretVerificationResult::SignedWithCurrent(verified)
+        } else if self.previous.is_retired_key(&verified.kid) {
+            JwksSecretVerificationResult::SignedWithPrevious(verified)
+        } else {
+            JwksSecretVerificationResult::SignedWithNextKey
         }
     }
 }

@@ -37,6 +37,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+    #[cfg(unix)]
+    use std::ffi::OsStr;
+    #[cfg(unix)]
+    use std::os::unix::ffi::OsStrExt;
     use std::path::PathBuf;
 
     use crate::environment_variable_error::EnvironmentVariableError;
@@ -46,7 +51,7 @@ mod tests {
     fn set(name: &str, value: &str) {
         // SAFETY: `cargo nextest` runs every test in its own process, so no
         // other thread observes the process environment while it is mutated.
-        unsafe { std::env::set_var(name, value) };
+        unsafe { env::set_var(name, value) };
     }
 
     #[test]
@@ -108,13 +113,10 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn reports_a_value_that_is_not_unicode() {
-        use std::ffi::OsStr;
-        use std::os::unix::ffi::OsStrExt;
-
         // SAFETY: `cargo nextest` runs every test in its own process, so no
         // other thread observes the process environment while it is mutated.
         unsafe {
-            std::env::set_var(
+            env::set_var(
                 "MARGARET_OPTIONAL_NOT_UNICODE",
                 OsStr::from_bytes(&[0x66, 0x80, 0x6f]),
             );

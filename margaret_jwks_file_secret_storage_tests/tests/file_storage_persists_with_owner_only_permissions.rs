@@ -1,3 +1,4 @@
+use std::fs;
 use std::os::unix::fs::PermissionsExt;
 
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage::FileJwksSecretStorage;
@@ -14,7 +15,7 @@ fn file_storage_persists_with_owner_only_permissions() {
         .persist(&sample_secret())
         .expect("the secret can be persisted");
 
-    let mode = std::fs::metadata(&path)
+    let mode = fs::metadata(&path)
         .expect("the persisted secret file exists")
         .permissions()
         .mode();

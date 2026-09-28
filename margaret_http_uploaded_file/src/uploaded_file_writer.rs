@@ -75,6 +75,7 @@ impl UploadedFileWriter {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Error;
     use std::mem::discriminant;
 
     use tempfile::tempdir;
@@ -117,7 +118,7 @@ mod tests {
         assert_eq!(
             discriminant(&error),
             discriminant(&UploadedFileError::UploadTempFile {
-                source: std::io::Error::other("an unusable upload directory"),
+                source: Error::other("an unusable upload directory"),
             })
         );
     }

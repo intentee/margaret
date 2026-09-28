@@ -6,7 +6,6 @@ use sqlx::query_as;
 use sqlx::query_scalar;
 
 use margaret_model::table::Table;
-
 use margaret_schema_postgres_tests::apply_schema::apply_schema;
 use margaret_schema_postgres_tests::schema_fixture::schema_fixture;
 use margaret_schema_postgres_tests::start_database::start_database;

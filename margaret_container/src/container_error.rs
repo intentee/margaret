@@ -3,7 +3,6 @@ use thiserror::Error;
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_serve_input_codegen::serve_input_codegen_error::ServeInputCodegenError;
-use margaret_tag_codegen::tag_error::TagError;
 
 #[derive(Debug, Error)]
 pub enum ContainerError {
@@ -25,37 +24,48 @@ pub enum ContainerError {
         source: ServeInputCodegenError,
     },
 
-    #[error(transparent)]
-    Tag {
-        #[from]
-        source: TagError,
+    #[error("#[{attribute}] is only supported on structs, but '{path}' is not a struct")]
+    DeclarationNotAStruct {
+        attribute: &'static str,
+        path: String,
     },
 
-    #[error("#[provides_jwks_endpoint] is only supported on structs, but '{path}' is not a struct")]
-    NotAnEndpointStruct { path: String },
-
-    #[error("the jwks endpoint provider '{path}' must not also carry a role attribute")]
-    ConflictingEndpointRole { path: String },
+    #[error("the #[{attribute}] singleton '{path}' must not also carry a role attribute")]
+    ConflictingDeclarationRole {
+        attribute: &'static str,
+        path: String,
+    },
 
     #[error("#[singleton] does not take any arguments, but '{path}' declares some")]
     SingletonHasArguments { path: String },
 
-    #[error("the jwks endpoint provider '{path}' must also be declared as a #[singleton]")]
-    EndpointProviderRequiresSingleton { path: String },
+    #[error("'{path}' carries #[{attribute}], so it must also be declared as a #[singleton]")]
+    DeclarationRequiresSingleton {
+        attribute: &'static str,
+        path: String,
+    },
+
+    #[error("the #[{attribute}] singleton '{path}' does not implement {required}")]
+    DeclarationMissingTrait {
+        attribute: &'static str,
+        path: String,
+        required: String,
+    },
+
+    #[error("more than one singleton is declared with #[issues_tokens]: {paths}")]
+    AmbiguousTokenIssuance { paths: String },
 
     #[error(
-        "the jwks endpoint provider '{path}' does not implement margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint"
+        "the framework provider '{provider}' stamps issued tokens, but no singleton is declared with #[issues_tokens]"
     )]
-    EndpointProviderMissingTrait { path: String },
-
-    #[error("{site} references a jwks secret store that is not available: {target}")]
-    UnknownJwksSecretStore { site: String, target: String },
+    MissingTokenIssuance { provider: String },
 
     #[error(
-        "parameter '{parameter}' of singleton '{singleton}' carries a serve input together with #[jwks_secret_store]; a parameter must resolve to exactly one source"
+        "parameter '{parameter}' of singleton '{singleton}' injects '{provider}', which only the framework may inject"
     )]
-    AmbiguousServeInputAndJwksSecretStore {
+    FrameworkOnlyProvider {
         parameter: String,
+        provider: String,
         singleton: String,
     },
 

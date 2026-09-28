@@ -1,3 +1,5 @@
+pub mod bearer_challenge;
+pub mod bearer_token;
 pub(crate) mod body_class;
 pub mod body_limit;
 pub mod bound_server;
@@ -26,6 +28,7 @@ pub(crate) mod one_shot_handler;
 pub(crate) mod one_shot_layer;
 pub mod redirect;
 pub mod request;
+pub mod request_authorization;
 pub(crate) mod request_body;
 pub(crate) mod request_headers;
 pub(crate) mod request_inputs;

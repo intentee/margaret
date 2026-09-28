@@ -7,7 +7,6 @@ use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 
 use super::asset_path::AssetPath;
-
 use crate::margaret::asset_bag::asset_responder::AssetResponder;
 
 #[singleton]

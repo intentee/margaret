@@ -29,28 +29,36 @@ mod websocket_sessions;
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::fs;
 
-    use tempfile::tempdir;
+    use quote::format_ident;
 
     use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes::canonical_path::CanonicalPath;
+    use margaret_attributes::tag::Tag;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
+    use margaret_container::framework_construction::FrameworkConstruction;
+    use margaret_container::framework_enablement::FrameworkEnablement;
+    use margaret_container::framework_injection_role::FrameworkInjectionRole;
+    use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_middleware_codegen::layer_application::LayerApplication;
-    use margaret_middleware_codegen::middleware_plans::middleware_plans;
+    use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::bound_parameter::BoundParameter;
     use margaret_request_binding_codegen::request_binding::RequestBinding;
+    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
-    use quote::format_ident;
+    use margaret_serve_input_codegen::scan::scan;
+    use margaret_tag_codegen::tag_pool::TagPool;
 
     use crate::handler_binding::HandlerBinding;
+    use crate::render_websocket;
     use crate::server_serve_inputs::server_serve_inputs;
     use crate::session_plan::SessionPlan;
     use crate::session_serve_inputs::session_serve_inputs;
+    use crate::web_socket_artifacts::WebSocketArtifacts;
     use crate::web_socket_codegen_error::WebSocketCodegenError;
     use crate::web_socket_plan::WebSocketPlan;
     use crate::web_socket_session::WebSocketSession;
@@ -59,11 +67,11 @@ mod tests {
     fn render_websocket(
         index: &AttributeIndex,
         bindings: &ContainerBindings,
-        middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+        middleware_plans: &MiddlewarePlans,
         registries: &BindingRegistries,
-    ) -> Result<crate::web_socket_artifacts::WebSocketArtifacts, WebSocketCodegenError> {
+    ) -> Result<WebSocketArtifacts, WebSocketCodegenError> {
         WebSocketPlan::build(index, bindings, middleware_plans, registries)
-            .map(|plan| crate::render_websocket::render_websocket(plan, bindings))
+            .map(|plan| render_websocket::render_websocket(plan, bindings))
     }
 
     const REQUEST_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
@@ -148,38 +156,31 @@ impl RespondsToWebSocketNotification for Typist {
 }
 "#;
 
-    fn index_for(source: &str) -> AttributeIndex {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), source).expect("lib.rs is written");
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", source_directory))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
-        let registry = margaret_serve_input_codegen::scan::scan(index)
-            .expect("the console arguments are scanned");
+        let registry = scan(index).expect("the console arguments are scanned");
 
         render_container(index, &registry, &[])
             .expect("the container renders")
             .bindings
     }
 
-    fn registries_for(index: &AttributeIndex) -> BindingRegistries {
-        BindingRegistries::collect(index, ViewsAvailability::Available)
-            .expect("the binding registries are collected")
+    fn collect_registries(
+        index: &AttributeIndex,
+    ) -> Result<BindingRegistries, RequestBindingError> {
+        BindingRegistries::collect(
+            index,
+            ViewsAvailability::Available,
+            &TagPool::collect(index).expect("the tags are collected"),
+            &bindings(&IndexedSource::new("").index),
+        )
     }
 
-    fn missing_path() -> margaret_attributes::canonical_path::CanonicalPath {
-        margaret_attributes::canonical_path::CanonicalPath::new(vec![
-            "crate".to_string(),
-            "Missing".to_string(),
-        ])
+    fn registries_for(index: &AttributeIndex) -> BindingRegistries {
+        collect_registries(index).expect("the binding registries are collected")
+    }
+
+    fn missing_path() -> CanonicalPath {
+        CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
     }
 
     fn empty_session_plan() -> SessionPlan {
@@ -193,10 +194,7 @@ impl RespondsToWebSocketNotification for Typist {
                 parameters: Vec::new(),
                 path: "/room".to_string(),
                 server: "public".to_string(),
-                session_path: margaret_attributes::canonical_path::CanonicalPath::new(vec![
-                    "crate".to_string(),
-                    "Room".to_string(),
-                ]),
+                session_path: CanonicalPath::new(vec!["crate".to_string(), "Room".to_string()]),
             },
         }
     }
@@ -211,10 +209,11 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     fn generated(source: &str) -> String {
-        let index = index_for(source);
+        let index = IndexedSource::new(source).index;
         let registries = registries_for(&index);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
 
         render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect("the websocket module is generated")
@@ -232,13 +231,14 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     fn error(source: &str) -> WebSocketCodegenError {
-        let index = index_for(source);
-        let registries = match BindingRegistries::collect(&index, ViewsAvailability::Available) {
+        let index = IndexedSource::new(source).index;
+        let registries = match collect_registries(&index) {
             Ok(registries) => registries,
             Err(rejection) => return WebSocketCodegenError::from(rejection),
         };
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
 
         render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect_err("the websocket module is rejected")
@@ -322,7 +322,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn reports_a_notification_handler_absent_from_the_container_plan() {
-        let index = index_for("#[singleton]\nstruct Known;\n");
+        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
         let mut plan = empty_session_plan();
         plan.notification_handlers.push(missing_handler());
 
@@ -334,7 +334,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn reports_a_request_handler_absent_from_the_container_plan() {
-        let index = index_for("#[singleton]\nstruct Known;\n");
+        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
         let mut plan = empty_session_plan();
         plan.request_handlers.push(missing_handler());
 
@@ -351,7 +351,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn reports_a_session_binding_absent_from_the_container_plan() {
-        let index = index_for("#[singleton]\nstruct Known;\n");
+        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
         let mut plan = empty_session_plan();
         plan.session.parameters.push(BoundParameter {
             binding: RequestBinding::BoundRouteParameter {
@@ -370,7 +370,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn reports_a_session_layer_absent_from_the_container_plan() {
-        let index = index_for("#[singleton]\nstruct Known;\n");
+        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
         let mut plan = empty_session_plan();
         plan.session.layers.push(LayerApplication {
             concrete: missing_path(),
@@ -389,7 +389,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn propagates_a_container_mismatch_from_websocket_rendering() {
-        let index = index_for(
+        let index = IndexedSource::new(
             r#"
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
@@ -412,11 +412,13 @@ impl RespondsToWebSocketMessage for Ponger {
     type Message = Ping;
 }
 "#,
-        );
+        )
+        .index;
         let registries = registries_for(&index);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
-        let empty_index = index_for("");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
+        let empty_index = IndexedSource::new("").index;
         let error = render_websocket(&index, &bindings(&empty_index), &plans, &registries)
             .map(drop)
             .expect_err("websocket rendering requires the same container plan");
@@ -443,7 +445,7 @@ impl RespondsToWebSocketMessage for Chatter {
 
     #[test]
     fn rejects_a_handler_that_is_not_a_struct() {
-        let error = websocket_handlers(&index_for(NON_STRUCT_HANDLER))
+        let error = websocket_handlers(&IndexedSource::new(NON_STRUCT_HANDLER).index)
             .err()
             .expect("a non-struct websocket handler is rejected");
 
@@ -487,7 +489,7 @@ mod a_b {
 
     #[test]
     fn resolves_a_handler_to_its_disambiguated_container_field() {
-        let handlers = websocket_handlers(&index_for(COLLIDING_HANDLER_FIELD))
+        let handlers = websocket_handlers(&IndexedSource::new(COLLIDING_HANDLER_FIELD).index)
             .expect("the handlers are discovered");
 
         assert_eq!(handlers.len(), 1);
@@ -687,7 +689,7 @@ impl Guard {
                 "#[websocket_session(path = \"/room\", server = \"public\")]\n#[middleware(missing)]\nstruct Room;\n\nimpl Room {\n    #[build_for_session]\n    fn build() -> anyhow::Result<Self> {}\n}\n"
             )
             .to_string()
-            .contains("no #[handles_middleware_attribute] handles it")
+            .contains("which no middleware handler declares")
         );
     }
 
@@ -1011,6 +1013,53 @@ impl Bad {
     }
 
     #[test]
+    fn rejects_a_session_parameter_that_injects_a_token_issuer_client_by_path() {
+        let index = IndexedSource::new(
+            r#"
+use std::sync::Arc;
+
+use crate::IssuerClient;
+
+#[websocket_session(path = "/x", server = "public")]
+struct Bad;
+
+impl Bad {
+    #[build_for_session]
+    fn build(client: Arc<IssuerClient>) -> anyhow::Result<Self> {}
+}
+"#,
+        )
+        .index;
+        let registries = registries_for(&index);
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
+        let registry = scan(&index).expect("the console arguments are scanned");
+        let bindings = render_container(
+            &index,
+            &registry,
+            &[FrameworkProvider {
+                construction: FrameworkConstruction::Unit,
+                enablement: FrameworkEnablement::Always,
+                injection: FrameworkInjectionRole::TokenIssuerClient(
+                    Tag::from_path(&syn::parse_str("auth").expect("the tag path parses"))
+                        .expect("the tag is a plain name"),
+                ),
+                provided: CanonicalPath::new(vec!["crate".to_string(), "IssuerClient".to_string()]),
+            }],
+        )
+        .expect("the container renders")
+        .bindings;
+
+        assert!(
+            render_websocket(&index, &bindings, &plans, &registries)
+                .expect_err("a token issuer client is not injectable by path")
+                .to_string()
+                .contains("which only the framework may inject")
+        );
+    }
+
+    #[test]
     fn rejects_a_session_parameter_without_a_provider() {
         assert!(
             error(
@@ -1031,7 +1080,9 @@ impl Bad {
         );
     }
 
-    const AUTHENTICATED_HANDSHAKE: &str = r#"
+    const AUTHENTICATED_HANDSHAKE: &str = r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 use margaret::framework::http::request::Request;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
@@ -1046,7 +1097,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, request: &Request, #[form_request(from = RequestInput::Cookie)] cookie: SessionCookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1352,7 +1403,9 @@ impl Bad {
     fn rejects_an_authenticated_user_whose_provider_reads_the_request_body() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
@@ -1365,7 +1418,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, #[form_request(from = RequestInput::Json)] credentials: Credentials) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1382,7 +1435,9 @@ impl Room {
         );
     }
 
-    const PARITY_SESSION: &str = r#"
+    const PARITY_SESSION: &str = r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 use std::sync::Arc;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
@@ -1422,8 +1477,8 @@ impl BoardSession {
         greeter: Arc<Greeter>,
         #[route_parameter(from = "topic")] topic: String,
         #[route_parameter(from = "article")] article: Article,
-        #[form_request(from = Query)] filters: Filters,
-        #[form_request(from = Cookie)] preferences: Preferences,
+        #[form_request(from = RequestInput::Query)] filters: Filters,
+        #[form_request(from = RequestInput::Cookie)] preferences: Preferences,
         request: &margaret::framework::http::request::Request,
         peer: &spiffe::spiffe_id::SpiffeId,
         routes: &crate::margaret::routes::Routes,
@@ -1468,7 +1523,9 @@ impl RespondsToWebSocketMessage for Poster {
     fn rejects_a_form_body_request_in_a_session() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -1476,7 +1533,7 @@ struct Form;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[form_request(from = Form)] form: Form) -> anyhow::Result<Self> {}
+    fn build(#[form_request(from = RequestInput::Form)] form: Form) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1489,7 +1546,9 @@ impl Bad {
     fn rejects_a_json_body_request_in_a_session() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -1497,7 +1556,7 @@ struct Payload;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[form_request(from = Json)] payload: Payload) -> anyhow::Result<Self> {}
+    fn build(#[form_request(from = RequestInput::Json)] payload: Payload) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1950,10 +2009,11 @@ impl Bad {
     }
 
     fn transport_policies(source: &str) -> BTreeMap<String, ServerTransportPolicy> {
-        let index = index_for(source);
+        let index = IndexedSource::new(source).index;
         let registries = registries_for(&index);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
 
         render_websocket(&index, &bindings(&index), &plans, &registries)
             .expect("the websocket module is generated")

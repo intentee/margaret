@@ -1,63 +1,63 @@
 use chrono::DateTime;
 use chrono::Utc;
-use futures_util::future::try_join;
-use serde::Serialize;
 
+use margaret_identity_session::access_token_claims::AccessTokenClaims;
+use margaret_identity_session::access_token_stamp::AccessTokenStamp;
 use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
-use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
+use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
-use margaret_jwks_keygen::signs_claims::SignsClaims;
-use margaret_jwks_keygen::verifies_any_token::VerifiesAnyToken;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
+use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
+use margaret_jwt_verification::verified_jwt::VerifiedJwt;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::access_token_minting::AccessTokenMinting;
 use crate::minted_tokens::MintedTokens;
-use crate::token_signer_error::TokenSignerError;
 
-async fn sign_with_current<TClaims: Send + Serialize + Sync>(
+#[must_use]
+pub fn mint_access_token(
     secret: &JwksSecret,
-    claims: &TClaims,
-) -> Result<String, JwksKeyError> {
-    secret.current.signing.sign(claims).await
-}
-
-/// # Errors
-///
-/// Returns `TokenSignerError::UnverifiableRefreshToken` or `TokenSignerError::InvalidRefreshToken` or `TokenSignerError::ExpiredRefreshToken`.
-pub async fn mint_access_token(
-    secret: &JwksSecret,
+    issuance: &TokenIssuance,
     refresh_token: &str,
     now: DateTime<Utc>,
-) -> Result<AccessTokenMinting, TokenSignerError> {
-    let verification = secret
-        .verify_any::<RefreshTokenClaims>(refresh_token)
-        .map_err(|source| TokenSignerError::RefreshTokenVerification { source })?;
-
-    let refresh_claims = match verification {
-        JwksSecretVerificationResult::Invalid => {
-            return Ok(AccessTokenMinting::UnknownRefreshTokenKey);
+) -> AccessTokenMinting {
+    let access_stamp = AccessTokenStamp::issued_by(issuance, now);
+    let VerifiedJwt {
+        claims: refresh_claims,
+        registered: refresh_registered,
+        ..
+    } = match secret.verify_jwt::<RefreshTokenClaims>(
+        refresh_token,
+        &JwtExpectation {
+            audience: &issuance.audience,
+            issuer: &issuance.issuer,
+            token_type: TypeHeaderExpectation::Required(JwtType::Jwt),
+        },
+        access_stamp.registered.iat,
+    ) {
+        JwksSecretVerificationResult::Rejected(rejection) => {
+            return AccessTokenMinting::RejectedRefreshToken(rejection);
         }
-        JwksSecretVerificationResult::Malformed(malformation) => {
-            return Ok(AccessTokenMinting::MalformedRefreshToken(malformation));
+        JwksSecretVerificationResult::SignedWithNextKey => {
+            return AccessTokenMinting::RefreshTokenSignedWithNextKey;
         }
-        JwksSecretVerificationResult::SignedWithCurrent(claims)
-        | JwksSecretVerificationResult::SignedWithPrevious(claims) => claims,
+        JwksSecretVerificationResult::SignedWithCurrent(verified)
+        | JwksSecretVerificationResult::SignedWithPrevious(verified) => verified,
+    };
+    let signer = secret.current();
+    let access_claims = AccessTokenClaims {
+        sub: refresh_claims.sub,
     };
 
-    if refresh_claims.is_expired_at(now) {
-        return Ok(AccessTokenMinting::ExpiredRefreshToken);
-    }
-
-    let access_claims = refresh_claims.mint_access_token_claims(now);
-    let (access_token, refresh_token) = try_join(
-        sign_with_current(secret, &access_claims),
-        sign_with_current(secret, &refresh_claims),
-    )
-    .await
-    .map_err(|source| TokenSignerError::Signing { source })?;
-
-    Ok(AccessTokenMinting::Minted(MintedTokens {
-        access_token,
-        refresh_token,
-    }))
+    AccessTokenMinting::Minted(MintedTokens {
+        access_token: signer.sign_json(
+            &access_claims.to_payload(&access_stamp),
+            JwtType::AccessToken,
+        ),
+        refresh_token: signer.sign_json(
+            &refresh_claims.to_payload(&refresh_registered),
+            JwtType::Jwt,
+        ),
+    })
 }

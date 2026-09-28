@@ -7,22 +7,19 @@ use jsonwebtoken::decode_header;
 use jsonwebtoken::jwk::JwkSet;
 use jsonwebtoken::jwk::KeyAlgorithm;
 
-use margaret_jwks_keygen::curve::Curve;
+use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::public_jwks::PublicJwks;
-use margaret_jwks_keygen::signs_claims::SignsClaims;
-use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
+use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 
-#[tokio::test]
-async fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
+#[test]
+fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
     let secret = JwksSecret::fresh(Curve::P256)?;
     let claims = TestClaims {
-        exp: FAR_FUTURE_EXPIRY,
         sub: "subject".to_string(),
     };
-    let token = secret.current.signing.sign(&claims).await?;
-    let document = serde_json::to_string(&PublicJwks::from(secret))?;
+    let token = claims.signed_by(secret.current());
+    let document = serde_json::to_string(secret.public_jwks())?;
 
     let published: JwkSet = serde_json::from_str(&document)?;
     let kid = decode_header(&token)?
@@ -36,11 +33,13 @@ async fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
         "a standard verifier reads the algorithm off the published key"
     );
 
-    let verified = decode::<TestClaims>(
-        &token,
-        &DecodingKey::from_jwk(signing_key)?,
-        &Validation::new(Algorithm::ES256),
-    )?;
+    let trust = fixture_trust();
+    let mut validation = Validation::new(Algorithm::ES256);
+
+    validation.set_audience(&[trust.audience.as_str()]);
+    validation.set_issuer(&[trust.issuer.as_str()]);
+
+    let verified = decode::<TestClaims>(&token, &DecodingKey::from_jwk(signing_key)?, &validation)?;
 
     assert_eq!(verified.claims, claims);
 

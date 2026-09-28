@@ -8,12 +8,9 @@ use crate::field_base::field_base;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::identifier::Identifier;
 use crate::indexed_item::IndexedItem;
-use crate::item_paths::ItemPaths;
 use crate::matched_attribute::MatchedAttribute;
-use crate::module_imports::ModuleImports;
 use crate::name_allocator::NameAllocator;
-use crate::resolve_path::resolve_path;
-use crate::resolve_type::resolve_type;
+use crate::path_resolver::PathResolver;
 
 fn module_of(item: &IndexedItem) -> &[String] {
     item.canonical_path()
@@ -40,34 +37,28 @@ fn allocate_identifiers(items: &[IndexedItem]) -> HashMap<CanonicalPath, Identif
 }
 
 pub struct AttributeIndex {
-    empty_imports: ModuleImports,
     identifiers: HashMap<CanonicalPath, Identifier>,
-    imports: HashMap<CanonicalPath, ModuleImports>,
-    item_paths: ItemPaths,
     items: Vec<IndexedItem>,
+    resolver: PathResolver,
 }
 
 impl AttributeIndex {
-    pub(crate) fn new(
-        items: Vec<IndexedItem>,
-        imports: HashMap<CanonicalPath, ModuleImports>,
-    ) -> Self {
-        let mut item_paths = ItemPaths::default();
-        for item in &items {
-            item_paths.insert(item.canonical_path().clone());
-        }
+    pub(crate) fn new(items: Vec<IndexedItem>, resolver: PathResolver) -> Self {
         Self {
-            empty_imports: ModuleImports::default(),
             identifiers: allocate_identifiers(&items),
-            imports,
-            item_paths,
             items,
+            resolver,
         }
     }
 
     #[must_use]
     pub fn has_framework_attribute(&self, attribute: FrameworkAttribute) -> bool {
         self.select_framework_attribute(attribute).next().is_some()
+    }
+
+    #[must_use]
+    pub fn is_imported(&self, target: &CanonicalPath) -> bool {
+        self.resolver.is_imported(target)
     }
 
     #[must_use]
@@ -106,22 +97,12 @@ impl AttributeIndex {
 
     #[must_use]
     pub fn resolve_module_path(&self, module: &[String], path: &Path) -> Option<CanonicalPath> {
-        resolve_path(
-            path,
-            module,
-            self.imports_for_module(module),
-            &self.item_paths,
-        )
+        self.resolver.resolve_path(module, path)
     }
 
     #[must_use]
     pub fn resolve_module_type(&self, module: &[String], declared: &Type) -> Option<CanonicalPath> {
-        resolve_type(
-            declared,
-            module,
-            self.imports_for_module(module),
-            &self.item_paths,
-        )
+        self.resolver.resolve_type(module, declared)
     }
 
     pub fn select_framework_attribute(
@@ -139,11 +120,5 @@ impl AttributeIndex {
     #[must_use]
     pub fn struct_identifier(&self, path: &CanonicalPath) -> Option<&Identifier> {
         self.identifiers.get(path)
-    }
-
-    fn imports_for_module(&self, module: &[String]) -> &ModuleImports {
-        self.imports
-            .get(&CanonicalPath::new(module.to_vec()))
-            .unwrap_or(&self.empty_imports)
     }
 }

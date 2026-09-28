@@ -18,8 +18,9 @@ pub fn parameters(method: &IndexedMethod) -> Vec<ParameterView<'_>> {
 
 #[cfg(test)]
 mod tests {
-    use margaret_attributes::indexed_method::IndexedMethod;
     use syn::parse_quote;
+
+    use margaret_attributes::indexed_method::IndexedMethod;
 
     use super::parameters;
 

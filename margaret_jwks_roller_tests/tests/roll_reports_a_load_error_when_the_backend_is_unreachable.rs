@@ -1,4 +1,4 @@
-use margaret_jwks_keygen::curve::Curve;
+use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_roller::roll::roll;
 use margaret_jwks_roller::roller_error::RollerError;

@@ -1,3 +1,5 @@
+use std::future;
+
 use tokio::sync::watch::Receiver;
 use tokio_util::sync::CancellationToken;
 
@@ -15,7 +17,7 @@ impl<TItem: Clone + Send + Sync + 'static> SyncHolderSubscription<TItem> {
 
     pub async fn changed(&mut self) {
         if self.receiver.changed().await.is_err() {
-            std::future::pending::<()>().await;
+            future::pending::<()>().await;
         }
     }
 
@@ -54,6 +56,7 @@ mod tests {
     use std::task::Context;
     use std::task::Waker;
 
+    use tokio::task;
     use tokio_util::sync::CancellationToken;
 
     use crate::sync_holder::SyncHolder;
@@ -107,7 +110,7 @@ mod tests {
         let (presence, ()) = tokio::join!(
             subscription.wait_until_present(&cancellation_token),
             async {
-                tokio::task::yield_now().await;
+                task::yield_now().await;
                 holder.set(Some(3));
             },
         );
@@ -122,7 +125,7 @@ mod tests {
         let cancellation_token = CancellationToken::new();
 
         let (presence, ()) = tokio::join!(clone.wait_until_present(&cancellation_token), async {
-            tokio::task::yield_now().await;
+            task::yield_now().await;
             holder.set(Some(9));
         });
 

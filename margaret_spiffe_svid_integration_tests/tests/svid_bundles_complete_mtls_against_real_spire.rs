@@ -3,6 +3,7 @@ use std::sync::Arc;
 use rustls::ClientConnection;
 use rustls::ServerConnection;
 use rustls::pki_types::ServerName;
+use tokio::task;
 use tokio_util::sync::CancellationToken;
 use trzcina::ServiceManager;
 use trzcina::ServiceShutdownOptions;
@@ -13,6 +14,7 @@ use margaret_spiffe_svid_tests::install_crypto_provider::install_crypto_provider
 use margaret_spiffe_svid_tests::pump_tls_handshake::pump_tls_handshake;
 use margaret_spiffe_svid_tests::spire_test_cluster::SpireTestCluster;
 use margaret_spiffe_svid_tests::spire_test_cluster_params::SpireTestClusterParams;
+use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
 
 #[tokio::test]
 async fn completes_mtls_with_a_real_spire_issued_svid() {
@@ -34,6 +36,7 @@ async fn completes_mtls_with_a_real_spire_issued_svid() {
 
     let server_config = Arc::new(svid_bundle.server_config());
     let client_config = Arc::new(svid_bundle.client_config());
+    let mut client_readiness = svid_bundle.client_readiness();
 
     let mut service_manager = ServiceManager::default();
     service_manager.register_bundle(svid_bundle).await.unwrap();
@@ -47,6 +50,11 @@ async fn completes_mtls_with_a_real_spire_issued_svid() {
             .await
     });
 
+    assert_eq!(
+        client_readiness.wait_until_ready(&cancellation_token).await,
+        SyncHolderPresence::Present
+    );
+
     loop {
         let mut server_connection = ServerConnection::new(server_config.clone()).unwrap();
         let mut client_connection = ClientConnection::new(
@@ -59,7 +67,7 @@ async fn completes_mtls_with_a_real_spire_issued_svid() {
             break;
         }
 
-        tokio::task::yield_now().await;
+        task::yield_now().await;
     }
 
     cancellation_token.cancel();

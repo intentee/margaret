@@ -1,4 +1,5 @@
 use syn::Attribute;
+use syn::Path;
 use syn::Type;
 
 use crate::canonical_path::CanonicalPath;
@@ -21,10 +22,7 @@ impl ScannedField {
         }
     }
 
-    pub(crate) fn resolve(
-        self,
-        resolve: impl Copy + Fn(&syn::Path) -> CanonicalPath,
-    ) -> IndexedField {
+    pub(crate) fn resolve(self, resolve: impl Copy + Fn(&Path) -> CanonicalPath) -> IndexedField {
         IndexedField::from_parts(
             self.identifier,
             self.ty,

@@ -21,30 +21,26 @@ pub mod web_socket_server_requirements;
 
 #[cfg(test)]
 mod tests {
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
-    use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
-    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use std::collections::BTreeMap;
-    use std::fs;
-    use std::path::Path;
 
-    use tempfile::TempDir;
-    use tempfile::tempdir;
-
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
-    use margaret_middleware_codegen::middleware_plans::middleware_plans;
+    use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
+    use margaret_tag_codegen::tag_pool::TagPool;
 
+    use crate::http_artifacts::HttpArtifacts;
     use crate::http_codegen_error::HttpCodegenError;
     use crate::http_plan::HttpPlan;
+    use crate::render_http;
     use crate::server_transport_policy::ServerTransportPolicy;
     use crate::serves_spiffe::serves_spiffe;
     use crate::web_socket_server_requirements::WebSocketServerRequirements;
@@ -53,10 +49,10 @@ mod tests {
         index: &AttributeIndex,
         has_views: bool,
         websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
-        middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+        middleware_plans: &MiddlewarePlans,
         bindings: &ContainerBindings,
         registries: &BindingRegistries,
-    ) -> Result<crate::http_artifacts::HttpArtifacts, HttpCodegenError> {
+    ) -> Result<HttpArtifacts, HttpCodegenError> {
         HttpPlan::build(
             index,
             has_views,
@@ -65,7 +61,7 @@ mod tests {
             bindings,
             registries,
         )
-        .map(|plan| crate::render_http::render_http(plan, bindings))
+        .map(|plan| render_http::render_http(plan, bindings))
     }
 
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
@@ -101,17 +97,29 @@ mod tests {
         }
     }
 
+    fn collect_registries(
+        index: &AttributeIndex,
+        has_views: bool,
+    ) -> Result<BindingRegistries, RequestBindingError> {
+        BindingRegistries::collect(
+            index,
+            views_availability(has_views),
+            &TagPool::collect(index).expect("the tags are collected"),
+            &bindings_for(&IndexedSource::new("").index),
+        )
+    }
+
     fn registries_for(index: &AttributeIndex, has_views: bool) -> BindingRegistries {
-        BindingRegistries::collect(index, views_availability(has_views))
-            .expect("the binding registries are collected")
+        collect_registries(index, has_views).expect("the binding registries are collected")
     }
 
     fn error_with_container_source(source: &str, container_source: &str) -> String {
-        let index = index_for(source);
+        let index = IndexedSource::new(source).index;
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
-        let container_index = index_for(container_source);
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
+        let container_index = IndexedSource::new(container_source).index;
         let bindings = bindings_for(&container_index);
 
         render_http(
@@ -127,16 +135,11 @@ mod tests {
         .to_string()
     }
 
-    fn http_source(
-        crate_name: &str,
-        source_directory: &Path,
-        has_views: bool,
-    ) -> Result<String, HttpCodegenError> {
-        let index = AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new(crate_name, source_directory))?
-            .build();
-        let registries = BindingRegistries::collect(&index, views_availability(has_views))?;
-        let plans = middleware_plans(&index, &registries)?;
+    fn http_source(lib_source: &str, has_views: bool) -> Result<String, HttpCodegenError> {
+        let index = IndexedSource::try_new(lib_source)?.index;
+        let registries = collect_registries(&index, has_views)?;
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)?;
         let bindings = bindings_for(&index);
 
         Ok(render_http(
@@ -159,13 +162,6 @@ mod tests {
         })
         .collect::<Vec<String>>()
         .join("\n"))
-    }
-
-    fn generate_http_source(
-        crate_name: &str,
-        source_directory: &Path,
-    ) -> Result<String, HttpCodegenError> {
-        http_source(crate_name, source_directory, false)
     }
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"
@@ -265,7 +261,7 @@ impl Resource {
 
     #[test]
     fn rejects_websocket_arguments_absent_from_the_container_plan() {
-        let index = index_for("");
+        let index = IndexedSource::new("").index;
         let bindings = bindings_for(&index);
         let registries = registries_for(&index, false);
         let websocket_servers = BTreeMap::from([(
@@ -277,11 +273,14 @@ impl Resource {
                 transport_policy: ServerTransportPolicy::Negotiable,
             },
         )]);
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let middleware_plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let error = render_http(
             &index,
             false,
             &websocket_servers,
-            &[],
+            &middleware_plans,
             &bindings,
             &registries,
         )
@@ -325,7 +324,7 @@ impl GetProfile {
             .collect();
 
         assert!(source.contains(
-            "letsession_user_provider=std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(),routes:routes.clone(),});"
+            "letsession_user_provider=::std::sync::Arc::new(super::super::authenticated_users::SessionUserProvider{inner:container.session_user_provider(),routes:routes.clone(),});"
         ));
         assert!(source.contains("letsession_user_provider=session_user_provider.clone();"));
         assert!(source.contains(
@@ -416,7 +415,7 @@ impl GetProfile {
         let source: String = source_for(COLLIDING_PROVIDER).split_whitespace().collect();
 
         assert!(source.contains(
-            "letsession_2=std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session(),});"
+            "letsession_2=::std::sync::Arc::new(super::super::authenticated_users::Session{inner:container.session(),});"
         ));
         assert!(source.contains("letsession_2=session_2.clone();"));
         assert!(source.contains("letsession=request;"));
@@ -425,7 +424,9 @@ impl GetProfile {
         ));
     }
 
-    const COLLIDING_BINDER: &str = r#"
+    const COLLIDING_BINDER: &str = r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 struct User;
 
 struct Filters;
@@ -447,7 +448,7 @@ impl GetUser {
     #[process]
     fn respond(
         &self,
-        #[form_request(from = Query)] store: Filters,
+        #[form_request(from = RequestInput::Query)] store: Filters,
         #[route_parameter(from = "user")] user: User,
     ) -> anyhow::Result<Response> {}
 }
@@ -540,7 +541,7 @@ impl GetArticle {
             .collect();
 
         assert!(source.contains(
-            "letstore=std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store(),});"
+            "letstore=::std::sync::Arc::new(super::super::authenticated_users::Store{inner:container.store(),});"
         ));
         assert!(source.contains("letstore_2=container.store();"));
         assert!(source.contains(
@@ -659,48 +660,22 @@ impl Echo {
 }
 "#;
 
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        directory
-    }
-
-    fn index_for(lib_source: &str) -> AttributeIndex {
-        let directory = crate_with(lib_source);
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn source_for(lib_source: &str) -> String {
-        let directory = crate_with(lib_source);
-
-        generate_http_source("crate", &directory.path().join("src"))
+        http_source(lib_source, false)
             .expect("the http source is generated")
             .split_whitespace()
             .collect()
     }
 
     fn source_for_with_views(lib_source: &str) -> String {
-        let directory = crate_with(lib_source);
-
-        http_source("crate", &directory.path().join("src"), true)
+        http_source(lib_source, true)
             .expect("the http source is generated")
             .split_whitespace()
             .collect()
     }
 
     fn rejection_for(lib_source: &str) -> HttpCodegenError {
-        let directory = crate_with(lib_source);
-
-        generate_http_source("crate", &directory.path().join("src"))
-            .expect_err("the http source fails to generate")
+        http_source(lib_source, false).expect_err("the http source fails to generate")
     }
 
     fn error_for(lib_source: &str) -> String {
@@ -764,10 +739,11 @@ impl Health {
         websocket_server_name: &str,
         has_views: bool,
     ) -> String {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         render_http(
@@ -821,10 +797,11 @@ impl Health {
         lib_source: &str,
         websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
     ) -> BTreeMap<String, ServerTransportPolicy> {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         render_http(
@@ -917,14 +894,11 @@ impl GetWorkload {
     }
 
     fn routes_source_for(lib_source: &str) -> String {
-        let directory = crate_with(lib_source);
-        let index = AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
-            .expect("the crate is indexed")
-            .build();
+        let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
 
         render_http(
@@ -1656,41 +1630,6 @@ impl GetProject {
     }
 
     #[test]
-    fn propagates_malformed_middleware_arguments() {
-        assert!(
-            error_for("#[handles_middleware_attribute(= 5)]\nstruct Bad;\n")
-                .contains("failed to index")
-        );
-    }
-
-    #[test]
-    fn rejects_middleware_without_handles() {
-        assert!(
-            error_for("#[handles_middleware_attribute]\nstruct Bad;\n")
-                .contains("missing the 'attribute'")
-        );
-    }
-
-    #[test]
-    fn propagates_a_non_path_handles_argument() {
-        let error =
-            rejection_for("#[handles_middleware_attribute(attribute = \"x\")]\nstruct Bad;\n");
-
-        assert!(matches!(
-            error,
-            HttpCodegenError::Middleware {
-                source: MiddlewareCodegenError::AttributeArguments {
-                    source: AttributeArgumentsError::UnexpectedArgument {
-                        ref key,
-                        ref expected,
-                        ..
-                    }
-                }
-            } if key == "attribute" && expected == "path"
-        ));
-    }
-
-    #[test]
     fn rejects_a_middleware_without_a_process_method() {
         let message =
             error_for("#[handles_middleware_attribute(attribute = guard)]\nstruct Bad;\n");
@@ -1724,7 +1663,7 @@ impl GetProject {
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\n#[middleware(missing)]\nstruct Bad;\nimpl Bad {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(message.contains("no #[handles_middleware_attribute] handles it"));
+        assert!(message.contains("which no middleware handler declares"));
     }
 
     #[test]
@@ -1944,8 +1883,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_form_source() {
         let source = source_for(
-            "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(source.contains(
@@ -1962,8 +1901,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_query_source() {
         let source = source_for(
-            "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = Query)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(
@@ -1976,8 +1915,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_json_source() {
         let source = source_for(
-            "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = Json)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Json)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(
@@ -1990,8 +1929,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_cookie_source() {
         let source = source_for(
-            "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Cookie)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(
@@ -2024,8 +1963,8 @@ impl GetMetrics {
     #[test]
     fn rejects_an_argument_with_conflicting_markers() {
         let message = error_for(
-            "#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] #[form_request(from = Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\n#[singleton]
+#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] #[form_request(from = RequestInput::Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(message.contains("both #[route_parameter] and #[form_request]"));
@@ -2065,8 +2004,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_guarded_form_request_as_a_bare_model() {
         let source = source_for(
-            "#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Form)] data: Data) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\n#[singleton]
+#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(source.contains(
@@ -2145,7 +2084,7 @@ impl Tracer {
 
     #[test]
     fn pins_a_server_to_mutual_tls_when_a_middleware_reads_the_peer_spiffe_id() {
-        let index = index_for(
+        let index = IndexedSource::new(
             r#"
 use margaret::framework::http::next::Next;
 use spiffe::spiffe_id::SpiffeId;
@@ -2168,10 +2107,12 @@ impl Guard {
     fn process(&self, peer: &SpiffeId, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 "#,
-        );
+        )
+        .index;
         let registries = registries_for(&index, false);
-        let plans =
-            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
         let artifacts = render_http(
             &index,

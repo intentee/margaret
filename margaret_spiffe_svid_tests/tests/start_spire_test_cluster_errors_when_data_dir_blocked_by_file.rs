@@ -1,3 +1,5 @@
+use tokio::fs;
+
 use margaret_spiffe_svid_tests::spire_test_cluster::SpireTestCluster;
 use margaret_spiffe_svid_tests::spire_test_cluster_params::SpireTestClusterParams;
 
@@ -5,7 +7,7 @@ use margaret_spiffe_svid_tests::spire_test_cluster_params::SpireTestClusterParam
 async fn errors_when_server_data_dir_path_is_blocked_by_a_file() {
     let data_dir = tempfile::tempdir().unwrap();
 
-    tokio::fs::write(data_dir.path().join("server-data"), b"blocker")
+    fs::write(data_dir.path().join("server-data"), b"blocker")
         .await
         .unwrap();
 

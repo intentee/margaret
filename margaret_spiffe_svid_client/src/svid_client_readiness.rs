@@ -38,9 +38,8 @@ mod tests {
 
     use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
 
-    use crate::svid_server_cert_verifier_facade::SvidServerCertVerifierFacade;
-
     use super::SvidClientReadiness;
+    use crate::svid_server_cert_verifier_facade::SvidServerCertVerifierFacade;
 
     #[tokio::test]
     async fn wait_until_ready_reports_cancellation_before_the_verifier_arrives() {

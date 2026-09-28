@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use matchit::InsertError;
+use matchit::MatchError;
 
 use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
@@ -70,7 +71,7 @@ impl Router {
     pub(crate) fn resolve(&self, method: &str, path: &str) -> RouteResolution {
         let matched = match self.matcher.at(path) {
             Ok(matched) => matched,
-            Err(matchit::MatchError::NotFound) => {
+            Err(MatchError::NotFound) => {
                 return RouteResolution::Request(RequestRoute::NotFound);
             }
         };

@@ -5,20 +5,31 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
 
 use crate::container_bindings::ContainerBindings;
+use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::injectable_resolution::InjectableResolution;
 use crate::injected_dependency::InjectedDependency;
-use crate::peel_target::peel_target;
+use crate::parameter_target::ParameterTarget;
+use crate::provider_binding::ProviderBinding;
 
 fn resolved_single(
     provider_key: CanonicalPath,
     bindings: &ContainerBindings,
-) -> Option<InjectedDependency> {
-    let binding = bindings.provider(&provider_key)?;
-
-    Some(InjectedDependency {
-        concrete: provider_key,
-        field: binding.field_name.clone(),
-    })
+) -> InjectableResolution {
+    match bindings.provider(&provider_key) {
+        None => InjectableResolution::MissingProvider,
+        Some(ProviderBinding {
+            injection: FrameworkInjectionRole::Unmarked,
+            field_name,
+            ..
+        }) => InjectableResolution::Resolved(InjectedDependency {
+            concrete: provider_key,
+            field: field_name.clone(),
+        }),
+        Some(ProviderBinding {
+            injection: FrameworkInjectionRole::TokenIssuerClient(_),
+            ..
+        }) => InjectableResolution::FrameworkOnly,
+    }
 }
 
 #[must_use]
@@ -28,15 +39,9 @@ pub fn resolve_injectable(
     declared: &Type,
     bindings: &ContainerBindings,
 ) -> InjectableResolution {
-    let Some(written) = peel_target(declared) else {
-        return InjectableResolution::UnsupportedShape;
-    };
-
-    match index
-        .resolve_item_path(item, &written)
-        .and_then(|provider_key| resolved_single(provider_key, bindings))
-    {
-        Some(dependency) => InjectableResolution::Resolved(dependency),
-        None => InjectableResolution::MissingProvider,
+    match ParameterTarget::peel(index, item, declared) {
+        ParameterTarget::Resolved { resolved, .. } => resolved_single(resolved, bindings),
+        ParameterTarget::Unresolved { .. } => InjectableResolution::MissingProvider,
+        ParameterTarget::UnsupportedShape => InjectableResolution::UnsupportedShape,
     }
 }

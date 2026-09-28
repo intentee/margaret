@@ -3,6 +3,7 @@ use std::collections::HashSet;
 
 use quote::ToTokens;
 use syn::Type;
+use syn::TypePath;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -15,7 +16,11 @@ use margaret_container::resolve_injectable::resolve_injectable;
 use margaret_injection_codegen::optional_parameter::OptionalParameter;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
+use margaret_syn_type_peeling::single_generic_argument::single_generic_argument;
+use margaret_tag_codegen::read_bearer_token_issuer::read_bearer_token_issuer;
+use margaret_tag_codegen::tag_expectation::TagExpectation;
 
+use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
 use crate::binding_context::BindingContext;
@@ -84,7 +89,7 @@ fn classify_authenticated_user(
     let OptionalParameter {
         required,
         value_type,
-    } = OptionalParameter::from_type(declared);
+    } = OptionalParameter::from_type(index, item, declared);
 
     if matches!(value_type, Type::Reference(_)) {
         return Err(RequestBindingError::AuthenticatedUserByReference {
@@ -216,6 +221,12 @@ fn classify_context_specific(
                         parameter: position.to_string(),
                     })
                 }
+                InjectableResolution::FrameworkOnly => {
+                    Err(RequestBindingError::FrameworkOnlyProviderInjected {
+                        subject: subject.to_string(),
+                        parameter: position.to_string(),
+                    })
+                }
             }
         }
         BindingContext::Middleware { .. } => {
@@ -238,7 +249,7 @@ fn classify_form_request(
     let subject = context.subject();
     let arguments = attribute.args()?;
     let FormRequestArguments { source } =
-        FormRequestArguments::parse(arguments, subject, position)?;
+        FormRequestArguments::parse(arguments, index, item, subject, position)?;
 
     if let BindingContext::Handshake { .. } = context {
         let unavailable = |written: &str| RequestBindingError::FormRequestBodyUnavailable {
@@ -338,161 +349,38 @@ fn verify_single_inference(
     subject: &str,
 ) -> Result<(), RequestBindingError> {
     let mut inferred: HashSet<&CanonicalPath> = HashSet::new();
+    let mut bearer_inferences = 0_usize;
 
     for parameter in bound {
-        if let RequestBinding::AuthenticatedUser { application, .. } = &parameter.binding
-            && !inferred.insert(&application.model)
-        {
+        let RequestBinding::AuthenticatedUser { application, .. } = &parameter.binding else {
+            continue;
+        };
+
+        if !inferred.insert(&application.model) {
             return Err(RequestBindingError::MultipleAuthenticatedUserParameters {
                 subject: subject.to_string(),
                 model: application.model.to_string(),
             });
         }
+
+        if let AuthenticatedUserChallenge::Bearer { .. } = application.challenge {
+            bearer_inferences += 1;
+        }
+    }
+
+    if bearer_inferences > 1 {
+        return Err(RequestBindingError::MultipleBearerAuthenticatedUsers {
+            subject: subject.to_string(),
+        });
     }
 
     Ok(())
 }
 
-struct ParameterMarkers<'marker> {
-    authenticated_user: Option<&'marker IndexedAttribute>,
-    form_request: Option<&'marker IndexedAttribute>,
-    route_parameter: Option<&'marker IndexedAttribute>,
-}
-
-fn parameter_markers<'marker>(
-    attributes: &'marker [IndexedAttribute],
+fn verify_single_request_parameters(
+    bound: &[BoundParameter],
     subject: &str,
-    position: usize,
-    is_peer_spiffe_id: bool,
-) -> Result<ParameterMarkers<'marker>, RequestBindingError> {
-    let marker = |attribute: FrameworkAttribute| {
-        attributes
-            .iter()
-            .find(|candidate| candidate.framework_attribute() == Some(attribute))
-    };
-    let authenticated_user = marker(FrameworkAttribute::AuthenticatedUser);
-    let form_request = marker(FrameworkAttribute::FormRequest);
-    let route_parameter = marker(FrameworkAttribute::RouteParameter);
-
-    if route_parameter.is_some() && form_request.is_some() {
-        return Err(RequestBindingError::ConflictingArgumentMarkers {
-            subject: subject.to_string(),
-            parameter: position.to_string(),
-        });
-    }
-
-    if authenticated_user.is_some() && (route_parameter.is_some() || form_request.is_some()) {
-        return Err(RequestBindingError::ConflictingAuthenticatedUserMarkers {
-            subject: subject.to_string(),
-            parameter: position.to_string(),
-        });
-    }
-
-    if is_peer_spiffe_id
-        && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
-    {
-        return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
-            subject: subject.to_string(),
-            parameter: position.to_string(),
-        });
-    }
-
-    Ok(ParameterMarkers {
-        authenticated_user,
-        form_request,
-        route_parameter,
-    })
-}
-
-/// # Errors
-///
-/// Returns `RequestBindingError` propagated from the work it performs.
-pub fn classify_parameters(
-    index: &AttributeIndex,
-    item: &IndexedItem,
-    method: &IndexedMethod,
-    context: &BindingContext,
-    registries: &BindingRegistries,
-) -> Result<Vec<BoundParameter>, RequestBindingError> {
-    let subject = context.subject();
-    let mut bound = Vec::new();
-    let mut bound_route_parameters = HashSet::new();
-
-    for ParameterView {
-        attributes,
-        declared,
-        holder,
-        position,
-    } in parameters(method)
-    {
-        let resolved = index.resolve_item_type(item, declared);
-        let is_reference = matches!(declared, Type::Reference(_));
-        let injectable = RequestInjectable::resolve(resolved.as_ref(), is_reference);
-        let is_peer_spiffe_id = matches!(injectable, Some(RequestInjectable::PeerSpiffeId));
-        let ParameterMarkers {
-            authenticated_user,
-            form_request,
-            route_parameter,
-        } = parameter_markers(attributes, subject, position, is_peer_spiffe_id)?;
-
-        let binding = if authenticated_user.is_some() {
-            classify_authenticated_user(
-                index,
-                item,
-                declared,
-                context,
-                position,
-                &registries.authenticated_users,
-            )?
-        } else if let Some(attribute) = form_request {
-            classify_form_request(index, item, attribute, declared, context, position)?
-        } else if let Some(attribute) = route_parameter {
-            classify_route_parameter(
-                context,
-                attribute,
-                declared,
-                resolved.as_ref(),
-                position,
-                &registries.route_parameters,
-                &mut bound_route_parameters,
-            )?
-        } else if matches!(injectable, Some(RequestInjectable::Next)) {
-            match context {
-                BindingContext::Middleware { .. } => RequestBinding::Next,
-                BindingContext::AuthenticatedUserProvider { .. }
-                | BindingContext::Handshake { .. }
-                | BindingContext::Responder { .. } => {
-                    return Err(RequestBindingError::NextOutsideMiddleware {
-                        subject: subject.to_string(),
-                        parameter: position.to_string(),
-                    });
-                }
-            }
-        } else if is_peer_spiffe_id {
-            RequestBinding::PeerSpiffeId
-        } else if matches!(injectable, Some(RequestInjectable::Routes)) {
-            RequestBinding::Routes
-        } else if matches!(injectable, Some(RequestInjectable::Views)) {
-            classify_views(context, position, registries.views)?
-        } else if matches!(injectable, Some(RequestInjectable::AssetBag)) {
-            RequestBinding::AssetBag
-        } else if matches!(injectable, Some(RequestInjectable::CurrentRequest)) {
-            RequestBinding::CurrentRequest
-        } else {
-            classify_context_specific(
-                index,
-                item,
-                declared,
-                resolved.as_ref(),
-                is_reference,
-                context,
-                position,
-            )?
-        };
-
-        bound.push(BoundParameter { binding, holder });
-    }
-
+) -> Result<(), RequestBindingError> {
     let next_count = bound
         .iter()
         .filter(|parameter| matches!(parameter.binding, RequestBinding::Next))
@@ -515,7 +403,287 @@ pub fn classify_parameters(
         });
     }
 
-    verify_single_inference(&bound, subject)?;
+    verify_single_inference(bound, subject)
+}
+
+fn bearer_token_claims_path(claims: &Type) -> Option<&TypePath> {
+    let Type::Path(claims_path) = claims else {
+        return None;
+    };
+
+    (claims_path.qself.is_none()
+        && claims_path
+            .path
+            .segments
+            .iter()
+            .all(|segment| segment.arguments.is_none()))
+    .then_some(claims_path)
+}
+
+fn classify_bearer_token(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    attribute: &IndexedAttribute,
+    declared: &Type,
+    context: &BindingContext,
+    position: usize,
+    slot: &mut BearerTokenSlot,
+) -> Result<RequestBinding, RequestBindingError> {
+    let subject = context.subject();
+    let BindingContext::AuthenticatedUserProvider {
+        container_bindings,
+        tags,
+        ..
+    } = context
+    else {
+        return Err(RequestBindingError::BearerTokenUnavailable {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    };
+    let site = format!("argument #{position} of {subject}");
+    let issuer = read_bearer_token_issuer(attribute.args()?, &site)?;
+
+    tags.resolve(&issuer, TagExpectation::TokenIssuer, &site)?;
+
+    let OptionalParameter {
+        required,
+        value_type,
+    } = OptionalParameter::from_type(index, item, declared);
+    let claims = match &value_type {
+        Type::Path(verified_path)
+            if !required
+                && RequestInjectable::VerifiedJwt
+                    .matches(index.resolve_item_type(item, &value_type).as_ref(), false) =>
+        {
+            verified_path
+                .path
+                .segments
+                .last()
+                .and_then(single_generic_argument)
+        }
+        _ => None,
+    }
+    .ok_or_else(|| RequestBindingError::BearerTokenTypeMismatch {
+        subject: subject.to_string(),
+        parameter: position.to_string(),
+        written: declared.to_token_stream().to_string(),
+    })?;
+    let claims_written = || claims.to_token_stream().to_string();
+    let claims_path = bearer_token_claims_path(claims).ok_or_else(|| {
+        RequestBindingError::UnsupportedBearerTokenClaims {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+            written: claims_written(),
+        }
+    })?;
+    let claims = index
+        .resolve_item_path(item, &claims_path.path)
+        .ok_or_else(|| RequestBindingError::UnknownBearerTokenClaims {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+            written: claims_written(),
+        })?;
+
+    if let BearerTokenSlot::Bound = slot {
+        return Err(RequestBindingError::MultipleBearerTokenParameters {
+            subject: subject.to_string(),
+        });
+    }
+
+    *slot = BearerTokenSlot::Bound;
+
+    let issuer_client = container_bindings
+        .token_issuer_client(&issuer)
+        .ok_or_else(|| RequestBindingError::UnplannedTokenIssuerClient {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+            issuer: issuer.to_string(),
+        })?;
+
+    Ok(RequestBinding::BearerToken {
+        claims,
+        issuer_client,
+    })
+}
+
+fn parameter_marker<'marker>(
+    attributes: &'marker [IndexedAttribute],
+    subject: &str,
+    position: usize,
+    is_peer_spiffe_id: bool,
+) -> Result<ParameterMarker<'marker>, RequestBindingError> {
+    let marker = |attribute: FrameworkAttribute| {
+        attributes
+            .iter()
+            .find(|candidate| candidate.framework_attribute() == Some(attribute))
+    };
+    let authenticated_user = marker(FrameworkAttribute::AuthenticatedUser);
+    let form_request = marker(FrameworkAttribute::FormRequest);
+    let bearer_token = marker(FrameworkAttribute::BearerToken);
+    let route_parameter = marker(FrameworkAttribute::RouteParameter);
+
+    if route_parameter.is_some() && form_request.is_some() {
+        return Err(RequestBindingError::ConflictingArgumentMarkers {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if authenticated_user.is_some() && (route_parameter.is_some() || form_request.is_some()) {
+        return Err(RequestBindingError::ConflictingAuthenticatedUserMarkers {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if bearer_token.is_some()
+        && (authenticated_user.is_some() || route_parameter.is_some() || form_request.is_some())
+    {
+        return Err(RequestBindingError::ConflictingBearerTokenMarkers {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    if is_peer_spiffe_id
+        && (authenticated_user.is_some()
+            || route_parameter.is_some()
+            || form_request.is_some()
+            || bearer_token.is_some())
+    {
+        return Err(RequestBindingError::MarkedPeerSpiffeIdParameter {
+            subject: subject.to_string(),
+            parameter: position.to_string(),
+        });
+    }
+
+    Ok(
+        match (
+            authenticated_user,
+            form_request,
+            bearer_token,
+            route_parameter,
+        ) {
+            (Some(_), _, _, _) => ParameterMarker::AuthenticatedUser,
+            (None, Some(attribute), _, _) => ParameterMarker::FormRequest(attribute),
+            (None, None, Some(attribute), _) => ParameterMarker::BearerToken(attribute),
+            (None, None, None, Some(attribute)) => ParameterMarker::RouteParameter(attribute),
+            (None, None, None, None) => ParameterMarker::Unmarked,
+        },
+    )
+}
+
+enum BearerTokenSlot {
+    Bound,
+    Vacant,
+}
+
+enum ParameterMarker<'marker> {
+    AuthenticatedUser,
+    BearerToken(&'marker IndexedAttribute),
+    FormRequest(&'marker IndexedAttribute),
+    RouteParameter(&'marker IndexedAttribute),
+    Unmarked,
+}
+
+/// # Errors
+///
+/// Returns `RequestBindingError` propagated from the work it performs.
+pub fn classify_parameters(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    method: &IndexedMethod,
+    context: &BindingContext,
+    registries: &BindingRegistries,
+) -> Result<Vec<BoundParameter>, RequestBindingError> {
+    let subject = context.subject();
+    let mut bound = Vec::new();
+    let mut bearer_token_slot = BearerTokenSlot::Vacant;
+    let mut bound_route_parameters = HashSet::new();
+
+    for ParameterView {
+        attributes,
+        declared,
+        holder,
+        position,
+    } in parameters(method)
+    {
+        let resolved = index.resolve_item_type(item, declared);
+        let is_reference = matches!(declared, Type::Reference(_));
+        let injectable = RequestInjectable::resolve(resolved.as_ref(), is_reference);
+        let is_peer_spiffe_id = matches!(injectable, Some(RequestInjectable::PeerSpiffeId));
+        let binding = match parameter_marker(attributes, subject, position, is_peer_spiffe_id)? {
+            ParameterMarker::AuthenticatedUser => classify_authenticated_user(
+                index,
+                item,
+                declared,
+                context,
+                position,
+                &registries.authenticated_users,
+            )?,
+            ParameterMarker::BearerToken(attribute) => classify_bearer_token(
+                index,
+                item,
+                attribute,
+                declared,
+                context,
+                position,
+                &mut bearer_token_slot,
+            )?,
+            ParameterMarker::FormRequest(attribute) => {
+                classify_form_request(index, item, attribute, declared, context, position)?
+            }
+            ParameterMarker::RouteParameter(attribute) => classify_route_parameter(
+                context,
+                attribute,
+                declared,
+                resolved.as_ref(),
+                position,
+                &registries.route_parameters,
+                &mut bound_route_parameters,
+            )?,
+            ParameterMarker::Unmarked => {
+                if matches!(injectable, Some(RequestInjectable::Next)) {
+                    match context {
+                        BindingContext::Middleware { .. } => RequestBinding::Next,
+                        BindingContext::AuthenticatedUserProvider { .. }
+                        | BindingContext::Handshake { .. }
+                        | BindingContext::Responder { .. } => {
+                            return Err(RequestBindingError::NextOutsideMiddleware {
+                                subject: subject.to_string(),
+                                parameter: position.to_string(),
+                            });
+                        }
+                    }
+                } else if is_peer_spiffe_id {
+                    RequestBinding::PeerSpiffeId
+                } else if matches!(injectable, Some(RequestInjectable::Routes)) {
+                    RequestBinding::Routes
+                } else if matches!(injectable, Some(RequestInjectable::Views)) {
+                    classify_views(context, position, registries.views)?
+                } else if matches!(injectable, Some(RequestInjectable::AssetBag)) {
+                    RequestBinding::AssetBag
+                } else if matches!(injectable, Some(RequestInjectable::CurrentRequest)) {
+                    RequestBinding::CurrentRequest
+                } else {
+                    classify_context_specific(
+                        index,
+                        item,
+                        declared,
+                        resolved.as_ref(),
+                        is_reference,
+                        context,
+                        position,
+                    )?
+                }
+            }
+        };
+
+        bound.push(BoundParameter { binding, holder });
+    }
+
+    verify_single_request_parameters(&bound, subject)?;
 
     Ok(bound)
 }

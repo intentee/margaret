@@ -1,7 +1,26 @@
+mod catalog {
+    use std::time::Duration;
+
+    pub const TICK_INTERVAL: Duration = Duration::from_secs(1);
+
+    pub struct Account;
+
+    pub enum TickBehavior {
+        Delay,
+    }
+
+    pub enum RequestInput {
+        Query,
+    }
+}
+
 use margaret_macros::build_for_session;
 use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
+use margaret_macros::infer_from_request;
+use margaret_macros::infers_authenticated_user;
+use margaret_macros::issues_tokens;
 use margaret_macros::middleware;
 use margaret_macros::model;
 use margaret_macros::process;
@@ -13,8 +32,14 @@ use margaret_macros::route_parameter_value;
 use margaret_macros::scheduled_with_tick_timer;
 use margaret_macros::service;
 use margaret_macros::singleton;
+use margaret_macros::trusts_oidc_issuer;
 use margaret_macros::websocket_message;
 use margaret_macros::websocket_session;
+
+use crate::catalog::Account;
+use crate::catalog::RequestInput;
+use crate::catalog::TICK_INTERVAL;
+use crate::catalog::TickBehavior;
 
 #[singleton]
 #[responds_to_http(method = Get, path = "/subject", server = "public")]
@@ -41,6 +66,11 @@ impl Subject {
     fn run(&self) -> String {
         self.name.clone()
     }
+
+    #[process]
+    fn search(&self, #[form_request(from = RequestInput::Query)] phrase: &str) -> String {
+        format!("{}?{phrase}", self.name)
+    }
 }
 
 #[provides_route_parameter]
@@ -50,6 +80,12 @@ struct Binder {
 
 #[provides_jwks_endpoint]
 struct JwksEndpoint;
+
+#[issues_tokens]
+struct TokenIssuer;
+
+#[trusts_oidc_issuer(partner)]
+struct PartnerIssuer;
 
 #[route_parameter_value]
 struct SubjectId(String);
@@ -61,13 +97,24 @@ impl Binder {
 }
 
 #[service]
-#[scheduled_with_tick_timer(interval = SomeInterval)]
+#[scheduled_with_tick_timer(interval = TICK_INTERVAL, behavior = TickBehavior::Delay)]
 struct Worker;
+
+#[infers_authenticated_user(user_model = Account)]
+struct AccountProvider;
+
+impl AccountProvider {
+    #[infer_from_request]
+    fn infer(&self, #[bearer_token(issuer = partner)] token: &str) -> String {
+        format!("verified {token}")
+    }
+}
 
 #[model(table = "records")]
 #[primary_key(columns = [id, label])]
 #[unique(columns = [label, id])]
 #[index(name = "records_label_id", columns = [label, id])]
+#[foreign_key(columns = [id], references = Account)]
 struct Record {
     #[column(name = "id")]
     id: String,
@@ -98,6 +145,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
 
     assert_eq!(subject.respond("path-id"), "typed-name/path-id");
     assert_eq!(subject.run(), "typed-name");
+    assert_eq!(subject.search("term"), "typed-name?term");
     assert_eq!(
         Binder {
             prefix: "bind-".to_string(),
@@ -108,7 +156,12 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
 
     assert_eq!(SubjectId("7".to_string()).0, "7");
     assert_eq!(size_of::<JwksEndpoint>(), 0);
+    assert_eq!(size_of::<TokenIssuer>(), 0);
+    assert_eq!(size_of::<PartnerIssuer>(), 0);
     assert_eq!(size_of::<Worker>(), 0);
+    assert_eq!(size_of_val(&AccountProvider), 0);
+    assert_eq!(AccountProvider.infer("bearer"), "verified bearer");
+    assert_eq!(size_of_val(&Account), 0);
 
     let record = Record {
         id: "the-id".to_string(),

@@ -12,6 +12,10 @@ pub enum RequestBinding {
         application: AuthenticatedUserApplication,
         requirement: AuthenticatedUserRequirement,
     },
+    BearerToken {
+        claims: CanonicalPath,
+        issuer_client: InjectedDependency,
+    },
     BoundRouteParameter {
         binder_field: String,
         binder_provider: CanonicalPath,

@@ -3,10 +3,12 @@ use std::net::SocketAddr;
 use http::HeaderName;
 use http::Method;
 use http::Version;
+use http::header::AUTHORIZATION;
 use http::header::HOST;
 use http::request::Parts;
 use http::uri::Authority;
 
+use crate::request_authorization::RequestAuthorization;
 use crate::request_headers::RequestHeaders;
 use crate::request_outcome::RequestOutcome;
 use crate::request_path::RequestPath;
@@ -47,6 +49,7 @@ fn reconcile_authority(
 }
 
 pub struct ServerParams {
+    authorization: RequestAuthorization,
     headers: RequestHeaders,
     method: Method,
     path: RequestPath,
@@ -82,6 +85,7 @@ impl ServerParams {
         };
 
         RequestOutcome::Parsed(Self {
+            authorization: RequestAuthorization::parse(headers.get(&AUTHORIZATION)),
             headers,
             method,
             path,
@@ -92,12 +96,18 @@ impl ServerParams {
 
     pub(crate) fn synthetic(method: Method, path: String) -> Self {
         Self {
+            authorization: RequestAuthorization::Absent,
             headers: RequestHeaders::empty(),
             method,
             path: RequestPath::from_decoded(path),
             query_string: String::new(),
             remote_addr: unspecified_addr(),
         }
+    }
+
+    #[must_use]
+    pub fn authorization(&self) -> &RequestAuthorization {
+        &self.authorization
     }
 
     #[must_use]
@@ -135,12 +145,15 @@ mod tests {
     use http::Request;
     use http::Version;
     use http::header::ACCEPT_ENCODING;
+    use http::header::AUTHORIZATION;
     use http::header::HOST;
     use http::request::Parts;
     use http::uri::Authority;
 
     use super::ServerParams;
     use super::unspecified_addr;
+    use crate::bearer_token::BearerToken;
+    use crate::request_authorization::RequestAuthorization;
     use crate::request_outcome::RequestOutcome;
     use crate::request_rejection::RequestRejection;
     use crate::singleton_request_header::SingletonRequestHeader;
@@ -214,6 +227,21 @@ mod tests {
         assert_eq!(
             parse(Version::HTTP_11, "/", Some("localhost")).query_string(),
             ""
+        );
+    }
+
+    #[test]
+    fn parses_the_authorization_once_with_the_request_head() {
+        let mut parts = parts_of(Version::HTTP_11, "/", Some("localhost"));
+        parts
+            .headers
+            .append(AUTHORIZATION, HeaderValue::from_static("Bearer abc"));
+
+        let server = outcome_of(parts).expect("the request head is unambiguous");
+
+        assert_eq!(
+            server.authorization(),
+            &RequestAuthorization::Bearer(BearerToken::new("abc".to_string()))
         );
     }
 

@@ -1,4 +1,5 @@
 use proc_macro2::TokenStream;
+use syn::File;
 
 use crate::generated_module::GeneratedModule;
 use crate::generated_module_error::GeneratedModuleError;
@@ -21,7 +22,7 @@ impl GeneratedModuleTokens {
     ///
     /// Returns `GeneratedModuleError::InvalidGeneratedFile`.
     pub fn format(self) -> Result<GeneratedModule, GeneratedModuleError> {
-        let file = syn::parse2::<syn::File>(self.tokens).map_err(|source| {
+        let file = syn::parse2::<File>(self.tokens).map_err(|source| {
             GeneratedModuleError::InvalidGeneratedFile {
                 name: self.name.clone(),
                 source,

@@ -21,9 +21,8 @@ fn roll_and_publish_restores_the_persisted_secret_across_a_restart() {
         .jwks_secret_holder()
         .get()
         .expect("the first start seeds the holder")
-        .current
-        .public
-        .kid
+        .current()
+        .kid()
         .clone();
 
     let after_restart = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
@@ -38,9 +37,8 @@ fn roll_and_publish_restores_the_persisted_secret_across_a_restart() {
         .jwks_secret_holder()
         .get()
         .expect("the restarted server seeds the holder")
-        .current
-        .public
-        .kid
+        .current()
+        .kid()
         .clone();
 
     assert_eq!(restored_kid, persisted_kid);

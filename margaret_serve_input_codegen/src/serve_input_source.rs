@@ -77,7 +77,7 @@ mod tests {
     fn reports_no_source_on_a_plain_dependency() {
         assert_eq!(
             declared_by(&[IndexedAttribute::new(
-                &parse_quote!(#[jwks_secret_store(server)])
+                &parse_quote!(#[route_parameter(from = "id")])
             )]),
             None
         );

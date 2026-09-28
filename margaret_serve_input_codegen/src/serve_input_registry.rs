@@ -101,12 +101,7 @@ mod tests {
     fn value(segments: &[&str]) -> InputValue {
         InputValue {
             required: true,
-            value_type: CanonicalPath::new(
-                segments
-                    .iter()
-                    .map(std::string::ToString::to_string)
-                    .collect(),
-            ),
+            value_type: CanonicalPath::new(segments.iter().map(ToString::to_string).collect()),
             weaving: WeavingKind::Cloned,
         }
     }

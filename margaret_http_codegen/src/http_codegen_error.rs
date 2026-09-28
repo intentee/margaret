@@ -1,3 +1,4 @@
+use http::method::InvalidMethod;
 use matchit::InsertError;
 use thiserror::Error;
 
@@ -56,7 +57,7 @@ pub enum HttpCodegenError {
     InvalidHttpMethod {
         responder: String,
         method: String,
-        source: http::method::InvalidMethod,
+        source: InvalidMethod,
     },
 
     #[error("responder '{responder}' is missing the 'path' argument")]

@@ -1,5 +1,6 @@
+use std::fs;
 use std::io::ErrorKind;
-use std::io::Result as IoResult;
+use std::io::Result;
 use std::path::Path;
 
 #[derive(Clone, Debug)]
@@ -29,18 +30,18 @@ impl GeneratedModule {
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
-    pub fn write_if_changed(&self, path: &Path) -> IoResult<bool> {
+    pub fn write_if_changed(&self, path: &Path) -> Result<bool> {
         if self.matches_existing(path)? {
             return Ok(false);
         }
 
-        std::fs::write(path, &self.source)?;
+        fs::write(path, &self.source)?;
 
         Ok(true)
     }
 
-    fn matches_existing(&self, path: &Path) -> IoResult<bool> {
-        match std::fs::read_to_string(path) {
+    fn matches_existing(&self, path: &Path) -> Result<bool> {
+        match fs::read_to_string(path) {
             Ok(existing) => Ok(existing == self.source),
             Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
             Err(error) => Err(error),

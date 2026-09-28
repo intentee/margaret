@@ -1,3 +1,4 @@
+use sqlx::Error;
 use sqlx::PgPool;
 use sqlx::query;
 use uuid::Uuid;
@@ -14,7 +15,7 @@ async fn insert_fragment_metadata(
     pool: &PgPool,
     hash: Vec<u8>,
     size_payload: i64,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), Error> {
     query(INSERT_FRAGMENT_METADATA)
         .bind(Uuid::new_v4())
         .bind(hash)
@@ -24,7 +25,7 @@ async fn insert_fragment_metadata(
         .map(|_| ())
 }
 
-fn sqlstate(error: &sqlx::Error) -> String {
+fn sqlstate(error: &Error) -> String {
     error
         .as_database_error()
         .expect("the rejection carries a database error")

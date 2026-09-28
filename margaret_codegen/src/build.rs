@@ -6,45 +6,71 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_console_codegen::console_plan::ConsolePlan;
+use margaret_console_codegen::render_console::render_console;
 use margaret_container::container_bindings::ContainerBindings;
-use margaret_container::container_error::ContainerError;
+use margaret_container::framework_construction::FrameworkConstruction;
+use margaret_container::framework_enablement::FrameworkEnablement;
+use margaret_container::framework_injection_role::FrameworkInjectionRole;
+use margaret_container::framework_provider::FrameworkProvider;
+use margaret_container::plan_container::plan_container;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_http_codegen::http_plan::HttpPlan;
+use margaret_http_codegen::http_server::HttpServer;
+use margaret_http_codegen::render_http::render_http;
+use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
+use margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers;
+use margaret_model_codegen::models::models;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
 use margaret_request_binding_codegen::views_availability::ViewsAvailability;
+use margaret_schema_codegen::render_schema::render_schema;
+use margaret_serve_input_codegen::scan::scan;
+use margaret_service_codegen::framework_service::FrameworkService;
+use margaret_service_codegen::render_services::render_services;
+use margaret_service_codegen::service_plan::ServicePlan;
+use margaret_tag_codegen::segmented_tag_binding::SegmentedTagBinding;
+use margaret_tag_codegen::tag_kind::TagKind;
 use margaret_tag_codegen::tag_pool::TagPool;
+use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
+use margaret_views_codegen::render_views::render_views;
+use margaret_views_codegen::views_plan::ViewsPlan;
+use margaret_websocket_codegen::render_websocket::render_websocket;
+use margaret_websocket_codegen::web_socket_plan::WebSocketPlan;
 
 use crate::asset_bag_modules::asset_bag_modules;
+use crate::asset_responder_canonical_path::asset_responder_canonical_path;
 use crate::build_jwks_artifacts::build_jwks_artifacts;
+use crate::build_oidc_artifacts::build_oidc_artifacts;
 use crate::codegen_error::CodegenError;
 use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
 use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
+use crate::jwks_framework_providers::jwks_framework_providers;
+use crate::jwks_secret_storage_provider::jwks_secret_storage_provider;
+use crate::oidc_framework_providers::oidc_framework_providers;
 use crate::serve_inputs::serve_inputs;
 use crate::umbrella::umbrella;
-use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
 /// # Errors
 ///
 /// Returns `CodegenError` propagated from the work it performs.
 fn framework_providers(
-    client_bindings: &[margaret_tag_codegen::jwks_client_binding::JwksClientBinding],
-) -> Vec<margaret_container::framework_provider::FrameworkProvider> {
+    client_bindings: &[SegmentedTagBinding],
+    issuer_bindings: &[SegmentedTagBinding],
+) -> Vec<FrameworkProvider> {
     let mut framework_providers = vec![
-        margaret_container::framework_provider::FrameworkProvider {
-            construction: margaret_container::framework_construction::FrameworkConstruction::Unit,
-            enablement:
-                margaret_container::framework_enablement::FrameworkEnablement::WhenReferenced,
-            injection:
-                margaret_container::framework_injection_role::FrameworkInjectionRole::Unmarked,
-            provided: crate::asset_responder_canonical_path::asset_responder_canonical_path(),
+        FrameworkProvider {
+            construction: FrameworkConstruction::Unit,
+            enablement: FrameworkEnablement::WhenReferenced,
+            injection: FrameworkInjectionRole::Unmarked,
+            provided: asset_responder_canonical_path(),
         },
-        crate::jwks_secret_storage_provider::jwks_secret_storage_provider(),
+        jwks_secret_storage_provider(),
     ];
-    framework_providers.extend(crate::jwks_framework_providers::jwks_framework_providers(
-        client_bindings,
-    ));
+    framework_providers.extend(jwks_framework_providers(client_bindings));
+    framework_providers.extend(oidc_framework_providers(issuer_bindings));
 
     framework_providers
 }
@@ -52,7 +78,7 @@ fn framework_providers(
 struct ServingModules {
     http_roots: Vec<CanonicalPath>,
     modules: Vec<GeneratedModuleTokens>,
-    servers: Vec<margaret_http_codegen::http_server::HttpServer>,
+    servers: Vec<HttpServer>,
     view_roots: Vec<CanonicalPath>,
     websocket_roots: Vec<CanonicalPath>,
 }
@@ -61,20 +87,14 @@ fn render_serving_modules(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
-    middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+    middleware_plans: &MiddlewarePlans,
     registries: &BindingRegistries,
 ) -> Result<ServingModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
     let (websocket_roots, websocket_servers) = if features.contains(GeneratedFeature::Websockets) {
-        let plan = margaret_websocket_codegen::web_socket_plan::WebSocketPlan::build(
-            index,
-            bindings,
-            middleware_plans,
-            registries,
-        )?;
-        let artifacts =
-            margaret_websocket_codegen::render_websocket::render_websocket(plan, bindings);
+        let plan = WebSocketPlan::build(index, bindings, middleware_plans, registries)?;
+        let artifacts = render_websocket(plan, bindings);
         modules.extend(artifacts.modules);
 
         (artifacts.retained_roots, artifacts.servers)
@@ -83,8 +103,8 @@ fn render_serving_modules(
     };
 
     let view_roots = if features.contains(GeneratedFeature::Views) {
-        let plan = margaret_views_codegen::views_plan::ViewsPlan::build(index, bindings)?;
-        let artifacts = margaret_views_codegen::render_views::render_views(plan, bindings);
+        let plan = ViewsPlan::build(index, bindings)?;
+        let artifacts = render_views(plan, bindings);
         modules.extend(artifacts.modules);
 
         artifacts.retained_roots
@@ -95,7 +115,7 @@ fn render_serving_modules(
     let (http_roots, servers) = if features.contains(GeneratedFeature::Http)
         || features.contains(GeneratedFeature::Websockets)
     {
-        let plan = margaret_http_codegen::http_plan::HttpPlan::build(
+        let plan = HttpPlan::build(
             index,
             features.contains(GeneratedFeature::Views),
             &websocket_servers,
@@ -103,7 +123,7 @@ fn render_serving_modules(
             bindings,
             registries,
         )?;
-        let artifacts = margaret_http_codegen::render_http::render_http(plan, bindings);
+        let artifacts = render_http(plan, bindings);
         modules.extend(artifacts.modules);
 
         (artifacts.retained_roots, artifacts.servers)
@@ -130,22 +150,17 @@ fn render_role_modules(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
-    jwks_services: &[margaret_service_codegen::framework_service::FrameworkService],
-    servers: &[margaret_http_codegen::http_server::HttpServer],
+    framework_services: &[FrameworkService],
+    servers: &[HttpServer],
 ) -> Result<RoleModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
     let serve_inputs = serve_inputs(bindings);
-    let service_plan = margaret_service_codegen::service_plan::ServicePlan::build(
-        index,
-        jwks_services,
-        bindings,
-        &serve_inputs,
-    )?;
+    let service_plan = ServicePlan::build(index, framework_services, bindings, &serve_inputs)?;
     let service_roots = service_plan.roots().to_vec();
 
     if features.contains(GeneratedFeature::Serves) {
-        modules.push(margaret_service_codegen::render_services::render_services(
+        modules.push(render_services(
             &service_plan,
             servers,
             features.contains(GeneratedFeature::Views),
@@ -154,15 +169,13 @@ fn render_role_modules(
     }
 
     if features.contains(GeneratedFeature::Models) {
-        let models = margaret_model_codegen::models::models(index)?;
-        modules.push(margaret_schema_codegen::render_schema::render_schema(
-            &models,
-        ));
+        let models = models(index)?;
+        modules.push(render_schema(&models));
     }
 
     let console_roots = if features.contains(GeneratedFeature::Console) {
-        let plan = margaret_console_codegen::console_plan::ConsolePlan::build(index, bindings)?;
-        let console = margaret_console_codegen::render_console::render_console(
+        let plan = ConsolePlan::build(index, bindings)?;
+        let console = render_console(
             &plan,
             features.contains(GeneratedFeature::Serves),
             features.contains(GeneratedFeature::Models),
@@ -198,38 +211,40 @@ pub fn build(
         .index_crate(crate_root)?
         .build();
     let mut features = GeneratedFeatures::from_index(&index);
-    let registry = margaret_serve_input_codegen::scan::scan(&index)?;
-    let client_bindings = TagPool::collect(&index)
-        .map_err(ContainerError::from)?
-        .jwks_client_bindings();
-    let framework_providers = framework_providers(&client_bindings);
-    let planned_container = margaret_container::plan_container::plan_container(
-        &index,
-        &registry,
-        &framework_providers,
-    )?;
+    let registry = scan(&index)?;
+    let tags = TagPool::collect(&index)?;
+    let client_bindings = tags.segmented_bindings(TagKind::JwksClient);
+    let issuer_bindings = tags.segmented_bindings(TagKind::OidcIssuer);
+    let framework_providers = framework_providers(&client_bindings, &issuer_bindings);
+    let planned_container = plan_container(&index, &registry, &framework_providers)?;
     let bindings = planned_container.bindings();
     let application_roots = planned_container.roots();
-    features.enable_if(GeneratedFeature::AssetBag, metafile_contents.is_some());
     let mut module_tokens = asset_bag_modules(
+        &index,
         metafile_contents,
         bindings,
         assets_directory,
         embed_relative,
     )?;
+    features.enable_if(GeneratedFeature::AssetBag, !module_tokens.is_empty());
     let jwks = build_jwks_artifacts(bindings, &client_bindings);
+    let oidc = build_oidc_artifacts(bindings, &issuer_bindings);
 
     features.enable_if(GeneratedFeature::Jwks, jwks.enabled);
+    features.enable_if(GeneratedFeature::Oidc, oidc.enabled);
     module_tokens.extend(jwks.modules);
+    module_tokens.extend(oidc.modules);
 
-    let jwks_services = jwks.services;
+    let mut framework_services = jwks.services;
+
+    framework_services.extend(oidc.services);
 
     let views_availability = if features.contains(GeneratedFeature::Views) {
         ViewsAvailability::Available
     } else {
         ViewsAvailability::Unavailable
     };
-    let registries = BindingRegistries::collect(&index, views_availability)?;
+    let registries = BindingRegistries::collect(&index, views_availability, &tags, bindings)?;
     if features.contains(GeneratedFeature::AuthenticatedUsers)
         && (features.contains(GeneratedFeature::Http)
             || features.contains(GeneratedFeature::Websockets))
@@ -237,17 +252,12 @@ pub fn build(
         module_tokens.extend(render_authenticated_user_wrappers(&registries.providers()));
     }
 
-    let middleware_plans =
-        margaret_middleware_codegen::middleware_plans::middleware_plans(&index, &registries)?;
+    let middleware_plans = MiddlewarePlans::collect(&index, &registries, &tags)?;
     if features.contains(GeneratedFeature::Middleware)
         && (features.contains(GeneratedFeature::Http)
             || features.contains(GeneratedFeature::Websockets))
     {
-        module_tokens.extend(
-            margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers(
-                &middleware_plans,
-            ),
-        );
+        module_tokens.extend(render_middleware_wrappers(&middleware_plans.plans));
     }
 
     let ServingModules {
@@ -264,7 +274,7 @@ pub fn build(
         console_roots,
         modules: role_modules,
         service_roots,
-    } = render_role_modules(&index, bindings, &features, &jwks_services, &servers)?;
+    } = render_role_modules(&index, bindings, &features, &framework_services, &servers)?;
 
     module_tokens.extend(role_modules);
 
@@ -294,17 +304,16 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use tempfile::TempDir;
-    use tempfile::tempdir;
-
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::source_crate::SourceCrate;
+    use margaret_generated_module::generated_module::GeneratedModule;
     use margaret_http_codegen::http_codegen_error::HttpCodegenError;
+    use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
     use super::build;
     use crate::codegen_error::CodegenError;
     use crate::generated_code::GeneratedCode;
-    use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
     const WEB_CRATE: &str = "\
 #[rustfmt::skip]
@@ -400,30 +409,15 @@ pub mod margaret;
 struct Room;
 ";
 
-    fn write_lib(directory: &TempDir, lib_source: &str) {
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir_all(&source_directory).expect("the src directory exists");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-    }
-
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-
-        write_lib(&directory, lib_source);
-
-        directory
-    }
-
     const EMBED_RELATIVE: &str = ".";
 
     fn generate(lib_source: &str) -> Result<GeneratedCode, CodegenError> {
-        let directory = crate_with(lib_source);
+        let source_crate = SourceCrate::new(lib_source);
 
         build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             None,
-            &directory.path().join("assets"),
+            &source_crate.root().join("assets"),
             EMBED_RELATIVE,
         )
     }
@@ -453,7 +447,7 @@ struct Room;
     fn concatenated(code: &GeneratedCode) -> String {
         code.modules()
             .iter()
-            .map(margaret_generated_module::generated_module::GeneratedModule::source)
+            .map(GeneratedModule::source)
             .collect::<Vec<&str>>()
             .join("\n")
     }
@@ -485,13 +479,41 @@ struct Room;
     }
 
     #[test]
-    fn generates_the_asset_bag_module_when_a_metafile_is_present() {
-        let directory = crate_with(PLAIN_CRATE);
+    fn omits_the_asset_macro_of_a_crate_that_never_imports_it() {
+        let source_crate = SourceCrate::new(PLAIN_CRATE);
 
         let code = build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
-            &directory.path().join("assets"),
+            &source_crate.root().join("assets"),
+            EMBED_RELATIVE,
+        )
+        .expect("the build succeeds");
+
+        assert!(!module(&code, "mod").contains("pub mod asset_bag;"));
+        assert!(!has_module(&code, "asset_bag"));
+    }
+
+    const ASSET_MACRO_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+mod views {
+    use crate::margaret::asset_bag::asset;
+}
+
+#[singleton]
+struct Config;
+";
+
+    #[test]
+    fn generates_the_asset_macro_a_module_imports() {
+        let source_crate = SourceCrate::new(ASSET_MACRO_CRATE);
+
+        let code = build(
+            &CrateRoot::new("crate", source_crate.source_directory()),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
+            &source_crate.root().join("assets"),
             EMBED_RELATIVE,
         )
         .expect("the build succeeds");
@@ -521,8 +543,8 @@ impl AssetRoute {
 
     #[test]
     fn generates_the_asset_responder_when_a_constructor_injects_it() {
-        let directory = crate_with(ASSET_RESPONDER_CRATE);
-        let assets = directory.path().join("assets");
+        let source_crate = SourceCrate::new(ASSET_RESPONDER_CRATE);
+        let assets = source_crate.root().join("assets");
         fs::create_dir(&assets).expect("the assets directory exists");
         fs::write(assets.join("app_ABC.js"), "console.log(1)")
             .expect("the fingerprinted asset exists");
@@ -533,7 +555,7 @@ impl AssetRoute {
         .expect("the un-fingerprinted asset exists");
 
         let code = build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &assets,
             EMBED_RELATIVE,
@@ -555,13 +577,37 @@ impl AssetRoute {
     }
 
     #[test]
+    fn generates_the_asset_macro_beside_the_injected_responder() {
+        let source_crate = SourceCrate::new(&format!(
+            "{ASSET_RESPONDER_CRATE}\nmod views {{\n    use crate::margaret::asset_bag::asset;\n}}\n"
+        ));
+        let assets = source_crate.root().join("assets");
+        fs::create_dir(&assets).expect("the assets directory exists");
+        fs::write(assets.join("app_ABC.js"), "console.log(1)")
+            .expect("the fingerprinted asset exists");
+
+        let code = build(
+            &CrateRoot::new("crate", source_crate.source_directory()),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
+            &assets,
+            EMBED_RELATIVE,
+        )
+        .expect("the build succeeds");
+        let asset_bag = module(&code, "asset_bag");
+
+        assert!(asset_bag.contains("pub mod asset_responder;"));
+        assert!(asset_bag.contains("macro_rules! asset"));
+        assert!(has_module(&code, "asset_bag/asset_responder"));
+    }
+
+    #[test]
     fn reports_a_missing_asset_directory_when_the_responder_is_injected() {
-        let directory = crate_with(ASSET_RESPONDER_CRATE);
+        let source_crate = SourceCrate::new(ASSET_RESPONDER_CRATE);
 
         let message = build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
-            &directory.path().join("assets"),
+            &source_crate.root().join("assets"),
             EMBED_RELATIVE,
         )
         .expect_err("a missing asset directory is rejected")
@@ -588,13 +634,23 @@ impl AssetRoute {
     }
 
     #[test]
+    fn reports_an_imported_asset_macro_without_a_metafile() {
+        assert_eq!(
+            generate(ASSET_MACRO_CRATE)
+                .expect_err("an imported asset macro without a metafile is rejected")
+                .to_string(),
+            "a module imports the asset macro, but no esbuild metafile was found at the workspace root"
+        );
+    }
+
+    #[test]
     fn propagates_an_asset_bag_failure() {
-        let directory = crate_with(PLAIN_CRATE);
+        let source_crate = SourceCrate::new(ASSET_MACRO_CRATE);
 
         let message = build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{ "outputs": {} }"#),
-            &directory.path().join("assets"),
+            &source_crate.root().join("assets"),
             EMBED_RELATIVE,
         )
         .expect_err("an invalid metafile is rejected")
@@ -627,6 +683,7 @@ impl GetJwks {
 pub mod margaret;
 
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -634,26 +691,21 @@ struct AuthJwksEndpoint;
 
 impl ProvidesEndpoint for AuthJwksEndpoint {}
 
+impl DeclaresTokenTrust for AuthJwksEndpoint {}
+
 #[singleton]
 #[provides_jwks_endpoint(partner)]
 struct PartnerJwksEndpoint;
 
 impl ProvidesEndpoint for PartnerJwksEndpoint {}
 
+impl DeclaresTokenTrust for PartnerJwksEndpoint {}
+
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
-struct GetVerify {
-    auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
-    partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
-}
+struct GetVerify;
 
 impl GetVerify {
-    #[constructor]
-    fn create(
-        #[jwks_secret_store(client = auth)] auth: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
-        #[jwks_secret_store(client = partner)] partner: std::sync::Arc<crate::margaret::jwks::partner_jwks_endpoint::PublicJwksVerifier>,
-    ) -> anyhow::Result<Self> {}
-
     #[process]
     fn respond(&self) -> anyhow::Result<Response> {}
 }
@@ -662,6 +714,14 @@ impl GetVerify {
     const JWKS_SERVER_STORE_CRATE: &str = "\
 #[rustfmt::skip]
 pub mod margaret;
+
+use margaret::framework::token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+
+#[singleton]
+#[issues_tokens]
+struct Issuer;
+
+impl DeclaresTokenIssuance for Issuer {}
 
 #[singleton]
 #[responds_to_http(method = \"post\", path = \"/mint\", server = \"internal\")]
@@ -674,7 +734,7 @@ impl PostMint {
     #[constructor]
     fn create(
         minter: std::sync::Arc<crate::margaret::jwks::MintAccessTokenHandler>,
-        #[jwks_secret_store(server)] store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>,
+        store: std::sync::Arc<crate::margaret::jwks::JwksSecretStore>,
     ) -> anyhow::Result<Self> {}
 
     #[process]
@@ -717,7 +777,7 @@ impl Worker {
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
         assert!(serve.contains(
-            "margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
+            "iflet::std::result::Result::Err(error)=margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider(){returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(serve.contains(
             "letspiffe_bundle=margaret::framework::spiffe_svid_client::svid_client_bundle::SvidClientBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
@@ -944,7 +1004,6 @@ impl GetIdentity {
         assert!(serve.contains(
             "margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL"
         ));
-        assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
 
     #[test]
@@ -958,12 +1017,10 @@ impl GetIdentity {
             module(&code, "jwks/auth_jwks_endpoint")
                 .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;")
         );
-        assert!(module(&code, "jwks/auth_jwks_endpoint").contains(
-            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
-        ));
-        assert!(module(&code, "jwks/partner_jwks_endpoint").contains(
-            "pub use margaret::framework::jwks_client::public_jwks_verifier::PublicJwksVerifier;"
-        ));
+        assert!(
+            module(&code, "jwks/partner_jwks_endpoint")
+                .contains("pub use margaret::framework::jwks_client::jwks_client::JwksClient;")
+        );
 
         let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
@@ -1001,16 +1058,177 @@ impl GetIdentity {
         let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
-        assert!(construction.contains(".server_secret_store()"));
+        assert!(construction.contains("crate::margaret::jwks::JwksSecretStore::create("));
+        assert!(construction.contains("::std::sync::Arc::<crate::Issuer>::clone(&issuer)"));
         assert!(construction.contains("crate::margaret::jwks::MintAccessTokenHandler::create("));
-        assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
 
-    const JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE: &str = "\
+    const OIDC_ISSUERS_CRATE: &str = "\
 #[rustfmt::skip]
 pub mod margaret;
 
+mod first {
+    use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+    #[singleton]
+    #[trusts_oidc_issuer(first)]
+    pub struct Issuer;
+
+    impl DeclaresTokenTrust for Issuer {}
+}
+
+mod second {
+    use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+    #[singleton]
+    #[trusts_oidc_issuer(second)]
+    pub struct Issuer;
+
+    impl DeclaresTokenTrust for Issuer {}
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+struct Page;
+
+impl Page {
+    #[process]
+    fn respond(&self) -> anyhow::Result<Response> {}
+}
+";
+
+    #[test]
+    fn generates_an_oidc_client_per_trusted_issuer() {
+        let code = generate(OIDC_ISSUERS_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod oidc;"));
+        assert!(module(&code, "oidc").contains("pub mod first_issuer;"));
+        assert!(module(&code, "oidc").contains("pub mod second_issuer;"));
+        assert!(
+            module(&code, "oidc/first_issuer")
+                .contains("pub use margaret::framework::oidc_client::oidc_client::OidcClient;")
+        );
+    }
+
+    #[test]
+    fn constructs_each_oidc_client_from_its_issuer() {
+        let code = generate(OIDC_ISSUERS_CRATE).expect("the build succeeds");
+        let construction: String = module(&code, "container/build/serve")
+            .split_whitespace()
+            .collect();
+
+        assert!(construction.contains(
+            "crate::margaret::oidc::first_issuer::OidcClient::create(::std::sync::Arc::<crate::first::Issuer>::clone(&first_issuer),)"
+        ));
+        assert!(construction.contains(
+            "crate::margaret::oidc::second_issuer::OidcClient::create(::std::sync::Arc::<crate::second::Issuer>::clone(&second_issuer),)"
+        ));
+    }
+
+    #[test]
+    fn runs_each_oidc_client_as_a_service() {
+        let code = generate(OIDC_ISSUERS_CRATE).expect("the build succeeds");
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+
+        assert!(serve.contains("impltrzcina::ServiceforMargaretOidcFirstIssuerOidcClient"));
+        assert!(serve.contains("impltrzcina::ServiceforMargaretOidcSecondIssuerOidcClient"));
+    }
+
+    const OIDC_BEARER_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+#[singleton]
+#[trusts_oidc_issuer(partner)]
+struct Issuer;
+
+impl DeclaresTokenTrust for Issuer {}
+
+struct Claims;
+
+struct Runner;
+
+#[singleton]
+#[infers_authenticated_user(user_model = Runner)]
+struct RunnerProvider;
+
+impl RunnerProvider {
+    #[infer_from_request]
+    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<VerifiedJwt<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<Runner>> {}
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/runner\", server = \"public\")]
+struct RunnerPage;
+
+impl RunnerPage {
+    #[process]
+    fn respond(&self, #[authenticated_user] runner: Runner) -> anyhow::Result<Response> {}
+}
+";
+
+    #[test]
+    fn hands_the_wrapper_of_a_bearer_route_the_verifier_of_its_issuer() {
+        let code = generate(OIDC_BEARER_CRATE).expect("the build succeeds");
+        let server: String = module(&code, "http/server_public")
+            .split_whitespace()
+            .collect();
+
+        assert!(server.contains(
+            "bearer_token_verifier:container.margaret_oidc_issuer_oidc_client().verifier(),"
+        ));
+        assert!(server.contains(
+            "margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user("
+        ));
+        assert!(
+            module(&code, "container").contains("pub(crate) fn margaret_oidc_issuer_oidc_client(")
+        );
+    }
+
+    #[test]
+    fn rejects_the_oidc_client_injected_by_path() {
+        let error = generate(
+            "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+#[singleton]
+#[trusts_oidc_issuer(partner)]
+struct Issuer;
+
+impl DeclaresTokenTrust for Issuer {}
+
+#[singleton]
+struct Consumer {
+    client: std::sync::Arc<crate::margaret::oidc::issuer::OidcClient>,
+}
+
+impl Consumer {
+    #[constructor]
+    fn create(client: std::sync::Arc<crate::margaret::oidc::issuer::OidcClient>) -> anyhow::Result<Self> {}
+}
+",
+        )
+        .expect_err("the client is framework-only")
+        .to_string();
+
+        assert!(error.contains("which only the framework may inject"));
+    }
+
+    const JWKS_BEARER_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -1023,36 +1241,77 @@ impl AuthJwksEndpoint {
 
 impl ProvidesEndpoint for AuthJwksEndpoint {}
 
+impl DeclaresTokenTrust for AuthJwksEndpoint {}
+
+struct Claims;
+
+struct Holder;
+
 #[singleton]
-#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
-struct GetVerify {
-    verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>,
+#[infers_authenticated_user(user_model = Holder)]
+struct HolderProvider;
+
+impl HolderProvider {
+    #[infer_from_request]
+    fn infer(&self, #[bearer_token(issuer = auth)] token: Option<VerifiedJwt<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<Holder>> {}
 }
 
-impl GetVerify {
-    #[constructor]
-    fn create(#[jwks_secret_store(client = auth)] verifier: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::PublicJwksVerifier>) -> anyhow::Result<Self> {}
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/holder\", server = \"public\")]
+struct HolderPage;
 
+impl HolderPage {
     #[process]
-    fn respond(&self) -> anyhow::Result<Response> {}
+    fn respond(&self, #[authenticated_user] holder: Holder) -> anyhow::Result<Response> {}
 }
 ";
 
     #[test]
-    fn weaves_a_serve_input_from_the_jwks_endpoint_through_the_verifier_accessor() {
-        let code = generate(JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE).expect("the build succeeds");
-
-        let construction: String = module(&code, "container/build/serve")
+    fn hands_the_wrapper_of_a_bearer_route_the_verifier_of_its_jwks_endpoint() {
+        let code = generate(JWKS_BEARER_CRATE).expect("the build succeeds");
+        let server: String = module(&code, "http/server_public")
             .split_whitespace()
             .collect();
-        assert!(construction.contains(".verifier()"));
-        assert!(!construction.contains(".await?.verifier()"));
-        assert!(
-            construction.contains("crate::margaret::jwks::auth_jwks_endpoint::JwksClient::create(")
-        );
 
-        let run = module(&code, "run");
-        assert!(run.contains(r#"clap::Arg::new("issuer-url")"#));
+        assert!(server.contains(
+            "bearer_token_verifier:container.margaret_jwks_auth_jwks_endpoint_jwks_client().verifier(),"
+        ));
+        assert!(module(&code, "run").contains(r#"clap::Arg::new("issuer-url")"#));
+    }
+
+    #[test]
+    fn rejects_the_jwks_client_injected_by_path() {
+        let error = generate(
+            "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+#[singleton]
+#[provides_jwks_endpoint(auth)]
+struct AuthJwksEndpoint;
+
+impl ProvidesEndpoint for AuthJwksEndpoint {}
+
+impl DeclaresTokenTrust for AuthJwksEndpoint {}
+
+#[singleton]
+struct Consumer {
+    client: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::JwksClient>,
+}
+
+impl Consumer {
+    #[constructor]
+    fn create(client: std::sync::Arc<crate::margaret::jwks::auth_jwks_endpoint::JwksClient>) -> anyhow::Result<Self> {}
+}
+",
+        )
+        .expect_err("the client is framework-only")
+        .to_string();
+
+        assert!(error.contains("which only the framework may inject"));
     }
 
     const JWKS_NAME_COLLISION_CRATE: &str = "\
@@ -1137,14 +1396,15 @@ impl GetJwks {
     }
 
     #[test]
-    fn rejects_a_client_store_referencing_an_unknown_tag() {
-        let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]\nstruct GetVerify {\n    verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>,\n}\n\nimpl GetVerify {\n    #[constructor]\n    fn create(#[jwks_secret_store(client = missing)] verifier: std::sync::Arc<crate::margaret::jwks::missing::PublicJwksVerifier>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
-        )
-        .expect_err("a client store without a matching jwks endpoint is rejected")
+    fn rejects_a_bearer_token_referencing_an_unknown_issuer() {
+        let message = generate(&JWKS_BEARER_CRATE.replace(
+            "#[bearer_token(issuer = auth)]",
+            "#[bearer_token(issuer = missing)]",
+        ))
+        .expect_err("a bearer token without a matching token issuer is rejected")
         .to_string();
 
-        assert!(message.contains("client 'missing'"));
+        assert!(message.contains("references the tag 'missing', which no token issuer declares"));
     }
 
     const JWKS_DUPLICATE_ENDPOINT_TAG_CRATE: &str = "\
@@ -1152,6 +1412,7 @@ impl GetJwks {
 pub mod margaret;
 
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -1159,11 +1420,15 @@ struct FirstEndpoint;
 
 impl ProvidesEndpoint for FirstEndpoint {}
 
+impl DeclaresTokenTrust for FirstEndpoint {}
+
 #[singleton]
 #[provides_jwks_endpoint(auth)]
 struct SecondEndpoint;
 
 impl ProvidesEndpoint for SecondEndpoint {}
+
+impl DeclaresTokenTrust for SecondEndpoint {}
 ";
 
     #[test]
@@ -1403,19 +1668,17 @@ impl RequestLog {
 
     #[test]
     fn removes_the_server_when_responders_are_removed() {
-        let directory = crate_with(WEB_CRATE);
-        let source = directory.path().join("src");
-        let generated = directory.path().join(UMBRELLA_MODULE_NAME);
+        let web_crate = SourceCrate::new(WEB_CRATE);
+        let plain_crate = SourceCrate::new(PLAIN_CRATE);
+        let generated = web_crate.root().join(UMBRELLA_MODULE_NAME);
 
-        generate_from_source(&source)
+        generate_from_source(&web_crate.source_directory())
             .write_to(&generated)
             .expect("the first sources are written");
 
         assert!(generated.join("http.rs").exists());
 
-        write_lib(&directory, PLAIN_CRATE);
-
-        generate_from_source(&source)
+        generate_from_source(&plain_crate.source_directory())
             .write_to(&generated)
             .expect("the second sources are written");
 
@@ -1432,8 +1695,8 @@ impl RequestLog {
 
     #[test]
     fn is_idempotent() {
-        let directory = crate_with(WEB_CRATE);
-        let source = directory.path().join("src");
+        let source_crate = SourceCrate::new(WEB_CRATE);
+        let source = source_crate.source_directory();
 
         let first = generate_from_source(&source);
         let second = generate_from_source(&source);
@@ -1655,7 +1918,7 @@ impl RespondsToWebSocketMessage for Chatter {
     #[test]
     fn propagates_a_dependency_cycle_failure() {
         let message = generate(
-            "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\nstruct A;\n\nimpl A {\n    #[constructor]\n    fn create(b: Arc<B>) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct B;\n\nimpl B {\n    #[constructor]\n    fn create(a: Arc<A>) -> anyhow::Result<Self> {}\n}\n",
+            "#[rustfmt::skip]\npub mod margaret;\n\nuse std::sync::Arc;\n\n#[singleton]\nstruct A;\n\nimpl A {\n    #[constructor]\n    fn create(b: Arc<B>) -> anyhow::Result<Self> {}\n}\n\n#[singleton]\nstruct B;\n\nimpl B {\n    #[constructor]\n    fn create(a: Arc<A>) -> anyhow::Result<Self> {}\n}\n",
         )
         .expect_err("the build fails")
         .to_string();

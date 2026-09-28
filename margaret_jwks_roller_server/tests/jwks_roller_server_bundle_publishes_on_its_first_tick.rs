@@ -43,5 +43,5 @@ async fn jwks_roller_server_bundle_publishes_on_its_first_tick() {
 
     let published = jwks_secret_holder.get().expect("the first tick published");
 
-    assert_ne!(published.next.public.kid, published.current.public.kid);
+    assert_ne!(published.next().kid(), published.current().kid());
 }

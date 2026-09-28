@@ -1,0 +1,22 @@
+[package]
+name = "margaret_jws_verification_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+aws-lc-rs = { workspace = true, features = ["ring-io"] }
+base64ct = { workspace = true }
+margaret_jose_parameters = { workspace = true }
+margaret_jws_verification = { workspace = true }
+p256 = { workspace = true }
+p384 = { workspace = true }
+serde_json = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

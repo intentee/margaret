@@ -1,5 +1,6 @@
 use syn::Attribute;
 use syn::FnArg;
+use syn::Path;
 use syn::Signature;
 
 use crate::canonical_path::CanonicalPath;
@@ -52,9 +53,9 @@ impl ScannedMethod {
 
     pub(crate) fn resolve(
         self,
-        resolve: impl Copy + Fn(&[String], &syn::Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&[String], &Path) -> CanonicalPath,
     ) -> IndexedMethod {
-        let resolve_path = |path: &syn::Path| resolve(&self.module_path, path);
+        let resolve_path = |path: &Path| resolve(&self.module_path, path);
 
         IndexedMethod::from_parts(
             ScannedAttribute::resolve_all(self.attributes, resolve_path),

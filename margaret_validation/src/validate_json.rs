@@ -18,14 +18,16 @@ where
 
 #[cfg(test)]
 mod tests {
+    use serde::Deserialize;
     use serde_json::Value;
     use serde_json::json;
+    use validator::Validate;
 
     use super::validate_json;
     use crate::malformation::Malformation;
     use crate::validation_result::ValidationResult;
 
-    #[derive(Debug, serde::Deserialize, validator::Validate)]
+    #[derive(Debug, Deserialize, Validate)]
     struct Sample {
         #[validate(length(min = 1))]
         required: String,

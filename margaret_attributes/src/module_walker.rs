@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -27,7 +28,7 @@ use crate::indexed_variant::IndexedVariant;
 use crate::item_kind::ItemKind;
 use crate::item_paths::ItemPaths;
 use crate::module_imports::ModuleImports;
-use crate::resolve_type::resolve_type;
+use crate::path_resolver::PathResolver;
 use crate::scanned_field::ScannedField;
 use crate::scanned_item::ScannedItem;
 use crate::scanned_method::ScannedMethod;
@@ -178,11 +179,11 @@ impl ModuleWalker {
             seen_paths: _,
         } = self;
 
-        let item_paths: ItemPaths = items
+        let definitions: ItemPaths = items
             .iter()
             .map(|item| item.canonical_path().clone())
             .collect();
-        let empty_imports = ModuleImports::default();
+        let resolver = PathResolver::new(definitions, imports);
 
         for PendingMember {
             kind,
@@ -190,11 +191,7 @@ impl ModuleWalker {
             self_type,
         } in pending_members
         {
-            let module = CanonicalPath::new(module_path.clone());
-            let module_imports = imports.get(&module).unwrap_or(&empty_imports);
-            let Some(self_type_path) =
-                resolve_type(&self_type, &module_path, module_imports, &item_paths)
-            else {
+            let Some(self_type_path) = resolver.resolve_type(&module_path, &self_type) else {
                 continue;
             };
             let Some(item) = items
@@ -227,19 +224,7 @@ impl ModuleWalker {
             .into_iter()
             .map(|item| {
                 item.resolve(|module_path, path| {
-                    let module = CanonicalPath::new(module_path.to_vec());
-                    let module_imports = imports.get(&module).unwrap_or(&empty_imports);
-
-                    resolve_type(
-                        &Type::Path(syn::TypePath {
-                            qself: None,
-                            path: path.clone(),
-                        }),
-                        module_path,
-                        module_imports,
-                        &item_paths,
-                    )
-                    .unwrap_or_else(|| {
+                    resolver.resolve_path(module_path, path).unwrap_or_else(|| {
                         CanonicalPath::new(
                             path.segments
                                 .iter()
@@ -251,7 +236,7 @@ impl ModuleWalker {
             })
             .collect::<Result<Vec<IndexedItem>, AttributeError>>()?;
 
-        Ok(WalkOutput { imports, items })
+        Ok(WalkOutput { items, resolver })
     }
 
     fn record(
@@ -296,7 +281,7 @@ impl ModuleWalker {
         module_path: &[String],
         directory: &Path,
     ) -> Result<(), AttributeError> {
-        let source = match std::fs::read_to_string(file_path) {
+        let source = match fs::read_to_string(file_path) {
             Ok(source) => source,
             Err(source) => {
                 return Err(AttributeError::FileRead {

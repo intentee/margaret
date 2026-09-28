@@ -34,13 +34,15 @@ pub(crate) fn construction_flow<'plan>(
 mod tests {
     use std::collections::BTreeSet;
 
+    use margaret_attributes::canonical_path::CanonicalPath;
+
     use super::construction_flow;
     use crate::container_plan::ContainerPlan;
     use crate::dependency_kind::DependencyKind;
     use crate::direct_construction::DirectConstruction;
+    use crate::framework_injection_role::FrameworkInjectionRole;
     use crate::provided_type::ProvidedType;
     use crate::provider::Provider;
-    use margaret_attributes::canonical_path::CanonicalPath;
 
     fn path(name: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
@@ -62,6 +64,7 @@ mod tests {
                 method: "create".to_string(),
             },
             field_name: name.to_lowercase(),
+            injection: FrameworkInjectionRole::Unmarked,
             provided: ProvidedType::Concrete(concrete_path),
             type_name: name.to_string(),
         }

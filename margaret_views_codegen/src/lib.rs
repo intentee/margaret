@@ -11,42 +11,18 @@ mod views;
 
 #[cfg(test)]
 mod tests {
-    use crate::views_codegen_error::ViewsCodegenError;
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
-    use std::fs;
-
-    use tempfile::TempDir;
-    use tempfile::tempdir;
-
     use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
     use margaret_serve_input_codegen::scan::scan;
 
     use crate::render_views::render_views;
     use crate::views_artifacts::ViewsArtifacts;
+    use crate::views_codegen_error::ViewsCodegenError;
     use crate::views_plan::ViewsPlan;
-
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        directory
-    }
-
-    fn index_for(lib_source: &str) -> AttributeIndex {
-        let directory = crate_with(lib_source);
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
-            .expect("the crate is indexed")
-            .build()
-    }
 
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
@@ -57,11 +33,11 @@ mod tests {
     }
 
     fn empty_bindings() -> ContainerBindings {
-        bindings_for(&index_for(""))
+        bindings_for(&IndexedSource::new("").index)
     }
 
     fn generated(lib_source: &str) -> ViewsArtifacts {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         let bindings = bindings_for(&index);
 
         let plan = ViewsPlan::build(&index, &bindings).expect("the views are planned");
@@ -70,7 +46,7 @@ mod tests {
     }
 
     fn rejection_for(lib_source: &str) -> ViewsCodegenError {
-        ViewsPlan::build(&index_for(lib_source), &empty_bindings())
+        ViewsPlan::build(&IndexedSource::new(lib_source).index, &empty_bindings())
             .map(drop)
             .expect_err("the invalid view is rejected")
     }
@@ -84,9 +60,7 @@ mod tests {
         assert!(rejection(VALID_VIEW).contains("crate::CardLayout"));
     }
 
-    fn formatted(
-        modules: Vec<margaret_generated_module::generated_module_tokens::GeneratedModuleTokens>,
-    ) -> String {
+    fn formatted(modules: Vec<GeneratedModuleTokens>) -> String {
         modules
             .into_iter()
             .map(|module| {

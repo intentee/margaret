@@ -1,4 +1,8 @@
+use uuid::Uuid;
+
 use margaret::framework::macros::model;
+
+use crate::models::article_translation::ArticleTranslation;
 
 #[model(table = "translation_reviews")]
 #[primary_key(columns = [article_id, locale, reviewer])]
@@ -6,13 +10,13 @@ use margaret::framework::macros::model;
 #[index(name = "translation_reviews_reviewer_score", columns = [reviewer, score])]
 #[foreign_key(
     columns = [article_id, locale],
-    references = crate::models::article_translation::ArticleTranslation,
+    references = ArticleTranslation,
     on_delete = cascade
 )]
 #[derive(Clone)]
 pub struct TranslationReview {
     #[column]
-    pub article_id: uuid::Uuid,
+    pub article_id: Uuid,
     #[column]
     pub locale: String,
     #[column]

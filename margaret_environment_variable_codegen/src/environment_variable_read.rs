@@ -43,12 +43,7 @@ mod tests {
             name: EnvironmentVariableName::new(name).expect("the name is usable"),
             value: InputValue {
                 required,
-                value_type: CanonicalPath::new(
-                    segments
-                        .iter()
-                        .map(std::string::ToString::to_string)
-                        .collect(),
-                ),
+                value_type: CanonicalPath::new(segments.iter().map(ToString::to_string).collect()),
                 weaving: WeavingKind::Cloned,
             },
         }

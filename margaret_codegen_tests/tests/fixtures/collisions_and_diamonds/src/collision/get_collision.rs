@@ -1,8 +1,12 @@
+use tokio::task;
+
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
+
+use crate::collision::reader::Reader;
 
 #[singleton]
 #[responds_to_http(method = "get", path = "/collision", server = "public")]
@@ -16,9 +20,9 @@ impl GetCollision {
     pub async fn respond(
         &self,
         collision_session: &Request,
-        #[authenticated_user] reader: crate::collision::reader::Reader,
+        #[authenticated_user] reader: Reader,
     ) -> anyhow::Result<Response> {
-        tokio::task::yield_now().await;
+        task::yield_now().await;
 
         Ok(Response::text(
             200,

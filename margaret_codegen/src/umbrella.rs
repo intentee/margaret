@@ -17,6 +17,10 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
         source.push_str("#[rustfmt::skip]\npub mod jwks;\n");
     }
 
+    if features.contains(GeneratedFeature::Oidc) {
+        source.push_str("#[rustfmt::skip]\npub mod oidc;\n");
+    }
+
     if features.contains(GeneratedFeature::AuthenticatedUsers) && serves_http {
         source.push_str("#[rustfmt::skip]\npub mod authenticated_users;\n");
     }
@@ -58,9 +62,8 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
 
 #[cfg(test)]
 mod tests {
-    use crate::generated_features::GeneratedFeatures;
-
     use super::umbrella;
+    use crate::generated_features::GeneratedFeatures;
 
     fn minimal_features() -> GeneratedFeatures {
         GeneratedFeatures::default()

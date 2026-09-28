@@ -1,0 +1,34 @@
+[package]
+name = "margaret_bearer_token_verification_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+async-trait = { workspace = true }
+margaret_bearer_token_verification = { workspace = true }
+margaret_http = { workspace = true }
+margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_jose_parameters = { workspace = true }
+margaret_jws_verification = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
+margaret_jwt_verification = { workspace = true }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
+margaret_key_set_poll = { workspace = true }
+reqwest = { workspace = true }
+
+[dev-dependencies]
+margaret_identity_session = { workspace = true }
+margaret_jwks_keygen = { workspace = true }
+margaret_registered_claims = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+uuid = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

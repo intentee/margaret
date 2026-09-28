@@ -12,12 +12,15 @@ publish.workspace = true
 [dependencies]
 margaret_attribute_arguments = { workspace = true }
 margaret_attributes = { workspace = true }
+margaret_item_naming_argument = { workspace = true }
 margaret_codegen_tokens = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
 margaret_container = { workspace = true }
 margaret_generated_module = { workspace = true }
 margaret_injection_codegen = { workspace = true }
 margaret_route_parameter_codegen = { workspace = true }
+margaret_syn_type_peeling = { workspace = true }
+margaret_tag_codegen = { workspace = true }
 heck = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
@@ -25,7 +28,7 @@ syn = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
+margaret_attributes_tests = { path = "../margaret_attributes_tests" }
 
 [lints]
 workspace = true

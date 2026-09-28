@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
+use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::build_for_session;
 use margaret::framework::macros::websocket_session;
 
@@ -30,7 +31,7 @@ impl StoryboardSession {
         greeter: Arc<EnglishGreeter>,
         #[route_parameter(from = "topic")] topic: String,
         #[route_parameter(from = "article")] article: Article,
-        #[form_request(from = Query)] filters: GetArticlesForm,
+        #[form_request(from = RequestInput::Query)] filters: GetArticlesForm,
         #[authenticated_user] viewer: Option<User>,
         routes: &Routes,
     ) -> anyhow::Result<Self> {

@@ -1,4 +1,5 @@
 use failures::Result;
+
 use margaret::framework::http::response::Response;
 use margaret::framework::macros::middleware;
 use margaret::framework::macros::process;

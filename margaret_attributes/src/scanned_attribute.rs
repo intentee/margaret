@@ -1,4 +1,5 @@
 use syn::Attribute;
+use syn::Path;
 
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_attribute::IndexedAttribute;
@@ -18,7 +19,7 @@ impl ScannedAttribute {
 
     pub(crate) fn resolve_all(
         attributes: Vec<Self>,
-        resolve: impl Copy + Fn(&syn::Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&Path) -> CanonicalPath,
     ) -> Vec<IndexedAttribute> {
         attributes
             .into_iter()

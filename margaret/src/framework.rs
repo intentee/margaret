@@ -4,6 +4,8 @@ pub use anyhow;
 pub use margaret_access_token_minter as access_token_minter;
 #[cfg(feature = "runtime")]
 pub use margaret_asset_bag as asset_bag;
+#[cfg(feature = "runtime")]
+pub use margaret_bearer_token_verification as bearer_token_verification;
 #[cfg(feature = "codegen")]
 pub use margaret_codegen as codegen;
 #[cfg(feature = "runtime")]
@@ -25,6 +27,8 @@ pub use margaret_identity as identity;
 #[cfg(feature = "runtime")]
 pub use margaret_identity_session as identity_session;
 #[cfg(feature = "runtime")]
+pub use margaret_jose_parameters as jose_parameters;
+#[cfg(feature = "runtime")]
 pub use margaret_jwks_client as jwks_client;
 #[cfg(feature = "runtime")]
 pub use margaret_jwks_endpoint as jwks_endpoint;
@@ -41,11 +45,19 @@ pub use margaret_jwks_secret_storage_selection as jwks_secret_storage_selection;
 #[cfg(feature = "runtime")]
 pub use margaret_jwks_secret_store as jwks_secret_store;
 #[cfg(feature = "runtime")]
+pub use margaret_jws_verification as jws_verification;
+#[cfg(feature = "runtime")]
+pub use margaret_jwt_verification as jwt_verification;
+#[cfg(feature = "runtime")]
 pub use margaret_macros as macros;
 #[cfg(feature = "runtime")]
 pub use margaret_model as model;
 #[cfg(feature = "runtime")]
+pub use margaret_oidc_client as oidc_client;
+#[cfg(feature = "runtime")]
 pub use margaret_peer_identity as peer_identity;
+#[cfg(feature = "runtime")]
+pub use margaret_registered_claims as registered_claims;
 #[cfg(feature = "runtime")]
 pub use margaret_route_parameter_binding as route_parameter_binding;
 #[cfg(feature = "runtime")]
@@ -61,7 +73,11 @@ pub use margaret_spiffe_svid_server as spiffe_svid_server;
 #[cfg(feature = "runtime")]
 pub use margaret_sync_holder as sync_holder;
 #[cfg(feature = "runtime")]
+pub use margaret_token_issuance as token_issuance;
+#[cfg(feature = "runtime")]
 pub use margaret_token_signer as token_signer;
+#[cfg(feature = "runtime")]
+pub use margaret_token_trust as token_trust;
 #[cfg(feature = "runtime")]
 pub use margaret_validation as validation;
 #[cfg(feature = "runtime")]

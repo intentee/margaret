@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use failures::Result as Outcome;
+
 use margaret::framework::http::response::Response;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
