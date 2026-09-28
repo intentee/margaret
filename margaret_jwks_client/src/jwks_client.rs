@@ -6,10 +6,12 @@ use reqwest::ClientBuilder;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service as _;
 
+use margaret_issuer_document_fetch::issuer_document_client::IssuerDocumentClient;
 use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 
+use crate::jwks_client_error::JwksClientError;
 use crate::public_jwks_holder::PublicJwksHolder;
 use crate::public_jwks_poll_service::PublicJwksPollService;
 use crate::public_jwks_verifier::PublicJwksVerifier;
@@ -44,10 +46,11 @@ impl JwksClient {
         client_builder: ClientBuilder,
         cancellation_token: CancellationToken,
     ) -> Result<()> {
-        let http_client = client_builder.build()?;
+        let issuer_document_client = IssuerDocumentClient::build(client_builder)
+            .map_err(|source| JwksClientError::ClientBuild { source })?;
         let poll_service = PublicJwksPollService {
             endpoint_provider: self.endpoint_provider.clone(),
-            http_client,
+            issuer_document_client,
             public_jwks_holder: self.public_jwks_holder.clone(),
         };
 
@@ -70,6 +73,7 @@ mod tests {
     use std::sync::Arc;
 
     use reqwest::Client;
+    use reqwest::tls::Version;
     use tokio_util::sync::CancellationToken;
     use url::Url;
 
@@ -98,7 +102,7 @@ mod tests {
 
     #[tokio::test]
     async fn reports_a_client_builder_that_cannot_be_built() {
-        let broken_builder = Client::builder().use_preconfigured_tls(0u8);
+        let broken_builder = Client::builder().min_tls_version(Version::TLS_1_3);
 
         assert!(
             client()

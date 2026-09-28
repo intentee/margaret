@@ -28,6 +28,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_identity_session \
 	-p margaret_injection_codegen \
 	-p margaret_input_weaving \
+	-p margaret_issuer_document_fetch \
 	-p margaret_item_naming_argument \
 	-p margaret_jwks_client \
 	-p margaret_jwks_client_tests \
@@ -131,6 +132,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_identity_session \
 	-p margaret_injection_codegen \
 	-p margaret_input_weaving \
+	-p margaret_issuer_document_fetch \
 	-p margaret_item_naming_argument \
 	-p margaret_jwks_client \
 	-p margaret_jwks_codegen \
@@ -245,6 +247,7 @@ coverage: node_modules postgres-image
 		--gated margaret_identity_session=100 \
 		--gated margaret_injection_codegen=100 \
 		--gated margaret_input_weaving=100 \
+		--gated margaret_issuer_document_fetch=100 \
 		--gated margaret_item_naming_argument=100 \
 		--gated margaret_jwks_client=100 \
 		--gated margaret_jwks_client_tests=100 \

@@ -41,6 +41,7 @@ members = [
     "margaret_identity_session",
     "margaret_injection_codegen",
     "margaret_input_weaving",
+    "margaret_issuer_document_fetch",
     "margaret_item_naming_argument",
     "margaret_jwks_client",
     "margaret_jwks_client_tests",
@@ -186,6 +187,7 @@ margaret_identity = { path = "margaret_identity", version = "0.1.0" }
 margaret_identity_session = { path = "margaret_identity_session", version = "0.1.0" }
 margaret_injection_codegen = { path = "margaret_injection_codegen", version = "0.4.0" }
 margaret_input_weaving = { path = "margaret_input_weaving", version = "0.4.0" }
+margaret_issuer_document_fetch = { path = "margaret_issuer_document_fetch", version = "0.1.0" }
 margaret_item_naming_argument = { path = "margaret_item_naming_argument", version = "0.4.0" }
 margaret_jwks_client = { path = "margaret_jwks_client", version = "0.1.0" }
 margaret_jwks_codegen = { path = "margaret_jwks_codegen", version = "0.4.0" }
