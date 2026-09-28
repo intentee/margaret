@@ -1,3 +1,6 @@
-fn main() -> Result<(), margaret::framework::codegen::codegen_error::CodegenError> {
-    margaret::framework::codegen::generate::generate()
+use margaret::framework::codegen::codegen_error::CodegenError;
+use margaret::framework::codegen::generate;
+
+fn main() -> Result<(), CodegenError> {
+    generate::generate()
 }

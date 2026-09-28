@@ -65,6 +65,7 @@ mod tests {
     use std::sync::Arc;
 
     use http::Method;
+    use serde_json::Value;
     use serde_json::json;
 
     use margaret_http::request::Request;
@@ -86,7 +87,7 @@ mod tests {
         MintAccessTokenHandler::create(Arc::new(JwksSecretStore::new(holder)))
     }
 
-    fn request_with_body(body: serde_json::Value) -> Request {
+    fn request_with_body(body: Value) -> Request {
         let mut request = Request::new(Method::POST, "/mint".to_string());
 
         request.inputs.json = Some(body);

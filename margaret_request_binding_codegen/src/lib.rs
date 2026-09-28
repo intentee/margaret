@@ -37,11 +37,14 @@ pub mod views_availability;
 mod tests {
     use std::fs;
 
+    use quote::format_ident;
     use tempfile::tempdir;
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+    use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
     use margaret_injection_codegen::process_method::process_method;
@@ -59,7 +62,6 @@ mod tests {
     use crate::request_binding::RequestBinding;
     use crate::request_binding_error::RequestBindingError;
     use crate::views_availability::ViewsAvailability;
-    use quote::format_ident;
 
     const PRELUDE: &str = "\
 use margaret::framework::http::next::Next;
@@ -86,7 +88,7 @@ struct User;
         format!("{PRELUDE}{declaration}")
     }
 
-    fn empty_bindings() -> margaret_container::container_bindings::ContainerBindings {
+    fn empty_bindings() -> ContainerBindings {
         let index = index_for("");
         let registry = scan(&index).expect("the empty console argument registry is scanned");
 
@@ -95,11 +97,8 @@ struct User;
             .bindings
     }
 
-    fn missing_path() -> margaret_attributes::canonical_path::CanonicalPath {
-        margaret_attributes::canonical_path::CanonicalPath::new(vec![
-            "crate".to_string(),
-            "Missing".to_string(),
-        ])
+    fn missing_path() -> CanonicalPath {
+        CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
     }
 
     fn registries_with(declaration: &str, views: ViewsAvailability) -> BindingRegistries {

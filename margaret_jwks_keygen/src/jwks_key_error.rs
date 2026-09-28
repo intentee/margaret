@@ -1,3 +1,5 @@
+use p256::ecdsa;
+use p256::pkcs8;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -22,7 +24,7 @@ pub enum JwksKeyError {
     #[error("the jwk public key coordinates could not be built into a verifying key: {source}")]
     MalformedVerifyingKey {
         #[source]
-        source: p256::ecdsa::Error,
+        source: ecdsa::Error,
     },
 
     #[error("the generated public key is missing its {coordinate} coordinate")]
@@ -31,12 +33,12 @@ pub enum JwksKeyError {
     #[error("the generated private key could not be encoded to pkcs#8 pem: {source}")]
     PemEncoding {
         #[from]
-        source: p256::pkcs8::Error,
+        source: pkcs8::Error,
     },
 
     #[error("the signing key pem could not be parsed into an ecdsa signing key: {source}")]
     SigningKeyRejected {
         #[source]
-        source: p256::pkcs8::Error,
+        source: pkcs8::Error,
     },
 }

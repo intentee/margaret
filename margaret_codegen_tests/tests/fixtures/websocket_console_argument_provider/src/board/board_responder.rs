@@ -9,6 +9,10 @@ use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWe
 use margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret::framework::websocket::web_socket::WebSocket;
 
+use crate::board::board_chunk::BoardChunk;
+use crate::board::board_prompt::BoardPrompt;
+use crate::board::board_session::BoardSession;
+
 #[singleton]
 pub struct BoardResponder;
 
@@ -24,18 +28,18 @@ impl BoardResponder {
 
 #[async_trait]
 impl RespondsToWebSocketMessage for BoardResponder {
-    type Message = crate::board::board_prompt::BoardPrompt;
-    type Session = crate::board::board_session::BoardSession;
+    type Message = BoardPrompt;
+    type Session = BoardSession;
 
     async fn process(
         &self,
         _cancellation_token: CancellationToken,
-        session: Arc<crate::board::board_session::BoardSession>,
-        message: StreamingRequestEnvelope<crate::board::board_prompt::BoardPrompt>,
+        session: Arc<BoardSession>,
+        message: StreamingRequestEnvelope<BoardPrompt>,
         socket: WebSocket,
     ) -> anyhow::Result<()> {
         socket
-            .send(message.fin(crate::board::board_chunk::BoardChunk {
+            .send(message.fin(BoardChunk {
                 text: format!(
                     "{} {}: {}",
                     session.reader_name().unwrap_or("guest"),

@@ -24,28 +24,19 @@ pub fn resolve_type(
 #[cfg(test)]
 mod tests {
 
+    use syn::Type;
     use syn::parse_quote;
 
+    use super::resolve_type;
     use crate::canonical_path::CanonicalPath;
     use crate::item_paths::ItemPaths;
     use crate::module_imports::ModuleImports;
 
-    use super::resolve_type;
-
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
-        )
+        CanonicalPath::new(segments.iter().map(ToString::to_string).collect())
     }
 
-    fn resolved(
-        declared: &syn::Type,
-        imports: &ModuleImports,
-        items: &ItemPaths,
-    ) -> Option<String> {
+    fn resolved(declared: &Type, imports: &ModuleImports, items: &ItemPaths) -> Option<String> {
         resolve_type(declared, &["crate".to_string()], imports, items).map(|path| path.to_string())
     }
 

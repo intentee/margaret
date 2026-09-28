@@ -74,6 +74,8 @@ impl ServeInput {
 
 #[cfg(test)]
 mod tests {
+    use proc_macro2::TokenStream;
+
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_environment_variable_codegen::environment_variable::EnvironmentVariable;
@@ -85,7 +87,7 @@ mod tests {
 
     use super::ServeInput;
 
-    fn collapsed(tokens: &proc_macro2::TokenStream) -> String {
+    fn collapsed(tokens: &TokenStream) -> String {
         tokens.to_string().split_whitespace().collect()
     }
 

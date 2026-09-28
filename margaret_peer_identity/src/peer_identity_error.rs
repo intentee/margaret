@@ -1,3 +1,4 @@
+use spiffe::spiffe_id::SpiffeIdError;
 use thiserror::Error;
 use x509_parser::error::X509Error;
 
@@ -18,6 +19,6 @@ pub enum PeerIdentityError {
     #[error("the peer certificate URI is not a valid SPIFFE ID: {source}")]
     SpiffeId {
         #[source]
-        source: spiffe::spiffe_id::SpiffeIdError,
+        source: SpiffeIdError,
     },
 }

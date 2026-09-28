@@ -1,8 +1,6 @@
 use std::error::Error;
 
-use thiserror::Error as ThisError;
-
-#[derive(Debug, ThisError)]
+#[derive(Debug, thiserror::Error)]
 pub enum EnvironmentVariableError {
     #[error("the environment variable '{name}' is not set")]
     Missing { name: String },

@@ -2,6 +2,8 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
 
+use toml::Table;
+
 use crate::codegen_error::CodegenError;
 use crate::workspace_location::WorkspaceLocation;
 
@@ -19,7 +21,7 @@ fn is_workspace_manifest(manifest_path: &Path) -> Result<bool, CodegenError> {
 
     let document =
         contents
-            .parse::<toml::Table>()
+            .parse::<Table>()
             .map_err(|source| CodegenError::ParseWorkspaceManifest {
                 path: manifest_path.to_path_buf(),
                 source: Box::new(source),

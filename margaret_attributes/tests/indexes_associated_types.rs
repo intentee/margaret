@@ -5,6 +5,7 @@ use syn::parse_quote;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_attributes::indexed_associated_type::IndexedAssociatedType;
 
 #[test]
 fn indexes_associated_types() {
@@ -38,7 +39,7 @@ fn indexes_associated_types() {
     let names: Vec<&str> = produced_impl
         .associated_types()
         .iter()
-        .map(margaret_attributes::indexed_associated_type::IndexedAssociatedType::name)
+        .map(IndexedAssociatedType::name)
         .collect();
 
     assert_eq!(names, ["Extra", "Output"]);

@@ -4,6 +4,7 @@ use rustls::client::danger::ServerCertVerifier as _;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::ServerName;
 use rustls::pki_types::UnixTime;
+use tokio::task;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service as _;
 
@@ -48,7 +49,7 @@ async fn rebuilds_facade_when_root_store_set() {
             break;
         }
 
-        tokio::task::yield_now().await;
+        task::yield_now().await;
     }
 
     cancellation_token.cancel();

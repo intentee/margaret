@@ -64,12 +64,7 @@ mod tests {
     }
 
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
-        )
+        CanonicalPath::new(segments.iter().map(ToString::to_string).collect())
     }
 
     #[test]

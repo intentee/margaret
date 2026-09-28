@@ -1,5 +1,7 @@
 use std::convert::Infallible;
 use std::fmt::Display;
+use std::io::Error;
+use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -7,6 +9,9 @@ use bytes::Bytes;
 use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::body::Incoming;
+use hyper::rt::Read;
+use hyper::rt::Write;
+use hyper::upgrade;
 use hyper::upgrade::OnUpgrade;
 use hyper_util::rt::TokioExecutor;
 use hyper_util::rt::TokioIo;
@@ -71,7 +76,7 @@ struct AcceptedConnection {
     stream: TcpStream,
 }
 
-fn accept_outcome<Accept>(accepted: std::io::Result<(TcpStream, SocketAddr)>, accept: Accept)
+fn accept_outcome<Accept>(accepted: Result<(TcpStream, SocketAddr), Error>, accept: Accept)
 where
     Accept: FnOnce(AcceptedConnection),
 {
@@ -93,7 +98,7 @@ fn peer_identity_from_tls_stream(tls_stream: &TlsStream<TcpStream>) -> PeerIdent
             .1
             .peer_certificates()
             .and_then(|certificates| certificates.first())
-            .map(std::convert::AsRef::as_ref),
+            .map(AsRef::as_ref),
     )
 }
 
@@ -127,7 +132,7 @@ async fn serve_connection<Io>(
     io: Io,
     connection_context: ConnectionContext,
 ) where
-    Io: hyper::rt::Read + hyper::rt::Write + Unpin + Send + 'static,
+    Io: Read + Write + Unpin + Send + 'static,
 {
     let WebSocketDriverChannel {
         receiver: driver_receiver,
@@ -222,7 +227,7 @@ async fn dispatch(
     driver_sender: WebSocketDriverSender,
     mut request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
-    let on_upgrade = hyper::upgrade::on(&mut request);
+    let on_upgrade = upgrade::on(&mut request);
     let (parts, incoming) = request.into_parts();
     let server = match ServerParams::from_parts(parts, remote_addr) {
         RequestOutcome::Parsed(server) => server,
@@ -243,7 +248,7 @@ async fn dispatch(
             .await
         }
         RouteResolution::Request(route) => {
-            let body = incoming.map_err(std::io::Error::other).boxed_unsync();
+            let body = incoming.map_err(Error::other).boxed_unsync();
 
             match RequestInputs::parse(server, body, &body_limit, &upload_config).await {
                 Ok(RequestOutcome::Parsed(inputs)) => {
@@ -280,10 +285,10 @@ impl BoundServer {
         server_registry: Arc<ServerRegistry>,
         forward_targets: Arc<ForwardTargets>,
         name: Arc<str>,
-    ) -> std::io::Result<Self> {
+    ) -> Result<Self, Error> {
         let Some(server) = server_registry.server(&name) else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
+            return Err(Error::new(
+                ErrorKind::NotFound,
                 "the server is not registered",
             ));
         };
@@ -311,7 +316,7 @@ impl BoundServer {
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
-    pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> Result<SocketAddr, Error> {
         self.listener.local_addr()
     }
 
@@ -422,6 +427,8 @@ impl BoundServer {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::io::Error;
+    use std::io::ErrorKind;
     use std::net::SocketAddr;
     use std::sync::Arc;
 
@@ -430,8 +437,12 @@ mod tests {
     use hyper::upgrade::OnUpgrade;
     use tokio::io::AsyncReadExt;
     use tokio::io::AsyncWriteExt;
+    use tokio::net::TcpListener;
     use tokio::net::TcpStream;
     use tokio_util::sync::CancellationToken;
+
+    use margaret_http_uploaded_file::upload_config::UploadConfig;
+    use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 
     use super::BoundServer;
     use super::accept_outcome;
@@ -457,8 +468,6 @@ mod tests {
     use crate::transport_config::TransportConfig;
     use crate::web_socket_driver_sender::WebSocketDriverSender;
     use crate::web_socket_upgrade::WebSocketUpgrade;
-    use margaret_http_uploaded_file::upload_config::UploadConfig;
-    use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 
     struct PlainOk;
 
@@ -552,7 +561,7 @@ mod tests {
     fn answers_a_system_failure_with_internal_server_error() {
         assert_eq!(
             error_response(&UploadedFileError::UploadTempFile {
-                source: std::io::Error::other("the upload directory is unusable"),
+                source: Error::other("the upload directory is unusable"),
             })
             .status(),
             500
@@ -601,15 +610,12 @@ mod tests {
 
     #[test]
     fn skips_a_failed_accept() {
-        accept_outcome(
-            Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)),
-            drop,
-        );
+        accept_outcome(Err(Error::from(ErrorKind::ConnectionAborted)), drop);
     }
 
     #[tokio::test]
     async fn hands_the_peer_address_of_an_accepted_connection_to_the_acceptor() {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("the listener binds");
         let listening_on = listener

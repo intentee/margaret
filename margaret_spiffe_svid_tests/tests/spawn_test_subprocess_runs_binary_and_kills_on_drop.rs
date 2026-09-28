@@ -1,6 +1,10 @@
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::time::Duration;
+use std::time::Instant;
+
+use libc::pid_t;
+use tokio::time;
 
 use margaret_spiffe_svid_tests::spawn_test_subprocess::spawn_test_subprocess;
 
@@ -25,8 +29,8 @@ async fn runs_binary_and_kills_on_drop() {
     drop(child_again);
 
     let child_pid =
-        libc::pid_t::try_from(pid).expect("the child process id fits in a process identifier");
-    let started = std::time::Instant::now();
+        pid_t::try_from(pid).expect("the child process id fits in a process identifier");
+    let started = Instant::now();
     loop {
         let status = unsafe { libc::kill(child_pid, 0) };
         if status == -1 {
@@ -36,6 +40,6 @@ async fn runs_binary_and_kills_on_drop() {
             started.elapsed() < Duration::from_secs(5),
             "subprocess (pid {pid}) did not exit within 5 seconds after Child drop"
         );
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        time::sleep(Duration::from_millis(50)).await;
     }
 }

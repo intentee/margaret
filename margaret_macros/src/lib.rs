@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::Attribute;
+use syn::Error;
 use syn::FnArg;
 use syn::ImplItemFn;
 use syn::ItemStruct;
@@ -23,8 +23,8 @@ fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str
     });
 }
 
-fn argument_error(error: &AttributeArgumentsError) -> syn::Error {
-    syn::Error::new(Span::call_site(), error)
+fn argument_error(error: &AttributeArgumentsError) -> Error {
+    Error::new(Span::call_site(), error)
 }
 
 fn referencing_named_items(
@@ -44,10 +44,10 @@ fn referencing_named_items(
 
 fn referencing_named_items_or_compile_error(
     attribute_path: &str,
-    attributes: TokenStream2,
-    item: &TokenStream2,
+    attributes: proc_macro2::TokenStream,
+    item: &proc_macro2::TokenStream,
     item_naming_arguments: &[ItemNamingArgument],
-) -> TokenStream2 {
+) -> proc_macro2::TokenStream {
     or_compile_error(
         AttributeArgs::from_argument_tokens(attribute_path.to_string(), attributes)
             .map(|arguments| {
@@ -59,7 +59,7 @@ fn referencing_named_items_or_compile_error(
     )
 }
 
-fn or_compile_error(result: Result<TokenStream2, syn::Error>) -> TokenStream2 {
+fn or_compile_error(result: Result<proc_macro2::TokenStream, Error>) -> proc_macro2::TokenStream {
     match result {
         Ok(stripped) => stripped,
         Err(error) => error.to_compile_error(),
@@ -74,15 +74,24 @@ fn strip_struct_markers(item: TokenStream, markers: &[&str]) -> TokenStream {
     strip_struct_or_compile_error(item.into(), markers).into()
 }
 
-fn strip_or_compile_error(item: TokenStream2, markers: &[&str]) -> TokenStream2 {
+fn strip_or_compile_error(
+    item: proc_macro2::TokenStream,
+    markers: &[&str],
+) -> proc_macro2::TokenStream {
     or_compile_error(strip(item, markers))
 }
 
-fn strip_struct_or_compile_error(item: TokenStream2, markers: &[&str]) -> TokenStream2 {
+fn strip_struct_or_compile_error(
+    item: proc_macro2::TokenStream,
+    markers: &[&str],
+) -> proc_macro2::TokenStream {
     or_compile_error(strip_struct(item, markers))
 }
 
-fn strip(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
+fn strip(
+    item: proc_macro2::TokenStream,
+    markers: &[&str],
+) -> Result<proc_macro2::TokenStream, Error> {
     let mut function: ImplItemFn = syn::parse2(item)?;
 
     for input in &mut function.sig.inputs {
@@ -94,7 +103,10 @@ fn strip(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Erro
     Ok(quote!(#function))
 }
 
-fn strip_struct(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
+fn strip_struct(
+    item: proc_macro2::TokenStream,
+    markers: &[&str],
+) -> Result<proc_macro2::TokenStream, Error> {
     let mut item_struct: ItemStruct = syn::parse2(item)?;
     let mut references = Vec::new();
 

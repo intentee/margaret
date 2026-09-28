@@ -1,6 +1,9 @@
+use std::env::VarError;
+use std::io;
 use std::path::PathBuf;
 
 use thiserror::Error;
+use toml::de;
 
 use margaret_asset_bag_codegen::asset_bag_codegen_error::AssetBagCodegenError;
 use margaret_attributes::attribute_error::AttributeError;
@@ -104,47 +107,32 @@ pub enum CodegenError {
     #[error("the CARGO_MANIFEST_DIR environment variable is not available: {source}")]
     ManifestDirectory {
         #[source]
-        source: std::env::VarError,
+        source: VarError,
     },
 
     #[error("no Cargo workspace root was found above the manifest directory '{start}'")]
     WorkspaceRootNotFound { start: PathBuf },
 
     #[error("failed to read the workspace manifest '{path}': {source}")]
-    ReadWorkspaceManifest {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    ReadWorkspaceManifest { path: PathBuf, source: io::Error },
 
     #[error("failed to parse the workspace manifest '{path}': {source}")]
     ParseWorkspaceManifest {
         path: PathBuf,
-        source: Box<toml::de::Error>,
+        source: Box<de::Error>,
     },
 
     #[error("failed to create the generated directory '{path}': {source}")]
-    CreateDirectory {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    CreateDirectory { path: PathBuf, source: io::Error },
 
     #[error("failed to read the generated directory '{path}': {source}")]
-    ReadDirectory {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    ReadDirectory { path: PathBuf, source: io::Error },
 
     #[error("failed to read the esbuild metafile '{path}': {source}")]
-    ReadMetafile {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    ReadMetafile { path: PathBuf, source: io::Error },
 
     #[error("failed to read the asset directory '{path}': {source}")]
-    ReadAssetDirectory {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    ReadAssetDirectory { path: PathBuf, source: io::Error },
 
     #[error("the asset file name '{path}' is not valid UTF-8")]
     NonUtf8AssetPath { path: PathBuf },
@@ -158,14 +146,8 @@ pub enum CodegenError {
     NonRegularAsset { path: PathBuf },
 
     #[error("failed to write the generated source '{path}': {source}")]
-    WriteSource {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    WriteSource { path: PathBuf, source: io::Error },
 
     #[error("failed to remove the stale generated entry '{path}': {source}")]
-    RemoveEntry {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    RemoveEntry { path: PathBuf, source: io::Error },
 }

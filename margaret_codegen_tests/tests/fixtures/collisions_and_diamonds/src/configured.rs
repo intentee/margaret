@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use tokio::task;
+
 use margaret::framework::http::response::Response;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
@@ -50,7 +52,7 @@ impl Configured {
     /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn respond(&self) -> anyhow::Result<Response> {
-        tokio::task::yield_now().await;
+        task::yield_now().await;
 
         Ok({
             let _ = asset!("resources/ts/app.ts");

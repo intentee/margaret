@@ -11,22 +11,23 @@ mod views;
 
 #[cfg(test)]
 mod tests {
-    use crate::views_codegen_error::ViewsCodegenError;
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
     use margaret_serve_input_codegen::scan::scan;
 
     use crate::render_views::render_views;
     use crate::views_artifacts::ViewsArtifacts;
+    use crate::views_codegen_error::ViewsCodegenError;
     use crate::views_plan::ViewsPlan;
 
     fn crate_with(lib_source: &str) -> TempDir {
@@ -84,9 +85,7 @@ mod tests {
         assert!(rejection(VALID_VIEW).contains("crate::CardLayout"));
     }
 
-    fn formatted(
-        modules: Vec<margaret_generated_module::generated_module_tokens::GeneratedModuleTokens>,
-    ) -> String {
+    fn formatted(modules: Vec<GeneratedModuleTokens>) -> String {
         modules
             .into_iter()
             .map(|module| {

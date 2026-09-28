@@ -1,3 +1,5 @@
+use std::error;
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -5,7 +7,7 @@ pub enum EndpointError {
     #[error("the endpoint could not be resolved: {source}")]
     Resolution {
         #[source]
-        source: Box<dyn std::error::Error + Send + Sync>,
+        source: Box<dyn error::Error + Send + Sync>,
     },
 }
 

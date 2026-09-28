@@ -35,6 +35,8 @@ impl<'index> MatchedAttribute<'index> {
 
 #[cfg(test)]
 mod tests {
+    use std::ptr;
+
     use syn::Attribute;
     use syn::parse_quote;
 
@@ -80,6 +82,6 @@ mod tests {
         let first = matched.args().expect("the arguments parse");
         let second = matched.args().expect("the arguments parse");
 
-        assert!(std::ptr::eq(first, second));
+        assert!(ptr::eq(first, second));
     }
 }

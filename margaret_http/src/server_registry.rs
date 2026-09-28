@@ -26,12 +26,13 @@ impl ServerRegistry {
 
 #[cfg(test)]
 mod tests {
+    use margaret_http_uploaded_file::upload_config::UploadConfig;
+
     use super::ServerRegistry;
     use crate::body_limit::BodyLimit;
     use crate::router::Router;
     use crate::server::Server;
     use crate::transport_config::TransportConfig;
-    use margaret_http_uploaded_file::upload_config::UploadConfig;
 
     fn registry() -> ServerRegistry {
         ServerRegistry::new(vec![Server::new(

@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::io;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 
@@ -15,14 +16,14 @@ fn file_storage_error_variants_report_their_source() {
 
     let read = FileJwksSecretStorageError::Read {
         path: path.clone(),
-        source: std::io::Error::new(ErrorKind::PermissionDenied, "denied"),
+        source: io::Error::new(ErrorKind::PermissionDenied, "denied"),
     };
     assert!(read.to_string().contains("/secrets/jwks.json"));
     assert!(read.source().is_some());
 
     let write = FileJwksSecretStorageError::Write {
         path: path.clone(),
-        source: std::io::Error::new(ErrorKind::PermissionDenied, "denied"),
+        source: io::Error::new(ErrorKind::PermissionDenied, "denied"),
     };
     assert!(write.to_string().contains("/secrets/jwks.json"));
     assert!(write.source().is_some());

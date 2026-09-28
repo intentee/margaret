@@ -29,14 +29,16 @@ where
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::error::Error;
 
     use async_trait::async_trait;
     use http::Method;
 
-    use super::require_bound_route_parameter;
-    use crate::request::Request;
     use margaret_route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;
     use margaret_route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome;
+
+    use super::require_bound_route_parameter;
+    use crate::request::Request;
 
     struct EvenNumberBinder;
     struct FailingBinder;
@@ -114,7 +116,7 @@ mod tests {
             "the binder for route parameter 'number' failed: database unavailable"
         );
         assert_eq!(
-            std::error::Error::source(&error).map(ToString::to_string),
+            Error::source(&error).map(ToString::to_string),
             Some("database unavailable".to_string())
         );
     }

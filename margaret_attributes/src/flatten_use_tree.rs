@@ -83,6 +83,7 @@ pub(crate) fn flatten_use_tree(tree: &UseTree, module_path: &[String]) -> Vec<Fl
 
 #[cfg(test)]
 mod tests {
+    use syn::ItemUse;
     use syn::parse_quote;
 
     use super::flatten_use_tree;
@@ -100,11 +101,8 @@ mod tests {
         }
     }
 
-    fn entries(tree: &syn::ItemUse, module_path: &[&str]) -> Vec<Entry> {
-        let module: Vec<String> = module_path
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect();
+    fn entries(tree: &ItemUse, module_path: &[&str]) -> Vec<Entry> {
+        let module: Vec<String> = module_path.iter().map(ToString::to_string).collect();
 
         flatten_use_tree(&tree.tree, &module)
             .into_iter()

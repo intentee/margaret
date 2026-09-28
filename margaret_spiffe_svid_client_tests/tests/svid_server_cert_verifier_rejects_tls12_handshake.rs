@@ -8,6 +8,7 @@ use rustls::ServerConnection;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::PrivateKeyDer;
 use rustls::pki_types::ServerName;
+use rustls::version::TLS12;
 
 use margaret_spiffe_svid_client::svid_server_cert_verifier::SvidServerCertVerifier;
 use margaret_spiffe_svid_tests::ca_der::CA_DER;
@@ -27,7 +28,7 @@ fn rejects_tls12_when_used_as_client_server_verifier() {
 
     let svid_server_verifier = SvidServerCertVerifier::new(root_store, "example.org").unwrap();
 
-    let server_config = ServerConfig::builder_with_protocol_versions(&[&rustls::version::TLS12])
+    let server_config = ServerConfig::builder_with_protocol_versions(&[&TLS12])
         .with_no_client_auth()
         .with_single_cert(
             vec![CertificateDer::from(
@@ -37,7 +38,7 @@ fn rejects_tls12_when_used_as_client_server_verifier() {
         )
         .unwrap();
 
-    let client_config = ClientConfig::builder_with_protocol_versions(&[&rustls::version::TLS12])
+    let client_config = ClientConfig::builder_with_protocol_versions(&[&TLS12])
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(svid_server_verifier))
         .with_no_client_auth();

@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -14,6 +15,7 @@ use syn::ItemImpl;
 use syn::ItemMod;
 use syn::ItemUse;
 use syn::Type;
+use syn::TypePath;
 use syn::UseTree;
 
 use crate::attribute_error::AttributeError;
@@ -231,7 +233,7 @@ impl ModuleWalker {
                     let module_imports = imports.get(&module).unwrap_or(&empty_imports);
 
                     resolve_type(
-                        &Type::Path(syn::TypePath {
+                        &Type::Path(TypePath {
                             qself: None,
                             path: path.clone(),
                         }),
@@ -296,7 +298,7 @@ impl ModuleWalker {
         module_path: &[String],
         directory: &Path,
     ) -> Result<(), AttributeError> {
-        let source = match std::fs::read_to_string(file_path) {
+        let source = match fs::read_to_string(file_path) {
             Ok(source) => source,
             Err(source) => {
                 return Err(AttributeError::FileRead {

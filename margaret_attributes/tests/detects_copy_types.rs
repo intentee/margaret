@@ -16,12 +16,7 @@ fn index() -> AttributeIndex {
 }
 
 fn is_copy(segments: &[&str]) -> bool {
-    let canonical = CanonicalPath::new(
-        segments
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect(),
-    );
+    let canonical = CanonicalPath::new(segments.iter().map(ToString::to_string).collect());
 
     is_copy_type(&index(), &canonical)
 }

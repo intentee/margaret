@@ -147,13 +147,13 @@ impl TagPool {
 
 #[cfg(test)]
 mod tests {
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use syn::Path;
     use syn::parse_str;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;

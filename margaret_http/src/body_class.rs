@@ -1,18 +1,19 @@
 use http::header::CONTENT_TYPE;
+use mime::Mime;
 
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
 use crate::server_params::ServerParams;
 
-fn is_multipart(media: &mime::Mime) -> bool {
+fn is_multipart(media: &Mime) -> bool {
     media.type_() == mime::MULTIPART && media.subtype() == mime::FORM_DATA
 }
 
-fn is_urlencoded(media: &mime::Mime) -> bool {
+fn is_urlencoded(media: &Mime) -> bool {
     media.type_() == mime::APPLICATION && media.subtype() == mime::WWW_FORM_URLENCODED
 }
 
-fn is_json(media: &mime::Mime) -> bool {
+fn is_json(media: &Mime) -> bool {
     media.type_() == mime::APPLICATION && media.subtype() == mime::JSON
 }
 
@@ -29,7 +30,7 @@ impl BodyClass {
             return RequestOutcome::Parsed(Self::Other);
         };
 
-        let media = match value.parse::<mime::Mime>() {
+        let media = match value.parse::<Mime>() {
             Ok(media) => media,
             Err(source) => {
                 return RequestOutcome::Rejected(RequestRejection::MalformedContentType { source });
@@ -63,6 +64,7 @@ mod tests {
     use http::Request;
     use http::header::CONTENT_TYPE;
     use http::header::HOST;
+    use mime::Mime;
 
     use super::BodyClass;
     use crate::request_outcome::RequestOutcome;
@@ -115,7 +117,7 @@ mod tests {
         assert_rejects(
             b"not/a/media/type",
             &RequestRejection::MalformedContentType {
-                source: "//".parse::<mime::Mime>().expect_err("a malformed mime"),
+                source: "//".parse::<Mime>().expect_err("a malformed mime"),
             },
         );
     }

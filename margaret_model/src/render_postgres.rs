@@ -227,35 +227,23 @@ mod tests {
         on_delete: OnDelete,
     ) -> ForeignKey {
         ForeignKey {
-            columns: columns
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
+            columns: columns.iter().map(ToString::to_string).collect(),
             on_delete,
-            references_columns: references_columns
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
+            references_columns: references_columns.iter().map(ToString::to_string).collect(),
             references_table: references_table.to_string(),
         }
     }
 
     fn index(columns: &[&str], name: &str) -> Index {
         Index {
-            columns: columns
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
+            columns: columns.iter().map(ToString::to_string).collect(),
             name: name.to_string(),
         }
     }
 
     fn unique_constraint(columns: &[&str]) -> UniqueConstraint {
         UniqueConstraint {
-            columns: columns
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
+            columns: columns.iter().map(ToString::to_string).collect(),
         }
     }
 

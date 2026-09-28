@@ -1,11 +1,14 @@
+use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::fmt::Result;
 use std::str::Utf8Error;
 
 use cookie::ParseError;
 use http::HeaderName;
 use http::header::ToStrError;
 use http::uri::InvalidUri;
+use mime::FromStrError;
 
 use crate::response::Response;
 use crate::singleton_request_header::SingletonRequestHeader;
@@ -40,7 +43,7 @@ pub(crate) enum RequestRejection {
         source: ToStrError,
     },
     MalformedContentType {
-        source: mime::FromStrError,
+        source: FromStrError,
     },
     MalformedCookie {
         source: ParseError,
@@ -72,7 +75,7 @@ pub(crate) enum RequestRejection {
     },
     RequestTargetNotOriginForm,
     UnreadableBody {
-        source: Box<dyn std::error::Error + Send + Sync>,
+        source: Box<dyn Error + Send + Sync>,
     },
     UploadsDisabled,
 }
@@ -110,7 +113,7 @@ impl RequestRejection {
 }
 
 impl Display for RequestRejection {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         match self {
             Self::AuthorityMismatch => {
                 formatter.write_str("the request target authority and the Host header disagree")
@@ -206,9 +209,13 @@ impl Display for RequestRejection {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Error;
+
+    use cookie::Cookie;
     use http::header::COOKIE;
     use http::header::HeaderValue;
     use http::uri::Authority;
+    use mime::Mime;
     use percent_encoding::percent_decode_str;
 
     use super::RequestRejection;
@@ -248,11 +255,11 @@ mod tests {
             },
             RequestRejection::MalformedContentType {
                 source: "not/a/media/type"
-                    .parse::<mime::Mime>()
+                    .parse::<Mime>()
                     .expect_err("the media type is malformed"),
             },
             RequestRejection::MalformedCookie {
-                source: cookie::Cookie::parse("=nameless").expect_err("the cookie is malformed"),
+                source: Cookie::parse("=nameless").expect_err("the cookie is malformed"),
             },
             RequestRejection::MalformedHost {
                 source: "not a host"
@@ -284,7 +291,7 @@ mod tests {
             },
             RequestRejection::RequestTargetNotOriginForm,
             RequestRejection::UnreadableBody {
-                source: Box::new(std::io::Error::other("the connection closed")),
+                source: Box::new(Error::other("the connection closed")),
             },
             RequestRejection::UploadsDisabled,
         ]

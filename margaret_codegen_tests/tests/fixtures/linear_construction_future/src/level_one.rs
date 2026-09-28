@@ -4,6 +4,8 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
 
+use super::record::record;
+
 #[singleton]
 #[console_command(name = "level-one")]
 pub struct LevelOne;
@@ -14,7 +16,7 @@ impl LevelOne {
     /// Returns an error propagated from the work it performs.
     #[constructor]
     pub async fn create() -> anyhow::Result<Self> {
-        super::record::record(0).await;
+        record(0).await;
         Ok(Self)
     }
 

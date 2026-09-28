@@ -28,10 +28,13 @@ where
 mod tests {
     use std::collections::HashMap;
 
+    use serde::Deserialize;
+    use validator::Validate;
+
     use super::validate;
     use crate::validation_result::ValidationResult;
 
-    #[derive(Debug, serde::Deserialize, validator::Validate)]
+    #[derive(Debug, Deserialize, Validate)]
     struct Sample {
         #[validate(length(min = 1))]
         required: String,

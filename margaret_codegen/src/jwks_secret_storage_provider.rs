@@ -42,10 +42,11 @@ pub(crate) fn jwks_secret_storage_provider() -> FrameworkProvider {
 
 #[cfg(test)]
 mod tests {
+    use margaret_container::framework_construction::FrameworkConstruction;
+
     use super::canonical_path;
     use super::jwks_secret_storage_provider;
     use crate::jwks_secret_storage_canonical_path::jwks_secret_storage_canonical_path;
-    use margaret_container::framework_construction::FrameworkConstruction;
 
     #[test]
     fn provides_the_jwks_secret_storage_wiring_paths() {

@@ -14,13 +14,12 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
-    use crate::service_codegen_error::ServiceCodegenError;
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
@@ -37,6 +36,7 @@ mod tests {
     use crate::framework_service::FrameworkService;
     use crate::framework_service_kind::FrameworkServiceKind;
     use crate::render_services::render_services;
+    use crate::service_codegen_error::ServiceCodegenError;
     use crate::service_plan::ServicePlan;
 
     fn crate_with(lib_source: &str) -> TempDir {

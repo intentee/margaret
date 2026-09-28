@@ -2,6 +2,7 @@ use proc_macro2::Ident;
 use quote::format_ident;
 use syn::Attribute;
 use syn::Pat;
+use syn::Path;
 use syn::Type;
 
 use crate::canonical_path::CanonicalPath;
@@ -41,7 +42,7 @@ impl ScannedParameter {
 
     pub(crate) fn resolve(
         self,
-        resolve: impl Copy + Fn(&syn::Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&Path) -> CanonicalPath,
     ) -> IndexedParameter {
         IndexedParameter::from_parts(
             ScannedAttribute::resolve_all(self.attributes, resolve),

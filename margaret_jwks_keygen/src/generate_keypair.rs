@@ -2,6 +2,7 @@ use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 use p256::elliptic_curve::rand_core::OsRng;
 use p256::elliptic_curve::sec1::ToEncodedPoint;
+use p256::pkcs8;
 use p256::pkcs8::EncodePrivateKey;
 use p256::pkcs8::LineEnding;
 use zeroize::Zeroizing;
@@ -18,7 +19,7 @@ use crate::key_use::KeyUse;
 fn build_jwk_pair(
     crv: Curve,
     kid: String,
-    pem: Result<String, p256::pkcs8::Error>,
+    pem: Result<String, pkcs8::Error>,
     x: Option<Vec<u8>>,
     y: Option<Vec<u8>>,
 ) -> Result<JwkPair, JwksKeyError> {
@@ -91,6 +92,7 @@ pub fn generate_keypair(
 
 #[cfg(test)]
 mod tests {
+    use p256::SecretKey;
     use p256::pkcs8::DecodePrivateKey;
 
     use super::build_jwk_pair;
@@ -101,9 +103,7 @@ mod tests {
         let error = build_jwk_pair(
             Curve::P256,
             "kid".to_string(),
-            Err(p256::SecretKey::from_pkcs8_pem("not a valid pem")
-                .err()
-                .unwrap()),
+            Err(SecretKey::from_pkcs8_pem("not a valid pem").err().unwrap()),
             Some(vec![1]),
             Some(vec![2]),
         )
@@ -111,9 +111,7 @@ mod tests {
         .unwrap();
         let expected = format!(
             "the generated private key could not be encoded to pkcs#8 pem: {}",
-            p256::SecretKey::from_pkcs8_pem("not a valid pem")
-                .err()
-                .unwrap()
+            SecretKey::from_pkcs8_pem("not a valid pem").err().unwrap()
         );
 
         assert_eq!(error.to_string(), expected);

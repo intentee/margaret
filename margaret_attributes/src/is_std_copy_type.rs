@@ -37,22 +37,19 @@ pub(crate) fn is_std_copy_type(canonical: &CanonicalPath) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::canonical_path::CanonicalPath;
-
+    use super::STANDARD_LIBRARY_COPY_TYPES;
     use super::is_std_copy_type;
+    use crate::canonical_path::CanonicalPath;
 
     fn is_copy(segments: &[&str]) -> bool {
         is_std_copy_type(&CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
+            segments.iter().map(ToString::to_string).collect(),
         ))
     }
 
     #[test]
     fn recognizes_every_known_standard_library_copy_type() {
-        for [module, name] in super::STANDARD_LIBRARY_COPY_TYPES {
+        for [module, name] in STANDARD_LIBRARY_COPY_TYPES {
             assert!(is_copy(&["std", module, name]));
         }
     }

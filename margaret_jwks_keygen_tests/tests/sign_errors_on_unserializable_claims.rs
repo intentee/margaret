@@ -1,6 +1,7 @@
 use anyhow::Result;
 use serde::Serialize;
 use serde::Serializer;
+use serde::ser::Error;
 
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
@@ -15,7 +16,7 @@ impl Serialize for UnserializableClaims {
         &self,
         _serializer: TSerializer,
     ) -> Result<TSerializer::Ok, TSerializer::Error> {
-        Err(<TSerializer::Error as serde::ser::Error>::custom(
+        Err(<TSerializer::Error as Error>::custom(
             "claims cannot be serialized",
         ))
     }

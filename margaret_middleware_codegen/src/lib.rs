@@ -12,7 +12,6 @@ pub mod resolve_layers;
 
 #[cfg(test)]
 mod tests {
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use quote::format_ident;
@@ -20,6 +19,7 @@ mod tests {
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;

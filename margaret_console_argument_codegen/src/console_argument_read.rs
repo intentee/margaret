@@ -60,12 +60,7 @@ mod tests {
     fn value(required: bool, weaving: WeavingKind, segments: &[&str]) -> InputValue {
         InputValue {
             required,
-            value_type: CanonicalPath::new(
-                segments
-                    .iter()
-                    .map(std::string::ToString::to_string)
-                    .collect(),
-            ),
+            value_type: CanonicalPath::new(segments.iter().map(ToString::to_string).collect()),
             weaving,
         }
     }

@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::io::Result as IoResult;
+use std::io::Result;
 
 use tokio_util::sync::CancellationToken;
 
@@ -13,7 +13,7 @@ async fn dispatch_installed<SignalFuture, Serve, ServeFuture>(
     serve: Serve,
 ) -> CommandOutcome
 where
-    SignalFuture: Future<Output = IoResult<()>>,
+    SignalFuture: Future<Output = Result<()>>,
     Serve: FnOnce(CancellationToken) -> ServeFuture,
     ServeFuture: Future<Output = CommandOutcome>,
 {
@@ -40,7 +40,7 @@ pub async fn dispatch_serve<Install, Serve, ServeFuture>(
     serve: Serve,
 ) -> CommandOutcome
 where
-    Install: FnOnce() -> IoResult<ShutdownSignals>,
+    Install: FnOnce() -> Result<ShutdownSignals>,
     Serve: FnOnce(CancellationToken) -> ServeFuture,
     ServeFuture: Future<Output = CommandOutcome>,
 {
@@ -56,8 +56,9 @@ where
 mod tests {
     use std::io::Error;
 
-    use margaret_console::command_outcome::CommandOutcome;
     use tokio_util::sync::CancellationToken;
+
+    use margaret_console::command_outcome::CommandOutcome;
 
     use super::dispatch_installed;
     use super::dispatch_serve;

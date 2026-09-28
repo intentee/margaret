@@ -2,6 +2,7 @@ use std::path::Path;
 
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_attributes::indexed_item::IndexedItem;
 
 #[test]
 fn drops_members_without_an_indexed_item() {
@@ -21,14 +22,14 @@ fn drops_members_without_an_indexed_item() {
         !index
             .items()
             .iter()
-            .flat_map(margaret_attributes::indexed_item::IndexedItem::methods)
+            .flat_map(IndexedItem::methods)
             .any(|method| method.identifier() == "orphaned_method")
     );
     assert!(
         !index
             .items()
             .iter()
-            .flat_map(margaret_attributes::indexed_item::IndexedItem::methods)
+            .flat_map(IndexedItem::methods)
             .any(|method| method.identifier() == "skipped_imported_method")
     );
 }

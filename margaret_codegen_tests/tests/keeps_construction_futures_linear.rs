@@ -1,4 +1,5 @@
 use margaret_codegen_linear_construction_future_fixture::margaret::framework::console::command_outcome::CommandOutcome;
+use margaret_codegen_linear_construction_future_fixture::margaret::run;
 
 #[tokio::test]
 async fn keeps_deep_construction_futures_below_the_linear_size_ceiling() {
@@ -15,11 +16,7 @@ async fn keeps_deep_construction_futures_below_the_linear_size_ceiling() {
 
     let before = margaret_codegen_linear_construction_future_fixture::construction_counts();
     assert!(matches!(
-        margaret_codegen_linear_construction_future_fixture::margaret::run::run([
-            "future-size-fixture",
-            "level-eight",
-        ])
-        .await,
+        run::run(["future-size-fixture", "level-eight"]).await,
         CommandOutcome::Succeeded
     ));
     let after = margaret_codegen_linear_construction_future_fixture::construction_counts();
@@ -43,11 +40,7 @@ async fn keeps_deep_construction_futures_below_the_linear_size_ceiling() {
         "level-two",
     ] {
         assert!(matches!(
-            margaret_codegen_linear_construction_future_fixture::margaret::run::run([
-                "future-size-fixture",
-                command,
-            ])
-            .await,
+            run::run(["future-size-fixture", command]).await,
             CommandOutcome::Succeeded
         ));
     }

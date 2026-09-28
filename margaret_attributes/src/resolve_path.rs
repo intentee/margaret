@@ -77,33 +77,26 @@ pub fn resolve_path(
 #[cfg(test)]
 mod tests {
 
+    use syn::Path;
     use syn::parse_quote;
+    use syn::punctuated::Punctuated;
 
+    use super::resolve_path;
     use crate::canonical_path::CanonicalPath;
     use crate::item_paths::ItemPaths;
     use crate::module_imports::ModuleImports;
 
-    use super::resolve_path;
-
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
-        )
+        CanonicalPath::new(segments.iter().map(ToString::to_string).collect())
     }
 
     fn resolved(
-        written: &syn::Path,
+        written: &Path,
         module: &[&str],
         imports: &ModuleImports,
         items: &ItemPaths,
     ) -> Option<String> {
-        let module_path: Vec<String> = module
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect();
+        let module_path: Vec<String> = module.iter().map(ToString::to_string).collect();
 
         resolve_path(written, &module_path, imports, items).map(|resolved| resolved.to_string())
     }
@@ -247,9 +240,9 @@ mod tests {
 
     #[test]
     fn a_path_without_segments_is_unresolvable() {
-        let empty = syn::Path {
+        let empty = Path {
             leading_colon: None,
-            segments: syn::punctuated::Punctuated::new(),
+            segments: Punctuated::new(),
         };
 
         assert_eq!(

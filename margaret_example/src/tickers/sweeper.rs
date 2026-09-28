@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
+use tokio::time::MissedTickBehavior;
+
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::scheduled_with_tick_timer;
 
 use crate::deployment_environment::DeploymentEnvironment;
 use crate::metrics::Metrics;
+use crate::sweep_interval::SWEEP_INTERVAL;
 
-#[scheduled_with_tick_timer(
-    interval = crate::sweep_interval::SWEEP_INTERVAL,
-    behavior = tokio::time::MissedTickBehavior::Delay
-)]
+#[scheduled_with_tick_timer(interval = SWEEP_INTERVAL, behavior = MissedTickBehavior::Delay)]
 pub struct Sweeper {
     deployment_environment: Arc<DeploymentEnvironment>,
     metrics: Arc<Metrics>,

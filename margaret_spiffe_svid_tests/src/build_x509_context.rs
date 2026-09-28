@@ -26,11 +26,10 @@ pub fn build_x509_context(
 
 #[cfg(test)]
 mod tests {
+    use super::build_x509_context;
     use crate::ca_der::CA_DER;
     use crate::leaf_spiffe_example_org_workload_der::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_DER;
     use crate::leaf_spiffe_example_org_workload_key_der::LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_KEY_DER;
-
-    use super::build_x509_context;
 
     fn valid_cert_chain() -> Vec<u8> {
         [LEAF_SPIFFE_EXAMPLE_ORG_WORKLOAD_DER, CA_DER].concat()

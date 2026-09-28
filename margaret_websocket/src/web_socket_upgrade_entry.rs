@@ -127,6 +127,8 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
+    use hyper::Request;
+    use hyper::upgrade;
     use tokio_util::sync::CancellationToken;
 
     use super::drive_web_socket_upgrade;
@@ -134,8 +136,8 @@ mod tests {
 
     #[tokio::test]
     async fn returns_without_serving_when_the_upgrade_never_completes() {
-        let mut request = hyper::Request::new(());
-        let on_upgrade = hyper::upgrade::on(&mut request);
+        let mut request = Request::new(());
+        let on_upgrade = upgrade::on(&mut request);
         let session = Arc::new(());
         let session_handle = Arc::clone(&session);
         let dispatch_table: Arc<WebSocketDispatchTable<()>> =

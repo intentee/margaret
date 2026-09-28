@@ -31,26 +31,31 @@ mod tests {
     use std::collections::BTreeMap;
     use std::fs;
 
+    use quote::format_ident;
     use tempfile::tempdir;
 
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
+    use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_middleware_codegen::layer_application::LayerApplication;
+    use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::bound_parameter::BoundParameter;
     use margaret_request_binding_codegen::request_binding::RequestBinding;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
-    use quote::format_ident;
+    use margaret_serve_input_codegen::scan::scan;
 
     use crate::handler_binding::HandlerBinding;
+    use crate::render_websocket;
     use crate::server_serve_inputs::server_serve_inputs;
     use crate::session_plan::SessionPlan;
     use crate::session_serve_inputs::session_serve_inputs;
+    use crate::web_socket_artifacts::WebSocketArtifacts;
     use crate::web_socket_codegen_error::WebSocketCodegenError;
     use crate::web_socket_plan::WebSocketPlan;
     use crate::web_socket_session::WebSocketSession;
@@ -59,11 +64,11 @@ mod tests {
     fn render_websocket(
         index: &AttributeIndex,
         bindings: &ContainerBindings,
-        middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+        middleware_plans: &[MiddlewarePlan],
         registries: &BindingRegistries,
-    ) -> Result<crate::web_socket_artifacts::WebSocketArtifacts, WebSocketCodegenError> {
+    ) -> Result<WebSocketArtifacts, WebSocketCodegenError> {
         WebSocketPlan::build(index, bindings, middleware_plans, registries)
-            .map(|plan| crate::render_websocket::render_websocket(plan, bindings))
+            .map(|plan| render_websocket::render_websocket(plan, bindings))
     }
 
     const REQUEST_TRAIT: &str = "use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;\n";
@@ -162,8 +167,7 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
-        let registry = margaret_serve_input_codegen::scan::scan(index)
-            .expect("the console arguments are scanned");
+        let registry = scan(index).expect("the console arguments are scanned");
 
         render_container(index, &registry, &[])
             .expect("the container renders")
@@ -175,11 +179,8 @@ impl RespondsToWebSocketNotification for Typist {
             .expect("the binding registries are collected")
     }
 
-    fn missing_path() -> margaret_attributes::canonical_path::CanonicalPath {
-        margaret_attributes::canonical_path::CanonicalPath::new(vec![
-            "crate".to_string(),
-            "Missing".to_string(),
-        ])
+    fn missing_path() -> CanonicalPath {
+        CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
     }
 
     fn empty_session_plan() -> SessionPlan {
@@ -193,10 +194,7 @@ impl RespondsToWebSocketNotification for Typist {
                 parameters: Vec::new(),
                 path: "/room".to_string(),
                 server: "public".to_string(),
-                session_path: margaret_attributes::canonical_path::CanonicalPath::new(vec![
-                    "crate".to_string(),
-                    "Room".to_string(),
-                ]),
+                session_path: CanonicalPath::new(vec!["crate".to_string(), "Room".to_string()]),
             },
         }
     }

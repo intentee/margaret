@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use hyper::upgrade::OnUpgrade;
 use tokio_util::sync::CancellationToken;
-
-use async_trait::async_trait;
 
 use crate::handler_error::HandlerError;
 use crate::one_shot_handler::OneShotHandler;
@@ -60,6 +59,7 @@ mod tests {
 
     use async_trait::async_trait;
     use http::Method;
+    use hyper::upgrade;
     use hyper::upgrade::OnUpgrade;
     use tokio_util::sync::CancellationToken;
 
@@ -107,7 +107,7 @@ mod tests {
     #[tokio::test]
     async fn consumes_the_terminal_when_it_upgrades() {
         let mut request = hyper::Request::new(());
-        let on_upgrade = hyper::upgrade::on(&mut request);
+        let on_upgrade = upgrade::on(&mut request);
         let terminal = Box::new(WebSocketUpgradeTerminal::new(
             Arc::new(AcceptingUpgrade),
             on_upgrade,
