@@ -3,6 +3,7 @@ use syn::Path;
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attribute_arguments::format_path::format_path;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
+use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 use margaret_model::on_delete::OnDelete;
 
 use crate::column_list_arity::ColumnListArity;
@@ -27,11 +28,11 @@ impl ModelForeignKeyArguments {
                 model,
             )?;
 
-            let references = reader.take_path("references")?.ok_or_else(|| {
-                ModelCodegenError::ModelForeignKeyRequiresReferences {
+            let references = reader
+                .take_path(ItemNamingArgument::ForeignKeyReferences.key())?
+                .ok_or_else(|| ModelCodegenError::ModelForeignKeyRequiresReferences {
                     model: model.to_string(),
-                }
-            })?;
+                })?;
 
             let on_delete = match OnDeleteArgument::of(reader.take_path("on_delete")?) {
                 OnDeleteArgument::Known(on_delete) => on_delete,

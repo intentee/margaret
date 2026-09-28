@@ -1,6 +1,7 @@
 use syn::Path;
 
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
+use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
 use crate::service_codegen_error::ServiceCodegenError;
 
@@ -15,12 +16,12 @@ impl TickTimerArguments {
         ticker: &str,
     ) -> Result<Self, ServiceCodegenError> {
         arguments.interpret(|reader| {
-            let behavior = reader.take_path("behavior")?;
-            let interval = reader.take_path("interval")?.ok_or_else(|| {
-                ServiceCodegenError::TickerMissingInterval {
+            let behavior = reader.take_path(ItemNamingArgument::TickBehavior.key())?;
+            let interval = reader
+                .take_path(ItemNamingArgument::TickInterval.key())?
+                .ok_or_else(|| ServiceCodegenError::TickerMissingInterval {
                     ticker: ticker.to_string(),
-                }
-            })?;
+                })?;
 
             Ok(Self { behavior, interval })
         })

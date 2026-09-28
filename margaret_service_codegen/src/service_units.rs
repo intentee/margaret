@@ -9,6 +9,7 @@ use margaret_injection_codegen::is_cancellation_token::is_cancellation_token;
 use margaret_injection_codegen::parameters::parameters;
 use margaret_injection_codegen::process_method::process_method;
 use margaret_injection_codegen::request_binding_marker::request_binding_marker;
+use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
@@ -94,9 +95,21 @@ fn build_unit(
                 TickTimerArguments::parse(matched.args()?, &path)?;
             let behavior = behavior
                 .as_ref()
-                .map(|written| canonical_attribute_path(index, item, written, "behavior"))
+                .map(|written| {
+                    canonical_attribute_path(
+                        index,
+                        item,
+                        written,
+                        ItemNamingArgument::TickBehavior.key(),
+                    )
+                })
                 .transpose()?;
-            let interval = canonical_attribute_path(index, item, &interval, "interval")?;
+            let interval = canonical_attribute_path(
+                index,
+                item,
+                &interval,
+                ItemNamingArgument::TickInterval.key(),
+            )?;
 
             ServiceKind::Ticker { behavior, interval }
         }

@@ -12,6 +12,7 @@ publish.workspace = true
 [dependencies]
 margaret_attribute_arguments = { workspace = true }
 margaret_attributes = { workspace = true }
+margaret_item_naming_argument = { workspace = true }
 margaret_model = { workspace = true }
 margaret_schema_identifier_naming = { workspace = true }
 margaret_toposort = { workspace = true }
