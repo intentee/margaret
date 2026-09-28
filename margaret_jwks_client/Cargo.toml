@@ -21,6 +21,7 @@ margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_sync_holder = { workspace = true }
+margaret_token_trust = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

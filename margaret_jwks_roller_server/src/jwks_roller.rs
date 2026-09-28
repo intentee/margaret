@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
-use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 
 use crate::jwks_roller_server_bundle::JwksRollerServerBundle;
 use crate::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
@@ -11,7 +11,6 @@ use crate::public_jwks_handler::PublicJwksHandler;
 pub struct JwksRoller {
     bundle: JwksRollerServerBundle,
     public_jwks_handler: Arc<PublicJwksHandler>,
-    server_secret_store: Arc<JwksSecretStore>,
 }
 
 impl JwksRoller {
@@ -19,13 +18,16 @@ impl JwksRoller {
     pub fn create(storage: Arc<dyn JwksSecretStorage>) -> Self {
         let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams { storage });
         let public_jwks_handler = bundle.public_jwks_handler();
-        let server_secret_store = Arc::new(JwksSecretStore::new(bundle.jwks_secret_holder()));
 
         Self {
             bundle,
             public_jwks_handler,
-            server_secret_store,
         }
+    }
+
+    #[must_use]
+    pub fn jwks_secret_holder(&self) -> JwksSecretHolder {
+        self.bundle.jwks_secret_holder()
     }
 
     #[must_use]
@@ -39,19 +41,11 @@ impl JwksRoller {
     pub fn run(&self) -> Result<(), JwksRollerServerError> {
         self.bundle.roll_and_publish()
     }
-
-    #[must_use]
-    pub fn server_secret_store(&self) -> Arc<JwksSecretStore> {
-        self.server_secret_store.clone()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-
-    use chrono::DateTime;
-    use serde_json::json;
 
     use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 
@@ -76,23 +70,14 @@ mod tests {
     }
 
     #[test]
-    fn exposes_a_secret_store_backed_by_the_live_secret() {
+    fn exposes_the_secret_it_rolls() {
         let roller = roller();
-        let store = roller.server_secret_store();
-        let claims = json!({ "sub": "subject" });
+        let holder = roller.jwks_secret_holder();
 
-        assert!(
-            store
-                .sign_access_token(&claims, DateTime::UNIX_EPOCH)
-                .is_err()
-        );
+        assert!(holder.get().is_none());
 
         roller.run().expect("the first roll seeds the secret");
 
-        assert!(
-            store
-                .sign_access_token(&claims, DateTime::UNIX_EPOCH)
-                .is_ok()
-        );
+        assert!(holder.get().is_some());
     }
 }

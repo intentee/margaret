@@ -18,7 +18,10 @@ fn error(fixture: &str) -> ContainerError {
 fn rejects_a_provides_jwks_endpoint_on_a_non_struct() {
     assert!(matches!(
         error("endpoint_not_a_struct"),
-        ContainerError::NotAnEndpointStruct { .. }
+        ContainerError::DeclarationNotAStruct {
+            attribute: "provides_jwks_endpoint",
+            ..
+        }
     ));
 }
 
@@ -26,7 +29,10 @@ fn rejects_a_provides_jwks_endpoint_on_a_non_struct() {
 fn rejects_a_jwks_endpoint_provider_that_is_also_a_service() {
     assert!(matches!(
         error("endpoint_conflicting_role"),
-        ContainerError::ConflictingEndpointRole { .. }
+        ContainerError::ConflictingDeclarationRole {
+            attribute: "provides_jwks_endpoint",
+            ..
+        }
     ));
 }
 
@@ -44,7 +50,10 @@ fn rejects_two_jwks_endpoint_providers_sharing_a_tag() {
 fn rejects_a_jwks_endpoint_provider_without_a_singleton() {
     assert!(matches!(
         error("endpoint_without_singleton"),
-        ContainerError::EndpointProviderRequiresSingleton { .. }
+        ContainerError::DeclarationRequiresSingleton {
+            attribute: "provides_jwks_endpoint",
+            ..
+        }
     ));
 }
 
@@ -70,7 +79,17 @@ fn rejects_a_jwks_endpoint_provider_with_malformed_singleton_arguments() {
 fn rejects_a_jwks_endpoint_provider_without_the_trait() {
     assert!(matches!(
         error("endpoint_missing_trait"),
-        ContainerError::EndpointProviderMissingTrait { .. }
+        ContainerError::DeclarationMissingTrait { required, .. }
+            if required == "margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint"
+    ));
+}
+
+#[test]
+fn rejects_a_jwks_endpoint_provider_without_the_token_trust() {
+    assert!(matches!(
+        error("endpoint_missing_token_trust"),
+        ContainerError::DeclarationMissingTrait { required, .. }
+            if required == "margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust"
     ));
 }
 

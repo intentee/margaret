@@ -13,6 +13,7 @@ members = [
     "margaret_codegen_tests/tests/fixtures/copy_console_arguments",
     "margaret_codegen_tests/tests/fixtures/environment_variable_inputs",
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
+    "margaret_codegen_tests/tests/fixtures/jwks_token_trust",
     "margaret_codegen_tests/tests/fixtures/linear_construction_future",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",
     "margaret_codegen_tests/tests/fixtures/composite_foreign_key_model",
@@ -92,8 +93,10 @@ members = [
     "margaret_syn_type_peeling",
     "margaret_sync_holder",
     "margaret_tag_codegen",
+    "margaret_token_issuance",
     "margaret_token_signer",
     "margaret_token_signer_tests",
+    "margaret_token_trust",
     "margaret_toposort",
     "margaret_validation",
     "margaret_views",
@@ -230,7 +233,9 @@ margaret_spiffe_svid_server = { path = "margaret_spiffe_svid_server", version = 
 margaret_syn_type_peeling = { path = "margaret_syn_type_peeling", version = "0.1.0" }
 margaret_sync_holder = { path = "margaret_sync_holder", version = "0.1.0" }
 margaret_tag_codegen = { path = "margaret_tag_codegen", version = "0.4.0" }
+margaret_token_issuance = { path = "margaret_token_issuance", version = "0.1.0" }
 margaret_token_signer = { path = "margaret_token_signer", version = "0.1.0" }
+margaret_token_trust = { path = "margaret_token_trust", version = "0.1.0" }
 margaret_toposort = { path = "margaret_toposort", version = "0.1.0" }
 margaret_validation = { path = "margaret_validation", version = "0.1.0" }
 margaret_views = { path = "margaret_views", version = "0.1.0" }

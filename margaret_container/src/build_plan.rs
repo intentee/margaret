@@ -6,7 +6,6 @@ use syn::Path;
 
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attributes::attribute_index::AttributeIndex;
-use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_base::field_base;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
@@ -26,6 +25,7 @@ use margaret_tag_codegen::tag_pool::TagPool;
 use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
+use crate::declared_token_issuance::DeclaredTokenIssuance;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
 use crate::draft_parameter::DraftParameter;
@@ -39,15 +39,10 @@ use crate::parameter_target::ParameterTarget;
 use crate::path_text::path_text;
 use crate::provided_type::ProvidedType;
 use crate::provider::Provider;
-use crate::provides_endpoint_path::provides_endpoint_path;
 use crate::resolve_construction::resolve_construction;
+use crate::singleton_declaration::SingletonDeclaration;
 use crate::topological_order::topological_order;
 use crate::type_text::type_text;
-
-struct BuildableConstruction<'provider> {
-    construction: DirectConstruction,
-    framework_provider: &'provider FrameworkProvider,
-}
 
 fn concrete_roles() -> [FrameworkAttribute; 4] {
     [
@@ -58,22 +53,57 @@ fn concrete_roles() -> [FrameworkAttribute; 4] {
     ]
 }
 
+fn check_declared_item(
+    item: &IndexedItem,
+    declaration: SingletonDeclaration,
+) -> Result<(), ContainerError> {
+    let attribute = declaration.attribute().name();
+    let path = item.canonical_path().to_string();
+
+    if !matches!(item.kind(), ItemKind::Struct(_)) {
+        return Err(ContainerError::DeclarationNotAStruct { attribute, path });
+    }
+
+    if !item.has_framework_attribute(FrameworkAttribute::Singleton) {
+        return Err(ContainerError::DeclarationRequiresSingleton { attribute, path });
+    }
+
+    Ok(())
+}
+
+fn declared_token_issuance(
+    index: &AttributeIndex,
+) -> Result<DeclaredTokenIssuance, ContainerError> {
+    let issuers: Vec<CanonicalPath> = index
+        .select_framework_attribute(FrameworkAttribute::IssuesTokens)
+        .map(|matched| matched.item().canonical_path().clone())
+        .collect();
+
+    match issuers.as_slice() {
+        [] => Ok(DeclaredTokenIssuance::Absent),
+        [issuer] => Ok(DeclaredTokenIssuance::Declared(issuer.clone())),
+        _ => Err(ContainerError::AmbiguousTokenIssuance {
+            paths: issuers
+                .iter()
+                .map(CanonicalPath::to_string)
+                .collect::<Vec<String>>()
+                .join(", "),
+        }),
+    }
+}
+
 fn build_drafts(index: &AttributeIndex) -> Result<DraftedContainer<'_>, ContainerError> {
+    for declaration in SingletonDeclaration::ALL {
+        for matched in index.select_framework_attribute(declaration.attribute()) {
+            check_declared_item(matched.item(), declaration)?;
+        }
+    }
+
+    let token_issuance = declared_token_issuance(index)?;
     let mut provider_drafts: Vec<Draft> = Vec::new();
 
     for matched in index.select_framework_attribute(FrameworkAttribute::Singleton) {
-        if matched
-            .item()
-            .has_framework_attribute(FrameworkAttribute::ProvidesJwksEndpoint)
-        {
-            continue;
-        }
-
         provider_drafts.push(build_provider_draft(&matched, index)?);
-    }
-
-    for matched in index.select_framework_attribute(FrameworkAttribute::ProvidesJwksEndpoint) {
-        provider_drafts.push(build_endpoint_draft(&matched, index)?);
     }
 
     let mut provided_keys: HashMap<CanonicalPath, CanonicalPath> = HashMap::new();
@@ -106,6 +136,7 @@ fn build_drafts(index: &AttributeIndex) -> Result<DraftedContainer<'_>, Containe
         construction_drafts,
         provided_keys,
         provider_drafts,
+        token_issuance,
     })
 }
 
@@ -139,6 +170,12 @@ fn build_provider_draft<'index>(
 
     reject_singleton_arguments(matched.args()?, &concrete_path)?;
 
+    for declaration in SingletonDeclaration::ALL {
+        if item.has_framework_attribute(declaration.attribute()) {
+            check_declaration(index, item, declaration)?;
+        }
+    }
+
     let field_name = identifier.field().to_string();
     let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
     let parameters = read_draft_parameters(index, item, &construction, &concrete_path)?;
@@ -153,53 +190,31 @@ fn build_provider_draft<'index>(
     })
 }
 
-fn build_endpoint_draft<'index>(
-    matched: &MatchedAttribute<'index>,
+fn check_declaration(
     index: &AttributeIndex,
-) -> Result<Draft<'index>, ContainerError> {
-    let item = matched.item();
-    let (Some(identifier), ItemKind::Struct(shape)) =
-        (index.struct_identifier(item.canonical_path()), item.kind())
-    else {
-        return Err(ContainerError::NotAnEndpointStruct {
-            path: item.canonical_path().to_string(),
-        });
-    };
-
-    let concrete_path = item.canonical_path().clone();
-
-    let singletons = AttributeQuery::new(item).find_all_framework(FrameworkAttribute::Singleton);
-    let Some(singleton) = singletons.first() else {
-        return Err(ContainerError::EndpointProviderRequiresSingleton {
-            path: concrete_path.to_string(),
-        });
-    };
-
-    reject_singleton_arguments(singleton.args()?, &concrete_path)?;
+    item: &IndexedItem,
+    declaration: SingletonDeclaration,
+) -> Result<(), ContainerError> {
+    let attribute = declaration.attribute().name();
 
     if has_concrete_role(item) {
-        return Err(ContainerError::ConflictingEndpointRole {
-            path: concrete_path.to_string(),
+        return Err(ContainerError::ConflictingDeclarationRole {
+            attribute,
+            path: item.canonical_path().to_string(),
         });
     }
 
-    if !implements_provides_endpoint(index, item) {
-        return Err(ContainerError::EndpointProviderMissingTrait {
-            path: concrete_path.to_string(),
-        });
+    for required in declaration.required_traits() {
+        if !implements_trait(index, item, &required) {
+            return Err(ContainerError::DeclarationMissingTrait {
+                attribute,
+                path: item.canonical_path().to_string(),
+                required: required.to_string(),
+            });
+        }
     }
 
-    let construction = resolve_construction(item.methods(), &concrete_path, shape)?;
-    let parameters = read_draft_parameters(index, item, &construction, &concrete_path)?;
-
-    Ok(Draft {
-        concrete_path: concrete_path.clone(),
-        construction,
-        field_name: identifier.field().to_string(),
-        parameters,
-        provided: ProvidedType::Endpoint(concrete_path),
-        type_name: identifier.type_name().to_string(),
-    })
+    Ok(())
 }
 
 fn build_construction_draft<'index>(
@@ -251,12 +266,12 @@ fn has_concrete_role(item: &IndexedItem) -> bool {
         .any(|role| item.has_framework_attribute(*role))
 }
 
-fn implements_provides_endpoint(index: &AttributeIndex, item: &IndexedItem) -> bool {
+fn implements_trait(index: &AttributeIndex, item: &IndexedItem, required: &CanonicalPath) -> bool {
     item.trait_impls().iter().any(|trait_impl| {
         index
             .resolve_module_path(trait_impl.module_path(), trait_impl.trait_path())
             .as_ref()
-            == Some(&provides_endpoint_path())
+            == Some(required)
     })
 }
 
@@ -470,52 +485,45 @@ struct DraftedContainer<'index> {
     construction_drafts: Vec<Draft<'index>>,
     provided_keys: HashMap<CanonicalPath, CanonicalPath>,
     provider_drafts: Vec<Draft<'index>>,
+    token_issuance: DeclaredTokenIssuance,
 }
 
 fn resolve_framework_providers(
     index: &AttributeIndex,
-    provider_drafts: &[Draft],
-    construction_drafts: &[Draft],
-    provided_keys: &mut HashMap<CanonicalPath, CanonicalPath>,
+    drafted: &mut DraftedContainer,
     framework_providers: &[FrameworkProvider],
 ) -> Result<Vec<Provider>, ContainerError> {
-    let buildable = buildable_constructions(index, framework_providers);
+    let buildable = buildable_providers(framework_providers);
     let included = included_framework_providers(
-        provider_drafts,
-        construction_drafts,
+        &drafted.provider_drafts,
+        &drafted.construction_drafts,
         framework_providers,
         &buildable,
     );
     let mut allocator = index.reserved_allocator();
     let mut providers = Vec::new();
-    let mut ordered: Vec<BuildableConstruction> = buildable
+    let mut ordered: Vec<&FrameworkProvider> = buildable
         .into_values()
-        .filter(|buildable| included.contains(&buildable.framework_provider.provided))
+        .filter(|framework_provider| included.contains(&framework_provider.provided))
         .collect();
 
-    ordered.sort_by(|left, right| {
-        left.framework_provider
-            .provided
-            .cmp(&right.framework_provider.provided)
-    });
+    ordered.sort_by(|left, right| left.provided.cmp(&right.provided));
 
-    for BuildableConstruction {
-        construction,
-        framework_provider,
-    } in ordered
-    {
+    for framework_provider in ordered {
         let path = framework_provider.provided.clone();
 
-        if provided_keys.contains_key(&path) {
+        if drafted.provided_keys.contains_key(&path) {
             return Err(ContainerError::AmbiguousFrameworkProvider {
                 path: path.to_string(),
             });
         }
 
         if let FrameworkInjectionRole::Unmarked = framework_provider.injection {
-            provided_keys.insert(path.clone(), path.clone());
+            drafted.provided_keys.insert(path.clone(), path.clone());
         }
 
+        let construction =
+            resolve_framework_construction(index, framework_provider, &drafted.token_issuance)?;
         let identifier = allocator.allocate(&field_base(&path));
         let field_name = identifier.field().to_string();
         let type_name = identifier.type_name().to_string();
@@ -545,33 +553,22 @@ fn framework_provided_type(construction: &DirectConstruction, path: CanonicalPat
     }
 }
 
-fn buildable_constructions<'provider>(
-    index: &AttributeIndex,
-    framework_providers: &'provider [FrameworkProvider],
-) -> HashMap<CanonicalPath, BuildableConstruction<'provider>> {
-    let mut resolved: HashMap<CanonicalPath, BuildableConstruction<'provider>> = HashMap::new();
-
-    for framework_provider in framework_providers {
-        resolved.insert(
-            framework_provider.provided.clone(),
-            BuildableConstruction {
-                construction: resolve_framework_construction(
-                    index,
-                    &framework_provider.construction,
-                ),
-                framework_provider,
-            },
-        );
-    }
+fn buildable_providers(
+    framework_providers: &[FrameworkProvider],
+) -> HashMap<CanonicalPath, &FrameworkProvider> {
+    let mut buildable: HashMap<CanonicalPath, &FrameworkProvider> = framework_providers
+        .iter()
+        .map(|framework_provider| (framework_provider.provided.clone(), framework_provider))
+        .collect();
 
     loop {
         let removable: Vec<CanonicalPath> = framework_providers
             .iter()
-            .filter(|framework_provider| resolved.contains_key(&framework_provider.provided))
+            .filter(|framework_provider| buildable.contains_key(&framework_provider.provided))
             .filter(|framework_provider| {
                 framework_provider_dependencies(&framework_provider.construction)
                     .iter()
-                    .any(|dependency| !resolved.contains_key(*dependency))
+                    .any(|dependency| !buildable.contains_key(*dependency))
             })
             .map(|framework_provider| framework_provider.provided.clone())
             .collect();
@@ -581,18 +578,44 @@ fn buildable_constructions<'provider>(
         }
 
         for path in removable {
-            resolved.remove(&path);
+            buildable.remove(&path);
         }
     }
 
-    resolved
+    buildable
+}
+
+fn framework_dependency_kind(
+    dependency: &FrameworkDependency,
+    token_issuance: &DeclaredTokenIssuance,
+    provided: &CanonicalPath,
+) -> Result<DependencyKind, ContainerError> {
+    match dependency {
+        FrameworkDependency::Provider(provider_key)
+        | FrameworkDependency::SingletonView(provider_key) => Ok(DependencyKind::Single {
+            provider_key: provider_key.clone(),
+        }),
+        FrameworkDependency::TokenIssuance => match token_issuance {
+            DeclaredTokenIssuance::Absent => Err(ContainerError::MissingTokenIssuance {
+                provider: provided.to_string(),
+            }),
+            DeclaredTokenIssuance::Declared(issuer) => Ok(DependencyKind::Single {
+                provider_key: issuer.clone(),
+            }),
+        },
+    }
 }
 
 fn resolve_framework_construction(
     index: &AttributeIndex,
-    construction: &FrameworkConstruction,
-) -> DirectConstruction {
-    match construction {
+    FrameworkProvider {
+        construction,
+        provided,
+        ..
+    }: &FrameworkProvider,
+    token_issuance: &DeclaredTokenIssuance,
+) -> Result<DirectConstruction, ContainerError> {
+    Ok(match construction {
         FrameworkConstruction::Accessor { accessor, source } => {
             DirectConstruction::FrameworkAccessor {
                 accessor: accessor.clone(),
@@ -605,24 +628,14 @@ fn resolve_framework_construction(
             dependencies,
             is_async,
             method,
-        } => {
-            let mut resolved = Vec::new();
-
-            for dependency in dependencies {
-                let provider_key = match dependency {
-                    FrameworkDependency::Endpoint(endpoint_path) => endpoint_path.clone(),
-                    FrameworkDependency::Provider(provider_key) => provider_key.clone(),
-                };
-
-                resolved.push(DependencyKind::Single { provider_key });
-            }
-
-            DirectConstruction::FrameworkConstructor {
-                dependencies: resolved,
-                is_async: *is_async,
-                method: method.clone(),
-            }
-        }
+        } => DirectConstruction::FrameworkConstructor {
+            dependencies: dependencies
+                .iter()
+                .map(|dependency| framework_dependency_kind(dependency, token_issuance, provided))
+                .collect::<Result<Vec<DependencyKind>, ContainerError>>()?,
+            is_async: *is_async,
+            method: method.clone(),
+        },
         FrameworkConstruction::UriSelected {
             argument_name,
             resolver,
@@ -641,7 +654,7 @@ fn resolve_framework_construction(
             resolver: resolver.clone(),
         },
         FrameworkConstruction::Unit => DirectConstruction::FrameworkUnit,
-    }
+    })
 }
 
 fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<&CanonicalPath> {
@@ -651,7 +664,7 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
             .iter()
             .filter_map(|dependency| match dependency {
                 FrameworkDependency::Provider(provider_key) => Some(provider_key),
-                FrameworkDependency::Endpoint(_) => None,
+                FrameworkDependency::SingletonView(_) | FrameworkDependency::TokenIssuance => None,
             })
             .collect(),
         FrameworkConstruction::UriSelected { .. } | FrameworkConstruction::Unit => Vec::new(),
@@ -662,7 +675,7 @@ fn included_framework_providers(
     provider_drafts: &[Draft],
     construction_drafts: &[Draft],
     framework_providers: &[FrameworkProvider],
-    buildable: &HashMap<CanonicalPath, BuildableConstruction>,
+    buildable: &HashMap<CanonicalPath, &FrameworkProvider>,
 ) -> HashSet<CanonicalPath> {
     let mut triggered: HashSet<CanonicalPath> = HashSet::new();
 
@@ -753,19 +766,15 @@ pub(crate) fn build_plan(
     framework_providers: &[FrameworkProvider],
     tags: &TagPool,
 ) -> Result<ContainerPlan, ContainerError> {
+    let mut drafted = build_drafts(index)?;
+    let resolved_framework_providers =
+        resolve_framework_providers(index, &mut drafted, framework_providers)?;
     let DraftedContainer {
         construction_drafts,
-        mut provided_keys,
+        provided_keys,
         provider_drafts,
-    } = build_drafts(index)?;
-
-    let resolved_framework_providers = resolve_framework_providers(
-        index,
-        &provider_drafts,
-        &construction_drafts,
-        &mut provided_keys,
-        framework_providers,
-    )?;
+        ..
+    } = drafted;
     let resolver = DependencyResolver {
         framework_providers,
         provided_keys: &provided_keys,

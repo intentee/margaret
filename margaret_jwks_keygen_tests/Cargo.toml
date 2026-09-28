@@ -10,6 +10,7 @@ margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 margaret_registered_claims = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

@@ -19,7 +19,10 @@ fn client_providers(binding: &JwksClientBinding) -> [FrameworkProvider; 2] {
     [
         FrameworkProvider {
             construction: FrameworkConstruction::Constructor {
-                dependencies: vec![FrameworkDependency::Endpoint(binding.endpoint.clone())],
+                dependencies: vec![
+                    FrameworkDependency::SingletonView(binding.endpoint.clone()),
+                    FrameworkDependency::SingletonView(binding.endpoint.clone()),
+                ],
                 is_async: false,
                 method: "create".to_string(),
             },
@@ -66,9 +69,13 @@ fn server_providers() -> [FrameworkProvider; 4] {
             provided: public_jwks_handler_canonical_path(),
         },
         FrameworkProvider {
-            construction: FrameworkConstruction::Accessor {
-                accessor: "server_secret_store".to_string(),
-                source: roller,
+            construction: FrameworkConstruction::Constructor {
+                dependencies: vec![
+                    FrameworkDependency::Provider(roller),
+                    FrameworkDependency::TokenIssuance,
+                ],
+                is_async: false,
+                method: "create".to_string(),
             },
             enablement: FrameworkEnablement::WhenReferenced,
             injection: FrameworkInjectionRole::JwksServerStore,

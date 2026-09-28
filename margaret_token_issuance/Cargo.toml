@@ -1,0 +1,17 @@
+[package]
+name = "margaret_token_issuance"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "The issuer and audience that a Margaret application stamps onto the tokens it issues."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+margaret_registered_claims = { workspace = true }
+
+[lints]
+workspace = true

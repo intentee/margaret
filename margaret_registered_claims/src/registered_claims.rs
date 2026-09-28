@@ -1,10 +1,9 @@
-use chrono::DateTime;
-use chrono::Utc;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde_json::Map;
 use serde_json::Value;
 
+use crate::audience_claim::AudienceClaim;
 use crate::numeric_date::NumericDate;
 
 fn present<'wire, Source: Deserializer<'wire>>(
@@ -19,30 +18,23 @@ fn numeric_date_member(date: NumericDate) -> Value {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct RegisteredClaims {
+    pub aud: AudienceClaim,
     pub exp: NumericDate,
     pub iat: NumericDate,
+    pub iss: String,
     #[serde(default, deserialize_with = "present")]
     pub nbf: Option<NumericDate>,
 }
 
 impl RegisteredClaims {
     #[must_use]
-    pub fn issued_at(now: DateTime<Utc>, lifetime_seconds: u32) -> Self {
-        let iat = NumericDate::from(now);
-
-        Self {
-            exp: NumericDate::new(iat.seconds_since_epoch() + i64::from(lifetime_seconds)),
-            iat,
-            nbf: None,
-        }
-    }
-
-    #[must_use]
     pub fn to_json(&self) -> Map<String, Value> {
         let mut members = Map::new();
 
+        members.insert("aud".to_string(), self.aud.to_json());
         members.insert("exp".to_string(), numeric_date_member(self.exp));
         members.insert("iat".to_string(), numeric_date_member(self.iat));
+        members.insert("iss".to_string(), Value::String(self.iss.clone()));
 
         if let Some(nbf) = self.nbf {
             members.insert("nbf".to_string(), numeric_date_member(nbf));

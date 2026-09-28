@@ -21,6 +21,7 @@ thiserror = { workspace = true }
 [dev-dependencies]
 http = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
+margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 
 [lints]

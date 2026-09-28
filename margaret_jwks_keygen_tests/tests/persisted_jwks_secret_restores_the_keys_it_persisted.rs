@@ -7,11 +7,14 @@ use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificatio
 use margaret_jwks_keygen::persisted_jwks_secret::PersistedJwksSecret;
 use margaret_jwks_keygen::previous_key::PreviousKey;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
+use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[test]
 fn persisted_jwks_secret_restores_the_keys_it_persisted() -> Result<()> {
+    let trust = fixture_trust();
     let claims = TestClaims {
         sub: "subject".to_string(),
     };
@@ -27,7 +30,11 @@ fn persisted_jwks_secret_restores_the_keys_it_persisted() -> Result<()> {
     assert!(matches!(
         restored.verify_jwt::<TestClaims>(
             &current_token,
-            TypeHeaderExpectation::Required(JwtType::AccessToken),
+            &JwtExpectation {
+                audience: &trust.audience,
+                issuer: &trust.issuer,
+                token_type: TypeHeaderExpectation::Required(JwtType::AccessToken)
+            },
             NumericDate::new(0)
         ),
         JwksSecretVerificationResult::SignedWithCurrent(_)
@@ -35,7 +42,11 @@ fn persisted_jwks_secret_restores_the_keys_it_persisted() -> Result<()> {
     assert!(matches!(
         restored.verify_jwt::<TestClaims>(
             &retired_token,
-            TypeHeaderExpectation::Required(JwtType::AccessToken),
+            &JwtExpectation {
+                audience: &trust.audience,
+                issuer: &trust.issuer,
+                token_type: TypeHeaderExpectation::Required(JwtType::AccessToken)
+            },
             NumericDate::new(0)
         ),
         JwksSecretVerificationResult::SignedWithPrevious(_)

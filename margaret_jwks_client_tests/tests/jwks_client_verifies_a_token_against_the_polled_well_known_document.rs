@@ -16,6 +16,7 @@ use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
 use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
+use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
 use margaret_token_signer_tests::unix_time::unix_time;
 
@@ -67,7 +68,10 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
 
     let client_builder = fixture_client_builder(&fixture.certificate_authority);
     let jwks_url = fixture.url(jwks_server.port(), WELL_KNOWN_JWKS_PATH);
-    let jwks_client = JwksClient::create(Arc::new(StaticEndpoint::new(jwks_url)));
+    let jwks_client = JwksClient::create(
+        Arc::new(StaticEndpoint::new(jwks_url)),
+        Arc::new(fixture_trust()),
+    );
     let verifier = jwks_client.verifier();
     let mut jwks_subscription = jwks_client.subscribe();
 

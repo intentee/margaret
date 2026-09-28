@@ -1,0 +1,6 @@
+mod keeps_the_issuer_exactly_as_written;
+mod rejects_an_empty_audience;
+mod rejects_an_issuer_over_plain_http;
+mod rejects_an_issuer_that_is_not_a_url;
+mod rejects_an_issuer_with_a_fragment;
+mod rejects_an_issuer_with_a_query;

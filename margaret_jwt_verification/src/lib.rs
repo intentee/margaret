@@ -1,4 +1,5 @@
 pub mod claims_rejection;
+pub mod jwt_expectation;
 pub mod jwt_rejection;
 pub mod jwt_verification;
 pub mod type_header_expectation;

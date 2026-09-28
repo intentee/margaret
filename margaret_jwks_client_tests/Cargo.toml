@@ -13,6 +13,7 @@ margaret_jwks_client = { workspace = true }
 margaret_jwks_endpoint = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jws_verification = { workspace = true }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 reqwest = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "test-util", "time"] }
 tokio-util = { workspace = true }

@@ -13,6 +13,7 @@ mod generates_fieldless_singletons;
 mod generates_jwks_endpoint_injection;
 mod generates_linear_async_construction;
 mod generates_parameterized_root_construction;
+mod generates_token_issuance_injection;
 mod generation_is_deterministic;
 mod injectability_is_gated_by_singleton;
 mod injects_a_dependency_imported_through_a_reexport;

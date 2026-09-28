@@ -69,8 +69,9 @@ mod tests {
 
     use margaret_http::request::Request;
     use margaret_jwks_keygen::jwks_secret::JwksSecret;
-    use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
-    use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
+    use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
+    use margaret_jwks_secret_store_tests::unrolled_store::unrolled_store;
+    use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
     use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
     use margaret_token_signer_tests::refresh_claims::refresh_claims;
     use margaret_token_signer_tests::sign_refresh_token::sign_refresh_token;
@@ -79,11 +80,10 @@ mod tests {
     use super::MintAccessTokenHandler;
 
     fn handler_from(secret: Option<JwksSecret>) -> MintAccessTokenHandler {
-        let holder = JwksSecretHolder::default();
-
-        holder.set(secret.map(Arc::new));
-
-        MintAccessTokenHandler::create(Arc::new(JwksSecretStore::new(holder)))
+        MintAccessTokenHandler::create(Arc::new(match secret {
+            Some(secret) => rolled_store(secret),
+            None => unrolled_store(),
+        }))
     }
 
     fn request_with_body(body: Value) -> Request {
@@ -95,7 +95,12 @@ mod tests {
     }
 
     fn signed_refresh_token(secret: &JwksSecret, exp: i64) -> String {
-        sign_refresh_token(secret.current(), &refresh_claims(), exp)
+        sign_refresh_token(
+            secret.current(),
+            &fixture_issuance(),
+            &refresh_claims(),
+            exp,
+        )
     }
 
     #[test]

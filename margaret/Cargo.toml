@@ -46,7 +46,9 @@ margaret_spiffe_svid_bundle = { workspace = true, optional = true }
 margaret_spiffe_svid_client = { workspace = true, optional = true }
 margaret_spiffe_svid_server = { workspace = true, optional = true }
 margaret_sync_holder = { workspace = true, optional = true }
+margaret_token_issuance = { workspace = true, optional = true }
 margaret_token_signer = { workspace = true, optional = true }
+margaret_token_trust = { workspace = true, optional = true }
 margaret_validation = { workspace = true, optional = true }
 margaret_views = { workspace = true, optional = true }
 margaret_websocket = { workspace = true, optional = true }
@@ -89,7 +91,9 @@ runtime = [
     "dep:margaret_spiffe_svid_client",
     "dep:margaret_spiffe_svid_server",
     "dep:margaret_sync_holder",
+    "dep:margaret_token_issuance",
     "dep:margaret_token_signer",
+    "dep:margaret_token_trust",
     "dep:margaret_validation",
     "dep:margaret_views",
     "dep:margaret_websocket",

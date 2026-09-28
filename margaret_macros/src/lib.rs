@@ -220,6 +220,11 @@ pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
+pub fn issues_tokens(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
 pub fn provides_jwks_endpoint(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }

@@ -1904,7 +1904,9 @@ dependencies = [
  "margaret_spiffe_svid_client",
  "margaret_spiffe_svid_server",
  "margaret_sync_holder",
+ "margaret_token_issuance",
  "margaret_token_signer",
+ "margaret_token_trust",
  "margaret_validation",
  "margaret_views",
  "margaret_websocket",
@@ -1920,6 +1922,7 @@ dependencies = [
  "margaret_http",
  "margaret_jwks_keygen",
  "margaret_jwks_secret_store",
+ "margaret_jwks_secret_store_tests",
  "margaret_token_signer",
  "margaret_token_signer_tests",
  "serde",
@@ -2054,6 +2057,22 @@ dependencies = [
  "tokio-util",
  "trzcina",
  "validator",
+]
+
+[[package]]
+name = "margaret_codegen_jwks_token_trust_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "margaret",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "url",
 ]
 
 [[package]]
@@ -2412,6 +2431,7 @@ dependencies = [
  "chrono",
  "cookie",
  "margaret_registered_claims",
+ "margaret_token_issuance",
  "serde",
  "serde_json",
  "thiserror",
@@ -2493,6 +2513,7 @@ dependencies = [
  "margaret_jwt_verification",
  "margaret_registered_claims",
  "margaret_sync_holder",
+ "margaret_token_trust",
  "reqwest",
  "serde",
  "thiserror",
@@ -2521,6 +2542,7 @@ dependencies = [
  "margaret_jwks_roller_server",
  "margaret_jws_verification",
  "margaret_jwt_verification",
+ "margaret_jwt_verification_tests",
  "margaret_registered_claims",
  "margaret_sync_holder",
  "margaret_token_signer_tests",
@@ -2610,6 +2632,7 @@ dependencies = [
  "margaret_jwks_keygen",
  "margaret_jws_verification",
  "margaret_jwt_verification",
+ "margaret_jwt_verification_tests",
  "margaret_registered_claims",
  "p256",
  "serde",
@@ -2634,7 +2657,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
- "chrono",
  "http",
  "margaret_http",
  "margaret_identity_session",
@@ -2643,7 +2665,6 @@ dependencies = [
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_roller_tests",
- "margaret_jwks_secret_store",
  "margaret_sync_holder",
  "serde_json",
  "tempfile",
@@ -2694,8 +2715,10 @@ dependencies = [
  "margaret_identity_session",
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
+ "margaret_jwks_roller_server",
  "margaret_jwt_verification",
  "margaret_registered_claims",
+ "margaret_token_issuance",
  "margaret_token_signer",
  "serde",
  "serde_json",
@@ -2709,6 +2732,8 @@ version = "0.1.0"
 dependencies = [
  "margaret_identity_session",
  "margaret_jwks_keygen",
+ "margaret_jwks_roller",
+ "margaret_jwks_roller_server",
  "margaret_jwks_secret_store",
  "margaret_jws_verification",
  "margaret_jwt_verification",
@@ -2765,6 +2790,7 @@ dependencies = [
  "margaret_jws_verification_tests",
  "margaret_jwt_verification",
  "margaret_registered_claims",
+ "margaret_token_trust",
  "serde_json",
 ]
 
@@ -2848,6 +2874,8 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+ "thiserror",
+ "url",
 ]
 
 [[package]]
@@ -3192,6 +3220,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_token_issuance"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "margaret_registered_claims",
+]
+
+[[package]]
 name = "margaret_token_signer"
 version = "0.1.0"
 dependencies = [
@@ -3200,6 +3236,7 @@ dependencies = [
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jwt_verification",
+ "margaret_token_issuance",
  "serde",
 ]
 
@@ -3213,10 +3250,21 @@ dependencies = [
  "margaret_jwks_keygen",
  "margaret_jws_verification",
  "margaret_jwt_verification",
+ "margaret_jwt_verification_tests",
  "margaret_registered_claims",
+ "margaret_token_issuance",
  "margaret_token_signer",
+ "margaret_token_trust",
+ "serde",
  "serde_json",
  "uuid",
+]
+
+[[package]]
+name = "margaret_token_trust"
+version = "0.1.0"
+dependencies = [
+ "margaret_registered_claims",
 ]
 
 [[package]]

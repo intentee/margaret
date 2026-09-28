@@ -78,8 +78,10 @@ COVERAGE_PACKAGES := \
 	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
 	-p margaret_tag_codegen \
+	-p margaret_token_issuance \
 	-p margaret_token_signer \
 	-p margaret_token_signer_tests \
+	-p margaret_token_trust \
 	-p margaret_toposort \
 	-p margaret_validation \
 	-p margaret_views \
@@ -94,6 +96,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_copy_console_arguments_fixture \
 	--exclude-from-report margaret_codegen_environment_variable_inputs_fixture \
 	--exclude-from-report margaret_codegen_fallible_roles_fixture \
+	--exclude-from-report margaret_codegen_jwks_token_trust_fixture \
 	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
 	--exclude-from-report margaret_codegen_route_parameter_values_fixture \
 	--exclude-from-report margaret_codegen_websocket_fixture \
@@ -106,6 +109,7 @@ GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_copy_console_arguments_fixture \
 	-p margaret_codegen_environment_variable_inputs_fixture \
 	-p margaret_codegen_fallible_roles_fixture \
+	-p margaret_codegen_jwks_token_trust_fixture \
 	-p margaret_codegen_linear_construction_future_fixture \
 	-p margaret_codegen_route_parameter_values_fixture \
 	-p margaret_codegen_websocket_fixture \
@@ -174,7 +178,9 @@ RUNTIME_PACKAGES := \
 	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
 	-p margaret_tag_codegen \
+	-p margaret_token_issuance \
 	-p margaret_token_signer \
+	-p margaret_token_trust \
 	-p margaret_toposort \
 	-p margaret_validation \
 	-p margaret_views \
@@ -308,8 +314,10 @@ coverage: node_modules postgres-image
 		--gated margaret_syn_type_peeling=100 \
 		--gated margaret_sync_holder=100 \
 		--gated margaret_tag_codegen=100 \
+		--gated margaret_token_issuance=100 \
 		--gated margaret_token_signer=100 \
 		--gated margaret_token_signer_tests=100 \
+		--gated margaret_token_trust=100 \
 		--gated margaret_toposort=100 \
 		--gated margaret_validation=100 \
 		--gated margaret_views=100 \

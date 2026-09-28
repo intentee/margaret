@@ -15,11 +15,12 @@ use margaret_identity_session::refresh_token_claims_signed::RefreshTokenClaimsSi
 use margaret_identity_session::refresh_token_lifetime_secs::REFRESH_TOKEN_LIFETIME_SECS;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_registered_claims::registered_claims::RegisteredClaims;
+use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
 use margaret_token_signer::mint_access_token::mint_access_token;
 
@@ -27,13 +28,14 @@ use crate::access_token_signing::AccessTokenSigning;
 use crate::jwks_secret_store_error::JwksSecretStoreError;
 
 pub struct JwksSecretStore {
-    holder: JwksSecretHolder,
+    issuance: Arc<dyn DeclaresTokenIssuance>,
+    roller: Arc<JwksRoller>,
 }
 
 impl JwksSecretStore {
     #[must_use]
-    pub fn new(holder: JwksSecretHolder) -> Self {
-        Self { holder }
+    pub fn create(roller: Arc<JwksRoller>, issuance: Arc<dyn DeclaresTokenIssuance>) -> Self {
+        Self { issuance, roller }
     }
 
     /// # Errors
@@ -45,7 +47,10 @@ impl JwksSecretStore {
         now: DateTime<Utc>,
     ) -> Result<RefreshTokenClaimsSigned, JwksSecretStoreError> {
         let secret = self.current_secret()?;
-        let registered = RegisteredClaims::issued_at(now, REFRESH_TOKEN_LIFETIME_SECS);
+        let registered = self
+            .issuance
+            .token_issuance()
+            .registered_claims(now, REFRESH_TOKEN_LIFETIME_SECS);
         let claims = RefreshTokenClaims {
             jti: Uuid::new_v4(),
             sub: subject,
@@ -69,7 +74,12 @@ impl JwksSecretStore {
     ) -> Result<AccessTokenMinting, JwksSecretStoreError> {
         let secret = self.current_secret()?;
 
-        Ok(mint_access_token(&secret, refresh_token, now))
+        Ok(mint_access_token(
+            &secret,
+            self.issuance.token_issuance(),
+            refresh_token,
+            now,
+        ))
     }
 
     /// # Errors
@@ -87,7 +97,7 @@ impl JwksSecretStore {
         else {
             return Ok(AccessTokenSigning::ClaimsNotAnObject);
         };
-        let stamp = AccessTokenStamp::issued_at(now);
+        let stamp = AccessTokenStamp::issued_by(self.issuance.token_issuance(), now);
         let mut payload = stamp.to_json();
 
         for (member, value) in application_claims {
@@ -119,15 +129,22 @@ impl JwksSecretStore {
         token: &str,
         now: DateTime<Utc>,
     ) -> Result<JwksSecretVerificationResult<TClaims>, JwksSecretStoreError> {
+        let issuance = self.issuance.token_issuance();
+
         Ok(self.current_secret()?.verify_jwt(
             token,
-            TypeHeaderExpectation::Required(JwtType::AccessToken),
+            &JwtExpectation {
+                audience: &issuance.audience,
+                issuer: &issuance.issuer,
+                token_type: TypeHeaderExpectation::Required(JwtType::AccessToken),
+            },
             NumericDate::from(now),
         ))
     }
 
     fn current_secret(&self) -> Result<Arc<JwksSecret>, JwksSecretStoreError> {
-        self.holder
+        self.roller
+            .jwks_secret_holder()
             .get()
             .ok_or(JwksSecretStoreError::SecretUnavailable)
     }
