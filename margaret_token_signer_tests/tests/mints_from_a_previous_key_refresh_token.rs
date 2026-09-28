@@ -1,7 +1,9 @@
 use margaret_identity_session::access_token_claims::AccessTokenClaims;
 use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
+use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_keygen::previous_key::PreviousKey;
+use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
 use margaret_token_signer::mint_access_token::mint_access_token;
@@ -29,13 +31,21 @@ fn mints_from_a_previous_key_refresh_token() {
     else {
         panic!("a refresh token signed by the previous key mints an access token");
     };
-    let JwksSecretVerificationResult::SignedWithCurrent(access) =
-        secret.verify_jwt::<AccessTokenClaims>(&access_token, NumericDate::new(1_000))
+    let JwksSecretVerificationResult::SignedWithCurrent(access) = secret
+        .verify_jwt::<AccessTokenClaims>(
+            &access_token,
+            TypeHeaderExpectation::Required(JwtType::AccessToken),
+            NumericDate::new(1_000),
+        )
     else {
         panic!("the minted access token is signed with the current key");
     };
-    let JwksSecretVerificationResult::SignedWithCurrent(migrated) =
-        secret.verify_jwt::<RefreshTokenClaims>(&refresh_token, NumericDate::new(1_000))
+    let JwksSecretVerificationResult::SignedWithCurrent(migrated) = secret
+        .verify_jwt::<RefreshTokenClaims>(
+            &refresh_token,
+            TypeHeaderExpectation::Required(JwtType::Jwt),
+            NumericDate::new(1_000),
+        )
     else {
         panic!("the migrated refresh token is signed with the current key");
     };

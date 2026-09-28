@@ -1,6 +1,8 @@
 use margaret_identity_session::access_token_claims::AccessTokenClaims;
 use margaret_identity_session::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
+use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
+use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
@@ -22,8 +24,12 @@ fn mints_from_a_current_key_refresh_token() {
     else {
         panic!("a valid refresh token mints an access token");
     };
-    let JwksSecretVerificationResult::SignedWithCurrent(access) =
-        secret.verify_jwt::<AccessTokenClaims>(&access_token, NumericDate::new(1_000))
+    let JwksSecretVerificationResult::SignedWithCurrent(access) = secret
+        .verify_jwt::<AccessTokenClaims>(
+            &access_token,
+            TypeHeaderExpectation::Required(JwtType::AccessToken),
+            NumericDate::new(1_000),
+        )
     else {
         panic!("the minted access token verifies");
     };

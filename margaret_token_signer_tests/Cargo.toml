@@ -17,6 +17,7 @@ uuid = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_token_signer = { workspace = true }
+serde_json = { workspace = true }
 
 [[test]]
 name = "main"

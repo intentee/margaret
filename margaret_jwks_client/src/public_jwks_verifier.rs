@@ -2,7 +2,9 @@ use chrono::DateTime;
 use chrono::Utc;
 use serde::de::DeserializeOwned;
 
+use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
+use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_jwt_verification::verify_jwt::verify_jwt;
 use margaret_registered_claims::numeric_date::NumericDate;
 
@@ -31,7 +33,12 @@ impl PublicJwksVerifier {
             return AccessTokenVerification::NotReady;
         };
 
-        match verify_jwt(&key_set, token, NumericDate::from(now)) {
+        match verify_jwt(
+            &key_set,
+            token,
+            TypeHeaderExpectation::Required(JwtType::AccessToken),
+            NumericDate::from(now),
+        ) {
             JwtVerification::Rejected(rejection) => AccessTokenVerification::Rejected(rejection),
             JwtVerification::Verified(verified) => AccessTokenVerification::Verified(verified),
         }

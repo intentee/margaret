@@ -11,23 +11,22 @@ use margaret_jwt_verification_tests::signed_claims::SignedClaims;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[test]
-fn keeps_registered_claims_out_of_the_application_claims() {
+fn accepts_a_type_written_as_a_media_type() {
     let SignedClaims {
         key_set: KeySetParsing::Accepted(key_set),
         token,
-    } = SignedClaims::new(&json!({ "exp": 1_000, "iat": 900, "nbf": 900, "sub": "subject" }))
+    } = SignedClaims::typed("Application/AT+JWT", &json!({ "exp": 1_000, "iat": 900 }))
     else {
         panic!("the fixture key set is accepted");
     };
 
-    let JwtVerification::Verified(verified) = verify_jwt::<Map<String, Value>>(
-        &key_set,
-        &token,
-        TypeHeaderExpectation::Optional(JwtType::Jwt),
-        NumericDate::new(950),
-    ) else {
-        panic!("the token verifies");
-    };
-
-    assert_eq!(Value::Object(verified.claims), json!({ "sub": "subject" }));
+    assert!(matches!(
+        verify_jwt::<Map<String, Value>>(
+            &key_set,
+            &token,
+            TypeHeaderExpectation::Required(JwtType::AccessToken),
+            NumericDate::new(950)
+        ),
+        JwtVerification::Verified(_)
+    ));
 }

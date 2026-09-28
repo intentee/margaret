@@ -2,10 +2,12 @@ use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
 
+use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jwt_verification::claims_rejection::ClaimsRejection;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
+use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_jwt_verification::verify_jwt::verify_jwt;
 use margaret_jwt_verification_tests::signed_claims::SignedClaims;
 use margaret_registered_claims::numeric_date::NumericDate;
@@ -21,7 +23,7 @@ fn rejects_a_token_before_its_not_before() {
     };
 
     assert!(matches!(
-        verify_jwt::<Map<String, Value>>(&key_set, &token, NumericDate::new(949)),
+        verify_jwt::<Map<String, Value>>(&key_set, &token, TypeHeaderExpectation::Optional(JwtType::Jwt), NumericDate::new(949)),
         JwtVerification::Rejected(JwtRejection::Claims(ClaimsRejection::NotYetValid { nbf, now }))
             if nbf == NumericDate::new(950) && now == NumericDate::new(949)
     ));

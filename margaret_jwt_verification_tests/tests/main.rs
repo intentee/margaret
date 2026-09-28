@@ -1,10 +1,15 @@
 mod accepts_a_token_at_its_exact_not_before;
+mod accepts_a_type_written_as_a_media_type;
 mod keeps_registered_claims_out_of_the_application_claims;
 mod rejects_a_fractional_numeric_date;
 mod rejects_a_null_not_before;
 mod rejects_a_token_at_its_exact_expiry;
 mod rejects_a_token_before_its_not_before;
+mod rejects_a_token_of_an_unsupported_type;
+mod rejects_a_token_of_another_type;
+mod rejects_a_token_without_a_required_type;
 mod rejects_a_token_without_an_expiry;
 mod rejects_a_token_without_an_issue_time;
+mod rejects_a_type_of_another_media_type_family;
 mod reports_the_rejection_of_the_signature;
 mod verifies_a_token_before_its_expiry;

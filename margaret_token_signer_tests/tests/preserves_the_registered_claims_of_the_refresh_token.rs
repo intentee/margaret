@@ -1,5 +1,7 @@
 use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
+use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
+use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
@@ -19,15 +21,19 @@ fn preserves_the_registered_claims_of_the_refresh_token() {
     };
     let refresh_token = secret
         .current()
-        .sign_json(&refresh_claims().to_payload(&original));
+        .sign_json(&refresh_claims().to_payload(&original), JwtType::Jwt);
 
     let AccessTokenMinting::Minted(MintedTokens { refresh_token, .. }) =
         mint_access_token(&secret, &refresh_token, unix_time(1_000))
     else {
         panic!("a valid refresh token mints new tokens");
     };
-    let JwksSecretVerificationResult::SignedWithCurrent(reissued) =
-        secret.verify_jwt::<RefreshTokenClaims>(&refresh_token, NumericDate::new(1_000))
+    let JwksSecretVerificationResult::SignedWithCurrent(reissued) = secret
+        .verify_jwt::<RefreshTokenClaims>(
+            &refresh_token,
+            TypeHeaderExpectation::Required(JwtType::Jwt),
+            NumericDate::new(1_000),
+        )
     else {
         panic!("the reissued refresh token verifies");
     };

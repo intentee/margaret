@@ -12,9 +12,9 @@ publish.workspace = true
 [dependencies]
 chrono = { workspace = true }
 margaret_identity_session = { workspace = true }
+margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwt_verification = { workspace = true }
-margaret_registered_claims = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [lints]

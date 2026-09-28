@@ -6,3 +6,4 @@ mod rejects_a_refresh_token_at_its_exact_expiry;
 mod rejects_a_refresh_token_signed_by_an_unrelated_key;
 mod rejects_a_refresh_token_signed_with_the_next_key;
 mod rejects_a_refresh_token_with_claims_of_another_shape;
+mod rejects_an_access_token_presented_as_a_refresh_token;

@@ -15,6 +15,7 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 log = { workspace = true }
 margaret_issuer_document_fetch = { workspace = true }
+margaret_jose_parameters = { workspace = true }
 margaret_jwks_endpoint = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }

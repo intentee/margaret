@@ -3,21 +3,22 @@ use serde_json::Value;
 use serde_json::json;
 
 use margaret_jose_parameters::jwt_type::JwtType;
+use margaret_jws_verification::header_type::HeaderType;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
-use margaret_jwt_verification::claims_rejection::ClaimsRejection;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
+use margaret_jwt_verification::type_rejection::TypeRejection;
 use margaret_jwt_verification::verify_jwt::verify_jwt;
 use margaret_jwt_verification_tests::signed_claims::SignedClaims;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[test]
-fn rejects_a_null_not_before() {
+fn rejects_a_token_of_an_unsupported_type() {
     let SignedClaims {
         key_set: KeySetParsing::Accepted(key_set),
         token,
-    } = SignedClaims::new(&json!({ "exp": 1_000, "iat": 900, "nbf": null }))
+    } = SignedClaims::typed("dpop+jwt", &json!({ "exp": 1_000, "iat": 900 }))
     else {
         panic!("the fixture key set is accepted");
     };
@@ -26,9 +27,12 @@ fn rejects_a_null_not_before() {
         verify_jwt::<Map<String, Value>>(
             &key_set,
             &token,
-            TypeHeaderExpectation::Optional(JwtType::Jwt),
+            TypeHeaderExpectation::Required(JwtType::AccessToken),
             NumericDate::new(950)
         ),
-        JwtVerification::Rejected(JwtRejection::Claims(ClaimsRejection::Malformed { .. }))
+        JwtVerification::Rejected(JwtRejection::Type(TypeRejection::Mismatch {
+            expected: JwtType::AccessToken,
+            found: HeaderType::Unsupported(found),
+        })) if found == "dpop+jwt"
     ));
 }
