@@ -15,6 +15,7 @@ categories = ["web-programming"]
 anyhow = { workspace = true, optional = true }
 margaret_access_token_minter = { workspace = true, optional = true }
 margaret_asset_bag = { workspace = true, optional = true }
+margaret_bearer_token_verification = { workspace = true, optional = true }
 margaret_codegen = { workspace = true, optional = true }
 margaret_console = { workspace = true, optional = true }
 margaret_construction = { workspace = true, optional = true }
@@ -62,6 +63,7 @@ runtime = [
     "dep:anyhow",
     "dep:margaret_access_token_minter",
     "dep:margaret_asset_bag",
+    "dep:margaret_bearer_token_verification",
     "dep:margaret_console",
     "dep:margaret_construction",
     "dep:margaret_environment_variable",

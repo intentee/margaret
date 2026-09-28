@@ -7,6 +7,8 @@ members = [
     "margaret_attribute_arguments",
     "margaret_attributes",
     "margaret_attributes_tests",
+    "margaret_bearer_token_verification",
+    "margaret_bearer_token_verification_tests",
     "margaret_codegen",
     "margaret_codegen_tests",
     "margaret_codegen_tests/tests/fixtures/collisions_and_diamonds",
@@ -190,6 +192,7 @@ margaret_asset_bag = { path = "margaret_asset_bag", version = "0.1.0" }
 margaret_asset_bag_codegen = { path = "margaret_asset_bag_codegen", version = "0.4.0" }
 margaret_attribute_arguments = { path = "margaret_attribute_arguments", version = "0.4.0" }
 margaret_attributes = { path = "margaret_attributes", version = "0.4.0" }
+margaret_bearer_token_verification = { path = "margaret_bearer_token_verification", version = "0.1.0" }
 margaret_codegen = { path = "margaret_codegen", version = "0.4.0" }
 margaret_codegen_tokens = { path = "margaret_codegen_tokens", version = "0.4.0" }
 margaret_console = { path = "margaret_console", version = "0.1.0" }

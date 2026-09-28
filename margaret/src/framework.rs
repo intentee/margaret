@@ -4,6 +4,8 @@ pub use anyhow;
 pub use margaret_access_token_minter as access_token_minter;
 #[cfg(feature = "runtime")]
 pub use margaret_asset_bag as asset_bag;
+#[cfg(feature = "runtime")]
+pub use margaret_bearer_token_verification as bearer_token_verification;
 #[cfg(feature = "codegen")]
 pub use margaret_codegen as codegen;
 #[cfg(feature = "runtime")]

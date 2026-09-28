@@ -1873,6 +1873,7 @@ dependencies = [
  "anyhow",
  "margaret_access_token_minter",
  "margaret_asset_bag",
+ "margaret_bearer_token_verification",
  "margaret_codegen",
  "margaret_console",
  "margaret_construction",
@@ -1981,6 +1982,42 @@ version = "0.1.0"
 dependencies = [
  "margaret_attributes",
  "tempfile",
+]
+
+[[package]]
+name = "margaret_bearer_token_verification"
+version = "0.1.0"
+dependencies = [
+ "margaret_http",
+ "margaret_jose_parameters",
+ "margaret_jwt_verification",
+ "margaret_key_set_poll",
+ "margaret_registered_claims",
+ "margaret_token_trust",
+ "serde",
+]
+
+[[package]]
+name = "margaret_bearer_token_verification_tests"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "margaret_bearer_token_verification",
+ "margaret_http",
+ "margaret_http_tests",
+ "margaret_identity_session",
+ "margaret_jose_parameters",
+ "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
+ "margaret_jws_verification",
+ "margaret_jwt_verification",
+ "margaret_jwt_verification_tests",
+ "margaret_key_set_poll",
+ "margaret_registered_claims",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

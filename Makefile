@@ -6,6 +6,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_attribute_arguments \
 	-p margaret_attributes \
 	-p margaret_attributes_tests \
+	-p margaret_bearer_token_verification \
+	-p margaret_bearer_token_verification_tests \
 	-p margaret_codegen \
 	-p margaret_codegen_tests \
 	-p margaret_codegen_tokens \
@@ -137,6 +139,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_asset_bag_codegen \
 	-p margaret_attribute_arguments \
 	-p margaret_attributes \
+	-p margaret_bearer_token_verification \
 	-p margaret_codegen \
 	-p margaret_codegen_tokens \
 	-p margaret_console \
@@ -260,6 +263,8 @@ coverage: node_modules postgres-image
 		--gated margaret_attribute_arguments=100 \
 		--gated margaret_attributes=100 \
 		--gated margaret_attributes_tests=100 \
+		--gated margaret_bearer_token_verification=100 \
+		--gated margaret_bearer_token_verification_tests=100 \
 		--gated margaret_codegen=100 \
 		--gated margaret_codegen_tests=100 \
 		--gated margaret_codegen_tokens=100 \
