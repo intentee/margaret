@@ -2,12 +2,11 @@
 slow-timeout = { period = "100ms", terminate-after = 2 }
 
 [test-groups]
-postgres-container = { max-threads = 1 }
-spire-processes = { max-threads = 1 }
+external-processes = { max-threads = 1 }
 
 [[profile.default.overrides]]
 filter = 'binary_id(margaret_spiffe_svid_tests::integration) | binary_id(margaret_spiffe_svid_integration_tests::integration)'
-test-group = 'spire-processes'
+test-group = 'external-processes'
 
 [[profile.default.overrides]]
 filter = 'package(~_spiffe_svid)'
@@ -16,4 +15,4 @@ slow-timeout = { period = "1s", terminate-after = 2 }
 [[profile.default.overrides]]
 filter = 'package(margaret_schema_postgres_tests)'
 slow-timeout = { period = "3s", terminate-after = 2 }
-test-group = 'postgres-container'
+test-group = 'external-processes'
