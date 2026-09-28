@@ -41,9 +41,9 @@ use crate::resolve_construction::resolve_construction;
 use crate::topological_order::topological_order;
 use crate::type_text::type_text;
 
-struct BuildableConstruction {
+struct BuildableConstruction<'provider> {
     construction: DirectConstruction,
-    path: CanonicalPath,
+    framework_provider: &'provider FrameworkProvider,
 }
 
 fn concrete_roles() -> [FrameworkAttribute; 4] {
@@ -310,14 +310,30 @@ impl DependencyResolver<'_> {
                 (Some(input), None) => DependencyKind::ServeInput {
                     input: Box::new(input.clone()),
                 },
-                (None, Some(target)) => DependencyKind::Single {
-                    provider_key: resolve_jwks_secret_store(
+                (None, Some(target)) => {
+                    let provider_key = resolve_jwks_secret_store(
                         concrete_path,
                         &parameter,
                         target,
                         self.framework_providers,
-                    )?,
-                },
+                    )?;
+                    let declared = indexed_parameter.declared();
+
+                    if peel_target(self.index, item, declared)
+                        .and_then(|written| self.index.resolve_item_path(item, &written))
+                        .as_ref()
+                        != Some(&provider_key)
+                    {
+                        return Err(ContainerError::MismatchedJwksSecretStoreType {
+                            expected: provider_key.to_string(),
+                            site: format!("parameter '{parameter}' of singleton '{concrete_path}'"),
+                            target: jwks_store_target_description(target),
+                            written: type_text(declared),
+                        });
+                    }
+
+                    DependencyKind::Single { provider_key }
+                }
                 (None, None) => {
                     let Some(written) = peel_target(self.index, item, indexed_parameter.declared())
                     else {
@@ -335,6 +351,7 @@ impl DependencyResolver<'_> {
                         concrete_path,
                         &parameter,
                         self.provided_keys,
+                        self.framework_providers,
                     )?
                 }
             });
@@ -411,13 +428,33 @@ fn resolve_target(
     concrete_path: &CanonicalPath,
     parameter: &str,
     provided_keys: &HashMap<CanonicalPath, CanonicalPath>,
+    framework_providers: &[FrameworkProvider],
 ) -> Result<DependencyKind, ContainerError> {
-    let provider_key = index
-        .resolve_item_path(item, written)
-        .filter(|path| provided_keys.contains_key(path))
-        .ok_or_else(|| missing_provider(concrete_path, parameter, written))?;
+    let Some(resolved) = index.resolve_item_path(item, written) else {
+        return Err(missing_provider(concrete_path, parameter, written));
+    };
 
-    Ok(DependencyKind::Single { provider_key })
+    if provided_keys.contains_key(&resolved) {
+        return Ok(DependencyKind::Single {
+            provider_key: resolved,
+        });
+    }
+
+    if framework_providers.iter().any(|framework_provider| {
+        framework_provider.provided == resolved
+            && !matches!(
+                framework_provider.injection,
+                FrameworkInjectionRole::Unmarked
+            )
+    }) {
+        return Err(ContainerError::JwksSecretStoreInjectedByPath {
+            parameter: parameter.to_string(),
+            provider: resolved.to_string(),
+            singleton: concrete_path.to_string(),
+        });
+    }
+
+    Err(missing_provider(concrete_path, parameter, written))
 }
 
 fn missing_provider(
@@ -465,22 +502,32 @@ fn resolve_framework_providers(
     );
     let mut allocator = index.reserved_allocator();
     let mut providers = Vec::new();
-
-    let mut buildable: Vec<BuildableConstruction> = buildable
-        .into_iter()
-        .map(|(path, construction)| BuildableConstruction { construction, path })
+    let mut ordered: Vec<BuildableConstruction> = buildable
+        .into_values()
+        .filter(|buildable| included.contains(&buildable.framework_provider.provided))
         .collect();
-    buildable.sort_by(|left, right| left.path.cmp(&right.path));
 
-    for BuildableConstruction { construction, path } in buildable {
-        if !included.contains(&path) {
-            continue;
-        }
+    ordered.sort_by(|left, right| {
+        left.framework_provider
+            .provided
+            .cmp(&right.framework_provider.provided)
+    });
 
-        if provided_keys.insert(path.clone(), path.clone()).is_some() {
+    for BuildableConstruction {
+        construction,
+        framework_provider,
+    } in ordered
+    {
+        let path = framework_provider.provided.clone();
+
+        if provided_keys.contains_key(&path) {
             return Err(ContainerError::AmbiguousFrameworkProvider {
                 path: path.to_string(),
             });
+        }
+
+        if let FrameworkInjectionRole::Unmarked = framework_provider.injection {
+            provided_keys.insert(path.clone(), path.clone());
         }
 
         let identifier = allocator.allocate(&field_base(&path));
@@ -492,6 +539,7 @@ fn resolve_framework_providers(
             concrete_path: path,
             construction,
             field_name,
+            injection: framework_provider.injection.clone(),
             provided,
             type_name,
         });
@@ -511,16 +559,22 @@ fn framework_provided_type(construction: &DirectConstruction, path: CanonicalPat
     }
 }
 
-fn buildable_constructions(
+fn buildable_constructions<'provider>(
     index: &AttributeIndex,
-    framework_providers: &[FrameworkProvider],
-) -> HashMap<CanonicalPath, DirectConstruction> {
-    let mut resolved: HashMap<CanonicalPath, DirectConstruction> = HashMap::new();
+    framework_providers: &'provider [FrameworkProvider],
+) -> HashMap<CanonicalPath, BuildableConstruction<'provider>> {
+    let mut resolved: HashMap<CanonicalPath, BuildableConstruction<'provider>> = HashMap::new();
 
     for framework_provider in framework_providers {
         resolved.insert(
             framework_provider.provided.clone(),
-            resolve_framework_construction(index, &framework_provider.construction),
+            BuildableConstruction {
+                construction: resolve_framework_construction(
+                    index,
+                    &framework_provider.construction,
+                ),
+                framework_provider,
+            },
         );
     }
 
@@ -623,7 +677,7 @@ fn included_framework_providers(
     provider_drafts: &[Draft],
     construction_drafts: &[Draft],
     framework_providers: &[FrameworkProvider],
-    buildable: &HashMap<CanonicalPath, DirectConstruction>,
+    buildable: &HashMap<CanonicalPath, BuildableConstruction>,
 ) -> HashSet<CanonicalPath> {
     let mut triggered: HashSet<CanonicalPath> = HashSet::new();
 
@@ -776,6 +830,7 @@ pub(crate) fn build_plan(
                 concrete_path,
                 construction,
                 field_name,
+                injection: FrameworkInjectionRole::Unmarked,
                 provided,
                 type_name,
             },
@@ -802,6 +857,7 @@ pub(crate) fn build_plan(
                 concrete_path,
                 construction,
                 field_name,
+                injection: FrameworkInjectionRole::Unmarked,
                 provided,
                 type_name,
             },

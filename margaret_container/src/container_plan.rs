@@ -154,6 +154,7 @@ mod tests {
     use super::ContainerPlan;
     use crate::dependency_kind::DependencyKind;
     use crate::direct_construction::DirectConstruction;
+    use crate::framework_injection_role::FrameworkInjectionRole;
     use crate::provided_type::ProvidedType;
     use crate::provider::Provider;
 
@@ -174,6 +175,7 @@ mod tests {
                 method: "create".to_string(),
             },
             field_name: "root".to_string(),
+            injection: FrameworkInjectionRole::Unmarked,
             provided: ProvidedType::Concrete(concrete_path),
             type_name: "Root".to_string(),
         }
@@ -200,6 +202,7 @@ mod tests {
                 method: "create".to_string(),
             },
             field_name: "root".to_string(),
+            injection: FrameworkInjectionRole::Unmarked,
             provided: ProvidedType::Concrete(concrete_path),
             type_name: "Root".to_string(),
         }

@@ -40,6 +40,7 @@ mod tests {
     use crate::container_plan::ContainerPlan;
     use crate::dependency_kind::DependencyKind;
     use crate::direct_construction::DirectConstruction;
+    use crate::framework_injection_role::FrameworkInjectionRole;
     use crate::provided_type::ProvidedType;
     use crate::provider::Provider;
 
@@ -63,6 +64,7 @@ mod tests {
                 method: "create".to_string(),
             },
             field_name: name.to_lowercase(),
+            injection: FrameworkInjectionRole::Unmarked,
             provided: ProvidedType::Concrete(concrete_path),
             type_name: name.to_string(),
         }

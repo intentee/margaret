@@ -53,6 +53,11 @@ pub enum RequestBindingError {
     MissingProvider { subject: String, parameter: String },
 
     #[error(
+        "parameter '{parameter}' of {subject} injects a jwks secret store by its path; it is available only through #[jwks_secret_store(...)] on a constructor parameter"
+    )]
+    JwksSecretStoreInjectedByPath { subject: String, parameter: String },
+
+    #[error(
         "route parameter #{parameter} of {subject} is missing `from = \"...\"`; it must name the path parameter it binds"
     )]
     RouteParameterMissingFrom { subject: String, parameter: String },

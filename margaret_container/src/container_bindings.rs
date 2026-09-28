@@ -59,6 +59,7 @@ impl ContainerBindings {
                     entry.key.clone(),
                     ProviderBinding {
                         field_name: entry.provider.field_name.clone(),
+                        injection: entry.provider.injection.clone(),
                         type_name: entry.provider.type_name.clone(),
                     },
                 );

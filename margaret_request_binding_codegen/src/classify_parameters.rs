@@ -216,6 +216,12 @@ fn classify_context_specific(
                         parameter: position.to_string(),
                     })
                 }
+                InjectableResolution::JwksSecretStoreByPath => {
+                    Err(RequestBindingError::JwksSecretStoreInjectedByPath {
+                        subject: subject.to_string(),
+                        parameter: position.to_string(),
+                    })
+                }
             }
         }
         BindingContext::Middleware { .. } => {

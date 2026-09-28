@@ -5,20 +5,28 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::indexed_item::IndexedItem;
 
 use crate::container_bindings::ContainerBindings;
+use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::injectable_resolution::InjectableResolution;
 use crate::injected_dependency::InjectedDependency;
 use crate::peel_target::peel_target;
+use crate::provider_binding::ProviderBinding;
 
 fn resolved_single(
     provider_key: CanonicalPath,
     bindings: &ContainerBindings,
-) -> Option<InjectedDependency> {
-    let binding = bindings.provider(&provider_key)?;
-
-    Some(InjectedDependency {
-        concrete: provider_key,
-        field: binding.field_name.clone(),
-    })
+) -> InjectableResolution {
+    match bindings.provider(&provider_key) {
+        None => InjectableResolution::MissingProvider,
+        Some(ProviderBinding {
+            injection: FrameworkInjectionRole::Unmarked,
+            field_name,
+            ..
+        }) => InjectableResolution::Resolved(InjectedDependency {
+            concrete: provider_key,
+            field: field_name.clone(),
+        }),
+        Some(_) => InjectableResolution::JwksSecretStoreByPath,
+    }
 }
 
 #[must_use]
@@ -32,11 +40,8 @@ pub fn resolve_injectable(
         return InjectableResolution::UnsupportedShape;
     };
 
-    match index
-        .resolve_item_path(item, &written)
-        .and_then(|provider_key| resolved_single(provider_key, bindings))
-    {
-        Some(dependency) => InjectableResolution::Resolved(dependency),
+    match index.resolve_item_path(item, &written) {
+        Some(provider_key) => resolved_single(provider_key, bindings),
         None => InjectableResolution::MissingProvider,
     }
 }
