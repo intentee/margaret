@@ -23,7 +23,6 @@ mod public_set_publishes_the_next_key_before_it_signs;
 mod published_jwks_loads_into_a_standard_jwt_verifier;
 mod publishes_a_p256_key_as_an_es256_jwk;
 mod publishes_a_p384_key_as_an_es384_jwk;
-mod sign_errors_on_unserializable_claims;
 mod sign_produces_canonical_low_s_signature;
 mod signs_a_p256_token_that_its_published_set_verifies;
 mod signs_a_p384_token_that_its_published_set_verifies;

@@ -1,9 +1,8 @@
-use margaret_jws_verification::jws_rejection::JwsRejection;
+use margaret_jwt_verification::jwt_rejection::JwtRejection;
+use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 
 pub enum AccessTokenVerification<TClaims> {
-    Expired,
-    MalformedClaims(serde_json::Error),
     NotReady,
-    Rejected(JwsRejection),
-    Verified(TClaims),
+    Rejected(JwtRejection),
+    Verified(VerifiedJwt<TClaims>),
 }

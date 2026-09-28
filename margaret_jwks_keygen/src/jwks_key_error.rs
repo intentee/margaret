@@ -5,12 +5,6 @@ use margaret_jws_verification::key_set_rejection::KeySetRejection;
 
 #[derive(Debug, Error)]
 pub enum JwksKeyError {
-    #[error("the claims to sign could not be serialized to json: {source}")]
-    ClaimsSerialization {
-        #[source]
-        source: serde_json::Error,
-    },
-
     #[error("the secret's keys do not form a valid key set: {rejection}")]
     KeySetRejected { rejection: KeySetRejection },
 

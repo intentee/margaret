@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
-use chrono::DateTime;
-use chrono::Utc;
 use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
 
-use margaret::framework::identity_session::is_expired::IsExpired;
 use margaret::framework::jwks_client::access_token_verification::AccessTokenVerification;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
@@ -15,15 +12,7 @@ use crate::margaret::jwks::jwks_endpoint_jwks_endpoint::PublicJwksVerifier;
 use crate::system_clock::SystemClock;
 
 #[derive(Deserialize)]
-struct AccessClaims {
-    exp: i64,
-}
-
-impl IsExpired for AccessClaims {
-    fn is_expired(&self, now: DateTime<Utc>) -> anyhow::Result<bool> {
-        Ok(self.exp < now.timestamp())
-    }
-}
+struct AccessClaims {}
 
 #[service]
 pub struct JwksVerifier {
@@ -52,22 +41,15 @@ impl JwksVerifier {
             .verifier
             .verify::<AccessClaims>("sample.access.token", self.clock.now())
         {
-            Ok(AccessTokenVerification::Verified(_)) => {
+            AccessTokenVerification::Verified(_) => {
                 println!("the jwks verifier accepted the sample access token");
             }
-            Ok(AccessTokenVerification::Expired) => {
-                println!("the sample access token is expired");
-            }
-            Ok(AccessTokenVerification::MalformedClaims(error)) => {
-                println!("the sample access token carries malformed claims: {error}");
-            }
-            Ok(AccessTokenVerification::NotReady) => {
+            AccessTokenVerification::NotReady => {
                 println!("the jwks document has not been polled yet");
             }
-            Ok(AccessTokenVerification::Rejected(rejection)) => {
+            AccessTokenVerification::Rejected(rejection) => {
                 println!("the sample access token is rejected: {rejection}");
             }
-            Err(error) => println!("the jwks verifier could not verify the sample token: {error}"),
         }
 
         cancellation_token.cancelled().await;

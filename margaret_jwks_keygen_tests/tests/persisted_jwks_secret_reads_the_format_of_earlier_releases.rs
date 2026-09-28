@@ -3,8 +3,6 @@ use anyhow::Result;
 use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
-use margaret_jwks_keygen::signs_claims::SignsClaims;
-use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use serde_json::json;
 
@@ -12,15 +10,15 @@ use margaret_jwks_keygen::persisted_jwks_secret::PersistedJwksSecret;
 use margaret_jwks_keygen_tests::fixture_pair::fixture_pair;
 use margaret_jws_verification::ec_jwk::EcJwk;
 use margaret_jws_verification::jwk::Jwk;
+use margaret_registered_claims::numeric_date::NumericDate;
 
-#[tokio::test]
-async fn persisted_jwks_secret_reads_the_format_of_earlier_releases() -> Result<()> {
+#[test]
+fn persisted_jwks_secret_reads_the_format_of_earlier_releases() -> Result<()> {
     let claims = TestClaims {
-        exp: FAR_FUTURE_EXPIRY,
         sub: "subject".to_string(),
     };
     let pair = fixture_pair(Curve::P256, "fixture-kid");
-    let token = pair.sign(&claims).await?;
+    let token = claims.signed_by(&pair);
     let Jwk::Ec(EcJwk { x, y, .. }) = pair.public_jwk().clone() else {
         panic!("the pair publishes an ec key");
     };
@@ -46,8 +44,8 @@ async fn persisted_jwks_secret_reads_the_format_of_earlier_releases() -> Result<
         serde_json::from_value::<PersistedJwksSecret>(document)?.into_secret()?;
 
     assert!(matches!(
-        secret.verify_any::<TestClaims>(&token),
-        JwksSecretVerificationResult::SignedWithCurrent(verified) if verified == claims
+        secret.verify_jwt::<TestClaims>(&token, NumericDate::new(0)),
+        JwksSecretVerificationResult::SignedWithCurrent(verified) if verified.claims == claims
     ));
 
     Ok(())

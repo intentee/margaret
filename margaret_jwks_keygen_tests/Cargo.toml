@@ -9,6 +9,8 @@ autotests = false
 margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jws_verification = { workspace = true }
+margaret_jwt_verification = { workspace = true }
+margaret_registered_claims = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 
@@ -17,7 +19,6 @@ anyhow = { workspace = true }
 base64ct = { workspace = true }
 jsonwebtoken = { workspace = true }
 p256 = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
 zeroize = { workspace = true }
 
 [[test]]

@@ -10,15 +10,14 @@ use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
 use margaret_jwks_client::jwks_client::JwksClient;
-use margaret_jwks_client_tests::test_claims::TestClaims;
-use margaret_jwks_client_tests::test_instant::test_instant;
 use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
-use margaret_jwks_keygen::signs_claims::SignsClaims as _;
+use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
 use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
+use margaret_token_signer_tests::unix_time::unix_time;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
@@ -53,14 +52,9 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
 
     let secret = jwks_secret_holder.get().expect("the first roll published");
     let claims = TestClaims {
-        exp: 1_700_000_060,
         sub: "subject".to_string(),
     };
-    let token = secret
-        .current()
-        .sign(&claims)
-        .await
-        .expect("the claims sign");
+    let token = claims.signed_by(secret.current());
 
     let jwks_server = RunningFixtureServer::start(
         fixture.server_config.clone(),
@@ -91,15 +85,13 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
         SyncHolderPresence::Present
     );
 
-    let verification = verifier
-        .verify::<TestClaims>(&token, test_instant(1_700_000_000))
-        .expect("the polled document verifies the token");
-
-    let AccessTokenVerification::Verified(verification_outcome) = verification else {
+    let AccessTokenVerification::Verified(polled) =
+        verifier.verify::<TestClaims>(&token, unix_time(1_700_000_000))
+    else {
         panic!("the polled document verifies the token");
     };
 
-    assert_eq!(verification_outcome, claims);
+    assert_eq!(polled.claims, claims);
 
     cancellation_token.cancel();
     roll_task

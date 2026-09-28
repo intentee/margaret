@@ -10,10 +10,11 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
-async-trait = { workspace = true }
 base64ct = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_jws_verification = { workspace = true }
+margaret_jwt_verification = { workspace = true }
+margaret_registered_claims = { workspace = true }
 margaret_sync_holder = { workspace = true }
 p256 = { workspace = true }
 p384 = { workspace = true }

@@ -1892,9 +1892,11 @@ dependencies = [
  "margaret_jwks_secret_storage_selection",
  "margaret_jwks_secret_store",
  "margaret_jws_verification",
+ "margaret_jwt_verification",
  "margaret_macros",
  "margaret_model",
  "margaret_peer_identity",
+ "margaret_registered_claims",
  "margaret_route_parameter_binding",
  "margaret_service",
  "margaret_spiffe_svid",
@@ -2407,9 +2409,8 @@ dependencies = [
 name = "margaret_identity_session"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "chrono",
  "cookie",
+ "margaret_registered_claims",
  "serde",
  "serde_json",
  "thiserror",
@@ -2484,14 +2485,14 @@ dependencies = [
  "async-trait",
  "chrono",
  "log",
- "margaret_identity_session",
  "margaret_issuer_document_fetch",
  "margaret_jwks_endpoint",
  "margaret_jws_verification",
+ "margaret_jwt_verification",
+ "margaret_registered_claims",
  "margaret_sync_holder",
  "reqwest",
  "serde",
- "serde_json",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -2505,7 +2506,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "chrono",
  "margaret_http",
  "margaret_http_tests",
  "margaret_identity_session",
@@ -2514,16 +2514,21 @@ dependencies = [
  "margaret_jwks_client",
  "margaret_jwks_endpoint",
  "margaret_jwks_keygen",
+ "margaret_jwks_keygen_tests",
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
  "margaret_jws_verification",
+ "margaret_jwt_verification",
+ "margaret_registered_claims",
  "margaret_sync_holder",
+ "margaret_token_signer_tests",
  "reqwest",
- "serde",
+ "serde_json",
  "tokio",
  "tokio-util",
  "trzcina",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -2577,10 +2582,11 @@ dependencies = [
 name = "margaret_jwks_keygen"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "base64ct",
  "margaret_jose_parameters",
  "margaret_jws_verification",
+ "margaret_jwt_verification",
+ "margaret_registered_claims",
  "margaret_sync_holder",
  "p256",
  "p384",
@@ -2601,10 +2607,11 @@ dependencies = [
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jws_verification",
+ "margaret_jwt_verification",
+ "margaret_registered_claims",
  "p256",
  "serde",
  "serde_json",
- "tokio",
  "zeroize",
 ]
 
@@ -2625,6 +2632,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
+ "chrono",
  "http",
  "margaret_http",
  "margaret_identity_session",
@@ -2683,11 +2691,27 @@ dependencies = [
  "chrono",
  "margaret_identity_session",
  "margaret_jwks_keygen",
+ "margaret_registered_claims",
+ "margaret_token_signer",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
+name = "margaret_jwks_secret_store_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_identity_session",
+ "margaret_jwks_keygen",
+ "margaret_jwks_secret_store",
+ "margaret_jws_verification",
+ "margaret_jwt_verification",
  "margaret_token_signer",
  "margaret_token_signer_tests",
  "serde",
- "thiserror",
- "tokio",
+ "serde_json",
  "uuid",
 ]
 
@@ -2714,6 +2738,28 @@ dependencies = [
  "margaret_jws_verification",
  "p256",
  "p384",
+ "serde_json",
+]
+
+[[package]]
+name = "margaret_jwt_verification"
+version = "0.1.0"
+dependencies = [
+ "margaret_jws_verification",
+ "margaret_registered_claims",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "margaret_jwt_verification_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_jose_parameters",
+ "margaret_jws_verification",
+ "margaret_jws_verification_tests",
+ "margaret_jwt_verification",
+ "margaret_registered_claims",
  "serde_json",
 ]
 
@@ -2788,6 +2834,15 @@ dependencies = [
  "margaret_peer_identity",
  "rcgen",
  "spiffe",
+]
+
+[[package]]
+name = "margaret_registered_claims"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3138,9 +3193,9 @@ dependencies = [
  "chrono",
  "margaret_identity_session",
  "margaret_jwks_keygen",
- "margaret_jws_verification",
+ "margaret_jwt_verification",
+ "margaret_registered_claims",
  "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -3152,6 +3207,8 @@ dependencies = [
  "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jws_verification",
+ "margaret_jwt_verification",
+ "margaret_registered_claims",
  "margaret_token_signer",
  "uuid",
 ]

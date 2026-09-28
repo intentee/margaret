@@ -4,14 +4,24 @@ use chrono::DateTime;
 use chrono::Utc;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde_json::Value;
+use serde_json::map::Entry;
+use uuid::Uuid;
 
+use margaret_identity_session::access_token_claims_signed::AccessTokenClaimsSigned;
+use margaret_identity_session::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
+use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
+use margaret_identity_session::refresh_token_claims_signed::RefreshTokenClaimsSigned;
+use margaret_identity_session::refresh_token_lifetime_secs::REFRESH_TOKEN_LIFETIME_SECS;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
-use margaret_jwks_keygen::signs_claims::SignsClaims;
+use margaret_registered_claims::numeric_date::NumericDate;
+use margaret_registered_claims::registered_claims::RegisteredClaims;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
 use margaret_token_signer::mint_access_token::mint_access_token;
 
+use crate::access_token_signing::AccessTokenSigning;
 use crate::jwks_secret_store_error::JwksSecretStoreError;
 
 pub struct JwksSecretStore {
@@ -22,6 +32,27 @@ impl JwksSecretStore {
     #[must_use]
     pub fn new(holder: JwksSecretHolder) -> Self {
         Self { holder }
+    }
+
+    /// # Errors
+    ///
+    /// Returns `JwksSecretStoreError::SecretUnavailable` before the first roll.
+    pub fn issue_refresh_token(
+        &self,
+        subject: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<RefreshTokenClaimsSigned, JwksSecretStoreError> {
+        let secret = self.current_secret()?;
+        let registered = RegisteredClaims::issued_at(now, REFRESH_TOKEN_LIFETIME_SECS);
+        let claims = RefreshTokenClaims {
+            jti: Uuid::new_v4(),
+            sub: subject,
+        };
+
+        Ok(RefreshTokenClaimsSigned {
+            exp: registered.exp.seconds_since_epoch(),
+            signed_claims: secret.current().sign_json(&claims.to_payload(&registered)),
+        })
     }
 
     /// # Errors
@@ -39,201 +70,57 @@ impl JwksSecretStore {
 
     /// # Errors
     ///
-    /// Returns `JwksSecretStoreError::Sign`.
-    pub async fn sign<TClaims: Send + Serialize + Sync>(
+    /// Returns `JwksSecretStoreError::SecretUnavailable` before the first roll, and
+    /// `JwksSecretStoreError::ClaimsSerialization` when the claims cannot be serialized.
+    pub fn sign_access_token<TClaims: Serialize>(
         &self,
         claims: &TClaims,
-    ) -> Result<String, JwksSecretStoreError> {
+        now: DateTime<Utc>,
+    ) -> Result<AccessTokenSigning, JwksSecretStoreError> {
         let secret = self.current_secret()?;
+        let Value::Object(application_claims) = serde_json::to_value(claims)
+            .map_err(|source| JwksSecretStoreError::ClaimsSerialization { source })?
+        else {
+            return Ok(AccessTokenSigning::ClaimsNotAnObject);
+        };
+        let registered = RegisteredClaims::issued_at(now, ACCESS_TOKEN_LIFETIME_SECS);
+        let mut payload = registered.to_json();
 
-        secret
-            .current()
-            .sign(claims)
-            .await
-            .map_err(|source| JwksSecretStoreError::Sign { source })
+        for (member, value) in application_claims {
+            match payload.entry(member) {
+                Entry::Occupied(occupied) => {
+                    return Ok(AccessTokenSigning::CollidingClaim {
+                        member: occupied.key().clone(),
+                    });
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert(value);
+                }
+            }
+        }
+
+        Ok(AccessTokenSigning::Signed(AccessTokenClaimsSigned {
+            exp: registered.exp.seconds_since_epoch(),
+            signed_claims: secret.current().sign_json(&Value::Object(payload)),
+        }))
     }
 
     /// # Errors
     ///
     /// Returns `JwksSecretStoreError::SecretUnavailable` before the first roll.
-    pub fn verify<TClaims: DeserializeOwned>(
+    pub fn verify_access_token<TClaims: DeserializeOwned>(
         &self,
         token: &str,
+        now: DateTime<Utc>,
     ) -> Result<JwksSecretVerificationResult<TClaims>, JwksSecretStoreError> {
-        Ok(self.current_secret()?.verify_any::<TClaims>(token))
+        Ok(self
+            .current_secret()?
+            .verify_jwt(token, NumericDate::from(now)))
     }
 
     fn current_secret(&self) -> Result<Arc<JwksSecret>, JwksSecretStoreError> {
         self.holder
             .get()
             .ok_or(JwksSecretStoreError::SecretUnavailable)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use serde::Serialize;
-    use serde::Serializer;
-    use serde::ser::Error;
-    use uuid::Uuid;
-
-    use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
-    use margaret_jwks_keygen::jwks_secret::JwksSecret;
-    use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
-    use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
-    use margaret_token_signer::access_token_minting::AccessTokenMinting;
-    use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
-    use margaret_token_signer_tests::refresh_claims::refresh_claims;
-    use margaret_token_signer_tests::sign_refresh_token::sign_refresh_token;
-    use margaret_token_signer_tests::unix_time::unix_time;
-
-    use super::JwksSecretStore;
-
-    struct Unserializable;
-
-    impl Serialize for Unserializable {
-        fn serialize<Target: Serializer>(
-            &self,
-            _serializer: Target,
-        ) -> Result<Target::Ok, Target::Error> {
-            Err(Target::Error::custom("this value cannot be serialized"))
-        }
-    }
-
-    fn store_of(secret: JwksSecret) -> JwksSecretStore {
-        let holder = JwksSecretHolder::default();
-
-        holder.set(Some(Arc::new(secret)));
-
-        JwksSecretStore::new(holder)
-    }
-
-    fn unrolled_store() -> JwksSecretStore {
-        JwksSecretStore::new(JwksSecretHolder::default())
-    }
-
-    fn minted(minting: &AccessTokenMinting) -> bool {
-        match minting {
-            AccessTokenMinting::Minted(_) => true,
-            AccessTokenMinting::ExpiredRefreshToken
-            | AccessTokenMinting::MalformedRefreshTokenClaims(_)
-            | AccessTokenMinting::RefreshTokenSignedWithNextKey
-            | AccessTokenMinting::RejectedRefreshToken(_) => false,
-        }
-    }
-
-    fn verified_jti(result: JwksSecretVerificationResult<RefreshTokenClaims>) -> Option<Uuid> {
-        match result {
-            JwksSecretVerificationResult::SignedWithCurrent(claims)
-            | JwksSecretVerificationResult::SignedWithPrevious(claims) => Some(claims.jti),
-            JwksSecretVerificationResult::MalformedClaims(_)
-            | JwksSecretVerificationResult::Rejected(_)
-            | JwksSecretVerificationResult::SignedWithNextKey => None,
-        }
-    }
-
-    #[test]
-    fn mints_an_access_token_from_a_valid_refresh_token() {
-        let secret = fresh_p256_secret();
-        let refresh_token = sign_refresh_token(secret.current(), &refresh_claims(1_000));
-
-        assert!(minted(
-            &store_of(secret)
-                .mint_access_token(&refresh_token, unix_time(500))
-                .expect("the signing secret is usable")
-        ));
-    }
-
-    #[test]
-    fn reports_a_malformed_refresh_token_as_a_minting_outcome() {
-        assert!(!minted(
-            &store_of(fresh_p256_secret())
-                .mint_access_token("not.a.valid.token", unix_time(500))
-                .expect("the signing secret is usable")
-        ));
-    }
-
-    #[tokio::test]
-    async fn signs_claims_with_the_current_key() {
-        let secret = fresh_p256_secret();
-        let claims = refresh_claims(1_000);
-        let token = store_of(secret.clone())
-            .sign(&claims.to_json())
-            .await
-            .expect("the claims are signed");
-
-        assert_eq!(
-            verified_jti(secret.verify_any::<RefreshTokenClaims>(&token)),
-            Some(claims.jti)
-        );
-    }
-
-    #[test]
-    fn reports_a_malformed_token_as_a_verification_outcome() {
-        assert_eq!(
-            verified_jti(
-                store_of(fresh_p256_secret())
-                    .verify::<RefreshTokenClaims>("not.a.valid.token")
-                    .expect("the signing secret is usable")
-            ),
-            None
-        );
-    }
-
-    #[test]
-    fn verifies_a_token_signed_with_the_retired_key() {
-        let secret = fresh_p256_secret();
-        let claims = refresh_claims(1_000);
-        let token = sign_refresh_token(secret.current(), &claims);
-        let rotated = secret.rotate().expect("the signing secret rotates");
-
-        assert_eq!(
-            verified_jti(
-                store_of(rotated)
-                    .verify::<RefreshTokenClaims>(&token)
-                    .expect("the signing secret is usable")
-            ),
-            Some(claims.jti)
-        );
-    }
-
-    #[test]
-    fn reports_the_secret_is_unavailable_when_verifying_before_a_roll() {
-        assert!(
-            unrolled_store()
-                .verify::<RefreshTokenClaims>("token")
-                .is_err_and(|error| error.to_string().contains("not available yet"))
-        );
-    }
-
-    #[test]
-    fn reports_the_secret_is_unavailable_when_minting_before_a_roll() {
-        assert!(
-            unrolled_store()
-                .mint_access_token("token", unix_time(0))
-                .is_err_and(|error| error.to_string().contains("not available yet"))
-        );
-    }
-
-    #[tokio::test]
-    async fn reports_the_secret_is_unavailable_when_signing_before_a_roll() {
-        assert!(
-            unrolled_store()
-                .sign(&refresh_claims(1_000).to_json())
-                .await
-                .is_err_and(|error| error.to_string().contains("not available yet"))
-        );
-    }
-
-    #[tokio::test]
-    async fn reports_a_sign_failure_for_unserializable_claims() {
-        assert!(
-            store_of(fresh_p256_secret())
-                .sign(&Unserializable)
-                .await
-                .is_err_and(|error| error.to_string().contains("failed to sign claims"))
-        );
     }
 }

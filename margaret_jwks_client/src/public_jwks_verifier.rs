@@ -2,12 +2,11 @@ use chrono::DateTime;
 use chrono::Utc;
 use serde::de::DeserializeOwned;
 
-use margaret_identity_session::is_expired::IsExpired;
-use margaret_jws_verification::jws_verification::JwsVerification;
-use margaret_jws_verification::verified_jws::VerifiedJws;
+use margaret_jwt_verification::jwt_verification::JwtVerification;
+use margaret_jwt_verification::verify_jwt::verify_jwt;
+use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::access_token_verification::AccessTokenVerification;
-use crate::jwks_client_error::JwksClientError;
 use crate::verification_key_set_holder::VerificationKeySetHolder;
 
 pub struct PublicJwksVerifier {
@@ -22,35 +21,19 @@ impl PublicJwksVerifier {
         }
     }
 
-    /// # Errors
-    ///
-    /// Returns `JwksClientError::TokenExpiry` when the claims cannot tell whether they expired.
-    pub fn verify<TClaims: DeserializeOwned + IsExpired>(
+    #[must_use]
+    pub fn verify<TClaims: DeserializeOwned>(
         &self,
         token: &str,
         now: DateTime<Utc>,
-    ) -> Result<AccessTokenVerification<TClaims>, JwksClientError> {
+    ) -> AccessTokenVerification<TClaims> {
         let Some(key_set) = self.verification_key_set_holder.get() else {
-            return Ok(AccessTokenVerification::NotReady);
-        };
-        let VerifiedJws { payload, .. } = match key_set.verify(token) {
-            JwsVerification::Rejected(rejection) => {
-                return Ok(AccessTokenVerification::Rejected(rejection));
-            }
-            JwsVerification::Verified(verified) => verified,
-        };
-        let claims: TClaims = match serde_json::from_slice(&payload) {
-            Ok(claims) => claims,
-            Err(source) => return Ok(AccessTokenVerification::MalformedClaims(source)),
+            return AccessTokenVerification::NotReady;
         };
 
-        if claims
-            .is_expired(now)
-            .map_err(|source| JwksClientError::TokenExpiry { source })?
-        {
-            return Ok(AccessTokenVerification::Expired);
+        match verify_jwt(&key_set, token, NumericDate::from(now)) {
+            JwtVerification::Rejected(rejection) => AccessTokenVerification::Rejected(rejection),
+            JwtVerification::Verified(verified) => AccessTokenVerification::Verified(verified),
         }
-
-        Ok(AccessTokenVerification::Verified(claims))
     }
 }

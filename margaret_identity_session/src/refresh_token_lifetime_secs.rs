@@ -1,1 +1,1 @@
-pub const REFRESH_TOKEN_LIFETIME_SECS: i64 = 60 * 60 * 24 * 3;
+pub const REFRESH_TOKEN_LIFETIME_SECS: u32 = 60 * 60 * 24 * 3;

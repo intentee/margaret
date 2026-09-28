@@ -52,9 +52,7 @@ impl MintAccessTokenHandler {
             .map_err(|source| MintAccessTokenError::SecretStore { source })?;
 
         Ok(match minting {
-            AccessTokenMinting::ExpiredRefreshToken
-            | AccessTokenMinting::MalformedRefreshTokenClaims(_)
-            | AccessTokenMinting::RefreshTokenSignedWithNextKey
+            AccessTokenMinting::RefreshTokenSignedWithNextKey
             | AccessTokenMinting::RejectedRefreshToken(_) => Response::unauthorized(),
             AccessTokenMinting::Minted(minted) => Response::json(200, &minted),
         })
@@ -97,7 +95,7 @@ mod tests {
     }
 
     fn signed_refresh_token(secret: &JwksSecret, exp: i64) -> String {
-        sign_refresh_token(secret.current(), &refresh_claims(exp))
+        sign_refresh_token(secret.current(), &refresh_claims(), exp)
     }
 
     #[test]

@@ -9,18 +9,15 @@ use jsonwebtoken::jwk::KeyAlgorithm;
 
 use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::signs_claims::SignsClaims;
-use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 
-#[tokio::test]
-async fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
+#[test]
+fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
     let secret = JwksSecret::fresh(Curve::P256)?;
     let claims = TestClaims {
-        exp: FAR_FUTURE_EXPIRY,
         sub: "subject".to_string(),
     };
-    let token = secret.current().sign(&claims).await?;
+    let token = claims.signed_by(secret.current());
     let document = serde_json::to_string(secret.public_jwks())?;
 
     let published: JwkSet = serde_json::from_str(&document)?;

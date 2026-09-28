@@ -2,11 +2,12 @@ use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
 use margaret_jose_parameters::curve::Curve;
-use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::key_id::KeyId;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
-use margaret_jws_verification::verified_jws::VerifiedJws;
+use margaret_jwt_verification::jwt_verification::JwtVerification;
+use margaret_jwt_verification::verify_jwt::verify_jwt;
+use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::ec_signing_key::EcSigningKey;
 use crate::jwk_pair::JwkPair;
@@ -18,16 +19,6 @@ use crate::public_jwks::PublicJwks;
 fn random_pair(curve: Curve) -> Result<JwkPair, JwksKeyError> {
     EcSigningKey::generate(curve)
         .and_then(|signing_key| JwkPair::new(KeyId::new(Uuid::new_v4().to_string()), signing_key))
-}
-
-fn claims_of<TClaims: DeserializeOwned>(
-    payload: &[u8],
-    signed: impl FnOnce(TClaims) -> JwksSecretVerificationResult<TClaims>,
-) -> JwksSecretVerificationResult<TClaims> {
-    match serde_json::from_slice(payload) {
-        Ok(claims) => signed(claims),
-        Err(source) => JwksSecretVerificationResult::MalformedClaims(source),
-    }
 }
 
 #[derive(Clone)]
@@ -115,21 +106,22 @@ impl JwksSecret {
     }
 
     #[must_use]
-    pub fn verify_any<TClaims: DeserializeOwned>(
+    pub fn verify_jwt<TClaims: DeserializeOwned>(
         &self,
         token: &str,
+        now: NumericDate,
     ) -> JwksSecretVerificationResult<TClaims> {
-        let VerifiedJws { kid, payload } = match self.key_set.verify(token) {
-            JwsVerification::Rejected(rejection) => {
+        let verified = match verify_jwt(&self.key_set, token, now) {
+            JwtVerification::Rejected(rejection) => {
                 return JwksSecretVerificationResult::Rejected(rejection);
             }
-            JwsVerification::Verified(verified) => verified,
+            JwtVerification::Verified(verified) => verified,
         };
 
-        if &kid == self.current.kid() {
-            claims_of(&payload, JwksSecretVerificationResult::SignedWithCurrent)
-        } else if self.previous.is_retired_key(&kid) {
-            claims_of(&payload, JwksSecretVerificationResult::SignedWithPrevious)
+        if &verified.kid == self.current.kid() {
+            JwksSecretVerificationResult::SignedWithCurrent(verified)
+        } else if self.previous.is_retired_key(&verified.kid) {
+            JwksSecretVerificationResult::SignedWithPrevious(verified)
         } else {
             JwksSecretVerificationResult::SignedWithNextKey
         }

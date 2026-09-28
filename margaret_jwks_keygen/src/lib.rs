@@ -8,4 +8,3 @@ pub mod persisted_jwks_secret;
 pub mod previous_key;
 pub mod public_jwks;
 mod signing_material;
-pub mod signs_claims;
