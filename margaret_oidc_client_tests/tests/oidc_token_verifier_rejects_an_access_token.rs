@@ -19,7 +19,7 @@ use margaret_oidc_client_tests::signed_id_token::SignedIdToken;
 
 #[test]
 fn oidc_token_verifier_rejects_an_access_token() {
-    let key = FixtureRsaKey::load("github-kid");
+    let key = FixtureRsaKey::load("rsa-kid");
     let KeySetParsing::Accepted(key_set) = VerificationKeySet::from_jwks(vec![key.jwk()]) else {
         panic!("the fixture key set is accepted");
     };

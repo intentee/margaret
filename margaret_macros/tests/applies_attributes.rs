@@ -84,8 +84,8 @@ struct JwksEndpoint;
 #[issues_tokens]
 struct TokenIssuer;
 
-#[trusts_oidc_issuer(github)]
-struct GithubIssuer;
+#[trusts_oidc_issuer(partner)]
+struct PartnerIssuer;
 
 #[route_parameter_value]
 struct SubjectId(String);
@@ -105,7 +105,7 @@ struct AccountProvider;
 
 impl AccountProvider {
     #[infer_from_request]
-    fn infer(&self, #[oidc_token(issuer = github)] token: &str) -> String {
+    fn infer(&self, #[oidc_token(issuer = partner)] token: &str) -> String {
         format!("verified {token}")
     }
 }
@@ -157,7 +157,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(SubjectId("7".to_string()).0, "7");
     assert_eq!(size_of::<JwksEndpoint>(), 0);
     assert_eq!(size_of::<TokenIssuer>(), 0);
-    assert_eq!(size_of::<GithubIssuer>(), 0);
+    assert_eq!(size_of::<PartnerIssuer>(), 0);
     assert_eq!(size_of::<Worker>(), 0);
     assert_eq!(size_of_val(&AccountProvider), 0);
     assert_eq!(AccountProvider.infer("bearer"), "verified bearer");

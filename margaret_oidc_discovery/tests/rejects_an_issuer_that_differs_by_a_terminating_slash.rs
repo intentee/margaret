@@ -5,12 +5,12 @@ use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
 #[test]
 fn rejects_an_issuer_that_differs_by_a_terminating_slash() {
-    let issuer = "https://token.actions.githubusercontent.com"
+    let issuer = "https://server.example.com"
         .parse::<IssuerIdentifier>()
         .expect("the issuer is an https url");
 
     assert!(matches!(
-        ProviderMetadata::parse(br#"{"issuer":"https://token.actions.githubusercontent.com/","jwks_uri":"https://token.actions.githubusercontent.com/.well-known/jwks"}"#, &issuer),
+        ProviderMetadata::parse(br#"{"issuer":"https://server.example.com/","jwks_uri":"https://server.example.com/jwks.json"}"#, &issuer),
         ProviderMetadataParsing::Rejected(ProviderMetadataRejection::IssuerMismatch { .. })
     ));
 }

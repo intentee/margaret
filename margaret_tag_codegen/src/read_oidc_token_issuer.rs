@@ -40,12 +40,12 @@ mod tests {
     #[test]
     fn reads_the_issuer_tag() {
         let tag = read_oidc_token_issuer(
-            &args(&parse_quote!(#[oidc_token(issuer = github)])),
+            &args(&parse_quote!(#[oidc_token(issuer = partner)])),
             "the site",
         )
         .expect("the issuer is read");
 
-        assert_eq!(tag.to_string(), "github");
+        assert_eq!(tag.to_string(), "partner");
     }
 
     #[test]
@@ -59,7 +59,7 @@ mod tests {
     #[test]
     fn rejects_an_issuer_that_is_not_a_plain_name() {
         assert_eq!(
-            rejection(&parse_quote!(#[oidc_token(issuer = auth::github)])),
+            rejection(&parse_quote!(#[oidc_token(issuer = auth::partner)])),
             "the site must be `issuer = <tag>`"
         );
     }
@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn rejects_an_unrecognized_argument() {
         assert_eq!(
-            rejection(&parse_quote!(#[oidc_token(issuer = github, audience = ci)])),
+            rejection(&parse_quote!(#[oidc_token(issuer = partner, audience = ci)])),
             "failed to read the attribute arguments: attribute 'oidc_token' has an unrecognized argument 'audience'"
         );
     }
@@ -75,7 +75,7 @@ mod tests {
     #[test]
     fn rejects_an_issuer_that_is_not_a_path() {
         assert_eq!(
-            rejection(&parse_quote!(#[oidc_token(issuer = "github")])),
+            rejection(&parse_quote!(#[oidc_token(issuer = "partner")])),
             "failed to read the attribute arguments: argument 'issuer' of attribute 'oidc_token' is not a path"
         );
     }

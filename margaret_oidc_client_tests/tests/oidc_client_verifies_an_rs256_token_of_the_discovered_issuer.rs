@@ -18,7 +18,7 @@ use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn oidc_client_verifies_an_rs256_token_of_the_discovered_issuer() {
-    let key = FixtureRsaKey::load("github-kid");
+    let key = FixtureRsaKey::load("rsa-kid");
     let trust = localhost_trust();
     let issuer = RunningFixtureIssuer::start(FixtureIssuerRoutes {
         discovery: Arc::new(StaticHandler {
@@ -63,7 +63,7 @@ async fn oidc_client_verifies_an_rs256_token_of_the_discovered_issuer() {
         panic!("the token of the discovered issuer verifies");
     };
 
-    assert_eq!(identity.claims["repository_id"], "74");
+    assert_eq!(identity.claims["role"], "builder");
 
     cancellation_token.cancel();
     poll_task
