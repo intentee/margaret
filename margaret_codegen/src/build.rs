@@ -291,11 +291,9 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use tempfile::TempDir;
-    use tempfile::tempdir;
-
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::source_crate::SourceCrate;
     use margaret_generated_module::generated_module::GeneratedModule;
     use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 
@@ -398,30 +396,15 @@ pub mod margaret;
 struct Room;
 ";
 
-    fn write_lib(directory: &TempDir, lib_source: &str) {
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir_all(&source_directory).expect("the src directory exists");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-    }
-
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-
-        write_lib(&directory, lib_source);
-
-        directory
-    }
-
     const EMBED_RELATIVE: &str = ".";
 
     fn generate(lib_source: &str) -> Result<GeneratedCode, CodegenError> {
-        let directory = crate_with(lib_source);
+        let source_crate = SourceCrate::new(lib_source);
 
         build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             None,
-            &directory.path().join("assets"),
+            &source_crate.root().join("assets"),
             EMBED_RELATIVE,
         )
     }
@@ -484,12 +467,12 @@ struct Room;
 
     #[test]
     fn generates_the_asset_bag_module_when_a_metafile_is_present() {
-        let directory = crate_with(PLAIN_CRATE);
+        let source_crate = SourceCrate::new(PLAIN_CRATE);
 
         let code = build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
-            &directory.path().join("assets"),
+            &source_crate.root().join("assets"),
             EMBED_RELATIVE,
         )
         .expect("the build succeeds");
@@ -519,8 +502,8 @@ impl AssetRoute {
 
     #[test]
     fn generates_the_asset_responder_when_a_constructor_injects_it() {
-        let directory = crate_with(ASSET_RESPONDER_CRATE);
-        let assets = directory.path().join("assets");
+        let source_crate = SourceCrate::new(ASSET_RESPONDER_CRATE);
+        let assets = source_crate.root().join("assets");
         fs::create_dir(&assets).expect("the assets directory exists");
         fs::write(assets.join("app_ABC.js"), "console.log(1)")
             .expect("the fingerprinted asset exists");
@@ -531,7 +514,7 @@ impl AssetRoute {
         .expect("the un-fingerprinted asset exists");
 
         let code = build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &assets,
             EMBED_RELATIVE,
@@ -554,12 +537,12 @@ impl AssetRoute {
 
     #[test]
     fn reports_a_missing_asset_directory_when_the_responder_is_injected() {
-        let directory = crate_with(ASSET_RESPONDER_CRATE);
+        let source_crate = SourceCrate::new(ASSET_RESPONDER_CRATE);
 
         let message = build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
-            &directory.path().join("assets"),
+            &source_crate.root().join("assets"),
             EMBED_RELATIVE,
         )
         .expect_err("a missing asset directory is rejected")
@@ -587,12 +570,12 @@ impl AssetRoute {
 
     #[test]
     fn propagates_an_asset_bag_failure() {
-        let directory = crate_with(PLAIN_CRATE);
+        let source_crate = SourceCrate::new(PLAIN_CRATE);
 
         let message = build(
-            &CrateRoot::new("crate", directory.path().join("src")),
+            &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{ "outputs": {} }"#),
-            &directory.path().join("assets"),
+            &source_crate.root().join("assets"),
             EMBED_RELATIVE,
         )
         .expect_err("an invalid metafile is rejected")
@@ -1404,19 +1387,17 @@ impl RequestLog {
 
     #[test]
     fn removes_the_server_when_responders_are_removed() {
-        let directory = crate_with(WEB_CRATE);
-        let source = directory.path().join("src");
-        let generated = directory.path().join(UMBRELLA_MODULE_NAME);
+        let web_crate = SourceCrate::new(WEB_CRATE);
+        let plain_crate = SourceCrate::new(PLAIN_CRATE);
+        let generated = web_crate.root().join(UMBRELLA_MODULE_NAME);
 
-        generate_from_source(&source)
+        generate_from_source(&web_crate.source_directory())
             .write_to(&generated)
             .expect("the first sources are written");
 
         assert!(generated.join("http.rs").exists());
 
-        write_lib(&directory, PLAIN_CRATE);
-
-        generate_from_source(&source)
+        generate_from_source(&plain_crate.source_directory())
             .write_to(&generated)
             .expect("the second sources are written");
 
@@ -1433,8 +1414,8 @@ impl RequestLog {
 
     #[test]
     fn is_idempotent() {
-        let directory = crate_with(WEB_CRATE);
-        let source = directory.path().join("src");
+        let source_crate = SourceCrate::new(WEB_CRATE);
+        let source = source_crate.source_directory();
 
         let first = generate_from_source(&source);
         let second = generate_from_source(&source);

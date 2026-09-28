@@ -9,15 +9,9 @@ pub mod render_console;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
-    use tempfile::TempDir;
-    use tempfile::tempdir;
-
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_http_codegen::http_server::HttpServer;
@@ -74,25 +68,6 @@ impl Farewell {
 }
 "#;
 
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        directory
-    }
-
-    fn index_for(lib_source: &str) -> AttributeIndex {
-        let directory = crate_with(lib_source);
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
@@ -127,7 +102,7 @@ impl Farewell {
     }
 
     fn source_for(lib_source: &str, has_http: bool) -> String {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         let http_servers = if has_http {
             vec![HttpServer::new(
                 "public".to_string(),
@@ -156,7 +131,7 @@ impl Farewell {
     }
 
     fn rejection_for(lib_source: &str) -> ConsoleCodegenError {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
 
         render_planned_console(&index, false, false, &[], &[], &bindings(&index))
             .expect_err("the console source fails to generate")
@@ -168,8 +143,8 @@ impl Farewell {
 
     #[test]
     fn rejects_a_command_absent_from_the_container_plan() {
-        let index = index_for(COMMANDS);
-        let empty_bindings = bindings(&index_for(""));
+        let index = IndexedSource::new(COMMANDS).index;
+        let empty_bindings = bindings(&IndexedSource::new("").index);
         let error = render_planned_console(&index, false, false, &[], &[], &empty_bindings)
             .map(drop)
             .expect_err("every command must belong to the same container plan");
@@ -259,7 +234,7 @@ impl Farewell {
 
     #[test]
     fn emits_spiffe_transport_flags_when_a_server_is_pinned() {
-        let index = index_for("struct App;\n");
+        let index = IndexedSource::new("struct App;\n").index;
         let source: String = render_planned_console(
             &index,
             true,
@@ -312,7 +287,7 @@ impl Farewell {
 
     #[test]
     fn registers_one_address_argument_per_active_server() {
-        let index = index_for("struct App;\n");
+        let index = IndexedSource::new("struct App;\n").index;
         let source: String = render_planned_console(
             &index,
             true,
@@ -350,7 +325,7 @@ impl Farewell {
 
     #[test]
     fn registers_a_serve_command_without_addr_for_a_service_only_app() {
-        let index = index_for("struct App;\n");
+        let index = IndexedSource::new("struct App;\n").index;
         let source: String =
             render_planned_console(&index, true, false, &[], &[], &bindings(&index))
                 .expect("the console source is generated")
@@ -374,7 +349,7 @@ impl Farewell {
 
     #[test]
     fn adds_a_schema_command_when_models_exist() {
-        let index = index_for("struct App;\n");
+        let index = IndexedSource::new("struct App;\n").index;
         let source: String =
             render_planned_console(&index, false, true, &[], &[], &bindings(&index))
                 .expect("the console source is generated")
@@ -400,7 +375,7 @@ impl Farewell {
 
     #[test]
     fn emits_a_synchronous_run_when_only_the_schema_command_exists() {
-        let index = index_for("struct App;\n");
+        let index = IndexedSource::new("struct App;\n").index;
         let source: String =
             render_planned_console(&index, false, true, &[], &[], &bindings(&index))
                 .expect("the console source is generated")

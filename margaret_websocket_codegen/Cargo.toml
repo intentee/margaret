@@ -27,8 +27,8 @@ syn = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+margaret_attributes_tests = { path = "../margaret_attributes_tests" }
 margaret_tag_codegen = { workspace = true }
-tempfile = { workspace = true }
 
 [lints]
 workspace = true

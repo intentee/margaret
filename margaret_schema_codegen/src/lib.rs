@@ -8,15 +8,7 @@ mod render;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use std::path::Path;
-
-    use tempfile::TempDir;
-    use tempfile::tempdir;
-
-    use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_model_codegen::models::models;
 
     use crate::render_schema::render_schema;
@@ -43,26 +35,9 @@ struct Author {
 }
 ";
 
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source = directory.path().join("src");
-
-        fs::create_dir_all(&source).expect("the src directory exists");
-        fs::write(source.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        directory
-    }
-
-    fn index_of(directory: &Path) -> AttributeIndex {
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.join("src")))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn schema_source(lib_source: &str) -> String {
-        let directory = crate_with(lib_source);
-        let models = models(&index_of(directory.path())).expect("the models resolve");
+        let indexed = IndexedSource::new(lib_source);
+        let models = models(&indexed.index).expect("the models resolve");
 
         render_schema(&models)
             .to_source()

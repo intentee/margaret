@@ -23,7 +23,7 @@ syn = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
+margaret_attributes_tests = { path = "../margaret_attributes_tests" }
 
 [lints]
 workspace = true

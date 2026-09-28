@@ -14,17 +14,11 @@ mod tick_timer_arguments;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
-    use tempfile::TempDir;
-    use tempfile::tempdir;
-
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::crate_root::CrateRoot;
     use margaret_attributes::framework_attribute::FrameworkAttribute;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
@@ -39,25 +33,6 @@ mod tests {
     use crate::render_services::render_services;
     use crate::service_codegen_error::ServiceCodegenError;
     use crate::service_plan::ServicePlan;
-
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        directory
-    }
-
-    fn index_for(lib_source: &str) -> AttributeIndex {
-        let directory = crate_with(lib_source);
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
-            .expect("the crate is indexed")
-            .build()
-    }
 
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
@@ -90,7 +65,7 @@ mod tests {
     }
 
     fn render_source(lib_source: &str, servers: &[HttpServer], has_views: bool) -> String {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         let bindings = bindings(&index);
         let serve_inputs = bindings
             .serve_inputs(&serve_roots(&index), &[])
@@ -116,9 +91,10 @@ mod tests {
     }
 
     fn rejection_for(lib_source: &str) -> ServiceCodegenError {
-        let placeholder = bindings(&index_for("#[singleton]\nstruct Placeholder;\n"));
+        let placeholder =
+            bindings(&IndexedSource::new("#[singleton]\nstruct Placeholder;\n").index);
 
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         ServicePlan::build(&index, &[], &placeholder, &[])
             .err()
             .expect("the services source fails to generate")
@@ -247,7 +223,7 @@ impl Flusher {
 
     #[test]
     fn renders_framework_ticker_and_service_adapters_beside_user_units() {
-        let index = index_for("#[singleton]\nstruct Placeholder;\n");
+        let index = IndexedSource::new("#[singleton]\nstruct Placeholder;\n").index;
         let framework_services = vec![
             FrameworkService {
                 concrete_path: canonical(&[
@@ -419,7 +395,7 @@ impl Flusher {
 
     #[test]
     fn rejects_a_serve_input_absent_from_the_container_plan() {
-        let index = index_for("");
+        let index = IndexedSource::new("").index;
         let bindings = bindings(&index);
         let serve_inputs = [ServeInput::ConsoleArgument(ConsoleArgument::Flag {
             name: "missing".to_string(),
