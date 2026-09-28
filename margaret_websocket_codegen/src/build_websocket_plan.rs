@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
-use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 
 use crate::built_websocket_plan::BuiltWebSocketPlan;
@@ -42,7 +42,7 @@ fn reject_duplicate_response_methods(
 pub(crate) fn build_websocket_plan(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
-    middleware_plans: &[MiddlewarePlan],
+    middleware_plans: &MiddlewarePlans,
     registries: &BindingRegistries,
 ) -> Result<BuiltWebSocketPlan, WebSocketCodegenError> {
     let messages = websocket_messages(index)?;

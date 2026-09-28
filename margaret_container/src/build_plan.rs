@@ -21,6 +21,8 @@ use margaret_serve_input_codegen::declared_serve_inputs::DeclaredServeInputs;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 use margaret_tag_codegen::jwks_secret_store_target::JwksSecretStoreTarget;
 use margaret_tag_codegen::read_jwks_secret_store_target::read_jwks_secret_store_target;
+use margaret_tag_codegen::tag_kind::TagKind;
+use margaret_tag_codegen::tag_pool::TagPool;
 
 use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
@@ -273,6 +275,7 @@ struct DependencyResolver<'resolver> {
     index: &'resolver AttributeIndex,
     provided_keys: &'resolver HashMap<CanonicalPath, CanonicalPath>,
     serve_inputs: &'resolver DeclaredServeInputs,
+    tags: &'resolver TagPool<'resolver>,
 }
 
 impl DependencyResolver<'_> {
@@ -316,6 +319,7 @@ impl DependencyResolver<'_> {
                         &parameter,
                         target,
                         self.framework_providers,
+                        self.tags,
                     )?;
                     let declared = indexed_parameter.declared();
 
@@ -390,8 +394,13 @@ fn resolve_jwks_secret_store(
     parameter: &str,
     target: &JwksSecretStoreTarget,
     framework_providers: &[FrameworkProvider],
+    tags: &TagPool,
 ) -> Result<CanonicalPath, ContainerError> {
     let site = format!("parameter '{parameter}' of singleton '{concrete_path}'");
+
+    if let JwksSecretStoreTarget::Client(tag) = target {
+        tags.resolve(tag, TagKind::JwksClient, &site)?;
+    }
 
     framework_providers
         .iter()
@@ -784,6 +793,7 @@ pub(crate) fn build_plan(
     index: &AttributeIndex,
     serve_inputs: &DeclaredServeInputs,
     framework_providers: &[FrameworkProvider],
+    tags: &TagPool,
 ) -> Result<ContainerPlan, ContainerError> {
     let DraftedContainer {
         construction_drafts,
@@ -803,6 +813,7 @@ pub(crate) fn build_plan(
         index,
         provided_keys: &provided_keys,
         serve_inputs,
+        tags,
     };
 
     let mut providers = BTreeMap::new();

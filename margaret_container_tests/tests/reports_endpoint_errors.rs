@@ -4,6 +4,7 @@ use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsE
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_container::container_error::ContainerError;
 use margaret_container_tests::generate_container_source::generate_container_source;
+use margaret_tag_codegen::tag_error::TagError;
 
 fn error(fixture: &str) -> ContainerError {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -26,6 +27,16 @@ fn rejects_a_jwks_endpoint_provider_that_is_also_a_service() {
     assert!(matches!(
         error("endpoint_conflicting_role"),
         ContainerError::ConflictingEndpointRole { .. }
+    ));
+}
+
+#[test]
+fn rejects_two_jwks_endpoint_providers_sharing_a_tag() {
+    assert!(matches!(
+        error("endpoint_shared_tag"),
+        ContainerError::Tag {
+            source: TagError::DuplicateTag { .. }
+        }
     ));
 }
 

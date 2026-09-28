@@ -43,14 +43,6 @@ pub enum MiddlewareCodegenError {
     )]
     MiddlewareHandlerNotOnStruct { target: String },
 
-    #[error("middleware '{middleware}' is missing the 'attribute' argument")]
-    MissingMiddlewareHandles { middleware: String },
-
-    #[error("middleware '{middleware}' names a tag that is not a single plain name")]
-    MalformedMiddlewareTag { middleware: String },
-
-    #[error(
-        "{site} attaches the middleware tag '{tag}', but no #[handles_middleware_attribute] handles it"
-    )]
-    UnknownMiddleware { site: String, tag: String },
+    #[error("{site} attaches the middleware handled by '{handler}', which has no middleware plan")]
+    UnplannedMiddlewareHandler { handler: String, site: String },
 }

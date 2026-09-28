@@ -6,6 +6,7 @@ use margaret_attributes::crate_root::CrateRoot;
 use margaret_container::plan_container::plan_container;
 use margaret_container::planned_container::PlannedContainer;
 use margaret_serve_input_codegen::scan::scan;
+use margaret_tag_codegen::tag_pool::TagPool;
 
 fn planned_container() -> PlannedContainer {
     let directory =
@@ -15,7 +16,13 @@ fn planned_container() -> PlannedContainer {
         .expect("the fixture crate is indexed")
         .build();
     let registry = scan(&index).expect("the console arguments are scanned");
-    plan_container(&index, &registry, &[]).expect("the container is planned")
+    plan_container(
+        &index,
+        &registry,
+        &[],
+        &TagPool::collect(&index).expect("the tags are collected"),
+    )
+    .expect("the container is planned")
 }
 
 fn missing_path() -> CanonicalPath {

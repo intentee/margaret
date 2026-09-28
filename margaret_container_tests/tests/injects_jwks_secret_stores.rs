@@ -15,6 +15,7 @@ use margaret_container::rendered_container::RenderedContainer;
 use margaret_container::resolve_injectable::resolve_injectable;
 use margaret_container_tests::container_module_source::container_module_source;
 use margaret_serve_input_codegen::scan::scan;
+use margaret_tag_codegen::tag_pool::TagPool;
 
 fn auth_tag() -> Tag {
     let path: syn::Path = syn::parse_str("auth").expect("the tag path parses");
@@ -51,13 +52,17 @@ fn render(fixture: &str, providers: &[FrameworkProvider]) -> Result<String, Cont
         .build();
     let serve_inputs = scan(&index).expect("the serve inputs are scanned");
 
-    render_container(&index, &serve_inputs, providers).map(
-        |RenderedContainer { modules, .. }| {
-            container_module_source(modules)
-                .split_whitespace()
-                .collect()
-        },
+    render_container(
+        &index,
+        &serve_inputs,
+        providers,
+        &TagPool::collect(&index).expect("the tags are collected"),
     )
+    .map(|RenderedContainer { modules, .. }| {
+        container_module_source(modules)
+            .split_whitespace()
+            .collect()
+    })
 }
 
 #[test]
@@ -175,8 +180,13 @@ fn refuses_to_inject_a_jwks_secret_store_by_path_into_a_request_site() {
         .expect("the fixture crate is indexed")
         .build();
     let serve_inputs = scan(&index).expect("the serve inputs are scanned");
-    let RenderedContainer { bindings, .. } =
-        render_container(&index, &serve_inputs, &both_stores()).expect("the container renders");
+    let RenderedContainer { bindings, .. } = render_container(
+        &index,
+        &serve_inputs,
+        &both_stores(),
+        &TagPool::collect(&index).expect("the tags are collected"),
+    )
+    .expect("the container renders");
     let consumer = index
         .items()
         .iter()
@@ -188,4 +198,14 @@ fn refuses_to_inject_a_jwks_secret_store_by_path_into_a_request_site() {
         resolve_injectable(&index, consumer, &declared, &bindings),
         InjectableResolution::JwksSecretStoreByPath
     ));
+}
+
+#[test]
+fn reports_a_jwks_client_marker_that_names_a_middleware_tag() {
+    assert!(
+        render("jwks_client_marker_names_a_middleware", &both_stores())
+            .expect_err("a client marker must name a jwks endpoint tag")
+            .to_string()
+            .contains("which is a middleware handler, not a jwks endpoint provider")
+    );
 }

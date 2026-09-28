@@ -6,7 +6,7 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_injection_codegen::process_method::process_method;
-use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
@@ -20,7 +20,7 @@ use crate::http_route_table::HttpRouteTable;
 
 pub(crate) fn http_routes(
     index: &AttributeIndex,
-    middleware_plans: &[MiddlewarePlan],
+    middleware_plans: &MiddlewarePlans,
     registries: &BindingRegistries,
 ) -> Result<HttpRouteTable, HttpCodegenError> {
     let mut table = HttpRouteTable::new();

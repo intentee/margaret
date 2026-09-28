@@ -6,6 +6,7 @@ use margaret_container::container_error::ContainerError;
 use margaret_container::render_container::render_container;
 use margaret_generated_module::generated_module::GeneratedModule;
 use margaret_serve_input_codegen::scan::scan;
+use margaret_tag_codegen::tag_pool::TagPool;
 
 use crate::container_module_source::container_module_source;
 
@@ -20,7 +21,8 @@ pub fn generate_container_source(
         .index_crate(&CrateRoot::new(crate_name, source_directory))?
         .build();
     let registry = scan(&index)?;
-    let source = container_module_source(render_container(&index, &registry, &[])?.modules);
+    let tags = TagPool::collect(&index)?;
+    let source = container_module_source(render_container(&index, &registry, &[], &tags)?.modules);
 
     Ok(GeneratedModule::new("container", source))
 }
