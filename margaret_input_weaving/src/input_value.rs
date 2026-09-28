@@ -96,58 +96,18 @@ impl InputValue {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use proc_macro2::TokenStream;
     use syn::Type;
     use syn::parse_quote;
-    use tempfile::tempdir;
 
-    use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::crate_root::CrateRoot;
-    use margaret_attributes::indexed_item::IndexedItem;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
 
     use crate::constructor_parameter::ConstructorParameter;
     use crate::input_weaving_error::InputWeavingError;
     use crate::weaving_kind::WeavingKind;
 
     use super::InputValue;
-
-    struct IndexedCrate {
-        index: AttributeIndex,
-    }
-
-    impl IndexedCrate {
-        fn new() -> Self {
-            let directory = tempdir().expect("a temporary crate directory is created");
-            let source_directory = directory.path().join("src");
-
-            fs::create_dir(&source_directory).expect("the src directory is created");
-            fs::write(
-                source_directory.join("lib.rs"),
-                "#[singleton]\nstruct Config;\n",
-            )
-            .expect("lib.rs is written");
-
-            Self {
-                index: AttributeIndexBuilder::new()
-                    .index_crate(&CrateRoot::new("crate", source_directory))
-                    .expect("the crate is indexed")
-                    .build(),
-            }
-        }
-
-        fn item(&self) -> &IndexedItem {
-            self.index
-                .item(&CanonicalPath::new(vec![
-                    "crate".to_string(),
-                    "Config".to_string(),
-                ]))
-                .expect("the indexed struct is present")
-        }
-    }
 
     fn site() -> ConstructorParameter {
         ConstructorParameter {
@@ -157,9 +117,9 @@ mod tests {
     }
 
     fn from_declared(declared: &Type) -> Result<InputValue, InputWeavingError> {
-        let indexed = IndexedCrate::new();
+        let indexed = IndexedSource::new("#[singleton]\nstruct Config;\n");
 
-        InputValue::from_declared(&indexed.index, indexed.item(), declared, &site())
+        InputValue::from_declared(&indexed.index, indexed.item("Config"), declared, &site())
     }
 
     fn collapsed(tokens: &TokenStream) -> String {

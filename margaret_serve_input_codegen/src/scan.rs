@@ -103,13 +103,8 @@ pub fn scan(index: &AttributeIndex) -> Result<DeclaredServeInputs, ServeInputCod
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
-    use tempfile::tempdir;
-
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
 
     use crate::declared_serve_inputs::DeclaredServeInputs;
@@ -119,18 +114,7 @@ mod tests {
     use super::scan;
 
     fn scanned(lib_source: &str) -> Result<DeclaredServeInputs, ServeInputCodegenError> {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        scan(
-            &AttributeIndexBuilder::new()
-                .index_crate(&CrateRoot::new("crate", source_directory))
-                .expect("the crate is indexed")
-                .build(),
-        )
+        scan(&IndexedSource::new(lib_source).index)
     }
 
     fn owner(name: &str) -> CanonicalPath {

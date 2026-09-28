@@ -43,16 +43,8 @@ mod uuid_canonical_path;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use std::path::Path;
-
-    use tempfile::TempDir;
-    use tempfile::tempdir;
-
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
-    use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_model::check_predicate::CheckPredicate;
     use margaret_model::column_check::ColumnCheck;
     use margaret_model::column_default::ColumnDefault;
@@ -72,27 +64,10 @@ struct Author {
 }
 ";
 
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source = directory.path().join("src");
-
-        fs::create_dir_all(&source).expect("the src directory exists");
-        fs::write(source.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        directory
-    }
-
-    fn index_of(directory: &Path) -> AttributeIndex {
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.join("src")))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn rejection_for(lib_source: &str) -> ModelCodegenError {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path())).expect_err("the models fail to resolve")
+        models(&indexed.index).expect_err("the models fail to resolve")
     }
 
     fn error_message(lib_source: &str) -> String {
@@ -789,9 +764,9 @@ struct Book {
     }
 
     fn table_order(lib_source: &str) -> Vec<String> {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .map(|model| model.table)
@@ -799,9 +774,9 @@ struct Book {
     }
 
     fn resolved_index_columns(lib_source: &str) -> Vec<Vec<String>> {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .flat_map(|model| model.indexes)
@@ -840,9 +815,9 @@ struct Book {
     }
 
     fn resolved_model(lib_source: &str, table: &str) -> Model {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .find(|model| model.table == table)
@@ -850,9 +825,9 @@ struct Book {
     }
 
     fn inferred_column(lib_source: &str, table: &str, column: &str) -> InferredColumn {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .find(|model| model.table == table)
@@ -868,11 +843,11 @@ struct Book {
         lib_prelude: &str,
         value_type: &str,
     ) -> Result<InferredColumn, ModelCodegenError> {
-        let directory = crate_with(&format!(
+        let indexed = IndexedSource::new(&format!(
             "{lib_prelude}\n#[model(table = \"values\")]\nstruct Values {{\n    #[column]\n    value: {value_type},\n}}\n"
         ));
 
-        models(&index_of(directory.path())).map(|models| {
+        models(&indexed.index).map(|models| {
             models
                 .into_iter()
                 .flat_map(|model| model.columns)
@@ -1159,9 +1134,9 @@ struct FragmentMetadata {
     }
 
     fn column_checks(lib_source: &str, table: &str, column: &str) -> Vec<ColumnCheck> {
-        let directory = crate_with(lib_source);
+        let indexed = IndexedSource::new(lib_source);
 
-        models(&index_of(directory.path()))
+        models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .find(|model| model.table == table)
@@ -1251,9 +1226,9 @@ struct FragmentMetadata {
         let source = with_fragment_metadata(
             "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
         );
-        let directory = crate_with(&source);
+        let indexed = IndexedSource::new(&source);
 
-        let tables: Vec<String> = models(&index_of(directory.path()))
+        let tables: Vec<String> = models(&indexed.index)
             .expect("the models resolve")
             .into_iter()
             .map(|model| model.table)

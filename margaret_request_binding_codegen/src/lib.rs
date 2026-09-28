@@ -36,15 +36,10 @@ pub mod views_availability;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use quote::format_ident;
-    use tempfile::tempdir;
 
-    use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
@@ -73,25 +68,12 @@ use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUser
 struct User;
 ";
 
-    fn index_for(lib_source: &str) -> AttributeIndex {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", source_directory))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn provider_source(declaration: &str) -> String {
         format!("{PRELUDE}{declaration}")
     }
 
     fn empty_bindings() -> ContainerBindings {
-        let index = index_for("");
+        let index = IndexedSource::new("").index;
         let registry = scan(&index).expect("the empty console argument registry is scanned");
 
         render_container(
@@ -109,8 +91,11 @@ struct User;
     }
 
     fn registries_with(declaration: &str, views: ViewsAvailability) -> BindingRegistries {
-        BindingRegistries::collect(&index_for(&provider_source(declaration)), views)
-            .expect("the binding registries are collected")
+        BindingRegistries::collect(
+            &IndexedSource::new(&provider_source(declaration)).index,
+            views,
+        )
+        .expect("the binding registries are collected")
     }
 
     fn registries_for(declaration: &str) -> BindingRegistries {
@@ -119,7 +104,7 @@ struct User;
 
     fn rejection_for(declaration: &str) -> String {
         BindingRegistries::collect(
-            &index_for(&provider_source(declaration)),
+            &IndexedSource::new(&provider_source(declaration)).index,
             ViewsAvailability::Available,
         )
         .err()
@@ -329,21 +314,18 @@ impl SessionUserProvider {
         identifier: &str,
         declaration: &str,
     ) -> Result<Vec<BoundParameter>, RequestBindingError> {
-        let index = index_for(&provider_source(&format!(
+        let indexed = IndexedSource::new(&provider_source(&format!(
             "{SESSION_PROVIDER}{declaration}"
         )));
-        let registries = BindingRegistries::collect(&index, ViewsAvailability::Available)
+        let index = &indexed.index;
+        let registries = BindingRegistries::collect(index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
-        let item = index
-            .items()
-            .iter()
-            .find(|item| item.identifier() == identifier)
-            .expect("the responder is indexed");
+        let item = indexed.item(identifier);
         let route_path = RoutePath::parse("/{x}");
         let method = process_method(item).expect("the responder has a #[process] method");
 
         classify_parameters(
-            &index,
+            index,
             item,
             method,
             &BindingContext::Responder {
@@ -507,9 +489,9 @@ impl SessionUserProvider {
     #[test]
     fn rejects_a_provider_that_renders_views_this_crate_does_not_generate() {
         let rejection = BindingRegistries::collect(
-            &index_for(&provider_source(
+            &IndexedSource::new(&provider_source(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n\nimpl Bad {\n    #[infer_from_request]\n    fn infer(&self, views: &crate::margaret::views::Views) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
-            )),
+            )).index,
             ViewsAvailability::Unavailable,
         )
         .err()
@@ -535,7 +517,7 @@ impl SessionUserProvider {
 
     #[test]
     fn collects_the_console_arguments_a_binding_pulls_in() {
-        let index = index_for(&provider_source(CONSOLE_ARGUMENT_PROVIDER));
+        let index = IndexedSource::new(&provider_source(CONSOLE_ARGUMENT_PROVIDER)).index;
         let registry = scan(&index).expect("the console arguments are scanned");
         let bindings = render_container(
             &index,

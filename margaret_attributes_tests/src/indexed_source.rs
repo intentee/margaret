@@ -1,16 +1,13 @@
-use std::fs;
-
-use tempfile::TempDir;
-use tempfile::tempdir;
-
+use margaret_attributes::attribute_error::AttributeError;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::crate_root::CrateRoot;
 use margaret_attributes::indexed_item::IndexedItem;
 
+use crate::source_crate::SourceCrate;
+
 pub struct IndexedSource {
     pub index: AttributeIndex,
-    _directory: TempDir,
 }
 
 impl IndexedSource {
@@ -19,21 +16,24 @@ impl IndexedSource {
     /// Panics when the crate it writes cannot be created or indexed.
     #[must_use]
     pub fn new(lib_source: &str) -> Self {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source = directory.path().join("src");
+        Self::try_new(lib_source).expect("the crate is indexed")
+    }
 
-        fs::create_dir_all(&source).expect("the src directory exists");
-        fs::write(source.join("lib.rs"), lib_source).expect("lib.rs is written");
+    /// # Errors
+    ///
+    /// Returns the `AttributeError` raised while indexing the crate.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the crate it writes cannot be created.
+    pub fn try_new(lib_source: &str) -> Result<Self, AttributeError> {
+        let source_crate = SourceCrate::new(lib_source);
 
-        let index = AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", source))
-            .expect("the crate is indexed")
-            .build();
-
-        Self {
-            index,
-            _directory: directory,
-        }
+        Ok(Self {
+            index: AttributeIndexBuilder::new()
+                .index_crate(&CrateRoot::new("crate", source_crate.source_directory()))?
+                .build(),
+        })
     }
 
     /// # Panics

@@ -28,18 +28,13 @@ pub fn read_environment_variable(
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use syn::Attribute;
     use syn::Type;
     use syn::parse_quote;
-    use tempfile::tempdir;
 
     use margaret_attribute_arguments::attribute_args::AttributeArgs;
-    use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_input_weaving::constructor_parameter::ConstructorParameter;
 
     use crate::environment_variable::EnvironmentVariable;
@@ -49,23 +44,6 @@ mod tests {
 
     fn config_path() -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), "Config".to_string()])
-    }
-
-    fn indexed_crate() -> AttributeIndex {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(
-            source_directory.join("lib.rs"),
-            "#[singleton]\nstruct Config;\n",
-        )
-        .expect("lib.rs is written");
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", source_directory))
-            .expect("the crate is indexed")
-            .build()
     }
 
     fn describe(attribute: &Attribute, declared: &Type) -> String {
@@ -88,14 +66,11 @@ mod tests {
         attribute: &Attribute,
         declared: &Type,
     ) -> Result<EnvironmentVariable, EnvironmentVariableCodegenError> {
-        let index = indexed_crate();
-        let item = index
-            .item(&config_path())
-            .expect("the indexed struct is present");
+        let indexed = IndexedSource::new("#[singleton]\nstruct Config;\n");
 
         read_environment_variable(
-            &index,
-            item,
+            &indexed.index,
+            indexed.item("Config"),
             &AttributeArgs::from_attribute(attribute).expect("the arguments parse"),
             declared,
             &ConstructorParameter {

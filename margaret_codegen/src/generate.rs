@@ -71,7 +71,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use tempfile::tempdir;
+    use margaret_attributes_tests::source_crate::SourceCrate;
 
     use super::generate;
     use super::generate_into;
@@ -90,13 +90,13 @@ impl Config {
 }
 ";
 
-    fn write_crate(directory: &Path, lib_source: &str) {
-        let source = directory.join("src");
+    fn host_crate(lib_source: &str) -> SourceCrate {
+        let host = SourceCrate::new(lib_source);
 
-        fs::create_dir_all(&source).expect("the src directory exists");
-        fs::write(source.join("lib.rs"), lib_source).expect("lib.rs is written");
-        fs::write(directory.join("Cargo.toml"), "[workspace]\n")
+        fs::write(host.root().join("Cargo.toml"), "[workspace]\n")
             .expect("the workspace manifest is written");
+
+        host
     }
 
     fn read_generated(manifest_directory: &Path, name: &str) -> String {
@@ -116,29 +116,27 @@ struct Config {
 
     #[test]
     fn generates_the_container_for_the_manifest_crate() {
-        let host = tempdir().expect("a host crate directory");
-        write_crate(host.path(), HOST_CRATE);
+        let host = host_crate(HOST_CRATE);
 
-        generate_into(host.path()).expect("the crate generates");
+        generate_into(host.root()).expect("the crate generates");
 
-        assert!(read_generated(host.path(), "container.rs").contains("struct Container"));
-        assert!(read_generated(host.path(), "mod.rs").contains("pub mod container;"));
+        assert!(read_generated(host.root(), "container.rs").contains("struct Container"));
+        assert!(read_generated(host.root(), "mod.rs").contains("pub mod container;"));
     }
 
     #[test]
     fn generates_the_asset_bag_module_from_a_committed_metafile() {
-        let host = tempdir().expect("a host crate directory");
-        write_crate(host.path(), HOST_CRATE);
+        let host = host_crate(HOST_CRATE);
         fs::write(
-            host.path().join("esbuild-meta.json"),
+            host.root().join("esbuild-meta.json"),
             r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#,
         )
         .expect("the metafile is written");
 
-        generate_into(host.path()).expect("the crate generates");
+        generate_into(host.root()).expect("the crate generates");
 
-        assert!(read_generated(host.path(), "mod.rs").contains("pub mod asset_bag;"));
-        assert!(read_generated(host.path(), "asset_bag.rs").contains("macro_rules! asset"));
+        assert!(read_generated(host.root(), "mod.rs").contains("pub mod asset_bag;"));
+        assert!(read_generated(host.root(), "asset_bag.rs").contains("macro_rules! asset"));
     }
 
     const ASSET_RESPONDER_HOST: &str = "\
@@ -160,14 +158,13 @@ impl AssetRoute {
 
     #[test]
     fn serves_every_file_in_the_assets_directory_including_unfingerprinted_ones() {
-        let host = tempdir().expect("a host crate directory");
-        write_crate(host.path(), ASSET_RESPONDER_HOST);
+        let host = host_crate(ASSET_RESPONDER_HOST);
         fs::write(
-            host.path().join("esbuild-meta.json"),
+            host.root().join("esbuild-meta.json"),
             r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#,
         )
         .expect("the metafile is written");
-        let assets = host.path().join("assets");
+        let assets = host.root().join("assets");
         fs::create_dir(&assets).expect("the assets directory exists");
         fs::write(assets.join("app_ABC.js"), "console.log(1)")
             .expect("the fingerprinted asset exists");
@@ -177,9 +174,9 @@ impl AssetRoute {
         )
         .expect("the service worker exists");
 
-        generate_into(host.path()).expect("the crate generates");
+        generate_into(host.root()).expect("the crate generates");
 
-        let responder = read_generated(host.path(), "asset_bag/asset_responder.rs");
+        let responder = read_generated(host.root(), "asset_bag/asset_responder.rs");
 
         assert!(responder.contains("\"service_worker.js\" =>"));
         assert!(responder.contains("\"no-cache\""));
@@ -189,12 +186,11 @@ impl AssetRoute {
 
     #[test]
     fn reports_a_metafile_that_cannot_be_read() {
-        let host = tempdir().expect("a host crate directory");
-        write_crate(host.path(), HOST_CRATE);
-        fs::create_dir(host.path().join("esbuild-meta.json"))
+        let host = host_crate(HOST_CRATE);
+        fs::create_dir(host.root().join("esbuild-meta.json"))
             .expect("the blocking directory is created");
 
-        let error = generate_into(host.path()).expect_err("an unreadable metafile is reported");
+        let error = generate_into(host.root()).expect_err("an unreadable metafile is reported");
 
         assert!(
             error
@@ -205,13 +201,9 @@ impl AssetRoute {
 
     #[test]
     fn reports_a_manifest_without_a_workspace_root() {
-        let host = tempdir().expect("a host crate directory");
-        let source = host.path().join("src");
+        let host = SourceCrate::new("");
 
-        fs::create_dir_all(&source).expect("the src directory exists");
-        fs::write(source.join("lib.rs"), "").expect("lib.rs is written");
-
-        let error = generate_into(host.path())
+        let error = generate_into(host.root())
             .expect_err("a manifest without a workspace root is reported");
 
         assert!(
@@ -223,27 +215,25 @@ impl AssetRoute {
 
     #[test]
     fn regenerates_cleanly_on_a_second_run() {
-        let host = tempdir().expect("a host crate directory");
-        write_crate(host.path(), HOST_CRATE);
+        let host = host_crate(HOST_CRATE);
 
-        generate_into(host.path()).expect("the first generation succeeds");
-        generate_into(host.path()).expect("the second generation succeeds");
+        generate_into(host.root()).expect("the first generation succeeds");
+        generate_into(host.root()).expect("the second generation succeeds");
 
-        assert!(read_generated(host.path(), "container.rs").contains("struct Container"));
+        assert!(read_generated(host.root(), "container.rs").contains("struct Container"));
     }
 
     #[test]
     fn reads_the_manifest_directory_from_the_environment() {
-        let host = tempdir().expect("a host crate directory");
-        write_crate(host.path(), HOST_CRATE);
+        let host = host_crate(HOST_CRATE);
 
         unsafe {
-            env::set_var("CARGO_MANIFEST_DIR", host.path());
+            env::set_var("CARGO_MANIFEST_DIR", host.root());
         }
 
         generate().expect("the crate generates from the environment");
 
-        assert!(read_generated(host.path(), "container.rs").contains("struct Container"));
+        assert!(read_generated(host.root(), "container.rs").contains("struct Container"));
     }
 
     #[test]
@@ -259,13 +249,12 @@ impl AssetRoute {
 
     #[test]
     fn reports_a_generated_directory_that_cannot_be_created() {
-        let host = tempdir().expect("a host crate directory");
-        write_crate(host.path(), HOST_CRATE);
-        fs::write(host.path().join(UMBRELLA_MODULE_NAME), "")
+        let host = host_crate(HOST_CRATE);
+        fs::write(host.root().join(UMBRELLA_MODULE_NAME), "")
             .expect("the blocking file is written");
 
         let error =
-            generate_into(host.path()).expect_err("a blocked generated directory is reported");
+            generate_into(host.root()).expect_err("a blocked generated directory is reported");
 
         assert!(
             error
@@ -276,10 +265,9 @@ impl AssetRoute {
 
     #[test]
     fn propagates_a_crate_that_fails_to_build() {
-        let host = tempdir().expect("a host crate directory");
-        write_crate(host.path(), FIELDED_SINGLETON_CRATE);
+        let host = host_crate(FIELDED_SINGLETON_CRATE);
 
-        let error = generate_into(host.path()).expect_err("an unbuildable crate is reported");
+        let error = generate_into(host.root()).expect_err("an unbuildable crate is reported");
 
         assert!(
             error
@@ -290,12 +278,11 @@ impl AssetRoute {
 
     #[test]
     fn propagates_a_generated_source_that_cannot_be_written() {
-        let host = tempdir().expect("a host crate directory");
-        write_crate(host.path(), HOST_CRATE);
-        fs::create_dir_all(host.path().join(UMBRELLA_MODULE_NAME).join("container.rs"))
+        let host = host_crate(HOST_CRATE);
+        fs::create_dir_all(host.root().join(UMBRELLA_MODULE_NAME).join("container.rs"))
             .expect("the blocking directory is created");
 
-        let error = generate_into(host.path()).expect_err("a blocked generated source is reported");
+        let error = generate_into(host.root()).expect_err("a blocked generated source is reported");
 
         assert!(
             error

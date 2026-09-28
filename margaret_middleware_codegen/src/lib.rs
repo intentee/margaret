@@ -11,18 +11,13 @@ pub mod resolve_layers;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use quote::format_ident;
     use quote::quote;
-    use tempfile::TempDir;
-    use tempfile::tempdir;
 
     use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::crate_root::CrateRoot;
     use margaret_attributes::framework_attribute::FrameworkAttribute;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
@@ -38,25 +33,6 @@ mod tests {
     use crate::render_middleware_wrappers::render_middleware_wrappers;
     use crate::resolve_layers::resolve_layers;
 
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        directory
-    }
-
-    fn index_for(lib_source: &str) -> AttributeIndex {
-        let directory = crate_with(lib_source);
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
@@ -71,7 +47,7 @@ mod tests {
     }
 
     fn empty_bindings() -> ContainerBindings {
-        bindings_for(&index_for("#[singleton]\nstruct Config;\n"))
+        bindings_for(&IndexedSource::new("#[singleton]\nstruct Config;\n").index)
     }
 
     fn registries_for(index: &AttributeIndex) -> BindingRegistries {
@@ -80,7 +56,7 @@ mod tests {
     }
 
     fn wrappers_for(lib_source: &str) -> String {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
             .expect("the middleware plans are collected");
@@ -94,7 +70,7 @@ mod tests {
     }
 
     fn plans_rejection_for(lib_source: &str) -> MiddlewareCodegenError {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
 
         MiddlewarePlans::collect(
             &index,
@@ -110,7 +86,7 @@ mod tests {
     }
 
     fn layers_for(lib_source: &str) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
             .expect("the middleware plans are collected");
@@ -291,9 +267,9 @@ impl Guard {
 
     #[test]
     fn reports_a_handler_that_has_no_plan() {
-        let index = index_for(
+        let index = IndexedSource::new(
             "#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\n#[middleware(guard)]\nstruct Site;\n",
-        );
+        ).index;
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let site = index
             .select_framework_attribute(FrameworkAttribute::Middleware)
@@ -420,7 +396,7 @@ struct Site;
     #[test]
     fn weaves_a_serve_input_into_the_middleware_instance() {
         let layers = layers_for(CONSOLE_ARGUMENT_MIDDLEWARE).expect("the layers resolve");
-        let bindings = bindings_for(&index_for(CONSOLE_ARGUMENT_MIDDLEWARE));
+        let bindings = bindings_for(&IndexedSource::new(CONSOLE_ARGUMENT_MIDDLEWARE).index);
         let folded = fold_layers(
             &layers,
             quote! { BASE },

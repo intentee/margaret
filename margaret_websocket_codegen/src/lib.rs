@@ -29,15 +29,12 @@ mod websocket_sessions;
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::fs;
 
     use quote::format_ident;
-    use tempfile::tempdir;
 
     use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::framework_construction::FrameworkConstruction;
     use margaret_container::framework_enablement::FrameworkEnablement;
@@ -157,19 +154,6 @@ impl RespondsToWebSocketNotification for Typist {
 }
 "#;
 
-    fn index_for(source: &str) -> AttributeIndex {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), source).expect("lib.rs is written");
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", source_directory))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
@@ -218,7 +202,7 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     fn generated(source: &str) -> String {
-        let index = index_for(source);
+        let index = IndexedSource::new(source).index;
         let registries = registries_for(&index);
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
@@ -240,7 +224,7 @@ impl RespondsToWebSocketNotification for Typist {
     }
 
     fn error(source: &str) -> WebSocketCodegenError {
-        let index = index_for(source);
+        let index = IndexedSource::new(source).index;
         let registries = match BindingRegistries::collect(&index, ViewsAvailability::Available) {
             Ok(registries) => registries,
             Err(rejection) => return WebSocketCodegenError::from(rejection),
@@ -331,7 +315,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn reports_a_notification_handler_absent_from_the_container_plan() {
-        let index = index_for("#[singleton]\nstruct Known;\n");
+        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
         let mut plan = empty_session_plan();
         plan.notification_handlers.push(missing_handler());
 
@@ -343,7 +327,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn reports_a_request_handler_absent_from_the_container_plan() {
-        let index = index_for("#[singleton]\nstruct Known;\n");
+        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
         let mut plan = empty_session_plan();
         plan.request_handlers.push(missing_handler());
 
@@ -360,7 +344,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn reports_a_session_binding_absent_from_the_container_plan() {
-        let index = index_for("#[singleton]\nstruct Known;\n");
+        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
         let mut plan = empty_session_plan();
         plan.session.parameters.push(BoundParameter {
             binding: RequestBinding::BoundRouteParameter {
@@ -379,7 +363,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn reports_a_session_layer_absent_from_the_container_plan() {
-        let index = index_for("#[singleton]\nstruct Known;\n");
+        let index = IndexedSource::new("#[singleton]\nstruct Known;\n").index;
         let mut plan = empty_session_plan();
         plan.session.layers.push(LayerApplication {
             concrete: missing_path(),
@@ -398,7 +382,7 @@ impl RespondsToWebSocketNotification for Typist {
 
     #[test]
     fn propagates_a_container_mismatch_from_websocket_rendering() {
-        let index = index_for(
+        let index = IndexedSource::new(
             r#"
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
@@ -421,12 +405,13 @@ impl RespondsToWebSocketMessage for Ponger {
     type Message = Ping;
 }
 "#,
-        );
+        )
+        .index;
         let registries = registries_for(&index);
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
-        let empty_index = index_for("");
+        let empty_index = IndexedSource::new("").index;
         let error = render_websocket(&index, &bindings(&empty_index), &plans, &registries)
             .map(drop)
             .expect_err("websocket rendering requires the same container plan");
@@ -453,7 +438,7 @@ impl RespondsToWebSocketMessage for Chatter {
 
     #[test]
     fn rejects_a_handler_that_is_not_a_struct() {
-        let error = websocket_handlers(&index_for(NON_STRUCT_HANDLER))
+        let error = websocket_handlers(&IndexedSource::new(NON_STRUCT_HANDLER).index)
             .err()
             .expect("a non-struct websocket handler is rejected");
 
@@ -497,7 +482,7 @@ mod a_b {
 
     #[test]
     fn resolves_a_handler_to_its_disambiguated_container_field() {
-        let handlers = websocket_handlers(&index_for(COLLIDING_HANDLER_FIELD))
+        let handlers = websocket_handlers(&IndexedSource::new(COLLIDING_HANDLER_FIELD).index)
             .expect("the handlers are discovered");
 
         assert_eq!(handlers.len(), 1);
@@ -1022,7 +1007,7 @@ impl Bad {
 
     #[test]
     fn rejects_a_session_parameter_that_injects_a_jwks_secret_store_by_path() {
-        let index = index_for(
+        let index = IndexedSource::new(
             r#"
 use std::sync::Arc;
 
@@ -1036,7 +1021,8 @@ impl Bad {
     fn build(store: Arc<ServerStore>) -> anyhow::Result<Self> {}
 }
 "#,
-        );
+        )
+        .index;
         let registries = registries_for(&index);
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
@@ -2014,7 +2000,7 @@ impl Bad {
     }
 
     fn transport_policies(source: &str) -> BTreeMap<String, ServerTransportPolicy> {
-        let index = index_for(source);
+        let index = IndexedSource::new(source).index;
         let registries = registries_for(&index);
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)

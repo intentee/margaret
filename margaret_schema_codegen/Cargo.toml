@@ -18,8 +18,7 @@ proc-macro2 = { workspace = true }
 quote = { workspace = true }
 
 [dev-dependencies]
-margaret_attributes = { workspace = true }
-tempfile = { workspace = true }
+margaret_attributes_tests = { path = "../margaret_attributes_tests" }
 
 [lints]
 workspace = true

@@ -22,16 +22,10 @@ pub mod web_socket_server_requirements;
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::fs;
-    use std::path::Path;
-
-    use tempfile::TempDir;
-    use tempfile::tempdir;
 
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
-    use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
-    use margaret_attributes::crate_root::CrateRoot;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
@@ -114,12 +108,12 @@ mod tests {
     }
 
     fn error_with_container_source(source: &str, container_source: &str) -> String {
-        let index = index_for(source);
+        let index = IndexedSource::new(source).index;
         let registries = registries_for(&index, false);
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
-        let container_index = index_for(container_source);
+        let container_index = IndexedSource::new(container_source).index;
         let bindings = bindings_for(&container_index);
 
         render_http(
@@ -135,14 +129,8 @@ mod tests {
         .to_string()
     }
 
-    fn http_source(
-        crate_name: &str,
-        source_directory: &Path,
-        has_views: bool,
-    ) -> Result<String, HttpCodegenError> {
-        let index = AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new(crate_name, source_directory))?
-            .build();
+    fn http_source(lib_source: &str, has_views: bool) -> Result<String, HttpCodegenError> {
+        let index = IndexedSource::try_new(lib_source)?.index;
         let registries = BindingRegistries::collect(&index, views_availability(has_views))?;
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)?;
@@ -168,13 +156,6 @@ mod tests {
         })
         .collect::<Vec<String>>()
         .join("\n"))
-    }
-
-    fn generate_http_source(
-        crate_name: &str,
-        source_directory: &Path,
-    ) -> Result<String, HttpCodegenError> {
-        http_source(crate_name, source_directory, false)
     }
 
     const RESPONDERS_AND_MIDDLEWARE: &str = r#"
@@ -274,7 +255,7 @@ impl Resource {
 
     #[test]
     fn rejects_websocket_arguments_absent_from_the_container_plan() {
-        let index = index_for("");
+        let index = IndexedSource::new("").index;
         let bindings = bindings_for(&index);
         let registries = registries_for(&index, false);
         let websocket_servers = BTreeMap::from([(
@@ -673,48 +654,22 @@ impl Echo {
 }
 "#;
 
-    fn crate_with(lib_source: &str) -> TempDir {
-        let directory = tempdir().expect("a temporary crate directory is created");
-        let source_directory = directory.path().join("src");
-
-        fs::create_dir(&source_directory).expect("the src directory is created");
-        fs::write(source_directory.join("lib.rs"), lib_source).expect("lib.rs is written");
-
-        directory
-    }
-
-    fn index_for(lib_source: &str) -> AttributeIndex {
-        let directory = crate_with(lib_source);
-
-        AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
-            .expect("the crate is indexed")
-            .build()
-    }
-
     fn source_for(lib_source: &str) -> String {
-        let directory = crate_with(lib_source);
-
-        generate_http_source("crate", &directory.path().join("src"))
+        http_source(lib_source, false)
             .expect("the http source is generated")
             .split_whitespace()
             .collect()
     }
 
     fn source_for_with_views(lib_source: &str) -> String {
-        let directory = crate_with(lib_source);
-
-        http_source("crate", &directory.path().join("src"), true)
+        http_source(lib_source, true)
             .expect("the http source is generated")
             .split_whitespace()
             .collect()
     }
 
     fn rejection_for(lib_source: &str) -> HttpCodegenError {
-        let directory = crate_with(lib_source);
-
-        generate_http_source("crate", &directory.path().join("src"))
-            .expect_err("the http source fails to generate")
+        http_source(lib_source, false).expect_err("the http source fails to generate")
     }
 
     fn error_for(lib_source: &str) -> String {
@@ -778,7 +733,7 @@ impl Health {
         websocket_server_name: &str,
         has_views: bool,
     ) -> String {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
@@ -836,7 +791,7 @@ impl Health {
         lib_source: &str,
         websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
     ) -> BTreeMap<String, ServerTransportPolicy> {
-        let index = index_for(lib_source);
+        let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
@@ -933,11 +888,7 @@ impl GetWorkload {
     }
 
     fn routes_source_for(lib_source: &str) -> String {
-        let directory = crate_with(lib_source);
-        let index = AttributeIndexBuilder::new()
-            .index_crate(&CrateRoot::new("crate", directory.path().join("src")))
-            .expect("the crate is indexed")
-            .build();
+        let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
@@ -2127,7 +2078,7 @@ impl Tracer {
 
     #[test]
     fn pins_a_server_to_mutual_tls_when_a_middleware_reads_the_peer_spiffe_id() {
-        let index = index_for(
+        let index = IndexedSource::new(
             r#"
 use margaret::framework::http::next::Next;
 use spiffe::spiffe_id::SpiffeId;
@@ -2150,7 +2101,8 @@ impl Guard {
     fn process(&self, peer: &SpiffeId, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 "#,
-        );
+        )
+        .index;
         let registries = registries_for(&index, false);
         let tags = TagPool::collect(&index).expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
