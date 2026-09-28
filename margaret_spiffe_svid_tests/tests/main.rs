@@ -13,14 +13,14 @@ mod extract_spiffe_trust_domain_rejects_cert_without_spiffe_san;
 mod extract_spiffe_trust_domain_rejects_invalid_der;
 mod extract_spiffe_trust_domain_rejects_non_spiffe_uri_san;
 #[cfg(feature = "tests_that_use_spire")]
-mod obtain_join_token_errors_when_server_unreachable;
+mod obtain_join_token_errors_when_spire_server_unreachable;
 #[cfg(feature = "tests_that_use_spire")]
-mod obtain_trust_bundle_errors_when_server_unreachable;
+mod obtain_trust_bundle_errors_when_spire_server_unreachable;
 mod peer_identity_rejection_reports_none_for_an_unrelated_error;
 mod pump_tls_handshake_gives_up_when_handshake_cannot_progress;
 mod pump_tls_handshake_propagates_server_decode_error;
 #[cfg(feature = "tests_that_use_spire")]
-mod register_workload_entry_errors_when_server_unreachable;
+mod register_workload_entry_errors_when_spire_server_unreachable;
 mod root_cert_store_holder_changed_resolves_for_value_set_after_subscribe;
 mod root_cert_store_holder_read_current_returns_value_set_before_subscribe;
 mod root_cert_store_holder_returns_none_before_set;
@@ -76,8 +76,8 @@ mod svid_rotate_loop_does_not_panic_when_no_subscribers;
 mod svid_rotate_loop_exits_on_cancellation;
 mod svid_rotate_loop_forwards_context_to_subscriber;
 #[cfg(feature = "tests_that_use_spire")]
-mod svid_rotate_service_returns_when_stream_rpc_is_rejected;
+mod svid_rotate_service_returns_when_the_spire_server_rejects_the_stream_rpc;
 #[cfg(feature = "tests_that_use_spire")]
-mod svid_rotate_service_stream_from_agent_returns_on_cancel;
+mod svid_rotate_service_stream_from_spire_agent_returns_on_cancel;
 #[cfg(feature = "tests_that_use_spire")]
 mod svid_rotate_service_streams_from_spire_agent;
