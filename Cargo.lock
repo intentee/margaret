@@ -906,9 +906,9 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-postgres"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57b5000559cf808499b3d2fb73d5e24f32d4df2ae68d88354899aca3736cfc77"
+checksum = "919049a8a908fb0986b7fcda1d04ddae177593267afa3041115391e04aec531a"
 dependencies = [
  "sqlx",
  "testcontainers-modules",
