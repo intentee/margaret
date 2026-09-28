@@ -8,7 +8,7 @@ use crate::container_bindings::ContainerBindings;
 use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::injectable_resolution::InjectableResolution;
 use crate::injected_dependency::InjectedDependency;
-use crate::peel_target::peel_target;
+use crate::parameter_target::ParameterTarget;
 use crate::provider_binding::ProviderBinding;
 
 fn resolved_single(
@@ -36,12 +36,9 @@ pub fn resolve_injectable(
     declared: &Type,
     bindings: &ContainerBindings,
 ) -> InjectableResolution {
-    let Some(written) = peel_target(index, item, declared) else {
-        return InjectableResolution::UnsupportedShape;
-    };
-
-    match index.resolve_item_path(item, &written) {
-        Some(provider_key) => resolved_single(provider_key, bindings),
-        None => InjectableResolution::MissingProvider,
+    match ParameterTarget::peel(index, item, declared) {
+        ParameterTarget::Resolved { resolved, .. } => resolved_single(resolved, bindings),
+        ParameterTarget::Unresolved { .. } => InjectableResolution::MissingProvider,
+        ParameterTarget::UnsupportedShape => InjectableResolution::UnsupportedShape,
     }
 }
