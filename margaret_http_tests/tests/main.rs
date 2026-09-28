@@ -1,3 +1,6 @@
+mod challenges_a_request_with_malformed_credentials;
+mod challenges_a_request_without_credentials;
 mod forbids_a_peer_without_a_spiffe_id;
+mod reads_the_bearer_token_of_a_request;
 mod rejects_a_plaintext_connection_to_an_mtls_server;
 mod serves_a_request_over_spiffe_mtls;

@@ -1,3 +1,4 @@
+pub mod echo_bearer_route;
 pub mod echo_peer_route;
 pub mod fixture_certificate_authority;
 pub mod fixture_client_builder;
