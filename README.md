@@ -40,6 +40,54 @@ Application code uses the runtime facade through `margaret::framework`. Generate
 
 The [`margaret_example`](margaret_example) workspace crate demonstrates a complete application with commands, HTTP routes, views, models, services, identity, tokens, uploaded files, assets, validation, and WebSocket sessions.
 
+## Trusting OpenID Providers
+
+A `#[singleton]` that implements `DeclaresTokenTrust` declares a trusted OpenID Provider with `#[trusts_oidc_issuer(tag)]`. Margaret finds the provider's signing keys through OpenID Connect Discovery, keeps them fresh in a background service, and verifies bearer tokens against the declared issuer and audience.
+
+An `#[infers_authenticated_user]` provider receives the verification of the request's bearer token as an argument of its `#[infer_from_request]` method:
+
+```rust
+#[infer_from_request]
+pub fn infer_ci_runner(
+    &self,
+    #[oidc_token(issuer = github_actions)] verification: OidcTokenVerification<GithubActionsClaims>,
+) -> anyhow::Result<AuthenticatedUserOutcome<CiRunner>> {
+    Ok(match verification {
+        OidcTokenVerification::Absent | OidcTokenVerification::NotBearer => {
+            AuthenticatedUserOutcome::Anonymous
+        }
+        OidcTokenVerification::Rejected(rejection) => AuthenticatedUserOutcome::Interrupted(
+            ResponseContinuation::from(rejection.challenge().response()),
+        ),
+        OidcTokenVerification::Unavailable => AuthenticatedUserOutcome::Interrupted(
+            ResponseContinuation::from(Response::text(503, "the signing keys are not available yet")),
+        ),
+        OidcTokenVerification::Verified(verified) => {
+            let GithubActionsClaims {
+                repository,
+                repository_id,
+                repository_owner_id,
+            } = verified.claims;
+
+            if repository_owner_id == self.repository_owner_id {
+                AuthenticatedUserOutcome::Authenticated(CiRunner {
+                    repository,
+                    repository_id,
+                })
+            } else {
+                AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(
+                    Response::forbidden(),
+                ))
+            }
+        }
+    })
+}
+```
+
+A route that requires such a user answers an anonymous request with `401 Unauthorized` and `WWW-Authenticate: Bearer`. A malformed `Authorization` header is answered with `invalid_request`, and a token that fails verification with `invalid_token`.
+
+The example's `GET /ci/runner` route accepts GitHub Actions OIDC tokens. Its `serve` command takes the audience a workflow requests with `--github-actions-audience` and the repository owner it accepts with `--github-actions-repository-owner-id`. The example matches the immutable `repository_owner_id` claim, never a name parsed out of `sub`.
+
 ## Development
 
 Run the unit test and lint gates with:
