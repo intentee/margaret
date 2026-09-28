@@ -1,13 +1,11 @@
 use std::any;
 use std::mem;
 
-use crate::margaret::asset_bag::asset;
 use crate::margaret::container::build;
 use crate::margaret::framework::construction_error::ConstructionError;
 
 #[must_use]
 pub fn construction_future_sizes() -> [usize; 9] {
-    let _asset = asset!("resources/fonts/inter.woff2");
     let _framework_error = any::type_name::<ConstructionError>();
 
     [

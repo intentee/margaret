@@ -124,9 +124,19 @@ struct Config {
         assert!(read_generated(host.root(), "mod.rs").contains("pub mod container;"));
     }
 
+    const ASSET_MACRO_HOST: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use crate::margaret::asset_bag::asset;
+
+#[singleton]
+struct Config;
+";
+
     #[test]
     fn generates_the_asset_bag_module_from_a_committed_metafile() {
-        let host = host_crate(HOST_CRATE);
+        let host = host_crate(ASSET_MACRO_HOST);
         fs::write(
             host.root().join("esbuild-meta.json"),
             r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#,

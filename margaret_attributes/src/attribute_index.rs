@@ -57,6 +57,11 @@ impl AttributeIndex {
     }
 
     #[must_use]
+    pub fn is_imported(&self, target: &CanonicalPath) -> bool {
+        self.resolver.is_imported(target)
+    }
+
+    #[must_use]
     pub fn item(&self, path: &CanonicalPath) -> Option<&IndexedItem> {
         self.items
             .binary_search_by(|item| item.canonical_path().cmp(path))

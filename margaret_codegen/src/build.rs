@@ -220,13 +220,14 @@ pub fn build(
     let planned_container = plan_container(&index, &registry, &framework_providers, &tags)?;
     let bindings = planned_container.bindings();
     let application_roots = planned_container.roots();
-    features.enable_if(GeneratedFeature::AssetBag, metafile_contents.is_some());
     let mut module_tokens = asset_bag_modules(
+        &index,
         metafile_contents,
         bindings,
         assets_directory,
         embed_relative,
     )?;
+    features.enable_if(GeneratedFeature::AssetBag, !module_tokens.is_empty());
     let jwks = build_jwks_artifacts(bindings, &client_bindings);
     let oidc = build_oidc_artifacts(bindings, &issuer_bindings);
 
@@ -479,8 +480,36 @@ struct Room;
     }
 
     #[test]
-    fn generates_the_asset_bag_module_when_a_metafile_is_present() {
+    fn omits_the_asset_macro_of_a_crate_that_never_imports_it() {
         let source_crate = SourceCrate::new(PLAIN_CRATE);
+
+        let code = build(
+            &CrateRoot::new("crate", source_crate.source_directory()),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
+            &source_crate.root().join("assets"),
+            EMBED_RELATIVE,
+        )
+        .expect("the build succeeds");
+
+        assert!(!module(&code, "mod").contains("pub mod asset_bag;"));
+        assert!(!has_module(&code, "asset_bag"));
+    }
+
+    const ASSET_MACRO_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+mod views {
+    use crate::margaret::asset_bag::asset;
+}
+
+#[singleton]
+struct Config;
+";
+
+    #[test]
+    fn generates_the_asset_macro_a_module_imports() {
+        let source_crate = SourceCrate::new(ASSET_MACRO_CRATE);
 
         let code = build(
             &CrateRoot::new("crate", source_crate.source_directory()),
@@ -549,6 +578,30 @@ impl AssetRoute {
     }
 
     #[test]
+    fn generates_the_asset_macro_beside_the_injected_responder() {
+        let source_crate = SourceCrate::new(&format!(
+            "{ASSET_RESPONDER_CRATE}\nmod views {{\n    use crate::margaret::asset_bag::asset;\n}}\n"
+        ));
+        let assets = source_crate.root().join("assets");
+        fs::create_dir(&assets).expect("the assets directory exists");
+        fs::write(assets.join("app_ABC.js"), "console.log(1)")
+            .expect("the fingerprinted asset exists");
+
+        let code = build(
+            &CrateRoot::new("crate", source_crate.source_directory()),
+            Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
+            &assets,
+            EMBED_RELATIVE,
+        )
+        .expect("the build succeeds");
+        let asset_bag = module(&code, "asset_bag");
+
+        assert!(asset_bag.contains("pub mod asset_responder;"));
+        assert!(asset_bag.contains("macro_rules! asset"));
+        assert!(has_module(&code, "asset_bag/asset_responder"));
+    }
+
+    #[test]
     fn reports_a_missing_asset_directory_when_the_responder_is_injected() {
         let source_crate = SourceCrate::new(ASSET_RESPONDER_CRATE);
 
@@ -582,8 +635,18 @@ impl AssetRoute {
     }
 
     #[test]
+    fn reports_an_imported_asset_macro_without_a_metafile() {
+        assert_eq!(
+            generate(ASSET_MACRO_CRATE)
+                .expect_err("an imported asset macro without a metafile is rejected")
+                .to_string(),
+            "a module imports the asset macro, but no esbuild metafile was found at the workspace root"
+        );
+    }
+
+    #[test]
     fn propagates_an_asset_bag_failure() {
-        let source_crate = SourceCrate::new(PLAIN_CRATE);
+        let source_crate = SourceCrate::new(ASSET_MACRO_CRATE);
 
         let message = build(
             &CrateRoot::new("crate", source_crate.source_directory()),

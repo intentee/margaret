@@ -8,7 +8,6 @@ use margaret::framework::views::maud::html;
 use margaret::framework::views::renders_view::RendersView;
 
 pub use super::home_view_props::HomeViewProps;
-use super::margaret::asset_bag::asset;
 use super::secrets::Secrets;
 
 #[renders_view(name = "home_view")]
@@ -36,7 +35,6 @@ impl RendersView for HomeView {
     ) -> std::result::Result<Markup, failures::Error> {
         Ok({
             let _ = self.secrets.token();
-            let _ = asset!("resources/ts/app.ts");
 
             html! { h1 { (heading) } }
         })

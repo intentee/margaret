@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use margaret::framework::asset_bag::asset_bag::AssetBag;
 use margaret::framework::http::response::Response;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
@@ -27,10 +28,8 @@ impl GetProjectAsset {
         #[route_parameter(from = "project")] Project { name }: Project,
         #[route_parameter(from = "asset_path")] asset_path: String,
     ) -> Result<Response> {
-        Ok({
-            let _ = asset!("resources/ts/app.ts");
+        let logo = AssetBag::new().image(asset!("resources/media/logo.png"));
 
-            Response::text(200, [name, asset_path].join(":"))
-        })
+        Ok(Response::text(200, [name, asset_path, logo].join(":")))
     }
 }

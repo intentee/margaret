@@ -1,4 +1,5 @@
 mod asset_bag_modules;
+mod asset_macro_canonical_path;
 mod asset_responder_canonical_path;
 mod assets_directory_name;
 pub mod build;
