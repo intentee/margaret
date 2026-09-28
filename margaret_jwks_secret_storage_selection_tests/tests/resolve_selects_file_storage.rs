@@ -1,4 +1,4 @@
-use margaret_jwks_keygen::curve::Curve;
+use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_roller::loaded_secret::LoadedSecret;
 use margaret_jwks_secret_storage_selection::jwks_secret_storage_uri::JwksSecretStorageUri;
@@ -19,5 +19,5 @@ fn resolve_selects_file_storage() {
         panic!("the file storage must reload the persisted secret");
     };
 
-    assert_eq!(reloaded.current.public.kid, secret.current.public.kid);
+    assert_eq!(reloaded.current().kid(), secret.current().kid());
 }

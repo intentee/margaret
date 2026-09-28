@@ -5,26 +5,28 @@ use tokio_util::sync::CancellationToken;
 use trzcina::Ticker as _;
 
 use margaret_jwks_client::jwks_poll_interval_after_ready::JWKS_POLL_INTERVAL_AFTER_READY;
-use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_poll_service::PublicJwksPollService;
+use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_jwks_client_tests::first_tick_context::first_tick_context;
 use margaret_jwks_client_tests::system_issuer_document_client::system_issuer_document_client;
 use margaret_jwks_client_tests::unreachable_endpoint::unreachable_endpoint;
-use margaret_jwks_keygen::curve::Curve;
-use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::public_jwks::PublicJwks;
+use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::verification_key_set::VerificationKeySet;
 
 #[tokio::test(start_paused = true)]
 async fn public_jwks_poll_service_returns_promptly_when_cancelled_during_the_wait() {
-    let known_good = JwksSecret::fresh(Curve::P256).expect("a fresh secret");
-    let public_jwks_holder = PublicJwksHolder::default();
+    let KeySetParsing::Accepted(known_good) = VerificationKeySet::from_jwks(Vec::new()) else {
+        panic!("an empty key set is accepted");
+    };
+    let known_good = Arc::new(known_good);
+    let verification_key_set_holder = VerificationKeySetHolder::default();
 
-    public_jwks_holder.set(Some(Arc::new(PublicJwks::from(known_good))));
+    verification_key_set_holder.set(Some(known_good.clone()));
 
     let mut service = PublicJwksPollService {
         endpoint_provider: unreachable_endpoint(),
         issuer_document_client: system_issuer_document_client(),
-        public_jwks_holder,
+        verification_key_set_holder,
     };
 
     let cancellation_token = CancellationToken::new();

@@ -1,5 +1,6 @@
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage::FileJwksSecretStorage;
 use margaret_jwks_file_secret_storage_tests::sample_secret::sample_secret;
+use margaret_jwks_keygen::previous_key::PreviousKey;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::loaded_secret::LoadedSecret;
 
@@ -20,7 +21,7 @@ fn file_storage_persists_a_secret_that_reloads() {
         panic!("the persisted secret must reload as present");
     };
 
-    assert_eq!(reloaded.current.public.kid, secret.current.public.kid);
-    assert_eq!(reloaded.next.public.kid, secret.next.public.kid);
-    assert_eq!(reloaded.previous.public.kid, secret.previous.public.kid);
+    assert_eq!(reloaded.current().kid(), secret.current().kid());
+    assert_eq!(reloaded.next().kid(), secret.next().kid());
+    assert!(matches!(reloaded.previous(), PreviousKey::Absent));
 }

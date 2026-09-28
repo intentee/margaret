@@ -1,23 +1,30 @@
 use anyhow::Result;
 
-use margaret_jwks_keygen::curve::Curve;
+use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::public_jwks::PublicJwks;
+use margaret_jwks_keygen::signs_claims::SignsClaims;
+use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
+use margaret_jwks_keygen_tests::published_key_set::published_key_set;
+use margaret_jwks_keygen_tests::test_claims::TestClaims;
+use margaret_jws_verification::jws_verification::JwsVerification;
+use margaret_jws_verification::key_set_parsing::KeySetParsing;
 
-#[test]
-fn public_set_publishes_the_next_key_before_it_signs() -> Result<()> {
-    let rotated = JwksSecret::fresh(Curve::P256)?.rotate()?;
-    let next_kid = rotated.next.signing.kid.clone();
-    let signing_kid = rotated.current.signing.kid.clone();
+#[tokio::test]
+async fn public_set_publishes_the_next_key_before_it_signs() -> Result<()> {
+    let claims = TestClaims {
+        exp: FAR_FUTURE_EXPIRY,
+        sub: "subject".to_string(),
+    };
+    let secret = JwksSecret::fresh(Curve::P256)?;
+    let token = secret.next().sign(&claims).await?;
+    let KeySetParsing::Accepted(key_set) = published_key_set(&secret) else {
+        panic!("the published key set is accepted");
+    };
 
-    let published_before_signing = PublicJwks::from(rotated.clone());
-
-    assert_ne!(next_kid, signing_kid);
-    assert!(published_before_signing.find_by_kid(&next_kid).is_some());
-
-    let promoted = rotated.rotate()?;
-
-    assert_eq!(promoted.current.signing.kid, next_kid);
+    assert!(matches!(
+        key_set.verify(&token),
+        JwsVerification::Verified(_)
+    ));
 
     Ok(())
 }

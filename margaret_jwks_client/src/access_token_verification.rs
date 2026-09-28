@@ -1,9 +1,9 @@
-use margaret_jwks_keygen::token_malformation::TokenMalformation;
+use margaret_jws_verification::jws_rejection::JwsRejection;
 
 pub enum AccessTokenVerification<TClaims> {
     Expired,
-    Malformed(TokenMalformation),
+    MalformedClaims(serde_json::Error),
     NotReady,
-    SignatureMismatch,
+    Rejected(JwsRejection),
     Verified(TClaims),
 }

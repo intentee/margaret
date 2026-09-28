@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage::FileJwksSecretStorage;
+use margaret_jwks_keygen::previous_key::PreviousKey;
 use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 
@@ -24,6 +25,6 @@ fn roll_and_publish_seeds_and_persists_a_fresh_secret_on_first_start() {
         .get()
         .expect("the first start seeds the holder");
 
-    assert_eq!(seeded.previous.public.kid, seeded.current.public.kid);
+    assert!(matches!(seeded.previous(), PreviousKey::Absent));
     assert!(path.exists());
 }

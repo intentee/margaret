@@ -30,6 +30,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_input_weaving \
 	-p margaret_issuer_document_fetch \
 	-p margaret_item_naming_argument \
+	-p margaret_jose_parameters \
 	-p margaret_jwks_client \
 	-p margaret_jwks_client_tests \
 	-p margaret_jwks_codegen \
@@ -43,6 +44,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_jwks_secret_storage_selection \
 	-p margaret_jwks_secret_storage_selection_tests \
 	-p margaret_jwks_secret_store \
+	-p margaret_jws_verification \
+	-p margaret_jws_verification_tests \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
@@ -134,6 +137,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_input_weaving \
 	-p margaret_issuer_document_fetch \
 	-p margaret_item_naming_argument \
+	-p margaret_jose_parameters \
 	-p margaret_jwks_client \
 	-p margaret_jwks_codegen \
 	-p margaret_jwks_endpoint \
@@ -143,6 +147,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_jwks_roller_server \
 	-p margaret_jwks_secret_storage_selection \
 	-p margaret_jwks_secret_store \
+	-p margaret_jws_verification \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
@@ -249,6 +254,7 @@ coverage: node_modules postgres-image
 		--gated margaret_input_weaving=100 \
 		--gated margaret_issuer_document_fetch=100 \
 		--gated margaret_item_naming_argument=100 \
+		--gated margaret_jose_parameters=100 \
 		--gated margaret_jwks_client=100 \
 		--gated margaret_jwks_client_tests=100 \
 		--gated margaret_jwks_codegen=100 \
@@ -262,6 +268,8 @@ coverage: node_modules postgres-image
 		--gated margaret_jwks_secret_storage_selection=100 \
 		--gated margaret_jwks_secret_storage_selection_tests=100 \
 		--gated margaret_jwks_secret_store=100 \
+		--gated margaret_jws_verification=100 \
+		--gated margaret_jws_verification_tests=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_middleware_codegen=100 \
 		--gated margaret_model=100 \

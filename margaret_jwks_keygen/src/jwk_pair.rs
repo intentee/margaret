@@ -1,8 +1,89 @@
-use crate::jwk_public::JwkPublic;
-use crate::jwk_signing::JwkSigning;
+use async_trait::async_trait;
+use base64ct::Base64UrlUnpadded;
+use base64ct::Encoding;
+use serde::Serialize;
+use serde_json::Map;
+use serde_json::Value;
 
-#[derive(Clone)]
+use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
+use margaret_jws_verification::jwk::Jwk;
+use margaret_jws_verification::key_id::KeyId;
+
+use crate::ec_signing_key::EcSigningKey;
+use crate::jwks_key_error::JwksKeyError;
+use crate::signs_claims::SignsClaims;
+
+fn encoded_header(algorithm: JwsAlgorithm, kid: &KeyId) -> String {
+    let mut header = Map::new();
+
+    header.insert(
+        "alg".to_string(),
+        Value::String(algorithm.wire_name().to_string()),
+    );
+    header.insert("kid".to_string(), Value::String(kid.as_str().to_string()));
+
+    Base64UrlUnpadded::encode_string(Value::Object(header).to_string().as_bytes())
+}
+
+#[derive(Clone, PartialEq)]
 pub struct JwkPair {
-    pub public: JwkPublic,
-    pub signing: JwkSigning,
+    encoded_header: String,
+    kid: KeyId,
+    public_jwk: Jwk,
+    signing_key: EcSigningKey,
+}
+
+impl JwkPair {
+    /// # Errors
+    ///
+    /// Returns `JwksKeyError::MissingPublicKeyCoordinate` when the public key cannot be published.
+    pub fn new(kid: KeyId, signing_key: EcSigningKey) -> Result<Self, JwksKeyError> {
+        signing_key.public_jwk(&kid).map(|public_jwk| Self {
+            encoded_header: encoded_header(signing_key.curve().algorithm(), &kid),
+            kid,
+            public_jwk,
+            signing_key,
+        })
+    }
+
+    #[must_use]
+    pub fn kid(&self) -> &KeyId {
+        &self.kid
+    }
+
+    #[must_use]
+    pub fn public_jwk(&self) -> &Jwk {
+        &self.public_jwk
+    }
+
+    #[must_use]
+    pub fn sign_json(&self, claims: &Value) -> String {
+        let signing_input = format!(
+            "{}.{}",
+            self.encoded_header,
+            Base64UrlUnpadded::encode_string(claims.to_string().as_bytes()),
+        );
+        let signature =
+            Base64UrlUnpadded::encode_string(&self.signing_key.sign(signing_input.as_bytes()));
+
+        format!("{signing_input}.{signature}")
+    }
+
+    #[must_use]
+    pub fn signing_key(&self) -> &EcSigningKey {
+        &self.signing_key
+    }
+}
+
+#[async_trait]
+impl SignsClaims for JwkPair {
+    async fn sign<TClaims: Send + Serialize + Sync>(
+        &self,
+        claims: &TClaims,
+    ) -> Result<String, JwksKeyError> {
+        let claims = serde_json::to_value(claims)
+            .map_err(|source| JwksKeyError::ClaimsSerialization { source })?;
+
+        Ok(self.sign_json(&claims))
+    }
 }

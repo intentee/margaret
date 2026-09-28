@@ -30,14 +30,15 @@ impl MintAccessTokenHandler {
         Self { secret_store }
     }
 
-    pub async fn respond(&self, request: &Request, now: DateTime<Utc>) -> Response {
-        match self.mint(request, now).await {
+    #[must_use]
+    pub fn respond(&self, request: &Request, now: DateTime<Utc>) -> Response {
+        match self.mint(request, now) {
             Ok(response) => response,
             Err(error) => error_response(&error),
         }
     }
 
-    async fn mint(
+    fn mint(
         &self,
         request: &Request,
         now: DateTime<Utc>,
@@ -48,13 +49,13 @@ impl MintAccessTokenHandler {
         let minting = self
             .secret_store
             .mint_access_token(&refresh_token, now)
-            .await
             .map_err(|source| MintAccessTokenError::SecretStore { source })?;
 
         Ok(match minting {
             AccessTokenMinting::ExpiredRefreshToken
-            | AccessTokenMinting::MalformedRefreshToken(_)
-            | AccessTokenMinting::UnknownRefreshTokenKey => Response::unauthorized(),
+            | AccessTokenMinting::MalformedRefreshTokenClaims(_)
+            | AccessTokenMinting::RefreshTokenSignedWithNextKey
+            | AccessTokenMinting::RejectedRefreshToken(_) => Response::unauthorized(),
             AccessTokenMinting::Minted(minted) => Response::json(200, &minted),
         })
     }
@@ -95,80 +96,70 @@ mod tests {
         request
     }
 
-    async fn signed_refresh_token(secret: &JwksSecret, exp: i64) -> String {
-        sign_refresh_token(&secret.current.signing, &refresh_claims(exp)).await
+    fn signed_refresh_token(secret: &JwksSecret, exp: i64) -> String {
+        sign_refresh_token(secret.current(), &refresh_claims(exp))
     }
 
-    #[tokio::test]
-    async fn mints_tokens_for_a_valid_refresh_token() {
+    #[test]
+    fn mints_tokens_for_a_valid_refresh_token() {
         let secret = fresh_p256_secret();
-        let refresh_token = signed_refresh_token(&secret, 1_000).await;
+        let refresh_token = signed_refresh_token(&secret, 1_000);
         let handler = handler_from(Some(secret));
 
-        let response = handler
-            .respond(
-                &request_with_body(json!({ "refresh_token": refresh_token })),
-                unix_time(500),
-            )
-            .await;
+        let response = handler.respond(
+            &request_with_body(json!({ "refresh_token": refresh_token })),
+            unix_time(500),
+        );
 
         assert_eq!(response.status(), 200);
     }
 
-    #[tokio::test]
-    async fn reports_bad_request_when_the_body_is_missing() {
+    #[test]
+    fn reports_bad_request_when_the_body_is_missing() {
         let handler = handler_from(Some(fresh_p256_secret()));
 
-        let response = handler
-            .respond(
-                &Request::new(Method::POST, "/mint".to_string()),
-                unix_time(500),
-            )
-            .await;
+        let response = handler.respond(
+            &Request::new(Method::POST, "/mint".to_string()),
+            unix_time(500),
+        );
 
         assert_eq!(response.status(), 400);
     }
 
-    #[tokio::test]
-    async fn reports_bad_request_for_a_malformed_body() {
+    #[test]
+    fn reports_bad_request_for_a_malformed_body() {
         let handler = handler_from(Some(fresh_p256_secret()));
 
-        let response = handler
-            .respond(
-                &request_with_body(json!({ "wrong": "field" })),
-                unix_time(500),
-            )
-            .await;
+        let response = handler.respond(
+            &request_with_body(json!({ "wrong": "field" })),
+            unix_time(500),
+        );
 
         assert_eq!(response.status(), 400);
     }
 
-    #[tokio::test]
-    async fn reports_unauthorized_for_an_expired_refresh_token() {
+    #[test]
+    fn reports_unauthorized_for_an_expired_refresh_token() {
         let secret = fresh_p256_secret();
-        let refresh_token = signed_refresh_token(&secret, 1_000).await;
+        let refresh_token = signed_refresh_token(&secret, 1_000);
         let handler = handler_from(Some(secret));
 
-        let response = handler
-            .respond(
-                &request_with_body(json!({ "refresh_token": refresh_token })),
-                unix_time(2_000),
-            )
-            .await;
+        let response = handler.respond(
+            &request_with_body(json!({ "refresh_token": refresh_token })),
+            unix_time(2_000),
+        );
 
         assert_eq!(response.status(), 401);
     }
 
-    #[tokio::test]
-    async fn reports_internal_error_when_the_secret_is_unavailable() {
+    #[test]
+    fn reports_internal_error_when_the_secret_is_unavailable() {
         let handler = handler_from(None);
 
-        let response = handler
-            .respond(
-                &request_with_body(json!({ "refresh_token": "any.token.value" })),
-                unix_time(500),
-            )
-            .await;
+        let response = handler.respond(
+            &request_with_body(json!({ "refresh_token": "any.token.value" })),
+            unix_time(500),
+        );
 
         assert_eq!(response.status(), 500);
     }

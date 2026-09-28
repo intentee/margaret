@@ -58,14 +58,14 @@ impl JwksVerifier {
             Ok(AccessTokenVerification::Expired) => {
                 println!("the sample access token is expired");
             }
-            Ok(AccessTokenVerification::Malformed(malformation)) => {
-                println!("the sample access token is malformed: {malformation}");
+            Ok(AccessTokenVerification::MalformedClaims(error)) => {
+                println!("the sample access token carries malformed claims: {error}");
             }
             Ok(AccessTokenVerification::NotReady) => {
                 println!("the jwks document has not been polled yet");
             }
-            Ok(AccessTokenVerification::SignatureMismatch) => {
-                println!("the sample access token signature does not match a published key");
+            Ok(AccessTokenVerification::Rejected(rejection)) => {
+                println!("the sample access token is rejected: {rejection}");
             }
             Err(error) => println!("the jwks verifier could not verify the sample token: {error}"),
         }

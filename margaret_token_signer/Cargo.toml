@@ -10,13 +10,12 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
-anyhow = { workspace = true }
 chrono = { workspace = true }
-futures-util = { workspace = true }
 margaret_identity_session = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
+margaret_jws_verification = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,124 +1,92 @@
 use serde::Deserialize;
-use serde::Deserializer;
 use serde::Serialize;
-use serde::Serializer;
 use zeroize::Zeroizing;
 
-use crate::curve::Curve;
-use crate::jwk_pair::JwkPair;
-use crate::jwk_public::JwkPublic;
-use crate::jwk_signing::JwkSigning;
-use crate::jwks_secret::JwksSecret;
+use margaret_jose_parameters::curve::Curve;
+use margaret_jws_verification::jwk::Jwk;
+use margaret_jws_verification::key_id::KeyId;
 
+use crate::ec_signing_key::EcSigningKey;
+use crate::jwk_pair::JwkPair;
+use crate::jwks_key_error::JwksKeyError;
+use crate::jwks_secret::JwksSecret;
+use crate::previous_key::PreviousKey;
+
+#[derive(Deserialize, Serialize)]
+struct PersistedSigningKey {
+    crv: Curve,
+    kid: KeyId,
+    pem: Zeroizing<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct PersistedPair {
+    public: Jwk,
+    signing: PersistedSigningKey,
+}
+
+impl PersistedPair {
+    fn of(pair: &JwkPair) -> Self {
+        Self {
+            public: pair.public_jwk().clone(),
+            signing: PersistedSigningKey {
+                crv: pair.signing_key().curve(),
+                kid: pair.kid().clone(),
+                pem: pair.signing_key().pem().clone(),
+            },
+        }
+    }
+
+    fn restore(self) -> Result<JwkPair, JwksKeyError> {
+        let Self {
+            public: _,
+            signing: PersistedSigningKey { crv, kid, pem },
+        } = self;
+
+        JwkPair::new(kid, EcSigningKey::from_pkcs8_pem(crv, pem)?)
+    }
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct PersistedJwksSecret {
-    secret: JwksSecret,
+    current: PersistedPair,
+    next: PersistedPair,
+    previous: PersistedPair,
 }
 
 impl PersistedJwksSecret {
     #[must_use]
-    pub fn new(secret: JwksSecret) -> Self {
-        Self { secret }
+    pub fn from_secret(secret: &JwksSecret) -> Self {
+        let previous = match secret.previous() {
+            PreviousKey::Absent => secret.current(),
+            PreviousKey::Retired(retired) => retired,
+        };
+
+        Self {
+            current: PersistedPair::of(secret.current()),
+            next: PersistedPair::of(secret.next()),
+            previous: PersistedPair::of(previous),
+        }
     }
 
-    #[must_use]
-    pub fn into_secret(self) -> JwksSecret {
-        self.secret
-    }
-}
-
-impl Serialize for PersistedJwksSecret {
-    fn serialize<Target>(&self, serializer: Target) -> Result<Target::Ok, Target::Error>
-    where
-        Target: Serializer,
-    {
-        #[derive(Serialize)]
-        struct SigningWire<'material> {
-            crv: Curve,
-            kid: &'material str,
-            pem: &'material str,
-        }
-
-        #[derive(Serialize)]
-        struct PairWire<'material> {
-            public: &'material JwkPublic,
-            signing: SigningWire<'material>,
-        }
-
-        #[derive(Serialize)]
-        struct SecretWire<'material> {
-            current: PairWire<'material>,
-            next: PairWire<'material>,
-            previous: PairWire<'material>,
-        }
-
-        fn borrow(pair: &JwkPair) -> PairWire<'_> {
-            PairWire {
-                public: &pair.public,
-                signing: SigningWire {
-                    crv: pair.signing.crv,
-                    kid: pair.signing.kid.as_str(),
-                    pem: pair.signing.pem.as_str(),
-                },
-            }
-        }
-
-        SecretWire {
-            current: borrow(&self.secret.current),
-            next: borrow(&self.secret.next),
-            previous: borrow(&self.secret.previous),
-        }
-        .serialize(serializer)
-    }
-}
-
-impl<'wire> Deserialize<'wire> for PersistedJwksSecret {
-    fn deserialize<Source>(deserializer: Source) -> Result<Self, Source::Error>
-    where
-        Source: Deserializer<'wire>,
-    {
-        #[derive(Deserialize)]
-        struct SigningWire {
-            crv: Curve,
-            kid: String,
-            pem: String,
-        }
-
-        #[derive(Deserialize)]
-        struct PairWire {
-            public: JwkPublic,
-            signing: SigningWire,
-        }
-
-        #[derive(Deserialize)]
-        struct SecretWire {
-            current: PairWire,
-            next: PairWire,
-            previous: PairWire,
-        }
-
-        fn restore(PairWire { public, signing }: PairWire) -> JwkPair {
-            JwkPair {
-                public,
-                signing: JwkSigning {
-                    crv: signing.crv,
-                    kid: signing.kid,
-                    pem: Zeroizing::new(signing.pem),
-                },
-            }
-        }
-
-        let SecretWire {
+    /// # Errors
+    ///
+    /// Returns `JwksKeyError` when a persisted key cannot be restored or the keys do not form a key set.
+    pub fn into_secret(self) -> Result<JwksSecret, JwksKeyError> {
+        let Self {
             current,
             next,
             previous,
-        } = SecretWire::deserialize(deserializer)?;
+        } = self;
+        let current = current.restore()?;
+        let next = next.restore()?;
+        let previous = previous.restore()?;
+        let previous = if previous == current {
+            PreviousKey::Absent
+        } else {
+            PreviousKey::Retired(Box::new(previous))
+        };
 
-        Ok(Self {
-            secret: JwksSecret {
-                current: restore(current),
-                next: restore(next),
-                previous: restore(previous),
-            },
-        })
+        JwksSecret::from_pairs(current, next, previous)
     }
 }

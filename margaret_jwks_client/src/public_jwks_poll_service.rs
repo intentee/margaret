@@ -13,17 +13,19 @@ use margaret_issuer_document_fetch::issuer_document_client::IssuerDocumentClient
 use margaret_issuer_document_fetch::issuer_document_fetch::IssuerDocumentFetch;
 use margaret_issuer_document_fetch::issuer_document_request::IssuerDocumentRequest;
 use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::verification_key_set::VerificationKeySet;
 
 use crate::jwks_client_error::JwksClientError;
 use crate::jwks_poll_interval_after_ready::JWKS_POLL_INTERVAL_AFTER_READY;
 use crate::jwks_poll_interval_before_ready::JWKS_POLL_INTERVAL_BEFORE_READY;
-use crate::public_jwks_holder::PublicJwksHolder;
 use crate::public_jwks_poll::PublicJwksPoll;
+use crate::verification_key_set_holder::VerificationKeySetHolder;
 
 pub struct PublicJwksPollService {
     pub endpoint_provider: Arc<dyn ProvidesEndpoint>,
     pub issuer_document_client: IssuerDocumentClient,
-    pub public_jwks_holder: PublicJwksHolder,
+    pub verification_key_set_holder: VerificationKeySetHolder,
 }
 
 impl PublicJwksPollService {
@@ -53,10 +55,10 @@ impl PublicJwksPollService {
             .await
         {
             IssuerDocumentFetch::Cancelled => PublicJwksPoll::Cancelled,
-            IssuerDocumentFetch::Fetched(document) => match serde_json::from_slice(&document) {
-                Ok(public_jwks) => PublicJwksPoll::Fetched(public_jwks),
-                Err(source) => {
-                    PublicJwksPoll::Failed(JwksClientError::DocumentMalformed { source })
+            IssuerDocumentFetch::Fetched(document) => match VerificationKeySet::parse(&document) {
+                KeySetParsing::Accepted(key_set) => PublicJwksPoll::Fetched(key_set),
+                KeySetParsing::Rejected(rejection) => {
+                    PublicJwksPoll::Failed(JwksClientError::DocumentRejected { rejection })
                 }
             },
             IssuerDocumentFetch::TransportFailed(source) => {
@@ -69,7 +71,7 @@ impl PublicJwksPollService {
     }
 
     fn poll_interval(&self) -> Duration {
-        if self.public_jwks_holder.is_ready() {
+        if self.verification_key_set_holder.is_ready() {
             JWKS_POLL_INTERVAL_AFTER_READY
         } else {
             JWKS_POLL_INTERVAL_BEFORE_READY
@@ -96,12 +98,13 @@ impl Ticker for PublicJwksPollService {
             PublicJwksPoll::Failed(error) => {
                 error!("Unable to fetch the jwks document from the issuer: {error}");
             }
-            PublicJwksPoll::Fetched(public_jwks) => {
-                self.public_jwks_holder.set(Some(Arc::new(public_jwks)));
+            PublicJwksPoll::Fetched(key_set) => {
+                self.verification_key_set_holder
+                    .set(Some(Arc::new(key_set)));
             }
         }
 
-        if self.public_jwks_holder.is_ready() {
+        if self.verification_key_set_holder.is_ready() {
             tokio::select! {
                 biased;
                 () = cancellation_token.cancelled() => {}

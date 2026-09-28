@@ -1,13 +1,7 @@
 use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
-use margaret_jwks_keygen::jwk_signing::JwkSigning;
-use margaret_jwks_keygen::signs_claims::SignsClaims;
+use margaret_jwks_keygen::jwk_pair::JwkPair;
 
-/// # Panics
-///
-/// Panics when the fixture it builds cannot be prepared.
-pub async fn sign_refresh_token(signing: &JwkSigning, claims: &RefreshTokenClaims) -> String {
-    signing
-        .sign(claims)
-        .await
-        .expect("signing the refresh token fixture succeeds")
+#[must_use]
+pub fn sign_refresh_token(pair: &JwkPair, claims: &RefreshTokenClaims) -> String {
+    pair.sign_json(&claims.to_json())
 }

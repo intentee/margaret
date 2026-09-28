@@ -17,7 +17,7 @@ log = { workspace = true }
 margaret_issuer_document_fetch = { workspace = true }
 margaret_jwks_endpoint = { workspace = true }
 margaret_identity_session = { workspace = true }
-margaret_jwks_keygen = { workspace = true }
+margaret_jws_verification = { workspace = true }
 margaret_sync_holder = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

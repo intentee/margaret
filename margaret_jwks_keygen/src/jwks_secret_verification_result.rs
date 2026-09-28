@@ -1,8 +1,9 @@
-use crate::token_malformation::TokenMalformation;
+use margaret_jws_verification::jws_rejection::JwsRejection;
 
 pub enum JwksSecretVerificationResult<TClaims> {
-    Invalid,
-    Malformed(TokenMalformation),
+    MalformedClaims(serde_json::Error),
+    Rejected(JwsRejection),
     SignedWithCurrent(TClaims),
+    SignedWithNextKey,
     SignedWithPrevious(TClaims),
 }

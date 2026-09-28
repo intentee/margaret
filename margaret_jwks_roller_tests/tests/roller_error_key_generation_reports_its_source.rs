@@ -8,6 +8,6 @@ fn roller_error_key_generation_reports_its_source() {
 
     assert_eq!(
         error.to_string(),
-        "failed to generate a jwks signing key: the generated public key is missing its x coordinate"
+        "failed to generate a jwks signing key: the public key is missing its x coordinate"
     );
 }
