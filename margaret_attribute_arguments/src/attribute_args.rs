@@ -1,7 +1,10 @@
+use proc_macro2::TokenStream;
 use syn::Attribute;
 use syn::Expr;
 use syn::Meta;
+use syn::Path;
 use syn::Token;
+use syn::parse::Parser as _;
 use syn::punctuated::Punctuated;
 
 use crate::attribute_arguments_error::AttributeArgumentsError;
@@ -38,43 +41,52 @@ impl AttributeArgs {
                 positional: Vec::new(),
             }),
             Meta::List(meta_list) => {
-                let parser = Punctuated::<Expr, Token![,]>::parse_terminated;
-                let expressions = match meta_list.parse_args_with(parser) {
-                    Ok(expressions) => expressions,
-                    Err(source) => {
-                        return Err(AttributeArgumentsError::Malformed {
-                            attribute_path,
-                            source,
-                        });
-                    }
-                };
-
-                let mut named: Vec<NamedArgument> = Vec::new();
-                let mut positional = Vec::new();
-
-                for expression in expressions {
-                    match NamedArgument::from_expression(&expression) {
-                        Some(found) => {
-                            if named.iter().any(|existing| existing.name == found.name) {
-                                return Err(AttributeArgumentsError::DuplicateNamedArgument {
-                                    attribute_path,
-                                    key: found.name,
-                                });
-                            }
-
-                            named.push(found);
-                        }
-                        None => positional.push(expression),
-                    }
-                }
-
-                Ok(Self {
-                    attribute_path,
-                    named,
-                    positional,
-                })
+                Self::from_argument_tokens(attribute_path, meta_list.tokens.clone())
             }
         }
+    }
+
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
+    pub fn from_argument_tokens(
+        attribute_path: String,
+        tokens: TokenStream,
+    ) -> Result<Self, AttributeArgumentsError> {
+        let expressions = match Punctuated::<Expr, Token![,]>::parse_terminated.parse2(tokens) {
+            Ok(expressions) => expressions,
+            Err(source) => {
+                return Err(AttributeArgumentsError::Malformed {
+                    attribute_path,
+                    source,
+                });
+            }
+        };
+
+        let mut named: Vec<NamedArgument> = Vec::new();
+        let mut positional = Vec::new();
+
+        for expression in expressions {
+            match NamedArgument::from_expression(&expression) {
+                Some(found) => {
+                    if named.iter().any(|existing| existing.name == found.name) {
+                        return Err(AttributeArgumentsError::DuplicateNamedArgument {
+                            attribute_path,
+                            key: found.name,
+                        });
+                    }
+
+                    named.push(found);
+                }
+                None => positional.push(expression),
+            }
+        }
+
+        Ok(Self {
+            attribute_path,
+            named,
+            positional,
+        })
     }
 
     /// # Errors
@@ -103,10 +115,22 @@ impl AttributeArgs {
     pub fn is_empty(&self) -> bool {
         self.named.is_empty() && self.positional.is_empty()
     }
+
+    #[must_use]
+    pub fn named_path(&self, key: &str) -> Option<&Path> {
+        self.named
+            .iter()
+            .find(|argument| argument.name == key)
+            .and_then(|argument| match &argument.value {
+                Expr::Path(expression) => Some(&expression.path),
+                _ => None,
+            })
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use quote::quote;
     use syn::Attribute;
     use syn::parse_quote;
 
@@ -387,6 +411,54 @@ mod tests {
             AttributeArgumentsError::Malformed { attribute_path, .. }
                 if attribute_path == "index"
         ));
+    }
+
+    #[test]
+    fn from_argument_tokens_reads_the_arguments_of_a_macro_invocation() {
+        let arguments = AttributeArgs::from_argument_tokens(
+            "scheduled_with_tick_timer".to_string(),
+            quote!(
+                interval = TICK_INTERVAL,
+                behavior = MissedTickBehavior::Delay
+            ),
+        )
+        .expect("the macro arguments parse");
+
+        assert_eq!(
+            arguments.named_path("behavior").map(format_path).as_deref(),
+            Some("MissedTickBehavior::Delay")
+        );
+    }
+
+    #[test]
+    fn from_argument_tokens_rejects_malformed_macro_arguments() {
+        let error = AttributeArgs::from_argument_tokens("index".to_string(), quote!(= 5))
+            .map(|_| ())
+            .expect_err("malformed macro arguments fail");
+
+        assert!(matches!(
+            error,
+            AttributeArgumentsError::Malformed { attribute_path, .. }
+                if attribute_path == "index"
+        ));
+    }
+
+    #[test]
+    fn named_path_ignores_an_argument_written_as_another_expression() {
+        assert!(
+            parsed(&parse_quote!(#[infers_authenticated_user(user_model = "User")]))
+                .named_path("user_model")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn named_path_reports_no_path_for_an_absent_argument() {
+        assert!(
+            parsed(&parse_quote!(#[infers_authenticated_user]))
+                .named_path("user_model")
+                .is_none()
+        );
     }
 
     #[test]

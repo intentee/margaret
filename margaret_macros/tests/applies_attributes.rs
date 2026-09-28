@@ -1,7 +1,20 @@
+mod catalog {
+    use std::time::Duration;
+
+    pub const TICK_INTERVAL: Duration = Duration::from_secs(1);
+
+    pub struct Account;
+
+    pub enum TickBehavior {
+        Delay,
+    }
+}
+
 use margaret_macros::build_for_session;
 use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
+use margaret_macros::infers_authenticated_user;
 use margaret_macros::middleware;
 use margaret_macros::model;
 use margaret_macros::process;
@@ -15,6 +28,10 @@ use margaret_macros::service;
 use margaret_macros::singleton;
 use margaret_macros::websocket_message;
 use margaret_macros::websocket_session;
+
+use crate::catalog::Account;
+use crate::catalog::TICK_INTERVAL;
+use crate::catalog::TickBehavior;
 
 #[singleton]
 #[responds_to_http(method = Get, path = "/subject", server = "public")]
@@ -61,13 +78,17 @@ impl Binder {
 }
 
 #[service]
-#[scheduled_with_tick_timer(interval = SomeInterval)]
+#[scheduled_with_tick_timer(interval = TICK_INTERVAL, behavior = TickBehavior::Delay)]
 struct Worker;
+
+#[infers_authenticated_user(user_model = Account)]
+struct AccountProvider;
 
 #[model(table = "records")]
 #[primary_key(columns = [id, label])]
 #[unique(columns = [label, id])]
 #[index(name = "records_label_id", columns = [label, id])]
+#[foreign_key(columns = [id], references = Account)]
 struct Record {
     #[column(name = "id")]
     id: String,
@@ -109,6 +130,8 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(SubjectId("7".to_string()).0, "7");
     assert_eq!(size_of::<JwksEndpoint>(), 0);
     assert_eq!(size_of::<Worker>(), 0);
+    assert_eq!(size_of_val(&AccountProvider), 0);
+    assert_eq!(size_of_val(&Account), 0);
 
     let record = Record {
         id: "the-id".to_string(),
