@@ -427,6 +427,40 @@ impl SessionUserProvider {
     }
 
     #[test]
+    fn binds_a_form_request_source_imported_as_a_variant() {
+        assert!(
+            responder_binding(
+                "Page",
+                "use margaret::framework::http_validation::request_input::RequestInput::Cookie;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] cookie: Filters) -> anyhow::Result<Response> {}\n}\n"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn binds_a_form_request_source_through_a_reexported_module() {
+        assert!(
+            responder_binding(
+                "Page",
+                "mod prelude {\n    pub use margaret::framework::http_validation::request_input;\n}\n\nuse crate::prelude::request_input;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = request_input::RequestInput::Form)] form: Filters) -> anyhow::Result<Response> {}\n}\n"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn resolves_a_user_model_imported_through_a_reexport() {
+        let registries = registries_for(
+            "mod accounts {\n    mod member {\n        pub struct Member;\n    }\n\n    pub use member::Member;\n}\n\nuse crate::accounts::Member;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Member)]\nstruct MemberProvider;\n\nimpl MemberProvider {\n    #[infer_from_request]\n    fn infer(&self, request: &Request) -> anyhow::Result<AuthenticatedUserOutcome<Member>> {}\n}\n",
+        );
+
+        assert_eq!(
+            registries.providers()[0].application.model.to_string(),
+            "crate::accounts::member::Member"
+        );
+    }
+
+    #[test]
     fn rejects_an_authenticated_user_taken_by_reference() {
         assert!(
             responder_rejection(

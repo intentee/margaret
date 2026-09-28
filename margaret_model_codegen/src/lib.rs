@@ -1222,6 +1222,16 @@ struct FragmentMetadata {
     }
 
     #[test]
+    fn resolves_a_foreign_key_target_imported_through_a_reexport() {
+        let source = "mod metadata {\n    mod fragment {\n        #[model(table = \"fragment_metadata\")]\n        pub struct FragmentMetadata {\n            #[column(primary_key)]\n            pub hash: Vec<u8>,\n        }\n    }\n\n    pub use fragment::FragmentMetadata;\n}\n\nuse crate::metadata::FragmentMetadata;\n\n#[model(table = \"fragment\")]\n#[foreign_key(columns = [hash], references = FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column(primary_key)]\n    hash: Vec<u8>,\n}\n";
+
+        assert_eq!(
+            resolved_model(source, "fragment").foreign_keys[0].references_table,
+            "fragment_metadata"
+        );
+    }
+
+    #[test]
     fn orders_a_composite_foreign_key_target_before_the_model_that_references_it() {
         let source = with_fragment_metadata(
             "#[model(table = \"fragment\")]\n#[primary_key(columns = [partition, hash])]\n#[foreign_key(columns = [partition, hash], references = crate::FragmentMetadata)]\nstruct FragmentAssociation {\n    #[column]\n    partition: uuid::Uuid,\n    #[column]\n    hash: Vec<u8>,\n}\n",
