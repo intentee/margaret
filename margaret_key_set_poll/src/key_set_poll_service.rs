@@ -21,6 +21,7 @@ use crate::key_set_location::KeySetLocation;
 use crate::key_set_location_request::KeySetLocationRequest;
 use crate::key_set_poll::KeySetPoll;
 use crate::key_set_poll_failure::KeySetPollFailure;
+use crate::key_set_poll_fetch_timeout::KEY_SET_POLL_FETCH_TIMEOUT;
 use crate::key_set_poll_interval_after_ready::KEY_SET_POLL_INTERVAL_AFTER_READY;
 use crate::key_set_poll_interval_before_ready::KEY_SET_POLL_INTERVAL_BEFORE_READY;
 use crate::locates_key_set::LocatesKeySet;
@@ -36,14 +37,13 @@ impl<TLocator: LocatesKeySet> KeySetPollService<TLocator> {
     pub async fn fetch_key_set(
         &self,
         cancellation_token: &CancellationToken,
-        timeout: Duration,
     ) -> KeySetPoll<TLocator::Failure> {
         let key_set_url = match self
             .locator
             .locate(KeySetLocationRequest {
                 cancellation_token,
                 issuer_document_client: &self.issuer_document_client,
-                timeout,
+                timeout: KEY_SET_POLL_FETCH_TIMEOUT,
             })
             .await
         {
@@ -58,7 +58,7 @@ impl<TLocator: LocatesKeySet> KeySetPollService<TLocator> {
             .issuer_document_client
             .fetch(IssuerDocumentRequest {
                 cancellation_token,
-                timeout,
+                timeout: KEY_SET_POLL_FETCH_TIMEOUT,
                 url: key_set_url,
             })
             .await
@@ -78,14 +78,6 @@ impl<TLocator: LocatesKeySet> KeySetPollService<TLocator> {
             }
         }
     }
-
-    fn poll_interval(&self) -> Duration {
-        if self.verification_key_set_holder.is_ready() {
-            KEY_SET_POLL_INTERVAL_AFTER_READY
-        } else {
-            KEY_SET_POLL_INTERVAL_BEFORE_READY
-        }
-    }
 }
 
 #[async_trait]
@@ -99,10 +91,7 @@ impl<TLocator: LocatesKeySet> Ticker for KeySetPollService<TLocator> {
         cancellation_token: CancellationToken,
         _tick_context: TickContext,
     ) -> Result<()> {
-        match self
-            .fetch_key_set(&cancellation_token, self.poll_interval())
-            .await
-        {
+        match self.fetch_key_set(&cancellation_token).await {
             KeySetPoll::Cancelled => return Ok(()),
             KeySetPoll::Failed(failure) => {
                 error!("Unable to poll the key set of the issuer: {failure}");
