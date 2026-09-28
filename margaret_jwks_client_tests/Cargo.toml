@@ -8,31 +8,31 @@ autotests = false
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-margaret_issuer_document_fetch = { workspace = true }
 margaret_jwks_client = { workspace = true }
 margaret_jwks_endpoint = { workspace = true }
-margaret_jwks_keygen = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
-reqwest = { workspace = true }
-tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "test-util", "time"] }
-tokio-util = { workspace = true }
-trzcina = { workspace = true }
+margaret_key_set_poll = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
-margaret_identity_session = { workspace = true }
 margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_identity_session = { workspace = true }
 margaret_jose_parameters = { workspace = true }
+margaret_jwks_keygen = { workspace = true }
 margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller = { workspace = true }
 margaret_jwks_roller_server = { workspace = true }
 margaret_jwt_verification = { workspace = true }
+margaret_key_set_poll_tests = { path = "../margaret_key_set_poll_tests" }
 margaret_registered_claims = { workspace = true }
 margaret_sync_holder = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "test-util", "time"] }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
 uuid = { workspace = true }
 
 [[test]]

@@ -9,11 +9,11 @@ use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_jwt_verification::verify_jwt::verify_jwt;
+use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_trust::declares_token_trust::DeclaresTokenTrust;
 
 use crate::access_token_verification::AccessTokenVerification;
-use crate::verification_key_set_holder::VerificationKeySetHolder;
 
 pub struct PublicJwksVerifier {
     token_trust: Arc<dyn DeclaresTokenTrust>,

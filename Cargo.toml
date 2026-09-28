@@ -64,10 +64,14 @@ members = [
     "margaret_jwt_verification",
     "margaret_jwt_verification_tests",
     "margaret",
+    "margaret_key_set_poll",
+    "margaret_key_set_poll_tests",
     "margaret_macros",
     "margaret_middleware_codegen",
     "margaret_model",
     "margaret_model_codegen",
+    "margaret_oidc_client",
+    "margaret_oidc_client_tests",
     "margaret_oidc_discovery",
     "margaret_peer_identity",
     "margaret_peer_identity_tests",
@@ -213,10 +217,12 @@ margaret_jwks_secret_storage_selection = { path = "margaret_jwks_secret_storage_
 margaret_jwks_secret_store = { path = "margaret_jwks_secret_store", version = "0.1.0" }
 margaret_jws_verification = { path = "margaret_jws_verification", version = "0.1.0" }
 margaret_jwt_verification = { path = "margaret_jwt_verification", version = "0.1.0" }
+margaret_key_set_poll = { path = "margaret_key_set_poll", version = "0.1.0" }
 margaret_macros = { path = "margaret_macros", version = "0.4.0" }
 margaret_middleware_codegen = { path = "margaret_middleware_codegen", version = "0.4.0" }
 margaret_model = { path = "margaret_model", version = "0.4.0" }
 margaret_model_codegen = { path = "margaret_model_codegen", version = "0.4.0" }
+margaret_oidc_client = { path = "margaret_oidc_client", version = "0.1.0" }
 margaret_oidc_discovery = { path = "margaret_oidc_discovery", version = "0.1.0" }
 margaret_peer_identity = { path = "margaret_peer_identity", version = "0.1.0" }
 margaret_registered_claims = { path = "margaret_registered_claims", version = "0.1.0" }

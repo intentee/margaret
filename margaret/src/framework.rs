@@ -51,6 +51,8 @@ pub use margaret_macros as macros;
 #[cfg(feature = "runtime")]
 pub use margaret_model as model;
 #[cfg(feature = "runtime")]
+pub use margaret_oidc_client as oidc_client;
+#[cfg(feature = "runtime")]
 pub use margaret_peer_identity as peer_identity;
 #[cfg(feature = "runtime")]
 pub use margaret_registered_claims as registered_claims;

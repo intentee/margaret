@@ -9,21 +9,20 @@ use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_issuer_document_fetch::issuer_document_client::IssuerDocumentClient;
-use margaret_jwks_client::jwks_client_error::JwksClientError;
-use margaret_jwks_client::jwks_poll_interval_before_ready::JWKS_POLL_INTERVAL_BEFORE_READY;
-use margaret_jwks_client::public_jwks_poll::PublicJwksPoll;
-use margaret_jwks_client::public_jwks_poll_service::PublicJwksPollService;
-use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
-use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
-use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
+use margaret_key_set_poll::key_set_poll::KeySetPoll;
+use margaret_key_set_poll::key_set_poll_failure::KeySetPollFailure;
+use margaret_key_set_poll::key_set_poll_interval_before_ready::KEY_SET_POLL_INTERVAL_BEFORE_READY;
+use margaret_key_set_poll::key_set_poll_service::KeySetPollService;
+use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder;
+use margaret_key_set_poll_tests::fixed_key_set_locator::FixedKeySetLocator;
 
 #[tokio::test]
-async fn public_jwks_poll_service_reports_a_document_that_is_not_a_key_set() {
+async fn key_set_poll_service_reports_a_document_that_is_not_a_key_set() {
     let fixture = TlsFixture::generate();
     let server = RunningFixtureServer::start(
         fixture.server_config.clone(),
         vec![RouteEntry::new(
-            WELL_KNOWN_JWKS_PATH,
+            "/jwks",
             vec![MethodHandler::anonymous(
                 "GET",
                 Arc::new(StaticHandler {
@@ -35,24 +34,27 @@ async fn public_jwks_poll_service_reports_a_document_that_is_not_a_key_set() {
         )],
     )
     .await;
-    let service = PublicJwksPollService {
-        endpoint_provider: Arc::new(StaticEndpoint::new(
-            fixture.url(server.port(), WELL_KNOWN_JWKS_PATH),
-        )),
+    let service = KeySetPollService {
         issuer_document_client: IssuerDocumentClient::build(fixture_client_builder(
             &fixture.certificate_authority,
         ))
         .expect("the issuer document client builds"),
+        locator: FixedKeySetLocator {
+            key_set_url: fixture.url(server.port(), "/jwks"),
+        },
         verification_key_set_holder: VerificationKeySetHolder::default(),
     };
 
     let poll = service
-        .fetch_public_jwks(&CancellationToken::new(), JWKS_POLL_INTERVAL_BEFORE_READY)
+        .fetch_key_set(
+            &CancellationToken::new(),
+            KEY_SET_POLL_INTERVAL_BEFORE_READY,
+        )
         .await;
 
     assert!(matches!(
         poll,
-        PublicJwksPoll::Failed(JwksClientError::DocumentRejected { .. })
+        KeySetPoll::Failed(KeySetPollFailure::DocumentRejected(_))
     ));
 
     server.stop().await;
