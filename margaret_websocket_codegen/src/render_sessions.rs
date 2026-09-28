@@ -14,6 +14,7 @@ use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
 use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::render_authenticated_user_wrapper_construction::render_authenticated_user_wrapper_construction;
 use margaret_request_binding_codegen::render_bound_request_extractions::render_bound_request_extractions;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -109,20 +110,13 @@ fn factory_initializers(
         .entries()
         .map(|CapturedProvider { kind, local }| match kind {
             CapturedProviderKind::AuthenticatedUser { application } => {
-                let wrapper = &application.wrapper;
-                let inner = bindings.accessor_invocation(&container, kind.accessor());
-                let routes_init = application
-                    .injects_routes
-                    .then(|| quote! { routes: routes.clone(), });
+                let construction = render_authenticated_user_wrapper_construction(
+                    application,
+                    &quote! { super::super::super::authenticated_users },
+                    &bindings.accessor_invocation(&container, kind.accessor()),
+                );
 
-                quote! {
-                    #local: ::std::sync::Arc::new(
-                        super::super::super::authenticated_users::#wrapper {
-                            inner: #inner,
-                            #routes_init
-                        },
-                    ),
-                }
+                quote! { #local: #construction, }
             }
             CapturedProviderKind::Binder { .. } => {
                 let access = bindings.accessor_invocation(&container, kind.accessor());

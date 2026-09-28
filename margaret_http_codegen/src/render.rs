@@ -22,6 +22,7 @@ use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::extraction_context::ExtractionContext;
 use margaret_request_binding_codegen::injects_routes::injects_routes;
 use margaret_request_binding_codegen::injects_views::injects_views;
+use margaret_request_binding_codegen::render_authenticated_user_wrapper_construction::render_authenticated_user_wrapper_construction;
 use margaret_request_binding_codegen::render_bound_request_extractions::render_bound_request_extractions;
 use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -274,24 +275,13 @@ fn capture_binding(
 
     match kind {
         CapturedProviderKind::AuthenticatedUser { application } => {
-            let wrapper = &application.wrapper;
-            let inner_access = bindings.accessor_invocation(&container, kind.accessor());
-            let routes_init = application
-                .injects_routes
-                .then(|| quote! { routes: routes.clone(), });
-            let views_init = application
-                .injects_views
-                .then(|| quote! { views: views.clone(), });
+            let construction = render_authenticated_user_wrapper_construction(
+                application,
+                &quote! { super::super::authenticated_users },
+                &bindings.accessor_invocation(&container, kind.accessor()),
+            );
 
-            quote! {
-                let #local = std::sync::Arc::new(
-                    super::super::authenticated_users::#wrapper {
-                        inner: #inner_access,
-                        #routes_init
-                        #views_init
-                    },
-                );
-            }
+            quote! { let #local = #construction; }
         }
         CapturedProviderKind::Binder { .. } => {
             let binder_access = bindings.accessor_invocation(&container, kind.accessor());

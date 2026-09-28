@@ -20,6 +20,7 @@ mod infers_authenticated_user_arguments;
 pub mod injects_peer_spiffe_id;
 pub mod injects_routes;
 pub mod injects_views;
+pub mod render_authenticated_user_wrapper_construction;
 pub mod render_authenticated_user_wrappers;
 pub mod render_bound_request_extractions;
 pub mod render_request_extraction;
