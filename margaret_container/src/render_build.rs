@@ -8,7 +8,7 @@ use quote::quote;
 use margaret_attributes::struct_shape::StructShape;
 use margaret_codegen_tokens::bootstrap_argument_field_ident::bootstrap_argument_field_ident;
 use margaret_codegen_tokens::path_tokens::path_tokens;
-use margaret_codegen_tokens::serve_input_ident::serve_input_ident;
+use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
 use margaret_codegen_tokens::too_many_lines_allow::too_many_lines_allow;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_serve_input_codegen::serve_input::ServeInput;
@@ -161,7 +161,11 @@ struct RootBuilder {
     tokens: TokenStream,
 }
 
-fn arguments_declaration(function: &Ident, slots: &[usize]) -> TokenStream {
+fn arguments_declaration(
+    function: &Ident,
+    slots: &[usize],
+    naming: ServeInputNaming,
+) -> TokenStream {
     if slots.is_empty() {
         return TokenStream::new();
     }
@@ -170,7 +174,7 @@ fn arguments_declaration(function: &Ident, slots: &[usize]) -> TokenStream {
     let arguments_type = bootstrap_arguments_type(function);
     let bindings = slots.iter().map(|slot| {
         let field = bootstrap_argument_field_ident(*slot);
-        let binding = serve_input_ident(*slot);
+        let binding = naming.ident(*slot);
 
         quote! { #field: #binding, }
     });
@@ -207,8 +211,8 @@ fn arguments_module(
     ))
 }
 
-fn flow_statements(flow: &[&PlannedProvider]) -> Vec<TokenStream> {
-    let mut weaver = ReverseServeInputWeaver::new();
+fn flow_statements(flow: &[&PlannedProvider], naming: ServeInputNaming) -> Vec<TokenStream> {
+    let mut weaver = ReverseServeInputWeaver::new(naming);
     let mut statements: Vec<TokenStream> = flow
         .iter()
         .rev()
@@ -223,8 +227,9 @@ fn root_builder(root: &PlannedProvider, plan: &ContainerPlan) -> RootBuilder {
     let flow = construction_flow(plan, &[root]);
     let provider = &root.provider;
     let function = format_ident!("construct_{}", provider.field_name);
-    let parameters = arguments_declaration(&function, &root.serve_input_slots);
-    let statements = flow_statements(&flow);
+    let naming = plan.serve_input_naming();
+    let parameters = arguments_declaration(&function, &root.serve_input_slots, naming);
+    let statements = flow_statements(&flow, naming);
     let root_binding = field_ident(provider);
     let root_type = field_type(provider);
     let error = construction_error_path();
@@ -279,9 +284,10 @@ pub(crate) fn render_build(
         slots: serve_slots,
     } = RootServeInputs::from_roots(construction_roots);
     let serve_function = format_ident!("serve");
-    let serve_parameters = arguments_declaration(&serve_function, &serve_slots);
+    let naming = plan.serve_input_naming();
+    let serve_parameters = arguments_declaration(&serve_function, &serve_slots, naming);
     let serve_arguments_module = arguments_module(&serve_function, &serve_inputs, &serve_slots);
-    let serve_statements = flow_statements(&serve_flow);
+    let serve_statements = flow_statements(&serve_flow, naming);
     let retained: BTreeSet<_> = retained_roots.iter().map(|entry| &entry.key).collect();
     let fields = construction_roots
         .iter()

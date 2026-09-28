@@ -2126,6 +2126,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_codegen_many_serve_inputs_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "margaret",
+ "tokio-util",
+ "trzcina",
+]
+
+[[package]]
 name = "margaret_codegen_oidc_bearer_identity_fixture"
 version = "0.1.0"
 dependencies = [
