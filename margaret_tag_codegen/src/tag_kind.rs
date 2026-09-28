@@ -6,6 +6,7 @@ use std::fmt::Result;
 pub enum TagKind {
     JwksClient,
     Middleware,
+    OidcIssuer,
 }
 
 impl Display for TagKind {
@@ -13,6 +14,7 @@ impl Display for TagKind {
         let label = match self {
             TagKind::JwksClient => "jwks endpoint provider",
             TagKind::Middleware => "middleware handler",
+            TagKind::OidcIssuer => "oidc issuer",
         };
 
         formatter.write_str(label)

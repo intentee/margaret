@@ -10,8 +10,8 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_attributes::tag::Tag;
 
-use crate::jwks_client_binding::JwksClientBinding;
 use crate::read_middleware_attribute::read_middleware_attribute;
+use crate::segmented_tag_binding::SegmentedTagBinding;
 use crate::tag_error::TagError;
 use crate::tag_kind::TagKind;
 use crate::tagged_item::TaggedItem;
@@ -55,7 +55,7 @@ fn collect_kind<'index>(
 
 fn declared_tag_path(args: &AttributeArgs, kind: TagKind) -> Result<Option<Path>, TagError> {
     match kind {
-        TagKind::JwksClient => {
+        TagKind::JwksClient | TagKind::OidcIssuer => {
             args.interpret(|reader| Ok::<_, TagError>(reader.take_positional_path()))
         }
         TagKind::Middleware => Ok(read_middleware_attribute(args)?),
@@ -85,18 +85,24 @@ impl<'index> TagPool<'index> {
             TagKind::Middleware,
             &mut entries,
         )?;
+        collect_kind(
+            index,
+            FrameworkAttribute::TrustsOidcIssuer,
+            TagKind::OidcIssuer,
+            &mut entries,
+        )?;
 
         Ok(Self { entries })
     }
 
     #[must_use]
-    pub fn jwks_client_bindings(&self) -> Vec<JwksClientBinding> {
+    pub fn segmented_bindings(&self, kind: TagKind) -> Vec<SegmentedTagBinding> {
         let mut allocator = NameAllocator::new();
 
-        self.tagged_items(TagKind::JwksClient)
+        self.tagged_items(kind)
             .into_iter()
-            .map(|TaggedItem { item, tag }| JwksClientBinding {
-                endpoint: item.canonical_path().clone(),
+            .map(|TaggedItem { item, tag }| SegmentedTagBinding {
+                declaring: item.canonical_path().clone(),
                 module_segment: allocator
                     .allocate(&field_base(item.canonical_path()))
                     .field()
@@ -190,11 +196,11 @@ mod tests {
     fn binds_a_jwks_client_tag_to_its_endpoint() {
         let indexed = IndexedSource::new("#[provides_jwks_endpoint(jwks)]\nstruct JwksEndpoint;\n");
         let pool = TagPool::collect(&indexed.index).expect("the pool collects");
-        let bindings = pool.jwks_client_bindings();
+        let bindings = pool.segmented_bindings(TagKind::JwksClient);
 
         assert_eq!(bindings.len(), 1);
         assert_eq!(bindings[0].tag.to_string(), "jwks");
-        assert_eq!(bindings[0].endpoint.to_string(), "crate::JwksEndpoint");
+        assert_eq!(bindings[0].declaring.to_string(), "crate::JwksEndpoint");
         assert_eq!(bindings[0].module_segment, "jwks_endpoint");
     }
 
@@ -203,7 +209,7 @@ mod tests {
         let indexed =
             IndexedSource::new("#[provides_jwks_endpoint(r#async)]\nstruct AsyncEndpoint;\n");
         let pool = TagPool::collect(&indexed.index).expect("the pool collects");
-        let bindings = pool.jwks_client_bindings();
+        let bindings = pool.segmented_bindings(TagKind::JwksClient);
 
         assert_eq!(bindings.len(), 1);
         assert_eq!(bindings[0].tag.to_string(), "r#async");
@@ -218,7 +224,7 @@ mod tests {
         let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         let segments: Vec<String> = pool
-            .jwks_client_bindings()
+            .segmented_bindings(TagKind::JwksClient)
             .iter()
             .map(|binding| binding.module_segment.clone())
             .collect();
@@ -240,12 +246,43 @@ mod tests {
         let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
         let tags: Vec<String> = pool
-            .jwks_client_bindings()
+            .segmented_bindings(TagKind::JwksClient)
             .iter()
             .map(|binding| binding.tag.to_string())
             .collect();
 
         assert_eq!(tags, vec!["auth".to_string(), "partner".to_string()]);
+    }
+
+    #[test]
+    fn binds_an_oidc_issuer_tag_to_its_declaring_singleton() {
+        let indexed = IndexedSource::new("#[trusts_oidc_issuer(github)]\nstruct Issuer;\n");
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
+        let bindings = pool.segmented_bindings(TagKind::OidcIssuer);
+
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[0].tag.to_string(), "github");
+        assert_eq!(bindings[0].declaring.to_string(), "crate::Issuer");
+        assert_eq!(bindings[0].module_segment, "issuer");
+    }
+
+    #[test]
+    fn gives_same_named_issuers_of_different_modules_distinct_segments() {
+        let indexed = IndexedSource::new(
+            "mod first {\n    #[trusts_oidc_issuer(first)]\n    pub struct Issuer;\n}\n\nmod second {\n    #[trusts_oidc_issuer(second)]\n    pub struct Issuer;\n}\n",
+        );
+        let pool = TagPool::collect(&indexed.index).expect("the pool collects");
+
+        let segments: Vec<String> = pool
+            .segmented_bindings(TagKind::OidcIssuer)
+            .iter()
+            .map(|binding| binding.module_segment.clone())
+            .collect();
+
+        assert_eq!(
+            segments,
+            vec!["first_issuer".to_string(), "second_issuer".to_string()]
+        );
     }
 
     #[test]
@@ -255,7 +292,7 @@ mod tests {
         );
         let pool = TagPool::collect(&indexed.index).expect("the pool collects");
 
-        assert!(pool.jwks_client_bindings().is_empty());
+        assert!(pool.segmented_bindings(TagKind::JwksClient).is_empty());
     }
 
     #[test]
@@ -338,6 +375,14 @@ mod tests {
         assert!(
             error_for("#[provides_jwks_endpoint]\nstruct JwksEndpoint;\n")
                 .contains("does not name a tag")
+        );
+    }
+
+    #[test]
+    fn rejects_an_oidc_issuer_without_a_tag() {
+        assert_eq!(
+            error_for("#[trusts_oidc_issuer]\nstruct Issuer;\n"),
+            "the oidc issuer 'crate::Issuer' does not name a tag"
         );
     }
 

@@ -1998,11 +1998,14 @@ dependencies = [
  "margaret_jwks_codegen",
  "margaret_middleware_codegen",
  "margaret_model_codegen",
+ "margaret_oidc_codegen",
+ "margaret_polling_client_codegen",
  "margaret_request_binding_codegen",
  "margaret_schema_codegen",
  "margaret_serve_input_codegen",
  "margaret_service_codegen",
  "margaret_tag_codegen",
+ "margaret_umbrella_path",
  "margaret_views_codegen",
  "margaret_websocket_codegen",
  "quote",
@@ -2083,6 +2086,19 @@ dependencies = [
  "anyhow",
  "clap",
  "margaret",
+]
+
+[[package]]
+name = "margaret_codegen_oidc_issuers_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "margaret",
+ "tokio",
+ "tokio-util",
+ "trzcina",
 ]
 
 [[package]]
@@ -2559,6 +2575,7 @@ version = "0.4.0"
 dependencies = [
  "margaret_attributes",
  "margaret_generated_module",
+ "margaret_polling_client_codegen",
  "proc-macro2",
  "quote",
 ]
@@ -2928,6 +2945,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_oidc_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+ "margaret_generated_module",
+ "margaret_polling_client_codegen",
+ "margaret_umbrella_path",
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "margaret_oidc_discovery"
 version = "0.1.0"
 dependencies = [
@@ -2954,6 +2983,15 @@ dependencies = [
  "margaret_peer_identity",
  "rcgen",
  "spiffe",
+]
+
+[[package]]
+name = "margaret_polling_client_codegen"
+version = "0.1.0"
+dependencies = [
+ "margaret_generated_module",
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]
@@ -3359,6 +3397,13 @@ dependencies = [
 [[package]]
 name = "margaret_toposort"
 version = "0.1.0"
+
+[[package]]
+name = "margaret_umbrella_path"
+version = "0.1.0"
+dependencies = [
+ "margaret_attributes",
+]
 
 [[package]]
 name = "margaret_validation"

@@ -4,11 +4,11 @@ use std::io::ErrorKind;
 use std::path::Path;
 
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
 use crate::assets_directory_name::ASSETS_DIRECTORY_NAME;
 use crate::build::build;
 use crate::codegen_error::CodegenError;
-use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 use crate::workspace_root::workspace_root;
 
 fn read_metafile(metafile_path: &Path) -> Result<Option<String>, CodegenError> {
@@ -72,10 +72,10 @@ mod tests {
     use std::path::Path;
 
     use margaret_attributes_tests::source_crate::SourceCrate;
+    use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
     use super::generate;
     use super::generate_into;
-    use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
     const HOST_CRATE: &str = "\
 #[rustfmt::skip]

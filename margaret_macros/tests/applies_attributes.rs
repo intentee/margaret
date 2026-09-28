@@ -31,6 +31,7 @@ use margaret_macros::route_parameter_value;
 use margaret_macros::scheduled_with_tick_timer;
 use margaret_macros::service;
 use margaret_macros::singleton;
+use margaret_macros::trusts_oidc_issuer;
 use margaret_macros::websocket_message;
 use margaret_macros::websocket_session;
 
@@ -81,6 +82,9 @@ struct JwksEndpoint;
 
 #[issues_tokens]
 struct TokenIssuer;
+
+#[trusts_oidc_issuer(github)]
+struct GithubIssuer;
 
 #[route_parameter_value]
 struct SubjectId(String);
@@ -145,6 +149,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(SubjectId("7".to_string()).0, "7");
     assert_eq!(size_of::<JwksEndpoint>(), 0);
     assert_eq!(size_of::<TokenIssuer>(), 0);
+    assert_eq!(size_of::<GithubIssuer>(), 0);
     assert_eq!(size_of::<Worker>(), 0);
     assert_eq!(size_of_val(&AccountProvider), 0);
     assert_eq!(size_of_val(&Account), 0);

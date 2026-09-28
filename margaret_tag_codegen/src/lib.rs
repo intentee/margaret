@@ -1,8 +1,8 @@
-pub mod jwks_client_binding;
 pub mod jwks_secret_store_target;
 pub mod read_jwks_secret_store_target;
 pub mod read_middleware_attribute;
 pub mod read_reference_tag;
+pub mod segmented_tag_binding;
 pub mod tag_error;
 pub mod tag_kind;
 pub mod tag_pool;

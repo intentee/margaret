@@ -443,21 +443,28 @@ fn resolve_target(
         });
     }
 
-    if framework_providers.iter().any(|framework_provider| {
-        &framework_provider.provided == resolved
-            && !matches!(
-                framework_provider.injection,
-                FrameworkInjectionRole::Unmarked
-            )
-    }) {
-        return Err(ContainerError::JwksSecretStoreInjectedByPath {
+    let restricted_role = framework_providers
+        .iter()
+        .find(|framework_provider| &framework_provider.provided == resolved)
+        .map(|framework_provider| &framework_provider.injection);
+
+    match restricted_role {
+        Some(FrameworkInjectionRole::FrameworkOnly) => Err(ContainerError::FrameworkOnlyProvider {
             parameter: parameter.to_string(),
             provider: resolved.to_string(),
             singleton: concrete_path.to_string(),
-        });
+        }),
+        Some(
+            FrameworkInjectionRole::JwksClientStore(_) | FrameworkInjectionRole::JwksServerStore,
+        ) => Err(ContainerError::JwksSecretStoreInjectedByPath {
+            parameter: parameter.to_string(),
+            provider: resolved.to_string(),
+            singleton: concrete_path.to_string(),
+        }),
+        Some(FrameworkInjectionRole::Unmarked) | None => {
+            Err(missing_provider(concrete_path, parameter, written))
+        }
     }
-
-    Err(missing_provider(concrete_path, parameter, written))
 }
 
 fn missing_provider(
@@ -735,7 +742,7 @@ fn is_framework_path_referenced(drafts: &[Draft], path: &CanonicalPath) -> bool 
 
 fn is_framework_role_referenced(drafts: &[Draft], role: &FrameworkInjectionRole) -> bool {
     match role {
-        FrameworkInjectionRole::Unmarked => false,
+        FrameworkInjectionRole::FrameworkOnly | FrameworkInjectionRole::Unmarked => false,
         FrameworkInjectionRole::JwksClientStore(_) | FrameworkInjectionRole::JwksServerStore => {
             drafts
                 .iter()

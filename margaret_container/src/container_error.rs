@@ -90,6 +90,15 @@ pub enum ContainerError {
     },
 
     #[error(
+        "parameter '{parameter}' of singleton '{singleton}' injects '{provider}', which only the framework may inject"
+    )]
+    FrameworkOnlyProvider {
+        parameter: String,
+        provider: String,
+        singleton: String,
+    },
+
+    #[error(
         "parameter '{parameter}' of singleton '{singleton}' carries a serve input together with #[jwks_secret_store]; a parameter must resolve to exactly one source"
     )]
     AmbiguousServeInputAndJwksSecretStore {

@@ -1,11 +1,11 @@
 use margaret_container::container_bindings::ContainerBindings;
-use margaret_jwks_codegen::jwks_client_module::JwksClientModule;
 use margaret_jwks_codegen::jwks_server_module::JwksServerModule;
 use margaret_jwks_codegen::jwks_server_part::JwksServerPart;
 use margaret_jwks_codegen::render_jwks::render_jwks;
-use margaret_tag_codegen::jwks_client_binding::JwksClientBinding;
+use margaret_polling_client_codegen::polling_client_module::PollingClientModule;
+use margaret_tag_codegen::segmented_tag_binding::SegmentedTagBinding;
 
-use crate::jwks_artifacts::JwksArtifacts;
+use crate::framework_artifacts::FrameworkArtifacts;
 use crate::jwks_client_canonical_path::jwks_client_canonical_path;
 use crate::jwks_framework_services::jwks_framework_services;
 use crate::jwks_roller_canonical_path::jwks_roller_canonical_path;
@@ -16,8 +16,8 @@ use crate::server_secret_store_canonical_path::server_secret_store_canonical_pat
 
 pub(crate) fn build_jwks_artifacts(
     bindings: &ContainerBindings,
-    client_bindings: &[JwksClientBinding],
-) -> JwksArtifacts {
+    client_bindings: &[SegmentedTagBinding],
+) -> FrameworkArtifacts {
     let mut server = JwksServerModule::default();
 
     server.enable_if(
@@ -37,9 +37,9 @@ pub(crate) fn build_jwks_artifacts(
         bindings.provides(&server_secret_store_canonical_path()),
     );
 
-    let clients: Vec<JwksClientModule> = client_bindings
+    let clients: Vec<PollingClientModule> = client_bindings
         .iter()
-        .map(|binding| JwksClientModule {
+        .map(|binding| PollingClientModule {
             has_client: bindings.provides(&jwks_client_canonical_path(&binding.module_segment)),
             has_verifier: bindings.provides(&public_jwks_verifier_canonical_path(
                 &binding.module_segment,
@@ -55,7 +55,7 @@ pub(crate) fn build_jwks_artifacts(
         Vec::new()
     };
 
-    JwksArtifacts {
+    FrameworkArtifacts {
         enabled,
         modules,
         services,

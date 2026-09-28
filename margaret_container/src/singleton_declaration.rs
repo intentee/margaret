@@ -15,15 +15,21 @@ fn framework_path(segments: &[&str]) -> CanonicalPath {
 pub(crate) enum SingletonDeclaration {
     IssuesTokens,
     ProvidesJwksEndpoint,
+    TrustsOidcIssuer,
 }
 
 impl SingletonDeclaration {
-    pub(crate) const ALL: [Self; 2] = [Self::IssuesTokens, Self::ProvidesJwksEndpoint];
+    pub(crate) const ALL: [Self; 3] = [
+        Self::IssuesTokens,
+        Self::ProvidesJwksEndpoint,
+        Self::TrustsOidcIssuer,
+    ];
 
     pub(crate) fn attribute(self) -> FrameworkAttribute {
         match self {
             Self::IssuesTokens => FrameworkAttribute::IssuesTokens,
             Self::ProvidesJwksEndpoint => FrameworkAttribute::ProvidesJwksEndpoint,
+            Self::TrustsOidcIssuer => FrameworkAttribute::TrustsOidcIssuer,
         }
     }
 
@@ -38,6 +44,11 @@ impl SingletonDeclaration {
                 framework_path(&["jwks_endpoint", "provides_endpoint", "ProvidesEndpoint"]),
                 framework_path(&["token_trust", "declares_token_trust", "DeclaresTokenTrust"]),
             ],
+            Self::TrustsOidcIssuer => vec![framework_path(&[
+                "token_trust",
+                "declares_token_trust",
+                "DeclaresTokenTrust",
+            ])],
         }
     }
 }

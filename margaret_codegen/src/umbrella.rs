@@ -17,6 +17,10 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
         source.push_str("#[rustfmt::skip]\npub mod jwks;\n");
     }
 
+    if features.contains(GeneratedFeature::Oidc) {
+        source.push_str("#[rustfmt::skip]\npub mod oidc;\n");
+    }
+
     if features.contains(GeneratedFeature::AuthenticatedUsers) && serves_http {
         source.push_str("#[rustfmt::skip]\npub mod authenticated_users;\n");
     }
