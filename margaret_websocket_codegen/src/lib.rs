@@ -39,6 +39,10 @@ mod tests {
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_container::container_bindings::ContainerBindings;
+    use margaret_container::framework_construction::FrameworkConstruction;
+    use margaret_container::framework_enablement::FrameworkEnablement;
+    use margaret_container::framework_injection_role::FrameworkInjectionRole;
+    use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_middleware_codegen::layer_application::LayerApplication;
@@ -1005,6 +1009,48 @@ impl Bad {
             )
             .to_string()
             .contains("is not an injectable dependency")
+        );
+    }
+
+    #[test]
+    fn rejects_a_session_parameter_that_injects_a_jwks_secret_store_by_path() {
+        let index = index_for(
+            r#"
+use std::sync::Arc;
+
+use crate::ServerStore;
+
+#[websocket_session(path = "/x", server = "public")]
+struct Bad;
+
+impl Bad {
+    #[build_for_session]
+    fn build(store: Arc<ServerStore>) -> anyhow::Result<Self> {}
+}
+"#,
+        );
+        let registries = registries_for(&index);
+        let plans =
+            middleware_plans(&index, &registries).expect("the middleware plans are collected");
+        let registry = scan(&index).expect("the console arguments are scanned");
+        let bindings = render_container(
+            &index,
+            &registry,
+            &[FrameworkProvider {
+                construction: FrameworkConstruction::Unit,
+                enablement: FrameworkEnablement::Always,
+                injection: FrameworkInjectionRole::JwksServerStore,
+                provided: CanonicalPath::new(vec!["crate".to_string(), "ServerStore".to_string()]),
+            }],
+        )
+        .expect("the container renders")
+        .bindings;
+
+        assert!(
+            render_websocket(&index, &bindings, &plans, &registries)
+                .expect_err("a jwks secret store is not injectable by path")
+                .to_string()
+                .contains("injects a jwks secret store by its path")
         );
     }
 

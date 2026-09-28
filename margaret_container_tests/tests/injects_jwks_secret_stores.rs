@@ -9,8 +9,10 @@ use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
+use margaret_container::injectable_resolution::InjectableResolution;
 use margaret_container::render_container::render_container;
 use margaret_container::rendered_container::RenderedContainer;
+use margaret_container::resolve_injectable::resolve_injectable;
 use margaret_container_tests::container_module_source::container_module_source;
 use margaret_serve_input_codegen::scan::scan;
 
@@ -27,6 +29,16 @@ fn store_provider(injection: FrameworkInjectionRole, name: &str) -> FrameworkPro
         injection,
         provided: CanonicalPath::new(vec!["crate".to_string(), name.to_string()]),
     }
+}
+
+fn both_stores() -> [FrameworkProvider; 2] {
+    [
+        store_provider(FrameworkInjectionRole::JwksServerStore, "ServerStore"),
+        store_provider(
+            FrameworkInjectionRole::JwksClientStore(auth_tag()),
+            "AuthVerifier",
+        ),
+    ]
 }
 
 fn render(fixture: &str, providers: &[FrameworkProvider]) -> Result<String, ContainerError> {
@@ -135,4 +147,45 @@ fn rejects_a_parameter_that_is_both_a_serve_input_and_a_jwks_secret_store() {
             .to_string()
             .contains("carries a serve input together with #[jwks_secret_store]")
     );
+}
+
+#[test]
+fn reports_a_marked_parameter_declared_as_another_type() {
+    assert!(matches!(
+        render("jwks_mismatched_store_type", &both_stores())
+            .expect_err("a marked parameter must be declared as the provider it receives"),
+        ContainerError::MismatchedJwksSecretStoreType { .. }
+    ));
+}
+
+#[test]
+fn reports_a_jwks_secret_store_injected_by_path() {
+    assert!(matches!(
+        render("jwks_store_by_path", &both_stores())
+            .expect_err("a jwks secret store must be reachable only through its marker"),
+        ContainerError::JwksSecretStoreInjectedByPath { .. }
+    ));
+}
+
+#[test]
+fn refuses_to_inject_a_jwks_secret_store_by_path_into_a_request_site() {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/jwks_secret_stores");
+    let index = AttributeIndexBuilder::new()
+        .index_crate(&CrateRoot::new("crate", &directory))
+        .expect("the fixture crate is indexed")
+        .build();
+    let serve_inputs = scan(&index).expect("the serve inputs are scanned");
+    let RenderedContainer { bindings, .. } =
+        render_container(&index, &serve_inputs, &both_stores()).expect("the container renders");
+    let consumer = index
+        .items()
+        .iter()
+        .find(|item| item.identifier() == "Consumer")
+        .expect("the consumer is indexed");
+    let declared: syn::Type = syn::parse_str("Arc<ServerStore>").expect("the type parses");
+
+    assert!(matches!(
+        resolve_injectable(&index, consumer, &declared, &bindings),
+        InjectableResolution::JwksSecretStoreByPath
+    ));
 }

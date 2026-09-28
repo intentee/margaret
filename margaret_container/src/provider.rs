@@ -2,6 +2,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
+use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::provided_type::ProvidedType;
 
 #[derive(Clone)]
@@ -9,6 +10,7 @@ pub(crate) struct Provider {
     pub(crate) concrete_path: CanonicalPath,
     pub(crate) construction: DirectConstruction,
     pub(crate) field_name: String,
+    pub(crate) injection: FrameworkInjectionRole,
     pub(crate) provided: ProvidedType,
     pub(crate) type_name: String,
 }

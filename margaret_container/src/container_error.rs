@@ -52,6 +52,25 @@ pub enum ContainerError {
     UnknownJwksSecretStore { site: String, target: String },
 
     #[error(
+        "{site} marks the jwks secret store of {target}, which provides '{expected}', but the parameter is declared as '{written}'"
+    )]
+    MismatchedJwksSecretStoreType {
+        expected: String,
+        site: String,
+        target: String,
+        written: String,
+    },
+
+    #[error(
+        "parameter '{parameter}' of singleton '{singleton}' injects '{provider}' by its path; it is available only through #[jwks_secret_store(...)]"
+    )]
+    JwksSecretStoreInjectedByPath {
+        parameter: String,
+        provider: String,
+        singleton: String,
+    },
+
+    #[error(
         "parameter '{parameter}' of singleton '{singleton}' carries a serve input together with #[jwks_secret_store]; a parameter must resolve to exactly one source"
     )]
     AmbiguousServeInputAndJwksSecretStore {
