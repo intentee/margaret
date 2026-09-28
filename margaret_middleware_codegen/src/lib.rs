@@ -442,7 +442,9 @@ struct Site;
     #[test]
     fn extracts_a_validation_result_form_request_in_a_middleware() {
         let source = wrappers_for(
-            r"
+            r"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 use margaret::framework::http::next::Next;
 use margaret::framework::validation::validation_result::ValidationResult;
 
@@ -451,7 +453,7 @@ struct Guard;
 
 impl Guard {
     #[process]
-    fn process(&self, #[form_request(from = Json)] data: ValidationResult<Data>, next: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process(&self, #[form_request(from = RequestInput::Json)] data: ValidationResult<Data>, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 ",
         );
@@ -473,13 +475,15 @@ impl Guard {
     #[test]
     fn extracts_a_bare_model_form_request_in_a_middleware() {
         let source = wrappers_for(
-            r"
+            r"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 #[handles_middleware_attribute(attribute = guard)]
 struct Guard;
 
 impl Guard {
     #[process]
-    fn process(&self, #[form_request(from = Form)] data: Data) -> anyhow::Result<ResponseContinuation> {}
+    fn process(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<ResponseContinuation> {}
 }
 ",
         );
@@ -503,7 +507,9 @@ impl Guard {
     #[test]
     fn extracts_a_form_request_alongside_the_request_and_next_in_a_middleware() {
         let source = wrappers_for(
-            r"
+            r"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -512,7 +518,7 @@ struct Guard;
 
 impl Guard {
     #[process]
-    fn process(&self, request: &Request, #[form_request(from = Query)] filters: Filters, next: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process(&self, request: &Request, #[form_request(from = RequestInput::Query)] filters: Filters, next: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 ",
         );
@@ -553,7 +559,9 @@ impl Tracer {
     #[test]
     fn disambiguates_wrapper_parameters_named_request_and_next() {
         let source = wrappers_for(
-            r"
+            r"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 use margaret::framework::http::next::Next;
 use margaret::framework::http::request::Request;
 
@@ -562,7 +570,7 @@ struct Guard;
 
 impl Guard {
     #[process]
-    fn process(&self, next: &Request, #[form_request(from = Form)] request: Data, following: Next) -> anyhow::Result<ResponseContinuation> {}
+    fn process(&self, next: &Request, #[form_request(from = RequestInput::Form)] request: Data, following: Next) -> anyhow::Result<ResponseContinuation> {}
 }
 ",
         );

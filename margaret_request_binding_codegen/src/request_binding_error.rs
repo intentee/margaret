@@ -106,7 +106,7 @@ pub enum RequestBindingError {
     FormRequestMissingSource { subject: String, parameter: String },
 
     #[error(
-        "form request argument #{parameter} of {subject} names an unknown request input source '{written}'; expected Form, Query, Json, or Cookie"
+        "form request argument #{parameter} of {subject} names an unknown request input source '{written}'; expected a variant of margaret::framework::http_validation::request_input::RequestInput"
     )]
     UnknownRequestInput {
         subject: String,

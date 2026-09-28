@@ -397,6 +397,37 @@ impl SessionUserProvider {
     }
 
     #[test]
+    fn rejects_a_form_request_source_named_after_a_local_struct() {
+        assert!(
+            responder_rejection(
+                "struct Cookie;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] cookie: Cookie) -> anyhow::Result<Response> {}\n}\n"
+            )
+            .contains("unknown request input source 'Cookie'")
+        );
+    }
+
+    #[test]
+    fn rejects_a_form_request_source_from_a_foreign_enum() {
+        assert!(
+            responder_rejection(
+                "use crate::inputs::RequestInput;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] filters: Filters) -> anyhow::Result<Response> {}\n}\n"
+            )
+            .contains("unknown request input source 'RequestInput :: Query'")
+        );
+    }
+
+    #[test]
+    fn binds_a_form_request_source_imported_from_the_framework() {
+        assert!(
+            responder_binding(
+                "Page",
+                "use margaret::framework::http_validation::request_input::RequestInput;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] filters: Filters) -> anyhow::Result<Response> {}\n}\n"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
     fn rejects_an_authenticated_user_taken_by_reference() {
         assert!(
             responder_rejection(
@@ -606,7 +637,7 @@ impl SessionUserProvider {
     #[test]
     fn renders_a_wrapper_that_interrupts_a_failed_form_request() {
         let registries = registries_for(
-            "struct Cookie;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, #[form_request(from = Cookie)] cookie: Cookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nstruct Cookie;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct SessionUserProvider;\n\nimpl SessionUserProvider {\n    #[infer_from_request]\n    fn infer(&self, #[form_request(from = RequestInput::Cookie)] cookie: Cookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         );
         let source: String = render_authenticated_user_wrappers(&registries.providers())
             .into_iter()

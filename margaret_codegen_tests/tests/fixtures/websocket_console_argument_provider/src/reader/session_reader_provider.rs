@@ -3,6 +3,7 @@ use std::sync::Arc;
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
 use margaret::framework::http::response_continuation::ResponseContinuation;
+use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::infer_from_request;
@@ -35,7 +36,7 @@ impl SessionReaderProvider {
     pub fn infer_reader(
         &self,
         request: &Request,
-        #[form_request(from = Cookie)] cookie: ReaderCookie,
+        #[form_request(from = RequestInput::Cookie)] cookie: ReaderCookie,
     ) -> anyhow::Result<AuthenticatedUserOutcome<Reader>> {
         let _ = request.inputs.server.path();
 

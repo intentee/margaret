@@ -1029,7 +1029,9 @@ impl Bad {
         );
     }
 
-    const AUTHENTICATED_HANDSHAKE: &str = r#"
+    const AUTHENTICATED_HANDSHAKE: &str = r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 use margaret::framework::http::request::Request;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
@@ -1044,7 +1046,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, request: &Request, #[form_request(from = Cookie)] cookie: SessionCookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, request: &Request, #[form_request(from = RequestInput::Cookie)] cookie: SessionCookie) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1350,7 +1352,9 @@ impl Bad {
     fn rejects_an_authenticated_user_whose_provider_reads_the_request_body() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 
 struct User;
@@ -1363,7 +1367,7 @@ struct SessionUserProvider;
 
 impl SessionUserProvider {
     #[infer_from_request]
-    fn infer(&self, #[form_request(from = Json)] credentials: Credentials) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+    fn infer(&self, #[form_request(from = RequestInput::Json)] credentials: Credentials) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
 }
 
 #[websocket_session(path = "/room", server = "public")]
@@ -1380,7 +1384,9 @@ impl Room {
         );
     }
 
-    const PARITY_SESSION: &str = r#"
+    const PARITY_SESSION: &str = r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 use std::sync::Arc;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 
@@ -1420,8 +1426,8 @@ impl BoardSession {
         greeter: Arc<Greeter>,
         #[route_parameter(from = "topic")] topic: String,
         #[route_parameter(from = "article")] article: Article,
-        #[form_request(from = Query)] filters: Filters,
-        #[form_request(from = Cookie)] preferences: Preferences,
+        #[form_request(from = RequestInput::Query)] filters: Filters,
+        #[form_request(from = RequestInput::Cookie)] preferences: Preferences,
         request: &margaret::framework::http::request::Request,
         peer: &spiffe::spiffe_id::SpiffeId,
         routes: &crate::margaret::routes::Routes,
@@ -1466,7 +1472,9 @@ impl RespondsToWebSocketMessage for Poster {
     fn rejects_a_form_body_request_in_a_session() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -1474,7 +1482,7 @@ struct Form;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[form_request(from = Form)] form: Form) -> anyhow::Result<Self> {}
+    fn build(#[form_request(from = RequestInput::Form)] form: Form) -> anyhow::Result<Self> {}
 }
 "#
             )
@@ -1487,7 +1495,9 @@ impl Bad {
     fn rejects_a_json_body_request_in_a_session() {
         assert!(
             error(
-                r#"
+                r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
@@ -1495,7 +1505,7 @@ struct Payload;
 
 impl Bad {
     #[build_for_session]
-    fn build(#[form_request(from = Json)] payload: Payload) -> anyhow::Result<Self> {}
+    fn build(#[form_request(from = RequestInput::Json)] payload: Payload) -> anyhow::Result<Self> {}
 }
 "#
             )

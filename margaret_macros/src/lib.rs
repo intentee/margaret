@@ -27,6 +27,31 @@ fn argument_error(error: &AttributeArgumentsError) -> Error {
     Error::new(Span::call_site(), error)
 }
 
+fn marker_item_naming_arguments(attribute: &Attribute) -> &'static [ItemNamingArgument] {
+    if attribute.path().is_ident("foreign_key") {
+        &[ItemNamingArgument::ForeignKeyReferences]
+    } else if attribute.path().is_ident("form_request") {
+        &[ItemNamingArgument::FormRequestSource]
+    } else {
+        &[]
+    }
+}
+
+fn render_marker_references(
+    attributes: &[Attribute],
+) -> Result<Vec<proc_macro2::TokenStream>, Error> {
+    attributes
+        .iter()
+        .map(|attribute| (attribute, marker_item_naming_arguments(attribute)))
+        .filter(|(_, item_naming_arguments)| !item_naming_arguments.is_empty())
+        .map(|(attribute, item_naming_arguments)| {
+            AttributeArgs::from_attribute(attribute)
+                .map(|arguments| render_item_references(&arguments, item_naming_arguments))
+                .map_err(|error| argument_error(&error))
+        })
+        .collect()
+}
+
 fn referencing_named_items(
     attribute_path: &str,
     attributes: TokenStream,
@@ -92,15 +117,31 @@ fn strip(
     item: proc_macro2::TokenStream,
     markers: &[&str],
 ) -> Result<proc_macro2::TokenStream, Error> {
-    let mut function: ImplItemFn = syn::parse2(item)?;
+    let ImplItemFn {
+        attrs,
+        vis,
+        defaultness,
+        mut sig,
+        block,
+    } = syn::parse2(item)?;
+    let mut references = Vec::new();
 
-    for input in &mut function.sig.inputs {
+    for input in &mut sig.inputs {
         if let FnArg::Typed(pattern_type) = input {
+            references.extend(render_marker_references(&pattern_type.attrs)?);
             retain_non_marker_attributes(&mut pattern_type.attrs, markers);
         }
     }
 
-    Ok(quote!(#function))
+    let statements = block.stmts;
+
+    Ok(quote! {
+        #(#attrs)*
+        #vis #defaultness #sig {
+            #(#references)*
+            #(#statements)*
+        }
+    })
 }
 
 fn strip_struct(
@@ -108,19 +149,7 @@ fn strip_struct(
     markers: &[&str],
 ) -> Result<proc_macro2::TokenStream, Error> {
     let mut item_struct: ItemStruct = syn::parse2(item)?;
-    let mut references = Vec::new();
-
-    for attribute in &item_struct.attrs {
-        if attribute.path().is_ident("foreign_key") {
-            let arguments =
-                AttributeArgs::from_attribute(attribute).map_err(|error| argument_error(&error))?;
-
-            references.push(render_item_references(
-                &arguments,
-                &[ItemNamingArgument::ForeignKeyReferences],
-            ));
-        }
-    }
+    let references = render_marker_references(&item_struct.attrs)?;
 
     retain_non_marker_attributes(&mut item_struct.attrs, markers);
 
@@ -333,7 +362,7 @@ mod tests {
                 pub async fn respond(
                     &self,
                     #[route_parameter] id: String,
-                    #[form_request(from = Form)] form: ValidationResult<Data>,
+                    #[form_request(from = RequestInput::Form)] form: ValidationResult<Data>,
                 ) -> Response {
                     Response::text(200, id)
                 }
@@ -346,6 +375,43 @@ mod tests {
         assert!(!stripped.contains("form_request"));
         assert!(stripped.contains("id"));
         assert!(stripped.contains("form"));
+    }
+
+    #[test]
+    fn references_the_request_input_named_by_a_form_request() {
+        let stripped: String = strip_or_compile_error(
+            quote! {
+                pub async fn respond(
+                    &self,
+                    #[form_request(from = RequestInput::Query)] filters: Filters,
+                ) -> Response {
+                    Response::text(200, filters.name)
+                }
+            },
+            &["form_request"],
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(
+            stripped.contains("->Response{const_:()={let_=&RequestInput::Query;};Response::text")
+        );
+    }
+
+    #[test]
+    fn turns_malformed_form_request_arguments_into_a_compile_error() {
+        let output = strip_or_compile_error(
+            quote! {
+                pub fn respond(&self, #[form_request(= 5)] filters: Filters) -> Response {
+                    Response::text(200, filters.name)
+                }
+            },
+            &["form_request"],
+        )
+        .to_string();
+
+        assert!(output.contains("compile_error"));
     }
 
     #[test]
