@@ -421,7 +421,7 @@ impl Flusher {
         );
 
         assert!(source.contains(
-            "margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider();"
+            "iflet::std::result::Result::Err(error)=margaret::framework::spiffe_svid::install_default_crypto_provider::install_default_crypto_provider(){returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(source.contains(
             "margaret::framework::spiffe_svid_server::svid_server_bundle::SvidServerBundle::new(margaret::framework::spiffe_svid::svid_service_bundle_params::SvidServiceBundleParams{"
