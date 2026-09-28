@@ -11,12 +11,18 @@ const ISSUER_SCHEME: &str = "https";
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssuerIdentifier {
     original: String,
+    url: Url,
 }
 
 impl IssuerIdentifier {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.original
+    }
+
+    #[must_use]
+    pub fn url(&self) -> &Url {
+        &self.url
     }
 }
 
@@ -57,6 +63,7 @@ impl FromStr for IssuerIdentifier {
 
         Ok(Self {
             original: original.to_string(),
+            url,
         })
     }
 }

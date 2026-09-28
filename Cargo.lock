@@ -2849,6 +2849,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_oidc_discovery"
+version = "0.1.0"
+dependencies = [
+ "margaret_registered_claims",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
 name = "margaret_peer_identity"
 version = "0.1.0"
 dependencies = [
