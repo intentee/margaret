@@ -608,6 +608,7 @@ impl GetJwks {
 pub mod margaret;
 
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -615,11 +616,15 @@ struct AuthJwksEndpoint;
 
 impl ProvidesEndpoint for AuthJwksEndpoint {}
 
+impl DeclaresTokenTrust for AuthJwksEndpoint {}
+
 #[singleton]
 #[provides_jwks_endpoint(partner)]
 struct PartnerJwksEndpoint;
 
 impl ProvidesEndpoint for PartnerJwksEndpoint {}
+
+impl DeclaresTokenTrust for PartnerJwksEndpoint {}
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
@@ -643,6 +648,14 @@ impl GetVerify {
     const JWKS_SERVER_STORE_CRATE: &str = "\
 #[rustfmt::skip]
 pub mod margaret;
+
+use margaret::framework::token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+
+#[singleton]
+#[issues_tokens]
+struct Issuer;
+
+impl DeclaresTokenIssuance for Issuer {}
 
 #[singleton]
 #[responds_to_http(method = \"post\", path = \"/mint\", server = \"internal\")]
@@ -982,7 +995,8 @@ impl GetIdentity {
         let construction: String = module(&code, "container/build/serve")
             .split_whitespace()
             .collect();
-        assert!(construction.contains(".server_secret_store()"));
+        assert!(construction.contains("crate::margaret::jwks::JwksSecretStore::create("));
+        assert!(construction.contains("::std::sync::Arc::<crate::Issuer>::clone(&issuer)"));
         assert!(construction.contains("crate::margaret::jwks::MintAccessTokenHandler::create("));
         assert!(!concatenated(&code).contains("PublicJwksVerifier"));
     }
@@ -992,6 +1006,7 @@ impl GetIdentity {
 pub mod margaret;
 
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -1003,6 +1018,8 @@ impl AuthJwksEndpoint {
 }
 
 impl ProvidesEndpoint for AuthJwksEndpoint {}
+
+impl DeclaresTokenTrust for AuthJwksEndpoint {}
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
@@ -1136,6 +1153,7 @@ impl GetJwks {
 pub mod margaret;
 
 use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
 #[provides_jwks_endpoint(auth)]
@@ -1143,11 +1161,15 @@ struct FirstEndpoint;
 
 impl ProvidesEndpoint for FirstEndpoint {}
 
+impl DeclaresTokenTrust for FirstEndpoint {}
+
 #[singleton]
 #[provides_jwks_endpoint(auth)]
 struct SecondEndpoint;
 
 impl ProvidesEndpoint for SecondEndpoint {}
+
+impl DeclaresTokenTrust for SecondEndpoint {}
 ";
 
     #[test]

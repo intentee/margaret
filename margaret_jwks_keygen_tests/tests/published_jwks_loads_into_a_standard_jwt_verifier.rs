@@ -10,6 +10,7 @@ use jsonwebtoken::jwk::KeyAlgorithm;
 use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
+use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 
 #[test]
 fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
@@ -32,11 +33,13 @@ fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
         "a standard verifier reads the algorithm off the published key"
     );
 
-    let verified = decode::<TestClaims>(
-        &token,
-        &DecodingKey::from_jwk(signing_key)?,
-        &Validation::new(Algorithm::ES256),
-    )?;
+    let trust = fixture_trust();
+    let mut validation = Validation::new(Algorithm::ES256);
+
+    validation.set_audience(&[trust.audience.as_str()]);
+    validation.set_issuer(&[trust.issuer.as_str()]);
+
+    let verified = decode::<TestClaims>(&token, &DecodingKey::from_jwk(signing_key)?, &validation)?;
 
     assert_eq!(verified.claims, claims);
 

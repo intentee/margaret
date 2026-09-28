@@ -69,7 +69,11 @@ pub use margaret_spiffe_svid_server as spiffe_svid_server;
 #[cfg(feature = "runtime")]
 pub use margaret_sync_holder as sync_holder;
 #[cfg(feature = "runtime")]
+pub use margaret_token_issuance as token_issuance;
+#[cfg(feature = "runtime")]
 pub use margaret_token_signer as token_signer;
+#[cfg(feature = "runtime")]
+pub use margaret_token_trust as token_trust;
 #[cfg(feature = "runtime")]
 pub use margaret_validation as validation;
 #[cfg(feature = "runtime")]

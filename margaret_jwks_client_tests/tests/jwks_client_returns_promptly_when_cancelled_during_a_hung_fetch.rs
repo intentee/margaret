@@ -11,6 +11,7 @@ use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_jwks_client::jwks_client::JwksClient;
 use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
+use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn jwks_client_returns_promptly_when_cancelled_during_a_hung_fetch() {
@@ -25,7 +26,10 @@ async fn jwks_client_returns_promptly_when_cancelled_during_a_hung_fetch() {
     )
     .await;
     let jwks_url = fixture.url(server.port(), WELL_KNOWN_JWKS_PATH);
-    let jwks_client = JwksClient::create(Arc::new(StaticEndpoint::new(jwks_url)));
+    let jwks_client = JwksClient::create(
+        Arc::new(StaticEndpoint::new(jwks_url)),
+        Arc::new(fixture_trust()),
+    );
     let client_builder = fixture_client_builder(&fixture.certificate_authority);
     let cancellation_token = CancellationToken::new();
     let poll_token = cancellation_token.clone();

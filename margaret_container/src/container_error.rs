@@ -31,22 +31,41 @@ pub enum ContainerError {
         source: TagError,
     },
 
-    #[error("#[provides_jwks_endpoint] is only supported on structs, but '{path}' is not a struct")]
-    NotAnEndpointStruct { path: String },
+    #[error("#[{attribute}] is only supported on structs, but '{path}' is not a struct")]
+    DeclarationNotAStruct {
+        attribute: &'static str,
+        path: String,
+    },
 
-    #[error("the jwks endpoint provider '{path}' must not also carry a role attribute")]
-    ConflictingEndpointRole { path: String },
+    #[error("the #[{attribute}] singleton '{path}' must not also carry a role attribute")]
+    ConflictingDeclarationRole {
+        attribute: &'static str,
+        path: String,
+    },
 
     #[error("#[singleton] does not take any arguments, but '{path}' declares some")]
     SingletonHasArguments { path: String },
 
-    #[error("the jwks endpoint provider '{path}' must also be declared as a #[singleton]")]
-    EndpointProviderRequiresSingleton { path: String },
+    #[error("'{path}' carries #[{attribute}], so it must also be declared as a #[singleton]")]
+    DeclarationRequiresSingleton {
+        attribute: &'static str,
+        path: String,
+    },
+
+    #[error("the #[{attribute}] singleton '{path}' does not implement {required}")]
+    DeclarationMissingTrait {
+        attribute: &'static str,
+        path: String,
+        required: String,
+    },
+
+    #[error("more than one singleton is declared with #[issues_tokens]: {paths}")]
+    AmbiguousTokenIssuance { paths: String },
 
     #[error(
-        "the jwks endpoint provider '{path}' does not implement margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint"
+        "the framework provider '{provider}' stamps issued tokens, but no singleton is declared with #[issues_tokens]"
     )]
-    EndpointProviderMissingTrait { path: String },
+    MissingTokenIssuance { provider: String },
 
     #[error("{site} references a jwks secret store that is not available: {target}")]
     UnknownJwksSecretStore { site: String, target: String },

@@ -18,7 +18,6 @@ margaret_http = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwks_roller = { workspace = true }
-margaret_jwks_secret_store = { workspace = true }
 margaret_sync_holder = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -26,7 +25,6 @@ tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
 [dev-dependencies]
-chrono = { workspace = true }
 http = { workspace = true }
 margaret_identity_session = { workspace = true }
 margaret_jwks_file_secret_storage = { workspace = true }

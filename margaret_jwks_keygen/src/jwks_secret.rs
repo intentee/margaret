@@ -5,8 +5,8 @@ use margaret_jose_parameters::curve::Curve;
 use margaret_jws_verification::key_id::KeyId;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
-use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_jwt_verification::verify_jwt::verify_jwt;
 use margaret_registered_claims::numeric_date::NumericDate;
 
@@ -110,10 +110,10 @@ impl JwksSecret {
     pub fn verify_jwt<TClaims: DeserializeOwned>(
         &self,
         token: &str,
-        type_expectation: TypeHeaderExpectation,
+        expectation: &JwtExpectation,
         now: NumericDate,
     ) -> JwksSecretVerificationResult<TClaims> {
-        let verified = match verify_jwt(&self.key_set, token, type_expectation, now) {
+        let verified = match verify_jwt(&self.key_set, token, expectation, now) {
             JwtVerification::Rejected(rejection) => {
                 return JwksSecretVerificationResult::Rejected(rejection);
             }

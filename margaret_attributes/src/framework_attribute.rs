@@ -15,6 +15,7 @@ pub enum FrameworkAttribute {
     Index,
     InferFromRequest,
     InfersAuthenticatedUser,
+    IssuesTokens,
     JwksSecretStore,
     Middleware,
     Model,
@@ -36,7 +37,7 @@ pub enum FrameworkAttribute {
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 32] = [
         Self::AuthenticatedUser,
         Self::BuildForSession,
         Self::Column,
@@ -50,6 +51,7 @@ impl FrameworkAttribute {
         Self::Index,
         Self::InferFromRequest,
         Self::InfersAuthenticatedUser,
+        Self::IssuesTokens,
         Self::JwksSecretStore,
         Self::Middleware,
         Self::Model,
@@ -97,6 +99,7 @@ impl FrameworkAttribute {
             "index" => Some(Self::Index),
             "infer_from_request" => Some(Self::InferFromRequest),
             "infers_authenticated_user" => Some(Self::InfersAuthenticatedUser),
+            "issues_tokens" => Some(Self::IssuesTokens),
             "jwks_secret_store" => Some(Self::JwksSecretStore),
             "middleware" => Some(Self::Middleware),
             "model" => Some(Self::Model),
@@ -135,6 +138,7 @@ impl FrameworkAttribute {
             Self::Index => "index",
             Self::InferFromRequest => "infer_from_request",
             Self::InfersAuthenticatedUser => "infers_authenticated_user",
+            Self::IssuesTokens => "issues_tokens",
             Self::JwksSecretStore => "jwks_secret_store",
             Self::Middleware => "middleware",
             Self::Model => "model",

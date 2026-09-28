@@ -5,11 +5,14 @@ use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
+use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[test]
 fn jwks_secret_verifies_a_token_of_the_retired_key_after_rotation() -> Result<()> {
+    let trust = fixture_trust();
     let claims = TestClaims {
         sub: "subject".to_string(),
     };
@@ -18,7 +21,7 @@ fn jwks_secret_verifies_a_token_of_the_retired_key_after_rotation() -> Result<()
     let rotated = secret.rotate()?;
 
     assert!(matches!(
-        rotated.verify_jwt::<TestClaims>(&token, TypeHeaderExpectation::Required(JwtType::AccessToken), NumericDate::new(0)),
+        rotated.verify_jwt::<TestClaims>(&token, &JwtExpectation { audience: &trust.audience, issuer: &trust.issuer, token_type: TypeHeaderExpectation::Required(JwtType::AccessToken) }, NumericDate::new(0)),
         JwksSecretVerificationResult::SignedWithPrevious(verified) if verified.claims == claims
     ));
 

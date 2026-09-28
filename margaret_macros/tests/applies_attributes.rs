@@ -19,6 +19,7 @@ use margaret_macros::console_command;
 use margaret_macros::constructor;
 use margaret_macros::handles_middleware_attribute;
 use margaret_macros::infers_authenticated_user;
+use margaret_macros::issues_tokens;
 use margaret_macros::middleware;
 use margaret_macros::model;
 use margaret_macros::process;
@@ -77,6 +78,9 @@ struct Binder {
 
 #[provides_jwks_endpoint]
 struct JwksEndpoint;
+
+#[issues_tokens]
+struct TokenIssuer;
 
 #[route_parameter_value]
 struct SubjectId(String);
@@ -140,6 +144,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
 
     assert_eq!(SubjectId("7".to_string()).0, "7");
     assert_eq!(size_of::<JwksEndpoint>(), 0);
+    assert_eq!(size_of::<TokenIssuer>(), 0);
     assert_eq!(size_of::<Worker>(), 0);
     assert_eq!(size_of_val(&AccountProvider), 0);
     assert_eq!(size_of_val(&Account), 0);

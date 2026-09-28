@@ -8,14 +8,17 @@ use margaret_jws_verification::jws_rejection::JwsRejection;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_jwt_verification::verify_jwt::verify_jwt;
+use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[test]
 fn reports_the_rejection_of_the_signature() {
+    let trust = fixture_trust();
     let KeySetParsing::Accepted(key_set) =
         VerificationKeySet::from_jwks(vec![FixtureKey::generate(Curve::P256, "published").jwk()])
     else {
@@ -28,7 +31,11 @@ fn reports_the_rejection_of_the_signature() {
         verify_jwt::<Map<String, Value>>(
             &key_set,
             &token,
-            TypeHeaderExpectation::Optional(JwtType::Jwt),
+            &JwtExpectation {
+                audience: &trust.audience,
+                issuer: &trust.issuer,
+                token_type: TypeHeaderExpectation::Optional(JwtType::Jwt)
+            },
             NumericDate::new(950)
         ),
         JwtVerification::Rejected(JwtRejection::Jws(JwsRejection::UnknownKeyId { .. }))

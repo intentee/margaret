@@ -16,6 +16,7 @@ use margaret_serve_input_codegen::serve_input::ServeInput;
 use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
 use crate::construct_singleton_path::construct_singleton_path;
+use crate::constructed_type::constructed_type;
 use crate::construction_error_path::construction_error_path;
 use crate::construction_errors_doc::construction_errors_doc;
 use crate::construction_flow::construction_flow;
@@ -37,16 +38,33 @@ fn fieldless_literal(concrete: &TokenStream, shape: StructShape) -> TokenStream 
     }
 }
 
+#[derive(Clone, Copy)]
+enum ArcClone {
+    Inferred,
+    Typed,
+}
+
 fn dependency_expression(
     dependency: &PlannedDependency,
     weaver: &mut ReverseServeInputWeaver,
+    arc_clone: ArcClone,
 ) -> TokenStream {
     match dependency {
         PlannedDependency::ServeInput { input, slot } => weaver.weave(input, *slot),
-        PlannedDependency::Single { field_name } => {
+        PlannedDependency::Single {
+            field_name,
+            provided,
+        } => {
             let dependency = format_ident!("{field_name}");
 
-            quote! { ::std::sync::Arc::clone(&#dependency) }
+            match arc_clone {
+                ArcClone::Inferred => quote! { ::std::sync::Arc::clone(&#dependency) },
+                ArcClone::Typed => {
+                    let value_type = constructed_type(provided);
+
+                    quote! { ::std::sync::Arc::<#value_type>::clone(&#dependency) }
+                }
+            }
         }
     }
 }
@@ -54,11 +72,12 @@ fn dependency_expression(
 fn dependency_expressions(
     dependencies: &[PlannedDependency],
     weaver: &mut ReverseServeInputWeaver,
+    arc_clone: ArcClone,
 ) -> Vec<TokenStream> {
     let mut expressions: Vec<TokenStream> = dependencies
         .iter()
         .rev()
-        .map(|dependency| dependency_expression(dependency, weaver))
+        .map(|dependency| dependency_expression(dependency, weaver, arc_clone))
         .collect();
 
     expressions.reverse();
@@ -75,7 +94,7 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
             is_async, method, ..
         } => {
             let constructor = format_ident!("{method}");
-            let arguments = dependency_expressions(dependencies, weaver);
+            let arguments = dependency_expressions(dependencies, weaver, ArcClone::Inferred);
             let construct_singleton = construct_singleton_path();
             let singleton = provider.concrete_path.to_string();
             let call = if *is_async {
@@ -91,7 +110,7 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
             is_async, method, ..
         } => {
             let constructor = format_ident!("{method}");
-            let arguments = dependency_expressions(dependencies, weaver);
+            let arguments = dependency_expressions(dependencies, weaver, ArcClone::Typed);
 
             if *is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
@@ -102,13 +121,13 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
         DirectConstruction::FrameworkUnit => quote! { #concrete },
         DirectConstruction::FrameworkAccessor { accessor, .. } => {
             let accessor = format_ident!("{accessor}");
-            let sources = dependency_expressions(dependencies, weaver);
+            let sources = dependency_expressions(dependencies, weaver, ArcClone::Inferred);
 
             quote! { #(#sources)*.#accessor() }
         }
         DirectConstruction::Resolved { resolver, .. } => {
             let resolver = path_tokens(resolver);
-            let arguments = dependency_expressions(dependencies, weaver);
+            let arguments = dependency_expressions(dependencies, weaver, ArcClone::Inferred);
 
             quote! { #resolver(#(#arguments),*) }
         }

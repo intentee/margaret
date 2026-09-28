@@ -7,8 +7,10 @@ use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::access_token_minting::AccessTokenMinting;
 use crate::minted_tokens::MintedTokens;
@@ -16,17 +18,22 @@ use crate::minted_tokens::MintedTokens;
 #[must_use]
 pub fn mint_access_token(
     secret: &JwksSecret,
+    issuance: &TokenIssuance,
     refresh_token: &str,
     now: DateTime<Utc>,
 ) -> AccessTokenMinting {
-    let access_stamp = AccessTokenStamp::issued_at(now);
+    let access_stamp = AccessTokenStamp::issued_by(issuance, now);
     let VerifiedJwt {
         claims: refresh_claims,
         registered: refresh_registered,
         ..
     } = match secret.verify_jwt::<RefreshTokenClaims>(
         refresh_token,
-        TypeHeaderExpectation::Required(JwtType::Jwt),
+        &JwtExpectation {
+            audience: &issuance.audience,
+            issuer: &issuance.issuer,
+            token_type: TypeHeaderExpectation::Required(JwtType::Jwt),
+        },
         access_stamp.registered.iat,
     ) {
         JwksSecretVerificationResult::Rejected(rejection) => {

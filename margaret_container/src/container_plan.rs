@@ -68,6 +68,7 @@ impl ContainerPlan {
                             })?;
                         dependencies.push(PlannedDependency::Single {
                             field_name: dependency.provider.field_name.clone(),
+                            provided: dependency.provider.provided.clone(),
                         });
 
                         for (input, slot) in dependency

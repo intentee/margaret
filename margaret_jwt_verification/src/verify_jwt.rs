@@ -10,9 +10,9 @@ use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 
 use crate::claims_rejection::ClaimsRejection;
+use crate::jwt_expectation::JwtExpectation;
 use crate::jwt_rejection::JwtRejection;
 use crate::jwt_verification::JwtVerification;
-use crate::type_header_expectation::TypeHeaderExpectation;
 use crate::verified_jwt::VerifiedJwt;
 
 #[derive(Deserialize)]
@@ -27,7 +27,11 @@ struct JwtPayload<TClaims> {
 pub fn verify_jwt<TClaims: DeserializeOwned>(
     key_set: &VerificationKeySet,
     token: &str,
-    type_expectation: TypeHeaderExpectation,
+    JwtExpectation {
+        audience,
+        issuer,
+        token_type,
+    }: &JwtExpectation,
     now: NumericDate,
 ) -> JwtVerification<TClaims> {
     let VerifiedJws { kid, payload, typ } = match key_set.verify(token) {
@@ -37,7 +41,7 @@ pub fn verify_jwt<TClaims: DeserializeOwned>(
         JwsVerification::Verified(verified) => verified,
     };
 
-    if let ControlFlow::Break(rejection) = type_expectation.check(typ) {
+    if let ControlFlow::Break(rejection) = token_type.check(typ) {
         return JwtVerification::Rejected(JwtRejection::Type(rejection));
     }
 
@@ -49,6 +53,22 @@ pub fn verify_jwt<TClaims: DeserializeOwned>(
             }));
         }
     };
+
+    if registered.iss != issuer.as_str() {
+        return JwtVerification::Rejected(JwtRejection::Claims(ClaimsRejection::IssuerMismatch {
+            expected: (*issuer).clone(),
+            found: registered.iss,
+        }));
+    }
+
+    if !registered.aud.is_exactly(audience) {
+        return JwtVerification::Rejected(JwtRejection::Claims(
+            ClaimsRejection::AudienceMismatch {
+                expected: (*audience).clone(),
+                found: registered.aud,
+            },
+        ));
+    }
 
     if now >= registered.exp {
         return JwtVerification::Rejected(JwtRejection::Claims(ClaimsRejection::Expired {
