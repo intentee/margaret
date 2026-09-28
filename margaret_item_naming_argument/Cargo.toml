@@ -1,22 +1,20 @@
 [package]
-name = "margaret_macros"
+name = "margaret_item_naming_argument"
 version = "0.4.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "Declarative attribute macros for the Margaret application framework."
+description = "Attribute arguments that name Rust items in the Margaret application framework."
 license.workspace = true
 repository.workspace = true
 readme.workspace = true
 publish.workspace = true
 
-[lib]
-proc-macro = true
-
 [dependencies]
 margaret_attribute_arguments = { workspace = true }
-margaret_item_naming_argument = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
+
+[dev-dependencies]
 syn = { workspace = true }
 
 [lints]

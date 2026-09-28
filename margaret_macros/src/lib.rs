@@ -1,10 +1,16 @@
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::Attribute;
 use syn::FnArg;
 use syn::ImplItemFn;
 use syn::ItemStruct;
+
+use margaret_attribute_arguments::attribute_args::AttributeArgs;
+use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
+use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
+use margaret_item_naming_argument::render_item_references::render_item_references;
 
 const REQUEST_BINDING_MARKERS: [&str; 3] =
     ["authenticated_user", "route_parameter", "form_request"];
@@ -15,6 +21,42 @@ fn retain_non_marker_attributes(attributes: &mut Vec<Attribute>, markers: &[&str
             .iter()
             .any(|marker| attribute.path().is_ident(marker))
     });
+}
+
+fn argument_error(error: &AttributeArgumentsError) -> syn::Error {
+    syn::Error::new(Span::call_site(), error)
+}
+
+fn referencing_named_items(
+    attribute_path: &str,
+    attributes: TokenStream,
+    item: TokenStream,
+    item_naming_arguments: &[ItemNamingArgument],
+) -> TokenStream {
+    referencing_named_items_or_compile_error(
+        attribute_path,
+        attributes.into(),
+        &item.into(),
+        item_naming_arguments,
+    )
+    .into()
+}
+
+fn referencing_named_items_or_compile_error(
+    attribute_path: &str,
+    attributes: TokenStream2,
+    item: &TokenStream2,
+    item_naming_arguments: &[ItemNamingArgument],
+) -> TokenStream2 {
+    or_compile_error(
+        AttributeArgs::from_argument_tokens(attribute_path.to_string(), attributes)
+            .map(|arguments| {
+                let references = render_item_references(&arguments, item_naming_arguments);
+
+                quote!(#item #references)
+            })
+            .map_err(|error| argument_error(&error)),
+    )
 }
 
 fn or_compile_error(result: Result<TokenStream2, syn::Error>) -> TokenStream2 {
@@ -54,6 +96,19 @@ fn strip(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Erro
 
 fn strip_struct(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, syn::Error> {
     let mut item_struct: ItemStruct = syn::parse2(item)?;
+    let mut references = Vec::new();
+
+    for attribute in &item_struct.attrs {
+        if attribute.path().is_ident("foreign_key") {
+            let arguments =
+                AttributeArgs::from_attribute(attribute).map_err(|error| argument_error(&error))?;
+
+            references.push(render_item_references(
+                &arguments,
+                &[ItemNamingArgument::ForeignKeyReferences],
+            ));
+        }
+    }
 
     retain_non_marker_attributes(&mut item_struct.attrs, markers);
 
@@ -61,7 +116,7 @@ fn strip_struct(item: TokenStream2, markers: &[&str]) -> Result<TokenStream2, sy
         retain_non_marker_attributes(&mut field.attrs, markers);
     }
 
-    Ok(quote!(#item_struct))
+    Ok(quote!(#item_struct #(#references)*))
 }
 
 #[proc_macro_attribute]
@@ -88,8 +143,16 @@ pub fn service(_attributes: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn scheduled_with_tick_timer(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
+pub fn scheduled_with_tick_timer(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "scheduled_with_tick_timer",
+        attributes,
+        item,
+        &[
+            ItemNamingArgument::TickInterval,
+            ItemNamingArgument::TickBehavior,
+        ],
+    )
 }
 
 #[proc_macro_attribute]
@@ -131,8 +194,13 @@ pub fn route_parameter_value(_attributes: TokenStream, item: TokenStream) -> Tok
 }
 
 #[proc_macro_attribute]
-pub fn infers_authenticated_user(_attributes: TokenStream, item: TokenStream) -> TokenStream {
-    item
+pub fn infers_authenticated_user(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    referencing_named_items(
+        "infers_authenticated_user",
+        attributes,
+        item,
+        &[ItemNamingArgument::UserModel],
+    )
 }
 
 #[proc_macro_attribute]
@@ -174,6 +242,9 @@ pub fn build_for_session(_attributes: TokenStream, item: TokenStream) -> TokenSt
 mod tests {
     use quote::quote;
 
+    use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
+
+    use super::referencing_named_items_or_compile_error;
     use super::strip_or_compile_error;
     use super::strip_struct_or_compile_error;
 
@@ -384,6 +455,72 @@ mod tests {
         assert!(!stripped.contains("column"));
         assert!(stripped.contains("derive"));
         assert!(stripped.contains("partition"));
+    }
+
+    #[test]
+    fn references_the_model_named_by_a_struct_foreign_key() {
+        let stripped: String = strip_struct_or_compile_error(
+            quote! {
+                #[foreign_key(columns = [partition], references = Metadata)]
+                pub struct FragmentAssociation {
+                    #[column]
+                    pub partition: Uuid,
+                }
+            },
+            &["column", "foreign_key"],
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(stripped.contains("const_:()={let_:::core::marker::PhantomData<Metadata>"));
+    }
+
+    #[test]
+    fn turns_malformed_foreign_key_arguments_into_a_compile_error() {
+        let output = strip_struct_or_compile_error(
+            quote! {
+                #[foreign_key(= 5)]
+                pub struct FragmentAssociation;
+            },
+            &["foreign_key"],
+        )
+        .to_string();
+
+        assert!(output.contains("compile_error"));
+    }
+
+    #[test]
+    fn references_the_items_named_by_attribute_arguments() {
+        let output: String = referencing_named_items_or_compile_error(
+            "infers_authenticated_user",
+            quote!(user_model = Account),
+            &quote!(
+                struct AccountProvider;
+            ),
+            &[ItemNamingArgument::UserModel],
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(output.starts_with("structAccountProvider;"));
+        assert!(output.contains("::core::marker::PhantomData<Account>"));
+    }
+
+    #[test]
+    fn turns_malformed_attribute_arguments_into_a_compile_error() {
+        let output = referencing_named_items_or_compile_error(
+            "infers_authenticated_user",
+            quote!(= 5),
+            &quote!(
+                struct AccountProvider;
+            ),
+            &[ItemNamingArgument::UserModel],
+        )
+        .to_string();
+
+        assert!(output.contains("compile_error"));
     }
 
     #[test]
