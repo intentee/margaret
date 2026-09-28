@@ -16,6 +16,10 @@ impl ModuleImports {
     pub(crate) fn insert(&mut self, name: String, path: CanonicalPath) {
         self.by_name.insert(name, path);
     }
+
+    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
+        self.by_name.keys().map(String::as_str)
+    }
 }
 
 #[cfg(test)]

@@ -7,7 +7,6 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::service;
 
 use crate::identity_client::IdentityClient;
-use crate::margaret::asset_bag::asset;
 
 #[service]
 pub struct Heartbeat {
@@ -28,7 +27,6 @@ impl Heartbeat {
     /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
-        let _asset = asset!("resources/ts/app.ts");
         let _http_client = self.identity_client.http_client();
 
         cancellation_token.cancelled().await;

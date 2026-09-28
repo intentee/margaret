@@ -44,6 +44,11 @@ pub enum CodegenError {
     )]
     AssetResponderWithoutMetafile,
 
+    #[error(
+        "a module imports the asset macro, but no esbuild metafile was found at the workspace root"
+    )]
+    AssetMacroWithoutMetafile,
+
     #[error("failed to generate the dependency container: {source}")]
     Container {
         #[from]

@@ -9,7 +9,6 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
 
-use crate::margaret::asset_bag::asset;
 use crate::margaret::jwks::JwksSecretStore;
 use crate::margaret::jwks::partner_endpoint_partner_endpoint::PublicJwksVerifier;
 
@@ -39,7 +38,6 @@ impl TokenAudit {
     /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
-        let _asset = asset!("resources/ts/app.ts");
         let _signing = self
             .secret_store
             .sign_access_token(&json!({ "scope": "audit" }), DateTime::UNIX_EPOCH)?;

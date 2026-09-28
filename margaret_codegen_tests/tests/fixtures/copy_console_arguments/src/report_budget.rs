@@ -9,7 +9,6 @@ use margaret::framework::macros::singleton;
 
 use crate::budget::Budget;
 use crate::connection_limits::ConnectionLimits;
-use crate::margaret::asset_bag::asset;
 
 #[singleton]
 #[console_command(name = "report-budget", description = "Reports the configured budget")]
@@ -52,8 +51,6 @@ impl ReportBudget {
                 self.max_connections,
                 self.spare_connections.map_or(0, NonZeroU32::get)
             );
-
-            let _ = asset!("resources/ts/app.ts");
 
             CommandOutcome::Succeeded
         })

@@ -7,7 +7,6 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
 
 use crate::deployment::Deployment;
-use crate::margaret::asset_bag::asset;
 
 #[singleton]
 #[console_command(
@@ -50,8 +49,6 @@ impl ReportDeployment {
                 self.worker_count,
                 self.verbose.unwrap_or(false)
             );
-
-            let _ = asset!("resources/ts/app.ts");
 
             CommandOutcome::Succeeded
         })

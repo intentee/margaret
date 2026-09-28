@@ -8,8 +8,6 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
 
-use crate::margaret::asset_bag::asset;
-
 #[singleton]
 #[responds_to_http(method = "get", path = "/configured", server = "public")]
 pub struct Configured {
@@ -54,10 +52,6 @@ impl Configured {
     pub async fn respond(&self) -> anyhow::Result<Response> {
         task::yield_now().await;
 
-        Ok({
-            let _ = asset!("resources/ts/app.ts");
-
-            Response::text(200, "configured")
-        })
+        Ok(Response::text(200, "configured"))
     }
 }

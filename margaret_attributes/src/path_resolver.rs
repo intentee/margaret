@@ -99,6 +99,18 @@ impl PathResolver {
     }
 
     #[must_use]
+    pub fn is_imported(&self, target: &CanonicalPath) -> bool {
+        self.imports.iter().any(|(module, imports)| {
+            imports.names().any(|name| {
+                matches!(
+                    self.bind(module.segments(), name, &mut HashSet::new()),
+                    NameBinding::Bound(bound) if bound.as_slice() == target.segments()
+                )
+            })
+        })
+    }
+
+    #[must_use]
     pub fn resolve_path(&self, module: &[String], path: &Path) -> Option<CanonicalPath> {
         let segments: Vec<String> = path
             .segments
@@ -715,5 +727,54 @@ mod tests {
             resolved_type(&PathResolver::default(), &parse_quote!((u8, u8))),
             None
         );
+    }
+
+    #[test]
+    fn recognizes_an_item_imported_by_name() {
+        let resolver = resolver(
+            &[],
+            &[Import {
+                module: &["crate", "views"],
+                name: "asset",
+                target: &["crate", "margaret", "asset_bag", "asset"],
+            }],
+        );
+
+        assert!(resolver.is_imported(&path(&["crate", "margaret", "asset_bag", "asset"])));
+    }
+
+    #[test]
+    fn recognizes_an_item_imported_through_a_reexported_module() {
+        let resolver = resolver(
+            &[],
+            &[
+                Import {
+                    module: &["crate", "prelude"],
+                    name: "asset_bag",
+                    target: &["crate", "margaret", "asset_bag"],
+                },
+                Import {
+                    module: &["crate", "views"],
+                    name: "asset",
+                    target: &["crate", "prelude", "asset_bag", "asset"],
+                },
+            ],
+        );
+
+        assert!(resolver.is_imported(&path(&["crate", "margaret", "asset_bag", "asset"])));
+    }
+
+    #[test]
+    fn ignores_an_item_that_no_module_imports() {
+        let resolver = resolver(
+            &[],
+            &[Import {
+                module: &["crate", "views"],
+                name: "asset_bag",
+                target: &["crate", "margaret", "asset_bag"],
+            }],
+        );
+
+        assert!(!resolver.is_imported(&path(&["crate", "margaret", "asset_bag", "asset"])));
     }
 }

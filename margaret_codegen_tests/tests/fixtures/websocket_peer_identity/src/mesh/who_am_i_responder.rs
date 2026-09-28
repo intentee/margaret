@@ -9,7 +9,6 @@ use margaret::framework::websocket::request_envelope::RequestEnvelope;
 use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWebSocketMessage;
 use margaret::framework::websocket::web_socket::WebSocket;
 
-use crate::margaret::asset_bag::asset;
 use crate::mesh::mesh_session::MeshSession;
 use crate::mesh::peer_report::PeerReport;
 use crate::mesh::who_am_i::WhoAmI;
@@ -39,8 +38,6 @@ impl RespondsToWebSocketMessage for WhoAmIResponder {
         message: RequestEnvelope<WhoAmI>,
         socket: WebSocket,
     ) -> anyhow::Result<()> {
-        let _asset = asset!("resources/ts/app.ts");
-
         socket
             .send(message.response(PeerReport {
                 spiffe_id: session.peer().to_string(),
