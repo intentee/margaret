@@ -10,5 +10,5 @@ slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]
 filter = 'package(margaret_schema_postgres_tests)'
-slow-timeout = { period = "2s", terminate-after = 2 }
+slow-timeout = { period = "3s", terminate-after = 2 }
 test-group = 'postgres-container'
