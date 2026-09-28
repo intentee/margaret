@@ -44,14 +44,18 @@ COVERAGE_PACKAGES := \
 	-p margaret_jwks_secret_storage_selection \
 	-p margaret_jwks_secret_storage_selection_tests \
 	-p margaret_jwks_secret_store \
+	-p margaret_jwks_secret_store_tests \
 	-p margaret_jws_verification \
 	-p margaret_jws_verification_tests \
+	-p margaret_jwt_verification \
+	-p margaret_jwt_verification_tests \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
 	-p margaret_model_codegen \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
+	-p margaret_registered_claims \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_binding \
 	-p margaret_route_parameter_codegen \
@@ -148,11 +152,13 @@ RUNTIME_PACKAGES := \
 	-p margaret_jwks_secret_storage_selection \
 	-p margaret_jwks_secret_store \
 	-p margaret_jws_verification \
+	-p margaret_jwt_verification \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
 	-p margaret_model_codegen \
 	-p margaret_peer_identity \
+	-p margaret_registered_claims \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_binding \
 	-p margaret_route_parameter_codegen \
@@ -268,14 +274,18 @@ coverage: node_modules postgres-image
 		--gated margaret_jwks_secret_storage_selection=100 \
 		--gated margaret_jwks_secret_storage_selection_tests=100 \
 		--gated margaret_jwks_secret_store=100 \
+		--gated margaret_jwks_secret_store_tests=100 \
 		--gated margaret_jws_verification=100 \
 		--gated margaret_jws_verification_tests=100 \
+		--gated margaret_jwt_verification=100 \
+		--gated margaret_jwt_verification_tests=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_middleware_codegen=100 \
 		--gated margaret_model=100 \
 		--gated margaret_model_codegen=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
+		--gated margaret_registered_claims=100 \
 		--gated margaret_request_binding_codegen=100 \
 		--gated margaret_route_parameter_binding=100 \
 		--gated margaret_route_parameter_codegen=100 \

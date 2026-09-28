@@ -1,42 +1,29 @@
-use std::sync::Arc;
-
 use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
-use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
-use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
-use margaret_jwks_client_tests::test_claims::TestClaims;
-use margaret_jwks_client_tests::test_instant::test_instant;
+use margaret_jwks_client_tests::verifier_holding::verifier_holding;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::signs_claims::SignsClaims;
+use margaret_jwks_keygen_tests::published_key_set::published_key_set;
+use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jws_verification::jws_rejection::JwsRejection;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
-use margaret_jws_verification::verification_key_set::VerificationKeySet;
+use margaret_jwt_verification::jwt_rejection::JwtRejection;
+use margaret_token_signer_tests::unix_time::unix_time;
 
-#[tokio::test]
-async fn public_jwks_verifier_rejects_a_token_signed_by_an_unrelated_key() {
+#[test]
+fn public_jwks_verifier_rejects_a_token_signed_by_an_unrelated_key() {
     let published = JwksSecret::fresh(Curve::P256).expect("a published secret");
-    let token = JwksSecret::fresh(Curve::P256)
-        .expect("an unrelated secret")
-        .current()
-        .sign(&TestClaims {
-            exp: 1_700_000_060,
-            sub: "subject".to_string(),
-        })
-        .await
-        .expect("the claims sign");
-    let KeySetParsing::Accepted(key_set) =
-        VerificationKeySet::from_jwks(published.public_jwks().keys().to_vec())
-    else {
+    let unrelated = JwksSecret::fresh(Curve::P256).expect("an unrelated secret");
+    let token = TestClaims {
+        sub: "subject".to_string(),
+    }
+    .signed_by(unrelated.current());
+
+    let KeySetParsing::Accepted(key_set) = published_key_set(&published) else {
         panic!("the published key set is accepted");
     };
-    let holder = VerificationKeySetHolder::default();
-
-    holder.set(Some(Arc::new(key_set)));
 
     assert!(matches!(
-        PublicJwksVerifier::new(holder).verify::<TestClaims>(&token, test_instant(1_700_000_000)),
-        Ok(AccessTokenVerification::Rejected(
-            JwsRejection::UnknownKeyId { .. }
-        ))
+        verifier_holding(key_set).verify::<TestClaims>(&token, unix_time(1_700_000_000)),
+        AccessTokenVerification::Rejected(JwtRejection::Jws(JwsRejection::UnknownKeyId { .. }))
     ));
 }

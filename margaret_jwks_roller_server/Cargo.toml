@@ -26,6 +26,7 @@ tokio-util = { workspace = true }
 trzcina = { workspace = true }
 
 [dev-dependencies]
+chrono = { workspace = true }
 http = { workspace = true }
 margaret_identity_session = { workspace = true }
 margaret_jwks_file_secret_storage = { workspace = true }

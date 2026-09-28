@@ -1,7 +1,5 @@
-use async_trait::async_trait;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
-use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 
@@ -11,7 +9,6 @@ use margaret_jws_verification::key_id::KeyId;
 
 use crate::ec_signing_key::EcSigningKey;
 use crate::jwks_key_error::JwksKeyError;
-use crate::signs_claims::SignsClaims;
 
 fn encoded_header(algorithm: JwsAlgorithm, kid: &KeyId) -> String {
     let mut header = Map::new();
@@ -72,18 +69,5 @@ impl JwkPair {
     #[must_use]
     pub fn signing_key(&self) -> &EcSigningKey {
         &self.signing_key
-    }
-}
-
-#[async_trait]
-impl SignsClaims for JwkPair {
-    async fn sign<TClaims: Send + Serialize + Sync>(
-        &self,
-        claims: &TClaims,
-    ) -> Result<String, JwksKeyError> {
-        let claims = serde_json::to_value(claims)
-            .map_err(|source| JwksKeyError::ClaimsSerialization { source })?;
-
-        Ok(self.sign_json(&claims))
     }
 }

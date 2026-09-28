@@ -1,35 +1,29 @@
-use std::sync::Arc;
+use serde_json::json;
 
 use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
-use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
-use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
-use margaret_jwks_client_tests::test_claims::TestClaims;
-use margaret_jwks_client_tests::test_instant::test_instant;
+use margaret_jwks_client_tests::verifier_holding::verifier_holding;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::signs_claims::SignsClaims;
+use margaret_jwks_keygen_tests::published_key_set::published_key_set;
+use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
-use margaret_jws_verification::verification_key_set::VerificationKeySet;
+use margaret_jwt_verification::claims_rejection::ClaimsRejection;
+use margaret_jwt_verification::jwt_rejection::JwtRejection;
+use margaret_token_signer_tests::unix_time::unix_time;
 
-#[tokio::test]
-async fn public_jwks_verifier_reports_claims_of_another_shape() {
+#[test]
+fn public_jwks_verifier_reports_claims_of_another_shape() {
     let secret = JwksSecret::fresh(Curve::P256).expect("a fresh secret");
     let token = secret
         .current()
-        .sign(&"not the expected claims")
-        .await
-        .expect("the claims sign");
-    let KeySetParsing::Accepted(key_set) =
-        VerificationKeySet::from_jwks(secret.public_jwks().keys().to_vec())
-    else {
+        .sign_json(&json!("not the expected claims"));
+
+    let KeySetParsing::Accepted(key_set) = published_key_set(&secret) else {
         panic!("the published key set is accepted");
     };
-    let holder = VerificationKeySetHolder::default();
-
-    holder.set(Some(Arc::new(key_set)));
 
     assert!(matches!(
-        PublicJwksVerifier::new(holder).verify::<TestClaims>(&token, test_instant(1_700_000_000)),
-        Ok(AccessTokenVerification::MalformedClaims(_))
+        verifier_holding(key_set).verify::<TestClaims>(&token, unix_time(1_700_000_000)),
+        AccessTokenVerification::Rejected(JwtRejection::Claims(ClaimsRejection::Malformed { .. }))
     ));
 }

@@ -4,7 +4,6 @@ pub mod access_token_lifetime_secs;
 pub mod cookie_name_access_token;
 pub mod cookie_name_refresh_token;
 pub mod identity_session_error;
-pub mod is_expired;
 pub mod refresh_token_claims;
 pub mod refresh_token_claims_signed;
 pub mod refresh_token_lifetime_secs;

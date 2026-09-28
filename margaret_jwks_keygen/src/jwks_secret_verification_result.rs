@@ -1,9 +1,9 @@
-use margaret_jws_verification::jws_rejection::JwsRejection;
+use margaret_jwt_verification::jwt_rejection::JwtRejection;
+use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 
 pub enum JwksSecretVerificationResult<TClaims> {
-    MalformedClaims(serde_json::Error),
-    Rejected(JwsRejection),
-    SignedWithCurrent(TClaims),
+    Rejected(JwtRejection),
+    SignedWithCurrent(VerifiedJwt<TClaims>),
     SignedWithNextKey,
-    SignedWithPrevious(TClaims),
+    SignedWithPrevious(VerifiedJwt<TClaims>),
 }

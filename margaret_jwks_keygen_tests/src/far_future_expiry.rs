@@ -1,1 +1,1 @@
-pub const FAR_FUTURE_EXPIRY: usize = 9_999_999_999;
+pub const FAR_FUTURE_EXPIRY: i64 = 9_999_999_999;

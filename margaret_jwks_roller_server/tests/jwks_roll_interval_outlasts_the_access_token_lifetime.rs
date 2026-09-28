@@ -5,7 +5,7 @@ use margaret_jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL;
 
 #[test]
 fn jwks_roll_interval_outlasts_the_access_token_lifetime() {
-    let access_token_lifetime = Duration::from_secs(ACCESS_TOKEN_LIFETIME_SECS.unsigned_abs());
+    let access_token_lifetime = Duration::from_secs(u64::from(ACCESS_TOKEN_LIFETIME_SECS));
 
     assert!(JWKS_ROLL_INTERVAL >= access_token_lifetime);
 }

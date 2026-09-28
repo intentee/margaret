@@ -50,6 +50,9 @@ impl JwksRoller {
 mod tests {
     use std::sync::Arc;
 
+    use chrono::DateTime;
+    use serde_json::json;
+
     use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 
     use super::JwksRoller;
@@ -72,16 +75,24 @@ mod tests {
         assert_eq!(roller.public_jwks_handler().respond().status(), 200);
     }
 
-    #[tokio::test]
-    async fn exposes_a_secret_store_backed_by_the_live_secret() {
+    #[test]
+    fn exposes_a_secret_store_backed_by_the_live_secret() {
         let roller = roller();
         let store = roller.server_secret_store();
-        let claims = serde_json::json!({ "sub": "subject" });
+        let claims = json!({ "sub": "subject" });
 
-        assert!(store.sign(&claims).await.is_err());
+        assert!(
+            store
+                .sign_access_token(&claims, DateTime::UNIX_EPOCH)
+                .is_err()
+        );
 
         roller.run().expect("the first roll seeds the secret");
 
-        assert!(store.sign(&claims).await.is_ok());
+        assert!(
+            store
+                .sign_access_token(&claims, DateTime::UNIX_EPOCH)
+                .is_ok()
+        );
     }
 }

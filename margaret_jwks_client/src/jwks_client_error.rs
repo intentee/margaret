@@ -26,10 +26,4 @@ pub enum JwksClientError {
 
     #[error("the jwks endpoint could not be resolved: {0}")]
     EndpointResolution(#[source] anyhow::Error),
-
-    #[error("the token expiry could not be determined: {source:#}")]
-    TokenExpiry {
-        #[source]
-        source: anyhow::Error,
-    },
 }
