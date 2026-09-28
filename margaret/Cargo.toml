@@ -37,6 +37,7 @@ margaret_jws_verification = { workspace = true, optional = true }
 margaret_jwt_verification = { workspace = true, optional = true }
 margaret_macros = { workspace = true, optional = true }
 margaret_model = { workspace = true, optional = true }
+margaret_oidc_client = { workspace = true, optional = true }
 margaret_peer_identity = { workspace = true, optional = true }
 margaret_registered_claims = { workspace = true, optional = true }
 margaret_route_parameter_binding = { workspace = true, optional = true }
@@ -82,6 +83,7 @@ runtime = [
     "dep:margaret_jwt_verification",
     "dep:margaret_macros",
     "dep:margaret_model",
+    "dep:margaret_oidc_client",
     "dep:margaret_peer_identity",
     "dep:margaret_registered_claims",
     "dep:margaret_route_parameter_binding",

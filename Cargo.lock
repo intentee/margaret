@@ -1895,6 +1895,7 @@ dependencies = [
  "margaret_jwt_verification",
  "margaret_macros",
  "margaret_model",
+ "margaret_oidc_client",
  "margaret_peer_identity",
  "margaret_registered_claims",
  "margaret_route_parameter_binding",
@@ -2505,21 +2506,18 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "log",
- "margaret_issuer_document_fetch",
  "margaret_jose_parameters",
  "margaret_jwks_endpoint",
  "margaret_jws_verification",
  "margaret_jwt_verification",
+ "margaret_key_set_poll",
  "margaret_registered_claims",
  "margaret_sync_holder",
  "margaret_token_trust",
  "reqwest",
  "serde",
- "thiserror",
  "tokio",
  "tokio-util",
- "trzcina",
  "url",
 ]
 
@@ -2532,7 +2530,6 @@ dependencies = [
  "margaret_http",
  "margaret_http_tests",
  "margaret_identity_session",
- "margaret_issuer_document_fetch",
  "margaret_jose_parameters",
  "margaret_jwks_client",
  "margaret_jwks_endpoint",
@@ -2543,10 +2540,11 @@ dependencies = [
  "margaret_jws_verification",
  "margaret_jwt_verification",
  "margaret_jwt_verification_tests",
+ "margaret_key_set_poll",
+ "margaret_key_set_poll_tests",
  "margaret_registered_claims",
  "margaret_sync_holder",
  "margaret_token_signer_tests",
- "reqwest",
  "serde_json",
  "tokio",
  "tokio-util",
@@ -2795,6 +2793,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_key_set_poll"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "log",
+ "margaret_issuer_document_fetch",
+ "margaret_jws_verification",
+ "margaret_sync_holder",
+ "reqwest",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "url",
+]
+
+[[package]]
+name = "margaret_key_set_poll_tests"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "margaret_http",
+ "margaret_http_tests",
+ "margaret_issuer_document_fetch",
+ "margaret_jws_verification",
+ "margaret_key_set_poll",
+ "reqwest",
+ "tokio",
+ "tokio-util",
+ "trzcina",
+ "url",
+]
+
+[[package]]
 name = "margaret_macros"
 version = "0.4.0"
 dependencies = [
@@ -2846,6 +2880,51 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "thiserror",
+]
+
+[[package]]
+name = "margaret_oidc_client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "margaret_http",
+ "margaret_issuer_document_fetch",
+ "margaret_jose_parameters",
+ "margaret_jws_verification",
+ "margaret_jwt_verification",
+ "margaret_key_set_poll",
+ "margaret_oidc_discovery",
+ "margaret_registered_claims",
+ "margaret_sync_holder",
+ "margaret_token_trust",
+ "reqwest",
+ "serde",
+ "tokio-util",
+ "url",
+]
+
+[[package]]
+name = "margaret_oidc_client_tests"
+version = "0.1.0"
+dependencies = [
+ "margaret_http",
+ "margaret_http_tests",
+ "margaret_issuer_document_fetch",
+ "margaret_jws_verification",
+ "margaret_jws_verification_tests",
+ "margaret_jwt_verification",
+ "margaret_key_set_poll",
+ "margaret_key_set_poll_tests",
+ "margaret_oidc_client",
+ "margaret_oidc_discovery",
+ "margaret_sync_holder",
+ "margaret_token_trust",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "url",
 ]
 
 [[package]]

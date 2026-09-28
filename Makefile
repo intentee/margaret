@@ -49,10 +49,14 @@ COVERAGE_PACKAGES := \
 	-p margaret_jws_verification_tests \
 	-p margaret_jwt_verification \
 	-p margaret_jwt_verification_tests \
+	-p margaret_key_set_poll \
+	-p margaret_key_set_poll_tests \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
 	-p margaret_model_codegen \
+	-p margaret_oidc_client \
+	-p margaret_oidc_client_tests \
 	-p margaret_oidc_discovery \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
@@ -158,10 +162,12 @@ RUNTIME_PACKAGES := \
 	-p margaret_jwks_secret_store \
 	-p margaret_jws_verification \
 	-p margaret_jwt_verification \
+	-p margaret_key_set_poll \
 	-p margaret_macros \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
 	-p margaret_model_codegen \
+	-p margaret_oidc_client \
 	-p margaret_oidc_discovery \
 	-p margaret_peer_identity \
 	-p margaret_registered_claims \
@@ -287,10 +293,14 @@ coverage: node_modules postgres-image
 		--gated margaret_jws_verification_tests=100 \
 		--gated margaret_jwt_verification=100 \
 		--gated margaret_jwt_verification_tests=100 \
+		--gated margaret_key_set_poll=100 \
+		--gated margaret_key_set_poll_tests=100 \
 		--gated margaret_macros=100 \
 		--gated margaret_middleware_codegen=100 \
 		--gated margaret_model=100 \
 		--gated margaret_model_codegen=100 \
+		--gated margaret_oidc_client=100 \
+		--gated margaret_oidc_client_tests=100 \
 		--gated margaret_oidc_discovery=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \

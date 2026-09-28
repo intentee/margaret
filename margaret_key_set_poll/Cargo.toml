@@ -1,0 +1,30 @@
+[package]
+name = "margaret_key_set_poll"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Polls a located JSON web key set and holds the last one it accepted, for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+log = { workspace = true }
+margaret_issuer_document_fetch = { workspace = true }
+margaret_jws_verification = { workspace = true }
+margaret_sync_holder = { workspace = true }
+reqwest = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "time"] }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

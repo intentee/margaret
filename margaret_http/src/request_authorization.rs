@@ -31,7 +31,8 @@ pub enum RequestAuthorization {
 }
 
 impl RequestAuthorization {
-    pub(crate) fn parse(field_value: Option<&str>) -> Self {
+    #[must_use]
+    pub fn parse(field_value: Option<&str>) -> Self {
         match field_value {
             None => Self::Absent,
             Some(credentials) => match credentials.split_once(SEPARATOR) {

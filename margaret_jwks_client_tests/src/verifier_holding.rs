@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
-use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
+use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder;
 
 #[must_use]
 pub fn verifier_holding(key_set: VerificationKeySet) -> PublicJwksVerifier {

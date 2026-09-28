@@ -4,18 +4,16 @@ use anyhow::Result;
 use reqwest::Client;
 use reqwest::ClientBuilder;
 use tokio_util::sync::CancellationToken;
-use trzcina::Service as _;
 
-use margaret_issuer_document_fetch::issuer_document_client::IssuerDocumentClient;
 use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
+use margaret_key_set_poll::poll_key_set::poll_key_set;
+use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 use margaret_token_trust::declares_token_trust::DeclaresTokenTrust;
 
-use crate::jwks_client_error::JwksClientError;
-use crate::public_jwks_poll_service::PublicJwksPollService;
+use crate::endpoint_key_set_locator::EndpointKeySetLocator;
 use crate::public_jwks_verifier::PublicJwksVerifier;
-use crate::verification_key_set_holder::VerificationKeySetHolder;
 
 pub struct JwksClient {
     endpoint_provider: Arc<dyn ProvidesEndpoint>,
@@ -52,15 +50,15 @@ impl JwksClient {
         client_builder: ClientBuilder,
         cancellation_token: CancellationToken,
     ) -> Result<()> {
-        let issuer_document_client = IssuerDocumentClient::build(client_builder)
-            .map_err(|source| JwksClientError::ClientBuild { source })?;
-        let poll_service = PublicJwksPollService {
-            endpoint_provider: self.endpoint_provider.clone(),
-            issuer_document_client,
-            verification_key_set_holder: self.verification_key_set_holder.clone(),
-        };
-
-        Box::new(poll_service).run(cancellation_token).await
+        poll_key_set(
+            EndpointKeySetLocator {
+                endpoint_provider: self.endpoint_provider.clone(),
+            },
+            self.verification_key_set_holder.clone(),
+            client_builder,
+            cancellation_token,
+        )
+        .await
     }
 
     #[must_use]

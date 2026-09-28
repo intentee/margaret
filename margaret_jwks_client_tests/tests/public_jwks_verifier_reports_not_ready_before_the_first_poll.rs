@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
 use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
-use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
+use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_token_signer_tests::unix_time::unix_time;
 
 #[test]
