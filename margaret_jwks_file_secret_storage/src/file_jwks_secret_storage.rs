@@ -51,11 +51,20 @@ impl FileJwksSecretStorage {
                 }),
             })?;
 
-        Ok(LoadedSecret::Present(Box::new(persisted.into_secret())))
+        let secret = persisted
+            .into_secret()
+            .map_err(|source| RollerError::SecretLoad {
+                source: Box::new(FileJwksSecretStorageError::Restore {
+                    path: self.path.clone(),
+                    source,
+                }),
+            })?;
+
+        Ok(LoadedSecret::Present(Box::new(secret)))
     }
 
     fn persist_document(&self, secret: &JwksSecret) -> Result<(), FileJwksSecretStorageError> {
-        serde_json::to_vec(&PersistedJwksSecret::new(secret.clone()))
+        serde_json::to_vec(&PersistedJwksSecret::from_secret(secret))
             .map(Zeroizing::new)
             .map_err(FileJwksSecretStorageError::Serialize)
             .and_then(|document| self.write_securely(&document))

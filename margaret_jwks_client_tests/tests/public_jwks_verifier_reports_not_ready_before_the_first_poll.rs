@@ -1,12 +1,12 @@
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
-use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
+use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
 
 #[test]
 fn public_jwks_verifier_reports_not_ready_before_the_first_poll() {
-    let verifier = PublicJwksVerifier::new(PublicJwksHolder::default());
+    let verifier = PublicJwksVerifier::new(VerificationKeySetHolder::default());
 
     let verification = verifier
         .verify::<TestClaims>("any.token.value", test_instant(1_700_000_000))

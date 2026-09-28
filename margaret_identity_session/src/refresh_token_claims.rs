@@ -1,14 +1,15 @@
 use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
-use serde::Serialize;
+use serde_json::Map;
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::access_token_claims::AccessTokenClaims;
 use crate::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
 use crate::is_expired::IsExpired;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize)]
 pub struct RefreshTokenClaims {
     pub exp: i64,
     pub iat: i64,
@@ -37,6 +38,18 @@ impl RefreshTokenClaims {
             exp: timestamp + ACCESS_TOKEN_LIFETIME_SECS,
             iat: timestamp,
         }
+    }
+
+    #[must_use]
+    pub fn to_json(&self) -> Value {
+        let mut claims = Map::new();
+
+        claims.insert("exp".to_string(), Value::Number(self.exp.into()));
+        claims.insert("iat".to_string(), Value::Number(self.iat.into()));
+        claims.insert("jti".to_string(), Value::String(self.jti.to_string()));
+        claims.insert("sub".to_string(), Value::String(self.sub.to_string()));
+
+        Value::Object(claims)
     }
 }
 

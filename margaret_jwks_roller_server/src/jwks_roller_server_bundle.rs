@@ -7,7 +7,6 @@ use trzcina::Service;
 use trzcina::ServiceBundle;
 
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
-use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::roll::roll;
 
@@ -56,7 +55,7 @@ impl JwksRollerServerBundle {
         let rolled = roll(self.storage.as_ref(), &self.jwks_secret_holder, JWKS_CURVE)
             .map_err(JwksRollerServerError::SecretRoll)?;
 
-        serde_json::to_vec(&PublicJwks::from(rolled))
+        serde_json::to_vec(rolled.public_jwks())
             .map_err(JwksRollerServerError::DocumentSerialization)
             .map(|document| self.jwks_document_holder.set(Some(Bytes::from(document))))
     }

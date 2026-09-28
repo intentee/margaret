@@ -57,8 +57,7 @@ async fn jwks_client_verifies_a_token_against_the_polled_well_known_document() {
         sub: "subject".to_string(),
     };
     let token = secret
-        .current
-        .signing
+        .current()
         .sign(&claims)
         .await
         .expect("the claims sign");

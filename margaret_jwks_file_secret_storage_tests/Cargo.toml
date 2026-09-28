@@ -6,6 +6,7 @@ publish = false
 autotests = false
 
 [dependencies]
+margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 
 [dev-dependencies]

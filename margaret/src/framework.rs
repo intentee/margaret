@@ -25,6 +25,8 @@ pub use margaret_identity as identity;
 #[cfg(feature = "runtime")]
 pub use margaret_identity_session as identity_session;
 #[cfg(feature = "runtime")]
+pub use margaret_jose_parameters as jose_parameters;
+#[cfg(feature = "runtime")]
 pub use margaret_jwks_client as jwks_client;
 #[cfg(feature = "runtime")]
 pub use margaret_jwks_endpoint as jwks_endpoint;
@@ -40,6 +42,8 @@ pub use margaret_jwks_roller_server as jwks_roller_server;
 pub use margaret_jwks_secret_storage_selection as jwks_secret_storage_selection;
 #[cfg(feature = "runtime")]
 pub use margaret_jwks_secret_store as jwks_secret_store;
+#[cfg(feature = "runtime")]
+pub use margaret_jws_verification as jws_verification;
 #[cfg(feature = "runtime")]
 pub use margaret_macros as macros;
 #[cfg(feature = "runtime")]

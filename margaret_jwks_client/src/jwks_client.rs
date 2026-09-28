@@ -8,17 +8,17 @@ use trzcina::Service as _;
 
 use margaret_issuer_document_fetch::issuer_document_client::IssuerDocumentClient;
 use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
-use margaret_jwks_keygen::public_jwks::PublicJwks;
+use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_sync_holder::sync_holder_subscription::SyncHolderSubscription;
 
 use crate::jwks_client_error::JwksClientError;
-use crate::public_jwks_holder::PublicJwksHolder;
 use crate::public_jwks_poll_service::PublicJwksPollService;
 use crate::public_jwks_verifier::PublicJwksVerifier;
+use crate::verification_key_set_holder::VerificationKeySetHolder;
 
 pub struct JwksClient {
     endpoint_provider: Arc<dyn ProvidesEndpoint>,
-    public_jwks_holder: PublicJwksHolder,
+    verification_key_set_holder: VerificationKeySetHolder,
 }
 
 impl JwksClient {
@@ -26,7 +26,7 @@ impl JwksClient {
     pub fn create(endpoint_provider: Arc<dyn ProvidesEndpoint>) -> Self {
         Self {
             endpoint_provider,
-            public_jwks_holder: PublicJwksHolder::default(),
+            verification_key_set_holder: VerificationKeySetHolder::default(),
         }
     }
 
@@ -51,20 +51,22 @@ impl JwksClient {
         let poll_service = PublicJwksPollService {
             endpoint_provider: self.endpoint_provider.clone(),
             issuer_document_client,
-            public_jwks_holder: self.public_jwks_holder.clone(),
+            verification_key_set_holder: self.verification_key_set_holder.clone(),
         };
 
         Box::new(poll_service).run(cancellation_token).await
     }
 
     #[must_use]
-    pub fn subscribe(&self) -> SyncHolderSubscription<Arc<PublicJwks>> {
-        self.public_jwks_holder.subscribe()
+    pub fn subscribe(&self) -> SyncHolderSubscription<Arc<VerificationKeySet>> {
+        self.verification_key_set_holder.subscribe()
     }
 
     #[must_use]
     pub fn verifier(&self) -> Arc<PublicJwksVerifier> {
-        Arc::new(PublicJwksVerifier::new(self.public_jwks_holder.clone()))
+        Arc::new(PublicJwksVerifier::new(
+            self.verification_key_set_holder.clone(),
+        ))
     }
 }
 

@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
+use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
-use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_verifier::PublicJwksVerifier;
+use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_jwks_client_tests::test_claims::TestClaims;
 use margaret_jwks_client_tests::test_instant::test_instant;
-use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::public_jwks::PublicJwks;
-use margaret_jwks_keygen::signs_claims::SignsClaims as _;
+use margaret_jwks_keygen::signs_claims::SignsClaims;
+use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::verification_key_set::VerificationKeySet;
 
 #[tokio::test]
 async fn public_jwks_verifier_accepts_a_freshly_signed_token() {
@@ -18,19 +19,22 @@ async fn public_jwks_verifier_accepts_a_freshly_signed_token() {
         sub: "subject".to_string(),
     };
     let token = secret
-        .current
-        .signing
+        .current()
         .sign(&claims)
         .await
         .expect("the claims sign");
+    let KeySetParsing::Accepted(key_set) =
+        VerificationKeySet::from_jwks(secret.public_jwks().keys().to_vec())
+    else {
+        panic!("the published key set is accepted");
+    };
+    let holder = VerificationKeySetHolder::default();
 
-    let holder = PublicJwksHolder::default();
-
-    holder.set(Some(Arc::new(PublicJwks::from(secret))));
+    holder.set(Some(Arc::new(key_set)));
 
     let verification = PublicJwksVerifier::new(holder)
         .verify::<TestClaims>(&token, test_instant(1_700_000_000))
-        .expect("the freshly signed token verifies");
+        .expect("the claims tell their expiry");
 
     let AccessTokenVerification::Verified(verified) = verification else {
         panic!("the freshly signed token verifies");

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use margaret_jwks_keygen::curve::Curve;
+use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_roller::roll::roll;
@@ -11,7 +11,7 @@ use margaret_jwks_roller_tests::unreachable_jwks_secret_storage::UnreachableJwks
 fn roll_reports_a_persist_error_when_the_backend_is_unreachable() {
     let storage = UnreachableJwksSecretStorage;
     let seeded = JwksSecret::fresh(Curve::P256).expect("a fresh secret");
-    let seeded_kid = seeded.current.public.kid.clone();
+    let seeded_kid = seeded.current().kid().clone();
     let holder = JwksSecretHolder::default();
 
     holder.set(Some(Arc::new(seeded)));
@@ -28,5 +28,5 @@ fn roll_reports_a_persist_error_when_the_backend_is_unreachable() {
 
     let unchanged = holder.get().expect("the holder keeps its previous secret");
 
-    assert_eq!(unchanged.current.public.kid, seeded_kid);
+    assert_eq!(unchanged.current().kid(), &seeded_kid);
 }

@@ -20,6 +20,7 @@ thiserror = { workspace = true }
 margaret_identity_session = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 tokio = { workspace = true, features = ["macros", "rt"] }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

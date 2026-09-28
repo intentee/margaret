@@ -24,6 +24,7 @@ margaret_http_uploaded_file = { workspace = true, optional = true }
 margaret_http_validation = { workspace = true, optional = true }
 margaret_identity = { workspace = true, optional = true }
 margaret_identity_session = { workspace = true, optional = true }
+margaret_jose_parameters = { workspace = true, optional = true }
 margaret_jwks_client = { workspace = true, optional = true }
 margaret_jwks_endpoint = { workspace = true, optional = true }
 margaret_jwks_file_secret_storage = { workspace = true, optional = true }
@@ -32,6 +33,7 @@ margaret_jwks_roller = { workspace = true, optional = true }
 margaret_jwks_roller_server = { workspace = true, optional = true }
 margaret_jwks_secret_storage_selection = { workspace = true, optional = true }
 margaret_jwks_secret_store = { workspace = true, optional = true }
+margaret_jws_verification = { workspace = true, optional = true }
 margaret_macros = { workspace = true, optional = true }
 margaret_model = { workspace = true, optional = true }
 margaret_peer_identity = { workspace = true, optional = true }
@@ -63,6 +65,7 @@ runtime = [
     "dep:margaret_http_validation",
     "dep:margaret_identity",
     "dep:margaret_identity_session",
+    "dep:margaret_jose_parameters",
     "dep:margaret_jwks_client",
     "dep:margaret_jwks_endpoint",
     "dep:margaret_jwks_file_secret_storage",
@@ -71,6 +74,7 @@ runtime = [
     "dep:margaret_jwks_roller_server",
     "dep:margaret_jwks_secret_storage_selection",
     "dep:margaret_jwks_secret_store",
+    "dep:margaret_jws_verification",
     "dep:margaret_macros",
     "dep:margaret_model",
     "dep:margaret_peer_identity",

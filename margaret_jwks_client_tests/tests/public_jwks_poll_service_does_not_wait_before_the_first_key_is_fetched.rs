@@ -5,8 +5,8 @@ use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use trzcina::Ticker as _;
 
-use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_poll_service::PublicJwksPollService;
+use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_jwks_client_tests::failing_endpoint::FailingEndpoint;
 use margaret_jwks_client_tests::first_tick_context::first_tick_context;
 use margaret_jwks_client_tests::system_issuer_document_client::system_issuer_document_client;
@@ -16,7 +16,7 @@ async fn public_jwks_poll_service_does_not_wait_before_the_first_key_is_fetched(
     let mut service = PublicJwksPollService {
         endpoint_provider: Arc::new(FailingEndpoint),
         issuer_document_client: system_issuer_document_client(),
-        public_jwks_holder: PublicJwksHolder::default(),
+        verification_key_set_holder: VerificationKeySetHolder::default(),
     };
 
     let started_at = Instant::now();

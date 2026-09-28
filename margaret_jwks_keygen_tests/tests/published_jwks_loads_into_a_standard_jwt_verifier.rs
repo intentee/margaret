@@ -7,9 +7,8 @@ use jsonwebtoken::decode_header;
 use jsonwebtoken::jwk::JwkSet;
 use jsonwebtoken::jwk::KeyAlgorithm;
 
-use margaret_jwks_keygen::curve::Curve;
+use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::public_jwks::PublicJwks;
 use margaret_jwks_keygen::signs_claims::SignsClaims;
 use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
@@ -21,8 +20,8 @@ async fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
         exp: FAR_FUTURE_EXPIRY,
         sub: "subject".to_string(),
     };
-    let token = secret.current.signing.sign(&claims).await?;
-    let document = serde_json::to_string(&PublicJwks::from(secret))?;
+    let token = secret.current().sign(&claims).await?;
+    let document = serde_json::to_string(secret.public_jwks())?;
 
     let published: JwkSet = serde_json::from_str(&document)?;
     let kid = decode_header(&token)?

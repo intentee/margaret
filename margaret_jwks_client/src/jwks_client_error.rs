@@ -2,7 +2,7 @@ use reqwest::StatusCode;
 use thiserror::Error;
 
 use margaret_issuer_document_fetch::issuer_document_fetch_error::IssuerDocumentFetchError;
-use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
+use margaret_jws_verification::key_set_rejection::KeySetRejection;
 
 #[derive(Debug, Error)]
 pub enum JwksClientError {
@@ -12,11 +12,8 @@ pub enum JwksClientError {
         source: IssuerDocumentFetchError,
     },
 
-    #[error("the jwks document is not a valid key set: {source}")]
-    DocumentMalformed {
-        #[source]
-        source: serde_json::Error,
-    },
+    #[error("the jwks document is rejected: {rejection}")]
+    DocumentRejected { rejection: KeySetRejection },
 
     #[error("the issuer answered the jwks document request with status {status}")]
     DocumentStatus { status: StatusCode },
@@ -35,7 +32,4 @@ pub enum JwksClientError {
         #[source]
         source: anyhow::Error,
     },
-
-    #[error("the published jwks could not be used to verify a token: {0}")]
-    TokenVerification(#[source] JwksKeyError),
 }

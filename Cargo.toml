@@ -43,6 +43,7 @@ members = [
     "margaret_input_weaving",
     "margaret_issuer_document_fetch",
     "margaret_item_naming_argument",
+    "margaret_jose_parameters",
     "margaret_jwks_client",
     "margaret_jwks_client_tests",
     "margaret_jwks_codegen",
@@ -56,6 +57,8 @@ members = [
     "margaret_jwks_secret_storage_selection",
     "margaret_jwks_secret_storage_selection_tests",
     "margaret_jwks_secret_store",
+    "margaret_jws_verification",
+    "margaret_jws_verification_tests",
     "margaret",
     "margaret_macros",
     "margaret_middleware_codegen",
@@ -189,6 +192,7 @@ margaret_injection_codegen = { path = "margaret_injection_codegen", version = "0
 margaret_input_weaving = { path = "margaret_input_weaving", version = "0.4.0" }
 margaret_issuer_document_fetch = { path = "margaret_issuer_document_fetch", version = "0.1.0" }
 margaret_item_naming_argument = { path = "margaret_item_naming_argument", version = "0.4.0" }
+margaret_jose_parameters = { path = "margaret_jose_parameters", version = "0.1.0" }
 margaret_jwks_client = { path = "margaret_jwks_client", version = "0.1.0" }
 margaret_jwks_codegen = { path = "margaret_jwks_codegen", version = "0.4.0" }
 margaret_jwks_endpoint = { path = "margaret_jwks_endpoint", version = "0.1.0" }
@@ -198,6 +202,7 @@ margaret_jwks_roller = { path = "margaret_jwks_roller", version = "0.1.0" }
 margaret_jwks_roller_server = { path = "margaret_jwks_roller_server", version = "0.1.0" }
 margaret_jwks_secret_storage_selection = { path = "margaret_jwks_secret_storage_selection", version = "0.1.0" }
 margaret_jwks_secret_store = { path = "margaret_jwks_secret_store", version = "0.1.0" }
+margaret_jws_verification = { path = "margaret_jws_verification", version = "0.1.0" }
 margaret_macros = { path = "margaret_macros", version = "0.4.0" }
 margaret_middleware_codegen = { path = "margaret_middleware_codegen", version = "0.4.0" }
 margaret_model = { path = "margaret_model", version = "0.4.0" }

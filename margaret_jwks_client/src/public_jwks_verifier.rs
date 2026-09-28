@@ -3,46 +3,45 @@ use chrono::Utc;
 use serde::de::DeserializeOwned;
 
 use margaret_identity_session::is_expired::IsExpired;
-use margaret_jwks_keygen::token_verification::TokenVerification;
-use margaret_jwks_keygen::verifies_token::VerifiesToken as _;
+use margaret_jws_verification::jws_verification::JwsVerification;
+use margaret_jws_verification::verified_jws::VerifiedJws;
 
 use crate::access_token_verification::AccessTokenVerification;
 use crate::jwks_client_error::JwksClientError;
-use crate::public_jwks_holder::PublicJwksHolder;
+use crate::verification_key_set_holder::VerificationKeySetHolder;
 
 pub struct PublicJwksVerifier {
-    public_jwks_holder: PublicJwksHolder,
+    verification_key_set_holder: VerificationKeySetHolder,
 }
 
 impl PublicJwksVerifier {
     #[must_use]
-    pub fn new(public_jwks_holder: PublicJwksHolder) -> Self {
-        Self { public_jwks_holder }
+    pub fn new(verification_key_set_holder: VerificationKeySetHolder) -> Self {
+        Self {
+            verification_key_set_holder,
+        }
     }
 
     /// # Errors
     ///
-    /// Returns `JwksClientError::NotReady` or `JwksClientError::TokenVerification` or `JwksClientError::TokenExpiry`.
+    /// Returns `JwksClientError::TokenExpiry` when the claims cannot tell whether they expired.
     pub fn verify<TClaims: DeserializeOwned + IsExpired>(
         &self,
         token: &str,
         now: DateTime<Utc>,
     ) -> Result<AccessTokenVerification<TClaims>, JwksClientError> {
-        let Some(public_jwks) = self.public_jwks_holder.get() else {
+        let Some(key_set) = self.verification_key_set_holder.get() else {
             return Ok(AccessTokenVerification::NotReady);
         };
-
-        let claims: TClaims = match public_jwks
-            .verify(token)
-            .map_err(JwksClientError::TokenVerification)?
-        {
-            TokenVerification::Malformed(malformation) => {
-                return Ok(AccessTokenVerification::Malformed(malformation));
+        let VerifiedJws { payload, .. } = match key_set.verify(token) {
+            JwsVerification::Rejected(rejection) => {
+                return Ok(AccessTokenVerification::Rejected(rejection));
             }
-            TokenVerification::SignatureMismatch => {
-                return Ok(AccessTokenVerification::SignatureMismatch);
-            }
-            TokenVerification::Verified(claims) => claims,
+            JwsVerification::Verified(verified) => verified,
+        };
+        let claims: TClaims = match serde_json::from_slice(&payload) {
+            Ok(claims) => claims,
+            Err(source) => return Ok(AccessTokenVerification::MalformedClaims(source)),
         };
 
         if claims

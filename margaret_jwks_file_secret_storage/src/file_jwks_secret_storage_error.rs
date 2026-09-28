@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
+
 #[derive(Debug, Error)]
 pub enum FileJwksSecretStorageError {
     #[error("failed to deserialize the jwks secret file at '{}': {source}", .path.display())]
@@ -20,6 +22,13 @@ pub enum FileJwksSecretStorageError {
         path: PathBuf,
         #[source]
         source: io::Error,
+    },
+
+    #[error("failed to restore the jwks secret read from '{}': {source}", .path.display())]
+    Restore {
+        path: PathBuf,
+        #[source]
+        source: JwksKeyError,
     },
 
     #[error("failed to serialize the jwks secret: {0}")]

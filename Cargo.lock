@@ -1881,6 +1881,7 @@ dependencies = [
  "margaret_http_validation",
  "margaret_identity",
  "margaret_identity_session",
+ "margaret_jose_parameters",
  "margaret_jwks_client",
  "margaret_jwks_endpoint",
  "margaret_jwks_file_secret_storage",
@@ -1889,6 +1890,7 @@ dependencies = [
  "margaret_jwks_roller_server",
  "margaret_jwks_secret_storage_selection",
  "margaret_jwks_secret_store",
+ "margaret_jws_verification",
  "margaret_macros",
  "margaret_model",
  "margaret_peer_identity",
@@ -1920,7 +1922,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "tokio",
 ]
 
 [[package]]
@@ -2409,6 +2410,7 @@ dependencies = [
  "chrono",
  "cookie",
  "serde",
+ "serde_json",
  "thiserror",
  "uuid",
 ]
@@ -2466,6 +2468,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_jose_parameters"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "margaret_jwks_client"
 version = "0.1.0"
 dependencies = [
@@ -2476,7 +2486,7 @@ dependencies = [
  "margaret_identity_session",
  "margaret_issuer_document_fetch",
  "margaret_jwks_endpoint",
- "margaret_jwks_keygen",
+ "margaret_jws_verification",
  "margaret_sync_holder",
  "reqwest",
  "serde",
@@ -2499,11 +2509,13 @@ dependencies = [
  "margaret_http_tests",
  "margaret_identity_session",
  "margaret_issuer_document_fetch",
+ "margaret_jose_parameters",
  "margaret_jwks_client",
  "margaret_jwks_endpoint",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_roller_server",
+ "margaret_jws_verification",
  "margaret_sync_holder",
  "reqwest",
  "serde",
@@ -2552,6 +2564,7 @@ name = "margaret_jwks_file_secret_storage_tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "margaret_jose_parameters",
  "margaret_jwks_file_secret_storage",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
@@ -2565,6 +2578,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64ct",
+ "margaret_jose_parameters",
+ "margaret_jws_verification",
  "margaret_sync_holder",
  "p256",
  "p384",
@@ -2582,9 +2597,10 @@ dependencies = [
  "anyhow",
  "base64ct",
  "jsonwebtoken",
+ "margaret_jose_parameters",
  "margaret_jwks_keygen",
+ "margaret_jws_verification",
  "p256",
- "p384",
  "serde",
  "serde_json",
  "tokio",
@@ -2596,6 +2612,7 @@ name = "margaret_jwks_roller"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "thiserror",
 ]
@@ -2610,6 +2627,7 @@ dependencies = [
  "http",
  "margaret_http",
  "margaret_identity_session",
+ "margaret_jose_parameters",
  "margaret_jwks_file_secret_storage",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
@@ -2629,6 +2647,7 @@ name = "margaret_jwks_roller_tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "thiserror",
@@ -2649,6 +2668,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jwks_roller",
  "margaret_jwks_secret_storage_selection",
@@ -2667,6 +2687,31 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "margaret_jws_verification"
+version = "0.1.0"
+dependencies = [
+ "base64ct",
+ "margaret_jose_parameters",
+ "p256",
+ "p384",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "margaret_jws_verification_tests"
+version = "0.1.0"
+dependencies = [
+ "base64ct",
+ "margaret_jose_parameters",
+ "margaret_jws_verification",
+ "p256",
+ "p384",
+ "serde_json",
 ]
 
 [[package]]
@@ -3087,27 +3132,25 @@ dependencies = [
 name = "margaret_token_signer"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "chrono",
- "futures-util",
  "margaret_identity_session",
  "margaret_jwks_keygen",
+ "margaret_jws_verification",
  "serde",
- "thiserror",
+ "serde_json",
 ]
 
 [[package]]
 name = "margaret_token_signer_tests"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "chrono",
  "margaret_identity_session",
+ "margaret_jose_parameters",
  "margaret_jwks_keygen",
+ "margaret_jws_verification",
  "margaret_token_signer",
- "tokio",
  "uuid",
- "zeroize",
 ]
 
 [[package]]
@@ -6115,6 +6158,7 @@ version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
 dependencies = [
+ "serde",
  "zeroize_derive",
 ]
 

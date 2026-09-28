@@ -8,14 +8,13 @@ autotests = false
 [dependencies]
 chrono = { workspace = true }
 margaret_identity_session = { workspace = true }
+margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
+margaret_jws_verification = { workspace = true }
 margaret_token_signer = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
-zeroize = { workspace = true }
 
 [[test]]
 name = "main"

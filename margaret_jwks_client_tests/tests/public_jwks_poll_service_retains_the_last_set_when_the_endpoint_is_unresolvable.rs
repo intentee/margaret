@@ -3,27 +3,28 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use trzcina::Ticker as _;
 
-use margaret_jwks_client::public_jwks_holder::PublicJwksHolder;
 use margaret_jwks_client::public_jwks_poll_service::PublicJwksPollService;
+use margaret_jwks_client::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_jwks_client_tests::failing_endpoint::FailingEndpoint;
 use margaret_jwks_client_tests::first_tick_context::first_tick_context;
 use margaret_jwks_client_tests::system_issuer_document_client::system_issuer_document_client;
-use margaret_jwks_keygen::curve::Curve;
-use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::public_jwks::PublicJwks;
+use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::verification_key_set::VerificationKeySet;
 
 #[tokio::test(start_paused = true)]
 async fn public_jwks_poll_service_retains_the_last_set_when_the_endpoint_is_unresolvable() {
-    let known_good = JwksSecret::fresh(Curve::P256).expect("a fresh secret");
-    let known_good_kid = known_good.current.public.kid.clone();
-    let public_jwks_holder = PublicJwksHolder::default();
+    let KeySetParsing::Accepted(known_good) = VerificationKeySet::from_jwks(Vec::new()) else {
+        panic!("an empty key set is accepted");
+    };
+    let known_good = Arc::new(known_good);
+    let verification_key_set_holder = VerificationKeySetHolder::default();
 
-    public_jwks_holder.set(Some(Arc::new(PublicJwks::from(known_good))));
+    verification_key_set_holder.set(Some(known_good.clone()));
 
     let mut service = PublicJwksPollService {
         endpoint_provider: Arc::new(FailingEndpoint),
         issuer_document_client: system_issuer_document_client(),
-        public_jwks_holder: public_jwks_holder.clone(),
+        verification_key_set_holder: verification_key_set_holder.clone(),
     };
 
     service
@@ -31,9 +32,9 @@ async fn public_jwks_poll_service_retains_the_last_set_when_the_endpoint_is_unre
         .await
         .expect("a failed resolution never fails the service");
 
-    let retained = public_jwks_holder
+    let retained = verification_key_set_holder
         .get()
         .expect("the last known good document survives a failed resolution");
 
-    assert!(retained.find_by_kid(&known_good_kid).is_some());
+    assert!(Arc::ptr_eq(&retained, &known_good));
 }

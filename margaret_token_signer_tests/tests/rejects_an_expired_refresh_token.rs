@@ -5,15 +5,13 @@ use margaret_token_signer_tests::refresh_claims::refresh_claims;
 use margaret_token_signer_tests::sign_refresh_token::sign_refresh_token;
 use margaret_token_signer_tests::unix_time::unix_time;
 
-#[tokio::test]
-async fn rejects_an_expired_refresh_token() {
+#[test]
+fn rejects_an_expired_refresh_token() {
     let secret = fresh_p256_secret();
-    let refresh_token = sign_refresh_token(&secret.current.signing, &refresh_claims(100)).await;
-
-    let result = mint_access_token(&secret, &refresh_token, unix_time(200)).await;
+    let refresh_token = sign_refresh_token(secret.current(), &refresh_claims(100));
 
     assert!(matches!(
-        result,
-        Ok(AccessTokenMinting::ExpiredRefreshToken)
+        mint_access_token(&secret, &refresh_token, unix_time(200)),
+        AccessTokenMinting::ExpiredRefreshToken
     ));
 }
