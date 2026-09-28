@@ -53,6 +53,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
 	-p margaret_model_codegen \
+	-p margaret_oidc_discovery \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
 	-p margaret_registered_claims \
@@ -161,6 +162,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
 	-p margaret_model_codegen \
+	-p margaret_oidc_discovery \
 	-p margaret_peer_identity \
 	-p margaret_registered_claims \
 	-p margaret_request_binding_codegen \
@@ -289,6 +291,7 @@ coverage: node_modules postgres-image
 		--gated margaret_middleware_codegen=100 \
 		--gated margaret_model=100 \
 		--gated margaret_model_codegen=100 \
+		--gated margaret_oidc_discovery=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
 		--gated margaret_registered_claims=100 \
