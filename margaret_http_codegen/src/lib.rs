@@ -428,7 +428,9 @@ impl GetProfile {
         ));
     }
 
-    const COLLIDING_BINDER: &str = r#"
+    const COLLIDING_BINDER: &str = r#"use margaret::framework::http_validation::request_input::RequestInput;
+
+
 struct User;
 
 struct Filters;
@@ -450,7 +452,7 @@ impl GetUser {
     #[process]
     fn respond(
         &self,
-        #[form_request(from = Query)] store: Filters,
+        #[form_request(from = RequestInput::Query)] store: Filters,
         #[route_parameter(from = "user")] user: User,
     ) -> anyhow::Result<Response> {}
 }
@@ -1947,8 +1949,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_form_source() {
         let source = source_for(
-            "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(source.contains(
@@ -1965,8 +1967,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_query_source() {
         let source = source_for(
-            "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = Query)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(
@@ -1979,8 +1981,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_json_source() {
         let source = source_for(
-            "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = Json)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Json)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(
@@ -1993,8 +1995,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_form_request_from_the_cookie_source() {
         let source = source_for(
-            "use margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = Cookie)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
+#[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Cookie)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(
@@ -2027,8 +2029,8 @@ impl GetMetrics {
     #[test]
     fn rejects_an_argument_with_conflicting_markers() {
         let message = error_for(
-            "#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] #[form_request(from = Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\n#[singleton]
+#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] #[form_request(from = RequestInput::Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(message.contains("both #[route_parameter] and #[form_request]"));
@@ -2068,8 +2070,8 @@ impl GetMetrics {
     #[test]
     fn injects_a_guarded_form_request_as_a_bare_model() {
         let source = source_for(
-            "#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = Form)] data: Data) -> anyhow::Result<Response> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\n#[singleton]
+#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(source.contains(

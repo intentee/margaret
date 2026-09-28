@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use margaret::framework::http::response::Response;
 use margaret::framework::http::response_continuation::ResponseContinuation;
+use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::infer_from_request;
@@ -35,7 +36,7 @@ impl SessionUserProvider {
     #[infer_from_request]
     pub fn infer_session_user(
         &self,
-        #[form_request(from = Cookie)] cookie: SessionCookie,
+        #[form_request(from = RequestInput::Cookie)] cookie: SessionCookie,
     ) -> anyhow::Result<AuthenticatedUserOutcome<User>> {
         Ok({
             let Some(session) = cookie.session else {

@@ -8,6 +8,10 @@ mod catalog {
     pub enum TickBehavior {
         Delay,
     }
+
+    pub enum RequestInput {
+        Query,
+    }
 }
 
 use margaret_macros::build_for_session;
@@ -30,6 +34,7 @@ use margaret_macros::websocket_message;
 use margaret_macros::websocket_session;
 
 use crate::catalog::Account;
+use crate::catalog::RequestInput;
 use crate::catalog::TICK_INTERVAL;
 use crate::catalog::TickBehavior;
 
@@ -57,6 +62,11 @@ impl Subject {
     #[process]
     fn run(&self) -> String {
         self.name.clone()
+    }
+
+    #[process]
+    fn search(&self, #[form_request(from = RequestInput::Query)] phrase: &str) -> String {
+        format!("{}?{phrase}", self.name)
     }
 }
 
@@ -119,6 +129,7 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
 
     assert_eq!(subject.respond("path-id"), "typed-name/path-id");
     assert_eq!(subject.run(), "typed-name");
+    assert_eq!(subject.search("term"), "typed-name?term");
     assert_eq!(
         Binder {
             prefix: "bind-".to_string(),

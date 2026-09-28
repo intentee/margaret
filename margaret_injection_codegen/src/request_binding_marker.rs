@@ -38,7 +38,7 @@ mod tests {
     #[test]
     fn finds_the_form_request_marker() {
         let attributes = vec![IndexedAttribute::new(
-            &parse_quote!(#[form_request(from = Query)]),
+            &parse_quote!(#[form_request(from = RequestInput::Query)]),
         )];
 
         assert_eq!(

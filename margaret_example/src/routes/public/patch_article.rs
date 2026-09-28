@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use margaret::framework::http::response::Response;
+use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
@@ -43,7 +44,8 @@ impl PatchArticle {
             created_at,
             author,
         }: Article,
-        #[form_request(from = Form)] PatchArticleForm { title, body }: PatchArticleForm,
+        #[form_request(from = RequestInput::Form)]
+        PatchArticleForm { title, body }: PatchArticleForm,
     ) -> anyhow::Result<Response> {
         Ok({
             let title = title.unwrap_or(current_title);

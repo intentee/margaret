@@ -3,6 +3,7 @@ use crate::named_item::NamedItem;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ItemNamingArgument {
     ForeignKeyReferences,
+    FormRequestSource,
     TickBehavior,
     TickInterval,
     UserModel,
@@ -13,6 +14,7 @@ impl ItemNamingArgument {
     pub fn key(self) -> &'static str {
         match self {
             Self::ForeignKeyReferences => "references",
+            Self::FormRequestSource => "from",
             Self::TickBehavior => "behavior",
             Self::TickInterval => "interval",
             Self::UserModel => "user_model",
@@ -23,7 +25,7 @@ impl ItemNamingArgument {
     pub fn named_item(self) -> NamedItem {
         match self {
             Self::ForeignKeyReferences | Self::UserModel => NamedItem::Type,
-            Self::TickBehavior | Self::TickInterval => NamedItem::Value,
+            Self::FormRequestSource | Self::TickBehavior | Self::TickInterval => NamedItem::Value,
         }
     }
 }
@@ -46,14 +48,15 @@ mod tests {
     }
 
     #[test]
-    fn a_tick_timer_argument_names_a_value() {
+    fn a_request_input_or_tick_timer_argument_names_a_value() {
         assert_eq!(
             [
+                ItemNamingArgument::FormRequestSource,
                 ItemNamingArgument::TickBehavior,
                 ItemNamingArgument::TickInterval,
             ]
             .map(ItemNamingArgument::named_item),
-            [NamedItem::Value, NamedItem::Value]
+            [NamedItem::Value, NamedItem::Value, NamedItem::Value]
         );
     }
 }

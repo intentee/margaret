@@ -238,7 +238,7 @@ fn classify_form_request(
     let subject = context.subject();
     let arguments = attribute.args()?;
     let FormRequestArguments { source } =
-        FormRequestArguments::parse(arguments, subject, position)?;
+        FormRequestArguments::parse(arguments, index, item, subject, position)?;
 
     if let BindingContext::Handshake { .. } = context {
         let unavailable = |written: &str| RequestBindingError::FormRequestBodyUnavailable {

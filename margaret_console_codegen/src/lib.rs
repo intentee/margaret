@@ -579,7 +579,7 @@ impl Farewell {
     #[test]
     fn rejects_a_request_binding_marker_on_a_runner_parameter() {
         let message = error_for(
-            "use tokio_util::sync::CancellationToken;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = Query)] token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
+            "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse tokio_util::sync::CancellationToken;\n\n#[console_command(name = \"bad\")]\nstruct Bad;\n\nimpl Bad {\n    #[process]\n    fn run(&self, #[form_request(from = RequestInput::Query)] token: CancellationToken) -> anyhow::Result<CommandOutcome> {}\n}\n",
         );
 
         assert!(message.contains("carries #[form_request]"));

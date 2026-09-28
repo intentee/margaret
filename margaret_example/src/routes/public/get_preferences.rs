@@ -1,4 +1,5 @@
 use margaret::framework::http::response::Response;
+use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
@@ -16,7 +17,8 @@ impl GetPreferences {
     #[process]
     pub fn respond(
         &self,
-        #[form_request(from = Cookie)] ReaderPreferencesCookie { theme }: ReaderPreferencesCookie,
+        #[form_request(from = RequestInput::Cookie)]
+        ReaderPreferencesCookie { theme }: ReaderPreferencesCookie,
     ) -> anyhow::Result<Response> {
         Ok({
             match theme {

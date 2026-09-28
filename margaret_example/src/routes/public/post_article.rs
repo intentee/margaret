@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use margaret::framework::http::response::Response;
+use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
@@ -35,7 +36,7 @@ impl PostArticle {
     #[process]
     pub fn respond(
         &self,
-        #[form_request(from = Form)] PostArticleForm {
+        #[form_request(from = RequestInput::Form)] PostArticleForm {
             title,
             body,
             author_id,

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use margaret::framework::http::response::Response;
+use margaret::framework::http_validation::request_input::RequestInput;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
@@ -32,7 +33,7 @@ impl GetArticles {
     pub fn respond(
         &self,
         routes: &Routes,
-        #[form_request(from = Query)] GetArticlesForm { author }: GetArticlesForm,
+        #[form_request(from = RequestInput::Query)] GetArticlesForm { author }: GetArticlesForm,
     ) -> anyhow::Result<Response> {
         Ok({
             let author = author.as_deref();
