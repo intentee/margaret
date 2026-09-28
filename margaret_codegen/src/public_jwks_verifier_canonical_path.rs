@@ -1,14 +1,7 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_jwks_codegen::jwks_module_name::JWKS_MODULE_NAME;
-
-use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
+use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 
 pub(crate) fn public_jwks_verifier_canonical_path(module_segment: &str) -> CanonicalPath {
-    CanonicalPath::new(vec![
-        "crate".to_string(),
-        UMBRELLA_MODULE_NAME.to_string(),
-        JWKS_MODULE_NAME.to_string(),
-        module_segment.to_string(),
-        "PublicJwksVerifier".to_string(),
-    ])
+    umbrella_item_path(&[JWKS_MODULE_NAME, module_segment, "PublicJwksVerifier"])
 }

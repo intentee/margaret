@@ -30,8 +30,10 @@ use margaret_serve_input_codegen::scan::scan;
 use margaret_service_codegen::framework_service::FrameworkService;
 use margaret_service_codegen::render_services::render_services;
 use margaret_service_codegen::service_plan::ServicePlan;
-use margaret_tag_codegen::jwks_client_binding::JwksClientBinding;
+use margaret_tag_codegen::segmented_tag_binding::SegmentedTagBinding;
+use margaret_tag_codegen::tag_kind::TagKind;
 use margaret_tag_codegen::tag_pool::TagPool;
+use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 use margaret_views_codegen::render_views::render_views;
 use margaret_views_codegen::views_plan::ViewsPlan;
 use margaret_websocket_codegen::render_websocket::render_websocket;
@@ -40,6 +42,7 @@ use margaret_websocket_codegen::web_socket_plan::WebSocketPlan;
 use crate::asset_bag_modules::asset_bag_modules;
 use crate::asset_responder_canonical_path::asset_responder_canonical_path;
 use crate::build_jwks_artifacts::build_jwks_artifacts;
+use crate::build_oidc_artifacts::build_oidc_artifacts;
 use crate::codegen_error::CodegenError;
 use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
@@ -47,14 +50,17 @@ use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
 use crate::jwks_framework_providers::jwks_framework_providers;
 use crate::jwks_secret_storage_provider::jwks_secret_storage_provider;
+use crate::oidc_framework_providers::oidc_framework_providers;
 use crate::serve_inputs::serve_inputs;
 use crate::umbrella::umbrella;
-use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
 /// # Errors
 ///
 /// Returns `CodegenError` propagated from the work it performs.
-fn framework_providers(client_bindings: &[JwksClientBinding]) -> Vec<FrameworkProvider> {
+fn framework_providers(
+    client_bindings: &[SegmentedTagBinding],
+    issuer_bindings: &[SegmentedTagBinding],
+) -> Vec<FrameworkProvider> {
     let mut framework_providers = vec![
         FrameworkProvider {
             construction: FrameworkConstruction::Unit,
@@ -65,6 +71,7 @@ fn framework_providers(client_bindings: &[JwksClientBinding]) -> Vec<FrameworkPr
         jwks_secret_storage_provider(),
     ];
     framework_providers.extend(jwks_framework_providers(client_bindings));
+    framework_providers.extend(oidc_framework_providers(issuer_bindings));
 
     framework_providers
 }
@@ -144,13 +151,13 @@ fn render_role_modules(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
-    jwks_services: &[FrameworkService],
+    framework_services: &[FrameworkService],
     servers: &[HttpServer],
 ) -> Result<RoleModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
     let serve_inputs = serve_inputs(bindings);
-    let service_plan = ServicePlan::build(index, jwks_services, bindings, &serve_inputs)?;
+    let service_plan = ServicePlan::build(index, framework_services, bindings, &serve_inputs)?;
     let service_roots = service_plan.roots().to_vec();
 
     if features.contains(GeneratedFeature::Serves) {
@@ -207,8 +214,9 @@ pub fn build(
     let mut features = GeneratedFeatures::from_index(&index);
     let registry = scan(&index)?;
     let tags = TagPool::collect(&index).map_err(ContainerError::from)?;
-    let client_bindings = tags.jwks_client_bindings();
-    let framework_providers = framework_providers(&client_bindings);
+    let client_bindings = tags.segmented_bindings(TagKind::JwksClient);
+    let issuer_bindings = tags.segmented_bindings(TagKind::OidcIssuer);
+    let framework_providers = framework_providers(&client_bindings, &issuer_bindings);
     let planned_container = plan_container(&index, &registry, &framework_providers, &tags)?;
     let bindings = planned_container.bindings();
     let application_roots = planned_container.roots();
@@ -220,11 +228,16 @@ pub fn build(
         embed_relative,
     )?;
     let jwks = build_jwks_artifacts(bindings, &client_bindings);
+    let oidc = build_oidc_artifacts(bindings, &issuer_bindings);
 
     features.enable_if(GeneratedFeature::Jwks, jwks.enabled);
+    features.enable_if(GeneratedFeature::Oidc, oidc.enabled);
     module_tokens.extend(jwks.modules);
+    module_tokens.extend(oidc.modules);
 
-    let jwks_services = jwks.services;
+    let mut framework_services = jwks.services;
+
+    framework_services.extend(oidc.services);
 
     let views_availability = if features.contains(GeneratedFeature::Views) {
         ViewsAvailability::Available
@@ -261,7 +274,7 @@ pub fn build(
         console_roots,
         modules: role_modules,
         service_roots,
-    } = render_role_modules(&index, bindings, &features, &jwks_services, &servers)?;
+    } = render_role_modules(&index, bindings, &features, &framework_services, &servers)?;
 
     module_tokens.extend(role_modules);
 
@@ -296,11 +309,11 @@ mod tests {
     use margaret_attributes_tests::source_crate::SourceCrate;
     use margaret_generated_module::generated_module::GeneratedModule;
     use margaret_http_codegen::http_codegen_error::HttpCodegenError;
+    use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
     use super::build;
     use crate::codegen_error::CodegenError;
     use crate::generated_code::GeneratedCode;
-    use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
     const WEB_CRATE: &str = "\
 #[rustfmt::skip]
@@ -999,6 +1012,110 @@ impl GetIdentity {
         assert!(construction.contains("::std::sync::Arc::<crate::Issuer>::clone(&issuer)"));
         assert!(construction.contains("crate::margaret::jwks::MintAccessTokenHandler::create("));
         assert!(!concatenated(&code).contains("PublicJwksVerifier"));
+    }
+
+    const OIDC_ISSUERS_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+mod first {
+    use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+    #[singleton]
+    #[trusts_oidc_issuer(first)]
+    pub struct Issuer;
+
+    impl DeclaresTokenTrust for Issuer {}
+}
+
+mod second {
+    use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+    #[singleton]
+    #[trusts_oidc_issuer(second)]
+    pub struct Issuer;
+
+    impl DeclaresTokenTrust for Issuer {}
+}
+
+#[singleton]
+#[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]
+struct Page;
+
+impl Page {
+    #[process]
+    fn respond(&self) -> anyhow::Result<Response> {}
+}
+";
+
+    #[test]
+    fn generates_an_oidc_client_per_trusted_issuer() {
+        let code = generate(OIDC_ISSUERS_CRATE).expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod oidc;"));
+        assert!(module(&code, "oidc").contains("pub mod first_issuer;"));
+        assert!(module(&code, "oidc").contains("pub mod second_issuer;"));
+        assert!(
+            module(&code, "oidc/first_issuer")
+                .contains("pub use margaret::framework::oidc_client::oidc_client::OidcClient;")
+        );
+        assert!(!concatenated(&code).contains("OidcTokenVerifier"));
+    }
+
+    #[test]
+    fn constructs_each_oidc_client_from_its_issuer() {
+        let code = generate(OIDC_ISSUERS_CRATE).expect("the build succeeds");
+        let construction: String = module(&code, "container/build/serve")
+            .split_whitespace()
+            .collect();
+
+        assert!(construction.contains(
+            "crate::margaret::oidc::first_issuer::OidcClient::create(::std::sync::Arc::<crate::first::Issuer>::clone(&first_issuer),)"
+        ));
+        assert!(construction.contains(
+            "crate::margaret::oidc::second_issuer::OidcClient::create(::std::sync::Arc::<crate::second::Issuer>::clone(&second_issuer),)"
+        ));
+    }
+
+    #[test]
+    fn runs_each_oidc_client_as_a_service() {
+        let code = generate(OIDC_ISSUERS_CRATE).expect("the build succeeds");
+        let serve: String = module(&code, "serve").split_whitespace().collect();
+
+        assert!(serve.contains("impltrzcina::ServiceforMargaretOidcFirstIssuerOidcClient"));
+        assert!(serve.contains("impltrzcina::ServiceforMargaretOidcSecondIssuerOidcClient"));
+    }
+
+    #[test]
+    fn rejects_the_oidc_verifier_injected_by_path() {
+        let error = generate(
+            "\
+#[rustfmt::skip]
+pub mod margaret;
+
+use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
+
+#[singleton]
+#[trusts_oidc_issuer(github)]
+struct Issuer;
+
+impl DeclaresTokenTrust for Issuer {}
+
+#[singleton]
+struct Consumer {
+    verifier: std::sync::Arc<crate::margaret::oidc::issuer::OidcTokenVerifier>,
+}
+
+impl Consumer {
+    #[constructor]
+    fn create(verifier: std::sync::Arc<crate::margaret::oidc::issuer::OidcTokenVerifier>) -> anyhow::Result<Self> {}
+}
+",
+        )
+        .expect_err("the verifier is framework-only")
+        .to_string();
+
+        assert!(error.contains("which only the framework may inject"));
     }
 
     const JWKS_CLIENT_CONSOLE_ARGUMENT_CRATE: &str = "\

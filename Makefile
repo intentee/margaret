@@ -57,9 +57,11 @@ COVERAGE_PACKAGES := \
 	-p margaret_model_codegen \
 	-p margaret_oidc_client \
 	-p margaret_oidc_client_tests \
+	-p margaret_oidc_codegen \
 	-p margaret_oidc_discovery \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
+	-p margaret_polling_client_codegen \
 	-p margaret_registered_claims \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_binding \
@@ -88,6 +90,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_token_signer_tests \
 	-p margaret_token_trust \
 	-p margaret_toposort \
+	-p margaret_umbrella_path \
 	-p margaret_validation \
 	-p margaret_views \
 	-p margaret_views_codegen \
@@ -103,6 +106,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_fallible_roles_fixture \
 	--exclude-from-report margaret_codegen_jwks_token_trust_fixture \
 	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
+	--exclude-from-report margaret_codegen_oidc_issuers_fixture \
 	--exclude-from-report margaret_codegen_route_parameter_values_fixture \
 	--exclude-from-report margaret_codegen_websocket_fixture \
 	--exclude-from-report margaret_codegen_websocket_peer_identity_fixture \
@@ -116,6 +120,7 @@ GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_fallible_roles_fixture \
 	-p margaret_codegen_jwks_token_trust_fixture \
 	-p margaret_codegen_linear_construction_future_fixture \
+	-p margaret_codegen_oidc_issuers_fixture \
 	-p margaret_codegen_route_parameter_values_fixture \
 	-p margaret_codegen_websocket_fixture \
 	-p margaret_codegen_websocket_peer_identity_fixture \
@@ -168,8 +173,10 @@ RUNTIME_PACKAGES := \
 	-p margaret_model \
 	-p margaret_model_codegen \
 	-p margaret_oidc_client \
+	-p margaret_oidc_codegen \
 	-p margaret_oidc_discovery \
 	-p margaret_peer_identity \
+	-p margaret_polling_client_codegen \
 	-p margaret_registered_claims \
 	-p margaret_request_binding_codegen \
 	-p margaret_route_parameter_binding \
@@ -190,6 +197,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_token_signer \
 	-p margaret_token_trust \
 	-p margaret_toposort \
+	-p margaret_umbrella_path \
 	-p margaret_validation \
 	-p margaret_views \
 	-p margaret_views_codegen \
@@ -301,9 +309,11 @@ coverage: node_modules postgres-image
 		--gated margaret_model_codegen=100 \
 		--gated margaret_oidc_client=100 \
 		--gated margaret_oidc_client_tests=100 \
+		--gated margaret_oidc_codegen=100 \
 		--gated margaret_oidc_discovery=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
+		--gated margaret_polling_client_codegen=100 \
 		--gated margaret_registered_claims=100 \
 		--gated margaret_request_binding_codegen=100 \
 		--gated margaret_route_parameter_binding=100 \
@@ -332,6 +342,7 @@ coverage: node_modules postgres-image
 		--gated margaret_token_signer_tests=100 \
 		--gated margaret_token_trust=100 \
 		--gated margaret_toposort=100 \
+		--gated margaret_umbrella_path=100 \
 		--gated margaret_validation=100 \
 		--gated margaret_views=100 \
 		--gated margaret_views_codegen=100 \

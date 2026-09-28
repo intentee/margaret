@@ -21,10 +21,13 @@ margaret_http_codegen = { workspace = true }
 margaret_jwks_codegen = { workspace = true }
 margaret_middleware_codegen = { workspace = true }
 margaret_model_codegen = { workspace = true }
+margaret_oidc_codegen = { workspace = true }
+margaret_polling_client_codegen = { workspace = true }
 margaret_request_binding_codegen = { workspace = true }
 margaret_schema_codegen = { workspace = true }
 margaret_service_codegen = { workspace = true }
 margaret_tag_codegen = { workspace = true }
+margaret_umbrella_path = { workspace = true }
 margaret_views_codegen = { workspace = true }
 margaret_websocket_codegen = { workspace = true }
 thiserror = { workspace = true }

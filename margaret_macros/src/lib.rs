@@ -235,6 +235,11 @@ pub fn provides_route_parameter(_attributes: TokenStream, item: TokenStream) -> 
 }
 
 #[proc_macro_attribute]
+pub fn trusts_oidc_issuer(_attributes: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
 pub fn route_parameter_value(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     item
 }

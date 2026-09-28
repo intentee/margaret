@@ -35,6 +35,7 @@ mod reports_a_foreign_arc_as_an_unsupported_parameter_shape;
 mod reports_a_foreign_constructor_attribute_as_a_missing_constructor;
 mod reports_a_framework_provider_colliding_with_a_user_singleton;
 mod reports_ambiguous_constructor;
+mod reports_an_oidc_issuer_without_the_token_trust;
 mod reports_dependency_cycle;
 mod reports_endpoint_errors;
 mod reports_missing_provider;
