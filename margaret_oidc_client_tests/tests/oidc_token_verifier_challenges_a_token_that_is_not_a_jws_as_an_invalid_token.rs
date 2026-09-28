@@ -18,7 +18,7 @@ use margaret_oidc_client_tests::localhost_trust::localhost_trust;
 #[test]
 fn oidc_token_verifier_challenges_a_token_that_is_not_a_jws_as_an_invalid_token() {
     let KeySetParsing::Accepted(key_set) =
-        VerificationKeySet::from_jwks(vec![FixtureRsaKey::load("github-kid").jwk()])
+        VerificationKeySet::from_jwks(vec![FixtureRsaKey::load("rsa-kid").jwk()])
     else {
         panic!("the fixture key set is accepted");
     };

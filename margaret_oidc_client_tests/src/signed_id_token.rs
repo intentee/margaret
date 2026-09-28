@@ -24,8 +24,8 @@ impl SignedIdToken {
                 "exp": self.exp,
                 "iat": 1_700_000_000,
                 "iss": trust.issuer.as_str(),
-                "repository_id": "74",
-                "sub": "repo:octo-org/octo-repo:ref:refs/heads/main",
+                "role": "builder",
+                "sub": "service-account",
             }),
         )
     }

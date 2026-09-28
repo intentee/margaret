@@ -5,12 +5,12 @@ use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
 #[test]
 fn rejects_a_plaintext_jwks_uri() {
-    let issuer = "https://token.actions.githubusercontent.com"
+    let issuer = "https://server.example.com"
         .parse::<IssuerIdentifier>()
         .expect("the issuer is an https url");
 
     assert!(matches!(
-        ProviderMetadata::parse(br#"{"issuer":"https://token.actions.githubusercontent.com","jwks_uri":"http://token.actions.githubusercontent.com/.well-known/jwks"}"#, &issuer),
+        ProviderMetadata::parse(br#"{"issuer":"https://server.example.com","jwks_uri":"http://server.example.com/jwks.json"}"#, &issuer),
         ProviderMetadataParsing::Rejected(ProviderMetadataRejection::JwksUriNotHttps { scheme }) if scheme == "http"
     ));
 }

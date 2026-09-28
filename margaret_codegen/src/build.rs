@@ -1158,7 +1158,7 @@ use margaret::framework::oidc_client::oidc_token_verification::OidcTokenVerifica
 use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
-#[trusts_oidc_issuer(github)]
+#[trusts_oidc_issuer(partner)]
 struct Issuer;
 
 impl DeclaresTokenTrust for Issuer {}
@@ -1173,7 +1173,7 @@ struct RunnerProvider;
 
 impl RunnerProvider {
     #[infer_from_request]
-    fn infer(&self, #[oidc_token(issuer = github)] verification: OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<Runner>> {}
+    fn infer(&self, #[oidc_token(issuer = partner)] verification: OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<Runner>> {}
 }
 
 #[singleton]
@@ -1214,7 +1214,7 @@ pub mod margaret;
 use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
 #[singleton]
-#[trusts_oidc_issuer(github)]
+#[trusts_oidc_issuer(partner)]
 struct Issuer;
 
 impl DeclaresTokenTrust for Issuer {}

@@ -30,9 +30,9 @@ mod tests {
 
     #[test]
     fn re_exports_the_client_of_an_issuer_in_its_segment() {
-        let source = render_oidc(&["github_issuer"])
+        let source = render_oidc(&["partner_issuer"])
             .into_iter()
-            .find(|module| module.name() == "oidc/github_issuer")
+            .find(|module| module.name() == "oidc/partner_issuer")
             .expect("the issuer segment is generated")
             .format()
             .expect("the module formats")

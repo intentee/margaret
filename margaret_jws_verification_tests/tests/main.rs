@@ -37,4 +37,4 @@ mod rejects_an_unsigned_token;
 mod rejects_coordinates_that_are_not_a_curve_point;
 mod verifies_a_token_of_a_published_key;
 mod verifies_an_es384_token;
-mod verifies_an_rs256_token_of_a_github_shaped_key_set;
+mod verifies_an_rs256_token_of_a_key_set_with_certificate_members;

@@ -48,10 +48,10 @@ An `#[infers_authenticated_user]` provider receives the verification of the requ
 
 ```rust
 #[infer_from_request]
-pub fn infer_ci_runner(
+pub fn infer_service_account(
     &self,
-    #[oidc_token(issuer = github_actions)] verification: OidcTokenVerification<GithubActionsClaims>,
-) -> anyhow::Result<AuthenticatedUserOutcome<CiRunner>> {
+    #[oidc_token(issuer = partner)] verification: OidcTokenVerification<PartnerClaims>,
+) -> anyhow::Result<AuthenticatedUserOutcome<ServiceAccount>> {
     Ok(match verification {
         OidcTokenVerification::Absent | OidcTokenVerification::NotBearer => {
             AuthenticatedUserOutcome::Anonymous
@@ -63,17 +63,10 @@ pub fn infer_ci_runner(
             ResponseContinuation::from(Response::text(503, "the signing keys are not available yet")),
         ),
         OidcTokenVerification::Verified(verified) => {
-            let GithubActionsClaims {
-                repository,
-                repository_id,
-                repository_owner_id,
-            } = verified.claims;
+            let PartnerClaims { sub, tenant_id } = verified.claims;
 
-            if repository_owner_id == self.repository_owner_id {
-                AuthenticatedUserOutcome::Authenticated(CiRunner {
-                    repository,
-                    repository_id,
-                })
+            if tenant_id == self.tenant_id {
+                AuthenticatedUserOutcome::Authenticated(ServiceAccount { subject: sub })
             } else {
                 AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(
                     Response::forbidden(),
@@ -86,7 +79,7 @@ pub fn infer_ci_runner(
 
 A route that requires such a user answers an anonymous request with `401 Unauthorized` and `WWW-Authenticate: Bearer`. A malformed `Authorization` header is answered with `invalid_request`, and a token that fails verification with `invalid_token`.
 
-The example's `GET /ci/runner` route accepts GitHub Actions OIDC tokens. Its `serve` command takes the audience a workflow requests with `--github-actions-audience` and the repository owner it accepts with `--github-actions-repository-owner-id`. The example matches the immutable `repository_owner_id` claim, never a name parsed out of `sub`.
+The example's `GET /ci/runner` route demonstrates an OIDC-protected route.
 
 ## Development
 

@@ -5,7 +5,7 @@ use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
 #[test]
 fn rejects_metadata_of_another_issuer() {
-    let issuer = "https://token.actions.githubusercontent.com"
+    let issuer = "https://server.example.com"
         .parse::<IssuerIdentifier>()
         .expect("the issuer is an https url");
 

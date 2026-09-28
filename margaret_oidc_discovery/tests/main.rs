@@ -1,4 +1,4 @@
-mod accepts_the_github_actions_provider_metadata;
+mod accepts_the_discovery_specification_example_metadata;
 mod locates_the_discovery_document_at_the_issuer_root;
 mod locates_the_discovery_document_below_the_issuer_path;
 mod rejects_a_jwks_uri_that_is_not_a_url;

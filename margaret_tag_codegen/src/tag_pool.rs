@@ -256,12 +256,12 @@ mod tests {
 
     #[test]
     fn binds_an_oidc_issuer_tag_to_its_declaring_singleton() {
-        let indexed = IndexedSource::new("#[trusts_oidc_issuer(github)]\nstruct Issuer;\n");
+        let indexed = IndexedSource::new("#[trusts_oidc_issuer(partner)]\nstruct Issuer;\n");
         let pool = TagPool::collect(&indexed.index).expect("the pool collects");
         let bindings = pool.segmented_bindings(TagKind::OidcIssuer);
 
         assert_eq!(bindings.len(), 1);
-        assert_eq!(bindings[0].tag.to_string(), "github");
+        assert_eq!(bindings[0].tag.to_string(), "partner");
         assert_eq!(bindings[0].declaring.to_string(), "crate::Issuer");
         assert_eq!(bindings[0].module_segment, "issuer");
     }

@@ -131,7 +131,7 @@ struct User;
         render_container(
             &index,
             &scan(&index).expect("the serve inputs are scanned"),
-            &[oidc_client("github"), oidc_client("gitlab")],
+            &[oidc_client("partner"), oidc_client("upstream")],
             &TagPool::collect(&index).expect("the tags are collected"),
         )
         .expect("the container renders")
@@ -752,19 +752,19 @@ impl SessionUserProvider {
         ));
     }
 
-    const GITHUB_ISSUER: &str = "\
+    const PARTNER_ISSUER: &str = "\
 use margaret::framework::oidc_client::oidc_token_verification::OidcTokenVerification;
 
 #[singleton]
-#[trusts_oidc_issuer(github)]
-struct GithubIssuer;
+#[trusts_oidc_issuer(partner)]
+struct PartnerIssuer;
 
 struct Claims;
 ";
 
     fn oidc_provider(parameters: &str) -> String {
         format!(
-            "{GITHUB_ISSUER}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameters}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+            "{PARTNER_ISSUER}\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {parameters}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )
     }
 
@@ -781,12 +781,12 @@ struct Claims;
             .collect()
     }
 
-    const GITHUB_TOKEN: &str =
-        "#[oidc_token(issuer = github)] verification: OidcTokenVerification<Claims>";
+    const PARTNER_TOKEN: &str =
+        "#[oidc_token(issuer = partner)] verification: OidcTokenVerification<Claims>";
 
     #[test]
     fn binds_an_oidc_token_to_the_client_of_its_issuer() {
-        let registries = registries_for(&oidc_provider(GITHUB_TOKEN));
+        let registries = registries_for(&oidc_provider(PARTNER_TOKEN));
         let verifiers: Vec<String> = registries.providers()[0]
             .application
             .oidc_token_verifiers
@@ -796,14 +796,14 @@ struct Claims;
 
         assert_eq!(
             verifiers,
-            vec!["crate::margaret::oidc::github::OidcClient oidc_token_verifier".to_string()]
+            vec!["crate::margaret::oidc::partner::OidcClient oidc_token_verifier".to_string()]
         );
     }
 
     #[test]
     fn challenges_for_bearer_credentials_only_when_a_provider_reads_an_oidc_token() {
         assert_eq!(
-            registries_for(&oidc_provider(GITHUB_TOKEN)).providers()[0]
+            registries_for(&oidc_provider(PARTNER_TOKEN)).providers()[0]
                 .application
                 .challenge,
             AuthenticatedUserChallenge::Bearer
@@ -819,7 +819,7 @@ struct Claims;
     #[test]
     fn renders_a_wrapper_that_verifies_the_oidc_token_with_the_verifier_of_its_issuer() {
         let source = wrapper_source(&registries_for(&oidc_provider(&format!(
-            "request: &Request, {GITHUB_TOKEN}"
+            "request: &Request, {PARTNER_TOKEN}"
         ))));
 
         assert!(source.contains(
@@ -834,7 +834,7 @@ struct Claims;
     #[test]
     fn resolves_the_oidc_token_type_and_claims_through_use_statements() {
         let source = wrapper_source(&registries_for(
-            "use margaret::framework::oidc_client::oidc_token_verification;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(github)]\nstruct GithubIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[oidc_token(issuer = github)] verification: oidc_token_verification::OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::oidc_client::oidc_token_verification;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[oidc_token(issuer = partner)] verification: oidc_token_verification::OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         ));
 
         assert!(source.contains("verify::<crate::ci::claims::Claims>(&presented_bearer)"));
@@ -860,16 +860,16 @@ struct Claims;
     fn rejects_an_oidc_token_of_an_undeclared_issuer() {
         assert!(
             oidc_rejection(
-                "#[oidc_token(issuer = gitlab)] verification: OidcTokenVerification<Claims>"
+                "#[oidc_token(issuer = undeclared)] verification: OidcTokenVerification<Claims>"
             )
-            .ends_with("references the tag 'gitlab', which no oidc issuer declares")
+            .ends_with("references the tag 'undeclared', which no oidc issuer declares")
         );
     }
 
     #[test]
     fn rejects_an_oidc_token_declared_as_another_type() {
         assert!(
-            oidc_rejection("#[oidc_token(issuer = github)] verification: String")
+            oidc_rejection("#[oidc_token(issuer = partner)] verification: String")
                 .contains("carries #[oidc_token] on 'String'")
         );
     }
@@ -878,7 +878,7 @@ struct Claims;
     fn rejects_an_oidc_token_verification_taken_by_reference() {
         assert!(
             oidc_rejection(
-                "#[oidc_token(issuer = github)] verification: &OidcTokenVerification<Claims>"
+                "#[oidc_token(issuer = partner)] verification: &OidcTokenVerification<Claims>"
             )
             .contains("taken by value")
         );
@@ -888,7 +888,7 @@ struct Claims;
     fn rejects_oidc_claims_with_generic_arguments() {
         assert!(
             oidc_rejection(
-                "#[oidc_token(issuer = github)] verification: OidcTokenVerification<Vec<Claims>>"
+                "#[oidc_token(issuer = partner)] verification: OidcTokenVerification<Vec<Claims>>"
             )
             .ends_with(
                 "into the claims 'Vec < Claims >', which is not a named type without generic arguments"
@@ -900,7 +900,7 @@ struct Claims;
     fn rejects_oidc_claims_that_are_not_a_named_type() {
         assert!(
             oidc_rejection(
-                "#[oidc_token(issuer = github)] verification: OidcTokenVerification<(Claims, Claims)>"
+                "#[oidc_token(issuer = partner)] verification: OidcTokenVerification<(Claims, Claims)>"
             )
             .ends_with(
                 "into the claims '(Claims , Claims)', which is not a named type without generic arguments"
@@ -912,7 +912,7 @@ struct Claims;
     fn rejects_oidc_claims_that_match_no_type() {
         assert!(
             oidc_rejection(
-                "#[oidc_token(issuer = github)] verification: OidcTokenVerification<Ghost>"
+                "#[oidc_token(issuer = partner)] verification: OidcTokenVerification<Ghost>"
             )
             .ends_with("into the claims 'Ghost', which matches no type in scope")
         );
@@ -922,10 +922,10 @@ struct Claims;
     fn rejects_the_oidc_token_of_one_issuer_requested_twice() {
         assert!(
             oidc_rejection(&format!(
-                "{GITHUB_TOKEN}, #[oidc_token(issuer = github)] repeated: OidcTokenVerification<Claims>"
+                "{PARTNER_TOKEN}, #[oidc_token(issuer = partner)] repeated: OidcTokenVerification<Claims>"
             ))
             .ends_with(
-                "requests the OIDC token of the issuer 'github' more than once; a request verifies it exactly once"
+                "requests the OIDC token of the issuer 'partner' more than once; a request verifies it exactly once"
             )
         );
     }
@@ -934,7 +934,7 @@ struct Claims;
     fn rejects_an_oidc_token_that_also_carries_a_form_request() {
         assert!(
             oidc_rejection(
-                "#[oidc_token(issuer = github)] #[form_request(from = RequestInput::Query)] verification: OidcTokenVerification<Claims>"
+                "#[oidc_token(issuer = partner)] #[form_request(from = RequestInput::Query)] verification: OidcTokenVerification<Claims>"
             )
             .contains("carries #[oidc_token] together with")
         );
@@ -943,7 +943,7 @@ struct Claims;
     #[test]
     fn rejects_an_oidc_token_on_the_peer_spiffe_id() {
         assert!(
-            oidc_rejection("#[oidc_token(issuer = github)] peer: &spiffe::spiffe_id::SpiffeId")
+            oidc_rejection("#[oidc_token(issuer = partner)] peer: &spiffe::spiffe_id::SpiffeId")
                 .contains("is the peer SPIFFE id and must not also carry")
         );
     }
@@ -952,7 +952,7 @@ struct Claims;
     fn rejects_an_oidc_token_outside_an_inference_method() {
         assert!(
             responder_rejection(&format!(
-                "{GITHUB_ISSUER}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, {GITHUB_TOKEN}) -> anyhow::Result<Response> {{}}\n}}\n"
+                "{PARTNER_ISSUER}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, {PARTNER_TOKEN}) -> anyhow::Result<Response> {{}}\n}}\n"
             ))
             .contains("which is only available in an #[infer_from_request] method")
         );
@@ -960,7 +960,7 @@ struct Claims;
 
     #[test]
     fn rejects_an_oidc_token_whose_client_the_container_does_not_plan() {
-        let index = IndexedSource::new(&provider_source(&oidc_provider(GITHUB_TOKEN))).index;
+        let index = IndexedSource::new(&provider_source(&oidc_provider(PARTNER_TOKEN))).index;
         let rejection = BindingRegistries::collect(
             &index,
             ViewsAvailability::Available,
@@ -972,7 +972,7 @@ struct Claims;
         .to_string();
 
         assert!(rejection.ends_with(
-            "verifies OIDC tokens of the issuer 'github', whose client the container does not plan"
+            "verifies OIDC tokens of the issuer 'partner', whose client the container does not plan"
         ));
     }
 
@@ -980,7 +980,7 @@ struct Claims;
     fn challenges_a_required_user_of_an_oidc_provider_for_bearer_credentials() {
         let indexed = IndexedSource::new(&provider_source(&format!(
             "{}\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: User) -> anyhow::Result<Response> {{}}\n}}\n",
-            oidc_provider(GITHUB_TOKEN)
+            oidc_provider(PARTNER_TOKEN)
         )));
         let registries = collect_registries(&indexed.index, ViewsAvailability::Available)
             .expect("the binding registries are collected");
@@ -1026,7 +1026,7 @@ struct Claims;
     #[test]
     fn refuses_to_inject_an_oidc_client_into_a_handshake() {
         let indexed = IndexedSource::new(
-            "struct Room;\n\nimpl Room {\n    #[process]\n    fn build(client: std::sync::Arc<crate::margaret::oidc::github::OidcClient>) -> anyhow::Result<Self> {}\n}\n",
+            "struct Room;\n\nimpl Room {\n    #[process]\n    fn build(client: std::sync::Arc<crate::margaret::oidc::partner::OidcClient>) -> anyhow::Result<Self> {}\n}\n",
         );
         let item = indexed.item("Room");
         let route_path = RoutePath::parse("/room");
@@ -1057,15 +1057,15 @@ struct Claims;
     #[test]
     fn verifies_the_oidc_tokens_of_every_issuer_from_one_presented_bearer() {
         let source = wrapper_source(&registries_for(&format!(
-            "#[singleton]\n#[trusts_oidc_issuer(gitlab)]\nstruct GitlabIssuer;\n\n{}",
+            "#[singleton]\n#[trusts_oidc_issuer(upstream)]\nstruct UpstreamIssuer;\n\n{}",
             oidc_provider(&format!(
-                "{GITHUB_TOKEN}, #[oidc_token(issuer = gitlab)] gitlab: OidcTokenVerification<Claims>"
+                "{PARTNER_TOKEN}, #[oidc_token(issuer = upstream)] upstream: OidcTokenVerification<Claims>"
             ))
         )));
 
         assert_eq!(source.matches("PresentedBearer::read(").count(), 1);
         assert!(source.contains(
-            "letverification=self.oidc_token_verifier.verify::<crate::Claims>(&presented_bearer);letgitlab=self.oidc_token_verifier_2.verify::<crate::Claims>(&presented_bearer);"
+            "letverification=self.oidc_token_verifier.verify::<crate::Claims>(&presented_bearer);letupstream=self.oidc_token_verifier_2.verify::<crate::Claims>(&presented_bearer);"
         ));
     }
 
@@ -1073,8 +1073,8 @@ struct Claims;
     fn rejects_a_site_that_infers_two_users_from_the_bearer_token() {
         assert_eq!(
             responder_rejection(&format!(
-                "{}\nstruct Runner;\n\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct AdminProvider;\n\nimpl AdminProvider {{\n    #[infer_from_request]\n    fn infer(&self, #[oidc_token(issuer = github)] verification: OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {{}}\n}}\n\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: Runner, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {{}}\n}}\n",
-                oidc_provider(GITHUB_TOKEN).replace("User", "Runner")
+                "{}\nstruct Runner;\n\nstruct Admin;\n\n#[singleton]\n#[infers_authenticated_user(user_model = Admin)]\nstruct AdminProvider;\n\nimpl AdminProvider {{\n    #[infer_from_request]\n    fn infer(&self, #[oidc_token(issuer = partner)] verification: OidcTokenVerification<Claims>) -> anyhow::Result<AuthenticatedUserOutcome<Admin>> {{}}\n}}\n\nstruct Page;\n\nimpl Page {{\n    #[process]\n    fn respond(&self, #[authenticated_user] runner: Runner, #[authenticated_user] admin: Admin) -> anyhow::Result<Response> {{}}\n}}\n",
+                oidc_provider(PARTNER_TOKEN).replace("User", "Runner")
             )),
             "responder 'Page' infers more than one authenticated user from the bearer token; a request presents one bearer credential, so exactly one #[infers_authenticated_user] provider verifies it"
         );
@@ -1083,7 +1083,7 @@ struct Claims;
     #[test]
     fn collects_the_console_arguments_of_the_issuers_a_bearer_provider_verifies() {
         let index = IndexedSource::new(&provider_source(&format!(
-            "use margaret::framework::oidc_client::oidc_token_verification::OidcTokenVerification;\nuse margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;\n\nstruct Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(github)]\nstruct GithubIssuer;\n\nimpl DeclaresTokenTrust for GithubIssuer {{}}\n\nimpl GithubIssuer {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {GITHUB_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+            "use margaret::framework::oidc_client::oidc_token_verification::OidcTokenVerification;\nuse margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;\n\nstruct Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\nimpl DeclaresTokenTrust for PartnerIssuer {{}}\n\nimpl PartnerIssuer {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )))
         .index;
         let tags = TagPool::collect(&index).expect("the tags are collected");
@@ -1093,12 +1093,12 @@ struct Claims;
             &[FrameworkProvider {
                 construction: FrameworkConstruction::Constructor {
                     dependencies: vec![FrameworkDependency::SingletonView(CanonicalPath::new(
-                        vec!["crate".to_string(), "GithubIssuer".to_string()],
+                        vec!["crate".to_string(), "PartnerIssuer".to_string()],
                     ))],
                     is_async: false,
                     method: "create".to_string(),
                 },
-                ..oidc_client("github")
+                ..oidc_client("partner")
             }],
             &tags,
         )

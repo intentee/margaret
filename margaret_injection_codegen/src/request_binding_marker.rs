@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn finds_the_oidc_token_marker() {
         let attributes = vec![IndexedAttribute::new(
-            &parse_quote!(#[oidc_token(issuer = github)]),
+            &parse_quote!(#[oidc_token(issuer = partner)]),
         )];
 
         assert_eq!(
