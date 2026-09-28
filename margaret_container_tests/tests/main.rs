@@ -15,6 +15,7 @@ mod generates_linear_async_construction;
 mod generates_parameterized_root_construction;
 mod generation_is_deterministic;
 mod injectability_is_gated_by_singleton;
+mod injects_a_dependency_imported_through_a_reexport;
 mod injects_a_uri_selected_framework_provider;
 mod injects_jwks_secret_stores;
 mod keeps_console_arguments_and_environment_variables_apart;

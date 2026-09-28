@@ -13,8 +13,8 @@ impl ItemPaths {
         self.paths.contains(path)
     }
 
-    pub(crate) fn insert(&mut self, path: CanonicalPath) {
-        self.paths.insert(path);
+    pub(crate) fn extend(&mut self, other: Self) {
+        self.paths.extend(other.paths);
     }
 }
 
@@ -37,9 +37,7 @@ mod tests {
 
     #[test]
     fn recognises_a_path_that_was_indexed() {
-        let mut paths = ItemPaths::default();
-
-        paths.insert(path("Indexed"));
+        let paths = ItemPaths::from_iter([path("Indexed")]);
 
         assert!(paths.contains(&path("Indexed")));
     }
