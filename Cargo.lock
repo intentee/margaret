@@ -3301,6 +3301,7 @@ dependencies = [
  "margaret_spiffe_svid",
  "margaret_spiffe_svid_bundle",
  "margaret_spiffe_svid_tests",
+ "margaret_sync_holder",
  "rustls",
  "tempfile",
  "tokio",
