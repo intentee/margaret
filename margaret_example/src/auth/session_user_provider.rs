@@ -15,7 +15,7 @@ use crate::models::user::User;
 use crate::stores::user_store::UserStore;
 
 #[singleton]
-#[infers_authenticated_user(user_model = crate::models::user::User)]
+#[infers_authenticated_user(user_model = User)]
 pub struct SessionUserProvider {
     users: Arc<UserStore>,
 }

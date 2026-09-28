@@ -1,3 +1,5 @@
+use std::iter;
+
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -86,7 +88,7 @@ pub fn render_bound_request_extractions(
         .collect();
     let future = joined_future(&first_future, &remaining_futures);
     let pattern = joined_pattern(first_holder, &remaining_holders);
-    let values = std::iter::once(first_holder)
+    let values = iter::once(first_holder)
         .chain(remaining_holders.iter().copied())
         .map(|holder| {
             quote! {

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use rustls::ClientConnection;
+use rustls::ProtocolVersion;
 use rustls::ServerConnection;
 use rustls::pki_types::ServerName;
 
@@ -39,6 +40,6 @@ fn mtls_handshake_completes_with_matching_trust_domain() {
     assert!(result.is_ok());
     assert_eq!(
         client_connection.protocol_version(),
-        Some(rustls::ProtocolVersion::TLSv1_3),
+        Some(ProtocolVersion::TLSv1_3),
     );
 }

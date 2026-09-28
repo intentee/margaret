@@ -1,4 +1,4 @@
-use std::error::Error as StdError;
+use std::error;
 
 use thiserror::Error;
 
@@ -12,12 +12,12 @@ pub enum RollerError {
     #[error("failed to load the persisted jwks secret: {source}")]
     SecretLoad {
         #[source]
-        source: Box<dyn StdError + Send + Sync>,
+        source: Box<dyn error::Error + Send + Sync>,
     },
 
     #[error("failed to persist the rolled jwks secret: {source}")]
     SecretPersist {
         #[source]
-        source: Box<dyn StdError + Send + Sync>,
+        source: Box<dyn error::Error + Send + Sync>,
     },
 }

@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt::Result as FormatResult;
+use std::fmt::Result;
+
+use p256::ecdsa;
 
 use crate::jws_algorithm::JwsAlgorithm;
 
@@ -17,14 +19,14 @@ pub enum TokenMalformation {
     NonCanonicalSignature,
     NotCompactJws,
     SignatureBase64(base64ct::Error),
-    SignatureMalformed(p256::ecdsa::Error),
+    SignatureMalformed(ecdsa::Error),
     UnknownKeyId {
         kid: String,
     },
 }
 
 impl Display for TokenMalformation {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> FormatResult {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         match self {
             Self::AlgorithmMismatch { expected, found } => write!(
                 formatter,
@@ -79,6 +81,8 @@ impl Display for TokenMalformation {
 mod tests {
     use base64ct::Base64UrlUnpadded;
     use base64ct::Encoding as _;
+    use p256::ecdsa;
+    use p256::ecdsa::Signature;
 
     use super::TokenMalformation;
     use crate::jws_algorithm::JwsAlgorithm;
@@ -91,9 +95,8 @@ mod tests {
         serde_json::from_str::<serde_json::Value>("not json").expect_err("the fixture is not json")
     }
 
-    fn signature_error() -> p256::ecdsa::Error {
-        p256::ecdsa::Signature::from_slice(&[0u8; 3])
-            .expect_err("the fixture is not a valid signature")
+    fn signature_error() -> ecdsa::Error {
+        Signature::from_slice(&[0u8; 3]).expect_err("the fixture is not a valid signature")
     }
 
     #[test]

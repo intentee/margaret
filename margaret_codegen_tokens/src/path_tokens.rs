@@ -28,12 +28,7 @@ mod tests {
     use super::path_tokens;
 
     fn rendered(segments: &[&str]) -> String {
-        let path = CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
-        );
+        let path = CanonicalPath::new(segments.iter().map(ToString::to_string).collect());
 
         path_tokens(&path).to_string()
     }

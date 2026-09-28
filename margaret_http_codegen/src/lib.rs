@@ -21,9 +21,6 @@ pub mod web_socket_server_requirements;
 
 #[cfg(test)]
 mod tests {
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
-    use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
-    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use std::collections::BTreeMap;
     use std::fs;
     use std::path::Path;
@@ -31,20 +28,26 @@ mod tests {
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
+    use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
     use margaret_middleware_codegen::middleware_plans::middleware_plans;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
+    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
 
+    use crate::http_artifacts::HttpArtifacts;
     use crate::http_codegen_error::HttpCodegenError;
     use crate::http_plan::HttpPlan;
+    use crate::render_http;
     use crate::server_transport_policy::ServerTransportPolicy;
     use crate::serves_spiffe::serves_spiffe;
     use crate::web_socket_server_requirements::WebSocketServerRequirements;
@@ -53,10 +56,10 @@ mod tests {
         index: &AttributeIndex,
         has_views: bool,
         websocket_servers: &BTreeMap<String, WebSocketServerRequirements>,
-        middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+        middleware_plans: &[MiddlewarePlan],
         bindings: &ContainerBindings,
         registries: &BindingRegistries,
-    ) -> Result<crate::http_artifacts::HttpArtifacts, HttpCodegenError> {
+    ) -> Result<HttpArtifacts, HttpCodegenError> {
         HttpPlan::build(
             index,
             has_views,
@@ -65,7 +68,7 @@ mod tests {
             bindings,
             registries,
         )
-        .map(|plan| crate::render_http::render_http(plan, bindings))
+        .map(|plan| render_http::render_http(plan, bindings))
     }
 
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {

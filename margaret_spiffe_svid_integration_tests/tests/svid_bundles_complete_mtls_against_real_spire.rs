@@ -3,6 +3,7 @@ use std::sync::Arc;
 use rustls::ClientConnection;
 use rustls::ServerConnection;
 use rustls::pki_types::ServerName;
+use tokio::task;
 use tokio_util::sync::CancellationToken;
 use trzcina::ServiceManager;
 use trzcina::ServiceShutdownOptions;
@@ -59,7 +60,7 @@ async fn completes_mtls_with_a_real_spire_issued_svid() {
             break;
         }
 
-        tokio::task::yield_now().await;
+        task::yield_now().await;
     }
 
     cancellation_token.cancel();

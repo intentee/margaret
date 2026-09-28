@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use cookie::Cookie;
 use http::Method;
 use http::header::COOKIE;
+use serde_json::Value;
 
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 use margaret_http_uploaded_file::uploaded_file::UploadedFile;
@@ -88,7 +89,7 @@ fn parse_query(server: &ServerParams) -> RequestOutcome<HashMap<String, String>>
 struct ParsedBody {
     files: HashMap<String, UploadedFile>,
     form: HashMap<String, String>,
-    json: Option<serde_json::Value>,
+    json: Option<Value>,
 }
 
 impl ParsedBody {
@@ -189,7 +190,7 @@ async fn parse_body(
 pub struct RequestInputs {
     pub cookies: HashMap<String, String>,
     pub files: HashMap<String, UploadedFile>,
-    pub json: Option<serde_json::Value>,
+    pub json: Option<Value>,
     pub form: HashMap<String, String>,
     pub query: HashMap<String, String>,
     pub server: ServerParams,
@@ -266,10 +267,14 @@ impl RequestInputs {
 #[cfg(test)]
 mod tests {
     use std::convert::Infallible;
+    use std::ffi::OsStr;
+    use std::fs;
+    use std::io::Error;
     use std::mem::discriminant;
     use std::net::SocketAddr;
 
     use bytes::Bytes;
+    use cookie::Cookie;
     use http::HeaderValue;
     use http::Method;
     use http::Request;
@@ -278,8 +283,12 @@ mod tests {
     use http::header::HOST;
     use http_body_util::BodyExt;
     use http_body_util::Full;
+    use serde_json::Value;
     use tempfile::TempDir;
     use tempfile::tempdir;
+
+    use margaret_http_uploaded_file::upload_config::UploadConfig;
+    use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 
     use super::RequestInputs;
     use crate::body_limit::BodyLimit;
@@ -288,8 +297,6 @@ mod tests {
     use crate::request_rejection::RequestRejection;
     use crate::server_params::ServerParams;
     use crate::singleton_request_header::SingletonRequestHeader;
-    use margaret_http_uploaded_file::upload_config::UploadConfig;
-    use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 
     fn any_name() -> String {
         "name".to_string()
@@ -547,7 +554,7 @@ mod tests {
                 .expect("a malformed cookie is rejected")
             ),
             discriminant(&RequestRejection::MalformedCookie {
-                source: cookie::Cookie::parse("=nameless").expect_err("a malformed cookie")
+                source: Cookie::parse("=nameless").expect_err("a malformed cookie")
             })
         );
     }
@@ -624,7 +631,7 @@ mod tests {
                     .expect("a malformed cookie is rejected")
             ),
             discriminant(&RequestRejection::MalformedCookie {
-                source: cookie::Cookie::parse("=nameless").expect_err("a malformed cookie")
+                source: Cookie::parse("=nameless").expect_err("a malformed cookie")
             })
         );
     }
@@ -728,7 +735,7 @@ mod tests {
         )
         .await;
 
-        assert!(provided.json == Some(serde_json::Value::Null));
+        assert!(provided.json == Some(Value::Null));
 
         let absent = parsed(None, "/", b"", &upload_in(&directory)).await;
 
@@ -750,8 +757,7 @@ mod tests {
                 .await
             ),
             discriminant(&RequestRejection::MalformedJson {
-                source: serde_json::from_slice::<serde_json::Value>(b"{")
-                    .expect_err("malformed json")
+                source: serde_json::from_slice::<Value>(b"{").expect_err("malformed json")
             })
         );
     }
@@ -778,14 +784,14 @@ mod tests {
         assert_eq!(avatar.content_type(), "image/png");
         assert_eq!(avatar.size(), 3);
         assert_eq!(
-            std::fs::read(avatar.path()).expect("the temp file is readable"),
+            fs::read(avatar.path()).expect("the temp file is readable"),
             b"PNG"
         );
 
         let raw = inputs.files.get("raw").expect("the raw file is present");
         assert_eq!(raw.content_type(), "application/octet-stream");
         assert_eq!(
-            std::fs::read(raw.path()).expect("the temp file is readable"),
+            fs::read(raw.path()).expect("the temp file is readable"),
             b"DATA"
         );
     }
@@ -808,12 +814,9 @@ mod tests {
 
         assert_eq!(avatar.file_name(), "../../escape.png");
         assert_eq!(avatar.path().parent(), Some(directory.path()));
-        assert_ne!(
-            avatar.path().file_name(),
-            Some(std::ffi::OsStr::new("escape.png"))
-        );
+        assert_ne!(avatar.path().file_name(), Some(OsStr::new("escape.png")));
         assert_eq!(
-            std::fs::read(avatar.path()).expect("the temp file is readable"),
+            fs::read(avatar.path()).expect("the temp file is readable"),
             b"PNG"
         );
     }
@@ -957,7 +960,7 @@ mod tests {
         assert_eq!(
             discriminant(&error),
             discriminant(&UploadedFileError::UploadTempFile {
-                source: std::io::Error::other("an unusable upload directory"),
+                source: Error::other("an unusable upload directory"),
             })
         );
     }

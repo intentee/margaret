@@ -1,3 +1,4 @@
+use serde_json::Value;
 use tokio_tungstenite::tungstenite::Message;
 
 use margaret_websocket_tests::driver_harness::DriverHarness;
@@ -206,7 +207,7 @@ async fn continues_when_a_handler_fails_to_serialize_a_response() {
     harness
         .send(r#"{"id":6,"method":"failing","params":{"prompt":"boom"}}"#)
         .await;
-    let response: serde_json::Value =
+    let response: Value =
         serde_json::from_str(&harness.recv().await).expect("the error response is valid JSON");
 
     assert_eq!(

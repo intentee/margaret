@@ -1,3 +1,5 @@
+use syn::Path;
+
 use margaret_attribute_arguments::format_path::format_path;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -26,7 +28,7 @@ enum Role {
 fn canonical_attribute_path(
     index: &AttributeIndex,
     item: &IndexedItem,
-    written: &syn::Path,
+    written: &Path,
     argument: &'static str,
 ) -> Result<CanonicalPath, ServiceCodegenError> {
     index.resolve_item_path(item, written).ok_or_else(|| {

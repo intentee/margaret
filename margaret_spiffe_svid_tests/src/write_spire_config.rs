@@ -2,12 +2,13 @@ use std::path::Path;
 
 use anyhow::Context as _;
 use anyhow::Result;
+use tokio::fs;
 
 /// # Errors
 ///
 /// Returns an error propagated from the work it performs.
 pub async fn write_spire_config(path: &Path, contents: String) -> Result<()> {
-    tokio::fs::write(path, contents)
+    fs::write(path, contents)
         .await
         .with_context(|| format!("failed to write SPIRE config to {}", path.display()))
 }
@@ -15,6 +16,8 @@ pub async fn write_spire_config(path: &Path, contents: String) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+
+    use tokio::fs;
 
     use super::write_spire_config;
 
@@ -28,7 +31,7 @@ mod tests {
             .await
             .unwrap();
 
-        let read_back = tokio::fs::read_to_string(&config_path).await.unwrap();
+        let read_back = fs::read_to_string(&config_path).await.unwrap();
 
         assert_eq!(read_back, contents);
     }

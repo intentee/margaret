@@ -1,4 +1,5 @@
 use failures::Result as InferenceResult;
+
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
@@ -7,7 +8,7 @@ use margaret::framework::macros::singleton;
 use super::user::User;
 
 #[singleton]
-#[infers_authenticated_user(user_model = crate::user::User)]
+#[infers_authenticated_user(user_model = User)]
 pub struct SessionUserProvider;
 
 impl SessionUserProvider {

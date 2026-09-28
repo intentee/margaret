@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use failures::Result;
+
 use margaret::framework::macros::provides_route_parameter;
 use margaret::framework::macros::singleton;
 use margaret::framework::route_parameter_binding::http_route_parameter_binder::HttpRouteParameterBinder;

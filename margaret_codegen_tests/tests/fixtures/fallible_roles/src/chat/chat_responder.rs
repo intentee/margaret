@@ -10,6 +10,9 @@ use margaret::framework::websocket::responds_to_web_socket_message::RespondsToWe
 use margaret::framework::websocket::streaming_request_envelope::StreamingRequestEnvelope;
 use margaret::framework::websocket::web_socket::WebSocket;
 
+use crate::chat::chat_echo::ChatEcho;
+use crate::chat::chat_say::ChatSay;
+use crate::chat::chat_session::ChatSession;
 use crate::secrets::Secrets;
 
 #[singleton]
@@ -29,20 +32,20 @@ impl ChatResponder {
 
 #[async_trait]
 impl RespondsToWebSocketMessage for ChatResponder {
-    type Message = crate::chat::chat_say::ChatSay;
-    type Session = crate::chat::chat_session::ChatSession;
+    type Message = ChatSay;
+    type Session = ChatSession;
 
     async fn process(
         &self,
         _cancellation_token: CancellationToken,
-        _session: Arc<crate::chat::chat_session::ChatSession>,
-        message: StreamingRequestEnvelope<crate::chat::chat_say::ChatSay>,
+        _session: Arc<ChatSession>,
+        message: StreamingRequestEnvelope<ChatSay>,
         socket: WebSocket,
     ) -> errors::Result<()> {
         let _ = self.secrets.token();
 
         socket
-            .send(message.fin(crate::chat::chat_echo::ChatEcho {
+            .send(message.fin(ChatEcho {
                 text: message.message().text.clone(),
             }))
             .await?;

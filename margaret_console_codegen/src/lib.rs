@@ -9,12 +9,12 @@ pub mod render_console;
 
 #[cfg(test)]
 mod tests {
-    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use std::fs;
 
     use tempfile::TempDir;
     use tempfile::tempdir;
 
+    use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
     use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
     use margaret_attributes::crate_root::CrateRoot;
@@ -23,6 +23,7 @@ mod tests {
     use margaret_http_codegen::http_server::HttpServer;
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_serve_input_codegen::serve_input::ServeInput;
 
     use crate::console_artifacts::ConsoleArtifacts;
     use crate::console_codegen_error::ConsoleCodegenError;
@@ -104,7 +105,7 @@ impl Farewell {
         serves: bool,
         has_models: bool,
         http_servers: &[HttpServer],
-        serve_inputs: &[margaret_serve_input_codegen::serve_input::ServeInput],
+        serve_inputs: &[ServeInput],
         bindings: &ContainerBindings,
     ) -> Result<ConsoleArtifacts, ConsoleCodegenError> {
         let plan = ConsolePlan::build(index, bindings)?;

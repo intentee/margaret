@@ -1,9 +1,11 @@
 use margaret::framework::macros::build_for_session;
 use margaret::framework::macros::websocket_session;
 
+use crate::reader::Reader;
+
 #[websocket_session(path = "/board/{topic}", server = "public")]
 pub struct BoardSession {
-    reader: Option<crate::reader::Reader>,
+    reader: Option<Reader>,
     topic: String,
 }
 
@@ -14,7 +16,7 @@ impl BoardSession {
     #[build_for_session]
     pub fn assemble(
         #[route_parameter(from = "topic")] topic: String,
-        #[authenticated_user] reader: Option<crate::reader::Reader>,
+        #[authenticated_user] reader: Option<Reader>,
     ) -> anyhow::Result<Self> {
         Ok(Self { reader, topic })
     }

@@ -1,3 +1,4 @@
+use cookie::time::error::ComponentRange;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -6,6 +7,6 @@ pub enum IdentitySessionError {
     CookieExpiration {
         exp: i64,
         #[source]
-        source: cookie::time::error::ComponentRange,
+        source: ComponentRange,
     },
 }

@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_toposort::cycle::Cycle;
-use margaret_toposort::topological_order::topological_order as order_by_dependencies;
+use margaret_toposort::topological_order;
 
 use crate::container_error::ContainerError;
 use crate::dependency_kind::DependencyKind;
@@ -43,5 +43,5 @@ pub(crate) fn topological_order(
         .map(|(key, provider)| (key.clone(), dependency_keys(provider)))
         .collect();
 
-    order_by_dependencies(&dependencies).map_err(|cycle| dependency_cycle(&cycle))
+    topological_order::topological_order(&dependencies).map_err(|cycle| dependency_cycle(&cycle))
 }

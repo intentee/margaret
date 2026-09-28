@@ -1,3 +1,5 @@
+use std::io;
+
 use thiserror::Error;
 
 use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
@@ -21,7 +23,7 @@ pub enum AttributeError {
     FileRead {
         path: String,
         #[source]
-        source: std::io::Error,
+        source: io::Error,
     },
 
     #[error("glob import is not allowed in '{file}'")]

@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use anyhow::anyhow;
 use tokio::net::UnixStream;
+use tokio::time;
 use tokio::time::Instant;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
@@ -26,7 +27,7 @@ pub async fn wait_until_unix_socket_ready(socket_path: &Path, timeout: Duration)
             ));
         }
 
-        tokio::time::sleep(POLL_INTERVAL).await;
+        time::sleep(POLL_INTERVAL).await;
     }
 }
 
@@ -34,6 +35,8 @@ pub async fn wait_until_unix_socket_ready(socket_path: &Path, timeout: Duration)
 mod tests {
     use std::path::PathBuf;
     use std::time::Duration;
+
+    use tokio::net::UnixListener;
 
     use super::wait_until_unix_socket_ready;
 
@@ -50,7 +53,7 @@ mod tests {
     async fn returns_ok_when_socket_already_bound() {
         let tempdir = tempfile::tempdir().unwrap();
         let socket_path = tempdir.path().join("ready.sock");
-        let _listener = tokio::net::UnixListener::bind(&socket_path).unwrap();
+        let _listener = UnixListener::bind(&socket_path).unwrap();
 
         wait_until_unix_socket_ready(&socket_path, Duration::from_secs(1))
             .await

@@ -1,3 +1,4 @@
+use std::io;
 use std::path::PathBuf;
 
 use thiserror::Error;
@@ -18,7 +19,7 @@ pub enum FileJwksSecretStorageError {
     Read {
         path: PathBuf,
         #[source]
-        source: std::io::Error,
+        source: io::Error,
     },
 
     #[error("failed to serialize the jwks secret: {0}")]
@@ -28,6 +29,6 @@ pub enum FileJwksSecretStorageError {
     Write {
         path: PathBuf,
         #[source]
-        source: std::io::Error,
+        source: io::Error,
     },
 }

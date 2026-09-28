@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt::Result as FormatResult;
+use std::fmt::Result;
 
 fn starts_a_name(character: char) -> bool {
     character.is_ascii_alphabetic() || character == '_'
@@ -40,7 +40,7 @@ impl EnvironmentVariableName {
 }
 
 impl Display for EnvironmentVariableName {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> FormatResult {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         formatter.write_str(&self.name)
     }
 }

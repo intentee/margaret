@@ -6,21 +6,48 @@ use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_console_codegen::console_plan::ConsolePlan;
+use margaret_console_codegen::render_console::render_console;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::container_error::ContainerError;
+use margaret_container::framework_construction::FrameworkConstruction;
+use margaret_container::framework_enablement::FrameworkEnablement;
+use margaret_container::framework_injection_role::FrameworkInjectionRole;
+use margaret_container::framework_provider::FrameworkProvider;
+use margaret_container::plan_container::plan_container;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_http_codegen::http_plan::HttpPlan;
+use margaret_http_codegen::http_server::HttpServer;
+use margaret_http_codegen::render_http::render_http;
+use margaret_middleware_codegen::middleware_plan::MiddlewarePlan;
+use margaret_middleware_codegen::middleware_plans::middleware_plans;
+use margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers;
+use margaret_model_codegen::models::models;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
 use margaret_request_binding_codegen::views_availability::ViewsAvailability;
+use margaret_schema_codegen::render_schema::render_schema;
+use margaret_serve_input_codegen::scan::scan;
+use margaret_service_codegen::framework_service::FrameworkService;
+use margaret_service_codegen::render_services::render_services;
+use margaret_service_codegen::service_plan::ServicePlan;
+use margaret_tag_codegen::jwks_client_binding::JwksClientBinding;
 use margaret_tag_codegen::tag_pool::TagPool;
+use margaret_views_codegen::render_views::render_views;
+use margaret_views_codegen::views_plan::ViewsPlan;
+use margaret_websocket_codegen::render_websocket::render_websocket;
+use margaret_websocket_codegen::web_socket_plan::WebSocketPlan;
 
 use crate::asset_bag_modules::asset_bag_modules;
+use crate::asset_responder_canonical_path::asset_responder_canonical_path;
 use crate::build_jwks_artifacts::build_jwks_artifacts;
 use crate::codegen_error::CodegenError;
 use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
 use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
+use crate::jwks_framework_providers::jwks_framework_providers;
+use crate::jwks_secret_storage_provider::jwks_secret_storage_provider;
 use crate::serve_inputs::serve_inputs;
 use crate::umbrella::umbrella;
 use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
@@ -28,23 +55,17 @@ use crate::umbrella_module_name::UMBRELLA_MODULE_NAME;
 /// # Errors
 ///
 /// Returns `CodegenError` propagated from the work it performs.
-fn framework_providers(
-    client_bindings: &[margaret_tag_codegen::jwks_client_binding::JwksClientBinding],
-) -> Vec<margaret_container::framework_provider::FrameworkProvider> {
+fn framework_providers(client_bindings: &[JwksClientBinding]) -> Vec<FrameworkProvider> {
     let mut framework_providers = vec![
-        margaret_container::framework_provider::FrameworkProvider {
-            construction: margaret_container::framework_construction::FrameworkConstruction::Unit,
-            enablement:
-                margaret_container::framework_enablement::FrameworkEnablement::WhenReferenced,
-            injection:
-                margaret_container::framework_injection_role::FrameworkInjectionRole::Unmarked,
-            provided: crate::asset_responder_canonical_path::asset_responder_canonical_path(),
+        FrameworkProvider {
+            construction: FrameworkConstruction::Unit,
+            enablement: FrameworkEnablement::WhenReferenced,
+            injection: FrameworkInjectionRole::Unmarked,
+            provided: asset_responder_canonical_path(),
         },
-        crate::jwks_secret_storage_provider::jwks_secret_storage_provider(),
+        jwks_secret_storage_provider(),
     ];
-    framework_providers.extend(crate::jwks_framework_providers::jwks_framework_providers(
-        client_bindings,
-    ));
+    framework_providers.extend(jwks_framework_providers(client_bindings));
 
     framework_providers
 }
@@ -52,7 +73,7 @@ fn framework_providers(
 struct ServingModules {
     http_roots: Vec<CanonicalPath>,
     modules: Vec<GeneratedModuleTokens>,
-    servers: Vec<margaret_http_codegen::http_server::HttpServer>,
+    servers: Vec<HttpServer>,
     view_roots: Vec<CanonicalPath>,
     websocket_roots: Vec<CanonicalPath>,
 }
@@ -61,20 +82,14 @@ fn render_serving_modules(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
-    middleware_plans: &[margaret_middleware_codegen::middleware_plan::MiddlewarePlan],
+    middleware_plans: &[MiddlewarePlan],
     registries: &BindingRegistries,
 ) -> Result<ServingModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
     let (websocket_roots, websocket_servers) = if features.contains(GeneratedFeature::Websockets) {
-        let plan = margaret_websocket_codegen::web_socket_plan::WebSocketPlan::build(
-            index,
-            bindings,
-            middleware_plans,
-            registries,
-        )?;
-        let artifacts =
-            margaret_websocket_codegen::render_websocket::render_websocket(plan, bindings);
+        let plan = WebSocketPlan::build(index, bindings, middleware_plans, registries)?;
+        let artifacts = render_websocket(plan, bindings);
         modules.extend(artifacts.modules);
 
         (artifacts.retained_roots, artifacts.servers)
@@ -83,8 +98,8 @@ fn render_serving_modules(
     };
 
     let view_roots = if features.contains(GeneratedFeature::Views) {
-        let plan = margaret_views_codegen::views_plan::ViewsPlan::build(index, bindings)?;
-        let artifacts = margaret_views_codegen::render_views::render_views(plan, bindings);
+        let plan = ViewsPlan::build(index, bindings)?;
+        let artifacts = render_views(plan, bindings);
         modules.extend(artifacts.modules);
 
         artifacts.retained_roots
@@ -95,7 +110,7 @@ fn render_serving_modules(
     let (http_roots, servers) = if features.contains(GeneratedFeature::Http)
         || features.contains(GeneratedFeature::Websockets)
     {
-        let plan = margaret_http_codegen::http_plan::HttpPlan::build(
+        let plan = HttpPlan::build(
             index,
             features.contains(GeneratedFeature::Views),
             &websocket_servers,
@@ -103,7 +118,7 @@ fn render_serving_modules(
             bindings,
             registries,
         )?;
-        let artifacts = margaret_http_codegen::render_http::render_http(plan, bindings);
+        let artifacts = render_http(plan, bindings);
         modules.extend(artifacts.modules);
 
         (artifacts.retained_roots, artifacts.servers)
@@ -130,22 +145,17 @@ fn render_role_modules(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
-    jwks_services: &[margaret_service_codegen::framework_service::FrameworkService],
-    servers: &[margaret_http_codegen::http_server::HttpServer],
+    jwks_services: &[FrameworkService],
+    servers: &[HttpServer],
 ) -> Result<RoleModules, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
 
     let serve_inputs = serve_inputs(bindings);
-    let service_plan = margaret_service_codegen::service_plan::ServicePlan::build(
-        index,
-        jwks_services,
-        bindings,
-        &serve_inputs,
-    )?;
+    let service_plan = ServicePlan::build(index, jwks_services, bindings, &serve_inputs)?;
     let service_roots = service_plan.roots().to_vec();
 
     if features.contains(GeneratedFeature::Serves) {
-        modules.push(margaret_service_codegen::render_services::render_services(
+        modules.push(render_services(
             &service_plan,
             servers,
             features.contains(GeneratedFeature::Views),
@@ -154,15 +164,13 @@ fn render_role_modules(
     }
 
     if features.contains(GeneratedFeature::Models) {
-        let models = margaret_model_codegen::models::models(index)?;
-        modules.push(margaret_schema_codegen::render_schema::render_schema(
-            &models,
-        ));
+        let models = models(index)?;
+        modules.push(render_schema(&models));
     }
 
     let console_roots = if features.contains(GeneratedFeature::Console) {
-        let plan = margaret_console_codegen::console_plan::ConsolePlan::build(index, bindings)?;
-        let console = margaret_console_codegen::render_console::render_console(
+        let plan = ConsolePlan::build(index, bindings)?;
+        let console = render_console(
             &plan,
             features.contains(GeneratedFeature::Serves),
             features.contains(GeneratedFeature::Models),
@@ -198,16 +206,12 @@ pub fn build(
         .index_crate(crate_root)?
         .build();
     let mut features = GeneratedFeatures::from_index(&index);
-    let registry = margaret_serve_input_codegen::scan::scan(&index)?;
+    let registry = scan(&index)?;
     let client_bindings = TagPool::collect(&index)
         .map_err(ContainerError::from)?
         .jwks_client_bindings();
     let framework_providers = framework_providers(&client_bindings);
-    let planned_container = margaret_container::plan_container::plan_container(
-        &index,
-        &registry,
-        &framework_providers,
-    )?;
+    let planned_container = plan_container(&index, &registry, &framework_providers)?;
     let bindings = planned_container.bindings();
     let application_roots = planned_container.roots();
     features.enable_if(GeneratedFeature::AssetBag, metafile_contents.is_some());
@@ -237,17 +241,12 @@ pub fn build(
         module_tokens.extend(render_authenticated_user_wrappers(&registries.providers()));
     }
 
-    let middleware_plans =
-        margaret_middleware_codegen::middleware_plans::middleware_plans(&index, &registries)?;
+    let middleware_plans = middleware_plans(&index, &registries)?;
     if features.contains(GeneratedFeature::Middleware)
         && (features.contains(GeneratedFeature::Http)
             || features.contains(GeneratedFeature::Websockets))
     {
-        module_tokens.extend(
-            margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers(
-                &middleware_plans,
-            ),
-        );
+        module_tokens.extend(render_middleware_wrappers(&middleware_plans));
     }
 
     let ServingModules {
@@ -299,6 +298,7 @@ mod tests {
 
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::crate_root::CrateRoot;
+    use margaret_generated_module::generated_module::GeneratedModule;
     use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 
     use super::build;
@@ -453,7 +453,7 @@ struct Room;
     fn concatenated(code: &GeneratedCode) -> String {
         code.modules()
             .iter()
-            .map(margaret_generated_module::generated_module::GeneratedModule::source)
+            .map(GeneratedModule::source)
             .collect::<Vec<&str>>()
             .join("\n")
     }

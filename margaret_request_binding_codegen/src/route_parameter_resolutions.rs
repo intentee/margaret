@@ -178,10 +178,7 @@ mod tests {
         let mut resolutions = resolutions_for(lib_source).expect("the crate is accepted");
 
         match resolutions.remove(&CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
+            segments.iter().map(ToString::to_string).collect(),
         )) {
             Some(RouteParameterResolution::Binder(RouteParameterBinder { provider, .. })) => {
                 ResolvedBy::Binder(provider.to_string())

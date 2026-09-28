@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -17,7 +18,7 @@ use crate::web_socket_codegen_error::WebSocketCodegenError;
 use crate::web_socket_message::WebSocketMessage;
 
 fn retained_roots(sessions: &[SessionPlan]) -> Vec<CanonicalPath> {
-    let mut roots = std::collections::BTreeSet::new();
+    let mut roots = BTreeSet::new();
 
     for session_plan in sessions {
         for layer in &session_plan.session.layers {

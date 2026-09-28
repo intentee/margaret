@@ -1,4 +1,5 @@
 use syn::Attribute;
+use syn::Path;
 
 use crate::attribute_error::AttributeError;
 use crate::canonical_path::CanonicalPath;
@@ -58,7 +59,7 @@ impl ScannedItem {
 
     pub(crate) fn resolve(
         mut self,
-        resolve: impl Copy + Fn(&[String], &syn::Path) -> CanonicalPath,
+        resolve: impl Copy + Fn(&[String], &Path) -> CanonicalPath,
     ) -> Result<IndexedItem, AttributeError> {
         self.methods
             .sort_by(|left, right| left.identifier().cmp(right.identifier()));
@@ -67,7 +68,7 @@ impl ScannedItem {
             .segments()
             .split_last()
             .map_or(&[][..], |(_, module)| module);
-        let resolve_item_path = |path: &syn::Path| resolve(module_path, path);
+        let resolve_item_path = |path: &Path| resolve(module_path, path);
         let attributes = ScannedAttribute::resolve_all(self.attributes, resolve_item_path);
         let fields = self
             .fields

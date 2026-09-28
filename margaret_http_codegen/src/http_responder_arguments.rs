@@ -1,3 +1,5 @@
+use http::Method;
+
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 
 use crate::http_codegen_error::HttpCodegenError;
@@ -5,7 +7,7 @@ use crate::http_codegen_error::HttpCodegenError;
 fn normalized_method(method: &str, responder: &str) -> Result<String, HttpCodegenError> {
     let method = method.to_uppercase();
 
-    http::Method::from_bytes(method.as_bytes()).map_err(|source| {
+    Method::from_bytes(method.as_bytes()).map_err(|source| {
         HttpCodegenError::InvalidHttpMethod {
             responder: responder.to_string(),
             method: method.clone(),

@@ -12,6 +12,7 @@ use rcgen::string::Ia5String;
 use rustls::ClientConfig;
 use rustls::RootCertStore;
 use rustls::ServerConfig;
+use rustls::crypto::aws_lc_rs;
 use rustls::pki_types::PrivateKeyDer;
 use rustls::server::WebPkiClientVerifier;
 
@@ -54,7 +55,7 @@ impl MtlsFixture {
     /// Panics when the fixture it builds cannot be prepared.
     #[must_use]
     pub fn new() -> Self {
-        let _already_installed = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let _already_installed = aws_lc_rs::default_provider().install_default();
 
         let server_name = "localhost".to_string();
         let client_spiffe_id = "spiffe://example.org/test-client".to_string();

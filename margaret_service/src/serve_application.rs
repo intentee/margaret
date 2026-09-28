@@ -1,3 +1,4 @@
+use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -44,7 +45,7 @@ pub fn serve_application(
             UploadConfig::enabled(
                 matches
                     .get_one::<String>(upload_dir_argument)
-                    .map_or_else(std::env::temp_dir, PathBuf::from),
+                    .map_or_else(env::temp_dir, PathBuf::from),
             )
         } else {
             UploadConfig::Disabled
@@ -80,12 +81,15 @@ pub fn serve_application(
 
 #[cfg(test)]
 mod tests {
+    use std::iter;
+
     use clap::Arg;
     use clap::ArgAction;
     use clap::ArgMatches;
     use clap::Command;
 
     use margaret_console::command_outcome::CommandOutcome;
+    use margaret_http::matchit::InsertError;
     use margaret_http::route_entry::RouteEntry;
     use margaret_http::router::Router;
     use margaret_http::server_routes::ServerRoutes;
@@ -103,13 +107,11 @@ mod tests {
                     .action(ArgAction::SetTrue),
             )
             .arg(Arg::new("public-upload-dir").long("public-upload-dir"))
-            .try_get_matches_from(std::iter::once("test").chain(arguments.iter().copied()))
+            .try_get_matches_from(iter::once("test").chain(arguments.iter().copied()))
             .expect("the test arguments parse")
     }
 
-    fn public_assembly(
-        routes: std::result::Result<ServerRoutes, margaret_http::matchit::InsertError>,
-    ) -> ServerAssembly {
+    fn public_assembly(routes: Result<ServerRoutes, InsertError>) -> ServerAssembly {
         ServerAssembly {
             address_argument: "public-addr",
             name: "public",

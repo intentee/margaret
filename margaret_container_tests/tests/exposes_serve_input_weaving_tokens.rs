@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::path::Path;
 
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -40,7 +41,7 @@ fn copy_named(name: &str) -> ServeInput {
     })
 }
 
-fn collapsed<Token: std::fmt::Display>(token: &Token) -> String {
+fn collapsed<Token: Display>(token: &Token) -> String {
     token.to_string().split_whitespace().collect()
 }
 

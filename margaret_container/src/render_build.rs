@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -261,8 +263,7 @@ pub(crate) fn render_build(
     let serve_parameters = arguments_declaration(&serve_function, &serve_slots);
     let serve_arguments_module = arguments_module(&serve_function, &serve_inputs, &serve_slots);
     let serve_statements = flow_statements(&serve_flow);
-    let retained: std::collections::BTreeSet<_> =
-        retained_roots.iter().map(|entry| &entry.key).collect();
+    let retained: BTreeSet<_> = retained_roots.iter().map(|entry| &entry.key).collect();
     let fields = construction_roots
         .iter()
         .enumerate()

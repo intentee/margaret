@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use rustls::ClientConnection;
+use rustls::Error;
 use rustls::ServerConnection;
 use rustls::pki_types::ServerName;
 
@@ -40,7 +41,7 @@ fn mtls_handshake_fails_with_wrong_trust_domain() {
     assert!(
         matches!(
             result,
-            Err(HandshakeError::Tls(rustls::Error::InvalidCertificate(_))),
+            Err(HandshakeError::Tls(Error::InvalidCertificate(_))),
         ),
         "expected TLS certificate error, got: {result:?}",
     );

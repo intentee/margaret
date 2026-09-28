@@ -1,6 +1,7 @@
 use anyhow::Result;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
+use p256::ecdsa::Signature;
 
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
@@ -25,8 +26,7 @@ async fn sign_produces_canonical_low_s_signature() -> Result<()> {
     let token = keypair.signing.sign(&claims).await?;
 
     let (_, signature_segment) = token.rsplit_once('.').unwrap();
-    let signature =
-        p256::ecdsa::Signature::from_slice(&Base64UrlUnpadded::decode_vec(signature_segment)?)?;
+    let signature = Signature::from_slice(&Base64UrlUnpadded::decode_vec(signature_segment)?)?;
     assert!(signature.normalize_s().is_none());
 
     assert!(matches!(

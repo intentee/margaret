@@ -18,9 +18,10 @@ pub fn request_binding_marker(attributes: &[IndexedAttribute]) -> Option<Framewo
 
 #[cfg(test)]
 mod tests {
+    use syn::parse_quote;
+
     use margaret_attributes::framework_attribute::FrameworkAttribute;
     use margaret_attributes::indexed_attribute::IndexedAttribute;
-    use syn::parse_quote;
 
     use super::request_binding_marker;
 

@@ -159,17 +159,11 @@ impl FrameworkAttribute {
 
 #[cfg(test)]
 mod tests {
+    use super::FrameworkAttribute;
     use crate::canonical_path::CanonicalPath;
 
-    use super::FrameworkAttribute;
-
     fn path(segments: &[&str]) -> CanonicalPath {
-        CanonicalPath::new(
-            segments
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
-        )
+        CanonicalPath::new(segments.iter().map(ToString::to_string).collect())
     }
 
     #[test]

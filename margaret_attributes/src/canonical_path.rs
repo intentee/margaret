@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt::Result as FormatResult;
+use std::fmt::Result;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CanonicalPath {
@@ -20,7 +20,7 @@ impl CanonicalPath {
 }
 
 impl Display for CanonicalPath {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> FormatResult {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         write!(formatter, "{}", self.segments.join("::"))
     }
 }

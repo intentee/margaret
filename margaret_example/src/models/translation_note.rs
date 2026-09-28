@@ -1,3 +1,5 @@
+use uuid::Uuid;
+
 use margaret::framework::macros::model;
 
 use crate::models::article_translation::ArticleTranslation;
@@ -6,7 +8,7 @@ use crate::models::article_translation::ArticleTranslation;
 #[derive(Clone)]
 pub struct TranslationNote {
     #[column(primary_key)]
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     #[column]
     pub body: String,
     #[column]

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt::Result as FormatResult;
+use std::fmt::Result;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 
@@ -11,7 +11,7 @@ pub struct ConstructorParameter {
 }
 
 impl Display for ConstructorParameter {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> FormatResult {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         write!(
             formatter,
             "parameter '{}' of '{}'",

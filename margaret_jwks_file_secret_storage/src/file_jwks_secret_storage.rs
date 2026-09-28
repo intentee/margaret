@@ -1,3 +1,5 @@
+use std::fs;
+use std::io;
 use std::io::ErrorKind;
 use std::io::Write;
 use std::path::Path;
@@ -15,12 +17,12 @@ use margaret_jwks_roller::roller_error::RollerError;
 use crate::file_jwks_secret_storage_error::FileJwksSecretStorageError;
 use crate::temporary_file_directory::temporary_file_directory;
 
-fn write_atomically(directory: &Path, path: &Path, document: &[u8]) -> std::io::Result<()> {
+fn write_atomically(directory: &Path, path: &Path, document: &[u8]) -> io::Result<()> {
     let mut file = NamedTempFile::new_in(directory)?;
 
     file.write_all(document)
         .and_then(|()| file.as_file().sync_all())
-        .and_then(|()| file.persist(path).map_err(std::io::Error::from))
+        .and_then(|()| file.persist(path).map_err(io::Error::from))
         .map(|_| ())
 }
 
@@ -73,7 +75,7 @@ impl FileJwksSecretStorage {
 
 impl JwksSecretStorage for FileJwksSecretStorage {
     fn load(&self) -> anyhow::Result<LoadedSecret> {
-        match std::fs::read(&self.path) {
+        match fs::read(&self.path) {
             Ok(bytes) => self.deserialize(&bytes).map_err(Into::into),
             Err(source) if source.kind() == ErrorKind::NotFound => Ok(LoadedSecret::Absent),
             Err(source) => Err(FileJwksSecretStorageError::Read {

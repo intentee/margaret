@@ -7,6 +7,7 @@ use margaret::framework::macros::process;
 use margaret::framework::macros::singleton;
 
 use super::level_two::LevelTwo;
+use super::record::record;
 
 #[singleton]
 #[console_command(name = "level-three")]
@@ -20,7 +21,7 @@ impl LevelThree {
     /// Returns an error propagated from the work it performs.
     #[constructor]
     pub async fn create(dependency: Arc<LevelTwo>) -> anyhow::Result<Self> {
-        super::record::record(2).await;
+        record(2).await;
         Ok(Self {
             _dependency: dependency,
         })

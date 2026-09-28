@@ -98,6 +98,7 @@ impl InputValue {
 mod tests {
     use std::fs;
 
+    use proc_macro2::TokenStream;
     use syn::Type;
     use syn::parse_quote;
     use tempfile::tempdir;
@@ -161,7 +162,7 @@ mod tests {
         InputValue::from_declared(&indexed.index, indexed.item(), declared, &site())
     }
 
-    fn collapsed(tokens: &proc_macro2::TokenStream) -> String {
+    fn collapsed(tokens: &TokenStream) -> String {
         tokens.to_string().split_whitespace().collect()
     }
 

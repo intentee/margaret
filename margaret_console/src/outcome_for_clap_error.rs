@@ -18,11 +18,12 @@ pub fn outcome_for_clap_error(error: &Error) -> CommandOutcome {
 #[cfg(test)]
 mod tests {
     use clap::Command;
+    use clap::Error;
 
     use super::outcome_for_clap_error;
     use crate::command_outcome::CommandOutcome;
 
-    fn clap_error(args: &[&str]) -> clap::Error {
+    fn clap_error(args: &[&str]) -> Error {
         Command::new("app")
             .subcommand(Command::new("greet"))
             .try_get_matches_from(args)

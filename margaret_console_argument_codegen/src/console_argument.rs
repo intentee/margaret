@@ -48,25 +48,22 @@ impl ConsoleArgument {
 
 #[cfg(test)]
 mod tests {
+    use proc_macro2::TokenStream;
+
     use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_input_weaving::input_value::InputValue;
     use margaret_input_weaving::weaving_kind::WeavingKind;
 
     use super::ConsoleArgument;
 
-    fn collapsed(tokens: &proc_macro2::TokenStream) -> String {
+    fn collapsed(tokens: &TokenStream) -> String {
         tokens.to_string().split_whitespace().collect()
     }
 
     fn value(required: bool, weaving: WeavingKind, segments: &[&str]) -> InputValue {
         InputValue {
             required,
-            value_type: CanonicalPath::new(
-                segments
-                    .iter()
-                    .map(std::string::ToString::to_string)
-                    .collect(),
-            ),
+            value_type: CanonicalPath::new(segments.iter().map(ToString::to_string).collect()),
             weaving,
         }
     }

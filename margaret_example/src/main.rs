@@ -1,8 +1,11 @@
+use std::env;
+
 use margaret::framework::console::command_outcome::CommandOutcome;
+use margaret_example::margaret::run;
 
 #[tokio::main]
 async fn main() -> CommandOutcome {
-    margaret_example::margaret::run::run(std::env::args_os()).await
+    run::run(env::args_os()).await
 }
 
 #[cfg(test)]

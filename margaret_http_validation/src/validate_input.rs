@@ -2,6 +2,8 @@ use serde::de::DeserializeOwned;
 use validator::Validate;
 
 use margaret_http::request::Request;
+use margaret_validation::validate::validate;
+use margaret_validation::validate_json::validate_json;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::request_input::RequestInput;
@@ -12,12 +14,10 @@ where
     Model: DeserializeOwned + Validate,
 {
     match source {
-        RequestInput::Cookie => margaret_validation::validate::validate(&request.inputs.cookies),
-        RequestInput::Form => margaret_validation::validate::validate(&request.inputs.form),
-        RequestInput::Query => margaret_validation::validate::validate(&request.inputs.query),
-        RequestInput::Json => {
-            margaret_validation::validate_json::validate_json(request.inputs.json.as_ref())
-        }
+        RequestInput::Cookie => validate(&request.inputs.cookies),
+        RequestInput::Form => validate(&request.inputs.form),
+        RequestInput::Query => validate(&request.inputs.query),
+        RequestInput::Json => validate_json(request.inputs.json.as_ref()),
     }
 }
 
@@ -26,7 +26,9 @@ mod tests {
     use std::collections::HashMap;
 
     use http::Method;
+    use serde::Deserialize;
     use serde_json::json;
+    use validator::Validate;
 
     use margaret_http::request::Request;
     use margaret_validation::validation_result::ValidationResult;
@@ -34,7 +36,7 @@ mod tests {
     use super::validate_input;
     use crate::request_input::RequestInput;
 
-    #[derive(Debug, serde::Deserialize, validator::Validate)]
+    #[derive(Debug, Deserialize, Validate)]
     struct Sample {
         #[validate(length(min = 1))]
         value: String,

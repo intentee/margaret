@@ -28,9 +28,8 @@ impl FromIterator<CanonicalPath> for ItemPaths {
 
 #[cfg(test)]
 mod tests {
-    use crate::canonical_path::CanonicalPath;
-
     use super::ItemPaths;
+    use crate::canonical_path::CanonicalPath;
 
     fn path(segment: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), segment.to_string()])

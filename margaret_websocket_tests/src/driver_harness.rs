@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use futures_util::SinkExt;
 use futures_util::StreamExt;
+use tokio::io;
 use tokio::io::DuplexStream;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::WebSocketStream;
@@ -23,7 +24,7 @@ pub struct DriverHarness {
 
 impl DriverHarness {
     pub async fn spawn(dispatch_table: Arc<WebSocketDispatchTable<TestSession>>) -> Self {
-        let (server_io, client_io) = tokio::io::duplex(65536);
+        let (server_io, client_io) = io::duplex(65536);
         let server = WebSocketStream::from_raw_socket(server_io, Role::Server, None).await;
         let client = WebSocketStream::from_raw_socket(client_io, Role::Client, None).await;
         let session = Arc::new(TestSession::default());

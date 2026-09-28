@@ -1,4 +1,5 @@
 use failures as errors;
+
 use margaret::framework::macros::build_for_session;
 use margaret::framework::macros::websocket_session;
 

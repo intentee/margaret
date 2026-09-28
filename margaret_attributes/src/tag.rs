@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt::Result as FormatResult;
+use std::fmt::Result;
 
 use proc_macro2::Ident;
 use syn::Path;
@@ -39,7 +39,7 @@ impl Tag {
 }
 
 impl Display for Tag {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> FormatResult {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         Display::fmt(&self.name, formatter)
     }
 }

@@ -9,10 +9,14 @@ use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
+use crate::reader::Reader;
+use crate::reader::reader_cookie::ReaderCookie;
+use crate::reader::reader_realm::ReaderRealm;
+
 #[singleton]
-#[infers_authenticated_user(user_model = crate::reader::Reader)]
+#[infers_authenticated_user(user_model = Reader)]
 pub struct SessionReaderProvider {
-    realm: Arc<crate::reader::reader_realm::ReaderRealm>,
+    realm: Arc<ReaderRealm>,
 }
 
 impl SessionReaderProvider {
@@ -20,7 +24,7 @@ impl SessionReaderProvider {
     ///
     /// Returns an error propagated from the work it performs.
     #[constructor]
-    pub fn create(realm: Arc<crate::reader::reader_realm::ReaderRealm>) -> anyhow::Result<Self> {
+    pub fn create(realm: Arc<ReaderRealm>) -> anyhow::Result<Self> {
         Ok(Self { realm })
     }
 
@@ -31,8 +35,8 @@ impl SessionReaderProvider {
     pub fn infer_reader(
         &self,
         request: &Request,
-        #[form_request(from = Cookie)] cookie: crate::reader::reader_cookie::ReaderCookie,
-    ) -> anyhow::Result<AuthenticatedUserOutcome<crate::reader::Reader>> {
+        #[form_request(from = Cookie)] cookie: ReaderCookie,
+    ) -> anyhow::Result<AuthenticatedUserOutcome<Reader>> {
         let _ = request.inputs.server.path();
 
         let Some(reader) = cookie.reader else {
@@ -40,7 +44,7 @@ impl SessionReaderProvider {
         };
 
         Ok(if self.realm.admits(&reader) {
-            AuthenticatedUserOutcome::Authenticated(crate::reader::Reader { name: reader })
+            AuthenticatedUserOutcome::Authenticated(Reader { name: reader })
         } else {
             AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(Response::forbidden()))
         })

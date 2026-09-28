@@ -1,6 +1,7 @@
 use anyhow::Result;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
+use p256::ecdsa::Signature;
 
 use margaret_jwks_keygen::curve::Curve;
 use margaret_jwks_keygen::generate_keypair::generate_keypair;
@@ -25,10 +26,9 @@ async fn verify_rejects_high_s_malleated_token() -> Result<()> {
 
     let token = keypair.signing.sign(&claims).await?;
     let (signing_input, signature_segment) = token.rsplit_once('.').unwrap();
-    let signature =
-        p256::ecdsa::Signature::from_slice(&Base64UrlUnpadded::decode_vec(signature_segment)?)?;
+    let signature = Signature::from_slice(&Base64UrlUnpadded::decode_vec(signature_segment)?)?;
     let (r, s) = signature.split_scalars();
-    let malleated_signature = p256::ecdsa::Signature::from_scalars(r, -s)?;
+    let malleated_signature = Signature::from_scalars(r, -s)?;
     let malleated = format!(
         "{signing_input}.{}",
         Base64UrlUnpadded::encode_string(&malleated_signature.to_bytes())

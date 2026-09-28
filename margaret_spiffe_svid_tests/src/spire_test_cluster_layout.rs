@@ -2,6 +2,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::Result;
+use tokio::fs;
 
 use crate::parse_join_token::parse_join_token;
 use crate::run_spire_command::run_spire_command;
@@ -69,7 +70,7 @@ impl SpireTestClusterLayout {
         )
         .await?;
 
-        tokio::fs::write(&self.trust_bundle_path, &trust_bundle).await?;
+        fs::write(&self.trust_bundle_path, &trust_bundle).await?;
 
         Ok(trust_bundle)
     }
@@ -78,8 +79,8 @@ impl SpireTestClusterLayout {
     ///
     /// Returns an error propagated from the work it performs.
     pub async fn prepare_data_dirs(&self) -> Result<()> {
-        tokio::fs::create_dir_all(&self.server_data_dir).await?;
-        tokio::fs::create_dir_all(&self.agent_data_dir).await?;
+        fs::create_dir_all(&self.server_data_dir).await?;
+        fs::create_dir_all(&self.agent_data_dir).await?;
 
         Ok(())
     }
@@ -197,6 +198,8 @@ plugins {{
 
 #[cfg(test)]
 mod tests {
+    use tokio::fs;
+
     use super::SpireTestClusterLayout;
 
     #[tokio::test]
@@ -215,7 +218,7 @@ mod tests {
         let tempdir = tempfile::tempdir().unwrap();
         let layout = SpireTestClusterLayout::new(tempdir.path(), "spiffe.test", 1234);
 
-        tokio::fs::write(&layout.server_data_dir, b"blocker")
+        fs::write(&layout.server_data_dir, b"blocker")
             .await
             .unwrap();
 
@@ -229,9 +232,7 @@ mod tests {
         let tempdir = tempfile::tempdir().unwrap();
         let layout = SpireTestClusterLayout::new(tempdir.path(), "spiffe.test", 1234);
 
-        tokio::fs::write(&layout.agent_data_dir, b"blocker")
-            .await
-            .unwrap();
+        fs::write(&layout.agent_data_dir, b"blocker").await.unwrap();
 
         let result = layout.prepare_data_dirs().await;
 
