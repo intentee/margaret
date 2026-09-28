@@ -1,5 +1,9 @@
 use std::ops::ControlFlow;
 
+use aws_lc_rs::encoding::AsDer;
+use aws_lc_rs::signature::ParsedPublicKey;
+use aws_lc_rs::signature::RSA_PKCS1_2048_8192_SHA256;
+use aws_lc_rs::signature::RsaPublicKeyComponents;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 use p256::ecdsa::signature::Verifier;
@@ -18,11 +22,18 @@ fn coordinate_length(curve: Curve) -> usize {
     }
 }
 
+fn decoded(
+    encoded: &str,
+    rejection: impl FnOnce(base64ct::Error) -> JwkRejection,
+) -> ControlFlow<JwkRejection, Vec<u8>> {
+    match Base64UrlUnpadded::decode_vec(encoded) {
+        Ok(bytes) => ControlFlow::Continue(bytes),
+        Err(source) => ControlFlow::Break(rejection(source)),
+    }
+}
+
 fn coordinate(curve: Curve, encoded: &str) -> ControlFlow<JwkRejection, Vec<u8>> {
-    let bytes = match Base64UrlUnpadded::decode_vec(encoded) {
-        Ok(bytes) => bytes,
-        Err(source) => return ControlFlow::Break(JwkRejection::CoordinateBase64 { source }),
-    };
+    let bytes = decoded(encoded, |source| JwkRejection::CoordinateBase64 { source })?;
     let expected = coordinate_length(curve);
 
     if bytes.len() != expected {
@@ -35,7 +46,17 @@ fn coordinate(curve: Curve, encoded: &str) -> ControlFlow<JwkRejection, Vec<u8>>
     ControlFlow::Continue(bytes)
 }
 
-fn verification<Signature, Key: Verifier<Signature>>(
+fn significant_bits(big_endian: &[u8]) -> u64 {
+    big_endian.iter().fold(0, |bits, octet| {
+        if bits == 0 {
+            u64::from(u8::BITS - octet.leading_zeros())
+        } else {
+            bits + u64::from(u8::BITS)
+        }
+    })
+}
+
+fn ecdsa_verification<Signature, Key: Verifier<Signature>>(
     key: &Key,
     message: &[u8],
     signature: Result<Signature, p256::ecdsa::Error>,
@@ -43,9 +64,9 @@ fn verification<Signature, Key: Verifier<Signature>>(
     match signature {
         Ok(signature) => match key.verify(message, &signature) {
             Ok(()) => SignatureCheck::Matches,
-            Err(source) => SignatureCheck::Mismatch(source),
+            Err(source) => SignatureCheck::EcdsaMismatch(source),
         },
-        Err(source) => SignatureCheck::Malformed(source),
+        Err(source) => SignatureCheck::EcdsaMalformed(source),
     }
 }
 
@@ -53,6 +74,7 @@ fn verification<Signature, Key: Verifier<Signature>>(
 pub(crate) enum VerificationMaterial {
     P256(p256::ecdsa::VerifyingKey),
     P384(p384::ecdsa::VerifyingKey),
+    Rs256(ParsedPublicKey),
 }
 
 impl VerificationMaterial {
@@ -79,14 +101,46 @@ impl VerificationMaterial {
         }
     }
 
+    pub(crate) fn from_rsa_components(n: &str, e: &str) -> ControlFlow<JwkRejection, Self> {
+        let modulus = decoded(n, |source| JwkRejection::ModulusBase64 { source })?;
+        let exponent = decoded(e, |source| JwkRejection::ExponentBase64 { source })?;
+        let bits = significant_bits(&modulus);
+
+        if bits < u64::from(RSA_PKCS1_2048_8192_SHA256.min_modulus_len())
+            || bits > u64::from(RSA_PKCS1_2048_8192_SHA256.max_modulus_len())
+        {
+            return ControlFlow::Break(JwkRejection::ModulusSize { bits });
+        }
+
+        let components = RsaPublicKeyComponents {
+            n: modulus.as_slice(),
+            e: exponent.as_slice(),
+        };
+        let public_key = match components.as_der() {
+            Ok(public_key) => public_key,
+            Err(source) => {
+                return ControlFlow::Break(JwkRejection::RsaComponentsNotMinimal { source });
+            }
+        };
+
+        match ParsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, public_key.as_ref()) {
+            Ok(parsed) => ControlFlow::Continue(Self::Rs256(parsed)),
+            Err(source) => ControlFlow::Break(JwkRejection::InvalidRsaKey { source }),
+        }
+    }
+
     pub(crate) fn check(&self, message: &[u8], signature: &[u8]) -> SignatureCheck {
         match self {
             Self::P256(key) => {
-                verification(key, message, p256::ecdsa::Signature::from_slice(signature))
+                ecdsa_verification(key, message, p256::ecdsa::Signature::from_slice(signature))
             }
             Self::P384(key) => {
-                verification(key, message, p384::ecdsa::Signature::from_slice(signature))
+                ecdsa_verification(key, message, p384::ecdsa::Signature::from_slice(signature))
             }
+            Self::Rs256(key) => match key.verify_sig(message, signature) {
+                Ok(()) => SignatureCheck::Matches,
+                Err(source) => SignatureCheck::RsaMismatch(source),
+            },
         }
     }
 }
@@ -101,6 +155,10 @@ mod tests {
     use super::VerificationMaterial;
     use crate::signature_check::SignatureCheck;
 
+    const RFC_7515_A2_N: &str = "ofgWCuLjybRlzo0tZWJjNiuSfb4p4fAkd_wWJcyQoTbji9k0l8W26mPddxHmfHQp-Vaw-4qPCJrcS2mJPMEzP1Pt0Bm4d4QlL-yRT-SFd2lZS-pCgNMsD1W_YpRPEwOWvG6b32690r2jZ47soMZo9wGzjb_7OMg0LOL-bSf63kpaSHSXndS5z5rexMdbBYUsLA9e-KXBdQOS-UTo7WTBEMa2R2CapHg665xsmtdVMTBQY4uDZlxvb3qCo5ZwKh9kG4LT6_I5IhlJH7aGhyxXFvUK-DWNmoudF8NAco9_h9iaGNj8q2ethFkMLs91kzk2PAcDTW9gb54h4FRWyuXpoQ";
+    const RFC_7515_A2_E: &str = "AQAB";
+    const RFC_7515_A2_SIGNING_INPUT: &str = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ";
+    const RFC_7515_A2_SIGNATURE: &str = "cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw";
     const RFC_7515_A3_X: &str = "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU";
     const RFC_7515_A3_Y: &str = "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0";
     const RFC_7515_A3_SIGNING_INPUT: &str = "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ";
@@ -113,11 +171,11 @@ mod tests {
             .expect("the RFC 7515 A.3 key is accepted")
     }
 
-    fn outcome(signing_input: &str, signature: &[u8]) -> &'static str {
-        match rfc_7515_a3_key().check(signing_input.as_bytes(), signature) {
-            SignatureCheck::Malformed(_) => "malformed",
+    fn outcome(key: &VerificationMaterial, signing_input: &str, signature: &[u8]) -> &'static str {
+        match key.check(signing_input.as_bytes(), signature) {
+            SignatureCheck::EcdsaMalformed(_) => "malformed",
+            SignatureCheck::EcdsaMismatch(_) | SignatureCheck::RsaMismatch(_) => "mismatch",
             SignatureCheck::Matches => "matches",
-            SignatureCheck::Mismatch(_) => "mismatch",
         }
     }
 
@@ -126,9 +184,27 @@ mod tests {
     }
 
     #[test]
+    fn verifies_the_rfc_7515_a2_example() {
+        let key = VerificationMaterial::from_rsa_components(RFC_7515_A2_N, RFC_7515_A2_E)
+            .continue_value()
+            .expect("the RFC 7515 A.2 key is accepted");
+        let signature = Base64UrlUnpadded::decode_vec(RFC_7515_A2_SIGNATURE)
+            .expect("the RFC signature decodes");
+
+        assert_eq!(
+            outcome(&key, RFC_7515_A2_SIGNING_INPUT, &signature),
+            "matches"
+        );
+    }
+
+    #[test]
     fn verifies_the_rfc_7515_a3_example() {
         assert_eq!(
-            outcome(RFC_7515_A3_SIGNING_INPUT, &rfc_7515_a3_signature()),
+            outcome(
+                &rfc_7515_a3_key(),
+                RFC_7515_A3_SIGNING_INPUT,
+                &rfc_7515_a3_signature()
+            ),
             "matches"
         );
     }
@@ -136,7 +212,11 @@ mod tests {
     #[test]
     fn reports_the_rfc_7515_a3_signature_over_another_input_as_a_mismatch() {
         assert_eq!(
-            outcome("eyJhbGciOiJFUzI1NiJ9.e30", &rfc_7515_a3_signature()),
+            outcome(
+                &rfc_7515_a3_key(),
+                "eyJhbGciOiJFUzI1NiJ9.e30",
+                &rfc_7515_a3_signature()
+            ),
             "mismatch"
         );
     }
@@ -145,6 +225,7 @@ mod tests {
     fn reports_a_truncated_signature_as_malformed() {
         assert_eq!(
             outcome(
+                &rfc_7515_a3_key(),
                 RFC_7515_A3_SIGNING_INPUT,
                 rfc_7515_a3_signature()
                     .split_last()

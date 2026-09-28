@@ -14,7 +14,10 @@ fn publishes_a_p384_key_as_an_es384_jwk() {
         kid,
         key_use,
         ..
-    }) = pair.public_jwk().clone();
+    }) = pair.public_jwk().clone()
+    else {
+        panic!("the pair publishes an ec key");
+    };
 
     assert_eq!(alg, Some(JwsAlgorithm::Es384));
     assert_eq!(crv, Curve::P384);

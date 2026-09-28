@@ -21,7 +21,9 @@ async fn persisted_jwks_secret_reads_the_format_of_earlier_releases() -> Result<
     };
     let pair = fixture_pair(Curve::P256, "fixture-kid");
     let token = pair.sign(&claims).await?;
-    let Jwk::Ec(EcJwk { x, y, .. }) = pair.public_jwk().clone();
+    let Jwk::Ec(EcJwk { x, y, .. }) = pair.public_jwk().clone() else {
+        panic!("the pair publishes an ec key");
+    };
     let pair_json = json!({
         "signing": { "crv": "P-256", "kid": "fixture-kid", "pem": pair.signing_key().pem().as_str() },
         "public": { "crv": "P-256", "kid": "fixture-kid", "kty": "EC", "use": "sig", "x": x, "y": y }
@@ -31,7 +33,10 @@ async fn persisted_jwks_secret_reads_the_format_of_earlier_releases() -> Result<
         x: next_x,
         y: next_y,
         ..
-    }) = next.public_jwk().clone();
+    }) = next.public_jwk().clone()
+    else {
+        panic!("the pair publishes an ec key");
+    };
     let next_json = json!({
         "signing": { "crv": "P-256", "kid": "next-kid", "pem": next.signing_key().pem().as_str() },
         "public": { "crv": "P-256", "kid": "next-kid", "kty": "EC", "use": "sig", "x": next_x, "y": next_y }
