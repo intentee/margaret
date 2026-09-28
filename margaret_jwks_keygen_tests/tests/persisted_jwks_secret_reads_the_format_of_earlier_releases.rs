@@ -1,15 +1,16 @@
 use anyhow::Result;
-
-use margaret_jose_parameters::curve::Curve;
-use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
-use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use serde_json::json;
 
+use margaret_jose_parameters::curve::Curve;
+use margaret_jose_parameters::jwt_type::JwtType;
+use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_keygen::persisted_jwks_secret::PersistedJwksSecret;
 use margaret_jwks_keygen_tests::fixture_pair::fixture_pair;
+use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jws_verification::ec_jwk::EcJwk;
 use margaret_jws_verification::jwk::Jwk;
+use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[test]
@@ -44,7 +45,7 @@ fn persisted_jwks_secret_reads_the_format_of_earlier_releases() -> Result<()> {
         serde_json::from_value::<PersistedJwksSecret>(document)?.into_secret()?;
 
     assert!(matches!(
-        secret.verify_jwt::<TestClaims>(&token, NumericDate::new(0)),
+        secret.verify_jwt::<TestClaims>(&token, TypeHeaderExpectation::Required(JwtType::AccessToken), NumericDate::new(0)),
         JwksSecretVerificationResult::SignedWithCurrent(verified) if verified.claims == claims
     ));
 

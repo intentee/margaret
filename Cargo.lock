@@ -2409,6 +2409,7 @@ dependencies = [
 name = "margaret_identity_session"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "cookie",
  "margaret_registered_claims",
  "serde",
@@ -2486,6 +2487,7 @@ dependencies = [
  "chrono",
  "log",
  "margaret_issuer_document_fetch",
+ "margaret_jose_parameters",
  "margaret_jwks_endpoint",
  "margaret_jws_verification",
  "margaret_jwt_verification",
@@ -2690,7 +2692,9 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "margaret_identity_session",
+ "margaret_jose_parameters",
  "margaret_jwks_keygen",
+ "margaret_jwt_verification",
  "margaret_registered_claims",
  "margaret_token_signer",
  "serde",
@@ -2745,6 +2749,7 @@ dependencies = [
 name = "margaret_jwt_verification"
 version = "0.1.0"
 dependencies = [
+ "margaret_jose_parameters",
  "margaret_jws_verification",
  "margaret_registered_claims",
  "serde",
@@ -3192,9 +3197,9 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "margaret_identity_session",
+ "margaret_jose_parameters",
  "margaret_jwks_keygen",
  "margaret_jwt_verification",
- "margaret_registered_claims",
  "serde",
 ]
 
@@ -3210,6 +3215,7 @@ dependencies = [
  "margaret_jwt_verification",
  "margaret_registered_claims",
  "margaret_token_signer",
+ "serde_json",
  "uuid",
 ]
 

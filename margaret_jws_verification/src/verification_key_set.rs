@@ -90,7 +90,13 @@ impl VerificationKeySet {
 
     fn verified(&self, token: &str) -> ControlFlow<JwsRejection, VerifiedJws> {
         let CompactJws {
-            header: JwsHeader { alg, crit, kid },
+            header:
+                JwsHeader {
+                    alg,
+                    crit,
+                    kid,
+                    typ,
+                },
             payload,
             signature,
             signing_input,
@@ -127,7 +133,7 @@ impl VerificationKeySet {
             SignatureCheck::EcdsaMismatch(source) => {
                 ControlFlow::Break(JwsRejection::EcdsaSignatureMismatch { source })
             }
-            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws { kid, payload }),
+            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws { kid, payload, typ }),
             SignatureCheck::RsaMismatch(source) => {
                 ControlFlow::Break(JwsRejection::RsaSignatureMismatch { source })
             }

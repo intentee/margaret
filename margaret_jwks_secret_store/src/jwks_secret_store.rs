@@ -9,13 +9,15 @@ use serde_json::map::Entry;
 use uuid::Uuid;
 
 use margaret_identity_session::access_token_claims_signed::AccessTokenClaimsSigned;
-use margaret_identity_session::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
+use margaret_identity_session::access_token_stamp::AccessTokenStamp;
 use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
 use margaret_identity_session::refresh_token_claims_signed::RefreshTokenClaimsSigned;
 use margaret_identity_session::refresh_token_lifetime_secs::REFRESH_TOKEN_LIFETIME_SECS;
+use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
+use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
@@ -51,7 +53,9 @@ impl JwksSecretStore {
 
         Ok(RefreshTokenClaimsSigned {
             exp: registered.exp.seconds_since_epoch(),
-            signed_claims: secret.current().sign_json(&claims.to_payload(&registered)),
+            signed_claims: secret
+                .current()
+                .sign_json(&claims.to_payload(&registered), JwtType::Jwt),
         })
     }
 
@@ -83,8 +87,8 @@ impl JwksSecretStore {
         else {
             return Ok(AccessTokenSigning::ClaimsNotAnObject);
         };
-        let registered = RegisteredClaims::issued_at(now, ACCESS_TOKEN_LIFETIME_SECS);
-        let mut payload = registered.to_json();
+        let stamp = AccessTokenStamp::issued_at(now);
+        let mut payload = stamp.to_json();
 
         for (member, value) in application_claims {
             match payload.entry(member) {
@@ -100,8 +104,10 @@ impl JwksSecretStore {
         }
 
         Ok(AccessTokenSigning::Signed(AccessTokenClaimsSigned {
-            exp: registered.exp.seconds_since_epoch(),
-            signed_claims: secret.current().sign_json(&Value::Object(payload)),
+            exp: stamp.registered.exp.seconds_since_epoch(),
+            signed_claims: secret
+                .current()
+                .sign_json(&Value::Object(payload), JwtType::AccessToken),
         }))
     }
 
@@ -113,9 +119,11 @@ impl JwksSecretStore {
         token: &str,
         now: DateTime<Utc>,
     ) -> Result<JwksSecretVerificationResult<TClaims>, JwksSecretStoreError> {
-        Ok(self
-            .current_secret()?
-            .verify_jwt(token, NumericDate::from(now)))
+        Ok(self.current_secret()?.verify_jwt(
+            token,
+            TypeHeaderExpectation::Required(JwtType::AccessToken),
+            NumericDate::from(now),
+        ))
     }
 
     fn current_secret(&self) -> Result<Arc<JwksSecret>, JwksSecretStoreError> {

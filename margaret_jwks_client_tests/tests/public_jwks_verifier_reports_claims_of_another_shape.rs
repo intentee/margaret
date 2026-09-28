@@ -1,6 +1,7 @@
 use serde_json::json;
 
 use margaret_jose_parameters::curve::Curve;
+use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_client::access_token_verification::AccessTokenVerification;
 use margaret_jwks_client_tests::verifier_holding::verifier_holding;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
@@ -16,7 +17,7 @@ fn public_jwks_verifier_reports_claims_of_another_shape() {
     let secret = JwksSecret::fresh(Curve::P256).expect("a fresh secret");
     let token = secret
         .current()
-        .sign_json(&json!("not the expected claims"));
+        .sign_json(&json!("not the expected claims"), JwtType::AccessToken);
 
     let KeySetParsing::Accepted(key_set) = published_key_set(&secret) else {
         panic!("the published key set is accepted");

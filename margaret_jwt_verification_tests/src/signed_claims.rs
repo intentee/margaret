@@ -1,4 +1,5 @@
 use serde_json::Value;
+use serde_json::json;
 
 use margaret_jose_parameters::curve::Curve;
 use margaret_jws_verification::key_set_parsing::KeySetParsing;
@@ -15,9 +16,23 @@ impl SignedClaims {
     pub fn new(claims: &Value) -> Self {
         let key = FixtureKey::generate(Curve::P256, "kid");
 
+        Self::signed(&key, &key.header(), claims)
+    }
+
+    #[must_use]
+    pub fn typed(typ: &str, claims: &Value) -> Self {
+        let key = FixtureKey::generate(Curve::P256, "kid");
+        let mut header = key.header();
+
+        header["typ"] = json!(typ);
+
+        Self::signed(&key, &header, claims)
+    }
+
+    fn signed(key: &FixtureKey, header: &Value, claims: &Value) -> Self {
         Self {
             key_set: VerificationKeySet::from_jwks(vec![key.jwk()]),
-            token: key.token(&key.header(), claims),
+            token: key.token(header, claims),
         }
     }
 }

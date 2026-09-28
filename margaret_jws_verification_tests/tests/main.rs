@@ -7,6 +7,7 @@ mod rejects_a_coordinate_that_is_not_base64url;
 mod rejects_a_document_that_is_not_a_key_set;
 mod rejects_a_header_that_is_not_a_jws_header;
 mod rejects_a_header_that_is_not_base64url;
+mod rejects_a_header_whose_type_is_not_a_string;
 mod rejects_a_key_meant_for_encryption;
 mod rejects_a_key_of_an_unsupported_type;
 mod rejects_a_key_whose_alg_disagrees_with_its_curve;
