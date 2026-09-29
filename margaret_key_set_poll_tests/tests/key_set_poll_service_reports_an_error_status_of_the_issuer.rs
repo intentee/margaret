@@ -12,7 +12,6 @@ use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_issuer_document_fetch::issuer_document_client::IssuerDocumentClient;
 use margaret_key_set_poll::key_set_poll::KeySetPoll;
 use margaret_key_set_poll::key_set_poll_failure::KeySetPollFailure;
-use margaret_key_set_poll::key_set_poll_interval_before_ready::KEY_SET_POLL_INTERVAL_BEFORE_READY;
 use margaret_key_set_poll::key_set_poll_service::KeySetPollService;
 use margaret_key_set_poll::verification_key_set_holder::VerificationKeySetHolder;
 use margaret_key_set_poll_tests::fixed_key_set_locator::FixedKeySetLocator;
@@ -46,12 +45,7 @@ async fn key_set_poll_service_reports_an_error_status_of_the_issuer() {
         verification_key_set_holder: VerificationKeySetHolder::default(),
     };
 
-    let poll = service
-        .fetch_key_set(
-            &CancellationToken::new(),
-            KEY_SET_POLL_INTERVAL_BEFORE_READY,
-        )
-        .await;
+    let poll = service.fetch_key_set(&CancellationToken::new()).await;
 
     assert!(matches!(
         poll,

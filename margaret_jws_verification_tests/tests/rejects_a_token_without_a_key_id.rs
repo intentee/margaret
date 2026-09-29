@@ -5,14 +5,16 @@ use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::jws_rejection::JwsRejection;
 use margaret_jws_verification::jws_verification::JwsVerification;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
 
 #[test]
 fn rejects_a_token_without_a_key_id() {
     let key = FixtureKey::generate(Curve::P256, "kid");
-    let KeySetParsing::Accepted(key_set) = VerificationKeySet::from_jwks(vec![key.jwk()]) else {
+    let KeySetAssembly::Assembled(key_set) =
+        VerificationKeySet::assemble(vec![key.verification_key()])
+    else {
         panic!("the fixture key set is accepted");
     };
 

@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use margaret_attributes::canonical_path::CanonicalPath;
+use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 use margaret_serve_input_codegen::serve_input_key::ServeInputKey;
 use margaret_serve_input_codegen::serve_input_registry::ServeInputRegistry;
@@ -19,6 +20,7 @@ pub(crate) struct ContainerPlan {
     inputs: Arc<[ServeInput]>,
     positions: BTreeMap<CanonicalPath, usize>,
     injectable: BTreeSet<CanonicalPath>,
+    serve_input_naming: ServeInputNaming,
     slots: Arc<BTreeMap<ServeInputKey, usize>>,
 }
 
@@ -101,6 +103,7 @@ impl ContainerPlan {
 
         Ok(Self {
             entries: ordered,
+            serve_input_naming: ServeInputNaming::for_slot_count(inputs.len()),
             inputs: inputs.into(),
             positions,
             injectable,
@@ -134,6 +137,10 @@ impl ContainerPlan {
 
     pub(crate) fn roots(&self) -> impl Iterator<Item = &CanonicalPath> {
         self.entries.iter().map(|entry| &entry.key)
+    }
+
+    pub(crate) fn serve_input_naming(&self) -> ServeInputNaming {
+        self.serve_input_naming
     }
 
     pub(crate) fn slots(&self) -> Arc<BTreeMap<ServeInputKey, usize>> {

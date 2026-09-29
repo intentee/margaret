@@ -12,6 +12,7 @@ margaret_jose_parameters = { workspace = true }
 margaret_jws_verification = { workspace = true }
 p256 = { workspace = true }
 p384 = { workspace = true }
+rcgen = { workspace = true }
 serde_json = { workspace = true }
 
 [[test]]

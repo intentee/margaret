@@ -17,6 +17,7 @@ members = [
     "margaret_codegen_tests/tests/fixtures/fallible_roles",
     "margaret_codegen_tests/tests/fixtures/jwks_token_trust",
     "margaret_codegen_tests/tests/fixtures/linear_construction_future",
+    "margaret_codegen_tests/tests/fixtures/many_serve_inputs",
     "margaret_codegen_tests/tests/fixtures/oidc_bearer_identity",
     "margaret_codegen_tests/tests/fixtures/oidc_issuers",
     "margaret_codegen_tests/tests/fixtures/route_parameter_values",
@@ -165,6 +166,7 @@ rcgen = "0.14"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 rust_decimal = { version = "1.42", default-features = false, features = ["std"] }
 rustls = "0.23"
+rustls-pki-types = "1.15"
 rustls-webpki = "0.103"
 serde = "1.0"
 serde_json = "1.0"

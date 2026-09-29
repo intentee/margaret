@@ -1,7 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use margaret_codegen_tokens::serve_input_ident::serve_input_ident;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::serve_input_binding::ServeInputBinding;
 use margaret_input_weaving::owned_weave::owned_weave;
@@ -22,10 +21,11 @@ impl ServeInputs {
     ) -> Result<Self, ServiceCodegenError> {
         let mut resolutions = Vec::with_capacity(serve_inputs.len());
         let mut construction_arguments = Vec::with_capacity(serve_inputs.len());
+        let naming = bindings.serve_input_naming();
 
         for input in serve_inputs {
             let slot = bindings.serve_input_slot(&input.slot_key())?;
-            let ident = serve_input_ident(slot);
+            let ident = naming.ident(slot);
             let value = serve_input_read(input);
 
             resolutions.push(quote! { let #ident = #value; });

@@ -4,7 +4,6 @@ use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_key_error::JwksKeyError;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::persisted_jwks_secret::PersistedJwksSecret;
-use margaret_jws_verification::key_set_rejection::KeySetRejection;
 
 #[test]
 fn persisted_jwks_secret_rejects_keys_that_share_a_key_id() -> Result<()> {
@@ -16,9 +15,7 @@ fn persisted_jwks_secret_rejects_keys_that_share_a_key_id() -> Result<()> {
 
     assert!(matches!(
         serde_json::from_value::<PersistedJwksSecret>(document)?.into_secret(),
-        Err(JwksKeyError::KeySetRejected {
-            rejection: KeySetRejection::DuplicateKeyId { .. }
-        })
+        Err(JwksKeyError::DuplicateKeyId { .. })
     ));
 
     Ok(())

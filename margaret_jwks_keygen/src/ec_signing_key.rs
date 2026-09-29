@@ -13,6 +13,7 @@ use margaret_jose_parameters::key_use::KeyUse;
 use margaret_jws_verification::ec_jwk::EcJwk;
 use margaret_jws_verification::jwk::Jwk;
 use margaret_jws_verification::key_id::KeyId;
+use margaret_jws_verification::verification_material::VerificationMaterial;
 
 use crate::jwks_key_error::JwksKeyError;
 use crate::signing_material::SigningMaterial;
@@ -153,6 +154,13 @@ impl EcSigningKey {
                     .to_bytes()
                     .to_vec()
             }
+        }
+    }
+
+    pub(crate) fn verification_material(&self) -> VerificationMaterial {
+        match &self.material {
+            SigningMaterial::P256(key) => VerificationMaterial::P256(*key.verifying_key()),
+            SigningMaterial::P384(key) => VerificationMaterial::P384(*key.verifying_key()),
         }
     }
 }

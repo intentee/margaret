@@ -7,7 +7,7 @@ use margaret_jwks_client::endpoint_key_set_locator::EndpointKeySetLocator;
 use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 use margaret_key_set_poll::key_set_location::KeySetLocation;
 use margaret_key_set_poll::key_set_location_request::KeySetLocationRequest;
-use margaret_key_set_poll::key_set_poll_interval_before_ready::KEY_SET_POLL_INTERVAL_BEFORE_READY;
+use margaret_key_set_poll::key_set_poll_fetch_timeout::KEY_SET_POLL_FETCH_TIMEOUT;
 use margaret_key_set_poll::locates_key_set::LocatesKeySet as _;
 use margaret_key_set_poll_tests::system_issuer_document_client::system_issuer_document_client;
 
@@ -23,7 +23,7 @@ async fn endpoint_key_set_locator_locates_the_provided_endpoint() {
         .locate(KeySetLocationRequest {
             cancellation_token: &CancellationToken::new(),
             issuer_document_client: &system_issuer_document_client(),
-            timeout: KEY_SET_POLL_INTERVAL_BEFORE_READY,
+            timeout: KEY_SET_POLL_FETCH_TIMEOUT,
         })
         .await;
 

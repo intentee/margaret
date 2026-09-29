@@ -1,3 +1,5 @@
+pub mod certificate_thumbprint;
+pub mod fixture_certificate;
 pub mod fixture_key;
 mod fixture_material;
 pub mod fixture_rsa_key;

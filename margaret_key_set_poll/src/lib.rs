@@ -3,6 +3,7 @@ pub mod key_set_location_request;
 pub mod key_set_poll;
 pub mod key_set_poll_error;
 pub mod key_set_poll_failure;
+pub mod key_set_poll_fetch_timeout;
 pub mod key_set_poll_interval_after_ready;
 pub mod key_set_poll_interval_before_ready;
 pub mod key_set_poll_service;

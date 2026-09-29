@@ -108,6 +108,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_codegen_fallible_roles_fixture \
 	--exclude-from-report margaret_codegen_jwks_token_trust_fixture \
 	--exclude-from-report margaret_codegen_linear_construction_future_fixture \
+	--exclude-from-report margaret_codegen_many_serve_inputs_fixture \
 	--exclude-from-report margaret_codegen_oidc_bearer_identity_fixture \
 	--exclude-from-report margaret_codegen_oidc_issuers_fixture \
 	--exclude-from-report margaret_codegen_route_parameter_values_fixture \
@@ -123,6 +124,7 @@ GENERATED_CODE_PACKAGES := \
 	-p margaret_codegen_fallible_roles_fixture \
 	-p margaret_codegen_jwks_token_trust_fixture \
 	-p margaret_codegen_linear_construction_future_fixture \
+	-p margaret_codegen_many_serve_inputs_fixture \
 	-p margaret_codegen_oidc_bearer_identity_fixture \
 	-p margaret_codegen_oidc_issuers_fixture \
 	-p margaret_codegen_route_parameter_values_fixture \

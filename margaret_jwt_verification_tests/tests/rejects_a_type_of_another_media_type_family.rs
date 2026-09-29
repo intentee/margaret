@@ -4,7 +4,7 @@ use serde_json::json;
 
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jws_verification::header_type::HeaderType;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
@@ -19,7 +19,7 @@ use margaret_registered_claims::numeric_date::NumericDate;
 fn rejects_a_type_of_another_media_type_family() {
     let trust = fixture_trust();
     let SignedClaims {
-        key_set: KeySetParsing::Accepted(key_set),
+        key_set: KeySetAssembly::Assembled(key_set),
         token,
     } = SignedClaims::typed(
         "text/at+jwt",

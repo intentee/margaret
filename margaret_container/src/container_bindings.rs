@@ -9,7 +9,7 @@ use quote::quote;
 
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::tag::Tag;
-use margaret_codegen_tokens::serve_input_ident::serve_input_ident;
+use margaret_codegen_tokens::serve_input_naming::ServeInputNaming;
 use margaret_input_weaving::owned_weave::owned_weave;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 use margaret_serve_input_codegen::serve_input_key::ServeInputKey;
@@ -42,6 +42,7 @@ pub struct ContainerBindings {
     concrete_providers: BTreeMap<CanonicalPath, ProviderServeInputs>,
     inputs: Arc<[ServeInput]>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
+    serve_input_naming: ServeInputNaming,
     slots: Arc<BTreeMap<ServeInputKey, usize>>,
 }
 
@@ -80,6 +81,7 @@ impl ContainerBindings {
             concrete_providers,
             inputs: plan.inputs(),
             providers,
+            serve_input_naming: plan.serve_input_naming(),
             slots: plan.slots(),
         }
     }
@@ -94,6 +96,11 @@ impl ContainerBindings {
     #[must_use]
     pub fn all_serve_inputs(&self) -> &[ServeInput] {
         &self.inputs
+    }
+
+    #[must_use]
+    pub fn serve_input_naming(&self) -> ServeInputNaming {
+        self.serve_input_naming
     }
 
     /// # Errors
@@ -255,7 +262,7 @@ impl ContainerBindings {
 
     fn materialize(&self, input: &ServeInput) -> Result<TokenStream, ContainerError> {
         let slot = self.serve_input_slot(&input.slot_key())?;
-        let ident = serve_input_ident(slot);
+        let ident = self.serve_input_naming.ident(slot);
 
         Ok(owned_weave(&input.weaving(), &quote! { #ident }, false))
     }

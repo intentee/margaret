@@ -8,12 +8,13 @@ use margaret::framework::macros::infers_authenticated_user;
 use margaret::framework::macros::singleton;
 
 use crate::auth::github_actions_claims::GithubActionsClaims;
+use crate::auth::trusted_workflow::TrustedWorkflow;
 use crate::models::ci_runner::CiRunner;
 
 #[singleton]
 #[infers_authenticated_user(user_model = CiRunner)]
 pub struct CiRunnerProvider {
-    repository_owner_id: String,
+    trusted_workflow: TrustedWorkflow,
 }
 
 impl CiRunnerProvider {
@@ -22,11 +23,19 @@ impl CiRunnerProvider {
     /// Returns an error propagated from the work it performs.
     #[constructor]
     pub fn create(
+        #[console_argument(from = "github-actions-ref")] git_ref: String,
+        #[console_argument(from = "github-actions-repository-id")] repository_id: String,
         #[console_argument(from = "github-actions-repository-owner-id")]
         repository_owner_id: String,
+        #[console_argument(from = "github-actions-workflow-ref")] workflow_ref: String,
     ) -> anyhow::Result<Self> {
         Ok(Self {
-            repository_owner_id,
+            trusted_workflow: TrustedWorkflow {
+                git_ref,
+                repository_id,
+                repository_owner_id,
+                workflow_ref,
+            },
         })
     }
 
@@ -41,19 +50,22 @@ impl CiRunnerProvider {
         let Some(verified) = token else {
             return Ok(AuthenticatedUserOutcome::Anonymous);
         };
+
+        if !self.trusted_workflow.admits(&verified.claims) {
+            return Ok(AuthenticatedUserOutcome::Interrupted(
+                ResponseContinuation::from(Response::forbidden()),
+            ));
+        }
+
         let GithubActionsClaims {
             repository,
             repository_id,
-            repository_owner_id,
+            ..
         } = verified.claims;
 
-        Ok(if repository_owner_id == self.repository_owner_id {
-            AuthenticatedUserOutcome::Authenticated(CiRunner {
-                repository,
-                repository_id,
-            })
-        } else {
-            AuthenticatedUserOutcome::Interrupted(ResponseContinuation::from(Response::forbidden()))
-        })
+        Ok(AuthenticatedUserOutcome::Authenticated(CiRunner {
+            repository,
+            repository_id,
+        }))
     }
 }

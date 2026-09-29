@@ -1,0 +1,18 @@
+[package]
+name = "margaret_codegen_many_serve_inputs_fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+margaret = { workspace = true, features = ["runtime"] }
+tokio-util = { workspace = true }
+trzcina = { workspace = true }
+
+[build-dependencies]
+margaret = { workspace = true, default-features = false, features = ["codegen"] }
+
+[lints]
+workspace = true

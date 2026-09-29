@@ -2126,6 +2126,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "margaret_codegen_many_serve_inputs_fixture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "margaret",
+ "tokio-util",
+ "trzcina",
+]
+
+[[package]]
 name = "margaret_codegen_oidc_bearer_identity_fixture"
 version = "0.1.0"
 dependencies = [
@@ -2812,6 +2823,8 @@ dependencies = [
  "margaret_jose_parameters",
  "p256",
  "p384",
+ "rustls-pki-types",
+ "rustls-webpki",
  "serde",
  "serde_json",
 ]
@@ -2826,6 +2839,7 @@ dependencies = [
  "margaret_jws_verification",
  "p256",
  "p384",
+ "rcgen",
  "serde_json",
 ]
 
@@ -2880,9 +2894,13 @@ dependencies = [
  "margaret_http",
  "margaret_http_tests",
  "margaret_issuer_document_fetch",
+ "margaret_jose_parameters",
  "margaret_jws_verification",
+ "margaret_jws_verification_tests",
  "margaret_key_set_poll",
+ "margaret_sync_holder",
  "reqwest",
+ "serde_json",
  "tokio",
  "tokio-util",
  "trzcina",
@@ -2982,6 +3000,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-util",
+ "trzcina",
  "url",
 ]
 

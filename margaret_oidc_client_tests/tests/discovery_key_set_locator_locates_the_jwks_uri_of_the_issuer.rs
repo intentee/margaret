@@ -6,7 +6,7 @@ use margaret_http_tests::static_handler::StaticHandler;
 use margaret_issuer_document_fetch::issuer_document_client::IssuerDocumentClient;
 use margaret_key_set_poll::key_set_location::KeySetLocation;
 use margaret_key_set_poll::key_set_location_request::KeySetLocationRequest;
-use margaret_key_set_poll::key_set_poll_interval_before_ready::KEY_SET_POLL_INTERVAL_BEFORE_READY;
+use margaret_key_set_poll::key_set_poll_fetch_timeout::KEY_SET_POLL_FETCH_TIMEOUT;
 use margaret_key_set_poll::locates_key_set::LocatesKeySet as _;
 use margaret_oidc_client::discovery_key_set_locator::DiscoveryKeySetLocator;
 use margaret_oidc_client_tests::fixture_issuer_routes::FixtureIssuerRoutes;
@@ -41,7 +41,7 @@ async fn discovery_key_set_locator_locates_the_jwks_uri_of_the_issuer() {
         .locate(KeySetLocationRequest {
             cancellation_token: &CancellationToken::new(),
             issuer_document_client: &issuer_document_client,
-            timeout: KEY_SET_POLL_INTERVAL_BEFORE_READY,
+            timeout: KEY_SET_POLL_FETCH_TIMEOUT,
         })
         .await;
 

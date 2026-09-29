@@ -16,8 +16,12 @@ url = { workspace = true }
 [dev-dependencies]
 margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_jose_parameters = { workspace = true }
 margaret_jws_verification = { workspace = true }
+margaret_jws_verification_tests = { path = "../margaret_jws_verification_tests" }
+margaret_sync_holder = { workspace = true }
 reqwest = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util", "time"] }
 tokio-util = { workspace = true }
 
