@@ -2,58 +2,44 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::ops::ControlFlow;
 
-use serde::Deserialize;
 use serde_json::Value;
 
 use crate::accepted_key_set_document::AcceptedKeySetDocument;
 use crate::compact_jws::CompactJws;
+use crate::disclosed_key::DisclosedKey;
+use crate::duplicate_key_id::DuplicateKeyId;
 use crate::ignored_key::IgnoredKey;
 use crate::ignored_key_reason::IgnoredKeyReason;
-use crate::jwk::Jwk;
 use crate::jws_header::JwsHeader;
 use crate::jws_rejection::JwsRejection;
 use crate::jws_verification::JwsVerification;
+use crate::key_exclusion::KeyExclusion;
 use crate::key_id::KeyId;
+use crate::key_set_assembly::KeySetAssembly;
+use crate::key_set_composition::KeySetComposition;
+use crate::key_set_document::KeySetDocument;
 use crate::key_set_document_parsing::KeySetDocumentParsing;
 use crate::key_set_document_rejection::KeySetDocumentRejection;
-use crate::key_set_parsing::KeySetParsing;
-use crate::key_set_rejection::KeySetRejection;
 use crate::parameter_value::ParameterValue;
 use crate::published_jwk::PublishedJwk;
 use crate::signature_check::SignatureCheck;
 use crate::verification_key::VerificationKey;
 use crate::verified_jws::VerifiedJws;
 
-#[derive(Deserialize)]
-struct KeySetDocument {
-    keys: Vec<Value>,
-}
-
-fn insert_unique(
-    keys: &mut HashMap<KeyId, VerificationKey>,
-    key: VerificationKey,
-) -> ControlFlow<KeyId> {
-    match keys.entry(key.kid.clone()) {
-        Entry::Occupied(occupied) => ControlFlow::Break(occupied.key().clone()),
-        Entry::Vacant(vacant) => {
-            vacant.insert(key);
-
-            ControlFlow::Continue(())
-        }
+fn published_jwk(entry: Value) -> ControlFlow<IgnoredKeyReason, PublishedJwk> {
+    match serde_json::from_value(entry) {
+        Ok(published) => ControlFlow::Continue(published),
+        Err(source) => ControlFlow::Break(IgnoredKeyReason::Malformed { source }),
     }
 }
 
-fn usable_key(published: Value) -> ControlFlow<IgnoredKeyReason, VerificationKey> {
-    let published: PublishedJwk = match serde_json::from_value(published) {
-        Ok(published) => published,
-        Err(source) => return ControlFlow::Break(IgnoredKeyReason::Malformed { source }),
-    };
-
-    match VerificationKey::from_jwk(published.into_jwk()?) {
-        ControlFlow::Continue(key) => ControlFlow::Continue(key),
-        ControlFlow::Break(rejection) => {
-            ControlFlow::Break(IgnoredKeyReason::Unusable { rejection })
-        }
+fn composition(published: &[ControlFlow<IgnoredKeyReason, PublishedJwk>]) -> KeySetComposition {
+    if published.iter().any(|entry| {
+        matches!(entry, ControlFlow::Continue(published) if published.declares_encryption())
+    }) {
+        KeySetComposition::IncludesEncryptionKeys
+    } else {
+        KeySetComposition::SignatureKeysOnly
     }
 }
 
@@ -64,30 +50,28 @@ pub struct VerificationKeySet {
 
 impl VerificationKeySet {
     #[must_use]
-    pub fn from_jwks(jwks: Vec<Jwk>) -> KeySetParsing {
-        let mut keys = HashMap::with_capacity(jwks.len());
+    pub fn assemble(verification_keys: Vec<VerificationKey>) -> KeySetAssembly {
+        let mut keys = HashMap::with_capacity(verification_keys.len());
 
-        for (index, jwk) in jwks.into_iter().enumerate() {
-            let key = match VerificationKey::from_jwk(jwk) {
-                ControlFlow::Continue(key) => key,
-                ControlFlow::Break(rejection) => {
-                    return KeySetParsing::Rejected(KeySetRejection::Key { index, rejection });
+        for key in verification_keys {
+            match keys.entry(key.kid.clone()) {
+                Entry::Occupied(occupied) => {
+                    return KeySetAssembly::DuplicateKeyId(DuplicateKeyId {
+                        kid: occupied.key().clone(),
+                    });
                 }
-            };
-
-            if let ControlFlow::Break(kid) = insert_unique(&mut keys, key) {
-                return KeySetParsing::Rejected(KeySetRejection::DuplicateKeyId { kid });
+                Entry::Vacant(vacant) => {
+                    vacant.insert(key);
+                }
             }
         }
 
-        KeySetParsing::Accepted(Self { keys })
+        KeySetAssembly::Assembled(Self { keys })
     }
 
     #[must_use]
     pub fn parse(document: &[u8]) -> KeySetDocumentParsing {
-        let KeySetDocument {
-            keys: published_keys,
-        } = match serde_json::from_slice(document) {
+        let KeySetDocument { keys } = match serde_json::from_slice(document) {
             Ok(document) => document,
             Err(source) => {
                 return KeySetDocumentParsing::Rejected(KeySetDocumentRejection::Malformed {
@@ -95,26 +79,41 @@ impl VerificationKeySet {
                 });
             }
         };
-        let mut keys = HashMap::with_capacity(published_keys.len());
+        let published = keys.into_iter().map(published_jwk).collect::<Vec<_>>();
+        let composition = composition(&published);
+        let mut admitted_keys = Vec::with_capacity(published.len());
+        let mut disclosed_keys = Vec::new();
         let mut ignored_keys = Vec::new();
 
-        for (index, published) in published_keys.into_iter().enumerate() {
-            match usable_key(published) {
-                ControlFlow::Continue(key) => {
-                    if let ControlFlow::Break(kid) = insert_unique(&mut keys, key) {
-                        return KeySetDocumentParsing::Rejected(
-                            KeySetDocumentRejection::DuplicateKeyId { kid },
-                        );
-                    }
+        for (index, entry) in published.into_iter().enumerate() {
+            let admission = match entry {
+                ControlFlow::Continue(published) => published.into_verification_key(composition),
+                ControlFlow::Break(reason) => ControlFlow::Break(KeyExclusion::Ignored(reason)),
+            };
+
+            match admission {
+                ControlFlow::Continue(key) => admitted_keys.push(key),
+                ControlFlow::Break(KeyExclusion::Disclosed(disclosure)) => {
+                    disclosed_keys.push(DisclosedKey { disclosure, index });
                 }
-                ControlFlow::Break(reason) => ignored_keys.push(IgnoredKey { index, reason }),
+                ControlFlow::Break(KeyExclusion::Ignored(reason)) => {
+                    ignored_keys.push(IgnoredKey { index, reason });
+                }
             }
         }
 
-        KeySetDocumentParsing::Accepted(AcceptedKeySetDocument {
-            ignored_keys,
-            key_set: Self { keys },
-        })
+        match Self::assemble(admitted_keys) {
+            KeySetAssembly::Assembled(key_set) => {
+                KeySetDocumentParsing::Accepted(AcceptedKeySetDocument {
+                    disclosed_keys,
+                    ignored_keys,
+                    key_set,
+                })
+            }
+            KeySetAssembly::DuplicateKeyId(duplicate) => {
+                KeySetDocumentParsing::Rejected(KeySetDocumentRejection::DuplicateKeyId(duplicate))
+            }
+        }
     }
 
     #[must_use]
@@ -157,9 +156,11 @@ impl VerificationKeySet {
             return ControlFlow::Break(JwsRejection::UnknownKeyId { kid: kid.clone() });
         };
 
-        if key.algorithm != algorithm {
+        let key_algorithm = key.material.algorithm();
+
+        if key_algorithm != algorithm {
             return ControlFlow::Break(JwsRejection::AlgorithmMismatch {
-                key: key.algorithm,
+                key: key_algorithm,
                 token: algorithm,
             });
         }

@@ -2,12 +2,12 @@ use serde_json::Value;
 use serde_json::json;
 
 use margaret_jose_parameters::curve::Curve;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
 
 pub struct SignedClaims {
-    pub key_set: KeySetParsing,
+    pub key_set: KeySetAssembly,
     pub token: String,
 }
 
@@ -31,7 +31,7 @@ impl SignedClaims {
 
     fn signed(key: &FixtureKey, header: &Value, claims: &Value) -> Self {
         Self {
-            key_set: VerificationKeySet::from_jwks(vec![key.jwk()]),
+            key_set: VerificationKeySet::assemble(vec![key.verification_key()]),
             token: key.token(header, claims),
         }
     }

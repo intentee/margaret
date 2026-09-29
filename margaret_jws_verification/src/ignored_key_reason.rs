@@ -2,43 +2,36 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
-use crate::jwk_rejection::JwkRejection;
+use crate::certificate_rejection::CertificateRejection;
+use crate::key_algorithm_rejection::KeyAlgorithmRejection;
+use crate::key_material_rejection::KeyMaterialRejection;
+use crate::key_usage_rejection::KeyUsageRejection;
 
 #[derive(Debug)]
 pub enum IgnoredKeyReason {
+    Algorithm(KeyAlgorithmRejection),
+    Certificate(CertificateRejection),
     Malformed { source: serde_json::Error },
-    UnrecognizedUse { key_use: String },
-    UnsupportedAlgorithm { alg: String },
-    UnsupportedCurve { crv: String },
+    Material(KeyMaterialRejection),
+    MissingKeyId,
     UnsupportedKeyType { kty: String },
-    Unusable { rejection: JwkRejection },
+    Usage(KeyUsageRejection),
 }
 
 impl Display for IgnoredKeyReason {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         match self {
+            Self::Algorithm(rejection) => rejection.fmt(formatter),
+            Self::Certificate(rejection) => rejection.fmt(formatter),
             Self::Malformed { source } => {
                 write!(formatter, "the key is not a well-formed jwk: {source}")
             }
-            Self::UnrecognizedUse { key_use } => {
-                write!(
-                    formatter,
-                    "the key declares the unrecognized use '{key_use}'"
-                )
-            }
-            Self::UnsupportedAlgorithm { alg } => {
-                write!(
-                    formatter,
-                    "the key declares the unsupported algorithm '{alg}'"
-                )
-            }
-            Self::UnsupportedCurve { crv } => {
-                write!(formatter, "the key is on the unsupported curve '{crv}'")
-            }
+            Self::Material(rejection) => rejection.fmt(formatter),
+            Self::MissingKeyId => write!(formatter, "the key has no key id"),
             Self::UnsupportedKeyType { kty } => {
                 write!(formatter, "the key is of the unsupported type '{kty}'")
             }
-            Self::Unusable { rejection } => rejection.fmt(formatter),
+            Self::Usage(rejection) => rejection.fmt(formatter),
         }
     }
 }
@@ -46,40 +39,39 @@ impl Display for IgnoredKeyReason {
 #[cfg(test)]
 mod tests {
     use super::IgnoredKeyReason;
-    use crate::jwk_rejection::JwkRejection;
+    use crate::certificate_rejection::CertificateRejection;
+    use crate::key_algorithm_rejection::KeyAlgorithmRejection;
+    use crate::key_material_rejection::KeyMaterialRejection;
+    use crate::key_usage_rejection::KeyUsageRejection;
 
     #[test]
     fn describes_every_reason() {
         let described = [
+            IgnoredKeyReason::Algorithm(KeyAlgorithmRejection::UnsupportedAlgorithm {
+                alg: "PS256".to_string(),
+            }),
+            IgnoredKeyReason::Certificate(CertificateRejection::EmptyChain),
             IgnoredKeyReason::Malformed {
                 source: serde_json::from_str::<u8>("x").expect_err("not json"),
             },
-            IgnoredKeyReason::UnrecognizedUse {
-                key_use: "tls".to_string(),
-            },
-            IgnoredKeyReason::UnsupportedAlgorithm {
-                alg: "RSA-OAEP".to_string(),
-            },
-            IgnoredKeyReason::UnsupportedCurve {
-                crv: "P-521".to_string(),
-            },
+            IgnoredKeyReason::Material(KeyMaterialRejection::ModulusSize { bits: 1024 }),
+            IgnoredKeyReason::MissingKeyId,
             IgnoredKeyReason::UnsupportedKeyType {
-                kty: "oct".to_string(),
+                kty: "OKP".to_string(),
             },
-            IgnoredKeyReason::Unusable {
-                rejection: JwkRejection::MissingKeyId,
-            },
+            IgnoredKeyReason::Usage(KeyUsageRejection::EncryptionUse),
         ]
         .map(|reason| reason.to_string());
 
-        assert!(described[0].starts_with("the key is not a well-formed jwk: "));
-        assert_eq!(described[1], "the key declares the unrecognized use 'tls'");
         assert_eq!(
-            described[2],
-            "the key declares the unsupported algorithm 'RSA-OAEP'"
+            described[0],
+            "the key declares the unsupported algorithm 'PS256'"
         );
-        assert_eq!(described[3], "the key is on the unsupported curve 'P-521'");
-        assert_eq!(described[4], "the key is of the unsupported type 'oct'");
-        assert_eq!(described[5], "the key has no key id");
+        assert_eq!(described[1], "the key's certificate chain is empty");
+        assert!(described[2].starts_with("the key is not a well-formed jwk: "));
+        assert!(described[3].contains("1024 bits"));
+        assert_eq!(described[4], "the key has no key id");
+        assert_eq!(described[5], "the key is of the unsupported type 'OKP'");
+        assert_eq!(described[6], "the key is meant for encryption");
     }
 }

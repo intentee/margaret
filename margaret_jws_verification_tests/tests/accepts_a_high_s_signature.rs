@@ -5,7 +5,7 @@ use margaret_jose_parameters::curve::Curve;
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::jws_verification::JwsVerification;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
 use margaret_jws_verification_tests::signed_token::signed_token;
@@ -14,7 +14,9 @@ use margaret_jws_verification_tests::signing_input::signing_input;
 #[test]
 fn accepts_a_high_s_signature() {
     let key = FixtureKey::generate(Curve::P256, "kid");
-    let KeySetParsing::Accepted(key_set) = VerificationKeySet::from_jwks(vec![key.jwk()]) else {
+    let KeySetAssembly::Assembled(key_set) =
+        VerificationKeySet::assemble(vec![key.verification_key()])
+    else {
         panic!("the fixture key set is accepted");
     };
 

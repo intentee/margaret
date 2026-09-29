@@ -23,9 +23,10 @@ use margaret_key_set_poll_tests::fixed_key_set_locator::FixedKeySetLocator;
 use margaret_sync_holder::sync_holder_presence::SyncHolderPresence;
 
 #[tokio::test]
-async fn key_set_poll_service_holds_the_usable_keys_of_a_set_with_an_ignored_key() {
+async fn key_set_poll_service_holds_the_usable_keys_of_a_set_with_excluded_keys() {
     let key = FixtureKey::generate(Curve::P256, "sig-kid");
     let document = json!({ "keys": [
+        { "kty": "OKP", "crv": "Ed25519", "kid": "edwards-kid", "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo" },
         { "kty": "oct", "kid": "secret-kid", "k": "c2VjcmV0" },
         key.jwk(),
     ] });

@@ -1,18 +1,18 @@
 use margaret_jose_parameters::curve::Curve;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
-use margaret_jws_verification::key_set_rejection::KeySetRejection;
+use margaret_jws_verification::duplicate_key_id::DuplicateKeyId;
+use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
 
 #[test]
-fn rejects_a_set_with_a_duplicate_key_id() {
-    let parsing = VerificationKeySet::from_jwks(vec![
-        FixtureKey::generate(Curve::P256, "same").jwk(),
-        FixtureKey::generate(Curve::P256, "same").jwk(),
+fn assembles_no_set_of_keys_sharing_a_key_id() {
+    let assembly = VerificationKeySet::assemble(vec![
+        FixtureKey::generate(Curve::P256, "same").verification_key(),
+        FixtureKey::generate(Curve::P256, "same").verification_key(),
     ]);
 
     assert!(matches!(
-        parsing,
-        KeySetParsing::Rejected(KeySetRejection::DuplicateKeyId { kid }) if kid.as_str() == "same"
+        assembly,
+        KeySetAssembly::DuplicateKeyId(DuplicateKeyId { kid }) if kid.as_str() == "same"
     ));
 }

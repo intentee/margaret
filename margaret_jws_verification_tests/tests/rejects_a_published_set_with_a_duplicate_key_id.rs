@@ -1,6 +1,7 @@
 use serde_json::json;
 
 use margaret_jose_parameters::curve::Curve;
+use margaret_jws_verification::duplicate_key_id::DuplicateKeyId;
 use margaret_jws_verification::key_set_document_parsing::KeySetDocumentParsing;
 use margaret_jws_verification::key_set_document_rejection::KeySetDocumentRejection;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
@@ -15,7 +16,7 @@ fn rejects_a_published_set_with_a_duplicate_key_id() {
 
     assert!(matches!(
         VerificationKeySet::parse(document.to_string().as_bytes()),
-        KeySetDocumentParsing::Rejected(KeySetDocumentRejection::DuplicateKeyId { kid })
+        KeySetDocumentParsing::Rejected(KeySetDocumentRejection::DuplicateKeyId(DuplicateKeyId { kid }))
             if kid.as_str() == "same"
     ));
 }

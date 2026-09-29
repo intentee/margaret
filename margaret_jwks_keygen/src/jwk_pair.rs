@@ -7,6 +7,7 @@ use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jws_verification::jwk::Jwk;
 use margaret_jws_verification::key_id::KeyId;
+use margaret_jws_verification::verification_key::VerificationKey;
 
 use crate::ec_signing_key::EcSigningKey;
 use crate::jwks_key_error::JwksKeyError;
@@ -81,5 +82,10 @@ impl JwkPair {
     #[must_use]
     pub fn signing_key(&self) -> &EcSigningKey {
         &self.signing_key
+    }
+
+    #[must_use]
+    pub fn verification_key(&self) -> VerificationKey {
+        VerificationKey::new(self.kid.clone(), self.signing_key.verification_material())
     }
 }

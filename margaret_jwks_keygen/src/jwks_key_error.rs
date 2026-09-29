@@ -1,12 +1,12 @@
 use p256::pkcs8;
 use thiserror::Error;
 
-use margaret_jws_verification::key_set_rejection::KeySetRejection;
+use margaret_jws_verification::duplicate_key_id::DuplicateKeyId;
 
 #[derive(Debug, Error)]
 pub enum JwksKeyError {
-    #[error("the secret's keys do not form a valid key set: {rejection}")]
-    KeySetRejected { rejection: KeySetRejection },
+    #[error("the secret's keys do not form a key set: {duplicate}")]
+    DuplicateKeyId { duplicate: DuplicateKeyId },
 
     #[error("the public key is missing its {coordinate} coordinate")]
     MissingPublicKeyCoordinate { coordinate: &'static str },

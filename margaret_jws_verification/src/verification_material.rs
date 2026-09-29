@@ -7,10 +7,14 @@ use aws_lc_rs::signature::RsaPublicKeyComponents;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 use p256::ecdsa::signature::Verifier;
+use p256::pkcs8::DecodePublicKey;
 
 use margaret_jose_parameters::curve::Curve;
+use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 
-use crate::jwk_rejection::JwkRejection;
+use crate::certificate_rejection::CertificateRejection;
+use crate::key_material_rejection::KeyMaterialRejection;
+use crate::rs256_public_key::Rs256PublicKey;
 use crate::signature_check::SignatureCheck;
 
 const SEC1_UNCOMPRESSED_POINT_TAG: u8 = 0x04;
@@ -24,20 +28,22 @@ fn coordinate_length(curve: Curve) -> usize {
 
 fn decoded(
     encoded: &str,
-    rejection: impl FnOnce(base64ct::Error) -> JwkRejection,
-) -> ControlFlow<JwkRejection, Vec<u8>> {
+    rejection: impl FnOnce(base64ct::Error) -> KeyMaterialRejection,
+) -> ControlFlow<KeyMaterialRejection, Vec<u8>> {
     match Base64UrlUnpadded::decode_vec(encoded) {
         Ok(bytes) => ControlFlow::Continue(bytes),
         Err(source) => ControlFlow::Break(rejection(source)),
     }
 }
 
-fn coordinate(curve: Curve, encoded: &str) -> ControlFlow<JwkRejection, Vec<u8>> {
-    let bytes = decoded(encoded, |source| JwkRejection::CoordinateBase64 { source })?;
+fn coordinate(curve: Curve, encoded: &str) -> ControlFlow<KeyMaterialRejection, Vec<u8>> {
+    let bytes = decoded(encoded, |source| KeyMaterialRejection::CoordinateBase64 {
+        source,
+    })?;
     let expected = coordinate_length(curve);
 
     if bytes.len() != expected {
-        return ControlFlow::Break(JwkRejection::CoordinateLength {
+        return ControlFlow::Break(KeyMaterialRejection::CoordinateLength {
             expected,
             found: bytes.len(),
         });
@@ -70,11 +76,24 @@ fn ecdsa_verification<Signature, Key: Verifier<Signature>>(
     }
 }
 
+fn certified_ec_key<TVerifyingKey: DecodePublicKey + PartialEq>(
+    key: &TVerifyingKey,
+    subject_public_key_info: &[u8],
+) -> ControlFlow<CertificateRejection> {
+    match TVerifyingKey::from_public_key_der(subject_public_key_info) {
+        Ok(certified) if certified == *key => ControlFlow::Continue(()),
+        Ok(_) => ControlFlow::Break(CertificateRejection::KeyMismatch),
+        Err(source) => {
+            ControlFlow::Break(CertificateRejection::CertificateKeyUnreadable { source })
+        }
+    }
+}
+
 #[derive(Clone)]
-pub(crate) enum VerificationMaterial {
+pub enum VerificationMaterial {
     P256(p256::ecdsa::VerifyingKey),
     P384(p384::ecdsa::VerifyingKey),
-    Rs256(ParsedPublicKey),
+    Rs256(Rs256PublicKey),
 }
 
 impl VerificationMaterial {
@@ -82,7 +101,7 @@ impl VerificationMaterial {
         curve: Curve,
         x: &str,
         y: &str,
-    ) -> ControlFlow<JwkRejection, Self> {
+    ) -> ControlFlow<KeyMaterialRejection, Self> {
         let x = coordinate(curve, x)?;
         let y = coordinate(curve, y)?;
         let mut sec1 = vec![SEC1_UNCOMPRESSED_POINT_TAG];
@@ -97,19 +116,19 @@ impl VerificationMaterial {
 
         match material {
             Ok(material) => ControlFlow::Continue(material),
-            Err(source) => ControlFlow::Break(JwkRejection::InvalidPoint { source }),
+            Err(source) => ControlFlow::Break(KeyMaterialRejection::InvalidPoint { source }),
         }
     }
 
-    pub(crate) fn from_rsa_components(n: &str, e: &str) -> ControlFlow<JwkRejection, Self> {
-        let modulus = decoded(n, |source| JwkRejection::ModulusBase64 { source })?;
-        let exponent = decoded(e, |source| JwkRejection::ExponentBase64 { source })?;
+    pub(crate) fn from_rsa_components(n: &str, e: &str) -> ControlFlow<KeyMaterialRejection, Self> {
+        let modulus = decoded(n, |source| KeyMaterialRejection::ModulusBase64 { source })?;
+        let exponent = decoded(e, |source| KeyMaterialRejection::ExponentBase64 { source })?;
         let bits = significant_bits(&modulus);
 
         if bits < u64::from(RSA_PKCS1_2048_8192_SHA256.min_modulus_len())
             || bits > u64::from(RSA_PKCS1_2048_8192_SHA256.max_modulus_len())
         {
-            return ControlFlow::Break(JwkRejection::ModulusSize { bits });
+            return ControlFlow::Break(KeyMaterialRejection::ModulusSize { bits });
         }
 
         let components = RsaPublicKeyComponents {
@@ -119,13 +138,40 @@ impl VerificationMaterial {
         let public_key = match components.as_der() {
             Ok(public_key) => public_key,
             Err(source) => {
-                return ControlFlow::Break(JwkRejection::RsaComponentsNotMinimal { source });
+                return ControlFlow::Break(KeyMaterialRejection::RsaComponentsNotMinimal {
+                    source,
+                });
             }
         };
 
         match ParsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, public_key.as_ref()) {
-            Ok(parsed) => ControlFlow::Continue(Self::Rs256(parsed)),
-            Err(source) => ControlFlow::Break(JwkRejection::InvalidRsaKey { source }),
+            Ok(key) => ControlFlow::Continue(Self::Rs256(Rs256PublicKey { key })),
+            Err(source) => ControlFlow::Break(KeyMaterialRejection::InvalidRsaKey { source }),
+        }
+    }
+
+    pub(crate) fn algorithm(&self) -> JwsAlgorithm {
+        match self {
+            Self::P256(_) => Curve::P256.algorithm(),
+            Self::P384(_) => Curve::P384.algorithm(),
+            Self::Rs256(_) => JwsAlgorithm::Rs256,
+        }
+    }
+
+    pub(crate) fn attested_by(
+        &self,
+        subject_public_key_info: &[u8],
+    ) -> ControlFlow<CertificateRejection> {
+        match self {
+            Self::P256(key) => certified_ec_key(key, subject_public_key_info),
+            Self::P384(key) => certified_ec_key(key, subject_public_key_info),
+            Self::Rs256(Rs256PublicKey { key }) => {
+                if key.as_ref() == subject_public_key_info {
+                    ControlFlow::Continue(())
+                } else {
+                    ControlFlow::Break(CertificateRejection::KeyMismatch)
+                }
+            }
         }
     }
 
@@ -137,7 +183,7 @@ impl VerificationMaterial {
             Self::P384(key) => {
                 ecdsa_verification(key, message, p384::ecdsa::Signature::from_slice(signature))
             }
-            Self::Rs256(key) => match key.verify_sig(message, signature) {
+            Self::Rs256(Rs256PublicKey { key }) => match key.verify_sig(message, signature) {
                 Ok(()) => SignatureCheck::Matches,
                 Err(source) => SignatureCheck::RsaMismatch(source),
             },

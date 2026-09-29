@@ -5,7 +5,7 @@ use serde_json::json;
 use margaret_jose_parameters::curve::Curve;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jws_verification::jws_rejection::JwsRejection;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
@@ -19,9 +19,9 @@ use margaret_registered_claims::numeric_date::NumericDate;
 #[test]
 fn reports_the_rejection_of_the_signature() {
     let trust = fixture_trust();
-    let KeySetParsing::Accepted(key_set) =
-        VerificationKeySet::from_jwks(vec![FixtureKey::generate(Curve::P256, "published").jwk()])
-    else {
+    let KeySetAssembly::Assembled(key_set) = VerificationKeySet::assemble(vec![
+        FixtureKey::generate(Curve::P256, "published").verification_key(),
+    ]) else {
         panic!("the fixture key set is accepted");
     };
     let unpublished = FixtureKey::generate(Curve::P256, "unpublished");

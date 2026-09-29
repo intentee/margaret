@@ -19,14 +19,4 @@ impl<TValue> ParameterValue<TValue> {
             Self::Unsupported(written) => ControlFlow::Break(unsupported(written)),
         }
     }
-
-    pub(crate) fn supported_when_present<TRejection>(
-        present: Option<Self>,
-        unsupported: impl FnOnce(String) -> TRejection,
-    ) -> ControlFlow<TRejection, Option<TValue>> {
-        match present {
-            Some(value) => ControlFlow::Continue(Some(value.supported(unsupported)?)),
-            None => ControlFlow::Continue(None),
-        }
-    }
 }

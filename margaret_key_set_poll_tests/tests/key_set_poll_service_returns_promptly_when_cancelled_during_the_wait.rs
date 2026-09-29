@@ -4,7 +4,7 @@ use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use trzcina::Ticker as _;
 
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_key_set_poll::key_set_poll_interval_after_ready::KEY_SET_POLL_INTERVAL_AFTER_READY;
 use margaret_key_set_poll::key_set_poll_service::KeySetPollService;
@@ -15,7 +15,7 @@ use margaret_key_set_poll_tests::system_issuer_document_client::system_issuer_do
 
 #[tokio::test(start_paused = true)]
 async fn key_set_poll_service_returns_promptly_when_cancelled_during_the_wait() {
-    let KeySetParsing::Accepted(known_good) = VerificationKeySet::from_jwks(Vec::new()) else {
+    let KeySetAssembly::Assembled(known_good) = VerificationKeySet::assemble(Vec::new()) else {
         panic!("an empty key set is accepted");
     };
     let verification_key_set_holder = VerificationKeySetHolder::default();

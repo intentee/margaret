@@ -14,8 +14,11 @@ use margaret_jws_verification::jwk::Jwk;
 use margaret_jws_verification::key_id::KeyId;
 use margaret_jws_verification::rsa_jwk::RsaJwk;
 
+use crate::fixture_certificate::fixture_certificate;
 use crate::signed_token::signed_token;
 use crate::signing_input::signing_input;
+
+const FIXTURE_PKCS8: &[u8] = include_bytes!("../fixtures/rsa_2048_pkcs8.der");
 
 pub struct FixtureRsaKey {
     key_pair: RsaKeyPair,
@@ -29,10 +32,15 @@ impl FixtureRsaKey {
     /// Panics when the committed fixture is not a pkcs#8 rsa key.
     pub fn load(kid: &str) -> Self {
         Self {
-            key_pair: RsaKeyPair::from_pkcs8(include_bytes!("../fixtures/rsa_2048_pkcs8.der"))
+            key_pair: RsaKeyPair::from_pkcs8(FIXTURE_PKCS8)
                 .expect("the committed fixture is a pkcs#8 rsa key"),
             kid: kid.to_string(),
         }
+    }
+
+    #[must_use]
+    pub fn certificate(&self) -> Vec<u8> {
+        fixture_certificate(FIXTURE_PKCS8)
     }
 
     #[must_use]

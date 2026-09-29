@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use margaret_jose_parameters::curve::Curve;
 use margaret_jws_verification::key_id::KeyId;
-use margaret_jws_verification::key_set_parsing::KeySetParsing;
+use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
@@ -43,24 +43,27 @@ impl JwksSecret {
 
     /// # Errors
     ///
-    /// Returns `JwksKeyError::KeySetRejected` when the keys do not form a key set.
+    /// Returns `JwksKeyError::DuplicateKeyId` when two of the keys share a key id.
     pub fn from_pairs(
         current: JwkPair,
         next: JwkPair,
         previous: PreviousKey,
     ) -> Result<Self, JwksKeyError> {
-        let mut keys = vec![current.public_jwk().clone()];
+        let mut published = vec![current.public_jwk().clone()];
+        let mut verification_keys = vec![current.verification_key()];
 
         if let PreviousKey::Retired(retired) = &previous {
-            keys.push(retired.public_jwk().clone());
+            published.push(retired.public_jwk().clone());
+            verification_keys.push(retired.verification_key());
         }
 
-        keys.push(next.public_jwk().clone());
+        published.push(next.public_jwk().clone());
+        verification_keys.push(next.verification_key());
 
-        let key_set = match VerificationKeySet::from_jwks(keys.clone()) {
-            KeySetParsing::Accepted(key_set) => key_set,
-            KeySetParsing::Rejected(rejection) => {
-                return Err(JwksKeyError::KeySetRejected { rejection });
+        let key_set = match VerificationKeySet::assemble(verification_keys) {
+            KeySetAssembly::Assembled(key_set) => key_set,
+            KeySetAssembly::DuplicateKeyId(duplicate) => {
+                return Err(JwksKeyError::DuplicateKeyId { duplicate });
             }
         };
 
@@ -69,7 +72,7 @@ impl JwksSecret {
             key_set,
             next,
             previous,
-            public_jwks: PublicJwks::new(keys),
+            public_jwks: PublicJwks::new(published),
         })
     }
 

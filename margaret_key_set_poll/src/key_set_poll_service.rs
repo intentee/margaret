@@ -97,9 +97,14 @@ impl<TLocator: LocatesKeySet> Ticker for KeySetPollService<TLocator> {
                 error!("Unable to poll the key set of the issuer: {failure}");
             }
             KeySetPoll::Fetched(AcceptedKeySetDocument {
+                disclosed_keys,
                 ignored_keys,
                 key_set,
             }) => {
+                for disclosed_key in disclosed_keys {
+                    error!("Distrusting a key of the issuer's key set: {disclosed_key}");
+                }
+
                 for ignored_key in ignored_keys {
                     debug!("Ignoring a key of the issuer's key set: {ignored_key}");
                 }

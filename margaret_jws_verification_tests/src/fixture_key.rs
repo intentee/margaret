@@ -2,6 +2,7 @@ use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 use p256::ecdsa::signature::Signer;
 use p256::elliptic_curve::rand_core::OsRng;
+use p256::pkcs8::EncodePrivateKey;
 use serde_json::Value;
 use serde_json::json;
 
@@ -10,7 +11,10 @@ use margaret_jose_parameters::key_use::KeyUse;
 use margaret_jws_verification::ec_jwk::EcJwk;
 use margaret_jws_verification::jwk::Jwk;
 use margaret_jws_verification::key_id::KeyId;
+use margaret_jws_verification::verification_key::VerificationKey;
+use margaret_jws_verification::verification_material::VerificationMaterial;
 
+use crate::fixture_certificate::fixture_certificate;
 use crate::fixture_material::FixtureMaterial;
 use crate::signed_token::signed_token;
 use crate::signing_input::signing_input;
@@ -38,6 +42,20 @@ impl FixtureKey {
             kid: kid.to_string(),
             material,
         }
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the fixture key cannot be encoded or certified.
+    #[must_use]
+    pub fn certificate(&self) -> Vec<u8> {
+        let pkcs8 = match &self.material {
+            FixtureMaterial::P256(key) => key.to_pkcs8_der(),
+            FixtureMaterial::P384(key) => key.to_pkcs8_der(),
+        }
+        .expect("the fixture key encodes as pkcs#8");
+
+        fixture_certificate(pkcs8.as_bytes())
     }
 
     #[must_use]
@@ -95,6 +113,16 @@ impl FixtureKey {
         let signing_input = signing_input(header, claims);
 
         signed_token(&signing_input, &self.signature(&signing_input))
+    }
+
+    #[must_use]
+    pub fn verification_key(&self) -> VerificationKey {
+        let material = match &self.material {
+            FixtureMaterial::P256(key) => VerificationMaterial::P256(*key.verifying_key()),
+            FixtureMaterial::P384(key) => VerificationMaterial::P384(*key.verifying_key()),
+        };
+
+        VerificationKey::new(KeyId::new(self.kid.clone()), material)
     }
 
     fn ec_jwk_of(&self, curve: Curve, x: Option<&[u8]>, y: Option<&[u8]>) -> EcJwk {

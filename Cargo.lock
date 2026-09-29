@@ -2823,6 +2823,8 @@ dependencies = [
  "margaret_jose_parameters",
  "p256",
  "p384",
+ "rustls-pki-types",
+ "rustls-webpki",
  "serde",
  "serde_json",
 ]
@@ -2837,6 +2839,7 @@ dependencies = [
  "margaret_jws_verification",
  "p256",
  "p384",
+ "rcgen",
  "serde_json",
 ]
 
