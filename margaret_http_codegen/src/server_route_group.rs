@@ -4,6 +4,7 @@ use std::collections::btree_map::Entry;
 use matchit::InsertError;
 use matchit::Router;
 
+use margaret_route_method::route_method::RouteMethod;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::http_codegen_error::HttpCodegenError;
@@ -27,7 +28,7 @@ impl ServerRouteGroup {
         &mut self,
         server: &str,
         path: RoutePath,
-        method: String,
+        method: RouteMethod,
         route: HttpRoute,
     ) -> Result<(), HttpCodegenError> {
         let responder = route.responder_path.to_string();
@@ -58,7 +59,7 @@ impl ServerRouteGroup {
             }
         };
 
-        match group.take_method(method.clone(), route) {
+        match group.take_method(method, route) {
             Some(existing) => Err(HttpCodegenError::DuplicateRoute {
                 existing_responder: existing.responder_path.to_string(),
                 method,

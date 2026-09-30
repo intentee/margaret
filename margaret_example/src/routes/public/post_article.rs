@@ -12,6 +12,7 @@ use crate::stores::article_store::ArticleStore;
 
 #[singleton]
 #[responds_to_http(
+    max_body_bytes = 8_388_608,
     method = "post",
     name = "post_article",
     path = "/articles",

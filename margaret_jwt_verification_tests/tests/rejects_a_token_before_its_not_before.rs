@@ -2,13 +2,12 @@ use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
 
-use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jwt_verification::claims_rejection::ClaimsRejection;
+use margaret_jwt_verification::id_token_profile::IdTokenProfile;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
-use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
 use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_jwt_verification_tests::signed_claims::SignedClaims;
@@ -28,7 +27,7 @@ fn rejects_a_token_before_its_not_before() {
     };
 
     assert!(matches!(
-        verify_serialized_jwt::<Map<String, Value>>(&key_set, &token, &JwtExpectation { audience: &trust.audience, issuer: &trust.issuer, token_type: TypeHeaderExpectation::Optional(JwtType::Jwt) }, NumericDate::new(949)),
+        verify_serialized_jwt::<Map<String, Value>, IdTokenProfile>(&key_set, &token, &JwtExpectation { audience: &trust.audience, issuer: &trust.issuer }, NumericDate::new(949)),
         JwtVerification::Rejected(JwtRejection::Claims(ClaimsRejection::NotYetValid { nbf, now }))
             if nbf == NumericDate::new(950) && now == NumericDate::new(949)
     ));

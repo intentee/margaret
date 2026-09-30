@@ -13,13 +13,17 @@ fn framework_path(segments: &[&str]) -> CanonicalPath {
 
 #[derive(Clone, Copy)]
 pub(crate) enum SingletonDeclaration {
+    AcceptsOAuthClient,
+    ExchangesSubjectTokens,
     IssuesTokens,
     ProvidesJwksEndpoint,
     TrustsOidcIssuer,
 }
 
 impl SingletonDeclaration {
-    pub(crate) const ALL: [Self; 3] = [
+    pub(crate) const ALL: [Self; 5] = [
+        Self::AcceptsOAuthClient,
+        Self::ExchangesSubjectTokens,
         Self::IssuesTokens,
         Self::ProvidesJwksEndpoint,
         Self::TrustsOidcIssuer,
@@ -27,6 +31,8 @@ impl SingletonDeclaration {
 
     pub(crate) fn attribute(self) -> FrameworkAttribute {
         match self {
+            Self::AcceptsOAuthClient => FrameworkAttribute::AcceptsOAuthClient,
+            Self::ExchangesSubjectTokens => FrameworkAttribute::ExchangesSubjectTokens,
             Self::IssuesTokens => FrameworkAttribute::IssuesTokens,
             Self::ProvidesJwksEndpoint => FrameworkAttribute::ProvidesJwksEndpoint,
             Self::TrustsOidcIssuer => FrameworkAttribute::TrustsOidcIssuer,
@@ -35,6 +41,16 @@ impl SingletonDeclaration {
 
     pub(crate) fn required_traits(self) -> Vec<CanonicalPath> {
         match self {
+            Self::AcceptsOAuthClient => vec![framework_path(&[
+                "accepted_clients",
+                "declares_accepted_client",
+                "DeclaresAcceptedClient",
+            ])],
+            Self::ExchangesSubjectTokens => vec![framework_path(&[
+                "subject_token_exchange",
+                "exchanges_subject_tokens",
+                "ExchangesSubjectTokens",
+            ])],
             Self::IssuesTokens => vec![framework_path(&[
                 "token_issuance",
                 "declares_token_issuance",

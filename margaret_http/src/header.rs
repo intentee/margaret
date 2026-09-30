@@ -1,4 +1,4 @@
-pub(crate) struct Header {
-    pub(crate) name: String,
-    pub(crate) value: String,
+pub struct Header {
+    pub name: String,
+    pub value: String,
 }

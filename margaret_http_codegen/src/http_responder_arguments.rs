@@ -1,25 +1,13 @@
-use http::Method;
+use std::num::NonZeroU64;
 
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
+use margaret_route_method::route_method::RouteMethod;
 
 use crate::http_codegen_error::HttpCodegenError;
 
-fn normalized_method(method: &str, responder: &str) -> Result<String, HttpCodegenError> {
-    let method = method.to_uppercase();
-
-    Method::from_bytes(method.as_bytes()).map_err(|source| {
-        HttpCodegenError::InvalidHttpMethod {
-            responder: responder.to_string(),
-            method: method.clone(),
-            source,
-        }
-    })?;
-
-    Ok(method)
-}
-
 pub(crate) struct HttpResponderArguments {
-    pub(crate) method: String,
+    pub(crate) max_body_bytes: Option<NonZeroU64>,
+    pub(crate) method: RouteMethod,
     pub(crate) name: Option<String>,
     pub(crate) path: String,
     pub(crate) server: String,
@@ -36,7 +24,12 @@ impl HttpResponderArguments {
                     responder: responder.to_string(),
                 }
             })?;
-            let method = normalized_method(&declared_method, responder)?;
+            let method = RouteMethod::from_attribute_value(&declared_method).ok_or_else(|| {
+                HttpCodegenError::UnsupportedHttpMethod {
+                    responder: responder.to_string(),
+                    method: declared_method.clone(),
+                }
+            })?;
             let path =
                 reader
                     .take_string("path")?
@@ -49,8 +42,10 @@ impl HttpResponderArguments {
                     responder: responder.to_string(),
                 }
             })?;
+            let max_body_bytes = reader.take_unsigned_integer("max_body_bytes")?;
 
             Ok(Self {
+                max_body_bytes,
                 method,
                 name,
                 path,

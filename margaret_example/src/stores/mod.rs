@@ -1,5 +1,6 @@
 pub mod article_store;
 pub mod article_store_error;
+pub mod user_session;
 pub mod user_store;
 
 mod featured_article_id;

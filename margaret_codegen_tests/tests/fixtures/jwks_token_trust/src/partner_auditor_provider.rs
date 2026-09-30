@@ -1,4 +1,5 @@
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
@@ -18,7 +19,9 @@ impl PartnerAuditorProvider {
     #[infer_from_request]
     pub fn infer(
         &self,
-        #[bearer_token(issuer = partner)] token: Option<VerifiedJwt<AuditClaims>>,
+        #[bearer_token(issuer = partner)] token: Option<
+            VerifiedJwt<AuditClaims, AccessTokenProfile>,
+        >,
     ) -> anyhow::Result<AuthenticatedUserOutcome<PartnerAuditor>> {
         Ok(match token {
             Some(verified) => AuthenticatedUserOutcome::Authenticated(PartnerAuditor {

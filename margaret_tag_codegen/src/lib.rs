@@ -1,9 +1,16 @@
+mod oauth_client_arguments;
+pub mod oauth_client_binding;
+pub mod read_bearer_token_client;
 pub mod read_bearer_token_issuer;
 pub mod read_middleware_attribute;
 pub mod read_reference_tag;
-pub mod segmented_tag_binding;
+pub mod subject_token_exchanger_binding;
+mod tag_declaration;
+mod tag_declaring_attribute;
 pub mod tag_error;
 pub mod tag_expectation;
 pub mod tag_kind;
 pub mod tag_pool;
 pub mod tagged_item;
+pub mod trusted_issuer_binding;
+pub mod trusted_issuer_kind;

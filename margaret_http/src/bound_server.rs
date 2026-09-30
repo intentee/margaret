@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper::rt::Read;
@@ -27,17 +26,14 @@ use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 use tokio_util::sync::CancellationToken;
 
-use margaret_http_uploaded_file::upload_config::UploadConfig;
-use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
-use crate::body_limit::BodyLimit;
 use crate::drive_connection::drive_connection;
 use crate::forward_targets::ForwardTargets;
 use crate::one_shot_handler::OneShotHandler;
 use crate::one_shot_layer::one_shot_layer;
 use crate::request::Request;
-use crate::request_inputs::RequestInputs;
+use crate::request_body::RequestBody;
 use crate::request_outcome::RequestOutcome;
 use crate::request_rejection::RequestRejection;
 use crate::request_route::RequestRoute;
@@ -45,8 +41,7 @@ use crate::respond_once::respond_once;
 use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
 use crate::route_resolution::RouteResolution;
-use crate::router::Router;
-use crate::server_params::ServerParams;
+use crate::server::Server;
 use crate::server_registry::ServerRegistry;
 use crate::transport_config::TransportConfig;
 use crate::upgrade_route::UpgradeRoute;
@@ -62,13 +57,11 @@ enum BoundTransport {
 
 #[derive(Clone)]
 struct ConnectionContext {
-    body_limit: BodyLimit,
     cancellation_token: CancellationToken,
     forward_targets: Arc<ForwardTargets>,
     peer_identity: Arc<PeerIdentity>,
     remote_addr: SocketAddr,
-    router: Arc<Router>,
-    upload_config: Arc<UploadConfig>,
+    server: Arc<Server>,
 }
 
 struct AcceptedConnection {
@@ -76,15 +69,21 @@ struct AcceptedConnection {
     stream: TcpStream,
 }
 
-fn accept_outcome<Accept>(accepted: Result<(TcpStream, SocketAddr), Error>, accept: Accept)
+fn accepted_connection(
+    (stream, remote_addr): (TcpStream, SocketAddr),
+) -> Result<AcceptedConnection, Error> {
+    stream.set_nodelay(true).map(|()| AcceptedConnection {
+        remote_addr,
+        stream,
+    })
+}
+
+fn accept_outcome<Accept>(accepted: Result<AcceptedConnection, Error>, accept: Accept)
 where
     Accept: FnOnce(AcceptedConnection),
 {
     match accepted {
-        Ok((stream, remote_addr)) => accept(AcceptedConnection {
-            remote_addr,
-            stream,
-        }),
+        Ok(connection) => accept(connection),
         Err(error) => {
             eprintln!("margaret_http: accept error: {error}");
         }
@@ -114,16 +113,10 @@ fn report_connection_task_outcome(outcome: Result<(), JoinError>) {
     }
 }
 
-fn error_response(error: &UploadedFileError) -> Response {
-    eprintln!("margaret_http: the request could not be received: {error}");
-
-    Response::text(500, "Internal Server Error")
-}
-
-fn rejection_response(rejection: RequestRejection) -> Response {
+fn rejection_response(rejection: &RequestRejection) -> Response {
     eprintln!("margaret_http: the request was rejected: {rejection}");
 
-    rejection.into_response()
+    Response::text(400, "Bad Request")
 }
 
 async fn serve_connection<Io>(
@@ -158,6 +151,7 @@ async fn serve_connection<Io>(
 async fn complete_request(
     route: RequestRoute,
     request: Request,
+    body: RequestBody,
     forward_targets: &Arc<ForwardTargets>,
 ) -> http::Response<Full<Bytes>> {
     match route {
@@ -167,6 +161,7 @@ async fn complete_request(
         } => respond_recursively(
             forward_targets,
             request.with_path_params(path_params),
+            body,
             handler,
         )
         .await
@@ -177,9 +172,8 @@ async fn complete_request(
 }
 
 async fn dispatch_web_socket(
-    server: ServerParams,
+    handshake: Request,
     on_upgrade: OnUpgrade,
-    peer_identity: Arc<PeerIdentity>,
     cancellation_token: CancellationToken,
     UpgradeRoute {
         middleware,
@@ -189,57 +183,52 @@ async fn dispatch_web_socket(
     forward_targets: &Arc<ForwardTargets>,
     driver_sender: WebSocketDriverSender,
 ) -> http::Response<Full<Bytes>> {
-    match RequestInputs::from_handshake(server) {
-        RequestOutcome::Parsed(inputs) => {
-            let handshake = Request::from_inputs(inputs)
-                .with_peer_identity(peer_identity)
-                .with_path_params(path_params);
+    let mut onion: Box<dyn OneShotHandler> = Box::new(WebSocketUpgradeTerminal::new(
+        upgrade,
+        on_upgrade,
+        cancellation_token,
+        driver_sender,
+    ));
 
-            let mut onion: Box<dyn OneShotHandler> = Box::new(WebSocketUpgradeTerminal::new(
-                upgrade,
-                on_upgrade,
-                cancellation_token,
-                driver_sender,
-            ));
-
-            for middleware_layer in middleware.iter().rev() {
-                onion = one_shot_layer(middleware_layer.clone(), onion);
-            }
-
-            respond_once(forward_targets, handshake, onion)
-                .await
-                .into_http()
-        }
-        RequestOutcome::Rejected(rejection) => rejection_response(rejection).into_http(),
+    for middleware_layer in middleware.iter().rev() {
+        onion = one_shot_layer(middleware_layer.clone(), onion);
     }
+
+    respond_once(
+        forward_targets,
+        handshake.with_path_params(path_params),
+        onion,
+    )
+    .await
+    .into_http()
 }
 
 async fn dispatch(
     ConnectionContext {
-        body_limit,
         cancellation_token,
         forward_targets,
         peer_identity,
         remote_addr,
-        router,
-        upload_config,
+        server,
     }: ConnectionContext,
     driver_sender: WebSocketDriverSender,
     mut request: http::Request<Incoming>,
 ) -> http::Response<Full<Bytes>> {
     let on_upgrade = upgrade::on(&mut request);
     let (parts, incoming) = request.into_parts();
-    let server = match ServerParams::from_parts(parts, remote_addr) {
-        RequestOutcome::Parsed(server) => server,
-        RequestOutcome::Rejected(rejection) => return rejection_response(rejection).into_http(),
+    let request = match Request::from_head(server.clone(), parts, remote_addr, peer_identity) {
+        RequestOutcome::Parsed(request) => request,
+        RequestOutcome::Rejected(rejection) => return rejection_response(&rejection).into_http(),
     };
+    let resolution = server
+        .router()
+        .resolve(request.inputs.server.method(), request.inputs.server.path());
 
-    match router.resolve(server.method(), server.path()) {
+    match resolution {
         RouteResolution::Upgrade(upgrade_route) => {
             dispatch_web_socket(
-                server,
+                request,
                 on_upgrade,
-                peer_identity,
                 cancellation_token.child_token(),
                 upgrade_route,
                 &forward_targets,
@@ -248,33 +237,16 @@ async fn dispatch(
             .await
         }
         RouteResolution::Request(route) => {
-            let body = incoming.map_err(Error::other).boxed_unsync();
-
-            match RequestInputs::parse(server, body, &body_limit, &upload_config).await {
-                Ok(RequestOutcome::Parsed(inputs)) => {
-                    complete_request(
-                        route,
-                        Request::from_inputs(inputs).with_peer_identity(peer_identity),
-                        &forward_targets,
-                    )
-                    .await
-                }
-                Ok(RequestOutcome::Rejected(rejection)) => {
-                    rejection_response(rejection).into_http()
-                }
-                Err(error) => error_response(&error).into_http(),
-            }
+            complete_request(route, request, RequestBody::new(incoming), &forward_targets).await
         }
     }
 }
 
 pub struct BoundServer {
-    body_limit: BodyLimit,
     forward_targets: Arc<ForwardTargets>,
     listener: TcpListener,
-    router: Arc<Router>,
+    server: Arc<Server>,
     transport: BoundTransport,
-    upload_config: Arc<UploadConfig>,
 }
 
 impl BoundServer {
@@ -292,24 +264,19 @@ impl BoundServer {
                 "the server is not registered",
             ));
         };
-        let body_limit = server.body_limit();
-        let router = server.router().clone();
-        let transport = match server.transport().as_ref() {
+        let transport = match server.transport() {
             TransportConfig::Plain => BoundTransport::Plain,
             TransportConfig::MutualTls { server_config } => BoundTransport::MutualTls {
                 acceptor: TlsAcceptor::from(server_config.clone()),
             },
         };
-        let upload_config = server.upload_config().clone();
         let listener = TcpListener::bind(server.address()).await?;
 
         Ok(Self {
-            body_limit,
             forward_targets,
             listener,
-            router,
+            server: server.clone(),
             transport,
-            upload_config,
         })
     }
 
@@ -333,7 +300,7 @@ impl BoundServer {
                     report_connection_task_outcome(outcome);
                 }
                 accepted = self.listener.accept() => {
-                    accept_outcome(accepted, |connection| {
+                    accept_outcome(accepted.and_then(accepted_connection), |connection| {
                         self.spawn_connection(
                             &mut connections,
                             &builder,
@@ -367,10 +334,8 @@ impl BoundServer {
         let builder = builder.clone();
         let watcher = graceful.watcher();
         let transport = self.transport.clone();
-        let router = self.router.clone();
-        let upload_config = self.upload_config.clone();
+        let server = self.server.clone();
         let forward_targets = self.forward_targets.clone();
-        let body_limit = self.body_limit;
         let cancellation_token = cancellation_token.clone();
 
         drop(connections.spawn(async move {
@@ -381,13 +346,11 @@ impl BoundServer {
                         watcher,
                         TokioIo::new(stream),
                         ConnectionContext {
-                            body_limit,
                             cancellation_token,
                             forward_targets,
                             peer_identity: Arc::new(PeerIdentity::from_peer_certificate(None)),
                             remote_addr,
-                            router,
-                            upload_config,
+                            server,
                         },
                     )
                     .await;
@@ -408,13 +371,11 @@ impl BoundServer {
                         watcher,
                         TokioIo::new(tls_stream),
                         ConnectionContext {
-                            body_limit,
                             cancellation_token,
                             forward_targets,
                             peer_identity,
                             remote_addr,
-                            router,
-                            upload_config,
+                            server,
                         },
                     )
                     .await;
@@ -442,13 +403,12 @@ mod tests {
     use tokio_util::sync::CancellationToken;
 
     use margaret_http_uploaded_file::upload_config::UploadConfig;
-    use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
+    use margaret_route_method::route_method::RouteMethod;
 
     use super::BoundServer;
     use super::accept_outcome;
-    use super::error_response;
+    use super::accepted_connection;
     use super::report_connection_task_outcome;
-    use crate::body_limit::BodyLimit;
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
     use crate::handler::Handler;
@@ -459,6 +419,7 @@ mod tests {
     use crate::next::Next;
     use crate::redirect::Redirect;
     use crate::request::Request;
+    use crate::request_body::RequestBody;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
     use crate::route_entry::RouteEntry;
@@ -473,7 +434,11 @@ mod tests {
 
     #[async_trait]
     impl Handler for PlainOk {
-        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        async fn handle(
+            &self,
+            _request: &Request,
+            _body: RequestBody,
+        ) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::Done(Response::text(200, "ok")))
         }
     }
@@ -482,27 +447,16 @@ mod tests {
 
     #[async_trait]
     impl Handler for EchoesTheNameParameter {
-        async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        async fn handle(
+            &self,
+            request: &Request,
+            _body: RequestBody,
+        ) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::Done(Response::text(
                 200,
                 request.path_param("name").unwrap_or("absent").to_string(),
             )))
         }
-    }
-
-    fn registry_with_an_unusable_upload_directory() -> Arc<ServerRegistry> {
-        Arc::new(ServerRegistry::new(vec![Server::new(
-            "test",
-            "127.0.0.1:0".to_string(),
-            TransportConfig::Plain,
-            UploadConfig::enabled("/margaret-nonexistent-upload-directory".into()),
-            BodyLimit::default(),
-            Router::build(vec![RouteEntry::new(
-                "/upload",
-                vec![MethodHandler::anonymous("POST", Arc::new(PlainOk))],
-            )])
-            .expect("the route entries register cleanly"),
-        )]))
     }
 
     fn registry_with_a_name_parameter() -> Arc<ServerRegistry> {
@@ -511,11 +465,10 @@ mod tests {
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/files/{name}",
                 vec![MethodHandler::anonymous(
-                    "GET",
+                    RouteMethod::Get,
                     Arc::new(EchoesTheNameParameter),
                 )],
             )])
@@ -529,10 +482,12 @@ mod tests {
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    RouteMethod::Get,
+                    Arc::new(PlainOk),
+                )],
             )])
             .expect("the route entries register cleanly"),
         )]))
@@ -544,10 +499,12 @@ mod tests {
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            BodyLimit::default(),
             Router::build(vec![RouteEntry::new(
                 "/articles/{article}",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    RouteMethod::Get,
+                    Arc::new(PlainOk),
+                )],
             )])
             .expect("the route paths do not conflict"),
         )]))
@@ -555,17 +512,6 @@ mod tests {
 
     fn empty_forward_targets() -> Arc<ForwardTargets> {
         Arc::new(ForwardTargets::new(Vec::new()))
-    }
-
-    #[test]
-    fn answers_a_system_failure_with_internal_server_error() {
-        assert_eq!(
-            error_response(&UploadedFileError::UploadTempFile {
-                source: Error::other("the upload directory is unusable"),
-            })
-            .status(),
-            500
-        );
     }
 
     #[tokio::test]
@@ -584,11 +530,17 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/items/{id}",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    RouteMethod::Get,
+                    Arc::new(PlainOk),
+                )],
             ),
             RouteEntry::new(
                 "/items/{name}",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    RouteMethod::Get,
+                    Arc::new(PlainOk),
+                )],
             ),
         ]);
 
@@ -600,7 +552,10 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/x/{id}",
-                vec![MethodHandler::anonymous("GET", Arc::new(PlainOk))],
+                vec![MethodHandler::anonymous(
+                    RouteMethod::Get,
+                    Arc::new(PlainOk),
+                )],
             ),
             RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade), Vec::new()),
         ]);
@@ -627,11 +582,40 @@ mod tests {
         let client_addr = client.local_addr().expect("the client reports its address");
         let mut accepted_from = None;
 
-        accept_outcome(listener.accept().await, |connection| {
-            accepted_from = Some(connection.remote_addr);
-        });
+        accept_outcome(
+            listener.accept().await.and_then(accepted_connection),
+            |connection| {
+                accepted_from = Some(connection.remote_addr);
+            },
+        );
 
         assert_eq!(accepted_from, Some(client_addr));
+    }
+
+    #[tokio::test]
+    async fn disables_the_delay_of_small_writes_on_an_accepted_connection() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("the listener binds");
+        let _client = TcpStream::connect(
+            listener
+                .local_addr()
+                .expect("the listener reports its address"),
+        )
+        .await
+        .expect("the client connects");
+        let connection = listener
+            .accept()
+            .await
+            .and_then(accepted_connection)
+            .expect("the connection is accepted");
+
+        assert!(
+            connection
+                .stream
+                .nodelay()
+                .expect("the socket reports its options")
+        );
     }
 
     #[tokio::test]
@@ -654,7 +638,6 @@ mod tests {
             "this is not an address".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            BodyLimit::default(),
             Router::build(Vec::new()).expect("an empty router builds"),
         )]));
 
@@ -804,24 +787,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn answers_an_unusable_upload_directory_with_internal_server_error() {
-        serve_registry(
-            registry_with_an_unusable_upload_directory(),
-            |address| async move {
-                let response = exchange(
-                    address,
-                    b"POST /upload HTTP/1.1\r\nHost: test\r\nContent-Type: multipart/form-data; boundary=X\r\nContent-Length: 74\r\nConnection: close\r\n\r\n--X\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a\"\r\n\r\nDATA\r\n--X--\r\n",
-                    false,
-                )
-                .await;
-
-                assert!(response.contains(" 500 "));
-            },
-        )
-        .await;
-    }
-
-    #[tokio::test]
     async fn serves_an_http_10_request_without_a_host() {
         serve_registry(registry_with_one(), |address| async move {
             let response = exchange(address, b"GET / HTTP/1.0\r\n\r\n", false).await;
@@ -846,7 +811,7 @@ mod tests {
         let cancellation_token = CancellationToken::new();
         let serving = tokio::spawn(bound.serve(cancellation_token.clone()));
 
-        let (served, interrupted, unmatched, unsupported, truncated) = tokio::join!(
+        let (served, interrupted, unmatched, unsupported, unread) = tokio::join!(
             exchange(
                 address,
                 b"GET / HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
@@ -874,7 +839,7 @@ mod tests {
         assert!(!interrupted.contains(" 200 "));
         assert!(unmatched.contains(" 404 "));
         assert!(unsupported.contains(" 405 "));
-        assert!(truncated.contains(" 400 "));
+        assert!(unread.contains(" 405 "));
 
         cancellation_token.cancel();
 
@@ -1027,7 +992,6 @@ mod tests {
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            BodyLimit::default(),
             Router::build(vec![RouteEntry::web_socket(
                 "/room/{id}",
                 Arc::new(TestUpgrade),

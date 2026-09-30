@@ -141,13 +141,6 @@ fn create_extractions(
             ),
         )
     };
-    let response_return = quote! {
-        return ::std::result::Result::Ok(
-            margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
-                response.into(),
-            ),
-        )
-    };
     let error_return = quote! {
         return ::std::result::Result::Err(
             margaret::framework::websocket_session::web_socket_session_creation_error::WebSocketSessionCreationError::consumer(
@@ -183,7 +176,6 @@ fn create_extractions(
                 error_return: &error_return,
                 provider_access: &provider_access,
                 request_local: handshake,
-                response_return: &response_return,
             },
         )
     });

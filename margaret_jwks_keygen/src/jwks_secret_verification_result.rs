@@ -1,9 +1,9 @@
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 
-pub enum JwksSecretVerificationResult<TClaims> {
+pub enum JwksSecretVerificationResult<TClaims, TProfile> {
     Rejected(JwtRejection),
-    SignedWithCurrent(VerifiedJwt<TClaims>),
+    SignedWithCurrent(VerifiedJwt<TClaims, TProfile>),
     SignedWithNextKey,
-    SignedWithPrevious(VerifiedJwt<TClaims>),
+    SignedWithPrevious(VerifiedJwt<TClaims, TProfile>),
 }

@@ -88,6 +88,11 @@ impl Response {
     }
 
     #[must_use]
+    pub fn headers(&self) -> &[Header] {
+        &self.headers
+    }
+
+    #[must_use]
     pub fn set_cookie(self, cookie: &Cookie<'_>) -> Self {
         self.header("set-cookie", cookie.to_string())
     }

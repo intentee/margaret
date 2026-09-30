@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use margaret_http::handler::Handler;
 use margaret_http::handler_error::HandlerError;
 use margaret_http::request::Request;
+use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 
@@ -33,7 +34,11 @@ impl PublicJwksHandler {
 
 #[async_trait]
 impl Handler for PublicJwksHandler {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+    async fn handle(
+        &self,
+        _request: &Request,
+        _body: RequestBody,
+    ) -> Result<ResponseContinuation, HandlerError> {
         Ok(self.respond().into())
     }
 }

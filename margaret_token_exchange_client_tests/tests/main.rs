@@ -1,0 +1,7 @@
+mod names_every_subject_token_type;
+mod propagates_an_assertion_that_cannot_be_signed;
+mod relays_a_refused_token_exchange;
+mod reports_an_exchange_that_issues_another_token_type;
+mod reports_an_exchange_without_an_issued_token_type;
+mod reports_an_unavailable_token_endpoint;
+mod requests_a_token_exchange_for_its_subject_and_target;

@@ -1,3 +1,4 @@
+pub mod framework_tables;
 pub mod render_schema;
 
 mod column_check_tokens;
@@ -11,6 +12,7 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_model_codegen::models::models;
 
+    use crate::framework_tables::FrameworkTables;
     use crate::render_schema::render_schema;
 
     const ARTICLE: &str = "\
@@ -39,7 +41,7 @@ struct Author {
         let indexed = IndexedSource::new(lib_source);
         let models = models(&indexed.index).expect("the models resolve");
 
-        render_schema(&models)
+        render_schema(&models, FrameworkTables::Unused)
             .to_source()
             .split_whitespace()
             .collect()
@@ -47,6 +49,30 @@ struct Author {
 
     fn with_author(referencing: &str) -> String {
         format!("{AUTHOR_MODEL}\n{referencing}")
+    }
+
+    fn schema_source_with_provider_state(lib_source: &str) -> String {
+        let indexed = IndexedSource::new(lib_source);
+        let models = models(&indexed.index).expect("the models resolve");
+
+        render_schema(&models, FrameworkTables::OidcProviderState)
+            .to_source()
+            .split_whitespace()
+            .collect()
+    }
+
+    #[test]
+    fn appends_the_provider_state_tables_to_the_model_tables() {
+        assert!(schema_source_with_provider_state(ARTICLE).contains(
+            ".into_iter().chain(margaret::framework::provider_state_postgres::provider_state_tables::provider_state_tables()).collect()"
+        ));
+    }
+
+    #[test]
+    fn declares_only_the_provider_state_tables_without_models() {
+        assert!(schema_source_with_provider_state("").contains(
+            "tables:margaret::framework::provider_state_postgres::provider_state_tables::provider_state_tables(),"
+        ));
     }
 
     #[test]

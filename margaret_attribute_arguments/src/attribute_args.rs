@@ -23,32 +23,6 @@ impl AttributeArgs {
     /// # Errors
     ///
     /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
-    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgumentsError> {
-        let attribute_path = format_path(attribute.path());
-
-        match &attribute.meta {
-            Meta::Path(_) => Ok(Self {
-                attribute_path,
-                named: Vec::new(),
-                positional: Vec::new(),
-            }),
-            Meta::NameValue(meta_name_value) => Ok(Self {
-                named: vec![NamedArgument {
-                    name: format_path(&meta_name_value.path),
-                    value: meta_name_value.value.clone(),
-                }],
-                attribute_path,
-                positional: Vec::new(),
-            }),
-            Meta::List(meta_list) => {
-                Self::from_argument_tokens(attribute_path, meta_list.tokens.clone())
-            }
-        }
-    }
-
-    /// # Errors
-    ///
-    /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
     pub fn from_argument_tokens(
         attribute_path: String,
         tokens: TokenStream,
@@ -87,6 +61,32 @@ impl AttributeArgs {
             named,
             positional,
         })
+    }
+
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::Malformed` or `AttributeArgumentsError::DuplicateNamedArgument`.
+    pub fn from_attribute(attribute: &Attribute) -> Result<Self, AttributeArgumentsError> {
+        let attribute_path = format_path(attribute.path());
+
+        match &attribute.meta {
+            Meta::Path(_) => Ok(Self {
+                attribute_path,
+                named: Vec::new(),
+                positional: Vec::new(),
+            }),
+            Meta::NameValue(meta_name_value) => Ok(Self {
+                named: vec![NamedArgument {
+                    name: format_path(&meta_name_value.path),
+                    value: meta_name_value.value.clone(),
+                }],
+                attribute_path,
+                positional: Vec::new(),
+            }),
+            Meta::List(meta_list) => {
+                Self::from_argument_tokens(attribute_path, meta_list.tokens.clone())
+            }
+        }
     }
 
     /// # Errors
@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_returns_none_when_the_argument_is_absent() {
         let value = parsed(&parse_quote!(#[column]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect("an absent unsigned integer reads as none");
 
         assert_eq!(value, None);
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_reads_an_integer_literal() {
         let value = parsed(&parse_quote!(#[column(precision = 12)]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect("the unsigned integer reads");
 
         assert_eq!(value, Some(12));
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_rejects_a_non_integer_literal() {
         let error = parsed(&parse_quote!(#[column(precision = "12")]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect_err("a string is not an unsigned integer literal");
 
         assert!(matches!(
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_rejects_a_negative_literal() {
         let error = parsed(&parse_quote!(#[column(precision = -12)]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect_err("a negative literal is not an unsigned integer literal");
 
         assert!(matches!(
@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn take_unsigned_integer_rejects_a_literal_that_overflows() {
         let error = parsed(&parse_quote!(#[column(precision = 4294967296)]))
-            .interpret(|reader| reader.take_unsigned_integer("precision"))
+            .interpret(|reader| reader.take_unsigned_integer::<u32>("precision"))
             .expect_err("a literal above u32::MAX is rejected");
 
         assert!(matches!(

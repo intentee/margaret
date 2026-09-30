@@ -3,6 +3,7 @@ use serde_json::Value;
 use serde_json::json;
 
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_secret_store::access_token_signing::AccessTokenSigning;
 use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
@@ -16,7 +17,11 @@ fn verifies_an_access_token_signed_with_the_retired_key() {
     else {
         panic!("the claims are signed");
     };
-    let rotated = rolled_store(secret.rotate().expect("the signing secret rotates"));
+    let rotated = rolled_store(
+        secret
+            .rotate(&FixtureRsaSigningKeys::default())
+            .expect("the signing secret rotates"),
+    );
 
     assert!(matches!(
         rotated.verify_access_token::<Map<String, Value>>(&signed.signed_claims, unix_time(500)),

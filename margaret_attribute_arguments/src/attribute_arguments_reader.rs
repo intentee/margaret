@@ -1,3 +1,6 @@
+use std::fmt::Display;
+use std::str::FromStr;
+
 use quote::ToTokens;
 use syn::Expr;
 use syn::Lit;
@@ -107,14 +110,18 @@ impl AttributeArgumentsReader {
     ///
     /// Returns `AttributeArgumentsError::UnexpectedArgument` or
     /// `AttributeArgumentsError::MalformedUnsignedInteger`.
-    pub fn take_unsigned_integer(
+    pub fn take_unsigned_integer<Integer>(
         &mut self,
         key: &str,
-    ) -> Result<Option<u32>, AttributeArgumentsError> {
+    ) -> Result<Option<Integer>, AttributeArgumentsError>
+    where
+        Integer: FromStr,
+        Integer::Err: Display,
+    {
         match self.take_named(key) {
             None => Ok(None),
             Some(Expr::Lit(expression)) => match expression.lit {
-                Lit::Int(literal) => match literal.base10_parse::<u32>() {
+                Lit::Int(literal) => match literal.base10_parse::<Integer>() {
                     Ok(value) => Ok(Some(value)),
                     Err(source) => Err(AttributeArgumentsError::MalformedUnsignedInteger {
                         attribute_path: self.attribute_path.clone(),

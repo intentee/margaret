@@ -14,15 +14,18 @@ mod catalog {
     }
 }
 
+use margaret_macros::accepts_oauth_client;
 use margaret_macros::build_for_session;
 use margaret_macros::console_command;
 use margaret_macros::constructor;
+use margaret_macros::exchanges_subject_tokens;
 use margaret_macros::handles_middleware_attribute;
 use margaret_macros::infer_from_request;
 use margaret_macros::infers_authenticated_user;
 use margaret_macros::issues_tokens;
 use margaret_macros::middleware;
 use margaret_macros::model;
+use margaret_macros::oauth_client;
 use margaret_macros::process;
 use margaret_macros::provides_jwks_endpoint;
 use margaret_macros::provides_route_parameter;
@@ -86,6 +89,15 @@ struct TokenIssuer;
 
 #[trusts_oidc_issuer(partner)]
 struct PartnerIssuer;
+
+#[oauth_client(partner_client, issuer = partner)]
+struct PartnerClient;
+
+#[accepts_oauth_client]
+struct PortalClient;
+
+#[exchanges_subject_tokens(issuer = partner)]
+struct PartnerExchanger;
 
 #[route_parameter_value]
 struct SubjectId(String);
@@ -158,6 +170,9 @@ fn attribute_macros_leave_runtime_behavior_untouched() {
     assert_eq!(size_of::<JwksEndpoint>(), 0);
     assert_eq!(size_of::<TokenIssuer>(), 0);
     assert_eq!(size_of::<PartnerIssuer>(), 0);
+    assert_eq!(size_of::<PartnerClient>(), 0);
+    assert_eq!(size_of::<PortalClient>(), 0);
+    assert_eq!(size_of::<PartnerExchanger>(), 0);
     assert_eq!(size_of::<Worker>(), 0);
     assert_eq!(size_of_val(&AccountProvider), 0);
     assert_eq!(AccountProvider.infer("bearer"), "verified bearer");

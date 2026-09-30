@@ -1,8 +1,8 @@
-use crate::form_field::FormField;
+use crate::named_value::NamedValue;
 
-pub(crate) fn form_fields(encoded: &[u8]) -> Vec<FormField> {
+pub(crate) fn form_fields(encoded: &[u8]) -> Vec<NamedValue<String>> {
     form_urlencoded::parse(encoded)
-        .map(|(name, value)| FormField {
+        .map(|(name, value)| NamedValue {
             name: name.into_owned(),
             value: value.into_owned(),
         })

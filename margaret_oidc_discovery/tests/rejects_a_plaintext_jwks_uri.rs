@@ -1,3 +1,4 @@
+use margaret_oidc_discovery::metadata_endpoint::MetadataEndpoint;
 use margaret_oidc_discovery::provider_metadata::ProviderMetadata;
 use margaret_oidc_discovery::provider_metadata_parsing::ProviderMetadataParsing;
 use margaret_oidc_discovery::provider_metadata_rejection::ProviderMetadataRejection;
@@ -11,6 +12,6 @@ fn rejects_a_plaintext_jwks_uri() {
 
     assert!(matches!(
         ProviderMetadata::parse(br#"{"issuer":"https://server.example.com","jwks_uri":"http://server.example.com/jwks.json"}"#, &issuer),
-        ProviderMetadataParsing::Rejected(ProviderMetadataRejection::JwksUriNotHttps { scheme }) if scheme == "http"
+        ProviderMetadataParsing::Rejected(ProviderMetadataRejection::EndpointNotHttps { endpoint: MetadataEndpoint::JwksUri, scheme }) if scheme == "http"
     ));
 }

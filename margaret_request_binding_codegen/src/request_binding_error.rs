@@ -127,13 +127,14 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "form request argument #{parameter} of {subject} reads the request body via '{input_source}', but a WebSocket upgrade handshake has no body; only `from = Query` or `from = Cookie` is available"
+        "argument #{parameter} of {subject} reads the request body, which only an HTTP responder receives; a request is authenticated and routed from its head before its body is read"
     )]
-    FormRequestBodyUnavailable {
-        subject: String,
-        parameter: String,
-        input_source: String,
-    },
+    ContentOutsideResponder { subject: String, parameter: String },
+
+    #[error(
+        "{subject} reads its request body in more than one way; a body is read once, as form fields, JSON, uploaded files (optionally with form fields) or a stream"
+    )]
+    ConflictingContentBindings { subject: String },
 
     #[error(
         "argument #{parameter} of {subject} has both #[route_parameter] and #[form_request]; an argument may use at most one"
@@ -254,16 +255,6 @@ pub enum RequestBindingError {
     AuthenticatedUserUnavailable { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} requests the authenticated user from '{provider}', which reads the request body via '{input_source}', but a WebSocket upgrade handshake has no body"
-    )]
-    AuthenticatedUserBodyUnavailable {
-        subject: String,
-        parameter: String,
-        provider: String,
-        input_source: String,
-    },
-
-    #[error(
         "parameter '{parameter}' of {subject} must be the current request, a form request, a bearer token, the peer SPIFFE id, the views, an asset bag, or the routes"
     )]
     UnmarkedProviderParameter { subject: String, parameter: String },
@@ -279,7 +270,7 @@ pub enum RequestBindingError {
     ConflictingBearerTokenMarkers { subject: String, parameter: String },
 
     #[error(
-        "argument #{parameter} of {subject} carries #[bearer_token] on '{written}'; it must be Option<margaret::framework::jwt_verification::verified_jwt::VerifiedJwt<Claims>> taken by value"
+        "argument #{parameter} of {subject} carries #[bearer_token] on '{written}'; it must be Option<margaret::framework::jwt_verification::verified_jwt::VerifiedJwt<Claims, Profile>> or Option<margaret::framework::token_introspection::introspected_token::IntrospectedToken<Claims>> taken by value"
     )]
     BearerTokenTypeMismatch {
         subject: String,
@@ -306,14 +297,51 @@ pub enum RequestBindingError {
     },
 
     #[error(
-        "{subject} reads the bearer token more than once; a request presents exactly one bearer token"
+        "argument #{parameter} of {subject} verifies the bearer token under the profile '{written}', which is not a named type without generic arguments"
     )]
-    MultipleBearerTokenParameters { subject: String },
+    UnsupportedBearerTokenProfile {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
 
     #[error(
-        "argument #{parameter} of {subject} verifies the bearer token of the token issuer '{issuer}', whose client the container does not plan"
+        "argument #{parameter} of {subject} verifies the bearer token under the profile '{written}', which matches no type in scope"
     )]
-    UnplannedTokenIssuerClient {
+    UnknownBearerTokenProfile {
+        subject: String,
+        parameter: String,
+        written: String,
+    },
+
+    #[error(
+        "{subject} verifies bearer tokens of the trusted issuer '{issuer}' more than once; each trusted issuer admits the bearer token into exactly one argument"
+    )]
+    DuplicateBearerTokenIssuer { subject: String, issuer: String },
+
+    #[error(
+        "{subject} introspects the bearer token more than once; exactly one argument may admit an introspected bearer token"
+    )]
+    DuplicateIntrospectedBearerToken { subject: String },
+
+    #[error(
+        "{subject} both verifies and introspects the bearer token; a provider admits the bearer token either as verified jwts or as one introspected token"
+    )]
+    MixedBearerTokenCarriers { subject: String },
+
+    #[error(
+        "argument #{parameter} of {subject} introspects the bearer token with the oauth client '{client}', which the container does not plan"
+    )]
+    UnplannedOAuthClient {
+        subject: String,
+        parameter: String,
+        client: String,
+    },
+
+    #[error(
+        "argument #{parameter} of {subject} verifies the bearer token of the trusted issuer '{issuer}', which the container does not plan"
+    )]
+    UnplannedTrustedIssuer {
         subject: String,
         parameter: String,
         issuer: String,

@@ -25,7 +25,7 @@ fn rejects_an_access_token_presented_as_a_refresh_token() {
     assert!(matches!(
         mint_access_token(&secret, &issuance, &access_token, unix_time(1_000)),
         AccessTokenMinting::RejectedRefreshToken(JwtRejection::Type(TypeRejection::Mismatch {
-            expected: JwtType::Jwt,
+            expected: JwtType::Refresh,
             found: HeaderType::Supported(JwtType::AccessToken),
         }))
     ));

@@ -17,8 +17,16 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
         source.push_str("#[rustfmt::skip]\npub mod jwks;\n");
     }
 
-    if features.contains(GeneratedFeature::Oidc) {
-        source.push_str("#[rustfmt::skip]\npub mod oidc;\n");
+    if features.contains(GeneratedFeature::TrustedIssuers) {
+        source.push_str("#[rustfmt::skip]\npub mod trusted_issuers;\n");
+    }
+
+    if features.contains(GeneratedFeature::OAuthClients) {
+        source.push_str("#[rustfmt::skip]\npub mod oauth_clients;\n");
+    }
+
+    if features.contains(GeneratedFeature::OidcProvider) {
+        source.push_str("#[rustfmt::skip]\npub mod oidc_provider;\n");
     }
 
     if features.contains(GeneratedFeature::AuthenticatedUsers) && serves_http {
@@ -39,7 +47,7 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
         source.push_str("#[rustfmt::skip]\npub mod websocket;\n");
     }
 
-    if features.contains(GeneratedFeature::Models) {
+    if features.contains(GeneratedFeature::Schema) {
         source.push_str("#[rustfmt::skip]\npub mod schema;\n");
     }
 

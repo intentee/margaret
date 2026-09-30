@@ -1,3 +1,4 @@
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::loaded_secret::LoadedSecret;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
@@ -6,5 +7,8 @@ use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 fn memory_storage_load_is_always_absent() {
     let storage = MemoryJwksSecretStorage;
 
-    assert!(matches!(storage.load(), Ok(LoadedSecret::Absent)));
+    assert!(matches!(
+        storage.load(&FixtureRsaSigningKeys::default()),
+        Ok(LoadedSecret::Absent)
+    ));
 }

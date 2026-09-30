@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::num::NonZeroU64;
 
 use quote::format_ident;
 
@@ -11,12 +12,42 @@ use margaret_middleware_codegen::resolve_layers::resolve_layers;
 use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
+use margaret_request_binding_codegen::responder_content::ResponderContent;
+use margaret_route_method::route_method::RouteMethod;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_responder_arguments::HttpResponderArguments;
 use crate::http_route::HttpRoute;
 use crate::http_route_table::HttpRouteTable;
+use crate::route_content::RouteContent;
+
+fn route_content(
+    responder_content: ResponderContent,
+    max_body_bytes: Option<NonZeroU64>,
+    method: RouteMethod,
+    responder: &str,
+) -> Result<RouteContent, HttpCodegenError> {
+    match responder_content {
+        ResponderContent::Unread => match max_body_bytes {
+            None => Ok(RouteContent::Unread),
+            Some(_) => Err(HttpCodegenError::UnusedBodyLimit {
+                responder: responder.to_string(),
+            }),
+        },
+        ResponderContent::Read(_) if method == RouteMethod::Get => {
+            Err(HttpCodegenError::ContentOnGetRoute {
+                responder: responder.to_string(),
+            })
+        }
+        ResponderContent::Read(binding) => match max_body_bytes {
+            None => Err(HttpCodegenError::MissingBodyLimit {
+                responder: responder.to_string(),
+            }),
+            Some(limit) => Ok(RouteContent::Read { binding, limit }),
+        },
+    }
+}
 
 pub(crate) fn http_routes(
     index: &AttributeIndex,
@@ -37,6 +68,7 @@ pub(crate) fn http_routes(
 
         let responder = item.canonical_path().to_string();
         let HttpResponderArguments {
+            max_body_bytes,
             method,
             name,
             path,
@@ -66,6 +98,13 @@ pub(crate) fn http_routes(
             registries,
         )?;
 
+        let content = route_content(
+            ResponderContent::of(&arguments, &subject)?,
+            max_body_bytes,
+            method,
+            &responder,
+        )?;
+
         if let Some(name) = &name {
             if !is_snake_case_identifier(name) {
                 return Err(HttpCodegenError::InvalidRouteName {
@@ -88,6 +127,7 @@ pub(crate) fn http_routes(
         table.insert(
             route_path,
             HttpRoute {
+                content,
                 is_async: handler_method.signature().asyncness.is_some(),
                 layers,
                 method,

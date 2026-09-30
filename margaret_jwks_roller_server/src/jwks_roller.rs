@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 
 use crate::jwks_roller_server_bundle::JwksRollerServerBundle;
@@ -15,8 +16,12 @@ pub struct JwksRoller {
 
 impl JwksRoller {
     #[must_use]
-    pub fn create(storage: Arc<dyn JwksSecretStorage>) -> Self {
-        let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams { storage });
+    pub fn create(
+        storage: Arc<dyn JwksSecretStorage>,
+        rsa_keys: Arc<dyn ProvidesRsaSigningKeys>,
+    ) -> Self {
+        let bundle =
+            JwksRollerServerBundle::new(JwksRollerServerBundleParams { rsa_keys, storage });
         let public_jwks_handler = bundle.public_jwks_handler();
 
         Self {
@@ -47,12 +52,16 @@ impl JwksRoller {
 mod tests {
     use std::sync::Arc;
 
+    use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
     use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 
     use super::JwksRoller;
 
     fn roller() -> JwksRoller {
-        JwksRoller::create(Arc::new(MemoryJwksSecretStorage))
+        JwksRoller::create(
+            Arc::new(MemoryJwksSecretStorage),
+            Arc::new(FixtureRsaSigningKeys::default()),
+        )
     }
 
     #[test]

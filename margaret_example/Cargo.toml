@@ -9,6 +9,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 clap = { workspace = true }
+cookie = { workspace = true }
 dashmap = { workspace = true }
 margaret = { workspace = true, features = ["runtime"] }
 maud = { workspace = true }
@@ -21,7 +22,7 @@ tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "syn
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
 url = { workspace = true }
-uuid = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["serde", "v4"] }
 validator = { workspace = true, features = ["derive"] }
 
 [build-dependencies]

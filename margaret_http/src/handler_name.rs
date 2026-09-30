@@ -1,4 +1,4 @@
 pub enum HandlerName {
     Anonymous,
-    Named(&'static str),
+    Forwardable(&'static str),
 }

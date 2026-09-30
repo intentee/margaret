@@ -30,7 +30,7 @@ fn issuer_client() -> FrameworkProvider {
     let path: syn::Path = syn::parse_str("auth").expect("the tag path parses");
 
     framework_provider(
-        FrameworkInjectionRole::TokenIssuerClient(
+        FrameworkInjectionRole::TrustedIssuer(
             Tag::from_path(&path).expect("the tag is a plain name"),
         ),
         "IssuerClient",

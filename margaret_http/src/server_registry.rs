@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::server::Server;
 
 pub struct ServerRegistry {
-    by_name: HashMap<Arc<str>, Server>,
+    by_name: HashMap<Arc<str>, Arc<Server>>,
 }
 
 impl ServerRegistry {
@@ -12,14 +12,14 @@ impl ServerRegistry {
     pub fn new(servers: Vec<Server>) -> Self {
         let by_name = servers
             .into_iter()
-            .map(|server| (server.name().clone(), server))
+            .map(|server| (server.name().clone(), Arc::new(server)))
             .collect();
 
         Self { by_name }
     }
 
     #[must_use]
-    pub fn server(&self, name: &str) -> Option<&Server> {
+    pub fn server(&self, name: &str) -> Option<&Arc<Server>> {
         self.by_name.get(name)
     }
 }
@@ -29,7 +29,6 @@ mod tests {
     use margaret_http_uploaded_file::upload_config::UploadConfig;
 
     use super::ServerRegistry;
-    use crate::body_limit::BodyLimit;
     use crate::router::Router;
     use crate::server::Server;
     use crate::transport_config::TransportConfig;
@@ -40,15 +39,14 @@ mod tests {
             "127.0.0.1:8080".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
-            BodyLimit::default(),
             Router::build(Vec::new()).expect("an empty router builds"),
         )])
     }
 
     #[test]
-    fn resolves_a_registered_server() {
+    fn resolves_a_registered_server_by_name() {
         assert_eq!(
-            registry().server("public").map(Server::address),
+            registry().server("public").map(|server| server.address()),
             Some("127.0.0.1:8080")
         );
     }
@@ -56,15 +54,5 @@ mod tests {
     #[test]
     fn reports_no_server_for_an_unknown_name() {
         assert!(registry().server("missing").is_none());
-    }
-
-    #[test]
-    fn resolves_a_registered_server_by_name() {
-        let registry = registry();
-
-        assert_eq!(
-            registry.server("public").map(Server::address),
-            Some("127.0.0.1:8080")
-        );
     }
 }

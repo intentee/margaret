@@ -4,17 +4,21 @@ use std::fmt::Result;
 
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
+use crate::metadata_endpoint::MetadataEndpoint;
+
 #[derive(Debug)]
 pub enum ProviderMetadataRejection {
+    EndpointMalformed {
+        endpoint: MetadataEndpoint,
+        source: url::ParseError,
+    },
+    EndpointNotHttps {
+        endpoint: MetadataEndpoint,
+        scheme: String,
+    },
     IssuerMismatch {
         expected: IssuerIdentifier,
         found: String,
-    },
-    JwksUriMalformed {
-        source: url::ParseError,
-    },
-    JwksUriNotHttps {
-        scheme: String,
     },
     Malformed {
         source: serde_json::Error,
@@ -24,16 +28,16 @@ pub enum ProviderMetadataRejection {
 impl Display for ProviderMetadataRejection {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         match self {
+            Self::EndpointMalformed { endpoint, source } => {
+                write!(formatter, "the provider {endpoint} is not a url: {source}")
+            }
+            Self::EndpointNotHttps { endpoint, scheme } => write!(
+                formatter,
+                "the provider {endpoint} uses the '{scheme}' scheme instead of https"
+            ),
             Self::IssuerMismatch { expected, found } => write!(
                 formatter,
                 "the provider metadata names the issuer '{found}' instead of '{expected}'"
-            ),
-            Self::JwksUriMalformed { source } => {
-                write!(formatter, "the provider jwks_uri is not a url: {source}")
-            }
-            Self::JwksUriNotHttps { scheme } => write!(
-                formatter,
-                "the provider jwks_uri uses the '{scheme}' scheme instead of https"
             ),
             Self::Malformed { source } => {
                 write!(formatter, "the provider metadata is malformed: {source}")
@@ -47,21 +51,24 @@ mod tests {
     use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
     use super::ProviderMetadataRejection;
+    use crate::metadata_endpoint::MetadataEndpoint;
 
     #[test]
     fn describes_every_rejection() {
         let described = [
+            ProviderMetadataRejection::EndpointMalformed {
+                endpoint: MetadataEndpoint::JwksUri,
+                source: url::ParseError::EmptyHost,
+            },
+            ProviderMetadataRejection::EndpointNotHttps {
+                endpoint: MetadataEndpoint::TokenEndpoint,
+                scheme: "http".to_string(),
+            },
             ProviderMetadataRejection::IssuerMismatch {
                 expected: "https://issuer.example"
                     .parse::<IssuerIdentifier>()
                     .expect("the issuer is an https url"),
                 found: "https://attacker.example".to_string(),
-            },
-            ProviderMetadataRejection::JwksUriMalformed {
-                source: url::ParseError::EmptyHost,
-            },
-            ProviderMetadataRejection::JwksUriNotHttps {
-                scheme: "http".to_string(),
             },
             ProviderMetadataRejection::Malformed {
                 source: serde_json::from_str::<u8>("x").expect_err("not json"),
@@ -71,15 +78,15 @@ mod tests {
 
         assert_eq!(
             described[0],
-            "the provider metadata names the issuer 'https://attacker.example' instead of 'https://issuer.example'"
-        );
-        assert_eq!(
-            described[1],
             "the provider jwks_uri is not a url: empty host"
         );
         assert_eq!(
+            described[1],
+            "the provider token_endpoint uses the 'http' scheme instead of https"
+        );
+        assert_eq!(
             described[2],
-            "the provider jwks_uri uses the 'http' scheme instead of https"
+            "the provider metadata names the issuer 'https://attacker.example' instead of 'https://issuer.example'"
         );
         assert!(described[3].starts_with("the provider metadata is malformed: "));
     }

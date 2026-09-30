@@ -3,6 +3,7 @@ use quote::format_ident;
 use quote::quote;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_route_method::route_method::RouteMethod;
 
 use crate::http_route_table::HttpRouteTable;
 use crate::http_server::HttpServer;
@@ -41,7 +42,7 @@ fn server_forwarder(table: &HttpRouteTable, server: &HttpServer) -> TokenStream 
     let methods: Vec<TokenStream> = table
         .named_routes(server.name())
         .iter()
-        .filter(|named| named.route.method == "GET")
+        .filter(|named| named.route.method == RouteMethod::Get)
         .map(forward_method)
         .collect();
 

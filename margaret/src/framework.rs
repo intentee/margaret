@@ -1,11 +1,17 @@
 #[cfg(feature = "runtime")]
 pub use anyhow;
 #[cfg(feature = "runtime")]
+pub use margaret_accepted_clients as accepted_clients;
+#[cfg(feature = "runtime")]
 pub use margaret_access_token_minter as access_token_minter;
 #[cfg(feature = "runtime")]
 pub use margaret_asset_bag as asset_bag;
 #[cfg(feature = "runtime")]
+pub use margaret_authorization_server_client as authorization_server_client;
+#[cfg(feature = "runtime")]
 pub use margaret_bearer_token_verification as bearer_token_verification;
+#[cfg(feature = "runtime")]
+pub use margaret_client_credentials as client_credentials;
 #[cfg(feature = "codegen")]
 pub use margaret_codegen as codegen;
 #[cfg(feature = "runtime")]
@@ -27,9 +33,15 @@ pub use margaret_identity as identity;
 #[cfg(feature = "runtime")]
 pub use margaret_identity_session as identity_session;
 #[cfg(feature = "runtime")]
-pub use margaret_jose_parameters as jose_parameters;
+pub use margaret_issuer_directory as issuer_directory;
 #[cfg(feature = "runtime")]
-pub use margaret_jwks_client as jwks_client;
+pub use margaret_issuer_key_set as issuer_key_set;
+#[cfg(feature = "runtime")]
+pub use margaret_issuer_metadata as issuer_metadata;
+#[cfg(feature = "runtime")]
+pub use margaret_issuer_request as issuer_request;
+#[cfg(feature = "runtime")]
+pub use margaret_jose_parameters as jose_parameters;
 #[cfg(feature = "runtime")]
 pub use margaret_jwks_endpoint as jwks_endpoint;
 #[cfg(feature = "runtime")]
@@ -53,11 +65,25 @@ pub use margaret_macros as macros;
 #[cfg(feature = "runtime")]
 pub use margaret_model as model;
 #[cfg(feature = "runtime")]
-pub use margaret_oidc_client as oidc_client;
+pub use margaret_oauth_client as oauth_client;
+#[cfg(feature = "runtime")]
+pub use margaret_oauth_vocabulary as oauth_vocabulary;
+#[cfg(feature = "runtime")]
+pub use margaret_oidc_provider as oidc_provider;
+#[cfg(feature = "runtime")]
+pub use margaret_oidc_sign_in as oidc_sign_in;
 #[cfg(feature = "runtime")]
 pub use margaret_peer_identity as peer_identity;
 #[cfg(feature = "runtime")]
+pub use margaret_provider_state_postgres as provider_state_postgres;
+#[cfg(feature = "runtime")]
+pub use margaret_provider_state_storage as provider_state_storage;
+#[cfg(feature = "runtime")]
+pub use margaret_provider_state_storage_selection as provider_state_storage_selection;
+#[cfg(feature = "runtime")]
 pub use margaret_registered_claims as registered_claims;
+#[cfg(feature = "runtime")]
+pub use margaret_route_method as route_method;
 #[cfg(feature = "runtime")]
 pub use margaret_route_parameter_binding as route_parameter_binding;
 #[cfg(feature = "runtime")]
@@ -71,13 +97,21 @@ pub use margaret_spiffe_svid_client as spiffe_svid_client;
 #[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid_server as spiffe_svid_server;
 #[cfg(feature = "runtime")]
+pub use margaret_subject_token_exchange as subject_token_exchange;
+#[cfg(feature = "runtime")]
 pub use margaret_sync_holder as sync_holder;
+#[cfg(feature = "runtime")]
+pub use margaret_token_exchange_client as token_exchange_client;
+#[cfg(feature = "runtime")]
+pub use margaret_token_introspection as token_introspection;
 #[cfg(feature = "runtime")]
 pub use margaret_token_issuance as token_issuance;
 #[cfg(feature = "runtime")]
 pub use margaret_token_signer as token_signer;
 #[cfg(feature = "runtime")]
 pub use margaret_token_trust as token_trust;
+#[cfg(feature = "runtime")]
+pub use margaret_trusted_issuer as trusted_issuer;
 #[cfg(feature = "runtime")]
 pub use margaret_validation as validation;
 #[cfg(feature = "runtime")]
@@ -86,6 +120,8 @@ pub use margaret_views as views;
 pub use margaret_websocket as websocket;
 #[cfg(feature = "runtime")]
 pub use margaret_websocket_session as websocket_session;
+#[cfg(feature = "runtime")]
+pub use oauth2;
 
 #[cfg(all(test, feature = "runtime"))]
 mod tests {

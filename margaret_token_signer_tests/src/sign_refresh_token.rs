@@ -21,6 +21,6 @@ pub fn sign_refresh_token(
             iss: issuer.as_str().to_string(),
             nbf: None,
         }),
-        JwtType::Jwt,
+        JwtType::Refresh,
     )
 }

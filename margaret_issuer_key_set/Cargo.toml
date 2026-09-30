@@ -1,0 +1,26 @@
+[package]
+name = "margaret_issuer_key_set"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Holds the key set of a token issuer and coordinates its on-demand refetch, for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+autotests = false
+
+[dependencies]
+margaret_jws_verification = { workspace = true }
+tokio = { workspace = true, features = ["macros", "sync", "time"] }
+
+[dev-dependencies]
+margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
+tokio = { workspace = true, features = ["macros", "rt", "sync", "test-util", "time"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

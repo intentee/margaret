@@ -1,65 +1,129 @@
+use std::ops::ControlFlow;
+use std::sync::Arc;
+
 use serde::Deserialize;
 use url::Url;
 
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
+use crate::advertised_endpoint::AdvertisedEndpoint;
+use crate::authorization_response_issuer::AuthorizationResponseIssuer;
+use crate::metadata_endpoint::MetadataEndpoint;
 use crate::provider_metadata_parsing::ProviderMetadataParsing;
 use crate::provider_metadata_rejection::ProviderMetadataRejection;
 
-const JWKS_URI_SCHEME: &str = "https";
+const ENDPOINT_SCHEME: &str = "https";
 
 #[derive(Deserialize)]
 struct ProviderMetadataDocument {
+    authorization_endpoint: Option<String>,
+    #[serde(default)]
+    authorization_response_iss_parameter_supported: bool,
+    introspection_endpoint: Option<String>,
     issuer: String,
     jwks_uri: String,
+    token_endpoint: Option<String>,
+    userinfo_endpoint: Option<String>,
+}
+
+fn https_endpoint(
+    endpoint: MetadataEndpoint,
+    declared: &str,
+) -> ControlFlow<ProviderMetadataRejection, Url> {
+    match Url::parse(declared) {
+        Ok(url) if url.scheme() == ENDPOINT_SCHEME => ControlFlow::Continue(url),
+        Ok(url) => ControlFlow::Break(ProviderMetadataRejection::EndpointNotHttps {
+            endpoint,
+            scheme: url.scheme().to_string(),
+        }),
+        Err(source) => {
+            ControlFlow::Break(ProviderMetadataRejection::EndpointMalformed { endpoint, source })
+        }
+    }
+}
+
+fn advertised_endpoint(
+    endpoint: MetadataEndpoint,
+    declared: Option<String>,
+) -> ControlFlow<ProviderMetadataRejection, AdvertisedEndpoint> {
+    match declared {
+        Some(declared) => {
+            https_endpoint(endpoint, &declared).map_continue(AdvertisedEndpoint::Advertised)
+        }
+        None => ControlFlow::Continue(AdvertisedEndpoint::Unadvertised),
+    }
+}
+
+fn authorization_response_issuer(advertised: bool) -> AuthorizationResponseIssuer {
+    if advertised {
+        AuthorizationResponseIssuer::Advertised
+    } else {
+        AuthorizationResponseIssuer::Unadvertised
+    }
 }
 
 pub struct ProviderMetadata {
-    jwks_uri: Url,
+    pub authorization_endpoint: AdvertisedEndpoint,
+    pub authorization_response_issuer: AuthorizationResponseIssuer,
+    pub introspection_endpoint: AdvertisedEndpoint,
+    pub jwks_uri: Url,
+    pub token_endpoint: AdvertisedEndpoint,
+    pub userinfo_endpoint: AdvertisedEndpoint,
 }
 
 impl ProviderMetadata {
-    #[must_use]
-    pub fn parse(document: &[u8], issuer: &IssuerIdentifier) -> ProviderMetadataParsing {
-        let ProviderMetadataDocument {
+    fn from_document(
+        ProviderMetadataDocument {
+            authorization_endpoint,
+            authorization_response_iss_parameter_supported,
+            introspection_endpoint,
             issuer: declared_issuer,
             jwks_uri,
-        } = match serde_json::from_slice(document) {
-            Ok(document) => document,
-            Err(source) => {
-                return ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Malformed {
-                    source,
-                });
-            }
-        };
-
+            token_endpoint,
+            userinfo_endpoint,
+        }: ProviderMetadataDocument,
+        issuer: &IssuerIdentifier,
+    ) -> ControlFlow<ProviderMetadataRejection, Self> {
         if declared_issuer != issuer.as_str() {
-            return ProviderMetadataParsing::Rejected(ProviderMetadataRejection::IssuerMismatch {
+            return ControlFlow::Break(ProviderMetadataRejection::IssuerMismatch {
                 expected: issuer.clone(),
                 found: declared_issuer,
             });
         }
 
-        let jwks_uri = match Url::parse(&jwks_uri) {
-            Ok(jwks_uri) => jwks_uri,
-            Err(source) => {
-                return ProviderMetadataParsing::Rejected(
-                    ProviderMetadataRejection::JwksUriMalformed { source },
-                );
-            }
-        };
-
-        if jwks_uri.scheme() != JWKS_URI_SCHEME {
-            return ProviderMetadataParsing::Rejected(ProviderMetadataRejection::JwksUriNotHttps {
-                scheme: jwks_uri.scheme().to_string(),
-            });
-        }
-
-        ProviderMetadataParsing::Accepted(Self { jwks_uri })
+        ControlFlow::Continue(Self {
+            authorization_endpoint: advertised_endpoint(
+                MetadataEndpoint::AuthorizationEndpoint,
+                authorization_endpoint,
+            )?,
+            authorization_response_issuer: authorization_response_issuer(
+                authorization_response_iss_parameter_supported,
+            ),
+            introspection_endpoint: advertised_endpoint(
+                MetadataEndpoint::IntrospectionEndpoint,
+                introspection_endpoint,
+            )?,
+            jwks_uri: https_endpoint(MetadataEndpoint::JwksUri, &jwks_uri)?,
+            token_endpoint: advertised_endpoint(MetadataEndpoint::TokenEndpoint, token_endpoint)?,
+            userinfo_endpoint: advertised_endpoint(
+                MetadataEndpoint::UserinfoEndpoint,
+                userinfo_endpoint,
+            )?,
+        })
     }
 
     #[must_use]
-    pub fn jwks_uri(&self) -> &Url {
-        &self.jwks_uri
+    pub fn parse(document: &[u8], issuer: &IssuerIdentifier) -> ProviderMetadataParsing {
+        match serde_json::from_slice(document) {
+            Ok(document) => match Self::from_document(document, issuer) {
+                ControlFlow::Continue(metadata) => {
+                    ProviderMetadataParsing::Accepted(Arc::new(metadata))
+                }
+                ControlFlow::Break(rejection) => ProviderMetadataParsing::Rejected(rejection),
+            },
+            Err(source) => {
+                ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Malformed { source })
+            }
+        }
     }
 }

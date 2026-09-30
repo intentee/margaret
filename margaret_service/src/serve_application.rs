@@ -6,7 +6,6 @@ use clap::ArgMatches;
 
 use margaret_console::command_outcome::CommandOutcome;
 use margaret_console::report_failure::report_failure;
-use margaret_http::body_limit::BodyLimit;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
@@ -60,7 +59,6 @@ pub fn serve_application(
             address,
             transport,
             upload_config,
-            BodyLimit::default(),
             server_routes.router,
         ));
     }

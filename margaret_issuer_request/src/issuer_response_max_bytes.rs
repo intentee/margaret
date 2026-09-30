@@ -1,0 +1,1 @@
+pub const ISSUER_RESPONSE_MAX_BYTES: usize = 1_048_576;

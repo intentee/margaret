@@ -13,6 +13,7 @@ use margaret_generated_module::generated_module_error::GeneratedModuleError;
 use margaret_http_codegen::http_codegen_error::HttpCodegenError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_model_codegen::model_codegen_error::ModelCodegenError;
+use margaret_oidc_provider_codegen::oidc_provider_codegen_error::OidcProviderCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
 use margaret_serve_input_codegen::serve_input_codegen_error::ServeInputCodegenError;
 use margaret_service_codegen::service_codegen_error::ServiceCodegenError;
@@ -49,6 +50,12 @@ pub enum CodegenError {
         "a module imports the asset macro, but no esbuild metafile was found at the workspace root"
     )]
     AssetMacroWithoutMetafile,
+
+    #[error("failed to derive the openid connect provider endpoints: {source}")]
+    OidcProvider {
+        #[from]
+        source: OidcProviderCodegenError,
+    },
 
     #[error("failed to collect the tags: {source}")]
     Tag {

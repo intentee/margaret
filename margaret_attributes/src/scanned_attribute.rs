@@ -13,10 +13,6 @@ impl ScannedAttribute {
         Self { attribute }
     }
 
-    pub(crate) fn scan_all(attributes: Vec<Attribute>) -> Vec<Self> {
-        attributes.into_iter().map(Self::new).collect()
-    }
-
     pub(crate) fn resolve_all(
         attributes: Vec<Self>,
         resolve: impl Copy + Fn(&Path) -> CanonicalPath,
@@ -29,5 +25,9 @@ impl ScannedAttribute {
                 IndexedAttribute::from_canonical(&attribute.attribute, &canonical_path)
             })
             .collect()
+    }
+
+    pub(crate) fn scan_all(attributes: Vec<Attribute>) -> Vec<Self> {
+        attributes.into_iter().map(Self::new).collect()
     }
 }

@@ -14,7 +14,7 @@ fn ignores_a_key_of_an_unsupported_algorithm() {
         serde_json::to_value(FixtureRsaKey::load("kid").jwk()).expect("the fixture jwk serializes");
     let members = published.as_object_mut().expect("a jwk is an object");
 
-    members.insert("alg".to_string(), json!("PS256"));
+    members.insert("alg".to_string(), json!("HS256"));
 
     let KeySetDocumentParsing::Accepted(AcceptedKeySetDocument { ignored_keys, .. }) =
         VerificationKeySet::parse(json!({ "keys": [published] }).to_string().as_bytes())
@@ -24,6 +24,6 @@ fn ignores_a_key_of_an_unsupported_algorithm() {
 
     assert!(matches!(
         ignored_keys.as_slice(),
-        [IgnoredKey { index: 0, reason: IgnoredKeyReason::Algorithm(KeyAlgorithmRejection::UnsupportedAlgorithm { alg }) }] if alg == "PS256"
+        [IgnoredKey { index: 0, reason: IgnoredKeyReason::Algorithm(KeyAlgorithmRejection::UnsupportedAlgorithm { alg }) }] if alg == "HS256"
     ));
 }

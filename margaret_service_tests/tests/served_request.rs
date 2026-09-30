@@ -7,12 +7,15 @@ use tokio::net::TcpStream;
 use tokio_util::sync::CancellationToken;
 
 use margaret_http::body_limit::BodyLimit;
+use margaret_http::body_reading::BodyReading;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::handler::Handler;
 use margaret_http::handler_error::HandlerError;
 use margaret_http::method_handler::MethodHandler;
+use margaret_http::read_form_fields::read_form_fields;
 use margaret_http::request::Request;
+use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::route_entry::RouteEntry;
@@ -21,30 +24,67 @@ use margaret_http::server::Server;
 use margaret_http::server_registry::ServerRegistry;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
+use margaret_route_method::route_method::RouteMethod;
 
 struct Accepts;
 
 #[async_trait]
 impl Handler for Accepts {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+    async fn handle(
+        &self,
+        _request: &Request,
+        _body: RequestBody,
+    ) -> Result<ResponseContinuation, HandlerError> {
         Ok(ResponseContinuation::Done(Response::text(200, "accepted")))
     }
 }
 
-async fn exchange(
-    request: &[u8],
-    body_limit: BodyLimit,
-    upload_config: UploadConfig,
-    close_write: bool,
-) -> String {
+struct ReadsForm {
+    limit: BodyLimit,
+}
+
+#[async_trait]
+impl Handler for ReadsForm {
+    async fn handle(
+        &self,
+        request: &Request,
+        body: RequestBody,
+    ) -> Result<ResponseContinuation, HandlerError> {
+        Ok(ResponseContinuation::Done(
+            match read_form_fields(request, body, self.limit).await {
+                BodyReading::Read(_) => Response::text(200, "accepted"),
+                BodyReading::Rejected(rejection) => rejection.into_response(),
+            },
+        ))
+    }
+}
+
+async fn exchange(request: &[u8], close_write: bool) -> String {
     let router = Router::build(vec![
         RouteEntry::new(
             "/submit",
-            vec![MethodHandler::anonymous("POST", Arc::new(Accepts))],
+            vec![MethodHandler::anonymous(
+                RouteMethod::Post,
+                Arc::new(ReadsForm {
+                    limit: BodyLimit::new(1024),
+                }),
+            )],
+        ),
+        RouteEntry::new(
+            "/tiny",
+            vec![MethodHandler::anonymous(
+                RouteMethod::Post,
+                Arc::new(ReadsForm {
+                    limit: BodyLimit::new(4),
+                }),
+            )],
         ),
         RouteEntry::new(
             "/search",
-            vec![MethodHandler::anonymous("QUERY", Arc::new(Accepts))],
+            vec![MethodHandler::anonymous(
+                RouteMethod::Query,
+                Arc::new(Accepts),
+            )],
         ),
     ])
     .expect("the route entries register cleanly");
@@ -52,8 +92,7 @@ async fn exchange(
         "public",
         "127.0.0.1:0".to_string(),
         TransportConfig::Plain,
-        upload_config,
-        body_limit,
+        UploadConfig::Disabled,
         router,
     )]));
     let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
@@ -96,8 +135,6 @@ async fn exchange(
 async fn accepts_a_form_body_within_the_limit() {
     let response = exchange(
         b"POST /submit HTTP/1.1\r\nHost: test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 7\r\nConnection: close\r\n\r\nname=hi",
-        BodyLimit::default(),
-        UploadConfig::Disabled,
         false,
     )
     .await;
@@ -106,11 +143,9 @@ async fn accepts_a_form_body_within_the_limit() {
 }
 
 #[tokio::test]
-async fn rejects_a_form_body_that_exceeds_the_limit() {
+async fn rejects_a_form_body_that_exceeds_the_route_limit() {
     let response = exchange(
-        b"POST /submit HTTP/1.1\r\nHost: test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 7\r\nConnection: close\r\n\r\nname=hi",
-        BodyLimit::new(4),
-        UploadConfig::Disabled,
+        b"POST /tiny HTTP/1.1\r\nHost: test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 7\r\nConnection: close\r\n\r\nname=hi",
         false,
     )
     .await;
@@ -122,8 +157,6 @@ async fn rejects_a_form_body_that_exceeds_the_limit() {
 async fn rejects_a_truncated_form_body() {
     let response = exchange(
         b"POST /submit HTTP/1.1\r\nHost: test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 64\r\nConnection: close\r\n\r\nshort",
-        BodyLimit::default(),
-        UploadConfig::Disabled,
         true,
     )
     .await;
@@ -135,8 +168,6 @@ async fn rejects_a_truncated_form_body() {
 async fn dispatches_a_request_using_an_extension_verb() {
     let response = exchange(
         b"QUERY /search HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-        BodyLimit::default(),
-        UploadConfig::Disabled,
         false,
     )
     .await;
@@ -148,8 +179,6 @@ async fn dispatches_a_request_using_an_extension_verb() {
 async fn rejects_a_known_path_reached_with_an_unhandled_method() {
     let response = exchange(
         b"GET /submit HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
-        BodyLimit::default(),
-        UploadConfig::Disabled,
         false,
     )
     .await;

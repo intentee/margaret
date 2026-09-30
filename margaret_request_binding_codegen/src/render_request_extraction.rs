@@ -1,15 +1,11 @@
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
-use quote::format_ident;
 use quote::quote;
-
-use margaret_codegen_tokens::path_tokens::path_tokens;
 
 use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
-use crate::bearer_token_verifier_field::BEARER_TOKEN_VERIFIER_FIELD;
 use crate::extraction_context::ExtractionContext;
-use crate::form_request_extraction::FormRequestExtraction;
+use crate::render_model_extraction::render_model_extraction;
 use crate::request_binding::RequestBinding;
 
 fn authenticated_user_resolver(
@@ -20,7 +16,11 @@ fn authenticated_user_resolver(
         (AuthenticatedUserRequirement::Optional, _) => quote! {
             margaret::framework::identity::optional_authenticated_user::optional_authenticated_user
         },
-        (AuthenticatedUserRequirement::Required, AuthenticatedUserChallenge::Bearer { .. }) => {
+        (
+            AuthenticatedUserRequirement::Required,
+            AuthenticatedUserChallenge::Bearer { .. }
+            | AuthenticatedUserChallenge::Introspection { .. },
+        ) => {
             quote! {
                 margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user
             }
@@ -43,7 +43,6 @@ pub fn render_request_extraction(
     let system_error_return = context.error_return;
     let provider_access = context.provider_access;
     let request_local = context.request_local;
-    let error_return = context.response_return;
 
     match binding {
         RequestBinding::AuthenticatedUser {
@@ -58,27 +57,9 @@ pub fn render_request_extraction(
                         #request_local,
                     ).await {
                     ::std::result::Result::Ok(outcome) => match #resolver(outcome) {
-                        ::std::result::Result::Ok(value) => value,
-                        ::std::result::Result::Err(response) => #continuation_return,
+                        margaret::framework::http::requirement::Requirement::Met(value) => value,
+                        margaret::framework::http::requirement::Requirement::Unmet(response) => #continuation_return,
                     },
-                    ::std::result::Result::Err(error) => #system_error_return,
-                };
-            }
-        }
-        RequestBinding::BearerToken { claims, .. } => {
-            let claims = path_tokens(claims);
-            let verifier = format_ident!("{BEARER_TOKEN_VERIFIER_FIELD}");
-
-            quote! {
-                let #holder = match margaret::framework::bearer_token_verification::admit_bearer_token::admit_bearer_token::<#claims>(
-                    &self.#verifier,
-                    #request_local.inputs.server.authorization(),
-                )
-                .map_err(margaret::framework::anyhow::Error::from)
-                {
-                    ::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Anonymous) => ::std::option::Option::None,
-                    ::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Presented(token)) => ::std::option::Option::Some(token),
-                    ::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Refused(response)) => #continuation_return,
                     ::std::result::Result::Err(error) => #system_error_return,
                 };
             }
@@ -88,37 +69,30 @@ pub fn render_request_extraction(
                 #request_local,
                 #path_key,
             ) {
-                Ok(value) => value,
-                Err(response) => #error_return,
+                margaret::framework::http::requirement::Requirement::Met(value) => value,
+                margaret::framework::http::requirement::Requirement::Unmet(response) => #continuation_return,
             };
         },
         RequestBinding::FormRequest { source, extraction } => {
-            let variant = source.variant();
+            let inputs_field = source.inputs_field();
 
-            match extraction {
-                FormRequestExtraction::Result => quote! {
-                    let #holder = margaret::framework::http_validation::validate_input::validate_input(
-                        #request_local,
-                        margaret::framework::http_validation::request_input::RequestInput::#variant,
-                    );
+            render_model_extraction(
+                extraction,
+                holder,
+                &quote! {
+                    margaret::framework::validation::validate::validate(
+                        &#request_local.inputs.#inputs_field,
+                    )
                 },
-                FormRequestExtraction::Model => quote! {
-                    let #holder = match margaret::framework::http_validation::require_input::require_input(
-                        #request_local,
-                        margaret::framework::http_validation::request_input::RequestInput::#variant,
-                    ) {
-                        Ok(model) => model,
-                        Err(response) => #error_return,
-                    };
-                },
-            }
+                continuation_return,
+            )
         }
         RequestBinding::PeerSpiffeId => quote! {
             let #holder = match margaret::framework::http::require_peer_spiffe_id::require_peer_spiffe_id(
                 #request_local,
             ) {
-                Ok(value) => value,
-                Err(response) => #error_return,
+                margaret::framework::http::requirement::Requirement::Met(value) => value,
+                margaret::framework::http::requirement::Requirement::Unmet(response) => #continuation_return,
             };
         },
         RequestBinding::CurrentRequest => {
@@ -133,11 +107,17 @@ pub fn render_request_extraction(
         RequestBinding::AssetBag => quote! {
             let #holder = ::margaret::framework::asset_bag::asset_bag::AssetBag::new();
         },
-        RequestBinding::BoundRouteParameter { .. }
+        RequestBinding::BearerToken { .. }
+        | RequestBinding::IntrospectedBearerToken { .. }
+        | RequestBinding::BoundRouteParameter { .. }
+        | RequestBinding::FormContent { .. }
         | RequestBinding::Forwarder
         | RequestBinding::Injectable { .. }
+        | RequestBinding::JsonContent { .. }
         | RequestBinding::Next
+        | RequestBinding::RequestBodyStream
         | RequestBinding::Routes
+        | RequestBinding::UploadedFiles
         | RequestBinding::Views => TokenStream::new(),
     }
 }

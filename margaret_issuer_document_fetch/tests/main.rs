@@ -1,9 +1,0 @@
-mod does_not_follow_a_redirect;
-mod fetches_a_document_over_tls_without_client_authentication;
-mod refuses_a_plaintext_url;
-mod reports_a_builder_that_openssl_cannot_satisfy;
-mod reports_a_non_success_status;
-mod reports_a_truncated_document_as_a_transport_failure;
-mod returns_cancelled_when_cancelled_during_a_hung_fetch;
-mod times_out_a_fetch_that_outlives_its_timeout;
-mod uses_openssl_even_when_rustls_is_preconfigured;

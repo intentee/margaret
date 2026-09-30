@@ -1,10 +1,11 @@
 use margaret_identity_session::access_token_claims::AccessTokenClaims;
 use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
-use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_keygen::previous_key::PreviousKey;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
+use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
-use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
+use margaret_jwt_verification::refresh_token_profile::RefreshTokenProfile;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
 use margaret_token_signer::mint_access_token::mint_access_token;
@@ -19,7 +20,7 @@ use margaret_token_signer_tests::unix_time::unix_time;
 fn mints_from_a_previous_key_refresh_token() {
     let issuance = fixture_issuance();
     let secret = fresh_p256_secret()
-        .rotate()
+        .rotate(&FixtureRsaSigningKeys::default())
         .expect("the fixture secret rotates");
     let PreviousKey::Retired(retired) = secret.previous() else {
         panic!("a rotated secret retires its previous key");
@@ -35,12 +36,11 @@ fn mints_from_a_previous_key_refresh_token() {
         panic!("a refresh token signed by the previous key mints an access token");
     };
     let JwksSecretVerificationResult::SignedWithCurrent(access) = secret
-        .verify_jwt::<AccessTokenClaims>(
+        .verify_jwt::<AccessTokenClaims, AccessTokenProfile>(
             &access_token,
             &JwtExpectation {
                 audience: &issuance.audience,
                 issuer: &issuance.issuer,
-                token_type: TypeHeaderExpectation::Required(JwtType::AccessToken),
             },
             NumericDate::new(1_000),
         )
@@ -48,12 +48,11 @@ fn mints_from_a_previous_key_refresh_token() {
         panic!("the minted access token is signed with the current key");
     };
     let JwksSecretVerificationResult::SignedWithCurrent(migrated) = secret
-        .verify_jwt::<RefreshTokenClaims>(
+        .verify_jwt::<RefreshTokenClaims, RefreshTokenProfile>(
             &refresh_token,
             &JwtExpectation {
                 audience: &issuance.audience,
                 issuer: &issuance.issuer,
-                token_type: TypeHeaderExpectation::Required(JwtType::Jwt),
             },
             NumericDate::new(1_000),
         )

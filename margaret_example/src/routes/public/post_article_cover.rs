@@ -1,5 +1,6 @@
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
+use margaret::framework::http_uploaded_file::uploaded_files::UploadedFiles;
 use margaret::framework::macros::process;
 use margaret::framework::macros::responds_to_http;
 use margaret::framework::macros::singleton;
@@ -7,7 +8,12 @@ use margaret::framework::macros::singleton;
 use crate::models::article::Article;
 
 #[singleton]
-#[responds_to_http(method = "post", path = "/articles/{article}/cover", server = "public")]
+#[responds_to_http(
+    max_body_bytes = 8_388_608,
+    method = "post",
+    path = "/articles/{article}/cover",
+    server = "public"
+)]
 pub struct PostArticleCover;
 
 impl PostArticleCover {
@@ -19,9 +25,10 @@ impl PostArticleCover {
         &self,
         request: &Request,
         #[route_parameter(from = "article")] Article { title, .. }: Article,
+        files: UploadedFiles,
     ) -> anyhow::Result<Response> {
         Ok({
-            let Some(cover) = request.inputs.files.get("cover") else {
+            let Some(cover) = files.get("cover") else {
                 return Ok(Response::text(422, "a \"cover\" file upload is required"));
             };
 

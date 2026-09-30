@@ -1,8 +1,12 @@
+use aws_lc_rs::rand::SystemRandom;
+use aws_lc_rs::signature::ECDSA_P256_SHA256_FIXED_SIGNING;
+use aws_lc_rs::signature::ECDSA_P384_SHA384_FIXED_SIGNING;
+use aws_lc_rs::signature::ECDSA_P521_SHA512_FIXED_SIGNING;
+use aws_lc_rs::signature::EcdsaKeyPair;
+use aws_lc_rs::signature::EcdsaSigningAlgorithm;
+use aws_lc_rs::signature::KeyPair;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
-use p256::ecdsa::signature::Signer;
-use p256::elliptic_curve::rand_core::OsRng;
-use p256::pkcs8::EncodePrivateKey;
 use serde_json::Value;
 use serde_json::json;
 
@@ -15,32 +19,34 @@ use margaret_jws_verification::verification_key::VerificationKey;
 use margaret_jws_verification::verification_material::VerificationMaterial;
 
 use crate::fixture_certificate::fixture_certificate;
-use crate::fixture_material::FixtureMaterial;
 use crate::signed_token::signed_token;
 use crate::signing_input::signing_input;
 
-fn encoded(coordinate: Option<&[u8]>) -> String {
-    Base64UrlUnpadded::encode_string(
-        coordinate.expect("an uncompressed point has both coordinates"),
-    )
+fn signing_algorithm(curve: Curve) -> &'static EcdsaSigningAlgorithm {
+    match curve {
+        Curve::P256 => &ECDSA_P256_SHA256_FIXED_SIGNING,
+        Curve::P384 => &ECDSA_P384_SHA384_FIXED_SIGNING,
+        Curve::P521 => &ECDSA_P521_SHA512_FIXED_SIGNING,
+    }
 }
 
 pub struct FixtureKey {
+    curve: Curve,
+    key_pair: EcdsaKeyPair,
     kid: String,
-    material: FixtureMaterial,
 }
 
 impl FixtureKey {
+    /// # Panics
+    ///
+    /// Panics when the fixture key cannot be generated.
     #[must_use]
     pub fn generate(curve: Curve, kid: &str) -> Self {
-        let material = match curve {
-            Curve::P256 => FixtureMaterial::P256(p256::ecdsa::SigningKey::random(&mut OsRng)),
-            Curve::P384 => FixtureMaterial::P384(p384::ecdsa::SigningKey::random(&mut OsRng)),
-        };
-
         Self {
+            curve,
+            key_pair: EcdsaKeyPair::generate(signing_algorithm(curve))
+                .expect("the fixture key generates"),
             kid: kid.to_string(),
-            material,
         }
     }
 
@@ -49,42 +55,32 @@ impl FixtureKey {
     /// Panics when the fixture key cannot be encoded or certified.
     #[must_use]
     pub fn certificate(&self) -> Vec<u8> {
-        let pkcs8 = match &self.material {
-            FixtureMaterial::P256(key) => key.to_pkcs8_der(),
-            FixtureMaterial::P384(key) => key.to_pkcs8_der(),
-        }
-        .expect("the fixture key encodes as pkcs#8");
-
-        fixture_certificate(pkcs8.as_bytes())
+        fixture_certificate(
+            self.key_pair
+                .to_pkcs8v1()
+                .expect("the fixture key encodes as pkcs#8")
+                .as_ref(),
+        )
     }
 
     #[must_use]
     pub fn ec_jwk(&self) -> EcJwk {
-        match &self.material {
-            FixtureMaterial::P256(key) => {
-                let point = key.verifying_key().to_encoded_point(false);
+        let coordinates = &self.key_pair.public_key().as_ref()[1..];
+        let coordinate_octets = self.curve.coordinate_octets();
 
-                self.ec_jwk_of(
-                    Curve::P256,
-                    point.x().map(AsRef::as_ref),
-                    point.y().map(AsRef::as_ref),
-                )
-            }
-            FixtureMaterial::P384(key) => {
-                let point = key.verifying_key().to_encoded_point(false);
-
-                self.ec_jwk_of(
-                    Curve::P384,
-                    point.x().map(AsRef::as_ref),
-                    point.y().map(AsRef::as_ref),
-                )
-            }
+        EcJwk {
+            alg: Some(self.curve.algorithm()),
+            crv: self.curve,
+            kid: Some(KeyId::new(self.kid.clone())),
+            key_use: Some(KeyUse::Signature),
+            x: Base64UrlUnpadded::encode_string(&coordinates[..coordinate_octets]),
+            y: Base64UrlUnpadded::encode_string(&coordinates[coordinate_octets..]),
         }
     }
 
     #[must_use]
     pub fn header(&self) -> Value {
-        json!({ "alg": self.ec_jwk().crv.algorithm().wire_name(), "kid": self.kid })
+        json!({ "alg": self.curve.algorithm().wire_name(), "kid": self.kid })
     }
 
     #[must_use]
@@ -92,20 +88,16 @@ impl FixtureKey {
         Jwk::Ec(self.ec_jwk())
     }
 
+    /// # Panics
+    ///
+    /// Panics when the fixture key cannot sign.
     #[must_use]
     pub fn signature(&self, signing_input: &str) -> Vec<u8> {
-        match &self.material {
-            FixtureMaterial::P256(key) => {
-                let signature: p256::ecdsa::Signature = key.sign(signing_input.as_bytes());
-
-                signature.to_bytes().to_vec()
-            }
-            FixtureMaterial::P384(key) => {
-                let signature: p384::ecdsa::Signature = key.sign(signing_input.as_bytes());
-
-                signature.to_bytes().to_vec()
-            }
-        }
+        self.key_pair
+            .sign(&SystemRandom::new(), signing_input.as_bytes())
+            .expect("the fixture key signs")
+            .as_ref()
+            .to_vec()
     }
 
     #[must_use]
@@ -115,24 +107,15 @@ impl FixtureKey {
         signed_token(&signing_input, &self.signature(&signing_input))
     }
 
+    /// # Panics
+    ///
+    /// Panics when the fixture public key does not verify.
     #[must_use]
     pub fn verification_key(&self) -> VerificationKey {
-        let material = match &self.material {
-            FixtureMaterial::P256(key) => VerificationMaterial::P256(*key.verifying_key()),
-            FixtureMaterial::P384(key) => VerificationMaterial::P384(*key.verifying_key()),
-        };
-
-        VerificationKey::new(KeyId::new(self.kid.clone()), material)
-    }
-
-    fn ec_jwk_of(&self, curve: Curve, x: Option<&[u8]>, y: Option<&[u8]>) -> EcJwk {
-        EcJwk {
-            alg: Some(curve.algorithm()),
-            crv: curve,
-            kid: Some(KeyId::new(self.kid.clone())),
-            key_use: Some(KeyUse::Signature),
-            x: encoded(x),
-            y: encoded(y),
-        }
+        VerificationKey::new(
+            KeyId::new(self.kid.clone()),
+            VerificationMaterial::from_ec_point(self.curve, self.key_pair.public_key().as_ref())
+                .expect("the fixture public key verifies"),
+        )
     }
 }

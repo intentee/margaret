@@ -10,6 +10,8 @@ use margaret_http::handler_error::HandlerError;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;
 use margaret_http::request_authorization::RequestAuthorization;
+use margaret_http::request_body::RequestBody;
+use margaret_http::requirement::Requirement;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::route_entry::RouteEntry;
@@ -18,12 +20,17 @@ use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret_identity::require_bearer_authenticated_user::require_bearer_authenticated_user;
+use margaret_route_method::route_method::RouteMethod;
 
 struct BearerGreeting;
 
 #[async_trait]
 impl Handler for BearerGreeting {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+    async fn handle(
+        &self,
+        request: &Request,
+        _body: RequestBody,
+    ) -> Result<ResponseContinuation, HandlerError> {
         let outcome = match request.inputs.server.authorization() {
             RequestAuthorization::Bearer(token) => {
                 AuthenticatedUserOutcome::Authenticated(token.as_str().to_string())
@@ -34,8 +41,8 @@ impl Handler for BearerGreeting {
         };
 
         Ok(match require_bearer_authenticated_user(outcome) {
-            Ok(runner) => ResponseContinuation::Done(Response::text(200, runner)),
-            Err(continuation) => continuation,
+            Requirement::Met(runner) => ResponseContinuation::Done(Response::text(200, runner)),
+            Requirement::Unmet(continuation) => continuation,
         })
     }
 }
@@ -47,7 +54,10 @@ async fn challenges_an_anonymous_visitor_for_bearer_credentials() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/",
-            vec![MethodHandler::anonymous("GET", Arc::new(BearerGreeting))],
+            vec![MethodHandler::anonymous(
+                RouteMethod::Get,
+                Arc::new(BearerGreeting),
+            )],
         )],
     )
     .await;

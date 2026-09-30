@@ -1,4 +1,5 @@
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage::FileJwksSecretStorage;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::loaded_secret::LoadedSecret;
 
@@ -8,7 +9,7 @@ fn file_storage_load_is_absent_when_the_file_is_missing() {
     let storage = FileJwksSecretStorage::new(directory.path().join("jwks.json"));
 
     let loaded = storage
-        .load()
+        .load(&FixtureRsaSigningKeys::default())
         .expect("a missing secret file loads as absent");
 
     assert!(matches!(loaded, LoadedSecret::Absent));

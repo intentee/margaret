@@ -3,7 +3,6 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use trzcina::Service;
 
-use margaret_http::body_limit::BodyLimit;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::router::Router;
 use margaret_http::server::Server;
@@ -23,7 +22,6 @@ async fn binds_and_drains_on_cancellation() {
         "127.0.0.1:0".to_string(),
         TransportConfig::Plain,
         UploadConfig::Disabled,
-        BodyLimit::default(),
         Router::build(Vec::new()).expect("an empty router builds"),
     )]));
     let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));

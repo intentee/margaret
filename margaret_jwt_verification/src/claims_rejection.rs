@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
@@ -11,6 +12,10 @@ use margaret_registered_claims::numeric_date::NumericDate;
 pub enum ClaimsRejection {
     AudienceMismatch {
         expected: Audience,
+        found: AudienceClaim,
+    },
+    AudienceOutside {
+        expected: BTreeSet<Audience>,
         found: AudienceClaim,
     },
     Expired {
@@ -35,7 +40,16 @@ impl Display for ClaimsRejection {
         match self {
             Self::AudienceMismatch { expected, found } => write!(
                 formatter,
-                "the token is meant for the audience {found} instead of exactly '{expected}'"
+                "the token's audience {found} does not include '{expected}'"
+            ),
+            Self::AudienceOutside { expected, found } => write!(
+                formatter,
+                "the token's audience {found} includes none of [{}]",
+                expected
+                    .iter()
+                    .map(Audience::as_str)
+                    .collect::<Vec<&str>>()
+                    .join(", ")
             ),
             Self::Expired { exp, now } => write!(
                 formatter,
@@ -58,6 +72,8 @@ impl Display for ClaimsRejection {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use margaret_registered_claims::audience::Audience;
     use margaret_registered_claims::audience_claim::AudienceClaim;
     use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
@@ -72,7 +88,18 @@ mod tests {
                 expected: "ours"
                     .parse::<Audience>()
                     .expect("the audience is not empty"),
-                found: AudienceClaim::Multiple(vec!["ours".to_string(), "theirs".to_string()]),
+                found: AudienceClaim::Multiple(vec!["theirs".to_string(), "others".to_string()]),
+            },
+            ClaimsRejection::AudienceOutside {
+                expected: BTreeSet::from([
+                    "first"
+                        .parse::<Audience>()
+                        .expect("the audience is not empty"),
+                    "second"
+                        .parse::<Audience>()
+                        .expect("the audience is not empty"),
+                ]),
+                found: AudienceClaim::Single("theirs".to_string()),
             },
             ClaimsRejection::Expired {
                 exp: NumericDate::new(100),
@@ -96,19 +123,23 @@ mod tests {
 
         assert_eq!(
             described[0],
-            "the token is meant for the audience [ours, theirs] instead of exactly 'ours'"
+            "the token's audience [theirs, others] does not include 'ours'"
         );
         assert_eq!(
             described[1],
-            "the token expired at 100, and the current time is 150"
+            "the token's audience theirs includes none of [first, second]"
         );
         assert_eq!(
             described[2],
+            "the token expired at 100, and the current time is 150"
+        );
+        assert_eq!(
+            described[3],
             "the token is issued by 'https://attacker.example' instead of 'https://issuer.example'"
         );
-        assert!(described[3].starts_with("the token claims are malformed: "));
+        assert!(described[4].starts_with("the token claims are malformed: "));
         assert_eq!(
-            described[4],
+            described[5],
             "the token is not valid before 200, and the current time is 150"
         );
     }

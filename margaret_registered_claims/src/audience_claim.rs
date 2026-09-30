@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
@@ -16,13 +17,16 @@ pub enum AudienceClaim {
 
 impl AudienceClaim {
     #[must_use]
-    pub fn is_exactly(&self, audience: &Audience) -> bool {
+    pub fn contains(&self, audience: &Audience) -> bool {
         match self {
-            Self::Multiple(values) => {
-                matches!(values.as_slice(), [value] if value == audience.as_str())
-            }
+            Self::Multiple(values) => values.iter().any(|value| value == audience.as_str()),
             Self::Single(value) => value == audience.as_str(),
         }
+    }
+
+    #[must_use]
+    pub fn contains_any(&self, audiences: &BTreeSet<Audience>) -> bool {
+        audiences.iter().any(|audience| self.contains(audience))
     }
 
     #[must_use]

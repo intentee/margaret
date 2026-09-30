@@ -6,7 +6,6 @@ use margaret_toposort::cycle::Cycle;
 use margaret_toposort::topological_order;
 
 use crate::container_error::ContainerError;
-use crate::dependency_kind::DependencyKind;
 use crate::provider::Provider;
 
 fn dependency_cycle(cycle: &Cycle<CanonicalPath>) -> ContainerError {
@@ -21,18 +20,11 @@ fn dependency_cycle(cycle: &Cycle<CanonicalPath>) -> ContainerError {
 }
 
 fn dependency_keys(provider: &Provider) -> BTreeSet<CanonicalPath> {
-    let mut keys: BTreeSet<CanonicalPath> = BTreeSet::new();
-
-    for dependency in provider.dependencies() {
-        match dependency {
-            DependencyKind::Single { provider_key } => {
-                keys.insert(provider_key.clone());
-            }
-            DependencyKind::ServeInput { .. } => {}
-        }
-    }
-
-    keys
+    provider
+        .dependencies()
+        .iter()
+        .flat_map(|dependency| dependency.provider_keys().iter().cloned())
+        .collect()
 }
 
 pub(crate) fn topological_order(

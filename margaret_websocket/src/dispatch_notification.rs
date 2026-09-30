@@ -28,7 +28,7 @@ pub async fn dispatch_notification<Handler>(
     Handler: RespondsToWebSocketNotification,
     Handler::Message: DeserializeOwned + Validate,
 {
-    if let ValidationResult::Valid(message) = validate_json::<Handler::Message>(Some(&params)) {
+    if let ValidationResult::Valid(message) = validate_json::<Handler::Message>(&params) {
         report_notification_result(
             handler
                 .process(

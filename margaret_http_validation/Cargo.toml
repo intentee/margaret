@@ -12,13 +12,9 @@ publish.workspace = true
 [dependencies]
 margaret_http = { workspace = true }
 margaret_validation = { workspace = true }
-serde = { workspace = true }
-validator = { workspace = true }
 
 [dev-dependencies]
-http = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
 validator = { workspace = true, features = ["derive"] }
 
 [lints]

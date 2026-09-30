@@ -27,7 +27,7 @@ impl GeneratedFeatures {
             index.has_framework_attribute(FrameworkAttribute::HandlesMiddlewareAttribute),
         );
         features.enable_if(
-            GeneratedFeature::Models,
+            GeneratedFeature::Schema,
             index.has_framework_attribute(FrameworkAttribute::Model),
         );
         features.enable_if(
@@ -53,7 +53,7 @@ impl GeneratedFeatures {
             GeneratedFeature::Console,
             index.has_framework_attribute(FrameworkAttribute::ConsoleCommand)
                 || features.contains(GeneratedFeature::Serves)
-                || features.contains(GeneratedFeature::Models),
+                || features.contains(GeneratedFeature::Schema),
         );
 
         features

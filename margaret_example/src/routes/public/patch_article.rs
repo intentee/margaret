@@ -12,7 +12,12 @@ use crate::models::article::Article;
 use crate::stores::article_store::ArticleStore;
 
 #[singleton]
-#[responds_to_http(method = "patch", path = "/articles/{article}", server = "public")]
+#[responds_to_http(
+    max_body_bytes = 8_388_608,
+    method = "patch",
+    path = "/articles/{article}",
+    server = "public"
+)]
 pub struct PatchArticle {
     articles: Arc<ArticleStore>,
 }

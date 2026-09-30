@@ -24,7 +24,7 @@ impl HttpRouteTable {
         path: RoutePath,
         route: HttpRoute,
     ) -> Result<(), HttpCodegenError> {
-        let method = route.method.clone();
+        let method = route.method;
         let server = route.server.clone();
 
         self.servers

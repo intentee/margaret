@@ -1,0 +1,1 @@
+pub const MULTIPART_FILES: &[u8] = b"--X\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"face.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n--X\r\nContent-Disposition: form-data; name=\"raw\"; filename=\"raw.txt\"\r\n\r\nDATA\r\n--X--\r\n";

@@ -14,12 +14,6 @@ pub(crate) struct RequestHeaders {
 }
 
 impl RequestHeaders {
-    pub(crate) fn empty() -> Self {
-        Self {
-            values: HashMap::new(),
-        }
-    }
-
     pub(crate) fn from_header_map(headers: &HeaderMap) -> RequestOutcome<Self> {
         let mut values = HashMap::with_capacity(headers.keys_len());
 
@@ -147,10 +141,5 @@ mod tests {
                     .expect_err("raw bytes are not visible ASCII"),
             },
         );
-    }
-
-    #[test]
-    fn reads_no_headers_from_an_empty_set() {
-        assert_eq!(RequestHeaders::empty().get(&COOKIE), None);
     }
 }

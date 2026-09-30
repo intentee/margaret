@@ -1,4 +1,5 @@
 pub mod bootstrap_argument_field_ident;
+pub mod grouped_integer_literal;
 pub mod path_tokens;
 pub mod serve_input_naming;
 pub mod spiffe_http_client_ident;

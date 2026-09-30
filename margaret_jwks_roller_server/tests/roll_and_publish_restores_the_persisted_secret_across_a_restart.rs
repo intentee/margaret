@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage::FileJwksSecretStorage;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 
@@ -10,6 +11,7 @@ fn roll_and_publish_restores_the_persisted_secret_across_a_restart() {
     let path = directory.path().join("jwks.json");
 
     let before_restart = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
+        rsa_keys: Arc::new(FixtureRsaSigningKeys::default()),
         storage: Arc::new(FileJwksSecretStorage::new(path.clone())),
     });
 
@@ -26,6 +28,7 @@ fn roll_and_publish_restores_the_persisted_secret_across_a_restart() {
         .clone();
 
     let after_restart = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
+        rsa_keys: Arc::new(FixtureRsaSigningKeys::default()),
         storage: Arc::new(FileJwksSecretStorage::new(path)),
     });
 

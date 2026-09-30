@@ -12,11 +12,13 @@ publish.workspace = true
 [dependencies]
 chrono = { workspace = true }
 cookie = { workspace = true }
+margaret_oauth_vocabulary = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_token_issuance = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+url = { workspace = true, features = ["serde"] }
 uuid = { workspace = true, features = ["serde", "v4"] }
 
 [lints]
