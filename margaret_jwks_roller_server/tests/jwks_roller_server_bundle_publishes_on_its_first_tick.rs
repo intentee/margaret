@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use trzcina::ServiceBundle as _;
 
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
 use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
@@ -10,6 +11,7 @@ use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerSer
 #[tokio::test(start_paused = true)]
 async fn jwks_roller_server_bundle_publishes_on_its_first_tick() {
     let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
+        rsa_keys: Arc::new(FixtureRsaSigningKeys::default()),
         storage: Arc::new(MemoryJwksSecretStorage),
     });
     let jwks_secret_holder = bundle.jwks_secret_holder();

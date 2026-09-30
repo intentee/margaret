@@ -14,6 +14,7 @@ use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route_table::HttpRouteTable;
 use crate::http_routes::http_routes;
 use crate::http_server::HttpServer;
+use crate::route_location::RouteLocation;
 use crate::server_serve_inputs::server_serve_inputs;
 use crate::web_socket_server_requirements::WebSocketServerRequirements;
 
@@ -70,5 +71,22 @@ impl HttpPlan {
             table,
             websocket_servers: websocket_servers.keys().cloned().collect(),
         })
+    }
+
+    #[must_use]
+    pub fn route_locations(&self) -> Vec<RouteLocation<'_>> {
+        self.servers
+            .iter()
+            .flat_map(|server| {
+                self.table.route_groups(server.name()).flat_map(|group| {
+                    group.method_routes().map(|route| RouteLocation {
+                        method: route.method,
+                        path: group.path(),
+                        responder_path: &route.responder_path,
+                        server: server.name(),
+                    })
+                })
+            })
+            .collect()
     }
 }

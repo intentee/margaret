@@ -1,0 +1,19 @@
+[package]
+name = "margaret_accepted_clients_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+margaret_accepted_clients = { workspace = true }
+margaret_jwks_secret_store = { workspace = true }
+margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
+url = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

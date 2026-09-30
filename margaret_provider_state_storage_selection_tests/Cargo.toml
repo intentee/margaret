@@ -1,0 +1,26 @@
+[package]
+name = "margaret_provider_state_storage_selection_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dev-dependencies]
+margaret_model = { workspace = true }
+margaret_provider_state_postgres = { workspace = true }
+margaret_provider_state_storage = { workspace = true }
+margaret_provider_state_storage_selection = { workspace = true }
+margaret_schema_postgres_tests = { path = "../margaret_schema_postgres_tests" }
+sqlx = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+uuid = { workspace = true, features = ["v4"] }
+
+[features]
+tests_that_use_postgres = []
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

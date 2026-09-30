@@ -8,7 +8,7 @@ use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
-use margaret_jwt_verification::type_header_expectation::TypeHeaderExpectation;
+use margaret_jwt_verification::refresh_token_profile::RefreshTokenProfile;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
@@ -27,12 +27,11 @@ pub fn mint_access_token(
         claims: refresh_claims,
         registered: refresh_registered,
         ..
-    } = match secret.verify_jwt::<RefreshTokenClaims>(
+    } = match secret.verify_jwt::<RefreshTokenClaims, RefreshTokenProfile>(
         refresh_token,
         &JwtExpectation {
             audience: &issuance.audience,
             issuer: &issuance.issuer,
-            token_type: TypeHeaderExpectation::Required(JwtType::Jwt),
         },
         access_stamp.registered.iat,
     ) {
@@ -57,7 +56,7 @@ pub fn mint_access_token(
         ),
         refresh_token: signer.sign_json(
             &refresh_claims.to_payload(&refresh_registered),
-            JwtType::Jwt,
+            JwtType::Refresh,
         ),
     })
 }

@@ -4,6 +4,7 @@ use tokio_util::sync::CancellationToken;
 use margaret_http::handler::Handler;
 use margaret_http::handler_error::HandlerError;
 use margaret_http::request::Request;
+use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 
@@ -15,7 +16,11 @@ pub struct HangingHandler {
 
 #[async_trait]
 impl Handler for HangingHandler {
-    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
+    async fn handle(
+        &self,
+        _request: &Request,
+        _body: RequestBody,
+    ) -> Result<ResponseContinuation, HandlerError> {
         self.request_received.cancel();
         self.release.cancelled().await;
 

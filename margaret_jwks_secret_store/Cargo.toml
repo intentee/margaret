@@ -24,5 +24,8 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
+[dev-dependencies]
+aws-lc-rs = { workspace = true }
+
 [lints]
 workspace = true

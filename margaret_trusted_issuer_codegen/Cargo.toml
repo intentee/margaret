@@ -1,0 +1,24 @@
+[package]
+name = "margaret_trusted_issuer_codegen"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Generates the per-tag trusted issuer modules for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+margaret_attributes = { workspace = true }
+margaret_generated_module = { workspace = true }
+margaret_tag_codegen = { workspace = true }
+margaret_umbrella_path = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+
+[dev-dependencies]
+syn = { workspace = true }
+
+[lints]
+workspace = true

@@ -2,7 +2,6 @@ use margaret_container::container_bindings::ContainerBindings;
 use margaret_container::container_error::ContainerError;
 use margaret_serve_input_codegen::serve_input::ServeInput;
 
-use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::request_binding::RequestBinding;
 
 /// # Errors
@@ -19,8 +18,8 @@ pub fn binding_serve_inputs(
                 .inputs
                 .to_vec();
 
-            if let AuthenticatedUserChallenge::Bearer { issuer_client } = &application.challenge {
-                inputs.extend(bindings.injected_serve_inputs(issuer_client)?);
+            for dependency in application.challenge.dependencies() {
+                inputs.extend(bindings.injected_serve_inputs(dependency)?);
             }
 
             inputs
@@ -34,13 +33,18 @@ pub fn binding_serve_inputs(
         RequestBinding::Injectable { dependency } => bindings.injected_serve_inputs(dependency)?,
         RequestBinding::AssetBag
         | RequestBinding::CurrentRequest
+        | RequestBinding::FormContent { .. }
         | RequestBinding::FormRequest { .. }
         | RequestBinding::Forwarder
+        | RequestBinding::JsonContent { .. }
         | RequestBinding::Next
         | RequestBinding::BearerToken { .. }
+        | RequestBinding::IntrospectedBearerToken { .. }
         | RequestBinding::PeerSpiffeId
+        | RequestBinding::RequestBodyStream
         | RequestBinding::RouteParameterValue { .. }
         | RequestBinding::Routes
+        | RequestBinding::UploadedFiles
         | RequestBinding::Views => Vec::new(),
     })
 }

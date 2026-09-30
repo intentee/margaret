@@ -6,10 +6,14 @@ filter = 'package(~_spiffe_svid)'
 slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = 'package(margaret_schema_postgres_tests)'
+filter = 'package(margaret_schema_postgres_tests) | (package(margaret_provider_state_storage_tests) & test(/^postgres_state/)) | (package(margaret_provider_state_storage_selection_tests) & test(/^postgres_/))'
 slow-timeout = { period = "3s", terminate-after = 2 }
 threads-required = 'num-test-threads'
 
 [[profile.default.overrides]]
 filter = 'test(~spire)'
+threads-required = 'num-test-threads'
+
+[[profile.default.overrides]]
+filter = 'test(generates_an_rsa_signing_key_that_signs_verifiable_tokens)'
 threads-required = 'num-test-threads'

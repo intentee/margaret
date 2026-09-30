@@ -3,6 +3,7 @@ use std::path::Path;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_container::constructor_outcome::ConstructorOutcome;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
@@ -23,6 +24,7 @@ fn jwks_client_provider() -> FrameworkProvider {
             ],
             is_async: true,
             method: "new".to_string(),
+            outcome: ConstructorOutcome::Infallible,
         },
         enablement: FrameworkEnablement::Always,
         injection: FrameworkInjectionRole::Unmarked,

@@ -1,13 +1,15 @@
 mod accepts_a_token_at_its_exact_not_before;
+mod accepts_a_token_for_additional_audiences;
 mod accepts_a_token_listing_only_our_audience;
 mod accepts_a_type_written_as_a_media_type;
 mod keeps_registered_claims_out_of_the_application_claims;
 mod rejects_a_fractional_numeric_date;
 mod rejects_a_null_not_before;
+mod rejects_a_payload_that_is_not_json;
 mod rejects_a_token_at_its_exact_expiry;
 mod rejects_a_token_before_its_not_before;
-mod rejects_a_token_for_additional_audiences;
 mod rejects_a_token_for_another_audience;
+mod rejects_a_token_listing_only_other_audiences;
 mod rejects_a_token_of_an_unsupported_type;
 mod rejects_a_token_of_another_issuer;
 mod rejects_a_token_of_another_type;

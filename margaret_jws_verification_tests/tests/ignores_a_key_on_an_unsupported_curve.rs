@@ -16,7 +16,7 @@ fn ignores_a_key_on_an_unsupported_curve() {
     let members = published.as_object_mut().expect("a jwk is an object");
 
     members.remove("alg");
-    members.insert("crv".to_string(), json!("P-521"));
+    members.insert("crv".to_string(), json!("secp256k1"));
 
     let KeySetDocumentParsing::Accepted(AcceptedKeySetDocument { ignored_keys, .. }) =
         VerificationKeySet::parse(json!({ "keys": [published] }).to_string().as_bytes())
@@ -26,6 +26,6 @@ fn ignores_a_key_on_an_unsupported_curve() {
 
     assert!(matches!(
         ignored_keys.as_slice(),
-        [IgnoredKey { index: 0, reason: IgnoredKeyReason::Material(KeyMaterialRejection::UnsupportedCurve { crv }) }] if crv == "P-521"
+        [IgnoredKey { index: 0, reason: IgnoredKeyReason::Material(KeyMaterialRejection::UnsupportedCurve { crv }) }] if crv == "secp256k1"
     ));
 }

@@ -11,10 +11,8 @@ publish.workspace = true
 
 [dependencies]
 aws-lc-rs = { workspace = true }
-base64ct = { workspace = true }
+base64ct = { workspace = true, features = ["alloc"] }
 margaret_jose_parameters = { workspace = true }
-p256 = { workspace = true }
-p384 = { workspace = true }
 rustls-pki-types = { workspace = true }
 rustls-webpki = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

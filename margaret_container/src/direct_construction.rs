@@ -1,6 +1,7 @@
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::struct_shape::StructShape;
 
+use crate::constructor_outcome::ConstructorOutcome;
 use crate::dependency_kind::DependencyKind;
 
 #[derive(Clone)]
@@ -17,6 +18,7 @@ pub(crate) enum DirectConstruction {
         dependencies: Vec<DependencyKind>,
         is_async: bool,
         method: String,
+        outcome: ConstructorOutcome,
     },
     FrameworkUnit,
     FrameworkAccessor {

@@ -1,9 +1,13 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use bytes::Bytes;
+use http_body_util::Empty;
+
 use crate::forward_targets::ForwardTargets;
 use crate::handler_error::HandlerError;
 use crate::request::Request;
+use crate::request_body::RequestBody;
 use crate::response::Response;
 use crate::response_continuation::ResponseContinuation;
 
@@ -31,7 +35,9 @@ pub(crate) async fn resolve_continuation(
                 };
 
                 request = request.with_path_params(forward.into_path_params());
-                outcome = target.handle(&request).await?;
+                outcome = target
+                    .handle(&request, RequestBody::new(Empty::<Bytes>::new()))
+                    .await?;
             }
             ResponseContinuation::Redirect(redirect) => return Ok(redirect.into_response()),
         }

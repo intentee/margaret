@@ -1,0 +1,7 @@
+#[cfg(feature = "tests_that_use_postgres")]
+mod postgres_resolve_selects_postgres_storage;
+mod provider_state_storage_uri_parses_a_postgres_url;
+mod provider_state_storage_uri_parses_the_memory_storage;
+mod provider_state_storage_uri_rejects_an_unknown_storage;
+mod provider_state_storage_uri_rejects_invalid_postgres_options;
+mod resolve_selects_memory_storage;

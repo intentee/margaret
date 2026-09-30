@@ -1,5 +1,6 @@
-use margaret_jose_parameters::curve::Curve;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
+use margaret_jwks_keygen::signing_curve::SigningCurve;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::loaded_secret::LoadedSecret;
 use margaret_jwks_roller::roll::roll;
@@ -10,10 +11,18 @@ fn roll_persists_the_secret_it_publishes() {
     let storage = StoredJwksSecretStorage::empty();
     let holder = JwksSecretHolder::default();
 
-    roll(&storage, &holder, Curve::P256).expect("the roll seeds a fresh secret");
+    roll(
+        &storage,
+        &holder,
+        SigningCurve::P256,
+        &FixtureRsaSigningKeys::default(),
+    )
+    .expect("the roll seeds a fresh secret");
 
     let published = holder.get().expect("the holder is seeded");
-    let stored = storage.load().expect("the backend can be read");
+    let stored = storage
+        .load(&FixtureRsaSigningKeys::default())
+        .expect("the backend can be read");
 
     match stored {
         LoadedSecret::Absent => panic!("the roll must persist the secret it publishes"),

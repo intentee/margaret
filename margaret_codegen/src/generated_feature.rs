@@ -6,9 +6,11 @@ pub(crate) enum GeneratedFeature {
     Http,
     Jwks,
     Middleware,
-    Models,
-    Oidc,
+    OAuthClients,
+    OidcProvider,
+    Schema,
     Serves,
+    TrustedIssuers,
     Views,
     Websockets,
 }

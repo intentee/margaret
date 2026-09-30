@@ -3,6 +3,7 @@ use std::path::Path;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
+use margaret_container::constructor_outcome::ConstructorOutcome;
 use margaret_container::container_error::ContainerError;
 use margaret_container::framework_construction::FrameworkConstruction;
 use margaret_container::framework_dependency::FrameworkDependency;
@@ -20,6 +21,7 @@ fn issued_token_store() -> FrameworkProvider {
             dependencies: vec![FrameworkDependency::TokenIssuance],
             is_async: false,
             method: "create".to_string(),
+            outcome: ConstructorOutcome::Infallible,
         },
         enablement: FrameworkEnablement::Always,
         injection: FrameworkInjectionRole::Unmarked,

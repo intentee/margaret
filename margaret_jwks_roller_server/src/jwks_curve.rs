@@ -1,3 +1,3 @@
-use margaret_jose_parameters::curve::Curve;
+use margaret_jwks_keygen::signing_curve::SigningCurve;
 
-pub const JWKS_CURVE: Curve = Curve::P256;
+pub const JWKS_CURVE: SigningCurve = SigningCurve::P256;

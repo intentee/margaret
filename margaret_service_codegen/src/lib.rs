@@ -1,6 +1,8 @@
 pub mod framework_service;
 pub mod framework_service_kind;
 pub mod render_services;
+pub mod runner_outcome;
+pub mod served_origin_check;
 pub mod service_codegen_error;
 pub mod service_plan;
 
@@ -30,6 +32,8 @@ mod tests {
     use crate::framework_service::FrameworkService;
     use crate::framework_service_kind::FrameworkServiceKind;
     use crate::render_services::render_services;
+    use crate::runner_outcome::RunnerOutcome;
+    use crate::served_origin_check::ServedOriginCheck;
     use crate::service_codegen_error::ServiceCodegenError;
     use crate::service_plan::ServicePlan;
 
@@ -68,7 +72,7 @@ mod tests {
         let plan = ServicePlan::build(&index, &[], &bindings, &serve_inputs)
             .expect("the service construction is planned");
 
-        render_services(&plan, servers, has_views, &bindings)
+        render_services(&plan, servers, has_views, &bindings, &[])
             .format()
             .expect("the module formats")
             .source()
@@ -109,6 +113,36 @@ mod tests {
     const STATELESS_RESPONDER: &str = "#[singleton]\n#[responds_to_http(method = \"get\", path = \"/health\", server = \"public\")]\nstruct Health;\n\nimpl Health {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n";
     const TICKER: &str = "#[scheduled_with_tick_timer(interval = crate::schedule::PERIOD, behavior = tokio::time::MissedTickBehavior::Delay)]\nstruct Flusher;\n\nimpl Flusher {\n    #[process]\n    fn run(&self) -> anyhow::Result<()> {}\n}\n";
     const SPIFFE_CLIENT: &str = "use tokio_util::sync::CancellationToken;\n\n#[singleton]\nstruct OutboundCaller {\n    client: reqwest::Client,\n}\n\nimpl OutboundCaller {\n    #[constructor]\n    fn create(#[spiffe_http_client] client: reqwest::Client) -> anyhow::Result<Self> {}\n}\n\n#[service]\nstruct Worker {\n    caller: std::sync::Arc<OutboundCaller>,\n}\n\nimpl Worker {\n    #[constructor]\n    fn create(caller: std::sync::Arc<OutboundCaller>) -> anyhow::Result<Self> {}\n\n    #[process]\n    fn run(&self, token: CancellationToken) -> anyhow::Result<()> {}\n}\n";
+
+    #[test]
+    fn checks_that_a_server_serves_the_origin_of_its_provider() {
+        let index = IndexedSource::new(STATELESS_RESPONDER).index;
+        let bindings = bindings(&index);
+        let serve_inputs = bindings
+            .serve_inputs(&serve_roots(&index), &[])
+            .expect("the rendered roots have planned console arguments");
+        let plan = ServicePlan::build(&index, &[], &bindings, &serve_inputs)
+            .expect("the service construction is planned");
+        let source: String = render_services(
+            &plan,
+            &public(),
+            false,
+            &bindings,
+            &[ServedOriginCheck {
+                accessor_field: "health".to_string(),
+                server: "public".to_string(),
+            }],
+        )
+        .format()
+        .expect("the module formats")
+        .source()
+        .split_whitespace()
+        .collect();
+
+        assert!(source.contains(
+            "iflet::std::result::Result::Err(error)=container.health().served_by(&origin_public){return::std::result::Result::Err(margaret::framework::console::report_failure::report_failure(error),);}"
+        ));
+    }
 
     #[test]
     fn invokes_server_and_views_helpers_directly_when_the_container_has_no_accessors() {
@@ -238,6 +272,7 @@ impl Flusher {
                         "JWKS_ROLL_INTERVAL",
                     ]),
                 },
+                outcome: RunnerOutcome::Fallible,
                 runner: "run".to_string(),
                 takes_token: false,
                 type_name: "JwksRoller".to_string(),
@@ -246,22 +281,24 @@ impl Flusher {
                 concrete_path: canonical(&[
                     "margaret",
                     "framework",
-                    "jwks_client",
-                    "jwks_client",
-                    "JwksClient",
+                    "issuer_directory",
+                    "issuer_directory",
+                    "IssuerDirectory",
                 ]),
-                field_name: "framework_jwks_client_jwks_client_jwks_client".to_string(),
+                field_name: "framework_issuer_directory_issuer_directory_issuer_directory"
+                    .to_string(),
                 is_async: true,
                 kind: FrameworkServiceKind::Service,
+                outcome: RunnerOutcome::Infallible,
                 runner: "run".to_string(),
                 takes_token: true,
-                type_name: "JwksClient".to_string(),
+                type_name: "IssuerDirectory".to_string(),
             },
         ];
         let container_bindings = bindings(&index);
         let plan = ServicePlan::build(&index, &framework_services, &container_bindings, &[])
             .expect("the framework services are planned");
-        let source: String = render_services(&plan, &public(), false, &container_bindings)
+        let source: String = render_services(&plan, &public(), false, &container_bindings, &[])
             .format()
             .expect("the module formats")
             .source()
@@ -275,14 +312,14 @@ impl Flusher {
         assert!(source.contains(
             "manager.register_service(JwksRoller{inner:container.framework_jwks_roller_server_jwks_roller_jwks_roller(),});"
         ));
-        assert!(source.contains("impltrzcina::ServiceforJwksClient"));
+        assert!(source.contains("self.inner.run()?;::std::result::Result::Ok(())"));
+        assert!(source.contains("impltrzcina::ServiceforIssuerDirectory"));
         assert!(
-            source.contains(
-                "self.inner.run(cancellation_token).await?;::std::result::Result::Ok(())"
-            )
+            source
+                .contains("self.inner.run(cancellation_token).await;::std::result::Result::Ok(())")
         );
         assert!(source.contains(
-            "manager.register_service(JwksClient{inner:container.framework_jwks_client_jwks_client_jwks_client(),});"
+            "manager.register_service(IssuerDirectory{inner:container.framework_issuer_directory_issuer_directory_issuer_directory(),});"
         ));
     }
 

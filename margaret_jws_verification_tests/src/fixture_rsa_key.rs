@@ -1,6 +1,7 @@
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::KeyPair;
 use aws_lc_rs::signature::RSA_PKCS1_SHA256;
+use aws_lc_rs::signature::RsaEncoding;
 use aws_lc_rs::signature::RsaKeyPair;
 use aws_lc_rs::signature::RsaPublicKeyComponents;
 use base64ct::Base64UrlUnpadded;
@@ -72,11 +73,19 @@ impl FixtureRsaKey {
     ///
     /// Panics when the fixture key cannot sign.
     pub fn signature(&self, signing_input: &str) -> Vec<u8> {
+        self.signature_of(&RSA_PKCS1_SHA256, signing_input)
+    }
+
+    #[must_use]
+    /// # Panics
+    ///
+    /// Panics when the fixture key cannot sign.
+    pub fn signature_of(&self, padding: &'static dyn RsaEncoding, signing_input: &str) -> Vec<u8> {
         let mut signature = vec![0; self.key_pair.public_modulus_len()];
 
         self.key_pair
             .sign(
-                &RSA_PKCS1_SHA256,
+                padding,
                 &SystemRandom::new(),
                 signing_input.as_bytes(),
                 &mut signature,

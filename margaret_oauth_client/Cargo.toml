@@ -1,0 +1,17 @@
+[package]
+name = "margaret_oauth_client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Declares how an application authenticates as a client of an OAuth authorization server, for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+margaret_jwks_secret_store = { workspace = true }
+margaret_oauth_vocabulary = { workspace = true }
+
+[lints]
+workspace = true

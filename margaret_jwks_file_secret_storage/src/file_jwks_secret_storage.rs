@@ -10,6 +10,7 @@ use zeroize::Zeroizing;
 
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::persisted_jwks_secret::PersistedJwksSecret;
+use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::loaded_secret::LoadedSecret;
 use margaret_jwks_roller::roller_error::RollerError;
@@ -42,7 +43,11 @@ impl FileJwksSecretStorage {
         Self { path }
     }
 
-    fn deserialize(&self, bytes: &[u8]) -> Result<LoadedSecret, RollerError> {
+    fn deserialize(
+        &self,
+        bytes: &[u8],
+        rsa_keys: &dyn ProvidesRsaSigningKeys,
+    ) -> Result<LoadedSecret, RollerError> {
         let persisted: PersistedJwksSecret =
             serde_json::from_slice(bytes).map_err(|source| RollerError::SecretLoad {
                 source: Box::new(FileJwksSecretStorageError::Deserialize {
@@ -52,7 +57,7 @@ impl FileJwksSecretStorage {
             })?;
 
         let secret = persisted
-            .into_secret()
+            .into_secret(rsa_keys)
             .map_err(|source| RollerError::SecretLoad {
                 source: Box::new(FileJwksSecretStorageError::Restore {
                     path: self.path.clone(),
@@ -83,9 +88,9 @@ impl FileJwksSecretStorage {
 }
 
 impl JwksSecretStorage for FileJwksSecretStorage {
-    fn load(&self) -> anyhow::Result<LoadedSecret> {
+    fn load(&self, rsa_keys: &dyn ProvidesRsaSigningKeys) -> anyhow::Result<LoadedSecret> {
         match fs::read(&self.path) {
-            Ok(bytes) => self.deserialize(&bytes).map_err(Into::into),
+            Ok(bytes) => self.deserialize(&bytes, rsa_keys).map_err(Into::into),
             Err(source) if source.kind() == ErrorKind::NotFound => Ok(LoadedSecret::Absent),
             Err(source) => Err(FileJwksSecretStorageError::Read {
                 path: self.path.clone(),

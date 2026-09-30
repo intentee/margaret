@@ -3,22 +3,12 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 
-use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
 
 use crate::mint_access_token_error::MintAccessTokenError;
 use crate::mint_access_token_request::MintAccessTokenRequest;
-
-fn error_response(error: &MintAccessTokenError) -> Response {
-    match error {
-        MintAccessTokenError::MissingBody | MintAccessTokenError::MalformedRequest { .. } => {
-            Response::text(400, "Bad Request")
-        }
-        MintAccessTokenError::SecretStore { .. } => Response::text(500, "Internal Server Error"),
-    }
-}
 
 pub struct MintAccessTokenHandler {
     secret_store: Arc<JwksSecretStore>,
@@ -30,22 +20,14 @@ impl MintAccessTokenHandler {
         Self { secret_store }
     }
 
-    #[must_use]
-    pub fn respond(&self, request: &Request, now: DateTime<Utc>) -> Response {
-        match self.mint(request, now) {
-            Ok(response) => response,
-            Err(error) => error_response(&error),
-        }
-    }
-
-    fn mint(
+    /// # Errors
+    ///
+    /// Returns `MintAccessTokenError::SecretStore` when the signing keys cannot mint the tokens.
+    pub fn respond(
         &self,
-        request: &Request,
+        MintAccessTokenRequest { refresh_token }: MintAccessTokenRequest,
         now: DateTime<Utc>,
     ) -> Result<Response, MintAccessTokenError> {
-        let MintAccessTokenRequest { refresh_token } =
-            MintAccessTokenRequest::from_request(request)?;
-
         let minting = self
             .secret_store
             .mint_access_token(&refresh_token, now)
@@ -61,14 +43,11 @@ impl MintAccessTokenHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::mem::discriminant;
     use std::sync::Arc;
 
-    use http::Method;
-    use serde_json::Value;
-    use serde_json::json;
-
-    use margaret_http::request::Request;
     use margaret_jwks_keygen::jwks_secret::JwksSecret;
+    use margaret_jwks_secret_store::jwks_secret_store_error::JwksSecretStoreError;
     use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
     use margaret_jwks_secret_store_tests::unrolled_store::unrolled_store;
     use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
@@ -78,6 +57,8 @@ mod tests {
     use margaret_token_signer_tests::unix_time::unix_time;
 
     use super::MintAccessTokenHandler;
+    use crate::mint_access_token_error::MintAccessTokenError;
+    use crate::mint_access_token_request::MintAccessTokenRequest;
 
     fn handler_from(secret: Option<JwksSecret>) -> MintAccessTokenHandler {
         MintAccessTokenHandler::create(Arc::new(match secret {
@@ -86,12 +67,8 @@ mod tests {
         }))
     }
 
-    fn request_with_body(body: Value) -> Request {
-        let mut request = Request::new(Method::POST, "/mint".to_string());
-
-        request.inputs.json = Some(body);
-
-        request
+    fn mint_request(refresh_token: String) -> MintAccessTokenRequest {
+        MintAccessTokenRequest { refresh_token }
     }
 
     fn signed_refresh_token(secret: &JwksSecret, exp: i64) -> String {
@@ -109,36 +86,11 @@ mod tests {
         let refresh_token = signed_refresh_token(&secret, 1_000);
         let handler = handler_from(Some(secret));
 
-        let response = handler.respond(
-            &request_with_body(json!({ "refresh_token": refresh_token })),
-            unix_time(500),
-        );
+        let response = handler
+            .respond(mint_request(refresh_token), unix_time(500))
+            .expect("the signing keys are available");
 
         assert_eq!(response.status(), 200);
-    }
-
-    #[test]
-    fn reports_bad_request_when_the_body_is_missing() {
-        let handler = handler_from(Some(fresh_p256_secret()));
-
-        let response = handler.respond(
-            &Request::new(Method::POST, "/mint".to_string()),
-            unix_time(500),
-        );
-
-        assert_eq!(response.status(), 400);
-    }
-
-    #[test]
-    fn reports_bad_request_for_a_malformed_body() {
-        let handler = handler_from(Some(fresh_p256_secret()));
-
-        let response = handler.respond(
-            &request_with_body(json!({ "wrong": "field" })),
-            unix_time(500),
-        );
-
-        assert_eq!(response.status(), 400);
     }
 
     #[test]
@@ -147,23 +99,27 @@ mod tests {
         let refresh_token = signed_refresh_token(&secret, 1_000);
         let handler = handler_from(Some(secret));
 
-        let response = handler.respond(
-            &request_with_body(json!({ "refresh_token": refresh_token })),
-            unix_time(2_000),
-        );
+        let response = handler
+            .respond(mint_request(refresh_token), unix_time(2_000))
+            .expect("the signing keys are available");
 
         assert_eq!(response.status(), 401);
     }
 
     #[test]
-    fn reports_internal_error_when_the_secret_is_unavailable() {
+    fn reports_a_secret_store_failure_when_the_signing_keys_are_unavailable() {
         let handler = handler_from(None);
 
-        let response = handler.respond(
-            &request_with_body(json!({ "refresh_token": "any.token.value" })),
-            unix_time(500),
-        );
+        let error = handler
+            .respond(mint_request("any.token.value".to_string()), unix_time(500))
+            .err()
+            .expect("unrolled signing keys cannot mint");
 
-        assert_eq!(response.status(), 500);
+        assert_eq!(
+            discriminant(&error),
+            discriminant(&MintAccessTokenError::SecretStore {
+                source: JwksSecretStoreError::SecretUnavailable,
+            })
+        );
     }
 }

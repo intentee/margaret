@@ -1,0 +1,19 @@
+[package]
+name = "margaret_token_exchange_client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Exchanges a subject token for an access token of another audience under RFC 8693, for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[dependencies]
+margaret_authorization_server_client = { workspace = true }
+oauth2 = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+zeroize = { workspace = true }
+
+[lints]
+workspace = true

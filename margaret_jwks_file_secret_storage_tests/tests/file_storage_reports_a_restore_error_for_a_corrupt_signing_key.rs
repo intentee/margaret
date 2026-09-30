@@ -5,6 +5,7 @@ use serde_json::Value;
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage::FileJwksSecretStorage;
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage_error::FileJwksSecretStorageError;
 use margaret_jwks_file_secret_storage_tests::sample_secret::sample_secret;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 
 #[test]
@@ -25,7 +26,7 @@ fn file_storage_reports_a_restore_error_for_a_corrupt_signing_key() {
     fs::write(&path, document.to_string()).expect("the corrupt fixture can be written");
 
     let source = storage
-        .load()
+        .load(&FixtureRsaSigningKeys::default())
         .err()
         .expect("a corrupt signing key fails to load");
     let backend = source

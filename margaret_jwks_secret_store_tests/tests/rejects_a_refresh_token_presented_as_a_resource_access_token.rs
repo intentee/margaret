@@ -1,0 +1,34 @@
+use std::collections::BTreeSet;
+
+use uuid::Uuid;
+
+use margaret_jose_parameters::jwt_type::JwtType;
+use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
+use margaret_jws_verification::header_type::HeaderType;
+use margaret_jwt_verification::jwt_rejection::JwtRejection;
+use margaret_jwt_verification::jwt_verification::JwtVerification;
+use margaret_jwt_verification::type_rejection::TypeRejection;
+use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
+use margaret_token_signer_tests::unix_time::unix_time;
+
+#[test]
+fn rejects_a_refresh_token_presented_as_a_resource_access_token() {
+    let store = rolled_store(fresh_p256_secret());
+    let refresh_token = store
+        .issue_refresh_token(Uuid::from_u128(7), unix_time(1_000))
+        .expect("the signing secret is usable");
+
+    assert!(matches!(
+        store.verify_resource_access_token(
+            &refresh_token.signed_claims,
+            &BTreeSet::new(),
+            unix_time(1_000)
+        ),
+        Ok(JwtVerification::Rejected(JwtRejection::Type(
+            TypeRejection::Mismatch {
+                expected: JwtType::AccessToken,
+                found: HeaderType::Supported(JwtType::Refresh),
+            }
+        )))
+    ));
+}

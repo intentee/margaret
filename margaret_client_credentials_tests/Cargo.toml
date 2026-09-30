@@ -1,0 +1,32 @@
+[package]
+name = "margaret_client_credentials_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+margaret_authorization_server_client = { workspace = true }
+margaret_oauth_client = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+margaret_authorization_server_client_tests = { path = "../margaret_authorization_server_client_tests" }
+margaret_client_credentials = { workspace = true }
+margaret_http = { workspace = true }
+margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_issuer_metadata = { workspace = true }
+margaret_issuer_request = { workspace = true }
+margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
+margaret_route_method = { workspace = true }
+margaret_trusted_issuer = { workspace = true }
+oauth2 = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

@@ -13,9 +13,9 @@ publish.workspace = true
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
-futures-util = { workspace = true }
 cookie = { workspace = true }
 form_urlencoded = { workspace = true }
+futures-util = { workspace = true }
 http = { workspace = true }
 http-body = { workspace = true }
 http-body-util = { workspace = true }
@@ -23,14 +23,15 @@ hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server", "server-auto", "server-graceful", "service", "tokio"] }
 margaret_http_uploaded_file = { workspace = true }
 margaret_peer_identity = { workspace = true }
+margaret_route_method = { workspace = true }
 margaret_route_parameter_binding = { workspace = true }
 matchit = { workspace = true }
 maud = { workspace = true }
 mime = { workspace = true }
 multer = { workspace = true }
 percent-encoding = { workspace = true }
-serde = { workspace = true }
 rustls = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 spiffe = { workspace = true, features = ["spiffe-types"] }
 tempfile = { workspace = true }

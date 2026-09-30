@@ -1,6 +1,7 @@
 use margaret_jwks_file_secret_storage::file_jwks_secret_storage::FileJwksSecretStorage;
 use margaret_jwks_file_secret_storage_tests::sample_secret::sample_secret;
 use margaret_jwks_keygen::previous_key::PreviousKey;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::loaded_secret::LoadedSecret;
 
@@ -15,7 +16,7 @@ fn file_storage_persists_a_secret_that_reloads() {
         .expect("the secret can be persisted");
 
     let LoadedSecret::Present(reloaded) = storage
-        .load()
+        .load(&FixtureRsaSigningKeys::default())
         .expect("the persisted secret can be reloaded")
     else {
         panic!("the persisted secret must reload as present");

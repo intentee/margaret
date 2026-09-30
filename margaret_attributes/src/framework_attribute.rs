@@ -2,6 +2,7 @@ use crate::canonical_path::CanonicalPath;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FrameworkAttribute {
+    AcceptsOAuthClient,
     AuthenticatedUser,
     BearerToken,
     BuildForSession,
@@ -10,6 +11,7 @@ pub enum FrameworkAttribute {
     ConsoleCommand,
     Constructor,
     EnvironmentVariable,
+    ExchangesSubjectTokens,
     ForeignKey,
     FormRequest,
     HandlesMiddlewareAttribute,
@@ -19,6 +21,7 @@ pub enum FrameworkAttribute {
     IssuesTokens,
     Middleware,
     Model,
+    OAuthClient,
     PrimaryKey,
     Process,
     ProvidesJwksEndpoint,
@@ -38,7 +41,8 @@ pub enum FrameworkAttribute {
 }
 
 impl FrameworkAttribute {
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 36] = [
+        Self::AcceptsOAuthClient,
         Self::AuthenticatedUser,
         Self::BearerToken,
         Self::BuildForSession,
@@ -47,6 +51,7 @@ impl FrameworkAttribute {
         Self::ConsoleCommand,
         Self::Constructor,
         Self::EnvironmentVariable,
+        Self::ExchangesSubjectTokens,
         Self::ForeignKey,
         Self::FormRequest,
         Self::HandlesMiddlewareAttribute,
@@ -56,6 +61,7 @@ impl FrameworkAttribute {
         Self::IssuesTokens,
         Self::Middleware,
         Self::Model,
+        Self::OAuthClient,
         Self::PrimaryKey,
         Self::Process,
         Self::ProvidesJwksEndpoint,
@@ -88,6 +94,7 @@ impl FrameworkAttribute {
         };
 
         match name {
+            "accepts_oauth_client" => Some(Self::AcceptsOAuthClient),
             "authenticated_user" => Some(Self::AuthenticatedUser),
             "bearer_token" => Some(Self::BearerToken),
             "build_for_session" => Some(Self::BuildForSession),
@@ -96,6 +103,7 @@ impl FrameworkAttribute {
             "console_command" => Some(Self::ConsoleCommand),
             "constructor" => Some(Self::Constructor),
             "environment_variable" => Some(Self::EnvironmentVariable),
+            "exchanges_subject_tokens" => Some(Self::ExchangesSubjectTokens),
             "foreign_key" => Some(Self::ForeignKey),
             "form_request" => Some(Self::FormRequest),
             "handles_middleware_attribute" => Some(Self::HandlesMiddlewareAttribute),
@@ -105,6 +113,7 @@ impl FrameworkAttribute {
             "issues_tokens" => Some(Self::IssuesTokens),
             "middleware" => Some(Self::Middleware),
             "model" => Some(Self::Model),
+            "oauth_client" => Some(Self::OAuthClient),
             "primary_key" => Some(Self::PrimaryKey),
             "process" => Some(Self::Process),
             "provides_jwks_endpoint" => Some(Self::ProvidesJwksEndpoint),
@@ -128,6 +137,7 @@ impl FrameworkAttribute {
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
+            Self::AcceptsOAuthClient => "accepts_oauth_client",
             Self::AuthenticatedUser => "authenticated_user",
             Self::BearerToken => "bearer_token",
             Self::BuildForSession => "build_for_session",
@@ -136,6 +146,7 @@ impl FrameworkAttribute {
             Self::ConsoleCommand => "console_command",
             Self::Constructor => "constructor",
             Self::EnvironmentVariable => "environment_variable",
+            Self::ExchangesSubjectTokens => "exchanges_subject_tokens",
             Self::ForeignKey => "foreign_key",
             Self::FormRequest => "form_request",
             Self::HandlesMiddlewareAttribute => "handles_middleware_attribute",
@@ -145,6 +156,7 @@ impl FrameworkAttribute {
             Self::IssuesTokens => "issues_tokens",
             Self::Middleware => "middleware",
             Self::Model => "model",
+            Self::OAuthClient => "oauth_client",
             Self::PrimaryKey => "primary_key",
             Self::Process => "process",
             Self::ProvidesJwksEndpoint => "provides_jwks_endpoint",

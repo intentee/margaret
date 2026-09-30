@@ -1,4 +1,3 @@
-use http::method::InvalidMethod;
 use matchit::InsertError;
 use thiserror::Error;
 
@@ -8,6 +7,7 @@ use margaret_container::container_error::ContainerError;
 use margaret_injection_codegen::injection_error::InjectionError;
 use margaret_middleware_codegen::middleware_codegen_error::MiddlewareCodegenError;
 use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+use margaret_route_method::route_method::RouteMethod;
 
 #[derive(Debug, Error)]
 pub enum HttpCodegenError {
@@ -53,12 +53,25 @@ pub enum HttpCodegenError {
     #[error("responder '{responder}' is missing the 'method' argument")]
     MissingHttpMethod { responder: String },
 
-    #[error("responder '{responder}' has an invalid HTTP method '{method}': {source}")]
-    InvalidHttpMethod {
-        responder: String,
-        method: String,
-        source: InvalidMethod,
-    },
+    #[error(
+        "responder '{responder}' declares the HTTP method '{method}'; a route responds to one of \"get\", \"post\", \"put\", \"delete\", \"patch\" or \"query\""
+    )]
+    UnsupportedHttpMethod { responder: String, method: String },
+
+    #[error(
+        "responder '{responder}' responds to GET and reads the request body; a GET request carries no content a route may read"
+    )]
+    ContentOnGetRoute { responder: String },
+
+    #[error(
+        "responder '{responder}' reads the request body but declares no `max_body_bytes`; a route that reads its body declares how large that body may be"
+    )]
+    MissingBodyLimit { responder: String },
+
+    #[error(
+        "responder '{responder}' declares `max_body_bytes` but does not read the request body; the limit belongs to the route that reads the body"
+    )]
+    UnusedBodyLimit { responder: String },
 
     #[error("responder '{responder}' is missing the 'path' argument")]
     MissingHttpPath { responder: String },
@@ -82,11 +95,11 @@ pub enum HttpCodegenError {
     },
 
     #[error(
-        "responder '{responder}' registers '{method} {path}' on server '{server}', which is already registered by responder '{existing_responder}'"
+        "responder '{responder}' registers '{method:?} {path}' on server '{server}', which is already registered by responder '{existing_responder}'"
     )]
     DuplicateRoute {
         existing_responder: String,
-        method: String,
+        method: RouteMethod,
         path: String,
         responder: String,
         server: String,

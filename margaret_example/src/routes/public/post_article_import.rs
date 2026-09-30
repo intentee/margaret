@@ -12,7 +12,12 @@ use crate::forms::post_article_form::PostArticleForm;
 use crate::stores::article_store::ArticleStore;
 
 #[singleton]
-#[responds_to_http(method = "post", path = "/articles/import", server = "public")]
+#[responds_to_http(
+    max_body_bytes = 8_388_608,
+    method = "post",
+    path = "/articles/import",
+    server = "public"
+)]
 pub struct PostArticleImport {
     articles: Arc<ArticleStore>,
 }

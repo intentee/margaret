@@ -36,6 +36,11 @@ impl Tag {
             name: segment.ident.clone(),
         })
     }
+
+    #[must_use]
+    pub fn ident(&self) -> &Ident {
+        &self.name
+    }
 }
 
 impl Display for Tag {

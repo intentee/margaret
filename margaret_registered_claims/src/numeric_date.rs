@@ -18,11 +18,12 @@ pub struct NumericDate {
 }
 
 impl NumericDate {
-    #[must_use]
-    pub fn new(seconds_since_epoch: i64) -> Self {
-        Self {
-            seconds_since_epoch,
-        }
+    fn from_duration_since_epoch(
+        duration: Duration,
+    ) -> std::result::Result<Self, RegisteredClaimsError> {
+        i64::try_from(duration.as_secs())
+            .map(Self::new)
+            .map_err(|source| RegisteredClaimsError::ClockBeyondNumericDate { source })
     }
 
     /// # Errors
@@ -36,16 +37,15 @@ impl NumericDate {
     }
 
     #[must_use]
-    pub fn seconds_since_epoch(self) -> i64 {
-        self.seconds_since_epoch
+    pub fn new(seconds_since_epoch: i64) -> Self {
+        Self {
+            seconds_since_epoch,
+        }
     }
 
-    fn from_duration_since_epoch(
-        duration: Duration,
-    ) -> std::result::Result<Self, RegisteredClaimsError> {
-        i64::try_from(duration.as_secs())
-            .map(Self::new)
-            .map_err(|source| RegisteredClaimsError::ClockBeyondNumericDate { source })
+    #[must_use]
+    pub fn seconds_since_epoch(self) -> i64 {
+        self.seconds_since_epoch
     }
 }
 

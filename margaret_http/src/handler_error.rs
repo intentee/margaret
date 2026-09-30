@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use margaret_http_uploaded_file::uploaded_file_error::UploadedFileError;
 use margaret_route_parameter_binding::route_parameter_binding_error::RouteParameterBindingError;
 
 #[derive(Debug, Error)]
@@ -18,6 +19,9 @@ pub enum HandlerError {
 
     #[error("no forward target is registered for '{responder}' on this server")]
     UnknownForwardTarget { responder: &'static str },
+
+    #[error(transparent)]
+    UploadedFile(#[from] UploadedFileError),
 }
 
 impl HandlerError {

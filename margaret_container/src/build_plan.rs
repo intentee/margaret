@@ -372,7 +372,7 @@ fn resolve_target(
         .map(|framework_provider| &framework_provider.injection);
 
     match restricted_role {
-        Some(FrameworkInjectionRole::TokenIssuerClient(_)) => {
+        Some(FrameworkInjectionRole::OAuthClient(_) | FrameworkInjectionRole::TrustedIssuer(_)) => {
             Err(ContainerError::FrameworkOnlyProvider {
                 parameter: parameter.to_string(),
                 provider: resolved.to_string(),
@@ -516,18 +516,49 @@ fn framework_dependency_kind(
     provided: &CanonicalPath,
 ) -> Result<DependencyKind, ContainerError> {
     match dependency {
+        FrameworkDependency::BorrowedProvider(provider_key) => Ok(DependencyKind::Borrowed {
+            provider_key: provider_key.clone(),
+        }),
+        FrameworkDependency::BorrowedTokenIssuance => {
+            required_token_issuer(token_issuance, provided).map(|provider_key| {
+                DependencyKind::Borrowed {
+                    provider_key: provider_key.clone(),
+                }
+            })
+        }
+        FrameworkDependency::Constant(path) => Ok(DependencyKind::Constant { path: path.clone() }),
         FrameworkDependency::Provider(provider_key)
         | FrameworkDependency::SingletonView(provider_key) => Ok(DependencyKind::Single {
             provider_key: provider_key.clone(),
         }),
-        FrameworkDependency::TokenIssuance => match token_issuance {
-            DeclaredTokenIssuance::Absent => Err(ContainerError::MissingTokenIssuance {
-                provider: provided.to_string(),
-            }),
-            DeclaredTokenIssuance::Declared(issuer) => Ok(DependencyKind::Single {
-                provider_key: issuer.clone(),
-            }),
-        },
+        FrameworkDependency::Providers(provider_keys) => Ok(DependencyKind::Collection {
+            provider_keys: provider_keys.clone(),
+        }),
+        FrameworkDependency::SingletonViews { singletons, view } => {
+            Ok(DependencyKind::ViewCollection {
+                provider_keys: singletons.clone(),
+                view: view.clone(),
+            })
+        }
+        FrameworkDependency::TokenIssuance => {
+            required_token_issuer(token_issuance, provided).map(|provider_key| {
+                DependencyKind::Single {
+                    provider_key: provider_key.clone(),
+                }
+            })
+        }
+    }
+}
+
+fn required_token_issuer<'issuance>(
+    token_issuance: &'issuance DeclaredTokenIssuance,
+    provided: &CanonicalPath,
+) -> Result<&'issuance CanonicalPath, ContainerError> {
+    match token_issuance {
+        DeclaredTokenIssuance::Absent => Err(ContainerError::MissingTokenIssuance {
+            provider: provided.to_string(),
+        }),
+        DeclaredTokenIssuance::Declared(issuer) => Ok(issuer),
     }
 }
 
@@ -553,6 +584,7 @@ fn resolve_framework_construction(
             dependencies,
             is_async,
             method,
+            outcome,
         } => DirectConstruction::FrameworkConstructor {
             dependencies: dependencies
                 .iter()
@@ -560,6 +592,7 @@ fn resolve_framework_construction(
                 .collect::<Result<Vec<DependencyKind>, ContainerError>>()?,
             is_async: *is_async,
             method: method.clone(),
+            outcome: *outcome,
         },
         FrameworkConstruction::UriSelected {
             argument_name,
@@ -587,9 +620,15 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
         FrameworkConstruction::Accessor { source, .. } => vec![source],
         FrameworkConstruction::Constructor { dependencies, .. } => dependencies
             .iter()
-            .filter_map(|dependency| match dependency {
-                FrameworkDependency::Provider(provider_key) => Some(provider_key),
-                FrameworkDependency::SingletonView(_) | FrameworkDependency::TokenIssuance => None,
+            .flat_map(|dependency| match dependency {
+                FrameworkDependency::BorrowedProvider(provider_key)
+                | FrameworkDependency::Provider(provider_key) => std::slice::from_ref(provider_key),
+                FrameworkDependency::Providers(provider_keys) => provider_keys.as_slice(),
+                FrameworkDependency::BorrowedTokenIssuance
+                | FrameworkDependency::Constant(_)
+                | FrameworkDependency::SingletonView(_)
+                | FrameworkDependency::SingletonViews { .. }
+                | FrameworkDependency::TokenIssuance => &[],
             })
             .collect(),
         FrameworkConstruction::UriSelected { .. } | FrameworkConstruction::Unit => Vec::new(),

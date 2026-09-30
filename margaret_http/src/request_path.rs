@@ -70,10 +70,6 @@ pub(crate) struct RequestPath {
 }
 
 impl RequestPath {
-    pub(crate) fn from_decoded(decoded: String) -> Self {
-        Self { decoded }
-    }
-
     pub(crate) fn from_request_target(target: &str) -> RequestOutcome<Self> {
         if !target.starts_with(PATH_SEPARATOR) {
             return RequestOutcome::Rejected(RequestRejection::RequestTargetNotOriginForm);
@@ -269,14 +265,6 @@ mod tests {
             &RequestRejection::ControlCharacterInPathSegment {
                 segment: any_segment(),
             },
-        );
-    }
-
-    #[test]
-    fn carries_a_path_that_is_already_decoded() {
-        assert_eq!(
-            RequestPath::from_decoded("/greeting".to_string()).as_str(),
-            "/greeting"
         );
     }
 }

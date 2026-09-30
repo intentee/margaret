@@ -1,3 +1,4 @@
+use margaret_oidc_discovery::metadata_endpoint::MetadataEndpoint;
 use margaret_oidc_discovery::provider_metadata::ProviderMetadata;
 use margaret_oidc_discovery::provider_metadata_parsing::ProviderMetadataParsing;
 use margaret_oidc_discovery::provider_metadata_rejection::ProviderMetadataRejection;
@@ -14,6 +15,9 @@ fn rejects_a_jwks_uri_that_is_not_a_url() {
             br#"{"issuer":"https://server.example.com","jwks_uri":"not a url"}"#,
             &issuer
         ),
-        ProviderMetadataParsing::Rejected(ProviderMetadataRejection::JwksUriMalformed { .. })
+        ProviderMetadataParsing::Rejected(ProviderMetadataRejection::EndpointMalformed {
+            endpoint: MetadataEndpoint::JwksUri,
+            ..
+        })
     ));
 }

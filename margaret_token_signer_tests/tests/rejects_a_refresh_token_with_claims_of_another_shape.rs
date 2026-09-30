@@ -21,7 +21,7 @@ fn rejects_a_refresh_token_with_claims_of_another_shape() {
             "iss": issuance.issuer.as_str(),
             "sub": "00000000-0000-0000-0000-000000000002",
         }),
-        JwtType::Jwt,
+        JwtType::Refresh,
     );
 
     assert!(matches!(

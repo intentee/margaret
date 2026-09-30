@@ -4,7 +4,6 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use margaret_http::body_limit::BodyLimit;
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::http_middleware::HttpMiddleware;
@@ -43,7 +42,6 @@ impl RunningWebSocketServer {
             "127.0.0.1:0".to_string(),
             transport,
             UploadConfig::Disabled,
-            BodyLimit::default(),
             ServerRoutes::build(vec![RouteEntry::web_socket("/ws", upgrade, middleware)])
                 .expect("the route entries register cleanly")
                 .router,

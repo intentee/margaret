@@ -27,5 +27,5 @@ fn verifies_a_token_of_an_assembled_key() {
     };
 
     assert_eq!(verified.kid.as_str(), "kid");
-    assert_eq!(verified.payload, br#"{"sub":"subject"}"#);
+    assert_eq!(jws.payload(), br#"{"sub":"subject"}"#);
 }

@@ -26,7 +26,8 @@ fn resolved_single(
             field: field_name.clone(),
         }),
         Some(ProviderBinding {
-            injection: FrameworkInjectionRole::TokenIssuerClient(_),
+            injection:
+                FrameworkInjectionRole::OAuthClient(_) | FrameworkInjectionRole::TrustedIssuer(_),
             ..
         }) => InjectableResolution::FrameworkOnly,
     }

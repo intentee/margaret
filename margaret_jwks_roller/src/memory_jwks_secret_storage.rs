@@ -1,4 +1,5 @@
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 
 use crate::jwks_secret_storage::JwksSecretStorage;
 use crate::loaded_secret::LoadedSecret;
@@ -6,7 +7,7 @@ use crate::loaded_secret::LoadedSecret;
 pub struct MemoryJwksSecretStorage;
 
 impl JwksSecretStorage for MemoryJwksSecretStorage {
-    fn load(&self) -> anyhow::Result<LoadedSecret> {
+    fn load(&self, _rsa_keys: &dyn ProvidesRsaSigningKeys) -> anyhow::Result<LoadedSecret> {
         Ok(LoadedSecret::Absent)
     }
 

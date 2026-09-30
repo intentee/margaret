@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use margaret_attributes::canonical_path::CanonicalPath;
 
 use crate::container_plan::ContainerPlan;
-use crate::dependency_kind::DependencyKind;
 use crate::planned_provider::PlannedProvider;
 
 pub(crate) fn construction_flow<'plan>(
@@ -19,9 +18,7 @@ pub(crate) fn construction_flow<'plan>(
         }
 
         for dependency in entry.provider.dependencies() {
-            if let DependencyKind::Single { provider_key } = dependency {
-                selected.insert(provider_key.clone());
-            }
+            selected.extend(dependency.provider_keys().iter().cloned());
         }
     }
 

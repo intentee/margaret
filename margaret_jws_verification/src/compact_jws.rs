@@ -4,6 +4,7 @@ use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 
 use crate::compact_jws_parsing::CompactJwsParsing;
+use crate::header_type::HeaderType;
 use crate::jws_header::JwsHeader;
 use crate::jws_rejection::JwsRejection;
 
@@ -65,5 +66,15 @@ impl<'token> CompactJws<'token> {
             signature,
             signing_input,
         })
+    }
+
+    #[must_use]
+    pub fn payload(&self) -> &[u8] {
+        &self.payload
+    }
+
+    #[must_use]
+    pub fn typ(&self) -> Option<&HeaderType> {
+        self.header.typ.as_ref()
     }
 }

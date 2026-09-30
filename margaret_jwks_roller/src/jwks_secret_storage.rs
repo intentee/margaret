@@ -1,11 +1,13 @@
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 
 use crate::loaded_secret::LoadedSecret;
+
 pub trait JwksSecretStorage: Send + Sync {
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
-    fn load(&self) -> anyhow::Result<LoadedSecret>;
+    fn load(&self, rsa_keys: &dyn ProvidesRsaSigningKeys) -> anyhow::Result<LoadedSecret>;
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.

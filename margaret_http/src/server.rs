@@ -2,17 +2,15 @@ use std::sync::Arc;
 
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 
-use crate::body_limit::BodyLimit;
 use crate::router::Router;
 use crate::transport_config::TransportConfig;
 
 pub struct Server {
     address: String,
-    body_limit: BodyLimit,
     name: Arc<str>,
-    router: Arc<Router>,
-    transport: Arc<TransportConfig>,
-    upload_config: Arc<UploadConfig>,
+    router: Router,
+    transport: TransportConfig,
+    upload_config: UploadConfig,
 }
 
 impl Server {
@@ -21,16 +19,14 @@ impl Server {
         address: String,
         transport: TransportConfig,
         upload_config: UploadConfig,
-        body_limit: BodyLimit,
         router: Router,
     ) -> Self {
         Self {
             address,
-            body_limit,
             name: name.into(),
-            router: Arc::new(router),
-            transport: Arc::new(transport),
-            upload_config: Arc::new(upload_config),
+            router,
+            transport,
+            upload_config,
         }
     }
 
@@ -39,23 +35,20 @@ impl Server {
         &self.address
     }
 
-    pub(crate) fn body_limit(&self) -> BodyLimit {
-        self.body_limit
+    #[must_use]
+    pub fn upload_config(&self) -> &UploadConfig {
+        &self.upload_config
     }
 
     pub(crate) fn name(&self) -> &Arc<str> {
         &self.name
     }
 
-    pub(crate) fn router(&self) -> &Arc<Router> {
+    pub(crate) fn router(&self) -> &Router {
         &self.router
     }
 
-    pub(crate) fn transport(&self) -> &Arc<TransportConfig> {
+    pub(crate) fn transport(&self) -> &TransportConfig {
         &self.transport
-    }
-
-    pub(crate) fn upload_config(&self) -> &Arc<UploadConfig> {
-        &self.upload_config
     }
 }

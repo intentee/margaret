@@ -15,6 +15,8 @@ use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
+use crate::runner_outcome::RunnerOutcome;
+use crate::served_origin_check::ServedOriginCheck;
 use crate::service_kind::ServiceKind;
 use crate::service_plan::ServicePlan;
 use crate::service_unit::ServiceUnit;
@@ -172,10 +174,37 @@ fn bundle_registration(
     }
 }
 
+fn origin_checks(
+    server: &HttpServer,
+    served_origin_checks: &[ServedOriginCheck],
+    bindings: &ContainerBindings,
+) -> TokenStream {
+    let origin_variable = format_ident!("origin_{}", server.name());
+    let checks = served_origin_checks
+        .iter()
+        .filter(|check| check.server == server.name())
+        .map(|check| {
+            let provider =
+                bindings.accessor_invocation(&format_ident!("container"), &check.accessor_field);
+
+            quote! {
+                if let ::std::result::Result::Err(error) = #provider.served_by(&#origin_variable) {
+                    return ::std::result::Result::Err(
+                        margaret::framework::console::report_failure::report_failure(error),
+                    );
+                }
+            }
+        });
+
+    quote! { #(#checks)* }
+}
+
 fn server_registration(
     servers: &[HttpServer],
     has_views: bool,
     activation: SpiffeActivation,
+    served_origin_checks: &[ServedOriginCheck],
+    bindings: &ContainerBindings,
 ) -> TokenStream {
     let origins = servers.iter().map(|server| {
         let origin_variable = format_ident!("origin_{}", server.name());
@@ -185,9 +214,11 @@ fn server_registration(
             &quote! { value.clone().into() },
             &failed_registration(),
         );
+        let checks = origin_checks(server, served_origin_checks, bindings);
 
         quote! {
             let #origin_variable: ::std::sync::Arc<str> = #origin_read;
+            #checks
         }
     });
 
@@ -276,10 +307,19 @@ fn adapter(unit: &ServiceUnit) -> TokenStream {
     }
 }
 
-fn runner_outcome(unit: &ServiceUnit, call: &TokenStream) -> TokenStream {
+fn runner_result(unit: &ServiceUnit, call: &TokenStream) -> TokenStream {
     match unit.origin {
-        ServiceUnitOrigin::Framework => quote! {
+        ServiceUnitOrigin::Framework {
+            outcome: RunnerOutcome::Fallible,
+        } => quote! {
             #call?;
+
+            ::std::result::Result::Ok(())
+        },
+        ServiceUnitOrigin::Framework {
+            outcome: RunnerOutcome::Infallible,
+        } => quote! {
+            #call;
 
             ::std::result::Result::Ok(())
         },
@@ -311,7 +351,7 @@ fn ticker_adapter(
     } else {
         quote! { self.inner.#runner(#arguments) }
     };
-    let outcome = runner_outcome(unit, &call);
+    let outcome = runner_result(unit, &call);
 
     quote! {
         struct #name {
@@ -351,7 +391,7 @@ fn service_adapter(unit: &ServiceUnit) -> TokenStream {
     } else {
         quote! { self.inner.#runner(#arguments) }
     };
-    let outcome = runner_outcome(unit, &call);
+    let outcome = runner_result(unit, &call);
 
     quote! {
         struct #name {
@@ -392,12 +432,20 @@ fn register_servers_definition(
     servers: &[HttpServer],
     has_views: bool,
     activation: SpiffeActivation,
+    served_origin_checks: &[ServedOriginCheck],
+    bindings: &ContainerBindings,
 ) -> TokenStream {
     if servers.is_empty() {
         return TokenStream::new();
     }
 
-    let body = server_registration(servers, has_views, activation);
+    let body = server_registration(
+        servers,
+        has_views,
+        activation,
+        served_origin_checks,
+        bindings,
+    );
     let spiffe_server_parameter = activation
         .server_active
         .then(|| quote! { spiffe_server_config: &::std::sync::Arc<margaret::framework::spiffe_svid::rustls::ServerConfig>, });
@@ -458,6 +506,7 @@ pub fn render_services(
     servers: &[HttpServer],
     has_views: bool,
     bindings: &ContainerBindings,
+    served_origin_checks: &[ServedOriginCheck],
 ) -> GeneratedModuleTokens {
     let activation = SpiffeActivation {
         client_active: plan.has_spiffe_http_client,
@@ -471,7 +520,13 @@ pub fn render_services(
         .map(|unit| registration(unit, bindings, activation.client_active));
     let identity_prelude = svid_identity_prelude(activation);
     let bundle_registration = bundle_registration(activation);
-    let register_servers = register_servers_definition(servers, has_views, activation);
+    let register_servers = register_servers_definition(
+        servers,
+        has_views,
+        activation,
+        served_origin_checks,
+        bindings,
+    );
     let server_registration = register_servers_invocation(servers, activation);
     let construction_invocation = bindings.serve_invocation(&plan.construction_arguments);
     let construction = quote! {

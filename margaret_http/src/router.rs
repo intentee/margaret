@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use http::Method;
 use matchit::InsertError;
 use matchit::MatchError;
+
+use margaret_route_method::route_method::RouteMethod;
 
 use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
@@ -14,7 +17,7 @@ use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
 enum RouteTarget {
-    Http(HashMap<&'static str, Arc<dyn Handler>>),
+    Http(HashMap<RouteMethod, Arc<dyn Handler>>),
     WebSocket {
         middleware: Vec<Arc<dyn HttpMiddleware>>,
         upgrade: Arc<dyn WebSocketUpgrade>,
@@ -68,7 +71,7 @@ impl Router {
         Ok(Self { matcher })
     }
 
-    pub(crate) fn resolve(&self, method: &str, path: &str) -> RouteResolution {
+    pub(crate) fn resolve(&self, method: &Method, path: &str) -> RouteResolution {
         let matched = match self.matcher.at(path) {
             Ok(matched) => matched,
             Err(MatchError::NotFound) => {
@@ -82,18 +85,20 @@ impl Router {
             .collect();
 
         match matched.value {
-            RouteTarget::Http(handlers) => match handlers.get(method) {
-                Some(handler) => RouteResolution::Request(RequestRoute::Handler {
-                    handler: handler.clone(),
-                    path_params,
-                }),
-                None => RouteResolution::Request(RequestRoute::MethodNotAllowed),
-            },
+            RouteTarget::Http(handlers) => {
+                match RouteMethod::of(method).and_then(|route_method| handlers.get(&route_method)) {
+                    Some(handler) => RouteResolution::Request(RequestRoute::Handler {
+                        handler: handler.clone(),
+                        path_params,
+                    }),
+                    None => RouteResolution::Request(RequestRoute::MethodNotAllowed),
+                }
+            }
             RouteTarget::WebSocket {
                 middleware,
                 upgrade,
             } => {
-                if method == "GET" {
+                if *method == Method::GET {
                     RouteResolution::Upgrade(UpgradeRoute {
                         middleware: middleware.clone(),
                         path_params,

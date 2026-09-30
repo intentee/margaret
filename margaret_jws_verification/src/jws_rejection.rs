@@ -3,7 +3,6 @@ use std::fmt::Formatter;
 use std::fmt::Result;
 
 use aws_lc_rs::error::Unspecified;
-use p256::ecdsa;
 
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 
@@ -16,12 +15,6 @@ pub enum JwsRejection {
         token: JwsAlgorithm,
     },
     CriticalHeader,
-    EcdsaSignatureMalformed {
-        source: ecdsa::Error,
-    },
-    EcdsaSignatureMismatch {
-        source: ecdsa::Error,
-    },
     HeaderBase64 {
         source: base64ct::Error,
     },
@@ -33,11 +26,16 @@ pub enum JwsRejection {
     PayloadBase64 {
         source: base64ct::Error,
     },
-    RsaSignatureMismatch {
-        source: Unspecified,
-    },
     SignatureBase64 {
         source: base64ct::Error,
+    },
+    SignatureLength {
+        expected: usize,
+        found: usize,
+    },
+    SignatureMismatch {
+        algorithm: JwsAlgorithm,
+        source: Unspecified,
     },
     UnknownKeyId {
         kid: KeyId,
@@ -58,14 +56,6 @@ impl Display for JwsRejection {
                 formatter,
                 "the token requires header extensions that are not understood"
             ),
-            Self::EcdsaSignatureMalformed { source } => write!(
-                formatter,
-                "the token signature is not a valid ecdsa signature encoding: {source}"
-            ),
-            Self::EcdsaSignatureMismatch { source } => write!(
-                formatter,
-                "the token ecdsa signature does not match its key: {source}"
-            ),
             Self::HeaderBase64 { source } => write!(
                 formatter,
                 "the token header segment is not valid base64url: {source}"
@@ -84,13 +74,17 @@ impl Display for JwsRejection {
                 formatter,
                 "the token payload segment is not valid base64url: {source}"
             ),
-            Self::RsaSignatureMismatch { source } => write!(
-                formatter,
-                "the token rsa signature does not match its key: {source}"
-            ),
             Self::SignatureBase64 { source } => write!(
                 formatter,
                 "the token signature segment is not valid base64url: {source}"
+            ),
+            Self::SignatureLength { expected, found } => write!(
+                formatter,
+                "the token signature has {found} octets where its key produces {expected}"
+            ),
+            Self::SignatureMismatch { algorithm, source } => write!(
+                formatter,
+                "the token {algorithm} signature does not match its key: {source}"
             ),
             Self::UnknownKeyId { kid } => {
                 write!(formatter, "no key in the set carries the key id '{kid}'")
@@ -107,7 +101,6 @@ mod tests {
     use aws_lc_rs::error::Unspecified;
     use base64ct::Base64UrlUnpadded;
     use base64ct::Encoding;
-    use p256::ecdsa::Signature;
 
     use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 
@@ -116,10 +109,6 @@ mod tests {
 
     fn base64_error() -> base64ct::Error {
         Base64UrlUnpadded::decode_vec("!!!").expect_err("the fixture is not base64url")
-    }
-
-    fn signature_error() -> p256::ecdsa::Error {
-        Signature::from_slice(&[0_u8; 3]).expect_err("the fixture is not a signature")
     }
 
     #[test]
@@ -144,13 +133,12 @@ mod tests {
             JwsRejection::SignatureBase64 {
                 source: base64_error(),
             },
-            JwsRejection::EcdsaSignatureMalformed {
-                source: signature_error(),
+            JwsRejection::SignatureLength {
+                expected: 64,
+                found: 3,
             },
-            JwsRejection::EcdsaSignatureMismatch {
-                source: signature_error(),
-            },
-            JwsRejection::RsaSignatureMismatch {
+            JwsRejection::SignatureMismatch {
+                algorithm: JwsAlgorithm::Ps256,
                 source: Unspecified,
             },
             JwsRejection::UnknownKeyId {
@@ -176,10 +164,12 @@ mod tests {
         );
         assert!(described[6].contains("payload segment is not valid base64url"));
         assert!(described[7].contains("signature segment is not valid base64url"));
-        assert!(described[8].contains("not a valid ecdsa signature encoding"));
-        assert!(described[9].contains("ecdsa signature does not match its key"));
-        assert!(described[10].contains("rsa signature does not match its key"));
-        assert!(described[11].contains("'absent'"));
-        assert!(described[12].contains("'none'"));
+        assert_eq!(
+            described[8],
+            "the token signature has 3 octets where its key produces 64"
+        );
+        assert!(described[9].starts_with("the token PS256 signature does not match its key: "));
+        assert!(described[10].contains("'absent'"));
+        assert!(described[11].contains("'none'"));
     }
 }

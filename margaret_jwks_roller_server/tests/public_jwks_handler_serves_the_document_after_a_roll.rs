@@ -1,18 +1,14 @@
 use std::sync::Arc;
 
-use http::Method;
-
-use margaret_http::handler::Handler as _;
-use margaret_http::request::Request;
-use margaret_http::response_continuation::ResponseContinuation;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
-use margaret_jwks_roller::well_known_jwks_path::WELL_KNOWN_JWKS_PATH;
 use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBundle;
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 
-#[tokio::test]
-async fn public_jwks_handler_serves_the_document_after_a_roll() {
+#[test]
+fn public_jwks_handler_serves_the_document_after_a_roll() {
     let bundle = JwksRollerServerBundle::new(JwksRollerServerBundleParams {
+        rsa_keys: Arc::new(FixtureRsaSigningKeys::default()),
         storage: Arc::new(MemoryJwksSecretStorage),
     });
 
@@ -20,12 +16,5 @@ async fn public_jwks_handler_serves_the_document_after_a_roll() {
         .roll_and_publish()
         .expect("the first roll publishes the document");
 
-    let handler = bundle.public_jwks_handler();
-    let request = Request::new(Method::GET, WELL_KNOWN_JWKS_PATH.to_string());
-
-    let Ok(ResponseContinuation::Done(response)) = handler.handle(&request).await else {
-        panic!("the jwks handler always responds directly");
-    };
-
-    assert_eq!(response.status(), 200);
+    assert_eq!(bundle.public_jwks_handler().respond().status(), 200);
 }

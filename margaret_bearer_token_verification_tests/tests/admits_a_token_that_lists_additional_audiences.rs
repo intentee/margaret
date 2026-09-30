@@ -1,0 +1,34 @@
+use serde_json::json;
+
+use margaret_bearer_token_verification::bearer_token_admission::BearerTokenAdmission;
+use margaret_bearer_token_verification_tests::admit_access_token::admit_access_token;
+use margaret_bearer_token_verification_tests::held_trusted_issuer::held_trusted_issuer;
+use margaret_jose_parameters::jwt_type::JwtType;
+use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::signing_curve::SigningCurve;
+use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
+use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
+
+#[tokio::test]
+async fn admits_a_token_that_lists_additional_audiences() {
+    let trust = fixture_trust();
+    let secret = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())
+        .expect("a fresh secret");
+    let token = secret.current().sign_json(
+        &json!({
+            "aud": ["someone-else", trust.audience.as_str()],
+            "exp": FAR_FUTURE_EXPIRY,
+            "iat": 0,
+            "iss": trust.issuer.as_str(),
+            "sub": "subject",
+        }),
+        JwtType::AccessToken,
+    );
+    let trusted_issuer = held_trusted_issuer(trust, secret.key_set().clone());
+
+    assert!(matches!(
+        admit_access_token(&trusted_issuer, &format!("Bearer {token}")).await,
+        BearerTokenAdmission::Admitted(_)
+    ));
+}

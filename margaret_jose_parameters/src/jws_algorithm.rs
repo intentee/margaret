@@ -8,24 +8,55 @@ use serde::Serialize;
 use serde::Serializer;
 use serde::de::Error;
 
-const WIRE_NAMES: [&str; 3] = ["ES256", "ES384", "RS256"];
+const WIRE_NAMES: [&str; 11] = [
+    "ES256", "ES384", "ES512", "EdDSA", "Ed25519", "PS256", "PS384", "PS512", "RS256", "RS384",
+    "RS512",
+];
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum JwsAlgorithm {
     Es256,
     Es384,
+    Es512,
+    EdDsa,
+    Ed25519,
+    Ps256,
+    Ps384,
+    Ps512,
     Rs256,
+    Rs384,
+    Rs512,
 }
 
 impl JwsAlgorithm {
-    pub const ALL: [Self; 3] = [Self::Es256, Self::Es384, Self::Rs256];
+    pub const ALL: [Self; 11] = [
+        Self::Es256,
+        Self::Es384,
+        Self::Es512,
+        Self::EdDsa,
+        Self::Ed25519,
+        Self::Ps256,
+        Self::Ps384,
+        Self::Ps512,
+        Self::Rs256,
+        Self::Rs384,
+        Self::Rs512,
+    ];
 
     #[must_use]
     pub fn wire_name(self) -> &'static str {
         match self {
             Self::Es256 => WIRE_NAMES[0],
             Self::Es384 => WIRE_NAMES[1],
-            Self::Rs256 => WIRE_NAMES[2],
+            Self::Es512 => WIRE_NAMES[2],
+            Self::EdDsa => WIRE_NAMES[3],
+            Self::Ed25519 => WIRE_NAMES[4],
+            Self::Ps256 => WIRE_NAMES[5],
+            Self::Ps384 => WIRE_NAMES[6],
+            Self::Ps512 => WIRE_NAMES[7],
+            Self::Rs256 => WIRE_NAMES[8],
+            Self::Rs384 => WIRE_NAMES[9],
+            Self::Rs512 => WIRE_NAMES[10],
         }
     }
 }
@@ -94,6 +125,6 @@ mod tests {
 
     #[test]
     fn displays_the_wire_name() {
-        assert_eq!(JwsAlgorithm::Es256.to_string(), "ES256");
+        assert_eq!(JwsAlgorithm::EdDsa.to_string(), "EdDSA");
     }
 }

@@ -10,11 +10,12 @@ pub(crate) fn confirm_declared_algorithm(
     alg: Option<ParameterValue<JwsAlgorithm>>,
     material: &VerificationMaterial,
 ) -> ControlFlow<KeyAlgorithmRejection> {
-    let implied = material.algorithm();
-
     match alg {
-        Some(ParameterValue::Supported(declared)) if declared != implied => {
-            ControlFlow::Break(KeyAlgorithmRejection::AlgorithmMismatch { declared, implied })
+        Some(ParameterValue::Supported(declared)) if !material.admits(declared) => {
+            ControlFlow::Break(KeyAlgorithmRejection::AlgorithmMismatch {
+                declared,
+                implied: material.algorithm(),
+            })
         }
         Some(ParameterValue::Unsupported(alg)) => {
             ControlFlow::Break(KeyAlgorithmRejection::UnsupportedAlgorithm { alg })

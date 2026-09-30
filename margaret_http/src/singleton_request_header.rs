@@ -13,7 +13,7 @@ use http::header::SEC_WEBSOCKET_VERSION;
 use http::header::USER_AGENT;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum SingletonRequestHeader {
+pub enum SingletonRequestHeader {
     Authorization,
     ContentLength,
     ContentType,

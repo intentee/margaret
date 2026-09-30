@@ -2,6 +2,7 @@ use std::sync::Mutex;
 use std::sync::PoisonError;
 
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::loaded_secret::LoadedSecret;
 
@@ -26,7 +27,7 @@ impl StoredJwksSecretStorage {
 }
 
 impl JwksSecretStorage for StoredJwksSecretStorage {
-    fn load(&self) -> anyhow::Result<LoadedSecret> {
+    fn load(&self, _rsa_keys: &dyn ProvidesRsaSigningKeys) -> anyhow::Result<LoadedSecret> {
         let stored = self.stored.lock().unwrap_or_else(PoisonError::into_inner);
 
         Ok(match &*stored {

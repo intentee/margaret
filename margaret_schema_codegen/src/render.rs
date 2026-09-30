@@ -11,6 +11,7 @@ use margaret_model_codegen::resolved_index::ResolvedIndex;
 use crate::column_check_tokens::column_check_tokens;
 use crate::column_default_tokens::column_default_tokens;
 use crate::column_type_tokens::column_type_tokens;
+use crate::framework_tables::FrameworkTables;
 use crate::on_delete_tokens::on_delete_tokens;
 
 fn string_vec(values: &[String]) -> TokenStream {
@@ -102,8 +103,23 @@ fn render_table(model: &Model) -> TokenStream {
     }
 }
 
-pub(crate) fn render(models: &[Model]) -> TokenStream {
+fn tables(models: &[Model], framework_tables: FrameworkTables) -> TokenStream {
     let tables = models.iter().map(render_table);
+    let provider_state_tables = quote! {
+        margaret::framework::provider_state_postgres::provider_state_tables::provider_state_tables()
+    };
+
+    match framework_tables {
+        FrameworkTables::OidcProviderState if models.is_empty() => provider_state_tables,
+        FrameworkTables::OidcProviderState => quote! {
+            vec![#(#tables),*].into_iter().chain(#provider_state_tables).collect()
+        },
+        FrameworkTables::Unused => quote! { vec![#(#tables),*] },
+    }
+}
+
+pub(crate) fn render(models: &[Model], framework_tables: FrameworkTables) -> TokenStream {
+    let tables = tables(models, framework_tables);
     let too_many_lines = too_many_lines_allow();
 
     quote! {
@@ -111,7 +127,7 @@ pub(crate) fn render(models: &[Model]) -> TokenStream {
         #too_many_lines
         pub fn schema() -> margaret::framework::model::schema::Schema {
             margaret::framework::model::schema::Schema {
-                tables: vec![#(#tables),*],
+                tables: #tables,
             }
         }
     }

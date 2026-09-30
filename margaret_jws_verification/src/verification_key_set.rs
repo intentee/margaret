@@ -127,16 +127,10 @@ impl VerificationKeySet {
     fn verified<'jws>(
         &self,
         CompactJws {
-            header:
-                JwsHeader {
-                    alg,
-                    crit,
-                    kid,
-                    typ,
-                },
-            payload,
+            header: JwsHeader { alg, crit, kid, .. },
             signature,
             signing_input,
+            ..
         }: &'jws CompactJws<'_>,
     ) -> ControlFlow<JwsRejection, VerifiedJws<'jws>> {
         if crit.is_some() {
@@ -156,29 +150,20 @@ impl VerificationKeySet {
             return ControlFlow::Break(JwsRejection::UnknownKeyId { kid: kid.clone() });
         };
 
-        let key_algorithm = key.material.algorithm();
-
-        if key_algorithm != algorithm {
+        if !key.material.admits(algorithm) {
             return ControlFlow::Break(JwsRejection::AlgorithmMismatch {
-                key: key_algorithm,
+                key: key.material.algorithm(),
                 token: algorithm,
             });
         }
 
         match key.material.check(signing_input.as_bytes(), signature) {
-            SignatureCheck::EcdsaMalformed(source) => {
-                ControlFlow::Break(JwsRejection::EcdsaSignatureMalformed { source })
+            SignatureCheck::LengthMismatch { expected, found } => {
+                ControlFlow::Break(JwsRejection::SignatureLength { expected, found })
             }
-            SignatureCheck::EcdsaMismatch(source) => {
-                ControlFlow::Break(JwsRejection::EcdsaSignatureMismatch { source })
-            }
-            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws {
-                kid,
-                payload,
-                typ: typ.as_ref(),
-            }),
-            SignatureCheck::RsaMismatch(source) => {
-                ControlFlow::Break(JwsRejection::RsaSignatureMismatch { source })
+            SignatureCheck::Matches => ControlFlow::Continue(VerifiedJws { kid }),
+            SignatureCheck::Mismatch(source) => {
+                ControlFlow::Break(JwsRejection::SignatureMismatch { algorithm, source })
             }
         }
     }

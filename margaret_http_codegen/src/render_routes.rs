@@ -5,6 +5,7 @@ use quote::quote;
 
 use margaret_attributes::name_allocator::NameAllocator;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
+use margaret_route_method::route_method::RouteMethod;
 use margaret_route_parameter_codegen::url_segment::UrlSegment;
 
 use crate::http_route_table::HttpRouteTable;
@@ -35,7 +36,7 @@ fn placeholders<'route>(named: &NamedRoute<'route>) -> Vec<&'route str> {
 }
 
 fn is_get(named: &NamedRoute<'_>) -> bool {
-    named.route.method == "GET"
+    named.route.method == RouteMethod::Get
 }
 
 fn server_layouts<'server>(
@@ -133,6 +134,13 @@ fn route_constructor(named: &NamedRoute<'_>, origin: &TokenStream) -> TokenStrea
     }
 }
 
+fn paramless_init(named: &NamedRoute<'_>, origin: &TokenStream) -> TokenStream {
+    let field = route_field_ident(named);
+    let route_construction = route_constructor(named, origin);
+
+    quote! { #field: #route_construction, }
+}
+
 fn route_method(named: &NamedRoute<'_>, origin: &Ident) -> TokenStream {
     let method = route_field_ident(named);
     let return_type = route_type_tokens(named);
@@ -185,12 +193,19 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
     } else {
         format_ident!("_origin")
     };
-    let paramless_inits = paramless.iter().map(|named| {
-        let field = route_field_ident(named);
-        let route_construction = route_constructor(named, &quote! { #origin.clone() });
-
-        quote! { #field: #route_construction, }
-    });
+    let cloned_origin_count = if has_parameterized {
+        paramless.len()
+    } else {
+        paramless.len().saturating_sub(1)
+    };
+    let cloned_inits = paramless
+        .iter()
+        .take(cloned_origin_count)
+        .map(|named| paramless_init(named, &quote! { #origin.clone() }));
+    let moved_inits = paramless
+        .iter()
+        .skip(cloned_origin_count)
+        .map(|named| paramless_init(named, &quote! { #origin }));
     let origin_init = has_parameterized.then(|| quote! { #origin, });
     let methods = parameterized
         .iter()
@@ -205,7 +220,8 @@ fn server_struct(table: &HttpRouteTable, layout: &ServerLayout) -> TokenStream {
         impl #struct_ident {
             pub(crate) fn #constructor(#origin_param: ::std::sync::Arc<str>) -> Self {
                 Self {
-                    #(#paramless_inits)*
+                    #(#cloned_inits)*
+                    #(#moved_inits)*
                     #origin_init
                 }
             }

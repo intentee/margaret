@@ -26,6 +26,9 @@ fn rejects_a_signature_of_the_wrong_length() {
 
     assert!(matches!(
         key_set.verify(&jws),
-        JwsVerification::Rejected(JwsRejection::EcdsaSignatureMalformed { .. })
+        JwsVerification::Rejected(JwsRejection::SignatureLength {
+            expected: 64,
+            found: 3
+        })
     ));
 }

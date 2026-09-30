@@ -1,5 +1,6 @@
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::identity_session::access_token_claims::AccessTokenClaims;
+use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::macros::infer_from_request;
 use margaret::framework::macros::infers_authenticated_user;
@@ -18,7 +19,9 @@ impl AccessTokenHolderProvider {
     #[infer_from_request]
     pub fn infer_access_token_holder(
         &self,
-        #[bearer_token(issuer = auth)] token: Option<VerifiedJwt<AccessTokenClaims>>,
+        #[bearer_token(issuer = auth)] token: Option<
+            VerifiedJwt<AccessTokenClaims, AccessTokenProfile>,
+        >,
     ) -> anyhow::Result<AuthenticatedUserOutcome<AccessTokenHolder>> {
         Ok(match token {
             Some(verified) => AuthenticatedUserOutcome::Authenticated(AccessTokenHolder {

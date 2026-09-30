@@ -14,13 +14,13 @@ margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" 
 margaret_registered_claims = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+zeroize = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 base64ct = { workspace = true }
 jsonwebtoken = { workspace = true }
 p256 = { workspace = true }
-zeroize = { workspace = true }
 
 [[test]]
 name = "main"

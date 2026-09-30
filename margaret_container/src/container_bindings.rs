@@ -19,6 +19,7 @@ use crate::bootstrap_arguments_module::bootstrap_arguments_module;
 use crate::bootstrap_arguments_type::bootstrap_arguments_type;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
+use crate::dependency_kind::DependencyKind;
 use crate::framework_injection_role::FrameworkInjectionRole;
 use crate::injected_dependency::InjectedDependency;
 use crate::provider_binding::ProviderBinding;
@@ -40,6 +41,7 @@ struct SlottedServeInput {
 pub struct ContainerBindings {
     asynchronous_constructions: BTreeSet<String>,
     concrete_providers: BTreeMap<CanonicalPath, ProviderServeInputs>,
+    direct_dependencies: BTreeMap<CanonicalPath, BTreeSet<CanonicalPath>>,
     inputs: Arc<[ServeInput]>,
     providers: BTreeMap<CanonicalPath, ProviderBinding>,
     serve_input_naming: ServeInputNaming,
@@ -51,6 +53,7 @@ impl ContainerBindings {
         let mut providers = BTreeMap::new();
         let mut asynchronous_constructions = BTreeSet::new();
         let mut concrete_providers = BTreeMap::new();
+        let mut direct_dependencies = BTreeMap::new();
 
         for entry in plan.planned_entries() {
             if entry.is_async {
@@ -74,11 +77,22 @@ impl ContainerBindings {
                     slots: Arc::clone(&entry.serve_input_slots),
                 },
             );
+            direct_dependencies.insert(
+                entry.provider.concrete_path.clone(),
+                entry
+                    .provider
+                    .dependencies()
+                    .iter()
+                    .flat_map(DependencyKind::provider_keys)
+                    .cloned()
+                    .collect(),
+            );
         }
 
         Self {
             asynchronous_constructions,
             concrete_providers,
+            direct_dependencies,
             inputs: plan.inputs(),
             providers,
             serve_input_naming: plan.serve_input_naming(),
@@ -99,8 +113,61 @@ impl ContainerBindings {
     }
 
     #[must_use]
-    pub fn serve_input_naming(&self) -> ServeInputNaming {
-        self.serve_input_naming
+    pub fn construction_invocation(
+        &self,
+        field_name: &str,
+        arguments: &[ServeInputBinding],
+    ) -> TokenStream {
+        let function = format_ident!("construct_{field_name}");
+        let literal = bootstrap_arguments_literal(&bootstrap_arguments_path(&function), arguments);
+        let invocation = quote! { super::container::build::#function(#literal) };
+
+        if self.asynchronous_constructions.contains(field_name) {
+            quote! { #invocation.await }
+        } else {
+            invocation
+        }
+    }
+
+    #[must_use]
+    pub fn construction_is_async(&self, field_name: &str) -> bool {
+        self.asynchronous_constructions.contains(field_name)
+    }
+
+    #[must_use]
+    pub fn depends_directly_on(
+        &self,
+        concrete_path: &CanonicalPath,
+        provider_key: &CanonicalPath,
+    ) -> bool {
+        self.direct_dependencies
+            .get(concrete_path)
+            .is_some_and(|dependencies| dependencies.contains(provider_key))
+    }
+
+    /// # Errors
+    ///
+    /// Returns `ContainerError` propagated from the work it performs.
+    pub fn injected_serve_inputs(
+        &self,
+        dependency: &InjectedDependency,
+    ) -> Result<Vec<ServeInput>, ContainerError> {
+        Ok(self
+            .provider_serve_inputs(&dependency.concrete)?
+            .inputs
+            .to_vec())
+    }
+
+    #[must_use]
+    pub fn oauth_client(&self, client: &Tag) -> Option<InjectedDependency> {
+        self.provider_in_role(|role| {
+            matches!(role, FrameworkInjectionRole::OAuthClient(declared) if declared == client)
+        })
+    }
+
+    #[must_use]
+    pub fn provider(&self, provider_key: &CanonicalPath) -> Option<&ProviderBinding> {
+        self.providers.get(provider_key)
     }
 
     /// # Errors
@@ -115,6 +182,16 @@ impl ContainerBindings {
                 path: concrete_path.to_string(),
             }
         })
+    }
+
+    #[must_use]
+    pub fn provides(&self, provider_key: &CanonicalPath) -> bool {
+        self.providers.contains_key(provider_key)
+    }
+
+    #[must_use]
+    pub fn serve_input_naming(&self) -> ServeInputNaming {
+        self.serve_input_naming
     }
 
     /// # Errors
@@ -165,67 +242,6 @@ impl ContainerBindings {
         inputs.iter().map(|input| self.materialize(input)).collect()
     }
 
-    #[must_use]
-    pub fn construction_invocation(
-        &self,
-        field_name: &str,
-        arguments: &[ServeInputBinding],
-    ) -> TokenStream {
-        let function = format_ident!("construct_{field_name}");
-        let literal = bootstrap_arguments_literal(&bootstrap_arguments_path(&function), arguments);
-        let invocation = quote! { super::container::build::#function(#literal) };
-
-        if self.asynchronous_constructions.contains(field_name) {
-            quote! { #invocation.await }
-        } else {
-            invocation
-        }
-    }
-
-    #[must_use]
-    pub fn construction_is_async(&self, field_name: &str) -> bool {
-        self.asynchronous_constructions.contains(field_name)
-    }
-
-    /// # Errors
-    ///
-    /// Returns `ContainerError` propagated from the work it performs.
-    pub fn injected_serve_inputs(
-        &self,
-        dependency: &InjectedDependency,
-    ) -> Result<Vec<ServeInput>, ContainerError> {
-        Ok(self
-            .provider_serve_inputs(&dependency.concrete)?
-            .inputs
-            .to_vec())
-    }
-
-    #[must_use]
-    pub fn token_issuer_client(&self, issuer: &Tag) -> Option<InjectedDependency> {
-        self.providers
-            .iter()
-            .find(|(_, binding)| {
-                matches!(
-                    &binding.injection,
-                    FrameworkInjectionRole::TokenIssuerClient(client_issuer) if client_issuer == issuer
-                )
-            })
-            .map(|(provided, binding)| InjectedDependency {
-                concrete: provided.clone(),
-                field: binding.field_name.clone(),
-            })
-    }
-
-    #[must_use]
-    pub fn provider(&self, provider_key: &CanonicalPath) -> Option<&ProviderBinding> {
-        self.providers.get(provider_key)
-    }
-
-    #[must_use]
-    pub fn provides(&self, provider_key: &CanonicalPath) -> bool {
-        self.providers.contains_key(provider_key)
-    }
-
     /// # Errors
     ///
     /// Returns `ContainerError` propagated from the work it performs.
@@ -260,10 +276,30 @@ impl ContainerBindings {
         }
     }
 
+    #[must_use]
+    pub fn trusted_issuer(&self, issuer: &Tag) -> Option<InjectedDependency> {
+        self.provider_in_role(|role| {
+            matches!(role, FrameworkInjectionRole::TrustedIssuer(trusted) if trusted == issuer)
+        })
+    }
+
     fn materialize(&self, input: &ServeInput) -> Result<TokenStream, ContainerError> {
         let slot = self.serve_input_slot(&input.slot_key())?;
         let ident = self.serve_input_naming.ident(slot);
 
         Ok(owned_weave(&input.weaving(), &quote! { #ident }, false))
+    }
+
+    fn provider_in_role(
+        &self,
+        admits: impl Fn(&FrameworkInjectionRole) -> bool,
+    ) -> Option<InjectedDependency> {
+        self.providers
+            .iter()
+            .find(|(_, binding)| admits(&binding.injection))
+            .map(|(provided, binding)| InjectedDependency {
+                concrete: provided.clone(),
+                field: binding.field_name.clone(),
+            })
     }
 }

@@ -1018,14 +1018,14 @@ impl Bad {
             r#"
 use std::sync::Arc;
 
-use crate::IssuerClient;
+use crate::TrustedIssuer;
 
 #[websocket_session(path = "/x", server = "public")]
 struct Bad;
 
 impl Bad {
     #[build_for_session]
-    fn build(client: Arc<IssuerClient>) -> anyhow::Result<Self> {}
+    fn build(trusted_issuer: Arc<TrustedIssuer>) -> anyhow::Result<Self> {}
 }
 "#,
         )
@@ -1041,11 +1041,14 @@ impl Bad {
             &[FrameworkProvider {
                 construction: FrameworkConstruction::Unit,
                 enablement: FrameworkEnablement::Always,
-                injection: FrameworkInjectionRole::TokenIssuerClient(
+                injection: FrameworkInjectionRole::TrustedIssuer(
                     Tag::from_path(&syn::parse_str("auth").expect("the tag path parses"))
                         .expect("the tag is a plain name"),
                 ),
-                provided: CanonicalPath::new(vec!["crate".to_string(), "IssuerClient".to_string()]),
+                provided: CanonicalPath::new(vec![
+                    "crate".to_string(),
+                    "TrustedIssuer".to_string(),
+                ]),
             }],
         )
         .expect("the container renders")
@@ -1053,7 +1056,7 @@ impl Bad {
 
         assert!(
             render_websocket(&index, &bindings, &plans, &registries)
-                .expect_err("a token issuer client is not injectable by path")
+                .expect_err("a trusted issuer is not injectable by path")
                 .to_string()
                 .contains("which only the framework may inject")
         );
@@ -1431,7 +1434,7 @@ impl Room {
 "#
             )
             .to_string()
-            .contains("but a WebSocket upgrade handshake has no body")
+            .contains("which only an HTTP responder receives")
         );
     }
 
@@ -1508,8 +1511,8 @@ impl RespondsToWebSocketMessage for Poster {
         let source = generated(PARITY_SESSION);
 
         assert!(source.contains("require_bound_route_parameter::require_bound_route_parameter"));
-        assert!(source.contains("RequestInput::Query"));
-        assert!(source.contains("RequestInput::Cookie"));
+        assert!(source.contains(".inputs.query"));
+        assert!(source.contains(".inputs.cookies"));
         assert!(source.contains("require_peer_spiffe_id::require_peer_spiffe_id"));
         assert!(source.contains("::margaret::framework::asset_bag::asset_bag::AssetBag::new()"));
         assert!(source.contains("self.routes.as_ref()"));
@@ -1538,7 +1541,7 @@ impl Bad {
 "#
             )
             .to_string()
-            .contains("handshake has no body")
+            .contains("which only an HTTP responder receives")
         );
     }
 
@@ -1561,7 +1564,7 @@ impl Bad {
 "#
             )
             .to_string()
-            .contains("handshake has no body")
+            .contains("which only an HTTP responder receives")
         );
     }
 

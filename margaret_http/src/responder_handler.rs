@@ -6,6 +6,7 @@ use crate::handler::Handler;
 use crate::handler_error::HandlerError;
 use crate::handler_future::HandlerFuture;
 use crate::request::Request;
+use crate::request_body::RequestBody;
 use crate::response_continuation::ResponseContinuation;
 
 struct FnHandler<Responder, Extract> {
@@ -17,13 +18,17 @@ struct FnHandler<Responder, Extract> {
 impl<Responder, Extract> Handler for FnHandler<Responder, Extract>
 where
     Responder: Send + Sync + 'static,
-    Extract: for<'request> Fn(Arc<Responder>, &'request Request) -> HandlerFuture<'request>
+    Extract: for<'request> Fn(Arc<Responder>, &'request Request, RequestBody) -> HandlerFuture<'request>
         + Send
         + Sync
         + 'static,
 {
-    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
-        (self.extract)(self.responder.clone(), request).await
+    async fn handle(
+        &self,
+        request: &Request,
+        body: RequestBody,
+    ) -> Result<ResponseContinuation, HandlerError> {
+        (self.extract)(self.responder.clone(), request, body).await
     }
 }
 
@@ -33,81 +38,10 @@ pub fn responder_handler<Responder, Extract>(
 ) -> Arc<dyn Handler>
 where
     Responder: Send + Sync + 'static,
-    Extract: for<'request> Fn(Arc<Responder>, &'request Request) -> HandlerFuture<'request>
+    Extract: for<'request> Fn(Arc<Responder>, &'request Request, RequestBody) -> HandlerFuture<'request>
         + Send
         + Sync
         + 'static,
 {
     Arc::new(FnHandler { extract, responder })
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-    use std::future::Future;
-    use std::pin::Pin;
-    use std::sync::Arc;
-
-    use http::Method;
-    use http_body_util::BodyExt;
-
-    use super::responder_handler;
-    use crate::forward_targets::ForwardTargets;
-    use crate::handler_error::HandlerError;
-    use crate::request::Request;
-    use crate::respond_recursively::respond_recursively;
-    use crate::response::Response;
-    use crate::response_continuation::ResponseContinuation;
-
-    struct Echo {
-        prefix: String,
-    }
-
-    impl Echo {
-        fn respond(&self, id: &str) -> Response {
-            Response::text(200, format!("{}{id}", self.prefix))
-        }
-    }
-
-    #[tokio::test]
-    async fn injects_request_values_into_the_responder() {
-        let handler = responder_handler(
-            Arc::new(Echo {
-                prefix: "echo-".to_string(),
-            }),
-            |responder: Arc<Echo>,
-             request: &Request|
-             -> Pin<
-                Box<dyn Future<Output = Result<ResponseContinuation, HandlerError>> + Send + '_>,
-            > {
-                Box::pin(async move {
-                    Ok(ResponseContinuation::from(
-                        responder.respond(
-                            request
-                                .path_param("id")
-                                .expect("the test request carries the id parameter"),
-                        ),
-                    ))
-                })
-            },
-        );
-        let request = Request::new(Method::GET, "/echo/7".to_string())
-            .with_path_params(HashMap::from([("id".to_string(), "7".to_string())]));
-        let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
-
-        let response = respond_recursively(&forward_targets, request, handler)
-            .await
-            .into_http();
-
-        assert_eq!(response.status().as_u16(), 200);
-        assert_eq!(
-            response
-                .into_body()
-                .collect()
-                .await
-                .expect("the response body collects")
-                .to_bytes(),
-            "echo-7"
-        );
-    }
 }

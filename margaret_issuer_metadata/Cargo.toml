@@ -1,0 +1,25 @@
+[package]
+name = "margaret_issuer_metadata"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Holds the discovered metadata of a token issuer, for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+autotests = false
+
+[dependencies]
+margaret_oidc_discovery = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+
+[dev-dependencies]
+margaret_registered_claims = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

@@ -8,6 +8,7 @@ autotests = false
 [dependencies]
 margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 
 [dev-dependencies]
 anyhow = { workspace = true }

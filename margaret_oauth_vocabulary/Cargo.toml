@@ -1,0 +1,27 @@
+[package]
+name = "margaret_oauth_vocabulary"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Client identifiers, client secrets and scopes of OAuth 2.0 for the Margaret application framework."
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+autotests = false
+
+[dependencies]
+margaret_registered_claims = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

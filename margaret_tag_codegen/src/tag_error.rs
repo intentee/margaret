@@ -53,4 +53,25 @@ pub enum TagError {
 
     #[error("{site} must be `issuer = <tag>`")]
     MalformedBearerToken { site: String },
+
+    #[error("{site} must be `client = <tag>`")]
+    MalformedIntrospectedBearerToken { site: String },
+
+    #[error("the oauth client '{concrete}' must name its issuer as `issuer = <tag>`")]
+    MalformedOAuthClientIssuer { concrete: String },
+
+    #[error("{site} names the issuer '{issuer}', which publishes no discovery document")]
+    OAuthClientIssuerNotDiscovered { issuer: String, site: String },
+
+    #[error("the subject token exchanger '{concrete}' must name its issuer as `issuer = <tag>`")]
+    MalformedSubjectTokenExchangerIssuer { concrete: String },
+
+    #[error(
+        "the issuer '{issuer}' has more than one subject token exchanger: '{first}' and '{second}'"
+    )]
+    DuplicateSubjectTokenExchanger {
+        issuer: String,
+        first: String,
+        second: String,
+    },
 }

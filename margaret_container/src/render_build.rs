@@ -20,12 +20,14 @@ use crate::constructed_type::constructed_type;
 use crate::construction_error_path::construction_error_path;
 use crate::construction_errors_doc::construction_errors_doc;
 use crate::construction_flow::construction_flow;
+use crate::constructor_outcome::ConstructorOutcome;
 use crate::container_field_ident::container_field_ident;
 use crate::container_plan::ContainerPlan;
 use crate::direct_construction::DirectConstruction;
 use crate::field_ident::field_ident;
 use crate::field_type::field_type;
 use crate::planned_dependency::PlannedDependency;
+use crate::planned_field::PlannedField;
 use crate::planned_provider::PlannedProvider;
 use crate::reverse_serve_input_weaver::ReverseServeInputWeaver;
 use crate::root_serve_inputs::RootServeInputs;
@@ -44,27 +46,59 @@ enum ArcClone {
     Typed,
 }
 
+fn field_expression(
+    PlannedField {
+        field_name,
+        provided,
+    }: &PlannedField,
+    arc_clone: ArcClone,
+) -> TokenStream {
+    let dependency = format_ident!("{field_name}");
+
+    match arc_clone {
+        ArcClone::Inferred => quote! { ::std::sync::Arc::clone(&#dependency) },
+        ArcClone::Typed => {
+            let value_type = constructed_type(provided);
+
+            quote! { ::std::sync::Arc::<#value_type>::clone(&#dependency) }
+        }
+    }
+}
+
 fn dependency_expression(
     dependency: &PlannedDependency,
     weaver: &mut ReverseServeInputWeaver,
     arc_clone: ArcClone,
 ) -> TokenStream {
     match dependency {
-        PlannedDependency::ServeInput { input, slot } => weaver.weave(input, *slot),
-        PlannedDependency::Single {
+        PlannedDependency::Borrowed(PlannedField {
             field_name,
             provided,
-        } => {
+        }) => {
             let dependency = format_ident!("{field_name}");
+            let value_type = constructed_type(provided);
 
-            match arc_clone {
-                ArcClone::Inferred => quote! { ::std::sync::Arc::clone(&#dependency) },
-                ArcClone::Typed => {
-                    let value_type = constructed_type(provided);
+            quote! { ::std::sync::Arc::<#value_type>::as_ref(&#dependency) }
+        }
+        PlannedDependency::Collection(fields) => {
+            let elements = fields
+                .iter()
+                .map(|field| field_expression(field, arc_clone));
 
-                    quote! { ::std::sync::Arc::<#value_type>::clone(&#dependency) }
-                }
-            }
+            quote! { ::std::vec::Vec::from([#(#elements),*]) }
+        }
+        PlannedDependency::Constant(path) => path_tokens(path),
+        PlannedDependency::ServeInput { input, slot } => weaver.weave(input, *slot),
+        PlannedDependency::Single(field) => field_expression(field, arc_clone),
+        PlannedDependency::ViewCollection { fields, view } => {
+            let view = path_tokens(view);
+            let elements = fields.iter().map(|field| {
+                let element = field_expression(field, ArcClone::Typed);
+
+                quote! { #element as ::std::sync::Arc<dyn #view> }
+            });
+
+            quote! { ::std::vec::Vec::from([#(#elements),*]) }
         }
     }
 }
@@ -107,15 +141,32 @@ fn direct_value(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver)
         }
         DirectConstruction::Fieldless { shape } => fieldless_literal(&concrete, *shape),
         DirectConstruction::FrameworkConstructor {
-            is_async, method, ..
+            is_async,
+            method,
+            outcome,
+            ..
         } => {
             let constructor = format_ident!("{method}");
             let arguments = dependency_expressions(dependencies, weaver, ArcClone::Typed);
-
-            if *is_async {
+            let call = if *is_async {
                 quote! { #concrete::#constructor(#(#arguments),*).await }
             } else {
                 quote! { #concrete::#constructor(#(#arguments),*) }
+            };
+
+            match outcome {
+                ConstructorOutcome::Fallible => {
+                    let construct_singleton = construct_singleton_path();
+                    let singleton = provider.concrete_path.to_string();
+
+                    quote! {
+                        #construct_singleton(
+                            #singleton,
+                            #call.map_err(margaret::framework::anyhow::Error::from),
+                        )?
+                    }
+                }
+                ConstructorOutcome::Infallible => call,
             }
         }
         DirectConstruction::FrameworkUnit => quote! { #concrete },
@@ -146,9 +197,16 @@ fn statement(planned: &PlannedProvider, weaver: &mut ReverseServeInputWeaver) ->
     let constructed = match &provider.construction {
         DirectConstruction::Constructor { .. }
         | DirectConstruction::FrameworkAccessor { .. }
+        | DirectConstruction::FrameworkConstructor {
+            outcome: ConstructorOutcome::Fallible,
+            ..
+        }
         | DirectConstruction::Resolved { .. } => value,
         DirectConstruction::Fieldless { .. }
-        | DirectConstruction::FrameworkConstructor { .. }
+        | DirectConstruction::FrameworkConstructor {
+            outcome: ConstructorOutcome::Infallible,
+            ..
+        }
         | DirectConstruction::FrameworkUnit => quote! { ::std::sync::Arc::new(#value) },
     };
 

@@ -1,9 +1,8 @@
 use aws_lc_rs::error::Unspecified;
-use p256::ecdsa;
 
+#[derive(Debug, PartialEq)]
 pub(crate) enum SignatureCheck {
-    EcdsaMalformed(ecdsa::Error),
-    EcdsaMismatch(ecdsa::Error),
+    LengthMismatch { expected: usize, found: usize },
     Matches,
-    RsaMismatch(Unspecified),
+    Mismatch(Unspecified),
 }

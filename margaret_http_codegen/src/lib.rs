@@ -12,7 +12,10 @@ mod render;
 mod render_forwarders;
 pub mod render_http;
 mod render_routes;
+mod route_content;
 mod route_group;
+pub mod route_location;
+mod route_method_tokens;
 mod server_route_group;
 mod server_serve_inputs;
 pub mod server_transport_policy;
@@ -1018,6 +1021,27 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
     }
 
     #[test]
+    fn moves_the_origin_into_the_last_route_of_a_server_without_parameterized_routes() {
+        let source = routes_source_for(
+            r#"
+#[singleton]
+#[responds_to_http(method = "get", name = "get_login", path = "/login", server = "identity")]
+struct GetLogin;
+impl GetLogin { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
+
+#[singleton]
+#[responds_to_http(method = "post", name = "post_consent", path = "/consent", server = "identity")]
+struct PostConsent;
+impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
+"#,
+        );
+
+        assert!(source.contains(
+            "implIdentity{pub(crate)fnnew(origin:::std::sync::Arc<str>)->Self{Self{get_login:margaret::framework::http::forwardable_route::ForwardableRoute::new(origin.clone(),::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/login\"),]),),post_consent:margaret::framework::http::route_reference::RouteReference::new(origin,::std::vec::Vec::from([margaret::framework::http::url_segment::UrlSegment::Literal(\"/consent\",),]),),}}}"
+        ));
+    }
+
+    #[test]
     fn constructs_the_routes_from_origins_in_alphabetical_server_order() {
         let source = routes_source_for(ROUTES_FIXTURE);
 
@@ -1159,8 +1183,12 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 #[responds_to_http(method = \"delete\", path = \"/articles/{article}\", server = \"public\")]\nstruct Remove;\nimpl Remove {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(source.contains("\"GET\""));
-        assert!(source.contains("\"DELETE\""));
+        assert!(
+            source.contains("margaret::framework::route_method::route_method::RouteMethod::Get")
+        );
+        assert!(
+            source.contains("margaret::framework::route_method::route_method::RouteMethod::Delete")
+        );
     }
 
     #[test]
@@ -1181,12 +1209,14 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 
         assert!(source.contains("pub(crate)fnserver"));
         assert!(source.contains("container:&super::super::container::Container"));
-        assert!(source.contains("\"GET\""));
+        assert!(
+            source.contains("margaret::framework::route_method::route_method::RouteMethod::Get")
+        );
         assert!(source.contains(
             "margaret::framework::http::responder_handler::responder_handler(container.open()"
         ));
         assert!(source.contains(
-            "|responder:std::sync::Arc<crate::Open>,_request:&margaret::framework::http::request::Request"
+            "|responder:std::sync::Arc<crate::Open>,_request:&margaret::framework::http::request::Request,_body:margaret::framework::http::request_body::RequestBody,|"
         ));
         assert!(source.contains("responder.respond()"));
         assert!(source.contains(
@@ -1228,8 +1258,10 @@ impl GetHealth { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
         assert!(source.contains(
             r#"letid=matchmargaret::framework::http::require_route_parameter::require_route_parameter(request,"id""#
         ));
-        assert!(source.contains("Ok(value)=>value"));
-        assert!(source.contains("::std::result::Result::Ok(response.into())"));
+        assert!(source.contains("margaret::framework::http::requirement::Requirement::Met(value"));
+        assert!(
+            source.contains("margaret::framework::http::requirement::Requirement::Unmet(response")
+        );
         assert!(source.contains("responder.respond(id)"));
     }
 
@@ -1560,13 +1592,16 @@ impl GetProject {
     }
 
     #[test]
-    fn rejects_a_malformed_method() {
-        let message = error_for(
+    fn rejects_a_method_outside_the_routable_methods() {
+        let error = rejection_for(
             "#[singleton]
-#[responds_to_http(method = \"in valid\", path = \"/x\", server = \"public\")]\nstruct Bad;\n",
+#[responds_to_http(method = \"options\", path = \"/x\", server = \"public\")]\nstruct Bad;\n",
         );
 
-        assert!(message.contains("invalid HTTP method"));
+        assert!(matches!(
+            error,
+            HttpCodegenError::UnsupportedHttpMethod { ref method, .. } if method == "options"
+        ));
     }
 
     #[test]
@@ -1577,7 +1612,7 @@ impl GetProject {
         );
 
         assert!(source.contains(
-            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"QUERY\","
+            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(margaret::framework::route_method::route_method::RouteMethod::Query,"
         ));
     }
 
@@ -1682,7 +1717,7 @@ impl GetProject {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(\"GET\","));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(margaret::framework::route_method::route_method::RouteMethod::Get,"));
     }
 
     const NAMED_ROUTE: &str = r#"
@@ -1707,7 +1742,7 @@ impl GetGreeting {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::named(\"GET\",\"get_greeting\","));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/greeting\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::forwardable(\"get_greeting\","));
     }
 
     #[test]
@@ -1884,16 +1919,15 @@ impl GetMetrics {
     fn injects_a_form_request_from_the_form_source() {
         let source = source_for(
             "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+#[responds_to_http(max_body_bytes = 1024, method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(source.contains(
-            "margaret::framework::http_validation::validate_input::validate_input(request,"
+            "letcontent=matchmargaret::framework::http::read_form_fields::read_form_fields(request,body,margaret::framework::http::body_limit::BodyLimit::new(1_024),).await"
         ));
         assert!(
-            source.contains(
-                "margaret::framework::http_validation::request_input::RequestInput::Form"
-            )
+            source
+                .contains("letdata=margaret::framework::validation::validate::validate(&content);")
         );
         assert!(source.contains("responder.respond(data)"));
     }
@@ -1905,25 +1939,24 @@ impl GetMetrics {
 #[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Query)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(
-            source.contains(
-                "margaret::framework::http_validation::request_input::RequestInput::Query"
-            )
-        );
+        assert!(source.contains(
+            "letdata=margaret::framework::validation::validate::validate(&request.inputs.query,);"
+        ));
     }
 
     #[test]
     fn injects_a_form_request_from_the_json_source() {
         let source = source_for(
             "use margaret::framework::http_validation::request_input::RequestInput;\n\nuse margaret::framework::validation::validation_result::ValidationResult;\n\n#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Json)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
+#[responds_to_http(max_body_bytes = 2048, method = \"post\", path = \"/data\", server = \"public\")]\nstruct ImportData;\nimpl ImportData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Json)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(
-            source.contains(
-                "margaret::framework::http_validation::request_input::RequestInput::Json"
-            )
-        );
+        assert!(source.contains(
+            "letcontent=matchmargaret::framework::http::read_json_value::read_json_value(request,body,margaret::framework::http::body_limit::BodyLimit::new(2_048),).await"
+        ));
+        assert!(source.contains(
+            "letdata=margaret::framework::validation::validate_json::validate_json(&content,);"
+        ));
     }
 
     #[test]
@@ -1933,11 +1966,9 @@ impl GetMetrics {
 #[responds_to_http(method = \"get\", path = \"/data\", server = \"public\")]\nstruct GetData;\nimpl GetData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Cookie)] data: ValidationResult<Data>) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(
-            source.contains(
-                "margaret::framework::http_validation::request_input::RequestInput::Cookie"
-            )
-        );
+        assert!(source.contains(
+            "letdata=margaret::framework::validation::validate::validate(&request.inputs.cookies,);"
+        ));
     }
 
     #[test]
@@ -2005,19 +2036,14 @@ impl GetMetrics {
     fn injects_a_guarded_form_request_as_a_bare_model() {
         let source = source_for(
             "use margaret::framework::http_validation::request_input::RequestInput;\n\n#[singleton]
-#[responds_to_http(method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<Response> {}\n}\n",
+#[responds_to_http(max_body_bytes = 1024, method = \"post\", path = \"/data\", server = \"public\")]\nstruct PostData;\nimpl PostData {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] data: Data) -> anyhow::Result<Response> {}\n}\n",
         );
 
         assert!(source.contains(
-            "margaret::framework::http_validation::require_input::require_input(request,"
+            "letdata=matchmargaret::framework::http_validation::require_input::require_input(margaret::framework::validation::validate::validate(&content),)"
         ));
-        assert!(
-            source.contains(
-                "margaret::framework::http_validation::request_input::RequestInput::Form"
-            )
-        );
-        assert!(source.contains("Ok(model)=>model"));
-        assert!(source.contains("::std::result::Result::Ok(response.into())"));
+        assert!(source.contains("margaret::framework::http::requirement::Requirement::Met(model)"));
+        assert!(source.contains("=>return::std::result::Result::Ok(response)"));
         assert!(source.contains("responder.respond(data)"));
     }
 
@@ -2276,5 +2302,175 @@ impl Configured {
 
         assert!(source.contains("container.configured()"));
         assert!(!source.contains("serve_input_"));
+    }
+    const UPLOADED_FILES_IMPORT: &str =
+        "use margaret::framework::http_uploaded_file::uploaded_files::UploadedFiles;\n";
+
+    const REQUEST_BODY_STREAM_IMPORT: &str =
+        "use margaret::framework::http::request_body_stream::RequestBodyStream;\n";
+
+    #[test]
+    fn reads_uploaded_files_after_the_head_bindings() {
+        let source = source_for(&format!(
+            "{UPLOADED_FILES_IMPORT}#[singleton]
+#[responds_to_http(max_body_bytes = 4096, method = \"post\", path = \"/files/{{name}}\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles, #[route_parameter(from = \"name\")] name: String) -> anyhow::Result<Response> {{}}\n}}\n"
+        ));
+        let read = source
+            .find("letfiles=matchmargaret::framework::http::read_uploaded_files::read_uploaded_files(request,body,margaret::framework::http::body_limit::BodyLimit::new(4_096),)")
+            .expect("the uploaded files are read");
+        let route_parameter = source
+            .find("letname=matchmargaret::framework::http::require_route_parameter::require_route_parameter(")
+            .expect("the route parameter is required");
+
+        assert!(route_parameter < read);
+        assert!(source.contains("responder.respond(files,name)"));
+    }
+
+    #[test]
+    fn reads_form_fields_and_uploaded_files_from_one_multipart_body() {
+        let source = source_for(&format!(
+            "use margaret::framework::http_validation::request_input::RequestInput;\n{UPLOADED_FILES_IMPORT}#[singleton]
+#[responds_to_http(max_body_bytes = 4096, method = \"post\", path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] form: Data, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
+        ));
+
+        assert!(source.contains(
+            "letmargaret::framework::http::multipart_content::MultipartContent{fields:content,files:files,}=matchmargaret::framework::http::read_multipart::read_multipart(request,body,margaret::framework::http::body_limit::BodyLimit::new(4_096),)"
+        ));
+        assert!(source.contains(
+            "margaret::framework::http_validation::require_input::require_input(margaret::framework::validation::validate::validate(&content),)"
+        ));
+    }
+
+    #[test]
+    fn opens_a_raw_body_stream() {
+        let source = source_for(&format!(
+            "{REQUEST_BODY_STREAM_IMPORT}#[singleton]
+#[responds_to_http(max_body_bytes = 1073741824, method = \"put\", path = \"/artifacts\", server = \"public\")]\nstruct Store;\nimpl Store {{\n    #[process]\n    async fn respond(&self, stream: RequestBodyStream) -> anyhow::Result<Response> {{}}\n}}\n"
+        ));
+
+        assert!(source.contains(
+            "letstream=matchmargaret::framework::http::request_body_stream::RequestBodyStream::open(body,margaret::framework::http::body_limit::BodyLimit::new(1_073_741_824),)"
+        ));
+    }
+
+    #[test]
+    fn registers_a_named_post_route_as_not_forwardable() {
+        let source = source_for(
+            "use margaret::framework::http_validation::request_input::RequestInput;\n#[singleton]
+#[responds_to_http(max_body_bytes = 64, method = \"post\", name = \"post_note\", path = \"/notes\", server = \"public\")]\nstruct PostNote;\nimpl PostNote {\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Form)] note: Data) -> anyhow::Result<Response> {}\n}\n",
+        );
+
+        assert!(source.contains(
+            "margaret::framework::http::method_handler::MethodHandler::anonymous(margaret::framework::route_method::route_method::RouteMethod::Post,"
+        ));
+        assert!(!source.contains("forwardable"));
+    }
+
+    #[test]
+    fn rejects_a_get_route_that_reads_the_request_body() {
+        let rejection = rejection_for(&format!(
+                "{UPLOADED_FILES_IMPORT}#[singleton]
+#[responds_to_http(max_body_bytes = 64, method = \"get\", path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
+            ));
+
+        assert!(matches!(
+            rejection,
+            HttpCodegenError::ContentOnGetRoute { ref responder } if responder == "crate::Upload"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_route_that_reads_the_request_body_without_a_limit() {
+        let rejection = rejection_for(&format!(
+                "{UPLOADED_FILES_IMPORT}#[singleton]
+#[responds_to_http(method = \"post\", path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
+            ));
+
+        assert!(matches!(
+            rejection,
+            HttpCodegenError::MissingBodyLimit { ref responder } if responder == "crate::Upload"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_body_limit_on_a_route_that_reads_no_body() {
+        let rejection = rejection_for(
+                "#[singleton]
+#[responds_to_http(max_body_bytes = 64, method = \"post\", path = \"/ping\", server = \"public\")]\nstruct Ping;\nimpl Ping {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n"
+            );
+
+        assert!(matches!(
+            rejection,
+            HttpCodegenError::UnusedBodyLimit { ref responder } if responder == "crate::Ping"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_zero_body_limit() {
+        let rejection = rejection_for(&format!(
+                "{UPLOADED_FILES_IMPORT}#[singleton]
+        #[responds_to_http(max_body_bytes = 0, method = \"post\", path = \"/files\", server = \"public\")]\nstruct Upload;\nimpl Upload {{\n    #[process]\n    fn respond(&self, files: UploadedFiles) -> anyhow::Result<Response> {{}}\n}}\n"
+            ));
+
+        assert!(matches!(
+            rejection,
+            HttpCodegenError::AttributeArguments {
+                source: AttributeArgumentsError::MalformedUnsignedInteger { ref key, .. }
+            } if key == "max_body_bytes"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_route_that_reads_its_body_in_two_ways() {
+        let rejection = rejection_for(&format!(
+                "use margaret::framework::http_validation::request_input::RequestInput;\n{REQUEST_BODY_STREAM_IMPORT}#[singleton]
+#[responds_to_http(max_body_bytes = 64, method = \"post\", path = \"/notes\", server = \"public\")]\nstruct PostNote;\nimpl PostNote {{\n    #[process]\n    fn respond(&self, #[form_request(from = RequestInput::Json)] note: Data, stream: RequestBodyStream) -> anyhow::Result<Response> {{}}\n}}\n"
+            ));
+
+        assert!(matches!(
+            rejection,
+            HttpCodegenError::Binding {
+                source: RequestBindingError::ConflictingContentBindings { ref subject }
+            } if subject == "responder 'crate::PostNote'"
+        ));
+    }
+    #[test]
+    fn authenticates_the_user_before_reading_the_uploaded_files() {
+        let source: String = source_for(
+            r#"
+use margaret::framework::http_uploaded_file::uploaded_files::UploadedFiles;
+use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
+
+struct User;
+
+#[singleton]
+#[infers_authenticated_user(user_model = User)]
+struct SessionUserProvider;
+
+impl SessionUserProvider {
+    #[infer_from_request]
+    fn infer(&self) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}
+}
+
+#[singleton]
+#[responds_to_http(max_body_bytes = 4096, method = "post", path = "/uploads", server = "public")]
+struct Upload;
+
+impl Upload {
+    #[process]
+    fn respond(&self, files: UploadedFiles, #[authenticated_user] user: User) -> anyhow::Result<Response> {}
+}
+"#,
+        )
+        .split_whitespace()
+        .collect();
+        let authentication = source
+            .find("InfersAuthenticatedUser::infer(")
+            .expect("the user is authenticated");
+        let reading = source
+            .find("read_uploaded_files::read_uploaded_files(")
+            .expect("the uploaded files are read");
+
+        assert!(authentication < reading);
     }
 }

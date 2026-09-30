@@ -54,6 +54,7 @@ mod tests {
     use crate::margaret::routes::Routes;
     use crate::margaret::views::Views;
     use crate::views::card_layout::CardLayout;
+    use crate::views::consent_view::ConsentView;
     use crate::views::farewell_view::FarewellView;
     use crate::views::greeting_view::GreetingView;
 
@@ -62,6 +63,9 @@ mod tests {
         let card_layout = Arc::new(CardLayout);
         let views = Views {
             card_layout: card_layout.clone(),
+            consent_view: Arc::new(
+                ConsentView::create(card_layout.clone()).expect("the consent view is constructed"),
+            ),
             farewell_view: Arc::new(
                 FarewellView::create(card_layout.clone())
                     .expect("the farewell view is constructed"),
@@ -70,7 +74,11 @@ mod tests {
                 GreetingView::create(card_layout).expect("the greeting view is constructed"),
             ),
         };
-        let routes = Routes::from_origins(Arc::from("http://internal"), Arc::from("http://public"));
+        let routes = Routes::from_origins(
+            Arc::from("http://identity"),
+            Arc::from("http://internal"),
+            Arc::from("http://public"),
+        );
         let app_name = AppName::create().expect("the app name is constructed");
         let greeter =
             EnglishGreeter::create(Arc::new(app_name)).expect("the English greeter is constructed");

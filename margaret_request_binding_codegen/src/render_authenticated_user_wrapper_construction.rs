@@ -6,8 +6,6 @@ use quote::quote;
 use margaret_container::container_bindings::ContainerBindings;
 
 use crate::authenticated_user_application::AuthenticatedUserApplication;
-use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
-use crate::bearer_token_verifier_field::BEARER_TOKEN_VERIFIER_FIELD;
 
 #[must_use]
 pub fn render_authenticated_user_wrapper_construction(
@@ -26,15 +24,12 @@ pub fn render_authenticated_user_wrapper_construction(
     let inner = bindings.accessor_invocation(container, field);
     let routes_init = injects_routes.then(|| quote! { routes: routes.clone(), });
     let views_init = injects_views.then(|| quote! { views: views.clone(), });
-    let verifier_init = match challenge {
-        AuthenticatedUserChallenge::Bearer { issuer_client } => {
-            let verifier_field = format_ident!("{BEARER_TOKEN_VERIFIER_FIELD}");
-            let client = bindings.accessor_invocation(container, &issuer_client.field);
+    let challenge_init = challenge.dependencies().into_iter().map(|dependency| {
+        let field = format_ident!("{}", dependency.field);
+        let access = bindings.accessor_invocation(container, &dependency.field);
 
-            quote! { #verifier_field: #client.verifier(), }
-        }
-        AuthenticatedUserChallenge::Unchallenged => TokenStream::new(),
-    };
+        quote! { #field: #access, }
+    });
 
     quote! {
         ::std::sync::Arc::new(
@@ -42,7 +37,7 @@ pub fn render_authenticated_user_wrapper_construction(
                 inner: #inner,
                 #routes_init
                 #views_init
-                #verifier_init
+                #(#challenge_init)*
             },
         )
     }
@@ -133,19 +128,25 @@ mod tests {
     }
 
     #[test]
-    fn hands_the_wrapper_the_verifier_of_the_token_issuer_its_provider_reads() {
+    fn hands_the_wrapper_every_trusted_issuer_its_provider_admits_tokens_of() {
         assert_eq!(
             construction(&application(
                 AuthenticatedUserChallenge::Bearer {
-                    issuer_client: InjectedDependency {
-                        concrete: path("Client"),
-                        field: "partner_client".to_string(),
-                    },
+                    trusted_issuers: vec![
+                        InjectedDependency {
+                            concrete: path("Partner"),
+                            field: "partner_trusted_issuer".to_string(),
+                        },
+                        InjectedDependency {
+                            concrete: path("Upstream"),
+                            field: "upstream_trusted_issuer".to_string(),
+                        },
+                    ],
                 },
                 false,
                 false,
             )),
-            "::std::sync::Arc::new(super::authenticated_users::Provider{inner:container.provider(),bearer_token_verifier:container.partner_client().verifier(),},)"
+            "::std::sync::Arc::new(super::authenticated_users::Provider{inner:container.provider(),partner_trusted_issuer:container.partner_trusted_issuer(),upstream_trusted_issuer:container.upstream_trusted_issuer(),},)"
         );
     }
 }

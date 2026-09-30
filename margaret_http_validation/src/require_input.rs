@@ -1,26 +1,18 @@
-use serde::de::DeserializeOwned;
-use validator::Validate;
-
-use margaret_http::request::Request;
+use margaret_http::requirement::Requirement;
 use margaret_http::response::Response;
+use margaret_http::response_continuation::ResponseContinuation;
 use margaret_validation::validation_result::ValidationResult;
 
-use crate::request_input::RequestInput;
-use crate::validate_input::validate_input;
-
-/// # Errors
-///
-/// Returns `Response` propagated from the work it performs.
-pub fn require_input<Model>(request: &Request, source: RequestInput) -> Result<Model, Response>
-where
-    Model: DeserializeOwned + Validate,
-{
-    match validate_input(request, source) {
-        ValidationResult::Valid(model) => Ok(model),
-        ValidationResult::Invalid(errors) => Err(Response::text(422, errors.to_string())),
-        ValidationResult::Malformed(malformation) => {
-            Err(Response::text(400, malformation.to_string()))
-        }
+#[must_use]
+pub fn require_input<Model>(validation: ValidationResult<Model>) -> Requirement<Model> {
+    match validation {
+        ValidationResult::Valid(model) => Requirement::Met(model),
+        ValidationResult::Invalid(errors) => Requirement::Unmet(ResponseContinuation::from(
+            Response::text(422, errors.to_string()),
+        )),
+        ValidationResult::Malformed(malformation) => Requirement::Unmet(
+            ResponseContinuation::from(Response::text(400, malformation.to_string())),
+        ),
     }
 }
 
@@ -28,14 +20,14 @@ where
 mod tests {
     use std::collections::HashMap;
 
-    use http::Method;
     use serde::Deserialize;
     use validator::Validate;
 
-    use margaret_http::request::Request;
+    use margaret_http::requirement::Requirement;
+    use margaret_http::response_continuation::ResponseContinuation;
+    use margaret_validation::validate::validate;
 
     use super::require_input;
-    use crate::request_input::RequestInput;
 
     #[derive(Deserialize, Validate)]
     struct Sample {
@@ -43,45 +35,37 @@ mod tests {
         value: String,
     }
 
-    fn request_with_form(form: HashMap<String, String>) -> Request {
-        let mut request = Request::new(Method::POST, "/".to_string());
-        request.inputs.form = form;
-        request
+    fn requirement(form: &[(&str, &str)]) -> Requirement<Sample> {
+        require_input(validate(
+            &form
+                .iter()
+                .map(|(name, value)| ((*name).to_string(), (*value).to_string()))
+                .collect::<HashMap<_, _>>(),
+        ))
+    }
+
+    fn is_unmet_with_status(requirement: Requirement<Sample>, status: u16) -> bool {
+        matches!(
+            requirement,
+            Requirement::Unmet(ResponseContinuation::Done(response)) if response.status() == status
+        )
     }
 
     #[test]
-    fn returns_the_model_when_valid() {
-        let request = request_with_form(HashMap::from([("value".to_string(), "ok".to_string())]));
-
-        assert_eq!(
-            require_input::<Sample>(&request, RequestInput::Form)
-                .ok()
-                .map(|model| model.value),
-            Some("ok".to_string())
-        );
+    fn meets_the_requirement_with_a_valid_model() {
+        assert!(matches!(
+            requirement(&[("value", "ok")]),
+            Requirement::Met(model) if model.value == "ok"
+        ));
     }
 
     #[test]
-    fn responds_with_422_when_invalid() {
-        let request = request_with_form(HashMap::from([("value".to_string(), String::new())]));
-
-        assert_eq!(
-            require_input::<Sample>(&request, RequestInput::Form)
-                .err()
-                .map(|response| response.status()),
-            Some(422)
-        );
+    fn answers_an_invalid_model_with_unprocessable_content() {
+        assert!(is_unmet_with_status(requirement(&[("value", "")]), 422));
     }
 
     #[test]
-    fn responds_with_400_when_malformed() {
-        let request = request_with_form(HashMap::new());
-
-        assert_eq!(
-            require_input::<Sample>(&request, RequestInput::Form)
-                .err()
-                .map(|response| response.status()),
-            Some(400)
-        );
+    fn answers_a_malformed_model_with_bad_request() {
+        assert!(is_unmet_with_status(requirement(&[]), 400));
     }
 }
