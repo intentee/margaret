@@ -9,6 +9,7 @@ use margaret_issuer_directory_tests::localhost_trust::localhost_trust;
 use margaret_issuer_directory_tests::running_fixture_issuer::RunningFixtureIssuer;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_metadata::metadata_holding::MetadataHolding;
+use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
@@ -29,7 +30,9 @@ async fn holds_the_discovered_metadata_of_an_oidc_issuer() {
     let metadata = Arc::new(IssuerMetadata::awaiting());
     let trusted_issuer = Arc::new(TrustedIssuer::for_oidc_issuer(
         Arc::clone(&metadata),
-        Arc::new(localhost_trust()),
+        Arc::new(TokenTrustDeclaration {
+            trust: localhost_trust(),
+        }),
     ));
 
     first_poll(&trusted_issuer, issuer.request_client()).await;

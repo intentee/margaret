@@ -11,8 +11,8 @@ use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
 use margaret::framework::macros::singleton;
+use margaret::framework::oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret::framework::token_exchange_client::subject_token::SubjectToken;
-use margaret::framework::token_exchange_client::subject_token_type::SubjectTokenType;
 
 use crate::margaret::oauth_clients::partner_client::ClientCredentials;
 use crate::margaret::oauth_clients::partner_client::TokenExchange;
@@ -41,7 +41,7 @@ impl TokenRefresher {
 
     /// # Errors
     ///
-    /// Returns an error when a client assertion cannot be signed.
+    /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         let target = TokenTarget {
@@ -49,8 +49,7 @@ impl TokenRefresher {
             scopes: BTreeSet::new(),
         };
 
-        if let AcquiredToken::Acquired(token) =
-            self.client_credentials.access_token(&target).await?
+        if let AcquiredToken::Acquired(token) = self.client_credentials.access_token(&target).await
         {
             self.token_exchange
                 .exchange(
@@ -60,7 +59,7 @@ impl TokenRefresher {
                     },
                     &target,
                 )
-                .await?;
+                .await;
         }
 
         cancellation_token.cancelled().await;

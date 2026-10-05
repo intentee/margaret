@@ -5,7 +5,7 @@ use serde_json::json;
 
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::body_reading::BodyReading;
-use margaret_http::handler::Handler;
+use margaret_http::content_handler::ContentHandler;
 use margaret_http::handler_error::HandlerError;
 use margaret_http::read_form_fields::read_form_fields;
 use margaret_http::request::Request;
@@ -37,7 +37,7 @@ pub struct FormEchoHandler {
 }
 
 #[async_trait]
-impl Handler for FormEchoHandler {
+impl ContentHandler for FormEchoHandler {
     async fn handle(
         &self,
         request: &Request,

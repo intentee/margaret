@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::client_credentials::ClientCredentials;
-use crate::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::client_credentials::ClientCredentials;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]
 async fn refuses_a_client_with_a_wrong_secret_with_a_basic_challenge() {

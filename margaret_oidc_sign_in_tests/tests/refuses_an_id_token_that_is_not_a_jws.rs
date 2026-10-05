@@ -9,8 +9,8 @@ use margaret_oidc_sign_in_tests::begin_sign_in::begin_sign_in;
 use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
+use margaret_oidc_sign_in_tests::issued_token_answer::issued_token_answer;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
-use margaret_oidc_sign_in_tests::token_answer::TokenAnswer;
 
 #[tokio::test]
 async fn refuses_an_id_token_that_is_not_a_jws() {
@@ -24,7 +24,7 @@ async fn refuses_an_id_token_that_is_not_a_jws() {
         fixture
             .token_endpoint
             .answer
-            .set(TokenAnswer::issued("not-a-jws"))
+            .set(issued_token_answer("not-a-jws"))
             .is_ok()
     );
 
@@ -37,8 +37,7 @@ async fn refuses_an_id_token_that_is_not_a_jws() {
                 ("state", begun.authorization_parameter("state")),
             ]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

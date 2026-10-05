@@ -1,8 +1,10 @@
 mod await_next_fetch;
 mod discovery_failure;
 mod fetch_key_set;
+mod group_locator;
 pub mod issuer_directory;
 pub mod issuer_directory_error;
+mod issuer_group;
 mod key_set_location;
 mod key_set_location_failure;
 mod key_set_poll;

@@ -1,7 +1,6 @@
 use std::convert::Infallible;
 use std::fmt::Display;
 use std::io::Error;
-use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -42,7 +41,6 @@ use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
 use crate::route_resolution::RouteResolution;
 use crate::server::Server;
-use crate::server_registry::ServerRegistry;
 use crate::transport_config::TransportConfig;
 use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_driver_channel::WebSocketDriverChannel;
@@ -254,16 +252,9 @@ impl BoundServer {
     ///
     /// Returns an error propagated from the work it performs.
     pub async fn bind(
-        server_registry: Arc<ServerRegistry>,
+        server: Arc<Server>,
         forward_targets: Arc<ForwardTargets>,
-        name: Arc<str>,
     ) -> Result<Self, Error> {
-        let Some(server) = server_registry.server(&name) else {
-            return Err(Error::new(
-                ErrorKind::NotFound,
-                "the server is not registered",
-            ));
-        };
         let transport = match server.transport() {
             TransportConfig::Plain => BoundTransport::Plain,
             TransportConfig::MutualTls { server_config } => BoundTransport::MutualTls {
@@ -275,7 +266,7 @@ impl BoundServer {
         Ok(Self {
             forward_targets,
             listener,
-            server: server.clone(),
+            server,
             transport,
         })
     }
@@ -411,21 +402,19 @@ mod tests {
     use super::report_connection_task_outcome;
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
-    use crate::handler::Handler;
     use crate::handler_error::HandlerError;
+    use crate::head_handler::HeadHandler;
     use crate::http_middleware::HttpMiddleware;
     use crate::method_handler::MethodHandler;
     use crate::named_handler::NamedHandler;
     use crate::next::Next;
     use crate::redirect::Redirect;
     use crate::request::Request;
-    use crate::request_body::RequestBody;
     use crate::response::Response;
     use crate::response_continuation::ResponseContinuation;
     use crate::route_entry::RouteEntry;
     use crate::router::Router;
     use crate::server::Server;
-    use crate::server_registry::ServerRegistry;
     use crate::transport_config::TransportConfig;
     use crate::web_socket_driver_sender::WebSocketDriverSender;
     use crate::web_socket_upgrade::WebSocketUpgrade;
@@ -433,12 +422,8 @@ mod tests {
     struct PlainOk;
 
     #[async_trait]
-    impl Handler for PlainOk {
-        async fn handle(
-            &self,
-            _request: &Request,
-            _body: RequestBody,
-        ) -> Result<ResponseContinuation, HandlerError> {
+    impl HeadHandler for PlainOk {
+        async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::Done(Response::text(200, "ok")))
         }
     }
@@ -446,12 +431,8 @@ mod tests {
     struct EchoesTheNameParameter;
 
     #[async_trait]
-    impl Handler for EchoesTheNameParameter {
-        async fn handle(
-            &self,
-            request: &Request,
-            _body: RequestBody,
-        ) -> Result<ResponseContinuation, HandlerError> {
+    impl HeadHandler for EchoesTheNameParameter {
+        async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
             Ok(ResponseContinuation::Done(Response::text(
                 200,
                 request.path_param("name").unwrap_or("absent").to_string(),
@@ -459,55 +440,46 @@ mod tests {
         }
     }
 
-    fn registry_with_a_name_parameter() -> Arc<ServerRegistry> {
-        Arc::new(ServerRegistry::new(vec![Server::new(
-            "test",
+    fn server_with_a_name_parameter() -> Arc<Server> {
+        Arc::new(Server::new(
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
             Router::build(vec![RouteEntry::new(
                 "/files/{name}",
-                vec![MethodHandler::anonymous(
+                vec![MethodHandler::head(
                     RouteMethod::Get,
                     Arc::new(EchoesTheNameParameter),
                 )],
             )])
             .expect("the route entries register cleanly"),
-        )]))
+        ))
     }
 
-    fn registry_with_one() -> Arc<ServerRegistry> {
-        Arc::new(ServerRegistry::new(vec![Server::new(
-            "test",
+    fn server_with_one() -> Arc<Server> {
+        Arc::new(Server::new(
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
             Router::build(vec![RouteEntry::new(
                 "/",
-                vec![MethodHandler::anonymous(
-                    RouteMethod::Get,
-                    Arc::new(PlainOk),
-                )],
+                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
             )])
             .expect("the route entries register cleanly"),
-        )]))
+        ))
     }
 
-    fn registry_with_a_route_parameter() -> Arc<ServerRegistry> {
-        Arc::new(ServerRegistry::new(vec![Server::new(
-            "test",
+    fn server_with_a_route_parameter() -> Arc<Server> {
+        Arc::new(Server::new(
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
             Router::build(vec![RouteEntry::new(
                 "/articles/{article}",
-                vec![MethodHandler::anonymous(
-                    RouteMethod::Get,
-                    Arc::new(PlainOk),
-                )],
+                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
             )])
             .expect("the route paths do not conflict"),
-        )]))
+        ))
     }
 
     fn empty_forward_targets() -> Arc<ForwardTargets> {
@@ -530,17 +502,11 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/items/{id}",
-                vec![MethodHandler::anonymous(
-                    RouteMethod::Get,
-                    Arc::new(PlainOk),
-                )],
+                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
             ),
             RouteEntry::new(
                 "/items/{name}",
-                vec![MethodHandler::anonymous(
-                    RouteMethod::Get,
-                    Arc::new(PlainOk),
-                )],
+                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
             ),
         ]);
 
@@ -552,10 +518,7 @@ mod tests {
         let conflict = Router::build(vec![
             RouteEntry::new(
                 "/x/{id}",
-                vec![MethodHandler::anonymous(
-                    RouteMethod::Get,
-                    Arc::new(PlainOk),
-                )],
+                vec![MethodHandler::head(RouteMethod::Get, Arc::new(PlainOk))],
             ),
             RouteEntry::web_socket("/x/{name}", Arc::new(TestUpgrade), Vec::new()),
         ]);
@@ -619,30 +582,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fails_to_bind_an_unregistered_server() {
-        assert!(
-            BoundServer::bind(
-                registry_with_one(),
-                empty_forward_targets(),
-                Arc::from("missing")
-            )
-            .await
-            .is_err()
-        );
-    }
-
-    #[tokio::test]
     async fn fails_to_bind_an_invalid_address() {
-        let server_registry = Arc::new(ServerRegistry::new(vec![Server::new(
-            "test",
+        let server = Arc::new(Server::new(
             "this is not an address".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
             Router::build(Vec::new()).expect("an empty router builds"),
-        )]));
+        ));
 
         assert!(
-            BoundServer::bind(server_registry, empty_forward_targets(), Arc::from("test"))
+            BoundServer::bind(server, empty_forward_targets())
                 .await
                 .is_err()
         );
@@ -672,14 +621,12 @@ mod tests {
         String::from_utf8_lossy(&response).into_owned()
     }
 
-    async fn serve_registry<Exchange, Assertions>(
-        server_registry: Arc<ServerRegistry>,
-        exchanges: Exchange,
-    ) where
+    async fn serve<Exchange, Assertions>(server: Arc<Server>, exchanges: Exchange)
+    where
         Exchange: FnOnce(SocketAddr) -> Assertions,
         Assertions: Future<Output = ()>,
     {
-        let bound = BoundServer::bind(server_registry, empty_forward_targets(), Arc::from("test"))
+        let bound = BoundServer::bind(server, empty_forward_targets())
             .await
             .expect("the server binds to an ephemeral port");
         let address = bound
@@ -696,7 +643,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_ambiguous_request_targets() {
-        serve_registry(registry_with_one(), |address| async move {
+        serve(server_with_one(), |address| async move {
             const AMBIGUOUS_TARGETS: [&[u8]; 7] = [
                 b"/a/../b", b"/a%2Fb", b"/a//b", b"/a%00b", b"/%FF", b"/a%zz", b"*",
             ];
@@ -718,7 +665,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_ambiguous_request_headers() {
-        serve_registry(registry_with_one(), |address| async move {
+        serve(server_with_one(), |address| async move {
             const AMBIGUOUS_REQUESTS: [&[u8]; 6] = [
                 b"GET / HTTP/1.1\r\nHost: test\r\nCookie: a=1\r\nCookie: b=2\r\nConnection: close\r\n\r\n",
                 b"GET / HTTP/1.1\r\nHost: test\r\nHost: elsewhere\r\nConnection: close\r\n\r\n",
@@ -741,7 +688,7 @@ mod tests {
 
     #[tokio::test]
     async fn combines_a_repeated_list_valued_request_header() {
-        serve_registry(registry_with_one(), |address| async move {
+        serve(server_with_one(), |address| async move {
             let response = exchange(
                 address,
                 b"GET / HTTP/1.1\r\nHost: test\r\nAccept-Encoding: gzip\r\nAccept-Encoding: br\r\nConnection: close\r\n\r\n",
@@ -756,7 +703,7 @@ mod tests {
 
     #[tokio::test]
     async fn hands_a_decoded_route_parameter_to_the_handler() {
-        serve_registry(registry_with_a_name_parameter(), |address| async move {
+        serve(server_with_a_name_parameter(), |address| async move {
             let response = exchange(
                 address,
                 b"GET /files/a%20b HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
@@ -772,7 +719,7 @@ mod tests {
 
     #[tokio::test]
     async fn decodes_a_route_parameter_exactly_once() {
-        serve_registry(registry_with_a_name_parameter(), |address| async move {
+        serve(server_with_a_name_parameter(), |address| async move {
             let response = exchange(
                 address,
                 b"GET /files/%2520 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
@@ -788,7 +735,7 @@ mod tests {
 
     #[tokio::test]
     async fn serves_an_http_10_request_without_a_host() {
-        serve_registry(registry_with_one(), |address| async move {
+        serve(server_with_one(), |address| async move {
             let response = exchange(address, b"GET / HTTP/1.0\r\n\r\n", false).await;
 
             assert!(response.contains(" 200 "));
@@ -798,13 +745,9 @@ mod tests {
 
     #[tokio::test]
     async fn serves_connections_until_cancellation() {
-        let bound = BoundServer::bind(
-            registry_with_one(),
-            empty_forward_targets(),
-            Arc::from("test"),
-        )
-        .await
-        .expect("the server binds to an ephemeral port");
+        let bound = BoundServer::bind(server_with_one(), empty_forward_targets())
+            .await
+            .expect("the server binds to an ephemeral port");
         let address = bound
             .local_addr()
             .expect("the bound listener reports its address");
@@ -848,13 +791,9 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_a_route_parameter_that_is_not_valid_percent_encoded_utf8() {
-        let bound = BoundServer::bind(
-            registry_with_a_route_parameter(),
-            empty_forward_targets(),
-            Arc::from("test"),
-        )
-        .await
-        .expect("the server binds to an ephemeral port");
+        let bound = BoundServer::bind(server_with_a_route_parameter(), empty_forward_targets())
+            .await
+            .expect("the server binds to an ephemeral port");
         let address = bound
             .local_addr()
             .expect("the bound listener reports its address");
@@ -984,11 +923,8 @@ mod tests {
         }
     }
 
-    fn registry_with_web_socket_middleware(
-        middleware: Vec<Arc<dyn HttpMiddleware>>,
-    ) -> Arc<ServerRegistry> {
-        Arc::new(ServerRegistry::new(vec![Server::new(
-            "test",
+    fn server_with_web_socket_middleware(middleware: Vec<Arc<dyn HttpMiddleware>>) -> Arc<Server> {
+        Arc::new(Server::new(
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             UploadConfig::Disabled,
@@ -998,18 +934,15 @@ mod tests {
                 middleware,
             )])
             .expect("the route entries register cleanly"),
-        )]))
+        ))
     }
 
-    fn registry_with_web_socket() -> Arc<ServerRegistry> {
-        registry_with_web_socket_middleware(Vec::new())
+    fn server_with_web_socket() -> Arc<Server> {
+        server_with_web_socket_middleware(Vec::new())
     }
 
-    async fn web_socket_handshake_response(
-        registry: Arc<ServerRegistry>,
-        request: &[u8],
-    ) -> String {
-        let bound = BoundServer::bind(registry, empty_forward_targets(), Arc::from("test"))
+    async fn web_socket_handshake_response(server: Arc<Server>, request: &[u8]) -> String {
+        let bound = BoundServer::bind(server, empty_forward_targets())
             .await
             .expect("the server binds to an ephemeral port");
         let address = bound
@@ -1035,13 +968,9 @@ mod tests {
 
     #[tokio::test]
     async fn serves_web_socket_routes() {
-        let bound = BoundServer::bind(
-            registry_with_web_socket(),
-            empty_forward_targets(),
-            Arc::from("test"),
-        )
-        .await
-        .expect("the server binds to an ephemeral port");
+        let bound = BoundServer::bind(server_with_web_socket(), empty_forward_targets())
+            .await
+            .expect("the server binds to an ephemeral port");
         let address = bound
             .local_addr()
             .expect("the bound listener reports its address");
@@ -1079,7 +1008,7 @@ mod tests {
     #[tokio::test]
     async fn upgrades_a_web_socket_handshake_through_a_delegating_middleware() {
         let response = web_socket_handshake_response(
-            registry_with_web_socket_middleware(vec![Arc::new(PassThrough)]),
+            server_with_web_socket_middleware(vec![Arc::new(PassThrough)]),
             b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
         )
         .await;
@@ -1091,7 +1020,7 @@ mod tests {
     #[tokio::test]
     async fn honors_a_web_socket_middleware_that_short_circuits_before_upgrading() {
         let response = web_socket_handshake_response(
-            registry_with_web_socket_middleware(vec![Arc::new(RespondsWith { status: 403 })]),
+            server_with_web_socket_middleware(vec![Arc::new(RespondsWith { status: 403 })]),
             b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
         )
         .await;
@@ -1103,7 +1032,7 @@ mod tests {
     #[tokio::test]
     async fn honors_a_web_socket_middleware_that_redirects_instead_of_upgrading() {
         let response = web_socket_handshake_response(
-            registry_with_web_socket_middleware(vec![Arc::new(RedirectsAway)]),
+            server_with_web_socket_middleware(vec![Arc::new(RedirectsAway)]),
             b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
         )
         .await;
@@ -1115,7 +1044,7 @@ mod tests {
     #[tokio::test]
     async fn honors_a_web_socket_middleware_that_overrides_the_response_after_delegating() {
         let response = web_socket_handshake_response(
-            registry_with_web_socket_middleware(vec![Arc::new(OverridesAfterDelegating)]),
+            server_with_web_socket_middleware(vec![Arc::new(OverridesAfterDelegating)]),
             b"GET /room/42 HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
         )
         .await;
@@ -1129,7 +1058,7 @@ mod tests {
     #[tokio::test]
     async fn applies_the_first_declared_web_socket_middleware_outermost() {
         let response = web_socket_handshake_response(
-            registry_with_web_socket_middleware(vec![
+            server_with_web_socket_middleware(vec![
                 Arc::new(RespondsWith { status: 401 }),
                 Arc::new(RespondsWith { status: 403 }),
             ]),
@@ -1143,12 +1072,11 @@ mod tests {
     #[tokio::test]
     async fn resolves_a_forward_from_a_web_socket_middleware() {
         let bound = BoundServer::bind(
-            registry_with_web_socket_middleware(vec![Arc::new(ForwardsToTarget)]),
+            server_with_web_socket_middleware(vec![Arc::new(ForwardsToTarget)]),
             Arc::new(ForwardTargets::new(vec![NamedHandler::new(
                 "target",
                 Arc::new(PlainOk),
             )])),
-            Arc::from("test"),
         )
         .await
         .expect("the server binds to an ephemeral port");

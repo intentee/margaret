@@ -1,8 +1,9 @@
 use cookie::Cookie;
-use cookie::SameSite;
 use serde::Deserialize;
 use uuid::Uuid;
 use validator::Validate;
+
+use margaret::framework::http::host_cookie::host_cookie;
 
 #[derive(Deserialize, Validate)]
 pub struct SessionCookie {
@@ -12,11 +13,6 @@ pub struct SessionCookie {
 impl SessionCookie {
     #[must_use]
     pub fn issued(session: Uuid) -> Cookie<'static> {
-        Cookie::build(("session", session.to_string()))
-            .http_only(true)
-            .path("/")
-            .same_site(SameSite::Lax)
-            .secure(true)
-            .build()
+        host_cookie("session".to_string(), session.to_string()).build()
     }
 }

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use margaret_bearer_token_verification_tests::admit_access_token::admit_access_token;
 use margaret_bearer_token_verification_tests::held_trusted_issuer::held_trusted_issuer;
 use margaret_bearer_token_verification_tests::refused_with_challenge::refused_with_challenge;
@@ -28,7 +30,9 @@ async fn refuses_a_key_that_the_refetched_set_still_lacks() {
         tokio::join!(admit_access_token(&trusted_issuer, &authorization), async {
             trusted_issuer.key_set.refresh_requested().await;
             trusted_issuer.key_set.start_fetch();
-            trusted_issuer.key_set.hold(published.key_set().clone());
+            trusted_issuer
+                .key_set
+                .hold(Arc::new(published.key_set().clone()));
         });
 
     assert!(refused_with_challenge(

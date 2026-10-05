@@ -1,4 +1,3 @@
-mod propagates_an_assertion_that_cannot_be_signed;
 mod relays_a_refused_client_credentials_grant;
 mod renews_a_token_that_expires_within_the_refresh_margin;
 mod renews_a_token_without_a_stated_lifetime;

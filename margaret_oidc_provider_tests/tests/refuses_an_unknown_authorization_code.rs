@@ -1,6 +1,6 @@
-use crate::code_exchange::code_exchange;
-use crate::portal_credentials::PORTAL_CREDENTIALS;
-use crate::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::code_exchange::code_exchange;
+use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]
 async fn refuses_an_unknown_authorization_code() {

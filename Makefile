@@ -105,6 +105,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
 	-p margaret_tag_codegen \
+	-p margaret_token_digest \
 	-p margaret_token_exchange_client \
 	-p margaret_token_exchange_client_tests \
 	-p margaret_token_introspection \
@@ -240,6 +241,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
 	-p margaret_tag_codegen \
+	-p margaret_token_digest \
 	-p margaret_token_exchange_client \
 	-p margaret_token_introspection \
 	-p margaret_token_issuance \
@@ -266,11 +268,12 @@ RUNTIME_LINTS := \
 	-D clippy::unwrap-used
 
 POSTGRES_FEATURES := \
+	--features margaret_oidc_provider_tests/tests_that_use_postgres \
 	--features margaret_provider_state_storage_selection_tests/tests_that_use_postgres \
 	--features margaret_provider_state_storage_tests/tests_that_use_postgres \
 	--features margaret_schema_postgres_tests/tests_that_use_postgres
 
-POSTGRES_TESTS := package(margaret_schema_postgres_tests) | (package(margaret_provider_state_storage_tests) & test(/^postgres_state/)) | (package(margaret_provider_state_storage_selection_tests) & test(/^postgres_/))
+POSTGRES_TESTS := package(margaret_schema_postgres_tests) | (package(margaret_oidc_provider_tests) & test(/^postgres_provider/)) | (package(margaret_provider_state_storage_tests) & test(/^postgres_state/)) | (package(margaret_provider_state_storage_selection_tests) & test(/^postgres_/))
 
 POSTGRES_IMAGE_NAME := postgres
 POSTGRES_IMAGE_TAG := 18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
@@ -416,6 +419,7 @@ coverage: node_modules postgres-image
 		--gated margaret_syn_type_peeling=100 \
 		--gated margaret_sync_holder=100 \
 		--gated margaret_tag_codegen=100 \
+		--gated margaret_token_digest=100 \
 		--gated margaret_token_exchange_client=100 \
 		--gated margaret_token_exchange_client_tests=100 \
 		--gated margaret_token_introspection=100 \

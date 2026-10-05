@@ -10,6 +10,7 @@ use margaret_http_tests::hanging_handler::HangingHandler;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_issuer_request::issuer_document::IssuerDocument;
+use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_issuer_request::issuer_request_timeout::ISSUER_REQUEST_TIMEOUT;
 use margaret_route_method::route_method::RouteMethod;
@@ -22,7 +23,7 @@ async fn times_out_a_fetch_that_outlives_its_timeout() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/document",
-            vec![MethodHandler::anonymous(RouteMethod::Get, hanging.clone())],
+            vec![MethodHandler::head(RouteMethod::Get, hanging.clone())],
         )],
     )
     .await;
@@ -39,7 +40,7 @@ async fn times_out_a_fetch_that_outlives_its_timeout() {
 
     assert!(matches!(
         fetched,
-        IssuerDocument::TransportFailed(error) if error.is_timeout()
+        IssuerDocument::Failed(IssuerExchangeError::Transport(error)) if error.is_timeout()
     ));
     assert_eq!(started_at.elapsed(), ISSUER_REQUEST_TIMEOUT);
 

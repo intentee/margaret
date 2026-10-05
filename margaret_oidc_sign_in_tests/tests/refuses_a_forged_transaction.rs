@@ -27,8 +27,7 @@ async fn refuses_a_forged_transaction() {
                 ("state", begun.authorization_parameter("state")),
             ]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

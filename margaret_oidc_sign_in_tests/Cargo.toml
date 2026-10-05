@@ -33,6 +33,7 @@ margaret_issuer_request = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 margaret_oidc_discovery = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_trusted_issuer = { workspace = true }

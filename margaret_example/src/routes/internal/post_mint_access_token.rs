@@ -50,6 +50,6 @@ impl PostMintAccessToken {
     ) -> anyhow::Result<Response> {
         Ok(self
             .mint_access_token_handler
-            .respond(mint_request, self.clock.now())?)
+            .respond(mint_request, self.clock.now()))
     }
 }

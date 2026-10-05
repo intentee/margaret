@@ -1,13 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use aws_lc_rs::constant_time::verify_slices_are_equal;
-use aws_lc_rs::digest::SHA256;
-use aws_lc_rs::digest::SHA256_OUTPUT_LEN;
-use aws_lc_rs::digest::digest;
 use uuid::Uuid;
 
 use margaret_oauth_vocabulary::client_id::ClientId;
+use margaret_token_digest::token_digest::TokenDigest;
 use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
 
 use crate::accepted_client::AcceptedClient;
@@ -16,65 +13,35 @@ use crate::accepted_clients_error::AcceptedClientsError;
 use crate::client_authentication_outcome::ClientAuthenticationOutcome;
 use crate::client_refusal::ClientRefusal;
 use crate::declares_accepted_client::DeclaresAcceptedClient;
-use crate::grant_type::GrantType;
 use crate::presented_client_credentials::PresentedClientCredentials;
 use crate::registered_client::RegisteredClient;
 use crate::registered_secret::RegisteredSecret;
-
-fn secret_digest(secret: &str) -> [u8; SHA256_OUTPUT_LEN] {
-    let mut computed = [0; SHA256_OUTPUT_LEN];
-
-    computed.copy_from_slice(digest(&SHA256, secret.as_bytes()).as_ref());
-
-    computed
-}
 
 fn registered_secret(
     client: &AcceptedClient,
     issuance: &dyn DeclaresTokenIssuance,
 ) -> Result<RegisteredSecret, AcceptedClientsError> {
-    let client_id = || client.client_id.clone();
-
     if Uuid::try_parse(client.client_id.as_str()).is_ok() {
         return Err(AcceptedClientsError::UuidClientId {
-            client_id: client_id(),
-        });
-    }
-
-    if client.resources.is_empty() {
-        return Err(AcceptedClientsError::WithoutResource {
-            client_id: client_id(),
+            client_id: client.client_id.clone(),
         });
     }
 
     let session_audience = &issuance.token_issuance().audience;
 
-    if client.resources.contains(session_audience) {
+    if client.resources.members().contains(session_audience) {
         return Err(AcceptedClientsError::SessionAudienceResource {
             audience: session_audience.clone(),
-            client_id: client_id(),
+            client_id: client.client_id.clone(),
         });
     }
 
-    if client.grants.contains(&GrantType::AuthorizationCode) && client.redirect_uris.is_empty() {
-        return Err(AcceptedClientsError::WithoutRedirectUri {
-            client_id: client_id(),
-        });
-    }
-
-    match &client.authentication {
-        AcceptedClientAuthentication::ClientSecretBasic(secret) => {
-            Ok(RegisteredSecret::Digest(secret_digest(secret.expose())))
+    Ok(match &client.authentication {
+        AcceptedClientAuthentication::ClientSecretBasic { secret, .. } => {
+            RegisteredSecret::Digest(TokenDigest::of(secret.expose()))
         }
-        AcceptedClientAuthentication::Public
-            if client.grants.contains(&GrantType::ClientCredentials) =>
-        {
-            Err(AcceptedClientsError::PublicClientCredentials {
-                client_id: client_id(),
-            })
-        }
-        AcceptedClientAuthentication::Public => Ok(RegisteredSecret::Public),
-    }
+        AcceptedClientAuthentication::Public => RegisteredSecret::Public,
+    })
 }
 
 pub struct AcceptedClients {
@@ -85,8 +52,7 @@ impl AcceptedClients {
     /// # Errors
     ///
     /// Returns `AcceptedClientsError` when a client is declared twice, is identified by a uuid,
-    /// names no resource or the session audience as one, grants authorization codes without a
-    /// redirect uri, or is public while granting client credentials.
+    /// or names the session audience as one of its resources.
     pub fn create(
         declarations: Vec<Arc<dyn DeclaresAcceptedClient>>,
         issuance: &dyn DeclaresTokenIssuance,
@@ -126,7 +92,7 @@ impl AcceptedClients {
             PresentedClientCredentials::Basic { client_id, secret } => {
                 self.with_client(client_id, |registered| match &registered.secret {
                     RegisteredSecret::Digest(expected) => {
-                        if verify_slices_are_equal(&secret_digest(secret), expected).is_ok() {
+                        if TokenDigest::of(secret).matches(expected) {
                             ClientAuthenticationOutcome::Authenticated(
                                 registered.declaration.accepted_client(),
                             )

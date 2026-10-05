@@ -1,6 +1,8 @@
-use margaret_bearer_token_verification::bearer_token_admission::BearerTokenAdmission;
+use std::sync::Arc;
+
 use margaret_bearer_token_verification_tests::admit_access_token::admit_access_token;
 use margaret_bearer_token_verification_tests::held_trusted_issuer::held_trusted_issuer;
+use margaret_http::token_admission::TokenAdmission;
 use margaret_issuer_key_set::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
@@ -28,8 +30,10 @@ async fn refetches_the_key_set_for_a_key_it_does_not_hold_yet() {
         tokio::join!(admit_access_token(&trusted_issuer, &authorization), async {
             trusted_issuer.key_set.refresh_requested().await;
             trusted_issuer.key_set.start_fetch();
-            trusted_issuer.key_set.hold(rotated_in.key_set().clone());
+            trusted_issuer
+                .key_set
+                .hold(Arc::new(rotated_in.key_set().clone()));
         });
 
-    assert!(matches!(admission, BearerTokenAdmission::Admitted(_)));
+    assert!(matches!(admission, TokenAdmission::Admitted(_)));
 }

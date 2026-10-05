@@ -43,6 +43,6 @@ impl PostIntrospect {
         request: &Request,
         #[form_request(from = RequestInput::Form)] submission: ValidationResult<TokenSubmission>,
     ) -> anyhow::Result<Response> {
-        Ok(self.introspection_endpoint.respond(request, submission)?)
+        Ok(self.introspection_endpoint.respond(request, submission))
     }
 }

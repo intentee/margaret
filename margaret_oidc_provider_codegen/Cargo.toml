@@ -15,6 +15,7 @@ margaret_container = { workspace = true }
 margaret_generated_module = { workspace = true }
 margaret_http_codegen = { workspace = true }
 margaret_jwks_codegen = { workspace = true }
+margaret_oidc_discovery = { workspace = true }
 margaret_route_method = { workspace = true }
 margaret_umbrella_path = { workspace = true }
 proc-macro2 = { workspace = true }

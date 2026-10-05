@@ -4,14 +4,17 @@ use url::Url;
 
 use margaret_accepted_clients::accepted_client::AcceptedClient;
 use margaret_accepted_clients::accepted_client_authentication::AcceptedClientAuthentication;
+use margaret_accepted_clients::authorization_code_grant::AuthorizationCodeGrant;
+use margaret_accepted_clients::code_grant_policy::CodeGrantPolicy;
 use margaret_accepted_clients::consent_policy::ConsentPolicy;
-use margaret_accepted_clients::grant_type::GrantType;
-use margaret_accepted_clients::introspection_permission::IntrospectionPermission;
+use margaret_accepted_clients::non_empty_set::NonEmptySet;
+use margaret_accepted_clients::refresh_token_grant::RefreshTokenGrant;
+use margaret_accepted_clients::token_exchange_grant::TokenExchangeGrant;
 use margaret_jwks_secret_store::id_token_signing::IdTokenSigning;
 
 /// # Panics
 ///
-/// Panics when the fixture client identifier, secret, callback, resource or scope is rejected.
+/// Panics when the fixture client identifier, callback, resource or scope is rejected.
 #[must_use]
 pub fn fixture_client(
     client_id: &str,
@@ -19,15 +22,21 @@ pub fn fixture_client(
 ) -> AcceptedClient {
     AcceptedClient {
         authentication,
+        authorization_code: AuthorizationCodeGrant::Granted(CodeGrantPolicy {
+            consent: ConsentPolicy::Prompted,
+            id_token_signing: IdTokenSigning::Rsa,
+            redirect_uris: NonEmptySet::of(
+                Url::parse("https://client.example/callback").expect("the callback is a url"),
+                [],
+            ),
+            refresh: RefreshTokenGrant::Granted,
+            scopes: BTreeSet::from(["openid".parse().expect("the scope is a scope token")]),
+        }),
         client_id: client_id.parse().expect("the client identifier is visible"),
-        consent: ConsentPolicy::Prompted,
-        grants: BTreeSet::from([GrantType::AuthorizationCode, GrantType::RefreshToken]),
-        id_token_signing: IdTokenSigning::Rsa,
-        introspection: IntrospectionPermission::Forbidden,
-        redirect_uris: BTreeSet::from([
-            Url::parse("https://client.example/callback").expect("the callback is a url")
-        ]),
-        resources: BTreeSet::from(["artifacts".parse().expect("the resource is an audience")]),
-        scopes: BTreeSet::from(["openid".parse().expect("the scope is a scope token")]),
+        resources: NonEmptySet::of(
+            "artifacts".parse().expect("the resource is an audience"),
+            [],
+        ),
+        token_exchange: TokenExchangeGrant::Withheld,
     }
 }

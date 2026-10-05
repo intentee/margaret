@@ -1,10 +1,9 @@
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
-
-use crate::authorization_request::authorization_request;
-use crate::portal_parameters::portal_parameters;
-use crate::provider_fixture::ProviderFixture;
-use crate::with_parameter::with_parameter;
+use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::validated_form::validated_form;
+use margaret_oidc_provider_tests::with_parameter::with_parameter;
 
 #[tokio::test]
 async fn rejects_an_authorization_request_of_an_unknown_client() {
@@ -12,7 +11,7 @@ async fn rejects_an_authorization_request_of_an_unknown_client() {
     let outcome = fixture
         .authorization
         .authorize(
-            authorization_request(&with_parameter(
+            validated_form(&with_parameter(
                 portal_parameters(),
                 "client_id",
                 "stranger",

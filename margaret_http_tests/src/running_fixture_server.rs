@@ -9,7 +9,6 @@ use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::server::Server;
-use margaret_http::server_registry::ServerRegistry;
 use margaret_http::server_routes::ServerRoutes;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
@@ -30,16 +29,9 @@ impl RunningFixtureServer {
             named_handlers,
             router,
         } = ServerRoutes::build(route_entries).expect("the route entries register cleanly");
-        let server = Server::new(
-            "fixture",
-            "127.0.0.1:0".to_string(),
-            transport,
-            upload_config,
-            router,
-        );
-        let server_registry = Arc::new(ServerRegistry::new(vec![server]));
+        let server = Server::new("127.0.0.1:0".to_string(), transport, upload_config, router);
         let forward_targets = Arc::new(ForwardTargets::new(named_handlers));
-        let bound = BoundServer::bind(server_registry, forward_targets, Arc::from("fixture"))
+        let bound = BoundServer::bind(Arc::new(server), forward_targets)
             .await
             .expect("the fixture server binds");
         let address = bound

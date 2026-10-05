@@ -2,7 +2,7 @@ use serde::Deserialize;
 use validator::Validate;
 use validator::ValidationErrors;
 
-use crate::token_type_hint::TokenTypeHint;
+use margaret_oauth_vocabulary::token_type_hint::TokenTypeHint;
 
 #[derive(Debug, Deserialize)]
 pub struct TokenSubmission {

@@ -7,17 +7,28 @@ use matchit::MatchError;
 
 use margaret_route_method::route_method::RouteMethod;
 
-use crate::handler::Handler;
 use crate::http_middleware::HttpMiddleware;
 use crate::method_handler::MethodHandler;
 use crate::request_route::RequestRoute;
 use crate::route_entry::RouteEntry;
+use crate::route_handler::RouteHandler;
 use crate::route_resolution::RouteResolution;
+use crate::routed_handler::RoutedHandler;
 use crate::upgrade_route::UpgradeRoute;
 use crate::web_socket_upgrade::WebSocketUpgrade;
 
+fn method_handlers(handlers: Vec<MethodHandler>) -> HashMap<RouteMethod, RouteHandler> {
+    let mut by_method = HashMap::with_capacity(handlers.len());
+
+    for RoutedHandler { handler, method } in handlers.into_iter().map(MethodHandler::into_routed) {
+        by_method.insert(method, handler);
+    }
+
+    by_method
+}
+
 enum RouteTarget {
-    Http(HashMap<RouteMethod, Arc<dyn Handler>>),
+    Http(HashMap<RouteMethod, RouteHandler>),
     WebSocket {
         middleware: Vec<Arc<dyn HttpMiddleware>>,
         upgrade: Arc<dyn WebSocketUpgrade>,
@@ -38,19 +49,7 @@ impl Router {
         for entry in entries {
             match entry {
                 RouteEntry::Http { handlers, path } => {
-                    matcher.insert(
-                        path,
-                        RouteTarget::Http(
-                            handlers
-                                .into_iter()
-                                .map(
-                                    |MethodHandler {
-                                         handler, method, ..
-                                     }| (method, handler),
-                                )
-                                .collect(),
-                        ),
-                    )?;
+                    matcher.insert(path, RouteTarget::Http(method_handlers(handlers)))?;
                 }
                 RouteEntry::WebSocket {
                     middleware,

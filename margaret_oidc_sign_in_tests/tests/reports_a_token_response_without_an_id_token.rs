@@ -4,6 +4,7 @@ use serde_json::json;
 
 use margaret_authorization_server_client::server_unavailability::ServerUnavailability;
 use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_http_tests::static_handler::StaticHandler;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
 use margaret_oidc_sign_in_tests::begin_sign_in::begin_sign_in;
@@ -11,7 +12,6 @@ use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
-use margaret_oidc_sign_in_tests::token_answer::TokenAnswer;
 
 #[tokio::test]
 async fn reports_a_token_response_without_an_id_token() {
@@ -25,8 +25,11 @@ async fn reports_a_token_response_without_an_id_token() {
         fixture
             .token_endpoint
             .answer
-            .set(TokenAnswer {
-                body: json!({ "access_token": "2YotnFZFEjr1zCsicMWpAA", "token_type": "Bearer" }),
+            .set(StaticHandler {
+                body: json!({ "access_token": "2YotnFZFEjr1zCsicMWpAA", "token_type": "Bearer" })
+                    .to_string()
+                    .into_bytes(),
+                content_type: "application/json",
                 status: 200,
             })
             .is_ok()
@@ -41,8 +44,7 @@ async fn reports_a_token_response_without_an_id_token() {
                 ("state", begun.authorization_parameter("state")),
             ]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

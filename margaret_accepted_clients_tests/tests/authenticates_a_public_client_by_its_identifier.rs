@@ -3,6 +3,7 @@ use margaret_accepted_clients::client_authentication_outcome::ClientAuthenticati
 use margaret_accepted_clients::presented_client_credentials::PresentedClientCredentials;
 use margaret_accepted_clients_tests::accepted_clients_of::accepted_clients_of;
 use margaret_accepted_clients_tests::fixture_client::fixture_client;
+use margaret_http::request_authorization::RequestAuthorization;
 
 #[test]
 fn authenticates_a_public_client_by_its_identifier() {
@@ -13,7 +14,7 @@ fn authenticates_a_public_client_by_its_identifier() {
     .expect("the client is accepted");
 
     assert!(matches!(
-        clients.authenticate(&PresentedClientCredentials::of(None, Some("client:id"))),
+        clients.authenticate(&PresentedClientCredentials::of(&RequestAuthorization::Absent, Some("client:id"))),
         ClientAuthenticationOutcome::Authenticated(client) if client.client_id.as_str() == "client:id"
     ));
 }

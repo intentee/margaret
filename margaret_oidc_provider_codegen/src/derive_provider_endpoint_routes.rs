@@ -1,9 +1,13 @@
 use std::collections::BTreeSet;
 
+use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::route_location::RouteLocation;
+use margaret_oidc_discovery::oidc_discovery_path::OIDC_DISCOVERY_PATH;
 
 use crate::oidc_provider_codegen_error::OidcProviderCodegenError;
+use crate::oidc_provider_item::OidcProviderItem;
+use crate::oidc_provider_item_path::oidc_provider_item_path;
 use crate::provider_endpoint::ProviderEndpoint;
 use crate::provider_endpoint_routes::ProviderEndpointRoutes;
 
@@ -59,6 +63,24 @@ impl<'plan> EndpointRoutes<'plan> {
         }
     }
 
+    fn consent_served(&self) -> Result<(), OidcProviderCodegenError> {
+        if self.serves(&oidc_provider_item_path(OidcProviderItem::ConsentEndpoint)) {
+            Ok(())
+        } else {
+            Err(OidcProviderCodegenError::MissingConsentRoute)
+        }
+    }
+
+    fn discovery_path(&self, server: &str) -> Result<String, OidcProviderCodegenError> {
+        let path = self.path(ProviderEndpoint::Discovery, server)?;
+
+        if path.ends_with(OIDC_DISCOVERY_PATH) {
+            Ok(path)
+        } else {
+            Err(OidcProviderCodegenError::DiscoveryOutsideWellKnownPath { path })
+        }
+    }
+
     fn provider_server(&self) -> Result<&'plan str, OidcProviderCodegenError> {
         let servers = self
             .serving(ProviderEndpoint::Discovery)
@@ -72,6 +94,13 @@ impl<'plan> EndpointRoutes<'plan> {
             }),
             None => Err(OidcProviderCodegenError::MissingDiscoveryRoute),
         }
+    }
+
+    fn serves(&self, handler: &CanonicalPath) -> bool {
+        self.locations.iter().any(|location| {
+            self.bindings
+                .depends_directly_on(location.responder_path, handler)
+        })
     }
 
     fn serving(&self, endpoint: ProviderEndpoint) -> Vec<&'plan RouteLocation<'plan>> {
@@ -90,8 +119,9 @@ impl<'plan> EndpointRoutes<'plan> {
 /// # Errors
 ///
 /// Returns `OidcProviderCodegenError` when the discovery document is not served by exactly one
-/// server, or when an endpoint is not served at exactly one parameterless path of that server by
-/// routes of a method it admits.
+/// server at its well-known location, when no route uses the consent endpoint, or when an
+/// endpoint is not served at exactly one parameterless path of that server by routes of a method
+/// it admits.
 pub fn derive_provider_endpoint_routes(
     locations: &[RouteLocation<'_>],
     bindings: &ContainerBindings,
@@ -102,9 +132,11 @@ pub fn derive_provider_endpoint_routes(
     };
     let server = routes.provider_server()?;
 
+    routes.consent_served()?;
+
     Ok(ProviderEndpointRoutes {
         authorization: routes.path(ProviderEndpoint::Authorization, server)?,
-        discovery: routes.path(ProviderEndpoint::Discovery, server)?,
+        discovery: routes.discovery_path(server)?,
         introspection: routes.path(ProviderEndpoint::Introspection, server)?,
         jwks: routes.path(ProviderEndpoint::Jwks, server)?,
         revocation: routes.path(ProviderEndpoint::Revocation, server)?,
@@ -133,6 +165,8 @@ mod tests {
 
     use super::derive_provider_endpoint_routes;
     use crate::oidc_provider_codegen_error::OidcProviderCodegenError;
+    use crate::oidc_provider_item::OidcProviderItem;
+    use crate::oidc_provider_item_path::oidc_provider_item_path;
     use crate::provider_endpoint::ProviderEndpoint;
     use crate::provider_endpoint_routes::ProviderEndpointRoutes;
 
@@ -183,6 +217,12 @@ mod tests {
                 "post",
                 "/authorize",
                 "oidc_provider::AuthorizationEndpoint",
+            ),
+            route(
+                "PostConsent",
+                "post",
+                "/consent",
+                "oidc_provider::ConsentEndpoint",
             ),
             route(
                 "GetDiscovery",
@@ -244,12 +284,14 @@ mod tests {
         let indexed = IndexedSource::new(&source_of(routes));
         let index = &indexed.index;
         let handlers: Vec<FrameworkProvider> = ENDPOINTS
-            .iter()
-            .map(|endpoint| FrameworkProvider {
+            .into_iter()
+            .map(ProviderEndpoint::handler_path)
+            .chain([oidc_provider_item_path(OidcProviderItem::ConsentEndpoint)])
+            .map(|provided| FrameworkProvider {
                 construction: FrameworkConstruction::Unit,
                 enablement: FrameworkEnablement::WhenReferenced,
                 injection: FrameworkInjectionRole::Unmarked,
-                provided: endpoint.handler_path(),
+                provided,
             })
             .collect();
         let bindings = render_container(
@@ -432,6 +474,35 @@ mod tests {
                 ),
             )),
             "the discovery document is served by a Post route at '/.well-known/openid-configuration', which it does not admit"
+        );
+    }
+
+    #[test]
+    fn rejects_a_provider_without_a_consent_route() {
+        let routes: Vec<FixtureRoute> = provider_routes()
+            .into_iter()
+            .filter(|route| route.name != "PostConsent")
+            .collect();
+
+        assert_eq!(
+            rejection(&routes),
+            "no route uses the consent endpoint, so the authorization endpoint cannot ask an end user for consent"
+        );
+    }
+
+    #[test]
+    fn rejects_a_discovery_document_outside_its_well_known_path() {
+        assert_eq!(
+            rejection(&replaced(
+                "GetDiscovery",
+                route(
+                    "",
+                    "get",
+                    "/openid-configuration",
+                    "oidc_provider::ProviderMetadataHandler"
+                ),
+            )),
+            "the discovery document is served at '/openid-configuration', outside the '/.well-known/openid-configuration' location of its issuer"
         );
     }
 

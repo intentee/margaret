@@ -1,18 +1,23 @@
-use chrono::Utc;
 use serde::Deserialize;
 
+use margaret_bearer_token_verification::bearer_token_routing::BearerTokenRouting;
+use margaret_bearer_token_verification::route_bearer_token::route_bearer_token;
+use margaret_http::token_admission::TokenAdmission;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_attribution::JwtAttribution;
-use margaret_jwt_verification::jwt_presentation::JwtPresentation;
-use margaret_jwt_verification::jwt_profiling::JwtProfiling;
-use margaret_jwt_verification::presented_jwt::PresentedJwt;
-use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_trusted_issuer::issuer_verification::IssuerVerification;
-
-use crate::end_user_subject::END_USER_SUBJECT;
-use crate::margaret_client::MargaretClient;
-use crate::provider_fixture::ProviderFixture;
-use crate::signed_in_portal::SignedInPortal;
+use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
+use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
+use margaret_oidc_provider_tests::authentication_claims::AuthenticationClaims;
+use margaret_oidc_provider_tests::end_user_subject::END_USER_SUBJECT;
+use margaret_oidc_provider_tests::margaret_client::MargaretClient;
+use margaret_oidc_provider_tests::portal_sign_in_request::portal_sign_in_request;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::request_authorized_by::request_authorized_by;
+use margaret_oidc_provider_tests::sign_in_callback::sign_in_callback;
+use margaret_oidc_provider_tests::signed_in_end_user::signed_in_end_user;
+use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
+use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
+use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
+use margaret_validation::validate::validate;
 
 #[derive(Deserialize)]
 struct ResourceClaims {
@@ -24,27 +29,38 @@ struct ResourceClaims {
 async fn serves_an_access_token_a_margaret_resource_server_admits() {
     let fixture = ProviderFixture::start(Vec::new()).await;
     let client = MargaretClient::of_portal(&fixture).await;
-    let SignedInPortal { signed_in, .. } = SignedInPortal::through(&fixture, &client).await;
-    let trusted_issuer = &client.server.trusted_issuer;
-    let JwtPresentation::Presented(presented) =
-        PresentedJwt::present(signed_in.access_token.secret())
-    else {
-        panic!("the access token is a jws");
+    let flow = client.sign_in_flow();
+    let SignInBeginning::Redirected(beginning) = flow.begin(portal_sign_in_request()).await else {
+        panic!("the sign-in redirects to the provider");
     };
-    let JwtAttribution::Attributed(attributed) =
-        presented.attribute_to(&trusted_issuer.trust.token_trust().issuer)
-    else {
-        panic!("the access token is issued by the provider");
-    };
-    let JwtProfiling::Profiled(profiled) = attributed.profile::<AccessTokenProfile>() else {
-        panic!("the access token is an at+jwt");
-    };
-    let IssuerVerification::Verified(verified) = trusted_issuer
-        .verify::<ResourceClaims, AccessTokenProfile>(
-            &profiled,
-            &trusted_issuer.trust.token_trust().audience,
-            NumericDate::from(Utc::now()),
+    let begun = BegunSignIn::of(&beginning);
+    let AuthorizationOutcome::Redirected(callback) = fixture
+        .authorization
+        .authorize(
+            validate(&begun.authorization.parameters),
+            &EndUserAuthentication::Authenticated(signed_in_end_user()),
         )
+        .await
+        .expect("the authorization reaches its state")
+    else {
+        panic!("the provider redirects back to the portal");
+    };
+    let SignInCompletion::SignedIn(signed_in) = flow
+        .complete::<AuthenticationClaims>(&sign_in_callback(&begun, &callback))
+        .await
+    else {
+        panic!("the portal signs in");
+    };
+    let trusted_issuer = client.server.trusted_issuer.as_ref();
+    let request = request_authorized_by(&format!("Bearer {}", signed_in.access_token.secret()));
+    let BearerTokenRouting::Routed(routed) =
+        route_bearer_token(request.inputs.server.authorization(), &[trusted_issuer])
+            .expect("the system clock reads as a numeric date")
+    else {
+        panic!("the access token is routed to the provider");
+    };
+    let TokenAdmission::Admitted(verified) = routed
+        .admit::<ResourceClaims, AccessTokenProfile>(trusted_issuer)
         .await
     else {
         panic!("the resource server admits the access token");

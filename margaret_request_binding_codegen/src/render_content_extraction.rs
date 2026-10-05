@@ -31,29 +31,15 @@ fn render_models(
     quote! { #(#models)* }
 }
 
-fn rejected_body(continuation_return: &TokenStream) -> TokenStream {
-    quote! {
-        {
-            let response = margaret::framework::http::response_continuation::ResponseContinuation::from(
-                rejection.into_response(),
-            );
-
-            #continuation_return
-        }
-    }
-}
-
 fn read_outcome(
     reading: &TokenStream,
     read_pattern: &TokenStream,
     continuation_return: &TokenStream,
 ) -> TokenStream {
-    let rejected = rejected_body(continuation_return);
-
     quote! {
-        match #reading {
-            margaret::framework::http::body_reading::BodyReading::Read(#read_pattern) => #read_pattern,
-            margaret::framework::http::body_reading::BodyReading::Rejected(rejection) => #rejected,
+        match #reading.into_requirement() {
+            margaret::framework::http::requirement::Requirement::Met(#read_pattern) => #read_pattern,
+            margaret::framework::http::requirement::Requirement::Unmet(response) => #continuation_return,
         }
     }
 }
@@ -63,13 +49,13 @@ fn fallible_read_outcome(
     read_pattern: &TokenStream,
     context: &ContentExtractionContext,
 ) -> TokenStream {
-    let rejected = rejected_body(context.continuation_return);
+    let continuation_return = context.continuation_return;
     let system_error_return = context.system_error_return;
 
     quote! {
-        match #reading {
-            ::std::result::Result::Ok(margaret::framework::http::body_reading::BodyReading::Read(#read_pattern)) => #read_pattern,
-            ::std::result::Result::Ok(margaret::framework::http::body_reading::BodyReading::Rejected(rejection)) => #rejected,
+        match #reading.map(margaret::framework::http::body_reading::BodyReading::into_requirement) {
+            ::std::result::Result::Ok(margaret::framework::http::requirement::Requirement::Met(#read_pattern)) => #read_pattern,
+            ::std::result::Result::Ok(margaret::framework::http::requirement::Requirement::Unmet(response)) => #continuation_return,
             ::std::result::Result::Err(error) => #system_error_return,
         }
     }

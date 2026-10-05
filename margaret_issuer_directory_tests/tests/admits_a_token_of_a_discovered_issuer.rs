@@ -3,10 +3,10 @@ use std::sync::Arc;
 use serde_json::Value;
 use serde_json::json;
 
-use margaret_bearer_token_verification::bearer_token_admission::BearerTokenAdmission;
 use margaret_bearer_token_verification::bearer_token_routing::BearerTokenRouting;
 use margaret_bearer_token_verification::route_bearer_token::route_bearer_token;
 use margaret_http::request_authorization::RequestAuthorization;
+use margaret_http::token_admission::TokenAdmission;
 use margaret_issuer_directory_tests::fixture_issuer_routes::FixtureIssuerRoutes;
 use margaret_issuer_directory_tests::json_handler::json_handler;
 use margaret_issuer_directory_tests::localhost_discovery::localhost_discovery;
@@ -53,7 +53,7 @@ async fn admits_a_token_of_a_discovered_issuer() {
     directory.stop().await;
     issuer.stop().await;
 
-    let BearerTokenAdmission::Admitted(verified) = admission else {
+    let TokenAdmission::Admitted(verified) = admission else {
         panic!("the token of the discovered issuer is admitted");
     };
 

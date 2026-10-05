@@ -1,13 +1,15 @@
 use serde_json::json;
 
+use margaret_http::token_admission::TokenAdmission;
+use margaret_oauth_vocabulary::client_id::ClientId;
+use margaret_oauth_vocabulary::scope_list::ScopeList;
 use margaret_token_introspection::introspected_token::IntrospectedToken;
-use margaret_token_introspection::introspection_admission::IntrospectionAdmission;
 use margaret_token_introspection_tests::introspected_with::introspected_with;
 use margaret_token_introspection_tests::repository_claims::RepositoryClaims;
 
 #[tokio::test]
 async fn admits_an_active_token_for_our_audience() {
-    let IntrospectionAdmission::Admitted(IntrospectedToken {
+    let TokenAdmission::Admitted(IntrospectedToken {
         claims,
         client_id,
         scopes,
@@ -39,16 +41,15 @@ async fn admits_an_active_token_for_our_audience() {
             repository: "intentee/margaret".to_string()
         }
     );
-    assert_eq!(client_id.as_deref().map(String::as_str), Some("uploader"));
+    assert_eq!(client_id.as_ref().map(ClientId::as_str), Some("uploader"));
     assert_eq!(
-        scopes.map(|scopes| scopes
-            .iter()
-            .map(|scope| scope.to_string())
-            .collect::<Vec<_>>()),
-        Some(vec![
-            "artifacts:read".to_string(),
-            "artifacts:write".to_string()
-        ])
+        scopes,
+        Some(
+            "artifacts:read artifacts:write"
+                .parse::<ScopeList>()
+                .expect("the scopes are scope tokens")
+                .scopes
+        )
     );
     assert_eq!(subject.as_deref(), Some("subject"));
     assert_eq!(username.as_deref(), Some("ci"));

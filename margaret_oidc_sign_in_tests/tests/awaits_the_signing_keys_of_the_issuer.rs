@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
 use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
@@ -11,14 +12,16 @@ use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
 use margaret_oidc_sign_in_tests::id_token_claims::id_token_claims;
+use margaret_oidc_sign_in_tests::issued_token_answer::issued_token_answer;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
-use margaret_oidc_sign_in_tests::token_answer::TokenAnswer;
 
 #[tokio::test]
 async fn awaits_the_signing_keys_of_the_issuer() {
     let fixture = SignInFixture::start(secret_basic_client()).await;
     let keyless = SignInFlow::create(
-        Arc::new(fixture.server.client(Arc::new(secret_basic_client()))),
+        Arc::new(fixture.server.client(Arc::new(OAuthClientDeclaration {
+            client: secret_basic_client(),
+        }))),
         Arc::clone(&fixture.secret_store),
     );
     let SignInBeginning::Redirected(response) = begin_sign_in(&keyless).await else {
@@ -30,7 +33,7 @@ async fn awaits_the_signing_keys_of_the_issuer() {
         fixture
             .token_endpoint
             .answer
-            .set(TokenAnswer::issued(
+            .set(issued_token_answer(
                 &fixture.issuer_secret.current().sign_json(
                     &id_token_claims(begun.authorization_parameter("nonce")),
                     JwtType::Jwt
@@ -47,8 +50,7 @@ async fn awaits_the_signing_keys_of_the_issuer() {
                 ("state", begun.authorization_parameter("state")),
             ]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

@@ -28,8 +28,7 @@ async fn refuses_a_response_of_another_issuer() {
                 ("state", begun.authorization_parameter("state")),
             ]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

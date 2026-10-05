@@ -1,15 +1,15 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use url::Url;
-
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
+use margaret_authorization_server_client_tests::localhost_discovery_metadata::localhost_discovery_metadata;
 use margaret_authorization_server_client_tests::localhost_trust::localhost_trust;
+use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
 use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
+use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
-use margaret_oidc_discovery::provider_metadata::ProviderMetadata;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
 use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
@@ -21,25 +21,15 @@ use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
-fn localhost_url(path: &str) -> Url {
-    Url::parse("https://localhost")
-        .and_then(|origin| origin.join(path))
-        .expect("the localhost endpoint is a url")
-}
-
 #[tokio::test]
 async fn refuses_a_response_without_the_advertised_issuer() {
     let fixture = SignInFixture::start(secret_basic_client()).await;
     let metadata = Arc::new(IssuerMetadata::awaiting());
 
-    metadata.hold(Arc::new(ProviderMetadata {
-        authorization_endpoint: AdvertisedEndpoint::Advertised(localhost_url("/authorize")),
-        authorization_response_issuer: AuthorizationResponseIssuer::Advertised,
-        introspection_endpoint: AdvertisedEndpoint::Unadvertised,
-        jwks_uri: localhost_url("/jwks"),
-        token_endpoint: AdvertisedEndpoint::Advertised(localhost_url("/token")),
-        userinfo_endpoint: AdvertisedEndpoint::Unadvertised,
-    }));
+    metadata.hold(localhost_discovery_metadata(
+        AuthorizationResponseIssuer::Advertised,
+        AdvertisedEndpoint::Unadvertised,
+    ));
 
     let advertising = SignInFlow::create(
         Arc::new(AuthorizationServerClient::create(
@@ -47,9 +37,13 @@ async fn refuses_a_response_without_the_advertised_issuer() {
             Arc::clone(&metadata),
             Arc::new(TrustedIssuer::for_oidc_issuer(
                 metadata,
-                Arc::new(localhost_trust()),
+                Arc::new(TokenTrustDeclaration {
+                    trust: localhost_trust(),
+                }),
             )),
-            Arc::new(secret_basic_client()),
+            Arc::new(OAuthClientDeclaration {
+                client: secret_basic_client(),
+            }),
         )),
         Arc::clone(&fixture.secret_store),
     );
@@ -66,8 +60,7 @@ async fn refuses_a_response_without_the_advertised_issuer() {
                 ("state", begun.authorization_parameter("state")),
             ]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

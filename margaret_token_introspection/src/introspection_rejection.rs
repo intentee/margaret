@@ -5,6 +5,8 @@ use std::fmt::Result;
 use chrono::DateTime;
 use chrono::Utc;
 
+use margaret_oauth_vocabulary::oauth_vocabulary_error::OAuthVocabularyError;
+
 #[derive(Debug)]
 pub enum IntrospectionRejection {
     AudienceMismatch {
@@ -18,6 +20,12 @@ pub enum IntrospectionRejection {
     Inactive,
     IssuerMismatch {
         found: String,
+    },
+    MalformedClientId {
+        source: OAuthVocabularyError,
+    },
+    MalformedScope {
+        source: OAuthVocabularyError,
     },
     NotYetValid {
         nbf: DateTime<Utc>,
@@ -46,6 +54,14 @@ impl Display for IntrospectionRejection {
             Self::IssuerMismatch { found } => write!(
                 formatter,
                 "the introspected token was issued by '{found}' instead of its authorization server"
+            ),
+            Self::MalformedClientId { source } => write!(
+                formatter,
+                "the introspected token names a malformed client identifier: {source}"
+            ),
+            Self::MalformedScope { source } => write!(
+                formatter,
+                "the introspected token names a malformed scope: {source}"
             ),
             Self::NotYetValid { nbf, now } => write!(
                 formatter,

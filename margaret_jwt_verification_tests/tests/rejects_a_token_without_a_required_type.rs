@@ -5,7 +5,6 @@ use serde_json::json;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::type_rejection::TypeRejection;
@@ -31,10 +30,7 @@ fn rejects_a_token_without_a_required_type() {
         verify_serialized_jwt::<Map<String, Value>, AccessTokenProfile>(
             &key_set,
             &token,
-            &JwtExpectation {
-                audience: &trust.audience,
-                issuer: &trust.issuer
-            },
+            &trust.expectation(),
             NumericDate::new(950)
         ),
         JwtVerification::Rejected(JwtRejection::Type(TypeRejection::Missing {

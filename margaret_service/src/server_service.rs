@@ -7,24 +7,19 @@ use trzcina::Service;
 
 use margaret_http::bound_server::BoundServer;
 use margaret_http::forward_targets::ForwardTargets;
-use margaret_http::server_registry::ServerRegistry;
+use margaret_http::server::Server;
 
 pub struct ServerService {
     forward_targets: Arc<ForwardTargets>,
-    name: Arc<str>,
-    server_registry: Arc<ServerRegistry>,
+    server: Arc<Server>,
 }
 
 impl ServerService {
-    pub fn new(
-        server_registry: Arc<ServerRegistry>,
-        forward_targets: Arc<ForwardTargets>,
-        name: impl Into<Arc<str>>,
-    ) -> Self {
+    #[must_use]
+    pub fn new(server: Arc<Server>, forward_targets: Arc<ForwardTargets>) -> Self {
         Self {
             forward_targets,
-            name: name.into(),
-            server_registry,
+            server,
         }
     }
 }
@@ -34,10 +29,9 @@ impl Service for ServerService {
     async fn run(self: Box<Self>, cancellation_token: CancellationToken) -> Result<()> {
         let Self {
             forward_targets,
-            name,
-            server_registry,
+            server,
         } = *self;
-        let bound = BoundServer::bind(server_registry, forward_targets, name).await?;
+        let bound = BoundServer::bind(server, forward_targets).await?;
 
         bound.serve(cancellation_token).await;
 

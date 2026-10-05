@@ -20,11 +20,11 @@ fn reports_two_route_entries_claiming_the_same_path() {
         ServerRoutes::build(vec![
             RouteEntry::new(
                 "/items/{id}",
-                vec![MethodHandler::anonymous(RouteMethod::Get, not_found())],
+                vec![MethodHandler::head(RouteMethod::Get, not_found())],
             ),
             RouteEntry::new(
                 "/items/{name}",
-                vec![MethodHandler::anonymous(RouteMethod::Get, not_found())],
+                vec![MethodHandler::head(RouteMethod::Get, not_found())],
             ),
         ])
         .is_err()

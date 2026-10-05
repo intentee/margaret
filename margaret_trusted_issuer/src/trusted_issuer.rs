@@ -7,10 +7,14 @@ use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_issuer_key_set::key_set_refresh::KeySetRefresh;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
+use margaret_jwt_verification::attributed_jwt::AttributedJwt;
+use margaret_jwt_verification::jwt_addressee::JwtAddressee;
 use margaret_jwt_verification::jwt_profile::JwtProfile;
-use margaret_jwt_verification::profiled_jwt::ProfiledJwt;
+use margaret_jwt_verification::jwt_profiling::JwtProfiling;
+use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_oidc_discovery::oidc_discovery_url::oidc_discovery_url;
 use margaret_registered_claims::audience::Audience;
+use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_trust::declares_token_trust::DeclaresTokenTrust;
 
@@ -55,13 +59,19 @@ impl TrustedIssuer {
 
     pub async fn verify<TClaims: DeserializeOwned, TProfile: JwtProfile>(
         &self,
-        jwt: &ProfiledJwt<'_, TProfile>,
+        jwt: &AttributedJwt<'_>,
         audience: &Audience,
         now: NumericDate,
     ) -> IssuerVerification<TClaims, TProfile> {
+        let jwt = match jwt.profile::<TProfile>() {
+            JwtProfiling::Profiled(profiled) => profiled,
+            JwtProfiling::Rejected(rejection) => {
+                return IssuerVerification::Rejected(JwtRejection::Type(rejection));
+            }
+        };
         let snapshot = self.key_set.snapshot();
 
-        match verify_with_key_set(jwt, &snapshot.holding, audience, now) {
+        match verify_with_key_set(&jwt, &snapshot.holding, audience, now) {
             KeySetVerification::UnknownKey {
                 fetched_at,
                 rejection,
@@ -69,11 +79,17 @@ impl TrustedIssuer {
                 match self.key_set.refreshed_since(&snapshot).await {
                     KeySetRefresh::PollingStopped => IssuerVerification::Rejected(rejection),
                     KeySetRefresh::Refreshed(holding) => {
-                        verify_with_key_set(jwt, &holding, audience, now).settled()
+                        verify_with_key_set(&jwt, &holding, audience, now).settled()
                     }
                 }
             }
             verification => verification.settled(),
         }
+    }
+}
+
+impl JwtAddressee for TrustedIssuer {
+    fn jwt_issuer(&self) -> &IssuerIdentifier {
+        &self.trust.token_trust().issuer
     }
 }

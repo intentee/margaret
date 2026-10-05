@@ -6,7 +6,6 @@ use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jws_verification::header_type::HeaderType;
 use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::type_rejection::TypeRejection;
@@ -30,7 +29,7 @@ fn rejects_a_token_of_an_unsupported_type() {
     };
 
     assert!(matches!(
-        verify_serialized_jwt::<Map<String, Value>, AccessTokenProfile>(&key_set, &token, &JwtExpectation { audience: &trust.audience, issuer: &trust.issuer }, NumericDate::new(950)),
+        verify_serialized_jwt::<Map<String, Value>, AccessTokenProfile>(&key_set, &token, &trust.expectation(), NumericDate::new(950)),
         JwtVerification::Rejected(JwtRejection::Type(TypeRejection::Mismatch {
             expected: JwtType::AccessToken,
             found: HeaderType::Unsupported(found),

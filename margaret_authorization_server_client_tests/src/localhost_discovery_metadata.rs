@@ -12,13 +12,17 @@ fn localhost_url(path: &str) -> Url {
         .expect("the localhost endpoint is a url")
 }
 
+/// # Panics
+///
+/// Panics when a localhost endpoint is not a url.
 #[must_use]
 pub fn localhost_discovery_metadata(
+    authorization_response_issuer: AuthorizationResponseIssuer,
     introspection_endpoint: AdvertisedEndpoint,
 ) -> Arc<ProviderMetadata> {
     Arc::new(ProviderMetadata {
         authorization_endpoint: AdvertisedEndpoint::Advertised(localhost_url("/authorize")),
-        authorization_response_issuer: AuthorizationResponseIssuer::Unadvertised,
+        authorization_response_issuer,
         introspection_endpoint,
         jwks_uri: localhost_url("/jwks"),
         token_endpoint: AdvertisedEndpoint::Advertised(localhost_url("/token")),

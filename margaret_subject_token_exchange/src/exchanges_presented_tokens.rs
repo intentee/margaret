@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use margaret_jwt_verification::attributed_jwt::AttributedJwt;
+use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_token_exchange_client::subject_token_type::SubjectTokenType;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 use crate::exchanged_subject::ExchangedSubject;

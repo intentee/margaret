@@ -1,14 +1,10 @@
 use uuid::Uuid;
 
-use margaret_provider_state_storage::code_redemption_request::CodeRedemptionRequest;
 use margaret_provider_state_storage::pending_decision::PendingDecision;
 use margaret_provider_state_storage::pending_verdict::PendingVerdict;
 use margaret_provider_state_storage::provider_state_error::ProviderStateError;
-use margaret_provider_state_storage::refresh_admission::RefreshAdmission;
 use margaret_provider_state_storage::refresh_issuance::RefreshIssuance;
-use margaret_provider_state_storage::refresh_scope::RefreshScope;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
-use margaret_provider_state_storage_tests::admission_of::admission_of;
 use margaret_provider_state_storage_tests::fixture_grant::fixture_grant;
 use margaret_provider_state_storage_tests::fresh_digest::fresh_digest;
 use margaret_provider_state_storage_tests::pending_of::pending_of;
@@ -20,15 +16,6 @@ async fn postgres_state_reports_every_operation_without_its_tables() {
     let state = &postgres.state;
     let grant = fixture_grant();
     let code = fresh_digest();
-    let redemption = || CodeRedemptionRequest {
-        admission: admission_of(&grant),
-        family: Uuid::new_v4(),
-        refresh: RefreshIssuance::Withheld,
-    };
-    let refresh = || RefreshAdmission {
-        client_id: &grant.client_id,
-        scope: &RefreshScope::Granted,
-    };
     let refresh_token = fresh_digest();
 
     postgres.dropped().await;
@@ -38,8 +25,12 @@ async fn postgres_state_reports_every_operation_without_its_tables() {
         Err(ProviderStateError::IssueCode { .. })
     ));
     assert!(matches!(
-        state.redeem_code(code, redemption()).await,
-        Err(ProviderStateError::RedeemCode { .. })
+        state.present_code(code).await,
+        Err(ProviderStateError::PresentCode { .. })
+    ));
+    assert!(matches!(
+        state.spend_code(code, RefreshIssuance::Withheld).await,
+        Err(ProviderStateError::SpendCode { .. })
     ));
     assert!(matches!(
         state
@@ -60,8 +51,12 @@ async fn postgres_state_reports_every_operation_without_its_tables() {
         Err(ProviderStateError::DecidePendingAuthorization { .. })
     ));
     assert!(matches!(
+        state.present_refresh_token(refresh_token).await,
+        Err(ProviderStateError::PresentRefreshToken { .. })
+    ));
+    assert!(matches!(
         state
-            .rotate_refresh_token(refresh_token, fresh_digest(), refresh())
+            .rotate_refresh_token(refresh_token, fresh_digest())
             .await,
         Err(ProviderStateError::RotateRefreshToken { .. })
     ));

@@ -1,10 +1,10 @@
+use margaret_http_tests::redirection::Redirection;
+use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
-
-use crate::authorization_request::authorization_request;
-use crate::portal_parameters::portal_parameters;
-use crate::provider_fixture::ProviderFixture;
-use crate::redirection::Redirection;
-use crate::with_parameter::with_parameter;
+use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::validated_form::validated_form;
+use margaret_oidc_provider_tests::with_parameter::with_parameter;
 
 #[tokio::test]
 async fn redirects_an_anonymous_end_user_asked_for_no_interaction() {
@@ -12,13 +12,16 @@ async fn redirects_an_anonymous_end_user_asked_for_no_interaction() {
     let outcome = fixture
         .authorization
         .authorize(
-            authorization_request(&with_parameter(portal_parameters(), "prompt", "none")),
+            validated_form(&with_parameter(portal_parameters(), "prompt", "none")),
             &EndUserAuthentication::Anonymous,
         )
         .await
         .expect("the authorization reaches its state");
 
-    let redirection = Redirection::of_authorization(&outcome);
+    let AuthorizationOutcome::Redirected(response) = outcome else {
+        panic!("the authorization redirects");
+    };
+    let redirection = Redirection::of(&response);
 
     assert_eq!(redirection.parameter("error"), "login_required");
     assert_eq!(redirection.parameter("iss"), "https://localhost");

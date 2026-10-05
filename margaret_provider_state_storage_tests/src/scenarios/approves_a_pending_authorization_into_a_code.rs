@@ -1,14 +1,11 @@
 use uuid::Uuid;
 
-use margaret_provider_state_storage::code_redemption::CodeRedemption;
-use margaret_provider_state_storage::code_redemption_request::CodeRedemptionRequest;
 use margaret_provider_state_storage::decided_authorization::DecidedAuthorization;
 use margaret_provider_state_storage::pending_decision::PendingDecision;
 use margaret_provider_state_storage::pending_verdict::PendingVerdict;
-use margaret_provider_state_storage::refresh_issuance::RefreshIssuance;
+use margaret_provider_state_storage::presented_code::PresentedCode;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 
-use crate::admission_of::admission_of;
 use crate::fresh_digest::fresh_digest;
 use crate::pending_of::pending_of;
 
@@ -45,16 +42,9 @@ pub async fn approves_a_pending_authorization_into_a_code(state: &dyn StoresProv
     );
     assert_eq!(
         state
-            .redeem_code(
-                code,
-                CodeRedemptionRequest {
-                    admission: admission_of(&pending.grant),
-                    family: Uuid::new_v4(),
-                    refresh: RefreshIssuance::Withheld,
-                },
-            )
+            .present_code(code)
             .await
-            .expect("the backend redeems the code"),
-        CodeRedemption::Redeemed(Box::new(pending.grant))
+            .expect("the backend looks up the code"),
+        PresentedCode::Issued(Box::new(pending.grant))
     );
 }

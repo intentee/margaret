@@ -8,7 +8,6 @@ use margaret_console::command_outcome::CommandOutcome;
 use margaret_console::report_failure::report_failure;
 use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::server::Server;
-use margaret_http::server_registry::ServerRegistry;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
 
 use crate::server_assembly::ServerAssembly;
@@ -21,12 +20,10 @@ pub fn serve_application(
     matches: &ArgMatches,
     servers: Vec<ServerAssembly>,
 ) -> Result<Vec<ServerService>, CommandOutcome> {
-    let mut server_models = Vec::new();
-    let mut server_forward_targets = Vec::new();
+    let mut server_services = Vec::new();
 
     for ServerAssembly {
         address_argument,
-        name,
         routes,
         transport,
         upload_dir_argument,
@@ -50,27 +47,14 @@ pub fn serve_application(
             UploadConfig::Disabled
         };
 
-        server_forward_targets.push((
-            Arc::new(ForwardTargets::new(server_routes.named_handlers)),
-            name,
-        ));
-        server_models.push(Server::new(
-            name,
-            address,
-            transport,
-            upload_config,
-            server_routes.router,
-        ));
-    }
-
-    let server_registry = Arc::new(ServerRegistry::new(server_models));
-    let mut server_services = Vec::new();
-
-    for (forward_targets, name) in server_forward_targets {
         server_services.push(ServerService::new(
-            server_registry.clone(),
-            forward_targets,
-            name,
+            Arc::new(Server::new(
+                address,
+                transport,
+                upload_config,
+                server_routes.router,
+            )),
+            Arc::new(ForwardTargets::new(server_routes.named_handlers)),
         ));
     }
 
@@ -112,7 +96,6 @@ mod tests {
     fn public_assembly(routes: Result<ServerRoutes, InsertError>) -> ServerAssembly {
         ServerAssembly {
             address_argument: "public-addr",
-            name: "public",
             routes,
             transport: TransportConfig::Plain,
             upload_dir_argument: "public-upload-dir",

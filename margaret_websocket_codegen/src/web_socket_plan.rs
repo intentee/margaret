@@ -6,6 +6,7 @@ use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::web_socket_server_requirements::WebSocketServerRequirements;
+use margaret_http_codegen::web_socket_session_route::WebSocketSessionRoute;
 use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::binding_roots::binding_roots;
@@ -95,6 +96,13 @@ impl WebSocketPlan {
                         server.clone(),
                         WebSocketServerRequirements {
                             serve_inputs,
+                            sessions: sessions
+                                .iter()
+                                .map(|session_plan| WebSocketSessionRoute {
+                                    path: session_plan.session.path.clone(),
+                                    session: session_plan.session.session_path.clone(),
+                                })
+                                .collect(),
                             transport_policy,
                         },
                     )

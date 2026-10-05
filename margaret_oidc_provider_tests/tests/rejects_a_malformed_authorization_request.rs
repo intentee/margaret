@@ -2,9 +2,8 @@ use validator::ValidationErrors;
 
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_validation::validation_result::ValidationResult;
-
-use crate::provider_fixture::ProviderFixture;
 
 #[tokio::test]
 async fn rejects_a_malformed_authorization_request() {

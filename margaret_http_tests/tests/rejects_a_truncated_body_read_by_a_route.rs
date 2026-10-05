@@ -10,7 +10,7 @@ use margaret_http::route_entry::RouteEntry;
 use margaret_http_tests::json_reading_handler::JsonReadingHandler;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
-use margaret_route_method::route_method::RouteMethod;
+use margaret_route_method::content_method::ContentMethod;
 
 #[tokio::test]
 async fn rejects_a_truncated_body_read_by_a_route() {
@@ -18,8 +18,8 @@ async fn rejects_a_truncated_body_read_by_a_route() {
         UploadConfig::Disabled,
         vec![RouteEntry::new(
             "/json",
-            vec![MethodHandler::anonymous(
-                RouteMethod::Post,
+            vec![MethodHandler::content(
+                ContentMethod::Post,
                 Arc::new(JsonReadingHandler {
                     limit: BodyLimit::new(1024),
                 }),

@@ -13,17 +13,21 @@ fn jwks_secret_holder_returns_set_secret() -> Result<()> {
         SigningCurve::P256,
         &FixtureRsaSigningKeys::default(),
     )?);
-    let holder = JwksSecretHolder::default();
+    let initial = Arc::new(JwksSecret::fresh(
+        SigningCurve::P256,
+        &FixtureRsaSigningKeys::default(),
+    )?);
+    let holder = JwksSecretHolder::new(Arc::clone(&initial));
 
-    assert!(holder.get().is_none());
+    assert!(Arc::ptr_eq(&holder.get(), &initial));
 
-    holder.set(Some(secret.clone()));
+    holder.set(Arc::clone(&secret));
 
-    assert!(matches!(holder.get(), Some(stored) if Arc::ptr_eq(&stored, &secret)));
+    assert!(Arc::ptr_eq(&holder.get(), &secret));
 
     let cloned_holder = holder.clone();
 
-    assert!(matches!(cloned_holder.get(), Some(stored) if Arc::ptr_eq(&stored, &secret)));
+    assert!(Arc::ptr_eq(&cloned_holder.get(), &secret));
 
     Ok(())
 }

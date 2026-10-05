@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::body_reading::BodyReading;
-use margaret_http::handler::Handler;
+use margaret_http::content_handler::ContentHandler;
 use margaret_http::handler_error::HandlerError;
 use margaret_http::read_uploaded_files::read_uploaded_files;
 use margaret_http::request::Request;
@@ -15,7 +15,7 @@ pub struct UploadedFilesReadingHandler {
 }
 
 #[async_trait]
-impl Handler for UploadedFilesReadingHandler {
+impl ContentHandler for UploadedFilesReadingHandler {
     async fn handle(
         &self,
         request: &Request,

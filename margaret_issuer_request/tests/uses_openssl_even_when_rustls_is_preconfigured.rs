@@ -22,7 +22,7 @@ async fn uses_openssl_even_when_rustls_is_preconfigured() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/document",
-            vec![MethodHandler::anonymous(
+            vec![MethodHandler::head(
                 RouteMethod::Get,
                 Arc::new(StaticHandler {
                     body: br#"{"keys":[]}"#.to_vec(),

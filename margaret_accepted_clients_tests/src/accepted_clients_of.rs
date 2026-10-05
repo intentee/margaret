@@ -5,6 +5,7 @@ use margaret_accepted_clients::accepted_clients::AcceptedClients;
 use margaret_accepted_clients::accepted_clients_error::AcceptedClientsError;
 use margaret_accepted_clients::declares_accepted_client::DeclaresAcceptedClient;
 use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
+use margaret_token_signer_tests::token_issuance_declaration::TokenIssuanceDeclaration;
 
 use crate::accepted_client_declaration::AcceptedClientDeclaration;
 
@@ -21,6 +22,8 @@ pub fn accepted_clients_of(
                 Arc::new(AcceptedClientDeclaration { client }) as Arc<dyn DeclaresAcceptedClient>
             })
             .collect(),
-        &fixture_issuance(),
+        &TokenIssuanceDeclaration {
+            issuance: fixture_issuance(),
+        },
     )
 }

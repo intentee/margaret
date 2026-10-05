@@ -8,12 +8,11 @@ use margaret_oidc_sign_in::sign_in_request::SignInRequest;
 
 /// # Panics
 ///
-/// Panics when the sign-in transaction cannot be signed.
+/// Panics when the fixture callback or scope is malformed.
 pub async fn begin_sign_in(flow: &SignInFlow) -> SignInBeginning {
     flow.begin(SignInRequest {
         callback: Url::parse("https://client.example/callback").expect("the callback is a url"),
         scopes: BTreeSet::from(["profile".parse().expect("the scope is a scope token")]),
     })
     .await
-    .expect("the transaction is signed")
 }

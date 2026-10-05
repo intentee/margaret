@@ -7,11 +7,13 @@ use serde_json::json;
 use margaret_authorization_server_client::target_audience::TargetAudience;
 use margaret_authorization_server_client::token_target::TokenTarget;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
+use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
 use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
 use margaret_http::body_limit::BodyLimit;
+use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::echo_wrapping::EchoWrapping;
 use margaret_http_tests::form_echo_handler::FormEchoHandler;
-use margaret_route_method::route_method::RouteMethod;
+use margaret_route_method::content_method::ContentMethod;
 use margaret_token_exchange_client::exchanged_token::ExchangedToken;
 use margaret_token_exchange_client::token_exchange::TokenExchange;
 use margaret_token_exchange_client_tests::workload_subject_token::workload_subject_token;
@@ -19,15 +21,20 @@ use margaret_token_exchange_client_tests::workload_subject_token::workload_subje
 #[tokio::test]
 async fn requests_a_token_exchange_for_its_subject_and_target() {
     let server = FixtureAuthorizationServer::start(
-        RouteMethod::Post,
         "/token",
-        Arc::new(FormEchoHandler {
-            limit: BodyLimit::new(1024),
-            wrapping: EchoWrapping::AccessToken,
-        }),
+        MethodHandler::content(
+            ContentMethod::Post,
+            Arc::new(FormEchoHandler {
+                limit: BodyLimit::new(1024),
+                wrapping: EchoWrapping::AccessToken,
+            }),
+        ),
     )
     .await;
-    let exchanged = TokenExchange::create(Arc::new(server.client(Arc::new(secret_basic_client()))))
+    let exchanged =
+        TokenExchange::create(Arc::new(server.client(Arc::new(OAuthClientDeclaration {
+            client: secret_basic_client(),
+        }))))
         .exchange(
             &workload_subject_token(),
             &TokenTarget {
@@ -35,8 +42,7 @@ async fn requests_a_token_exchange_for_its_subject_and_target() {
                 scopes: BTreeSet::new(),
             },
         )
-        .await
-        .expect("a secret basic client needs no assertion");
+        .await;
 
     server.stop().await;
 

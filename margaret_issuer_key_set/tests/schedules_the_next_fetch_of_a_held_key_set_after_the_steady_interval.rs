@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tokio::time::Instant;
 
 use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
@@ -10,7 +12,7 @@ fn schedules_the_next_fetch_of_a_held_key_set_after_the_steady_interval() {
     let fetch_started_at = Instant::now();
 
     issuer_key_set.start_fetch();
-    issuer_key_set.hold(fresh_p256_secret().key_set().clone());
+    issuer_key_set.hold(Arc::new(fresh_p256_secret().key_set().clone()));
 
     assert_eq!(
         issuer_key_set

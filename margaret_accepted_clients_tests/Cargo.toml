@@ -8,8 +8,12 @@ autotests = false
 [dependencies]
 margaret_accepted_clients = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
+margaret_oauth_vocabulary = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 url = { workspace = true }
+
+[dev-dependencies]
+margaret_http = { workspace = true }
 
 [[test]]
 name = "main"

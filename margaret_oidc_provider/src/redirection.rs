@@ -1,5 +1,6 @@
 use url::Url;
 
+use margaret_http::redirect::Redirect;
 use margaret_http::response::Response;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
@@ -39,6 +40,6 @@ impl Redirection<'_> {
             }
         }
 
-        frame_denied(Response::text(303, "").header("location", redirect_uri.as_str()))
+        frame_denied(Redirect::see_other(redirect_uri.into()).into_response())
     }
 }

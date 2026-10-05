@@ -24,8 +24,7 @@ async fn refuses_a_callback_with_another_state() {
             &begun.cookie_pair(),
             &BTreeMap::from([("code", "SplxlOBeZQQYbYS6WxSbIA"), ("state", "forged")]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

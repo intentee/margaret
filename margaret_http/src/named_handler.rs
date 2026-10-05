@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
-use crate::handler::Handler;
+use crate::head_handler::HeadHandler;
 
 pub struct NamedHandler {
-    handler: Arc<dyn Handler>,
+    handler: Arc<dyn HeadHandler>,
     name: &'static str,
 }
 
 impl NamedHandler {
-    pub fn new(name: &'static str, handler: Arc<dyn Handler>) -> Self {
+    pub(crate) fn new(name: &'static str, handler: Arc<dyn HeadHandler>) -> Self {
         Self { handler, name }
     }
 
-    pub(crate) fn into_handler(self) -> Arc<dyn Handler> {
+    pub(crate) fn into_handler(self) -> Arc<dyn HeadHandler> {
         self.handler
     }
 

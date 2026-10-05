@@ -9,8 +9,6 @@ use margaret_token_signer_tests::unix_time::unix_time;
 fn reports_a_malformed_refresh_token_as_a_minting_outcome() {
     assert!(matches!(
         rolled_store(fresh_p256_secret()).mint_access_token("not-a-valid-jwt", unix_time(500)),
-        Ok(AccessTokenMinting::RejectedRefreshToken(JwtRejection::Jws(
-            JwsRejection::NotCompactJws
-        )))
+        AccessTokenMinting::RejectedRefreshToken(JwtRejection::Jws(JwsRejection::NotCompactJws))
     ));
 }

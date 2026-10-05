@@ -258,10 +258,10 @@ impl Farewell {
         .collect();
 
         assert!(source.contains(
-            r#"clap::Arg::new("internal-transport").long("internal-transport").required(true).value_parser(["spiffe_mtls"])"#
+            r#"clap::Arg::new("internal-transport").long("internal-transport").required(true).value_parser(margaret::framework::service::transport_choice::TransportChoice::pinned_to_spiffe_mtls()"#
         ));
         assert!(source.contains(
-            r#"clap::Arg::new("public-transport").long("public-transport").required(true).value_parser(["plain","spiffe_mtls"])"#
+            r#"clap::Arg::new("public-transport").long("public-transport").required(true).value_parser(clap::value_parser!(margaret::framework::service::transport_choice::TransportChoice)"#
         ));
         assert!(source.contains(
             r#"clap::Arg::new("spiffe-trust-domain").long("spiffe-trust-domain").required(true)"#

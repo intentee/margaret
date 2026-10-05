@@ -2,6 +2,7 @@ use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_attributes::indexed_attribute::IndexedAttribute;
 use margaret_input_weaving::constructor_parameter::ConstructorParameter;
 
+use crate::declared_serve_input_source::DeclaredServeInputSource;
 use crate::serve_input_codegen_error::ServeInputCodegenError;
 
 const SERVE_INPUT_ATTRIBUTES: [FrameworkAttribute; 3] = [
@@ -9,11 +10,6 @@ const SERVE_INPUT_ATTRIBUTES: [FrameworkAttribute; 3] = [
     FrameworkAttribute::EnvironmentVariable,
     FrameworkAttribute::SpiffeHttpClient,
 ];
-
-pub(crate) struct DeclaredServeInputSource<'attributes> {
-    pub(crate) attribute: &'attributes IndexedAttribute,
-    pub(crate) declared_by: FrameworkAttribute,
-}
 
 pub(crate) fn serve_input_source<'attributes>(
     attributes: &'attributes [IndexedAttribute],

@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::portal_credentials::PORTAL_CREDENTIALS;
-use crate::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]
 async fn introspects_an_access_token_of_a_single_audience() {

@@ -57,7 +57,14 @@ impl HttpPlan {
         bindings: &ContainerBindings,
         registries: &BindingRegistries,
     ) -> Result<Self, HttpCodegenError> {
-        let table = http_routes(index, middleware_plans, registries)?;
+        let mut table = http_routes(index, middleware_plans, registries)?;
+
+        for (server, requirements) in websocket_servers {
+            for route in &requirements.sessions {
+                table.reserve_web_socket(server, route)?;
+            }
+        }
+
         let servers = active_servers(&table, websocket_servers);
         let server_serve_inputs =
             server_serve_inputs(&table, &servers, bindings, websocket_servers)?;
@@ -80,7 +87,7 @@ impl HttpPlan {
             .flat_map(|server| {
                 self.table.route_groups(server.name()).flat_map(|group| {
                     group.method_routes().map(|route| RouteLocation {
-                        method: route.method,
+                        method: route.method(),
                         path: group.path(),
                         responder_path: &route.responder_path,
                         server: server.name(),

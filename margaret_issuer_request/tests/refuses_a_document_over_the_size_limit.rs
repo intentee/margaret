@@ -9,6 +9,7 @@ use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_issuer_request::issuer_document::IssuerDocument;
+use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_issuer_request::issuer_response_max_bytes::ISSUER_RESPONSE_MAX_BYTES;
 use margaret_route_method::route_method::RouteMethod;
@@ -20,7 +21,7 @@ async fn refuses_a_document_over_the_size_limit() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/document",
-            vec![MethodHandler::anonymous(
+            vec![MethodHandler::head(
                 RouteMethod::Get,
                 Arc::new(StaticHandler {
                     body: vec![b' '; ISSUER_RESPONSE_MAX_BYTES + 1],
@@ -43,9 +44,9 @@ async fn refuses_a_document_over_the_size_limit() {
 
     assert!(matches!(
         fetched,
-        IssuerDocument::Oversized {
+        IssuerDocument::Failed(IssuerExchangeError::Oversized {
             max_bytes: ISSUER_RESPONSE_MAX_BYTES
-        }
+        })
     ));
 
     server.stop().await;

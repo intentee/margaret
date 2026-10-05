@@ -3,7 +3,6 @@ use std::sync::Arc;
 use moka::future::Cache;
 
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
-use margaret_authorization_server_client::authorization_server_client_error::AuthorizationServerClientError;
 use margaret_authorization_server_client::token_target::TokenTarget;
 
 use crate::acquired_token::AcquiredToken;
@@ -24,22 +23,12 @@ impl ClientCredentials {
         }
     }
 
-    /// # Errors
-    ///
-    /// Returns `AuthorizationServerClientError::AssertionSigning` when the client assertion of a
-    /// `private_key_jwt` client cannot be signed.
-    pub async fn access_token(
-        &self,
-        target: &TokenTarget,
-    ) -> Result<AcquiredToken, Arc<AuthorizationServerClientError>> {
+    pub async fn access_token(&self, target: &TokenTarget) -> AcquiredToken {
         self.tokens
-            .try_get_with(target.clone(), async {
-                self.server
-                    .client_credentials(target)
-                    .await
-                    .map(CachedAcquisition::of)
+            .get_with(target.clone(), async {
+                CachedAcquisition::of(self.server.client_credentials(target).await)
             })
             .await
-            .map(|cached| cached.acquired)
+            .acquired
     }
 }

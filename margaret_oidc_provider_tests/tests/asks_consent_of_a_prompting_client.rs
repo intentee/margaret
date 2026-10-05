@@ -1,16 +1,18 @@
+use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::consent_request::ConsentRequest;
-
-use crate::fixture_scopes::fixture_scopes;
-use crate::provider_fixture::ProviderFixture;
-use crate::requested_consent::requested_consent;
-use crate::spa_parameters::spa_parameters;
+use margaret_oidc_provider_tests::fixture_scopes::fixture_scopes;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::spa_parameters::spa_parameters;
 
 #[tokio::test]
 async fn asks_consent_of_a_prompting_client() {
     let fixture = ProviderFixture::start(Vec::new()).await;
-    let ConsentRequest {
+    let AuthorizationOutcome::ConsentRequired(ConsentRequest {
         client_id, scopes, ..
-    } = requested_consent(&fixture, &spa_parameters()).await;
+    }) = fixture.authorized(&spa_parameters()).await
+    else {
+        panic!("the end user is asked for consent");
+    };
 
     assert_eq!(client_id.as_str(), "spa");
     assert_eq!(scopes, fixture_scopes(&["openid"]));

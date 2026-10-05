@@ -13,12 +13,10 @@ fn jwks_secret_holder_subscription_reads_current() -> Result<()> {
         SigningCurve::P256,
         &FixtureRsaSigningKeys::default(),
     )?);
-    let holder = JwksSecretHolder::default();
-    holder.set(Some(secret.clone()));
-
+    let holder = JwksSecretHolder::new(Arc::clone(&secret));
     let mut subscription = holder.subscribe();
 
-    assert!(matches!(subscription.read_current(), Some(current) if Arc::ptr_eq(&current, &secret)));
+    assert!(Arc::ptr_eq(&subscription.read_current(), &secret));
 
     Ok(())
 }

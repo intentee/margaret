@@ -16,8 +16,8 @@ use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
 use margaret_oidc_sign_in_tests::id_token_claims::id_token_claims;
+use margaret_oidc_sign_in_tests::issued_token_answer::issued_token_answer;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
-use margaret_oidc_sign_in_tests::token_answer::TokenAnswer;
 
 async fn completed_with(
     adjust: impl FnOnce(&mut Value),
@@ -36,7 +36,7 @@ async fn completed_with(
         fixture
             .token_endpoint
             .answer
-            .set(TokenAnswer::issued(
+            .set(issued_token_answer(
                 &fixture.issuer_secret.current().sign_json(&claims, jwt_type)
             ))
             .is_ok()
@@ -52,8 +52,7 @@ async fn completed_with(
                 ("state", begun.authorization_parameter("state")),
             ]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

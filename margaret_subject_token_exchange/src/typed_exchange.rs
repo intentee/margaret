@@ -3,10 +3,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use margaret_jwt_verification::attributed_jwt::AttributedJwt;
-use margaret_jwt_verification::jwt_profiling::JwtProfiling;
-use margaret_jwt_verification::jwt_rejection::JwtRejection;
+use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_token_exchange_client::subject_token_type::SubjectTokenType;
 use margaret_trusted_issuer::issuer_verification::IssuerVerification;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
@@ -34,18 +32,9 @@ impl<TExchanger: ExchangesSubjectTokens> ExchangesPresentedTokens for TypedExcha
             return ExchangedSubject::Refused(SubjectTokenRefusal::TokenTypeMismatch);
         }
 
-        let profiled = match jwt.profile::<TExchanger::Profile>() {
-            JwtProfiling::Profiled(profiled) => profiled,
-            JwtProfiling::Rejected(rejection) => {
-                return ExchangedSubject::Refused(SubjectTokenRefusal::Rejected(
-                    JwtRejection::Type(rejection),
-                ));
-            }
-        };
-
         match trusted_issuer
             .verify::<TExchanger::Claims, TExchanger::Profile>(
-                &profiled,
+                jwt,
                 &trusted_issuer.trust.token_trust().audience,
                 now,
             )

@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::client_credentials::ClientCredentials;
-use crate::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::client_credentials::ClientCredentials;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]
 async fn refuses_a_revocation_by_an_unauthenticated_client() {

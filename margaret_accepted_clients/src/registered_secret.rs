@@ -1,6 +1,6 @@
-use aws_lc_rs::digest::SHA256_OUTPUT_LEN;
+use margaret_token_digest::token_digest::TokenDigest;
 
 pub(crate) enum RegisteredSecret {
-    Digest([u8; SHA256_OUTPUT_LEN]),
+    Digest(TokenDigest),
     Public,
 }

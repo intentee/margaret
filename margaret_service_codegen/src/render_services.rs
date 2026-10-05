@@ -12,9 +12,9 @@ use margaret_console_argument_codegen::required_flag_read::required_flag_read;
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
 use margaret_http_codegen::http_server::HttpServer;
-use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
 use margaret_http_codegen::serves_spiffe::serves_spiffe;
 
+use crate::first_tick::FirstTick;
 use crate::runner_outcome::RunnerOutcome;
 use crate::served_origin_check::ServedOriginCheck;
 use crate::service_kind::ServiceKind;
@@ -40,30 +40,12 @@ fn transport_expression(server: &HttpServer, spiffe_secured: bool) -> TokenStrea
         return quote! { margaret::framework::http::transport_config::TransportConfig::Plain };
     }
 
-    match server.transport_policy() {
-        ServerTransportPolicy::PinnedSpiffeMtls => quote! {
-            margaret::framework::http::transport_config::TransportConfig::MutualTls {
-                server_config: ::std::sync::Arc::clone(spiffe_server_config),
-            }
-        },
-        ServerTransportPolicy::Negotiable => {
-            let transport_argument = server.transport_argument();
-
-            quote! {
-                match matches.get_one::<String>(#transport_argument).map(String::as_str) {
-                    Some("plain") => margaret::framework::http::transport_config::TransportConfig::Plain,
-                    Some("spiffe_mtls") => margaret::framework::http::transport_config::TransportConfig::MutualTls {
-                        server_config: ::std::sync::Arc::clone(spiffe_server_config),
-                    },
-                    Some(_) | None => {
-                        return ::std::result::Result::Err(
-                            margaret::framework::console::command_outcome::CommandOutcome::Failed,
-                        );
-                    }
-                }
-            }
-        }
-    }
+    required_flag_read(
+        &quote! { margaret::framework::service::transport_choice::TransportChoice },
+        &server.transport_argument(),
+        &quote! { value.config(spiffe_server_config) },
+        &failed_registration(),
+    )
 }
 
 fn svid_identity_prelude(
@@ -188,7 +170,7 @@ fn origin_checks(
                 bindings.accessor_invocation(&format_ident!("container"), &check.accessor_field);
 
             quote! {
-                if let ::std::result::Result::Err(error) = #provider.served_by(&#origin_variable) {
+                if let ::std::result::Result::Err(error) = #provider.served_by(#origin_variable) {
                     return ::std::result::Result::Err(
                         margaret::framework::console::report_failure::report_failure(error),
                     );
@@ -209,15 +191,15 @@ fn server_registration(
     let origins = servers.iter().map(|server| {
         let origin_variable = format_ident!("origin_{}", server.name());
         let origin_read = required_flag_read(
-            &quote! { String },
+            &quote! { margaret::framework::http::server_origin::ServerOrigin },
             &server.url_argument(),
-            &quote! { value.clone().into() },
+            &quote! { value },
             &failed_registration(),
         );
         let checks = origin_checks(server, served_origin_checks, bindings);
 
         quote! {
-            let #origin_variable: ::std::sync::Arc<str> = #origin_read;
+            let #origin_variable: &margaret::framework::http::server_origin::ServerOrigin = #origin_read;
             #checks
         }
     });
@@ -225,13 +207,12 @@ fn server_registration(
     let origin_arguments = servers.iter().map(|server| {
         let origin_variable = format_ident!("origin_{}", server.name());
 
-        quote! { #origin_variable.clone() }
+        quote! { ::std::sync::Arc::from(#origin_variable.origin.ascii_serialization()) }
     });
 
     let views_argument = has_views.then(|| quote! { , &views });
     let assemblies = servers.iter().map(|server| {
         let function_name = server.function_name();
-        let name = server.name();
         let address_argument = server.address_argument();
         let uploads_argument = server.uploads_argument();
         let upload_dir_argument = server.upload_dir_argument();
@@ -243,7 +224,6 @@ fn server_registration(
         quote! {
             margaret::framework::service::server_assembly::ServerAssembly {
                 address_argument: #address_argument,
-                name: #name,
                 routes: #routes,
                 transport: #transport,
                 upload_dir_argument: #upload_dir_argument,
@@ -298,12 +278,25 @@ fn missed_tick_behavior_method(behavior: Option<&CanonicalPath>) -> TokenStream 
     }
 }
 
+fn first_tick_timing_method(first_tick: FirstTick) -> TokenStream {
+    match first_tick {
+        FirstTick::AfterInterval => quote! {
+            fn first_tick_timing(&self) -> trzcina::FirstTickTiming {
+                trzcina::FirstTickTiming::AfterInterval
+            }
+        },
+        FirstTick::Immediate => quote! {},
+    }
+}
+
 fn adapter(unit: &ServiceUnit) -> TokenStream {
     match &unit.kind {
         ServiceKind::Service => service_adapter(unit),
-        ServiceKind::Ticker { behavior, interval } => {
-            ticker_adapter(unit, behavior.as_ref(), interval)
-        }
+        ServiceKind::Ticker {
+            behavior,
+            first_tick,
+            interval,
+        } => ticker_adapter(unit, behavior.as_ref(), *first_tick, interval),
     }
 }
 
@@ -334,6 +327,7 @@ fn runner_result(unit: &ServiceUnit, call: &TokenStream) -> TokenStream {
 fn ticker_adapter(
     unit: &ServiceUnit,
     behavior: Option<&CanonicalPath>,
+    first_tick: FirstTick,
     interval: &CanonicalPath,
 ) -> TokenStream {
     let name = adapter_ident(unit);
@@ -341,6 +335,7 @@ fn ticker_adapter(
     let interval = path_tokens(interval);
     let runner = format_ident!("{}", unit.runner);
     let missed_tick_behavior_method = missed_tick_behavior_method(behavior);
+    let first_tick_timing_method = first_tick_timing_method(first_tick);
     let (token_binding, arguments) = if unit.takes_token {
         (quote! { cancellation_token }, quote! { cancellation_token })
     } else {
@@ -363,6 +358,8 @@ fn ticker_adapter(
             fn tick_interval(&self) -> std::time::Duration {
                 #interval
             }
+
+            #first_tick_timing_method
 
             #missed_tick_behavior_method
 

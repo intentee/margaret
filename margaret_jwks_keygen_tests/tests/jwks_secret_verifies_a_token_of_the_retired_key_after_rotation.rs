@@ -6,7 +6,6 @@ use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_registered_claims::numeric_date::NumericDate;
 
@@ -21,7 +20,7 @@ fn jwks_secret_verifies_a_token_of_the_retired_key_after_rotation() -> Result<()
     let rotated = secret.rotate(&FixtureRsaSigningKeys::default())?;
 
     assert!(matches!(
-        rotated.verify_jwt::<TestClaims, AccessTokenProfile>(&token, &JwtExpectation { audience: &trust.audience, issuer: &trust.issuer }, NumericDate::new(0)),
+        rotated.verify_jwt::<TestClaims, AccessTokenProfile>(&token, &trust.expectation(), NumericDate::new(0)),
         JwksSecretVerificationResult::SignedWithPrevious(verified) if verified.claims == claims
     ));
 

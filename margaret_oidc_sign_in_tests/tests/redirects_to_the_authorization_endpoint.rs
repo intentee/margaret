@@ -17,7 +17,7 @@ async fn redirects_to_the_authorization_endpoint() {
 
     fixture.server.stop().await;
 
-    assert_eq!(begun.status, 303);
+    assert_eq!(response.status(), 303);
     assert_eq!(begun.authorization_parameter("client_id"), "client:id");
     assert_eq!(
         begun.authorization_parameter("code_challenge_method"),

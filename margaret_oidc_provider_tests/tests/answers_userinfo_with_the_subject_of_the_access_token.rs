@@ -1,16 +1,23 @@
 use serde_json::json;
 
-use crate::answer::Answer;
-use crate::client_credentials::ClientCredentials;
-use crate::end_user_subject::END_USER_SUBJECT;
-use crate::portal_tokens::portal_tokens;
-use crate::provider_fixture::ProviderFixture;
-use crate::provider_url::provider_url;
+use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
+use margaret_oidc_provider_tests::answer::Answer;
+use margaret_oidc_provider_tests::client_credentials::ClientCredentials;
+use margaret_oidc_provider_tests::end_user_subject::END_USER_SUBJECT;
+use margaret_oidc_provider_tests::issued_code::issued_code;
+use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
+use margaret_oidc_provider_tests::portal_tokens::portal_tokens;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::provider_url::provider_url;
 
 #[tokio::test]
 async fn answers_userinfo_with_the_subject_of_the_access_token() {
     let fixture = ProviderFixture::start(Vec::new()).await;
-    let access_token = portal_tokens(&fixture).await.body["access_token"]
+    let AuthorizationOutcome::Redirected(redirect) = fixture.authorized(&portal_parameters()).await
+    else {
+        panic!("the portal is issued a code");
+    };
+    let access_token = portal_tokens(&fixture, &issued_code(&redirect)).await.body["access_token"]
         .as_str()
         .expect("the access token is a string")
         .to_string();

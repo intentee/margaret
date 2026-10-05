@@ -2,6 +2,7 @@ pub mod access_token_claims;
 pub mod access_token_claims_signed;
 pub mod access_token_lifetime_secs;
 pub mod access_token_stamp;
+pub mod client_assertion_claims;
 pub mod cookie_name_access_token;
 pub mod cookie_name_refresh_token;
 pub mod id_token_claims;

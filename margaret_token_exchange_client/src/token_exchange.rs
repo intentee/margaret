@@ -5,24 +5,26 @@ use oauth2::TokenResponse;
 use oauth2::basic::BasicTokenType;
 
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
-use margaret_authorization_server_client::authorization_server_client_error::AuthorizationServerClientError;
 use margaret_authorization_server_client::endpoint_outcome::EndpointOutcome;
 use margaret_authorization_server_client::form_parameter::FormParameter;
 use margaret_authorization_server_client::token_target::TokenTarget;
+use margaret_oauth_vocabulary::grant_type::GrantType;
+use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 
 use crate::exchanged_token::ExchangedToken;
 use crate::issued_token_type_fields::IssuedTokenTypeFields;
 use crate::issued_token_type_mismatch::IssuedTokenTypeMismatch;
 use crate::subject_token::SubjectToken;
-use crate::subject_token_type::SubjectTokenType;
-
-const TOKEN_EXCHANGE_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:token-exchange";
 
 fn exchanged(
     response: &StandardTokenResponse<IssuedTokenTypeFields, BasicTokenType>,
 ) -> ExchangedToken {
     match &response.extra_fields().issued_token_type {
-        Some(issued_token_type) if issued_token_type == SubjectTokenType::AccessToken.urn() => {
+        Some(issued_token_type)
+            if issued_token_type
+                .parse::<SubjectTokenType>()
+                .is_ok_and(|parsed| parsed == SubjectTokenType::AccessToken) =>
+        {
             ExchangedToken::Exchanged(response.access_token().clone())
         }
         Some(issued_token_type) => {
@@ -44,15 +46,7 @@ impl TokenExchange {
         Self { server }
     }
 
-    /// # Errors
-    ///
-    /// Returns `AuthorizationServerClientError::AssertionSigning` when the client assertion of a
-    /// `private_key_jwt` client cannot be signed.
-    pub async fn exchange(
-        &self,
-        subject: &SubjectToken,
-        target: &TokenTarget,
-    ) -> Result<ExchangedToken, AuthorizationServerClientError> {
+    pub async fn exchange(&self, subject: &SubjectToken, target: &TokenTarget) -> ExchangedToken {
         let mut parameters = vec![
             FormParameter {
                 name: "requested_token_type",
@@ -70,18 +64,16 @@ impl TokenExchange {
 
         parameters.extend(target.form_parameters());
 
-        Ok(
-            match self
-                .server
-                .request_grant::<IssuedTokenTypeFields>(TOKEN_EXCHANGE_GRANT_TYPE, parameters)
-                .await?
-            {
-                EndpointOutcome::Answered(response) => exchanged(&response),
-                EndpointOutcome::Refused(refusal) => ExchangedToken::Refused(refusal),
-                EndpointOutcome::Unavailable(unavailability) => {
-                    ExchangedToken::Unavailable(unavailability)
-                }
-            },
-        )
+        match self
+            .server
+            .request_grant::<IssuedTokenTypeFields>(GrantType::TokenExchange, parameters)
+            .await
+        {
+            EndpointOutcome::Answered(response) => exchanged(&response),
+            EndpointOutcome::Refused(refusal) => ExchangedToken::Refused(refusal),
+            EndpointOutcome::Unavailable(unavailability) => {
+                ExchangedToken::Unavailable(unavailability)
+            }
+        }
     }
 }

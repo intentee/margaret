@@ -1,5 +1,6 @@
 use margaret_container::container_bindings::ContainerBindings;
 use margaret_jwks_codegen::jwks_roll_interval_path::jwks_roll_interval_path;
+use margaret_service_codegen::first_tick::FirstTick;
 use margaret_service_codegen::framework_service::FrameworkService;
 use margaret_service_codegen::framework_service_kind::FrameworkServiceKind;
 use margaret_service_codegen::runner_outcome::RunnerOutcome;
@@ -16,6 +17,7 @@ pub(crate) fn jwks_framework_services(bindings: &ContainerBindings) -> Vec<Frame
             field_name: binding.field_name.clone(),
             is_async: false,
             kind: FrameworkServiceKind::Ticker {
+                first_tick: FirstTick::AfterInterval,
                 interval: jwks_roll_interval_path(),
             },
             outcome: RunnerOutcome::Fallible,

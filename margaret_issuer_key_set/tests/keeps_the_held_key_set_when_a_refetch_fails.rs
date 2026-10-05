@@ -11,7 +11,7 @@ async fn keeps_the_held_key_set_when_a_refetch_fails() {
     let issuer_key_set = IssuerKeySet::awaiting();
 
     issuer_key_set.start_fetch();
-    issuer_key_set.hold(fresh_p256_secret().key_set().clone());
+    issuer_key_set.hold(Arc::new(fresh_p256_secret().key_set().clone()));
 
     let snapshot = issuer_key_set.snapshot();
     let (refresh, ()) = tokio::join!(issuer_key_set.refreshed_since(&snapshot), async {

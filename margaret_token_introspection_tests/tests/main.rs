@@ -1,8 +1,9 @@
 mod admits_an_active_token_for_our_audience;
 mod describes_every_introspection_rejection;
 mod leaves_a_request_without_bearer_credentials_unaddressed;
-mod propagates_an_assertion_that_cannot_be_signed;
 mod refuses_a_token_for_another_audience;
+mod refuses_a_token_naming_a_malformed_client_identifier;
+mod refuses_a_token_naming_a_malformed_scope;
 mod refuses_a_token_of_another_issuer;
 mod refuses_a_token_that_is_not_valid_yet;
 mod refuses_a_token_without_an_audience;

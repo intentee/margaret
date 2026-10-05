@@ -3,15 +3,17 @@ use serde_json::json;
 
 use margaret_authorization_server_client::endpoint_outcome::EndpointOutcome;
 use margaret_authorization_server_client_tests::answered_token_request::answered_token_request;
+use margaret_http_tests::static_handler::StaticHandler;
 
 #[tokio::test]
 async fn relays_a_refusal_of_the_token_endpoint() {
-    let EndpointOutcome::Refused(refusal) = answered_token_request(
-        400,
-        json!({ "error": "invalid_scope", "error_description": "the scope is unknown" })
+    let EndpointOutcome::Refused(refusal) = answered_token_request(StaticHandler {
+        body: json!({ "error": "invalid_scope", "error_description": "the scope is unknown" })
             .to_string()
             .into_bytes(),
-    )
+        content_type: "application/json",
+        status: 400,
+    })
     .await
     else {
         panic!("the token request is refused");

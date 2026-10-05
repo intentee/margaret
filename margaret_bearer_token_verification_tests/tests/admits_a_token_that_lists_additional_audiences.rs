@@ -1,8 +1,8 @@
 use serde_json::json;
 
-use margaret_bearer_token_verification::bearer_token_admission::BearerTokenAdmission;
 use margaret_bearer_token_verification_tests::admit_access_token::admit_access_token;
 use margaret_bearer_token_verification_tests::held_trusted_issuer::held_trusted_issuer;
+use margaret_http::token_admission::TokenAdmission;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
@@ -29,6 +29,6 @@ async fn admits_a_token_that_lists_additional_audiences() {
 
     assert!(matches!(
         admit_access_token(&trusted_issuer, &format!("Bearer {token}")).await,
-        BearerTokenAdmission::Admitted(_)
+        TokenAdmission::Admitted(_)
     ));
 }

@@ -7,7 +7,8 @@ use margaret_provider_state_storage::pending_authorization::PendingAuthorization
 use margaret_provider_state_storage::pending_decision::PendingDecision;
 use margaret_provider_state_storage::pending_verdict::PendingVerdict;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
-use margaret_provider_state_storage::token_digest::TokenDigest;
+use margaret_token_digest::random_token::random_token;
+use margaret_token_digest::token_digest::TokenDigest;
 use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
 
 use crate::authenticated_end_user::AuthenticatedEndUser;
@@ -15,7 +16,6 @@ use crate::authorization_error::AuthorizationError;
 use crate::consent_decision::ConsentDecision;
 use crate::consent_outcome::ConsentOutcome;
 use crate::provider_error::ProviderError;
-use crate::random_token::random_token;
 use crate::redirection::Redirection;
 
 pub struct ConsentEndpoint {

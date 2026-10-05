@@ -8,7 +8,6 @@ use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_registered_claims::numeric_date::NumericDate;
 
@@ -32,10 +31,7 @@ fn persisted_jwks_secret_restores_the_keys_it_persisted() -> Result<()> {
     assert!(matches!(
         restored.verify_jwt::<TestClaims, AccessTokenProfile>(
             &current_token,
-            &JwtExpectation {
-                audience: &trust.audience,
-                issuer: &trust.issuer
-            },
+            &trust.expectation(),
             NumericDate::new(0)
         ),
         JwksSecretVerificationResult::SignedWithCurrent(_)
@@ -43,10 +39,7 @@ fn persisted_jwks_secret_restores_the_keys_it_persisted() -> Result<()> {
     assert!(matches!(
         restored.verify_jwt::<TestClaims, AccessTokenProfile>(
             &retired_token,
-            &JwtExpectation {
-                audience: &trust.audience,
-                issuer: &trust.issuer
-            },
+            &trust.expectation(),
             NumericDate::new(0)
         ),
         JwksSecretVerificationResult::SignedWithPrevious(_)

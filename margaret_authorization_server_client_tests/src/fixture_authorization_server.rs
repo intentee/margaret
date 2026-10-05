@@ -3,7 +3,6 @@ use std::sync::Arc;
 use url::Url;
 
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
-use margaret_http::handler::Handler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http_tests::fixture_client_builder::fixture_client_builder;
@@ -11,9 +10,10 @@ use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
+use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_oauth_client::declares_oauth_client::DeclaresOAuthClient;
 use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
-use margaret_route_method::route_method::RouteMethod;
+use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 use crate::localhost_discovery_metadata::localhost_discovery_metadata;
@@ -25,18 +25,11 @@ pub struct FixtureAuthorizationServer {
 }
 
 impl FixtureAuthorizationServer {
-    pub async fn start(
-        method: RouteMethod,
-        endpoint_path: &'static str,
-        endpoint: Arc<dyn Handler>,
-    ) -> Self {
+    pub async fn start(endpoint_path: &'static str, endpoint: MethodHandler) -> Self {
         let fixture = TlsFixture::generate();
         let server = RunningFixtureServer::start(
             fixture.server_config.clone(),
-            vec![RouteEntry::new(
-                endpoint_path,
-                vec![MethodHandler::anonymous(method, endpoint)],
-            )],
+            vec![RouteEntry::new(endpoint_path, vec![endpoint])],
         )
         .await;
 
@@ -51,6 +44,7 @@ impl FixtureAuthorizationServer {
         let metadata = Arc::new(IssuerMetadata::awaiting());
 
         metadata.hold(localhost_discovery_metadata(
+            AuthorizationResponseIssuer::Unadvertised,
             AdvertisedEndpoint::Advertised(
                 Url::parse("https://localhost/introspect")
                     .expect("the localhost introspection endpoint is a url"),
@@ -62,7 +56,9 @@ impl FixtureAuthorizationServer {
             Arc::clone(&metadata),
             Arc::new(TrustedIssuer::for_oidc_issuer(
                 metadata,
-                Arc::new(localhost_trust()),
+                Arc::new(TokenTrustDeclaration {
+                    trust: localhost_trust(),
+                }),
             )),
             declaration,
         )

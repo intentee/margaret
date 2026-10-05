@@ -1,7 +1,9 @@
 use uuid::Uuid;
 
+use crate::refresh_token_standing::RefreshTokenStanding;
+
 #[derive(Clone)]
-pub(crate) enum RefreshTokenState {
-    Current { family: Uuid },
-    Superseded { family: Uuid },
+pub(crate) struct RefreshTokenState {
+    pub(crate) family: Uuid,
+    pub(crate) standing: RefreshTokenStanding,
 }

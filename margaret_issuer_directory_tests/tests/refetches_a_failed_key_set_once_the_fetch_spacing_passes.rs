@@ -9,13 +9,16 @@ use margaret_issuer_key_set::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
 use margaret_issuer_key_set::key_set_holding::KeySetHolding;
 use margaret_issuer_key_set::key_set_refresh::KeySetRefresh;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
+use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test(start_paused = true)]
 async fn refetches_a_failed_key_set_once_the_fetch_spacing_passes() {
     let trusted_issuer = Arc::new(TrustedIssuer::for_jwks_endpoint(
         Arc::new(FailingEndpoint),
-        Arc::new(localhost_trust()),
+        Arc::new(TokenTrustDeclaration {
+            trust: localhost_trust(),
+        }),
     ));
     let started_at = Instant::now();
     let directory = PolledDirectory::start(

@@ -5,7 +5,6 @@ pub(crate) enum AuthorizationError {
     InvalidRequest,
     InvalidScope,
     LoginRequired,
-    UnauthorizedClient,
     UnsupportedResponseType,
 }
 
@@ -17,7 +16,6 @@ impl AuthorizationError {
             Self::InvalidRequest => "invalid_request",
             Self::InvalidScope => "invalid_scope",
             Self::LoginRequired => "login_required",
-            Self::UnauthorizedClient => "unauthorized_client",
             Self::UnsupportedResponseType => "unsupported_response_type",
         }
     }

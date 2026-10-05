@@ -6,12 +6,12 @@ use tokio_util::sync::CancellationToken;
 use crate::sync_holder_presence::SyncHolderPresence;
 
 pub struct SyncHolderSubscription<TItem> {
-    receiver: Receiver<Option<TItem>>,
+    receiver: Receiver<TItem>,
 }
 
 impl<TItem: Clone + Send + Sync + 'static> SyncHolderSubscription<TItem> {
     #[must_use]
-    pub fn new(receiver: Receiver<Option<TItem>>) -> Self {
+    pub fn new(receiver: Receiver<TItem>) -> Self {
         Self { receiver }
     }
 
@@ -21,10 +21,12 @@ impl<TItem: Clone + Send + Sync + 'static> SyncHolderSubscription<TItem> {
         }
     }
 
-    pub fn read_current(&mut self) -> Option<TItem> {
+    pub fn read_current(&mut self) -> TItem {
         self.receiver.borrow_and_update().clone()
     }
+}
 
+impl<TItem: Clone + Send + Sync + 'static> SyncHolderSubscription<Option<TItem>> {
     pub async fn wait_until_present(
         &mut self,
         cancellation_token: &CancellationToken,
@@ -64,7 +66,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_current_returns_set_value() {
-        let holder: SyncHolder<i32> = SyncHolder::default();
+        let holder: SyncHolder<Option<i32>> = SyncHolder::default();
 
         holder.set(Some(10));
 
@@ -75,7 +77,7 @@ mod tests {
 
     #[tokio::test]
     async fn changed_resolves_after_set_following_read_current() {
-        let holder: SyncHolder<i32> = SyncHolder::default();
+        let holder: SyncHolder<Option<i32>> = SyncHolder::default();
         let mut subscription = holder.subscribe();
 
         subscription.read_current();
@@ -87,7 +89,7 @@ mod tests {
 
     #[tokio::test]
     async fn wait_until_present_returns_present_when_already_set() {
-        let holder: SyncHolder<i32> = SyncHolder::default();
+        let holder: SyncHolder<Option<i32>> = SyncHolder::default();
 
         holder.set(Some(1));
 
@@ -103,7 +105,7 @@ mod tests {
 
     #[tokio::test]
     async fn wait_until_present_resolves_after_a_later_set() {
-        let holder: SyncHolder<i32> = SyncHolder::default();
+        let holder: SyncHolder<Option<i32>> = SyncHolder::default();
         let mut subscription = holder.subscribe();
         let cancellation_token = CancellationToken::new();
 
@@ -120,7 +122,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_clone_observes_a_later_set_independently() {
-        let holder: SyncHolder<i32> = SyncHolder::default();
+        let holder: SyncHolder<Option<i32>> = SyncHolder::default();
         let mut clone = holder.subscribe().clone();
         let cancellation_token = CancellationToken::new();
 
@@ -134,7 +136,7 @@ mod tests {
 
     #[tokio::test]
     async fn wait_until_present_reports_cancellation_before_a_value_arrives() {
-        let holder: SyncHolder<i32> = SyncHolder::default();
+        let holder: SyncHolder<Option<i32>> = SyncHolder::default();
         let mut subscription = holder.subscribe();
         let cancellation_token = CancellationToken::new();
 
@@ -148,7 +150,7 @@ mod tests {
 
     #[test]
     fn changed_stays_pending_after_holder_is_dropped() {
-        let holder: SyncHolder<i32> = SyncHolder::default();
+        let holder: SyncHolder<Option<i32>> = SyncHolder::default();
         let mut subscription = holder.subscribe();
 
         drop(holder);

@@ -10,6 +10,7 @@ use margaret_route_parameter_codegen::route_path::RoutePath;
 use crate::http_codegen_error::HttpCodegenError;
 use crate::http_route::HttpRoute;
 use crate::route_group::RouteGroup;
+use crate::web_socket_session_route::WebSocketSessionRoute;
 
 pub(crate) struct ServerRouteGroup {
     matcher: Router<()>,
@@ -69,6 +70,38 @@ impl ServerRouteGroup {
             }),
             None => Ok(()),
         }
+    }
+
+    pub(crate) fn reserve_web_socket(
+        &mut self,
+        server: &str,
+        WebSocketSessionRoute { path, session }: &WebSocketSessionRoute,
+    ) -> Result<(), HttpCodegenError> {
+        if self.paths.contains_key(path) {
+            return Err(HttpCodegenError::WebSocketPathOfResponder {
+                path: path.clone(),
+                server: server.to_owned(),
+                session: session.to_string(),
+            });
+        }
+
+        self.matcher
+            .insert(path.clone(), ())
+            .map_err(|source| match source {
+                InsertError::Conflict {
+                    with: conflicting_path,
+                } => HttpCodegenError::ConflictingWebSocketPath {
+                    conflicting_path,
+                    path: path.clone(),
+                    server: server.to_owned(),
+                    session: session.to_string(),
+                },
+                source => HttpCodegenError::InvalidWebSocketPath {
+                    path: path.clone(),
+                    session: session.to_string(),
+                    source,
+                },
+            })
     }
 
     pub(crate) fn route_groups(&self) -> impl Iterator<Item = &RouteGroup> {

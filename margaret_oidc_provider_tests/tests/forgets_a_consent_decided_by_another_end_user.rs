@@ -2,18 +2,21 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use margaret_oidc_provider::authenticated_end_user::AuthenticatedEndUser;
+use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::consent_decision::ConsentDecision;
 use margaret_oidc_provider::consent_outcome::ConsentOutcome;
-
-use crate::provider_fixture::ProviderFixture;
-use crate::requested_consent::requested_consent;
-use crate::signed_in_end_user::signed_in_end_user;
-use crate::spa_parameters::spa_parameters;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::signed_in_end_user::signed_in_end_user;
+use margaret_oidc_provider_tests::spa_parameters::spa_parameters;
 
 #[tokio::test]
 async fn forgets_a_consent_decided_by_another_end_user() {
     let fixture = ProviderFixture::start(Vec::new()).await;
-    let consent = requested_consent(&fixture, &spa_parameters()).await;
+    let AuthorizationOutcome::ConsentRequired(consent) =
+        fixture.authorized(&spa_parameters()).await
+    else {
+        panic!("the end user is asked for consent");
+    };
     let intruder = AuthenticatedEndUser {
         authenticated_at: Utc::now(),
         subject: Uuid::from_u128(99),

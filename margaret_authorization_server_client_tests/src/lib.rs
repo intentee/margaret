@@ -4,6 +4,7 @@ pub mod counting_token_handler;
 pub mod fixture_authorization_server;
 pub mod localhost_discovery_metadata;
 pub mod localhost_trust;
+pub mod oauth_client_declaration;
 pub mod private_key_jwt_client;
 pub mod secret_basic_client;
 pub mod userinfo_echo_handler;

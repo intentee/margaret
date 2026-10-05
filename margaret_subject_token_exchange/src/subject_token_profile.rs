@@ -1,7 +1,7 @@
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification::id_token_profile::IdTokenProfile;
 use margaret_jwt_verification::jwt_profile::JwtProfile;
-use margaret_token_exchange_client::subject_token_type::SubjectTokenType;
+use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 
 pub trait SubjectTokenProfile: JwtProfile {
     fn admits(token_type: SubjectTokenType) -> bool;

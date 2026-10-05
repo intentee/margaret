@@ -4,8 +4,8 @@ use margaret_issuer_request::issuer_document::IssuerDocument;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_jws_verification::key_set_document_parsing::KeySetDocumentParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
-use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
+use crate::issuer_group::IssuerGroup;
 use crate::key_set_location::KeySetLocation;
 use crate::key_set_poll::KeySetPoll;
 use crate::key_set_poll_failure::KeySetPollFailure;
@@ -13,10 +13,10 @@ use crate::locate_key_set::locate_key_set;
 
 pub(crate) async fn fetch_key_set(
     client: &IssuerRequestClient,
-    trusted_issuer: &TrustedIssuer,
+    group: &IssuerGroup,
     cancellation_token: &CancellationToken,
 ) -> KeySetPoll {
-    let key_set_url = match locate_key_set(client, trusted_issuer, cancellation_token).await {
+    let key_set_url = match locate_key_set(client, group, cancellation_token).await {
         KeySetLocation::Cancelled => return KeySetPoll::Cancelled,
         KeySetLocation::Failed(failure) => {
             return KeySetPoll::Failed(KeySetPollFailure::Location(failure));
@@ -32,11 +32,8 @@ pub(crate) async fn fetch_key_set(
                 KeySetPoll::Failed(KeySetPollFailure::DocumentRejected(rejection))
             }
         },
-        IssuerDocument::Oversized { max_bytes } => {
-            KeySetPoll::Failed(KeySetPollFailure::DocumentOversized { max_bytes })
-        }
-        IssuerDocument::TransportFailed(source) => {
-            KeySetPoll::Failed(KeySetPollFailure::DocumentTransport(source))
+        IssuerDocument::Failed(failure) => {
+            KeySetPoll::Failed(KeySetPollFailure::DocumentExchange(failure))
         }
         IssuerDocument::UnexpectedStatus(status) => {
             KeySetPoll::Failed(KeySetPollFailure::DocumentStatus(status))

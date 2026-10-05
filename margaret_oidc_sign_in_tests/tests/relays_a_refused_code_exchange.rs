@@ -4,6 +4,7 @@ use oauth2::basic::BasicErrorResponseType;
 use serde_json::json;
 
 use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_http_tests::static_handler::StaticHandler;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
 use margaret_oidc_sign_in::sign_in_refusal::SignInRefusal;
@@ -12,7 +13,6 @@ use margaret_oidc_sign_in_tests::begun_sign_in::BegunSignIn;
 use margaret_oidc_sign_in_tests::callback_request::callback_request;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
 use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
-use margaret_oidc_sign_in_tests::token_answer::TokenAnswer;
 
 #[tokio::test]
 async fn relays_a_refused_code_exchange() {
@@ -26,8 +26,9 @@ async fn relays_a_refused_code_exchange() {
         fixture
             .token_endpoint
             .answer
-            .set(TokenAnswer {
-                body: json!({ "error": "invalid_grant" }),
+            .set(StaticHandler {
+                body: json!({ "error": "invalid_grant" }).to_string().into_bytes(),
+                content_type: "application/json",
                 status: 400,
             })
             .is_ok()
@@ -42,8 +43,7 @@ async fn relays_a_refused_code_exchange() {
                 ("state", begun.authorization_parameter("state")),
             ]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

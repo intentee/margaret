@@ -11,6 +11,7 @@ publish.workspace = true
 
 [dependencies]
 chrono = { workspace = true }
+margaret_jwt_verification = { workspace = true }
 margaret_registered_claims = { workspace = true }
 
 [lints]

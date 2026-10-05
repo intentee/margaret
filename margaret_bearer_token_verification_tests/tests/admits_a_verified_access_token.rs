@@ -1,6 +1,6 @@
-use margaret_bearer_token_verification::bearer_token_admission::BearerTokenAdmission;
 use margaret_bearer_token_verification_tests::admit_access_token::admit_access_token;
 use margaret_bearer_token_verification_tests::held_trusted_issuer::held_trusted_issuer;
+use margaret_http::token_admission::TokenAdmission;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
@@ -17,7 +17,7 @@ async fn admits_a_verified_access_token() {
     }
     .signed_by(secret.current());
 
-    let BearerTokenAdmission::Admitted(verified) =
+    let TokenAdmission::Admitted(verified) =
         admit_access_token(&trusted_issuer, &format!("Bearer {token}")).await
     else {
         panic!("the token is admitted");

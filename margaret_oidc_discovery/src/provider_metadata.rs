@@ -1,7 +1,6 @@
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-use serde::Deserialize;
 use url::Url;
 
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
@@ -9,22 +8,11 @@ use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use crate::advertised_endpoint::AdvertisedEndpoint;
 use crate::authorization_response_issuer::AuthorizationResponseIssuer;
 use crate::metadata_endpoint::MetadataEndpoint;
+use crate::provider_metadata_document::ProviderMetadataDocument;
 use crate::provider_metadata_parsing::ProviderMetadataParsing;
 use crate::provider_metadata_rejection::ProviderMetadataRejection;
 
 const ENDPOINT_SCHEME: &str = "https";
-
-#[derive(Deserialize)]
-struct ProviderMetadataDocument {
-    authorization_endpoint: Option<String>,
-    #[serde(default)]
-    authorization_response_iss_parameter_supported: bool,
-    introspection_endpoint: Option<String>,
-    issuer: String,
-    jwks_uri: String,
-    token_endpoint: Option<String>,
-    userinfo_endpoint: Option<String>,
-}
 
 fn https_endpoint(
     endpoint: MetadataEndpoint,
@@ -81,6 +69,7 @@ impl ProviderMetadata {
             jwks_uri,
             token_endpoint,
             userinfo_endpoint,
+            ..
         }: ProviderMetadataDocument,
         issuer: &IssuerIdentifier,
     ) -> ControlFlow<ProviderMetadataRejection, Self> {

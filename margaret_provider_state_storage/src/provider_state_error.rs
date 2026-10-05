@@ -22,8 +22,14 @@ pub enum ProviderStateError {
         source: Box<dyn Error + Send + Sync>,
     },
 
-    #[error("the provider state could not redeem an authorization code: {source}")]
-    RedeemCode {
+    #[error("the provider state could not look up a presented authorization code: {source}")]
+    PresentCode {
+        #[source]
+        source: Box<dyn Error + Send + Sync>,
+    },
+
+    #[error("the provider state could not look up a presented refresh token: {source}")]
+    PresentRefreshToken {
         #[source]
         source: Box<dyn Error + Send + Sync>,
     },
@@ -36,6 +42,12 @@ pub enum ProviderStateError {
 
     #[error("the provider state could not rotate a refresh token: {source}")]
     RotateRefreshToken {
+        #[source]
+        source: Box<dyn Error + Send + Sync>,
+    },
+
+    #[error("the provider state could not spend an authorization code: {source}")]
+    SpendCode {
         #[source]
         source: Box<dyn Error + Send + Sync>,
     },

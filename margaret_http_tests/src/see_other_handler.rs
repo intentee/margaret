@@ -1,10 +1,9 @@
 use async_trait::async_trait;
 
 use margaret_http::forwardable_route::ForwardableRoute;
-use margaret_http::handler::Handler;
 use margaret_http::handler_error::HandlerError;
+use margaret_http::head_handler::HeadHandler;
 use margaret_http::request::Request;
-use margaret_http::request_body::RequestBody;
 use margaret_http::response_continuation::ResponseContinuation;
 
 pub struct SeeOtherHandler {
@@ -12,12 +11,8 @@ pub struct SeeOtherHandler {
 }
 
 #[async_trait]
-impl Handler for SeeOtherHandler {
-    async fn handle(
-        &self,
-        _request: &Request,
-        _body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
+impl HeadHandler for SeeOtherHandler {
+    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
         Ok(ResponseContinuation::from(self.route.see_other()))
     }
 }

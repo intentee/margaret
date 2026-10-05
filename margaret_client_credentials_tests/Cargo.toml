@@ -18,6 +18,7 @@ margaret_http_tests = { path = "../margaret_http_tests" }
 margaret_issuer_metadata = { workspace = true }
 margaret_issuer_request = { workspace = true }
 margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 margaret_route_method = { workspace = true }
 margaret_trusted_issuer = { workspace = true }
 oauth2 = { workspace = true }

@@ -11,6 +11,7 @@ margaret_issuer_metadata = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwt_verification = { workspace = true }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 margaret_subject_token_exchange = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 margaret_token_trust = { workspace = true }

@@ -20,7 +20,7 @@ fn collects_only_the_forwardable_handlers_of_a_server() {
         "/articles",
         vec![
             MethodHandler::forwardable("get_articles", not_found()),
-            MethodHandler::anonymous(RouteMethod::Post, not_found()),
+            MethodHandler::head(RouteMethod::Post, not_found()),
         ],
     )])
     .expect("the entries build a router");

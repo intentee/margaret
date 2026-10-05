@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use cookie::Cookie;
+use http::HeaderName;
 use http::StatusCode;
 use http_body_util::Full;
 use maud::Markup;
@@ -88,6 +89,14 @@ impl Response {
     }
 
     #[must_use]
+    pub fn header_value(&self, name: &HeaderName) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|header| header.name.eq_ignore_ascii_case(name.as_str()))
+            .map(|header| header.value.as_str())
+    }
+
+    #[must_use]
     pub fn headers(&self) -> &[Header] {
         &self.headers
     }
@@ -131,6 +140,7 @@ impl From<Markup> for Response {
 #[cfg(test)]
 mod tests {
     use cookie::Cookie;
+    use http::header::LOCATION;
     use http_body_util::BodyExt;
     use serde::Serialize;
     use serde::Serializer;
@@ -273,6 +283,18 @@ mod tests {
         let response = Response::text(9999, "unreachable status").into_http();
 
         assert_eq!(response.status().as_u16(), 500);
+    }
+
+    #[test]
+    fn finds_a_header_value_regardless_of_the_case_of_its_name() {
+        let response = Response::text(303, "").header("Location", "https://localhost/");
+
+        assert_eq!(response.header_value(&LOCATION), Some("https://localhost/"));
+    }
+
+    #[test]
+    fn finds_no_value_of_an_absent_header() {
+        assert_eq!(Response::text(200, "").header_value(&LOCATION), None);
     }
 
     #[test]

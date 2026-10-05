@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use margaret_jwt_verification::jwt_addressee::JwtAddressee;
+use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 use crate::exchanges_presented_tokens::ExchangesPresentedTokens;
@@ -21,5 +23,11 @@ impl SubjectTokenExchanger {
             exchange: Box::new(TypedExchange { exchanger }),
             trusted_issuer,
         }
+    }
+}
+
+impl JwtAddressee for SubjectTokenExchanger {
+    fn jwt_issuer(&self) -> &IssuerIdentifier {
+        self.trusted_issuer.jwt_issuer()
     }
 }

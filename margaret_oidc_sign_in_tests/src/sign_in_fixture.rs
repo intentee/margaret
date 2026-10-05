@@ -2,6 +2,8 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
+use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
+use margaret_http::method_handler::MethodHandler;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
@@ -25,17 +27,21 @@ impl SignInFixture {
         let token_endpoint = Arc::new(TokenEndpoint {
             answer: OnceLock::new(),
         });
-        let server =
-            FixtureAuthorizationServer::start(RouteMethod::Post, "/token", token_endpoint.clone())
-                .await;
+        let server = FixtureAuthorizationServer::start(
+            "/token",
+            MethodHandler::head(RouteMethod::Post, token_endpoint.clone()),
+        )
+        .await;
         let issuer_secret = fresh_p256_secret();
-        let client = server.client(Arc::new(declaration));
+        let client = server.client(Arc::new(OAuthClientDeclaration {
+            client: declaration,
+        }));
         let secret_store = Arc::new(rolled_store(fresh_p256_secret()));
 
         client
             .trusted_issuer
             .key_set
-            .hold(issuer_secret.key_set().clone());
+            .hold(Arc::new(issuer_secret.key_set().clone()));
 
         Self {
             flow: SignInFlow::create(Arc::new(client), Arc::clone(&secret_store)),

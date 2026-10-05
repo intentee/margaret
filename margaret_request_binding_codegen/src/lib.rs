@@ -868,7 +868,7 @@ struct SecondClient;
             "pubmargaret_oauth_clients_partner_client_authorization_server_client:std::sync::Arc<margaret::framework::authorization_server_client::authorization_server_client::AuthorizationServerClient>,"
         ));
         assert!(source.contains(
-            "lettoken=matchmargaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<crate::Claims>(request.inputs.server.authorization(),self.margaret_oauth_clients_partner_client_authorization_server_client.as_ref(),).await.map_err(margaret::framework::anyhow::Error::from){::std::result::Result::Ok(margaret::framework::token_introspection::introspection_admission::IntrospectionAdmission::Admitted(token))=>::std::option::Option::Some(token),::std::result::Result::Ok(margaret::framework::token_introspection::introspection_admission::IntrospectionAdmission::Refused(response))=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),::std::result::Result::Ok(margaret::framework::token_introspection::introspection_admission::IntrospectionAdmission::Unaddressed)=>::std::option::Option::None,::std::result::Result::Err(error)=>return::std::result::Result::Err(error),};"
+            "lettoken=matchmargaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<crate::Claims>(request.inputs.server.authorization(),self.margaret_oauth_clients_partner_client_authorization_server_client.as_ref(),).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
         ));
         assert!(!source.contains("route_bearer_token"));
     }
@@ -1001,7 +1001,7 @@ struct SecondClient;
             "letbearer_token=matchmargaret::framework::bearer_token_verification::route_bearer_token::route_bearer_token(request.inputs.server.authorization(),&[self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()],).map_err(margaret::framework::anyhow::Error::from){::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Refused(response))=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),::std::result::Result::Ok(margaret::framework::bearer_token_verification::bearer_token_routing::BearerTokenRouting::Routed(routed))=>routed,::std::result::Result::Err(error)=>return::std::result::Result::Err(error),};"
         ));
         assert!(source.contains(
-            "lettoken=matchbearer_token.admit::<crate::Claims,margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile>(self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()).await{margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Admitted(token)=>::std::option::Option::Some(token),margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Refused(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Unaddressed=>::std::option::Option::None,};"
+            "lettoken=matchbearer_token.admit::<crate::Claims,margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile>(self.margaret_trusted_issuers_partner_trusted_issuer.as_ref()).await.into_requirement(){margaret::framework::http::requirement::Requirement::Met(token)=>token,margaret::framework::http::requirement::Requirement::Unmet(response)=>return::std::result::Result::Ok(margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome::Interrupted(response,),),};"
         ));
         assert!(source.contains("self.inner.infer(request,token)"));
     }
@@ -1014,6 +1014,17 @@ struct SecondClient;
 
         assert!(source.contains(
             "admit::<crate::ci::claims::Claims,margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile>("
+        ));
+    }
+
+    #[test]
+    fn resolves_the_introspected_token_type_and_claims_through_use_statements() {
+        let source = wrapper_source(&registries_for(
+            "use margaret::framework::token_introspection::introspected_token;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[oauth_client(partner_client, issuer = partner)]\nstruct PartnerClient;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(client = partner_client)] token: Option<introspected_token::IntrospectedToken<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+        ));
+
+        assert!(source.contains(
+            "margaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<crate::ci::claims::Claims>("
         ));
     }
 

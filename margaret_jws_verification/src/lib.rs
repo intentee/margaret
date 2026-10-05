@@ -26,7 +26,7 @@ pub mod key_set_document_parsing;
 pub mod key_set_document_rejection;
 mod key_type;
 pub mod key_usage_rejection;
-mod parameter_value;
+pub mod parameter_value;
 mod private_key_members;
 mod published_certificate;
 mod published_ec_members;

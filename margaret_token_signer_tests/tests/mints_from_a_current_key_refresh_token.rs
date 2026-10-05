@@ -2,7 +2,6 @@ use margaret_identity_session::access_token_claims::AccessTokenClaims;
 use margaret_identity_session::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
@@ -30,10 +29,7 @@ fn mints_from_a_current_key_refresh_token() {
     let JwksSecretVerificationResult::SignedWithCurrent(access) = secret
         .verify_jwt::<AccessTokenClaims, AccessTokenProfile>(
             &access_token,
-            &JwtExpectation {
-                audience: &issuance.audience,
-                issuer: &issuance.issuer,
-            },
+            &issuance.expectation(),
             NumericDate::new(1_000),
         )
     else {

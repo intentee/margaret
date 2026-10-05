@@ -6,7 +6,7 @@ filter = 'package(~_spiffe_svid)'
 slow-timeout = { period = "1s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = 'package(margaret_schema_postgres_tests) | (package(margaret_provider_state_storage_tests) & test(/^postgres_state/)) | (package(margaret_provider_state_storage_selection_tests) & test(/^postgres_/))'
+filter = 'package(margaret_schema_postgres_tests) | (package(margaret_oidc_provider_tests) & test(/^postgres_provider/)) | (package(margaret_provider_state_storage_tests) & test(/^postgres_state/)) | (package(margaret_provider_state_storage_selection_tests) & test(/^postgres_/))'
 slow-timeout = { period = "3s", terminate-after = 2 }
 threads-required = 'num-test-threads'
 

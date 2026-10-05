@@ -12,10 +12,15 @@ pub(crate) struct HttpRoute {
     pub(crate) content: RouteContent,
     pub(crate) is_async: bool,
     pub(crate) layers: Vec<LayerApplication>,
-    pub(crate) method: RouteMethod,
     pub(crate) method_name: Ident,
     pub(crate) name: Option<String>,
     pub(crate) responder_field: Ident,
     pub(crate) responder_path: CanonicalPath,
     pub(crate) server: String,
+}
+
+impl HttpRoute {
+    pub(crate) fn method(&self) -> RouteMethod {
+        self.content.method()
+    }
 }

@@ -13,7 +13,9 @@ margaret_oauth_vocabulary = { workspace = true }
 margaret_provider_state_postgres = { workspace = true }
 margaret_provider_state_storage = { workspace = true }
 margaret_schema_postgres_tests = { path = "../margaret_schema_postgres_tests" }
+margaret_token_digest = { workspace = true }
 sqlx = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
 url = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 

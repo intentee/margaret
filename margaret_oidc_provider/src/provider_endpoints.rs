@@ -1,6 +1,7 @@
 use url::Origin;
 use url::Url;
 
+use margaret_http::server_origin::ServerOrigin;
 use margaret_oidc_discovery::oidc_discovery_url::oidc_discovery_url;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
@@ -58,23 +59,15 @@ impl ProviderEndpoints {
 
     /// # Errors
     ///
-    /// Returns `ProviderError::ServerUrlMalformed` when the url of the server that serves the
-    /// provider is not a url, and `ProviderError::IssuerNotServed` when the issuer is not served
-    /// at the origin of that server.
-    pub fn served_by(&self, server_url: &str) -> Result<(), ProviderError> {
-        let server_origin = Url::parse(server_url)
-            .map_err(|source| ProviderError::ServerUrlMalformed {
-                server_url: server_url.to_string(),
-                source,
-            })?
-            .origin();
-
-        if server_origin == self.issuer_origin {
+    /// Returns `ProviderError::IssuerNotServed` when the issuer is not served at the origin of
+    /// the server.
+    pub fn served_by(&self, server: &ServerOrigin) -> Result<(), ProviderError> {
+        if server.origin == self.issuer_origin {
             Ok(())
         } else {
             Err(ProviderError::IssuerNotServed {
-                issuer_origin: self.issuer_origin.ascii_serialization(),
-                server_origin: server_origin.ascii_serialization(),
+                issuer_origin: self.issuer_origin.clone(),
+                server_origin: server.origin.clone(),
             })
         }
     }

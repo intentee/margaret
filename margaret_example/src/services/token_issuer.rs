@@ -3,7 +3,6 @@ use std::sync::Arc;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
 
-use margaret::framework::jwks_secret_store::access_token_signing::AccessTokenSigning;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::process;
 use margaret::framework::macros::service;
@@ -48,16 +47,10 @@ impl TokenIssuer {
             },
             self.clock.now(),
         ) {
-            Ok(AccessTokenSigning::Signed(signed)) => println!(
+            Ok(signed) => println!(
                 "the token issuer signed a {} byte demo token",
                 signed.signed_claims.len()
             ),
-            Ok(AccessTokenSigning::ClaimsNotAnObject) => {
-                println!("the demo claims do not serialize to a json object");
-            }
-            Ok(AccessTokenSigning::CollidingClaim { member }) => {
-                println!("the demo claims collide with the registered claim '{member}'");
-            }
             Err(error) => println!("the token issuer could not sign a demo token: {error}"),
         }
 

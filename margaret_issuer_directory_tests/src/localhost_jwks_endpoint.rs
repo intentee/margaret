@@ -3,6 +3,7 @@ use std::sync::Arc;
 use url::Url;
 
 use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
+use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 use crate::localhost_trust::localhost_trust;
@@ -16,6 +17,8 @@ pub fn localhost_jwks_endpoint() -> Arc<TrustedIssuer> {
         Arc::new(StaticEndpoint::new(
             Url::parse("https://localhost/jwks").expect("the fixture key set url parses"),
         )),
-        Arc::new(localhost_trust()),
+        Arc::new(TokenTrustDeclaration {
+            trust: localhost_trust(),
+        }),
     ))
 }

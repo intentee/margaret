@@ -9,26 +9,28 @@ autotests = false
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
-futures-util = { workspace = true }
 http = { workspace = true }
-http-body = { workspace = true }
 http-body-util = { workspace = true }
 margaret_http = { workspace = true }
 margaret_http_uploaded_file = { workspace = true }
 margaret_peer_identity = { workspace = true }
 margaret_route_method = { workspace = true }
 margaret_route_parameter_binding = { workspace = true }
-mime = { workspace = true }
 rcgen = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 serde_json = { workspace = true }
-spiffe = { workspace = true, features = ["spiffe-types"] }
-tempfile = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread"] }
 tokio-rustls = { workspace = true }
 tokio-util = { workspace = true }
 url = { workspace = true }
+
+[dev-dependencies]
+futures-util = { workspace = true }
+http-body = { workspace = true }
+mime = { workspace = true }
+spiffe = { workspace = true, features = ["spiffe-types"] }
+tempfile = { workspace = true }
 
 [[test]]
 name = "main"

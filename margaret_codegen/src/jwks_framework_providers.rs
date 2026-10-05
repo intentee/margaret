@@ -32,7 +32,7 @@ pub(crate) fn jwks_framework_providers() -> [FrameworkProvider; 5] {
                 ],
                 is_async: false,
                 method: "create".to_string(),
-                outcome: ConstructorOutcome::Infallible,
+                outcome: ConstructorOutcome::Fallible,
             },
             enablement: FrameworkEnablement::Dependency,
             injection: FrameworkInjectionRole::Unmarked,

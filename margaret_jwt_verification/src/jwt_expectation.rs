@@ -1,7 +1,8 @@
-use margaret_registered_claims::audience::Audience;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
+use crate::expected_audience::ExpectedAudience;
+
 pub struct JwtExpectation<'expectation> {
-    pub audience: &'expectation Audience,
+    pub audience: ExpectedAudience<'expectation>,
     pub issuer: &'expectation IssuerIdentifier,
 }

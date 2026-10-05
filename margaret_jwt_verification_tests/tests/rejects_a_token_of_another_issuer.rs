@@ -5,7 +5,6 @@ use serde_json::json;
 use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jwt_verification::claims_rejection::ClaimsRejection;
 use margaret_jwt_verification::id_token_profile::IdTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
@@ -30,10 +29,7 @@ fn rejects_a_token_of_another_issuer() {
         verify_serialized_jwt::<Map<String, Value>, IdTokenProfile>(
             &key_set,
             &token,
-            &JwtExpectation {
-                audience: &trust.audience,
-                issuer: &trust.issuer
-            },
+            &trust.expectation(),
             NumericDate::new(950)
         ),
         JwtVerification::Rejected(JwtRejection::Claims(ClaimsRejection::IssuerMismatch { found, .. }))

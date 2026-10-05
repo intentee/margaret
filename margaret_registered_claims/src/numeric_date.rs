@@ -44,6 +44,14 @@ impl NumericDate {
     }
 
     #[must_use]
+    pub fn after(self, lifetime: Duration) -> Self {
+        Self::new(
+            self.seconds_since_epoch
+                .saturating_add_unsigned(lifetime.as_secs()),
+        )
+    }
+
+    #[must_use]
     pub fn seconds_since_epoch(self) -> i64 {
         self.seconds_since_epoch
     }

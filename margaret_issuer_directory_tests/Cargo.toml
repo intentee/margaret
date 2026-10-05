@@ -15,6 +15,7 @@ margaret_issuer_key_set = { workspace = true }
 margaret_issuer_metadata = { workspace = true }
 margaret_issuer_request = { workspace = true }
 margaret_jwks_endpoint = { workspace = true }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 margaret_route_method = { workspace = true }
 margaret_token_trust = { workspace = true }
 margaret_trusted_issuer = { workspace = true }
@@ -31,7 +32,6 @@ margaret_jwks_roller_server = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jws_verification_tests = { path = "../margaret_jws_verification_tests" }
 margaret_jwt_verification = { workspace = true }
-margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 margaret_oidc_discovery = { workspace = true }
 margaret_sync_holder = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "test-util"] }

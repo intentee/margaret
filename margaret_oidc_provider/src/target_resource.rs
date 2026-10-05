@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 
 use oauth2::basic::BasicErrorResponseType;
 
-use margaret_accepted_clients::accepted_client::AcceptedClient;
+use margaret_accepted_clients::non_empty_set::NonEmptySet;
 use margaret_http::response::Response;
 use margaret_registered_claims::audience::Audience;
 
@@ -17,21 +17,19 @@ fn invalid_target(description: &str) -> ControlFlow<Response, Audience> {
 }
 
 pub(crate) fn target_resource(
-    client: &AcceptedClient,
+    resources: &NonEmptySet<Audience>,
     requested: Option<&str>,
 ) -> ControlFlow<Response, Audience> {
     match requested {
         Some(requested) => match requested.parse::<Audience>() {
-            Ok(resource) if client.resources.contains(&resource) => ControlFlow::Continue(resource),
+            Ok(resource) if resources.members().contains(&resource) => {
+                ControlFlow::Continue(resource)
+            }
             Ok(_) | Err(_) => invalid_target("the client may not request the resource"),
         },
-        None => match client.resources.first() {
-            Some(resource) if client.resources.len() == 1 => {
-                ControlFlow::Continue(resource.clone())
-            }
-            Some(_) | None => {
-                invalid_target("the client serves several resources and must name one")
-            }
+        None => match resources.only() {
+            Some(resource) => ControlFlow::Continue(resource.clone()),
+            None => invalid_target("the client serves several resources and must name one"),
         },
     }
 }

@@ -9,7 +9,6 @@ use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification::claims_rejection::ClaimsRejection;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_registered_claims::numeric_date::NumericDate;
@@ -25,10 +24,7 @@ fn jwks_secret_reports_claims_of_another_shape() -> Result<()> {
     assert!(matches!(
         secret.verify_jwt::<TestClaims, AccessTokenProfile>(
             &token,
-            &JwtExpectation {
-                audience: &trust.audience,
-                issuer: &trust.issuer
-            },
+            &trust.expectation(),
             NumericDate::new(0)
         ),
         JwksSecretVerificationResult::Rejected(JwtRejection::Claims(

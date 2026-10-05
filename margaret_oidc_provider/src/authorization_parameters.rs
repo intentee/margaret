@@ -5,8 +5,8 @@ use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 use chrono::TimeDelta;
 
-use margaret_accepted_clients::accepted_client::AcceptedClient;
-use margaret_accepted_clients::grant_type::GrantType;
+use margaret_accepted_clients::code_grant_policy::CodeGrantPolicy;
+use margaret_oauth_vocabulary::code_challenge_method::CodeChallengeMethod;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oauth_vocabulary::scope_list::ScopeList;
 
@@ -17,7 +17,6 @@ use crate::prompt::Prompt;
 
 const CODE_CHALLENGE_OCTETS: usize = 32;
 const CODE_RESPONSE_TYPE: &str = "code";
-const S256: &str = "S256";
 
 fn prompt(request: &AuthorizationRequest) -> ControlFlow<AuthorizationError, Prompt> {
     let Some(prompt) = &request.prompt else {
@@ -61,16 +60,18 @@ fn authentication_age(
 }
 
 fn code_challenge(request: &AuthorizationRequest) -> ControlFlow<AuthorizationError, String> {
-    let s256 = request
+    let Some(Ok(CodeChallengeMethod::S256)) = request
         .code_challenge_method
-        .as_ref()
-        .is_some_and(|method| method == S256);
+        .as_deref()
+        .map(str::parse::<CodeChallengeMethod>)
+    else {
+        return ControlFlow::Break(AuthorizationError::InvalidRequest);
+    };
 
     match &request.code_challenge {
         Some(challenge)
-            if s256
-                && Base64UrlUnpadded::decode_vec(challenge)
-                    .is_ok_and(|digest| digest.len() == CODE_CHALLENGE_OCTETS) =>
+            if Base64UrlUnpadded::decode_vec(challenge)
+                .is_ok_and(|digest| digest.len() == CODE_CHALLENGE_OCTETS) =>
         {
             ControlFlow::Continue(challenge.clone())
         }
@@ -79,11 +80,11 @@ fn code_challenge(request: &AuthorizationRequest) -> ControlFlow<AuthorizationEr
 }
 
 fn granted_scopes(
-    client: &AcceptedClient,
+    policy: &CodeGrantPolicy,
     request: &AuthorizationRequest,
 ) -> ControlFlow<AuthorizationError, BTreeSet<Scope>> {
     match request.scope.as_deref().map(str::parse::<ScopeList>) {
-        Some(Ok(ScopeList { scopes })) if scopes.is_subset(&client.scopes) => {
+        Some(Ok(ScopeList { scopes })) if scopes.is_subset(&policy.scopes) => {
             ControlFlow::Continue(scopes)
         }
         Some(Ok(_) | Err(_)) => ControlFlow::Break(AuthorizationError::InvalidScope),
@@ -101,15 +102,11 @@ pub(crate) struct AuthorizationParameters {
 
 impl AuthorizationParameters {
     pub(crate) fn of(
-        client: &AcceptedClient,
+        policy: &CodeGrantPolicy,
         request: &AuthorizationRequest,
     ) -> ControlFlow<AuthorizationError, Self> {
         if request.response_type.as_deref() != Some(CODE_RESPONSE_TYPE) {
             return ControlFlow::Break(AuthorizationError::UnsupportedResponseType);
-        }
-
-        if !client.grants.contains(&GrantType::AuthorizationCode) {
-            return ControlFlow::Break(AuthorizationError::UnauthorizedClient);
         }
 
         ControlFlow::Continue(Self {
@@ -117,7 +114,7 @@ impl AuthorizationParameters {
             code_challenge: code_challenge(request)?,
             nonce: request.nonce.clone(),
             prompt: prompt(request)?,
-            scopes: granted_scopes(client, request)?,
+            scopes: granted_scopes(policy, request)?,
         })
     }
 }

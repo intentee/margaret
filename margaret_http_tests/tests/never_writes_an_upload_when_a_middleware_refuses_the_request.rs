@@ -12,7 +12,7 @@ use margaret_http_tests::refusing_middleware::RefusingMiddleware;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::uploaded_files_reading_handler::UploadedFilesReadingHandler;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
-use margaret_route_method::route_method::RouteMethod;
+use margaret_route_method::content_method::ContentMethod;
 
 #[tokio::test]
 async fn never_writes_an_upload_when_a_middleware_refuses_the_request() {
@@ -21,8 +21,8 @@ async fn never_writes_an_upload_when_a_middleware_refuses_the_request() {
         UploadConfig::enabled(directory.path().to_path_buf()),
         vec![RouteEntry::new(
             "/upload",
-            vec![MethodHandler::anonymous(
-                RouteMethod::Post,
+            vec![MethodHandler::content(
+                ContentMethod::Post,
                 layer(
                     Arc::new(RefusingMiddleware),
                     Arc::new(UploadedFilesReadingHandler {

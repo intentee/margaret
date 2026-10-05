@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 
 use margaret_http::forward::Forward;
-use margaret_http::handler::Handler;
 use margaret_http::handler_error::HandlerError;
+use margaret_http::head_handler::HeadHandler;
 use margaret_http::request::Request;
-use margaret_http::request_body::RequestBody;
 use margaret_http::response_continuation::ResponseContinuation;
 
 pub struct ForwardingHandler {
@@ -15,12 +14,8 @@ pub struct ForwardingHandler {
 }
 
 #[async_trait]
-impl Handler for ForwardingHandler {
-    async fn handle(
-        &self,
-        _request: &Request,
-        _body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
+impl HeadHandler for ForwardingHandler {
+    async fn handle(&self, _request: &Request) -> Result<ResponseContinuation, HandlerError> {
         Ok(ResponseContinuation::from(Forward::new(
             self.target,
             self.path_params.clone(),

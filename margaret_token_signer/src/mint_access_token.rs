@@ -7,7 +7,6 @@ use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::refresh_token_profile::RefreshTokenProfile;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 use margaret_token_issuance::token_issuance::TokenIssuance;
@@ -29,10 +28,7 @@ pub fn mint_access_token(
         ..
     } = match secret.verify_jwt::<RefreshTokenClaims, RefreshTokenProfile>(
         refresh_token,
-        &JwtExpectation {
-            audience: &issuance.audience,
-            issuer: &issuance.issuer,
-        },
+        &issuance.expectation(),
         access_stamp.registered.iat,
     ) {
         JwksSecretVerificationResult::Rejected(rejection) => {

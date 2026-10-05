@@ -8,6 +8,7 @@ use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
+use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test]
@@ -16,7 +17,9 @@ async fn refuses_while_the_signing_keys_are_unavailable() {
         .expect("a fresh secret");
     let trusted_issuer = TrustedIssuer::for_oidc_issuer(
         Arc::new(IssuerMetadata::awaiting()),
-        Arc::new(fixture_trust()),
+        Arc::new(TokenTrustDeclaration {
+            trust: fixture_trust(),
+        }),
     );
     let token = TestClaims {
         sub: "subject".to_string(),

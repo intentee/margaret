@@ -16,7 +16,7 @@ async fn answers_a_redirect_continuation_with_its_location() {
         UploadConfig::Disabled,
         vec![RouteEntry::new(
             "/moved",
-            vec![MethodHandler::anonymous(
+            vec![MethodHandler::head(
                 RouteMethod::Get,
                 Arc::new(SeeOtherHandler {
                     route: ForwardableRoute::new(

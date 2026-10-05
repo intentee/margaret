@@ -37,8 +37,7 @@ impl GetSignIn {
 
     /// # Errors
     ///
-    /// Returns an error when the callback url is malformed or the sign-in transaction cannot be
-    /// signed.
+    /// Returns an error when the callback url is malformed.
     #[process]
     pub async fn respond(&self, routes: &Routes) -> anyhow::Result<Response> {
         Ok(
@@ -48,7 +47,7 @@ impl GetSignIn {
                     callback: Url::parse(&routes.public.get_sign_in_callback.url())?,
                     scopes: BTreeSet::from([self.profile_scope.clone()]),
                 })
-                .await?
+                .await
             {
                 SignInBeginning::Redirected(response) => response,
                 SignInBeginning::Unavailable(unavailability) => {

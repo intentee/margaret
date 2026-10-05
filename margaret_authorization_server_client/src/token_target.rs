@@ -1,11 +1,10 @@
 use std::collections::BTreeSet;
 
 use margaret_oauth_vocabulary::scope::Scope;
+use margaret_oauth_vocabulary::scope_list::ScopeList;
 
 use crate::form_parameter::FormParameter;
 use crate::target_audience::TargetAudience;
-
-const SCOPE_SEPARATOR: &str = " ";
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct TokenTarget {
@@ -31,12 +30,10 @@ impl TokenTarget {
         if !self.scopes.is_empty() {
             form.push(FormParameter {
                 name: "scope",
-                value: self
-                    .scopes
-                    .iter()
-                    .map(Scope::as_str)
-                    .collect::<Vec<&str>>()
-                    .join(SCOPE_SEPARATOR),
+                value: ScopeList {
+                    scopes: self.scopes.clone(),
+                }
+                .to_string(),
             });
         }
 

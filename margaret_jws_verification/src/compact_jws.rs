@@ -3,10 +3,13 @@ use std::ops::ControlFlow;
 use base64ct::Base64UrlUnpadded;
 use base64ct::Encoding;
 
+use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
+
 use crate::compact_jws_parsing::CompactJwsParsing;
 use crate::header_type::HeaderType;
 use crate::jws_header::JwsHeader;
 use crate::jws_rejection::JwsRejection;
+use crate::parameter_value::ParameterValue;
 
 fn decoded(
     segment: &str,
@@ -66,6 +69,11 @@ impl<'token> CompactJws<'token> {
             signature,
             signing_input,
         })
+    }
+
+    #[must_use]
+    pub fn alg(&self) -> &ParameterValue<JwsAlgorithm> {
+        &self.header.alg
     }
 
     #[must_use]

@@ -29,7 +29,7 @@ impl AttachmentsTokenProbe {
 
     /// # Errors
     ///
-    /// Returns an error when the client cannot authenticate to the identity server.
+    /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn run(&self, cancellation_token: CancellationToken) -> anyhow::Result<()> {
         match self
@@ -38,7 +38,7 @@ impl AttachmentsTokenProbe {
                 audience: TargetAudience::Audience(ATTACHMENTS_RESOURCE.to_string()),
                 scopes: BTreeSet::new(),
             })
-            .await?
+            .await
         {
             AcquiredToken::Acquired(_) => {
                 println!("the blog acquired an access token for its attachments");

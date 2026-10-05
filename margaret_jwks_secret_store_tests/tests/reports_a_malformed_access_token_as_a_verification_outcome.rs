@@ -12,8 +12,6 @@ fn reports_a_malformed_access_token_as_a_verification_outcome() {
     assert!(matches!(
         rolled_store(fresh_p256_secret())
             .verify_access_token::<Value>("not-a-valid-jwt", unix_time(500)),
-        Ok(JwksSecretVerificationResult::Rejected(JwtRejection::Jws(
-            JwsRejection::NotCompactJws
-        )))
+        JwksSecretVerificationResult::Rejected(JwtRejection::Jws(JwsRejection::NotCompactJws))
     ));
 }

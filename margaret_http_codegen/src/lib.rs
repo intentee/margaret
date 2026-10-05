@@ -1,4 +1,5 @@
 mod active_servers;
+mod content_method_tokens;
 pub mod http_artifacts;
 pub mod http_codegen_error;
 pub mod http_plan;
@@ -21,6 +22,7 @@ mod server_serve_inputs;
 pub mod server_transport_policy;
 pub mod serves_spiffe;
 pub mod web_socket_server_requirements;
+pub mod web_socket_session_route;
 
 #[cfg(test)]
 mod tests {
@@ -28,6 +30,7 @@ mod tests {
 
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::attribute_index::AttributeIndex;
+    use margaret_attributes::canonical_path::CanonicalPath;
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_console_argument_codegen::console_argument::ConsoleArgument;
     use margaret_container::container_bindings::ContainerBindings;
@@ -47,6 +50,7 @@ mod tests {
     use crate::server_transport_policy::ServerTransportPolicy;
     use crate::serves_spiffe::serves_spiffe;
     use crate::web_socket_server_requirements::WebSocketServerRequirements;
+    use crate::web_socket_session_route::WebSocketSessionRoute;
 
     fn render_http(
         index: &AttributeIndex,
@@ -87,6 +91,7 @@ mod tests {
             name.to_string(),
             WebSocketServerRequirements {
                 serve_inputs: Vec::new(),
+                sessions: Vec::new(),
                 transport_policy,
             },
         )])
@@ -262,6 +267,62 @@ impl Resource {
         );
     }
 
+    fn web_socket_session_error(lib_source: &str, session_path: &str) -> String {
+        let index = IndexedSource::new(lib_source).index;
+        let registries = registries_for(&index, false);
+        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let plans = MiddlewarePlans::collect(&index, &registries, &tags)
+            .expect("the middleware plans are collected");
+
+        render_http(
+            &index,
+            false,
+            &BTreeMap::from([(
+                "public".to_string(),
+                WebSocketServerRequirements {
+                    serve_inputs: Vec::new(),
+                    sessions: vec![WebSocketSessionRoute {
+                        path: session_path.to_string(),
+                        session: CanonicalPath::new(vec!["crate".to_string(), "Chat".to_string()]),
+                    }],
+                    transport_policy: ServerTransportPolicy::Negotiable,
+                },
+            )]),
+            &plans,
+            &bindings_for(&index),
+            &registries,
+        )
+        .map(drop)
+        .expect_err("the websocket session path is rejected")
+        .to_string()
+    }
+
+    const GREETING_RESPONDER: &str = "#[singleton]
+#[responds_to_http(method = \"get\", path = \"/greeting/{name}\", server = \"public\")]\nstruct GetGreeting;\nimpl GetGreeting {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"name\")] name: String) -> anyhow::Result<Response> {}\n}\n";
+
+    #[test]
+    fn rejects_a_websocket_session_at_the_path_of_a_responder() {
+        assert_eq!(
+            web_socket_session_error(GREETING_RESPONDER, "/greeting/{name}"),
+            "websocket session 'crate::Chat' serves '/greeting/{name}' on server 'public', where a responder already serves that path"
+        );
+    }
+
+    #[test]
+    fn rejects_a_websocket_session_path_conflicting_with_a_route() {
+        assert_eq!(
+            web_socket_session_error(GREETING_RESPONDER, "/greeting/{other}"),
+            "websocket session 'crate::Chat' serves '/greeting/{other}' on server 'public', which conflicts with the already registered route path '/greeting/{name}'"
+        );
+    }
+
+    #[test]
+    fn rejects_a_malformed_websocket_session_path() {
+        assert!(web_socket_session_error("", "/chat/{unclosed").starts_with(
+            "websocket session 'crate::Chat' has a malformed path '/chat/{unclosed': "
+        ));
+    }
+
     #[test]
     fn rejects_websocket_arguments_absent_from_the_container_plan() {
         let index = IndexedSource::new("").index;
@@ -273,6 +334,7 @@ impl Resource {
                 serve_inputs: vec![ServeInput::ConsoleArgument(ConsoleArgument::Flag {
                     name: "missing".to_string(),
                 })],
+                sessions: Vec::new(),
                 transport_policy: ServerTransportPolicy::Negotiable,
             },
         )]);
@@ -1100,7 +1162,10 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct GetX;\nimpl GetX {\n    #[process]\n    fn respond(&self, forward: Forwarder) -> anyhow::Result<Forward> {}\n}\n",
         );
 
-        assert!(source.contains("responder.respond(super::super::forwarders::public::Forwarder)"));
+        assert!(
+            source
+                .contains("responder.respond(super::super::forwarders::public::Forwarder::new())")
+        );
     }
 
     #[test]
@@ -1213,14 +1278,14 @@ impl PostConsent { #[process] fn respond(&self) -> anyhow::Result<Response> {} }
             source.contains("margaret::framework::route_method::route_method::RouteMethod::Get")
         );
         assert!(source.contains(
-            "margaret::framework::http::responder_handler::responder_handler(container.open()"
+            "margaret::framework::http::head_responder::head_responder(container.open()"
         ));
         assert!(source.contains(
-            "|responder:std::sync::Arc<crate::Open>,_request:&margaret::framework::http::request::Request,_body:margaret::framework::http::request_body::RequestBody,|"
+            "|responder:std::sync::Arc<crate::Open>,_request:&margaret::framework::http::request::Request,|"
         ));
         assert!(source.contains("responder.respond()"));
         assert!(source.contains(
-            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard(),}),margaret::framework::http::responder_handler::responder_handler(container.resource()"
+            "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{inner:container.guard(),}),margaret::framework::http::head_responder::head_responder(container.resource()"
         ));
         assert!(source.contains(
             "margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Tracer{inner:container.tracer(),}),margaret::framework::http::layer::layer(std::sync::Arc::new(super::super::middleware::Guard{"
@@ -1612,7 +1677,7 @@ impl GetProject {
         );
 
         assert!(source.contains(
-            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(margaret::framework::route_method::route_method::RouteMethod::Query,"
+            "margaret::framework::http::route_entry::RouteEntry::new(\"/search\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::head(margaret::framework::route_method::route_method::RouteMethod::Query,"
         ));
     }
 
@@ -1717,7 +1782,7 @@ impl GetProject {
 
         assert!(!source.contains("enumRouteName"));
         assert!(!source.contains("route_with_name"));
-        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::anonymous(margaret::framework::route_method::route_method::RouteMethod::Get,"));
+        assert!(source.contains("margaret::framework::http::route_entry::RouteEntry::new(\"/open\",::std::vec::Vec::from([margaret::framework::http::method_handler::MethodHandler::head(margaret::framework::route_method::route_method::RouteMethod::Get,"));
     }
 
     const NAMED_ROUTE: &str = r#"
@@ -1845,12 +1910,8 @@ impl GetGreeting {
 #[responds_to_http(method = \"get\", path = \"/x\", server = \"public\")]\nstruct Page;\nimpl Page {\n    #[process]\n    fn respond(&self) -> anyhow::Result<Response> {}\n}\n",
         );
 
-        assert!(source.contains("responder.respond()"));
-        assert!(source.contains(
-            "margaret::framework::http::response_continuation::ResponseContinuation::from"
-        ));
         assert!(
-            source.contains("margaret::framework::http::handler_error::HandlerError::consumer")
+            source.contains("margaret::framework::http::responded::responded(responder.respond())")
         );
     }
 
@@ -2349,7 +2410,7 @@ impl Configured {
         ));
 
         assert!(source.contains(
-            "letstream=matchmargaret::framework::http::request_body_stream::RequestBodyStream::open(body,margaret::framework::http::body_limit::BodyLimit::new(1_073_741_824),)"
+            "letstream=matchmargaret::framework::http::request_body_stream::RequestBodyStream::open(body,margaret::framework::http::body_limit::BodyLimit::new(1_073_741_824,),).into_requirement()"
         ));
     }
 
@@ -2361,7 +2422,7 @@ impl Configured {
         );
 
         assert!(source.contains(
-            "margaret::framework::http::method_handler::MethodHandler::anonymous(margaret::framework::route_method::route_method::RouteMethod::Post,"
+            "margaret::framework::http::method_handler::MethodHandler::content(margaret::framework::route_method::content_method::ContentMethod::Post,"
         ));
         assert!(!source.contains("forwardable"));
     }

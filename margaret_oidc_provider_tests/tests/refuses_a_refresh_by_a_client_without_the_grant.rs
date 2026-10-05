@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::provider_fixture::ProviderFixture;
-use crate::service_credentials::SERVICE_CREDENTIALS;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::service_credentials::SERVICE_CREDENTIALS;
 
 #[tokio::test]
 async fn refuses_a_refresh_by_a_client_without_the_grant() {

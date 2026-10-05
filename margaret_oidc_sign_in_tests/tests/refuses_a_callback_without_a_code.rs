@@ -24,8 +24,7 @@ async fn refuses_a_callback_without_a_code() {
             &begun.cookie_pair(),
             &BTreeMap::from([("state", begun.authorization_parameter("state"))]),
         ))
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

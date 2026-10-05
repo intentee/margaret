@@ -7,5 +7,5 @@ use crate::authorization_grant::AuthorizationGrant;
 #[derive(Clone)]
 pub(crate) enum CodeState {
     Issued(Arc<AuthorizationGrant>),
-    Redeemed { family: Uuid },
+    Spent { family: Uuid },
 }

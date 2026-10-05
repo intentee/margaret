@@ -20,8 +20,7 @@ async fn refuses_a_callback_without_a_transaction() {
             )
             .into_request(),
         )
-        .await
-        .expect("the sign-in completes");
+        .await;
 
     fixture.server.stop().await;
 

@@ -18,6 +18,6 @@ fn mints_an_access_token_from_a_valid_refresh_token() {
 
     assert!(matches!(
         rolled_store(secret).mint_access_token(&refresh_token, unix_time(500)),
-        Ok(AccessTokenMinting::Minted(_))
+        AccessTokenMinting::Minted(_)
     ));
 }

@@ -2,6 +2,7 @@ use tokio_util::sync::CancellationToken;
 use url::Url;
 
 use margaret_issuer_request::issuer_document::IssuerDocument;
+use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 
 #[tokio::test]
@@ -17,6 +18,6 @@ async fn refuses_a_plaintext_url_before_connecting() {
 
     assert!(matches!(
         fetched,
-        IssuerDocument::TransportFailed(error) if error.is_builder()
+        IssuerDocument::Failed(IssuerExchangeError::Transport(error)) if error.is_builder()
     ));
 }

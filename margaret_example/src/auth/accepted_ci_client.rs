@@ -1,12 +1,9 @@
-use std::collections::BTreeSet;
-
 use margaret::framework::accepted_clients::accepted_client::AcceptedClient;
 use margaret::framework::accepted_clients::accepted_client_authentication::AcceptedClientAuthentication;
-use margaret::framework::accepted_clients::consent_policy::ConsentPolicy;
+use margaret::framework::accepted_clients::authorization_code_grant::AuthorizationCodeGrant;
 use margaret::framework::accepted_clients::declares_accepted_client::DeclaresAcceptedClient;
-use margaret::framework::accepted_clients::grant_type::GrantType;
-use margaret::framework::accepted_clients::introspection_permission::IntrospectionPermission;
-use margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning;
+use margaret::framework::accepted_clients::non_empty_set::NonEmptySet;
+use margaret::framework::accepted_clients::token_exchange_grant::TokenExchangeGrant;
 use margaret::framework::macros::accepts_oauth_client;
 use margaret::framework::macros::constructor;
 use margaret::framework::macros::singleton;
@@ -28,14 +25,10 @@ impl AcceptedCiClient {
         Ok(Self {
             accepted_client: AcceptedClient {
                 authentication: AcceptedClientAuthentication::Public,
+                authorization_code: AuthorizationCodeGrant::Withheld,
                 client_id: "ci".parse()?,
-                consent: ConsentPolicy::Implicit,
-                grants: BTreeSet::from([GrantType::TokenExchange]),
-                id_token_signing: IdTokenSigning::Rsa,
-                introspection: IntrospectionPermission::Forbidden,
-                redirect_uris: BTreeSet::new(),
-                resources: BTreeSet::from([ATTACHMENTS_RESOURCE.parse()?]),
-                scopes: BTreeSet::new(),
+                resources: NonEmptySet::of(ATTACHMENTS_RESOURCE.parse()?, []),
+                token_exchange: TokenExchangeGrant::Granted,
             },
         })
     }

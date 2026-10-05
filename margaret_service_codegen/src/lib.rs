@@ -1,3 +1,4 @@
+pub mod first_tick;
 pub mod framework_service;
 pub mod framework_service_kind;
 pub mod render_services;
@@ -29,6 +30,7 @@ mod tests {
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
 
+    use crate::first_tick::FirstTick;
     use crate::framework_service::FrameworkService;
     use crate::framework_service_kind::FrameworkServiceKind;
     use crate::render_services::render_services;
@@ -140,7 +142,7 @@ mod tests {
         .collect();
 
         assert!(source.contains(
-            "iflet::std::result::Result::Err(error)=container.health().served_by(&origin_public){return::std::result::Result::Err(margaret::framework::console::report_failure::report_failure(error),);}"
+            "iflet::std::result::Result::Err(error)=container.health().served_by(origin_public){return::std::result::Result::Err(margaret::framework::console::report_failure::report_failure(error),);}"
         ));
     }
 
@@ -264,6 +266,7 @@ impl Flusher {
                 field_name: "framework_jwks_roller_server_jwks_roller_jwks_roller".to_string(),
                 is_async: false,
                 kind: FrameworkServiceKind::Ticker {
+                    first_tick: FirstTick::AfterInterval,
                     interval: canonical(&[
                         "margaret",
                         "framework",
@@ -310,6 +313,9 @@ impl Flusher {
             "fntick_interval(&self)->std::time::Duration{margaret::framework::jwks_roller_server::jwks_roll_interval::JWKS_ROLL_INTERVAL}"
         ));
         assert!(source.contains(
+            "fnfirst_tick_timing(&self)->trzcina::FirstTickTiming{trzcina::FirstTickTiming::AfterInterval}"
+        ));
+        assert!(source.contains(
             "manager.register_service(JwksRoller{inner:container.framework_jwks_roller_server_jwks_roller_jwks_roller(),});"
         ));
         assert!(source.contains("self.inner.run()?;::std::result::Result::Ok(())"));
@@ -345,6 +351,7 @@ impl Flusher {
 
         assert!(source.contains("fntick_interval(&self)->std::time::Duration{crate::PERIOD}"));
         assert!(!source.contains("missed_tick_behavior"));
+        assert!(!source.contains("first_tick_timing"));
         assert!(!source.contains("impltrzcina::Servicefor"));
     }
 
@@ -389,9 +396,11 @@ impl Flusher {
     fn registers_the_http_server_when_responders_exist() {
         let source = rendered(SERVICE, &public());
 
-        assert!(source.contains(r#"matches.get_one::<String>("public-url")"#));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"matches.get_one::<margaret::framework::http::server_origin::ServerOrigin>("public-url")"#
+        ));
+        assert!(source.contains(
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"transport:margaret::framework::http::transport_config::TransportConfig::Plain,upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
@@ -462,20 +471,24 @@ impl Flusher {
         assert!(source.contains(
             "letspiffe_server_config=::std::sync::Arc::new(spiffe_bundle.server_config());"
         ));
+        assert_eq!(
+            source
+                .matches(
+                    "transport:matchmatches.get_one::<margaret::framework::service::transport_choice::TransportChoice"
+                )
+                .count(),
+            2
+        );
         assert!(source.contains(
-            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:::std::sync::Arc::clone(spiffe_server_config),}"
+            r#"("internal-transport"){Some(value)=>value.config(spiffe_server_config),"#
         ));
+        assert!(
+            source.contains(
+                r#"("public-transport"){Some(value)=>value.config(spiffe_server_config),"#
+            )
+        );
         assert!(source.contains(
-            r#"transport:matchmatches.get_one::<String>("public-transport").map(String::as_str)"#
-        ));
-        assert!(source.contains(
-            r#"Some("spiffe_mtls")=>{margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:::std::sync::Arc::clone(spiffe_server_config),}}"#
-        ));
-        assert!(source.contains(
-            r#"Some("plain")=>{margaret::framework::http::transport_config::TransportConfig::Plain}"#
-        ));
-        assert!(source.contains(
-            "Some(_)|None=>{return::std::result::Result::Err(margaret::framework::console::command_outcome::CommandOutcome::Failed,);}"
+            "value.config(spiffe_server_config),None=>{return::std::result::Result::Err(margaret::framework::console::command_outcome::CommandOutcome::Failed,);}"
         ));
         assert!(source.contains(
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
@@ -558,10 +571,10 @@ impl Flusher {
         );
 
         assert!(source.contains(
-            r#"letorigin_public:::std::sync::Arc<str>=matchmatches.get_one::<String>("public-url"){Some(value)=>value.clone().into(),None=>{return::std::result::Result::Err(margaret::framework::console::command_outcome::CommandOutcome::Failed,);}};"#
+            r#"letorigin_public:&margaret::framework::http::server_origin::ServerOrigin=matchmatches.get_one::<margaret::framework::http::server_origin::ServerOrigin>("public-url"){Some(value)=>value,None=>{return::std::result::Result::Err(margaret::framework::console::command_outcome::CommandOutcome::Failed,);}};"#
         ));
         assert!(source.contains(
-            "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(origin_internal.clone(),origin_public.clone(),),);"
+            "letroutes=::std::sync::Arc::new(super::routes::Routes::from_origins(::std::sync::Arc::from(origin_internal.origin.ascii_serialization()),::std::sync::Arc::from(origin_public.origin.ascii_serialization()),),);"
         ));
         assert!(source.contains("super::http::server_internal::server_internal(container,"));
         assert!(source.contains("super::http::server_public::server_public(container,"));
@@ -578,13 +591,13 @@ impl Flusher {
         );
 
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",name:"public",routes:super::http::server_public::server_public(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"public-addr",routes:super::http::server_public::server_public(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"public-upload-dir",uploads_argument:"public-uploads","#
         ));
         assert!(source.contains(
-            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",name:"internal",routes:super::http::server_internal::server_internal(container,"#
+            r#"margaret::framework::service::server_assembly::ServerAssembly{address_argument:"internal-addr",routes:super::http::server_internal::server_internal(container,"#
         ));
         assert!(source.contains(
             r#"upload_dir_argument:"internal-upload-dir",uploads_argument:"internal-uploads","#

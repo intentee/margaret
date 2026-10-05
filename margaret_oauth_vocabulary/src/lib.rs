@@ -1,6 +1,12 @@
 pub mod client_id;
 pub mod client_secret;
+pub mod client_secret_basic;
+pub mod code_challenge_method;
+pub mod grant_type;
 pub mod oauth_vocabulary_error;
+pub mod resource_scope;
 pub mod scope;
 pub mod scope_list;
+pub mod subject_token_type;
+pub mod token_type_hint;
 mod visible_characters;

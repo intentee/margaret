@@ -9,7 +9,9 @@ use oauth2::StandardTokenIntrospectionResponse;
 use oauth2::basic::BasicErrorResponseType;
 use oauth2::basic::BasicTokenType;
 
+use margaret_accepted_clients::accepted_client_authentication::AcceptedClientAuthentication;
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
+use margaret_accepted_clients::confidential_privileges::ConfidentialPrivileges;
 use margaret_accepted_clients::introspection_permission::IntrospectionPermission;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
@@ -23,7 +25,6 @@ use margaret_validation::validation_result::ValidationResult;
 use crate::authenticated_client::authenticated_client;
 use crate::no_store::no_store;
 use crate::oauth_error::oauth_error;
-use crate::provider_error::ProviderError;
 use crate::token_submission::TokenSubmission;
 
 fn active_introspection<TProfile>(
@@ -54,13 +55,7 @@ fn active_introspection<TProfile>(
         0,
     ));
     introspection.set_iss(Some(registered.iss));
-    introspection.set_scopes(Some(
-        scope
-            .scopes
-            .iter()
-            .map(|scope| oauth2::Scope::new(scope.as_str().to_string()))
-            .collect(),
-    ));
+    introspection.set_scopes(Some(scope.scopes.iter().map(oauth2::Scope::from).collect()));
     introspection.set_sub(Some(subject));
     introspection.set_token_type(Some(BasicTokenType::Bearer));
 
@@ -81,44 +76,49 @@ impl IntrospectionEndpoint {
         }
     }
 
-    /// # Errors
-    ///
-    /// Returns `ProviderError::Signing` when the signing secret is not available yet.
+    #[must_use]
     pub fn respond(
         &self,
         request: &Request,
         submission: ValidationResult<TokenSubmission>,
-    ) -> Result<Response, ProviderError> {
+    ) -> Response {
         let ValidationResult::Valid(TokenSubmission {
             client_id, token, ..
         }) = submission
         else {
-            return Ok(oauth_error(
+            return oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
                 "the introspection request is malformed",
-            ));
+            );
         };
         let client = match authenticated_client(&self.clients, request, client_id.as_deref()) {
-            ControlFlow::Break(refusal) => return Ok(refusal),
+            ControlFlow::Break(refusal) => return refusal,
             ControlFlow::Continue(client) => client,
         };
-
-        if client.introspection == IntrospectionPermission::Forbidden {
-            return Ok(oauth_error(
+        let AcceptedClientAuthentication::ClientSecretBasic {
+            privileges:
+                ConfidentialPrivileges {
+                    introspection: IntrospectionPermission::Permitted,
+                    ..
+                },
+            ..
+        } = &client.authentication
+        else {
+            return oauth_error(
                 403,
                 BasicErrorResponseType::UnauthorizedClient,
                 "the client may not introspect tokens",
-            ));
-        }
+            );
+        };
 
-        Ok(no_store(Response::json(
+        no_store(Response::json(
             200,
-            &match self
-                .secret_store
-                .verify_resource_access_token(&token, &client.resources, Utc::now())
-                .map_err(ProviderError::Signing)?
-            {
+            &match self.secret_store.verify_resource_access_token(
+                &token,
+                client.resources.members(),
+                Utc::now(),
+            ) {
                 JwtVerification::Rejected(_) => {
                     StandardTokenIntrospectionResponse::<EmptyExtraTokenFields, BasicTokenType>::new(
                         false,
@@ -127,6 +127,6 @@ impl IntrospectionEndpoint {
                 }
                 JwtVerification::Verified(verified) => active_introspection(verified),
             },
-        )))
+        ))
     }
 }

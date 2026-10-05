@@ -4,6 +4,7 @@ use std::sync::Arc;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_subject_token_exchange::subject_token_profile::SubjectTokenProfile;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
@@ -45,7 +46,9 @@ impl TrustedRepositoryIssuer {
     ) -> Arc<SubjectTokenExchanger> {
         let trusted_issuer = self.trusted_issuer();
 
-        trusted_issuer.key_set.hold(self.secret.key_set().clone());
+        trusted_issuer
+            .key_set
+            .hold(Arc::new(self.secret.key_set().clone()));
 
         Arc::new(SubjectTokenExchanger::create(
             Arc::new(trusted_issuer),
@@ -63,11 +66,13 @@ impl TrustedRepositoryIssuer {
     fn trusted_issuer(&self) -> TrustedIssuer {
         TrustedIssuer::for_oidc_issuer(
             Arc::new(IssuerMetadata::awaiting()),
-            Arc::new(TokenTrust {
-                audience: "https://provider.localhost"
-                    .parse()
-                    .expect("the audience is not empty"),
-                issuer: self.issuer.parse().expect("the issuer is an https url"),
+            Arc::new(TokenTrustDeclaration {
+                trust: TokenTrust {
+                    audience: "https://provider.localhost"
+                        .parse()
+                        .expect("the audience is not empty"),
+                    issuer: self.issuer.parse().expect("the issuer is an https url"),
+                },
             }),
         )
     }

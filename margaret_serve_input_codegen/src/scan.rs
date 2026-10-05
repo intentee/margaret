@@ -11,10 +11,10 @@ use margaret_environment_variable_codegen::read_environment_variable::read_envir
 use margaret_injection_codegen::parameters::parameters;
 use margaret_input_weaving::constructor_parameter::ConstructorParameter;
 
+use crate::declared_serve_input_source::DeclaredServeInputSource;
 use crate::declared_serve_inputs::DeclaredServeInputs;
 use crate::serve_input::ServeInput;
 use crate::serve_input_codegen_error::ServeInputCodegenError;
-use crate::serve_input_source::DeclaredServeInputSource;
 use crate::serve_input_source::serve_input_source;
 
 fn console_argument_scope(item: &IndexedItem) -> ConsoleArgumentScope {

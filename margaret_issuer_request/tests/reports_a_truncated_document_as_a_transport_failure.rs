@@ -4,6 +4,7 @@ use margaret_http_tests::fixture_client_builder::fixture_client_builder;
 use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_http_tests::truncated_response_server::TruncatedResponseServer;
 use margaret_issuer_request::issuer_document::IssuerDocument;
+use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 
 #[tokio::test]
@@ -22,7 +23,7 @@ async fn reports_a_truncated_document_as_a_transport_failure() {
 
     assert!(matches!(
         fetched,
-        IssuerDocument::TransportFailed(error) if error.is_decode()
+        IssuerDocument::Failed(IssuerExchangeError::Transport(error)) if error.is_decode()
     ));
 
     server.finish().await;

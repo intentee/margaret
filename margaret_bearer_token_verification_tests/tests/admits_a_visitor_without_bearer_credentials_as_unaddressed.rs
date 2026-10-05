@@ -1,8 +1,8 @@
-use margaret_bearer_token_verification::bearer_token_admission::BearerTokenAdmission;
 use margaret_bearer_token_verification::bearer_token_routing::BearerTokenRouting;
 use margaret_bearer_token_verification::route_bearer_token::route_bearer_token;
 use margaret_bearer_token_verification_tests::held_trusted_issuer::held_trusted_issuer;
 use margaret_http::request_authorization::RequestAuthorization;
+use margaret_http::token_admission::TokenAdmission;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
@@ -26,6 +26,6 @@ async fn admits_a_visitor_without_bearer_credentials_as_unaddressed() {
         routed
             .admit::<TestClaims, AccessTokenProfile>(&trusted_issuer)
             .await,
-        BearerTokenAdmission::Unaddressed
+        TokenAdmission::Unaddressed
     ));
 }

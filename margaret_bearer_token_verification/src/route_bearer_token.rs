@@ -1,10 +1,11 @@
+use std::ops::ControlFlow;
 use std::time::SystemTime;
 
 use margaret_http::bearer_challenge::BearerChallenge;
 use margaret_http::request_authorization::RequestAuthorization;
 use margaret_http::response_continuation::ResponseContinuation;
-use margaret_jwt_verification::jwt_attribution::JwtAttribution;
 use margaret_jwt_verification::jwt_presentation::JwtPresentation;
+use margaret_jwt_verification::jwt_routing::JwtRouting;
 use margaret_jwt_verification::presented_jwt::PresentedJwt;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims_error::RegisteredClaimsError;
@@ -25,33 +26,28 @@ fn route_presented_at<'request, 'trusted>(
     trusted_issuers: &[&'trusted TrustedIssuer],
     presented_at: NumericDate,
 ) -> BearerTokenRouting<'request, 'trusted> {
-    let mut presented = match authorization {
-        RequestAuthorization::Absent | RequestAuthorization::OtherScheme => {
+    let token = match authorization.bearer() {
+        ControlFlow::Continue(token) => token,
+        ControlFlow::Break(BearerChallenge::MissingCredentials) => {
             return BearerTokenRouting::Routed(RoutedBearerToken::Absent);
         }
-        RequestAuthorization::Bearer(token) => match PresentedJwt::present(token.as_str()) {
-            JwtPresentation::Presented(presented) => presented,
-            JwtPresentation::Rejected(_) => return refused(BearerChallenge::InvalidToken),
-        },
-        RequestAuthorization::Malformed => return refused(BearerChallenge::InvalidRequest),
+        ControlFlow::Break(challenge) => return refused(challenge),
+    };
+    let JwtPresentation::Presented(presented) = PresentedJwt::present(token.as_str()) else {
+        return refused(BearerChallenge::InvalidToken);
     };
 
-    for trusted_issuer in trusted_issuers {
-        match presented.attribute_to(&trusted_issuer.trust.token_trust().issuer) {
-            JwtAttribution::Attributed(jwt) => {
-                return BearerTokenRouting::Routed(RoutedBearerToken::Attributed(
-                    AttributedBearerToken {
-                        jwt,
-                        presented_at,
-                        trusted_issuer,
-                    },
-                ));
-            }
-            JwtAttribution::Unattributed(unattributed) => presented = unattributed,
-        }
+    match presented.route(trusted_issuers.iter().copied()) {
+        JwtRouting::Routed {
+            addressee: trusted_issuer,
+            jwt,
+        } => BearerTokenRouting::Routed(RoutedBearerToken::Attributed(AttributedBearerToken {
+            jwt,
+            presented_at,
+            trusted_issuer,
+        })),
+        JwtRouting::Unrouted(_) => refused(BearerChallenge::InvalidToken),
     }
-
-    refused(BearerChallenge::InvalidToken)
 }
 
 /// # Errors

@@ -11,6 +11,7 @@ use margaret_issuer_key_set::key_set_holding::KeySetHolding;
 use margaret_issuer_key_set::key_set_refresh::KeySetRefresh;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
+use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -22,7 +23,9 @@ async fn keeps_awaiting_a_key_set_document_that_cannot_be_transferred() {
             Url::parse(fixture.url(server.port(), "/jwks").as_str())
                 .expect("the fixture url parses"),
         )),
-        Arc::new(localhost_trust()),
+        Arc::new(TokenTrustDeclaration {
+            trust: localhost_trust(),
+        }),
     ));
 
     assert!(matches!(

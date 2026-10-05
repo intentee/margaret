@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::provider_fixture::ProviderFixture;
-use crate::service_credentials::SERVICE_CREDENTIALS;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::service_credentials::SERVICE_CREDENTIALS;
 
 #[tokio::test]
 async fn refuses_an_introspection_by_a_client_not_permitted_to_introspect() {

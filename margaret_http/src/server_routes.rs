@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 use matchit::InsertError;
 
-use crate::handler_name::HandlerName;
 use crate::method_handler::MethodHandler;
 use crate::named_handler::NamedHandler;
 use crate::route_entry::RouteEntry;
@@ -16,10 +13,7 @@ fn named_handlers(entries: &[RouteEntry]) -> Vec<NamedHandler> {
             RouteEntry::WebSocket { .. } => None,
         })
         .flatten()
-        .filter_map(|MethodHandler { handler, name, .. }| match name {
-            HandlerName::Anonymous => None,
-            HandlerName::Forwardable(name) => Some(NamedHandler::new(name, Arc::clone(handler))),
-        })
+        .filter_map(MethodHandler::forward_target)
         .collect()
 }
 

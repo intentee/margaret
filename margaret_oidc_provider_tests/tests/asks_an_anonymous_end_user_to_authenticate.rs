@@ -1,10 +1,9 @@
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
-
-use crate::authorization_request::authorization_request;
-use crate::pkce_challenge::pkce_challenge;
-use crate::portal_parameters::portal_parameters;
-use crate::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::pkce_challenge::pkce_challenge;
+use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::validated_form::validated_form;
 
 #[tokio::test]
 async fn asks_an_anonymous_end_user_to_authenticate() {
@@ -12,7 +11,7 @@ async fn asks_an_anonymous_end_user_to_authenticate() {
     let outcome = fixture
         .authorization
         .authorize(
-            authorization_request(&portal_parameters()),
+            validated_form(&portal_parameters()),
             &EndUserAuthentication::Anonymous,
         )
         .await

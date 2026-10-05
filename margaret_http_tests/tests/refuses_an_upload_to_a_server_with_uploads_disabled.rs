@@ -7,7 +7,7 @@ use margaret_http_tests::raw_exchange::raw_exchange;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::uploaded_files_reading_handler::UploadedFilesReadingHandler;
 use margaret_http_uploaded_file::upload_config::UploadConfig;
-use margaret_route_method::route_method::RouteMethod;
+use margaret_route_method::content_method::ContentMethod;
 
 #[tokio::test]
 async fn refuses_an_upload_to_a_server_with_uploads_disabled() {
@@ -15,8 +15,8 @@ async fn refuses_an_upload_to_a_server_with_uploads_disabled() {
         UploadConfig::Disabled,
         vec![RouteEntry::new(
             "/upload",
-            vec![MethodHandler::anonymous(
-                RouteMethod::Post,
+            vec![MethodHandler::content(
+                ContentMethod::Post,
                 Arc::new(UploadedFilesReadingHandler {
                     limit: BodyLimit::new(1024),
                 }),

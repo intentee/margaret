@@ -4,6 +4,7 @@ use margaret_accepted_clients::client_refusal::ClientRefusal;
 use margaret_accepted_clients::presented_client_credentials::PresentedClientCredentials;
 use margaret_accepted_clients_tests::accepted_clients_of::accepted_clients_of;
 use margaret_accepted_clients_tests::fixture_client::fixture_client;
+use margaret_http::request_authorization::RequestAuthorization;
 
 #[test]
 fn refuses_malformed_basic_credentials() {
@@ -20,7 +21,10 @@ fn refuses_malformed_basic_credentials() {
         "Basic Y2xpZW50OiVGRg==",
     ] {
         assert!(matches!(
-            clients.authenticate(&PresentedClientCredentials::of(Some(authorization), None)),
+            clients.authenticate(&PresentedClientCredentials::of(
+                &RequestAuthorization::parse(Some(authorization)),
+                None
+            )),
             ClientAuthenticationOutcome::Refused(ClientRefusal::MalformedCredentials)
         ));
     }

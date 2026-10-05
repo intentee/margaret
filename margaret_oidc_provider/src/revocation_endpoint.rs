@@ -6,9 +6,10 @@ use oauth2::basic::BasicErrorResponseType;
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
+use margaret_oauth_vocabulary::token_type_hint::TokenTypeHint;
 use margaret_provider_state_storage::refresh_revocation::RefreshRevocation;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
-use margaret_provider_state_storage::token_digest::TokenDigest;
+use margaret_token_digest::token_digest::TokenDigest;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::authenticated_client::authenticated_client;
@@ -16,7 +17,6 @@ use crate::no_store::no_store;
 use crate::oauth_error::oauth_error;
 use crate::provider_error::ProviderError;
 use crate::token_submission::TokenSubmission;
-use crate::token_type_hint::TokenTypeHint;
 
 pub struct RevocationEndpoint {
     clients: Arc<AcceptedClients>,

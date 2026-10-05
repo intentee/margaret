@@ -1,13 +1,15 @@
 use margaret_oidc_provider::provider_endpoint_paths::ProviderEndpointPaths;
 use margaret_oidc_provider::provider_endpoints::ProviderEndpoints;
-
-use crate::fixture_endpoint_paths::FIXTURE_ENDPOINT_PATHS;
-use crate::provider_issuance::provider_issuance;
+use margaret_oidc_provider_tests::fixture_endpoint_paths::FIXTURE_ENDPOINT_PATHS;
+use margaret_oidc_provider_tests::provider_issuance::provider_issuance;
+use margaret_token_signer_tests::token_issuance_declaration::TokenIssuanceDeclaration;
 
 #[test]
 fn rejects_a_discovery_route_outside_the_issuer() {
     let Err(rejection) = ProviderEndpoints::create(
-        &provider_issuance(),
+        &TokenIssuanceDeclaration {
+            issuance: provider_issuance(),
+        },
         ProviderEndpointPaths {
             discovery: "/openid-configuration",
             ..FIXTURE_ENDPOINT_PATHS

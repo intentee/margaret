@@ -1,21 +1,18 @@
 use http::header::WWW_AUTHENTICATE;
 
-use margaret_bearer_token_verification::bearer_token_admission::BearerTokenAdmission;
 use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::token_admission::TokenAdmission;
 
 #[must_use]
-pub fn refused_with_challenge<TClaims, TProfile>(
-    admission: &BearerTokenAdmission<TClaims, TProfile>,
+pub fn refused_with_challenge<TToken>(
+    admission: &TokenAdmission<TToken>,
     status: u16,
     challenge: &str,
 ) -> bool {
     matches!(
         admission,
-        BearerTokenAdmission::Refused(ResponseContinuation::Done(response))
+        TokenAdmission::Refused(ResponseContinuation::Done(response))
             if response.status() == status
-                && response
-                    .headers()
-                    .iter()
-                    .any(|header| header.name == WWW_AUTHENTICATE.as_str() && header.value == challenge)
+                && response.header_value(&WWW_AUTHENTICATE) == Some(challenge)
     )
 }

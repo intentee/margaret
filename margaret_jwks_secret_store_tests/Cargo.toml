@@ -14,10 +14,12 @@ margaret_jwks_secret_store = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 
 [dev-dependencies]
+aws-lc-rs = { workspace = true }
 margaret_identity_session = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
+margaret_registered_claims = { workspace = true }
 margaret_token_signer = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

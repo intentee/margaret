@@ -6,7 +6,6 @@ use margaret_jwks_keygen::signing_curve::SigningCurve;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_registered_claims::numeric_date::NumericDate;
 
@@ -20,7 +19,7 @@ fn jwks_secret_verifies_a_token_signed_with_the_current_key() -> Result<()> {
     let token = claims.signed_by(secret.current());
 
     assert!(matches!(
-        secret.verify_jwt::<TestClaims, AccessTokenProfile>(&token, &JwtExpectation { audience: &trust.audience, issuer: &trust.issuer }, NumericDate::new(0)),
+        secret.verify_jwt::<TestClaims, AccessTokenProfile>(&token, &trust.expectation(), NumericDate::new(0)),
         JwksSecretVerificationResult::SignedWithCurrent(verified) if verified.claims == claims
     ));
 

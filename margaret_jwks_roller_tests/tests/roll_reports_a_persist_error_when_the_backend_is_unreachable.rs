@@ -14,16 +14,9 @@ fn roll_reports_a_persist_error_when_the_backend_is_unreachable() {
     let seeded = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())
         .expect("a fresh secret");
     let seeded_kid = seeded.current().kid().clone();
-    let holder = JwksSecretHolder::default();
+    let holder = JwksSecretHolder::new(Arc::new(seeded));
 
-    holder.set(Some(Arc::new(seeded)));
-
-    let Err(error) = roll(
-        &storage,
-        &holder,
-        SigningCurve::P256,
-        &FixtureRsaSigningKeys::default(),
-    ) else {
+    let Err(error) = roll(&storage, &holder, &FixtureRsaSigningKeys::default()) else {
         panic!("the backend cannot be written");
     };
 
@@ -33,7 +26,5 @@ fn roll_reports_a_persist_error_when_the_backend_is_unreachable() {
         "failed to persist the rolled jwks secret: the jwks secret backend is unreachable"
     );
 
-    let unchanged = holder.get().expect("the holder keeps its previous secret");
-
-    assert_eq!(unchanged.current().kid(), &seeded_kid);
+    assert_eq!(holder.get().current().kid(), &seeded_kid);
 }

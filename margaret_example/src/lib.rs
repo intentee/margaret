@@ -4,7 +4,6 @@ pub mod commands;
 pub mod deployment_environment;
 pub mod english_greeter;
 pub mod forms;
-pub mod jwks_endpoint;
 pub mod metrics;
 pub mod models;
 pub mod routes;

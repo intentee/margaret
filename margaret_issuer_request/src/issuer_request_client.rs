@@ -1,9 +1,4 @@
-use std::future::Future;
-use std::pin::Pin;
-
-use oauth2::AsyncHttpClient;
-use oauth2::HttpRequest;
-use oauth2::HttpResponse;
+use http::Response;
 use reqwest::Client;
 use reqwest::ClientBuilder;
 use reqwest::Request;
@@ -22,7 +17,7 @@ use crate::response_body::ResponseBody;
 async fn received_document(request: RequestBuilder) -> IssuerDocument {
     let response = match request.send().await {
         Ok(response) => response,
-        Err(error) => return IssuerDocument::TransportFailed(error),
+        Err(source) => return IssuerDocument::Failed(IssuerExchangeError::Transport(source)),
     };
     let status = response.status();
 
@@ -31,8 +26,12 @@ async fn received_document(request: RequestBuilder) -> IssuerDocument {
     }
 
     match read_response_body(response).await {
-        ResponseBody::Failed(error) => IssuerDocument::TransportFailed(error),
-        ResponseBody::Oversized { max_bytes } => IssuerDocument::Oversized { max_bytes },
+        ResponseBody::Failed(source) => {
+            IssuerDocument::Failed(IssuerExchangeError::Transport(source))
+        }
+        ResponseBody::Oversized { max_bytes } => {
+            IssuerDocument::Failed(IssuerExchangeError::Oversized { max_bytes })
+        }
         ResponseBody::Read(document) => IssuerDocument::Fetched(document),
     }
 }
@@ -71,7 +70,7 @@ impl IssuerRequestClient {
     pub async fn exchange(
         &self,
         mut request: Request,
-    ) -> Result<HttpResponse, IssuerExchangeError> {
+    ) -> Result<Response<Vec<u8>>, IssuerExchangeError> {
         *request.timeout_mut() = Some(ISSUER_REQUEST_TIMEOUT);
 
         let response = match self.http_client.execute(request).await {
@@ -87,7 +86,7 @@ impl IssuerRequestClient {
                 Err(IssuerExchangeError::Oversized { max_bytes })
             }
             ResponseBody::Read(body) => {
-                let mut answer = HttpResponse::new(body.to_vec());
+                let mut answer = Response::new(body.to_vec());
 
                 *answer.status_mut() = status;
                 *answer.headers_mut() = headers;
@@ -109,20 +108,5 @@ impl IssuerRequestClient {
             () = cancellation_token.cancelled() => IssuerDocument::Cancelled,
             received = received_document(request) => received,
         }
-    }
-}
-
-impl<'client> AsyncHttpClient<'client> for IssuerRequestClient {
-    type Error = IssuerExchangeError;
-    type Future =
-        Pin<Box<dyn Future<Output = Result<HttpResponse, IssuerExchangeError>> + Send + 'client>>;
-
-    fn call(&'client self, request: HttpRequest) -> Self::Future {
-        Box::pin(async move {
-            match Request::try_from(request) {
-                Ok(request) => self.exchange(request).await,
-                Err(source) => Err(IssuerExchangeError::Transport(source)),
-            }
-        })
     }
 }

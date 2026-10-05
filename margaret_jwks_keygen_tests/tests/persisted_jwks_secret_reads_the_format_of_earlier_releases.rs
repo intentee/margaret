@@ -11,7 +11,6 @@ use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jws_verification::ec_jwk::EcJwk;
 use margaret_jws_verification::jwk::Jwk;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
 use margaret_registered_claims::numeric_date::NumericDate;
 
@@ -48,7 +47,7 @@ fn persisted_jwks_secret_reads_the_format_of_earlier_releases() -> Result<()> {
         .into_secret(&FixtureRsaSigningKeys::default())?;
 
     assert!(matches!(
-        secret.verify_jwt::<TestClaims, AccessTokenProfile>(&token, &JwtExpectation { audience: &trust.audience, issuer: &trust.issuer }, NumericDate::new(0)),
+        secret.verify_jwt::<TestClaims, AccessTokenProfile>(&token, &trust.expectation(), NumericDate::new(0)),
         JwksSecretVerificationResult::SignedWithCurrent(verified) if verified.claims == claims
     ));
 

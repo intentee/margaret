@@ -8,10 +8,13 @@ use margaret_authorization_server_client::server_endpoint::ServerEndpoint;
 use margaret_authorization_server_client::server_unavailability::ServerUnavailability;
 use margaret_authorization_server_client_tests::localhost_discovery_metadata::localhost_discovery_metadata;
 use margaret_authorization_server_client_tests::localhost_trust::localhost_trust;
+use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
 use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
+use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
+use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test]
@@ -19,6 +22,7 @@ async fn reports_an_endpoint_the_metadata_does_not_advertise() {
     let metadata = Arc::new(IssuerMetadata::awaiting());
 
     metadata.hold(localhost_discovery_metadata(
+        AuthorizationResponseIssuer::Unadvertised,
         AdvertisedEndpoint::Unadvertised,
     ));
 
@@ -27,16 +31,19 @@ async fn reports_an_endpoint_the_metadata_does_not_advertise() {
         Arc::clone(&metadata),
         Arc::new(TrustedIssuer::for_oidc_issuer(
             metadata,
-            Arc::new(localhost_trust()),
+            Arc::new(TokenTrustDeclaration {
+                trust: localhost_trust(),
+            }),
         )),
-        Arc::new(secret_basic_client()),
+        Arc::new(OAuthClientDeclaration {
+            client: secret_basic_client(),
+        }),
     );
 
     assert!(matches!(
         client
             .introspect::<EmptyExtraTokenFields>("opaque-token")
-            .await
-            .expect("a secret basic client needs no assertion"),
+            .await,
         EndpointOutcome::Unavailable(ServerUnavailability::EndpointUnadvertised {
             endpoint: ServerEndpoint::Introspection
         })

@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::portal_credentials::PORTAL_CREDENTIALS;
-use crate::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]
 async fn accepts_the_revocation_of_an_unknown_token_with_an_unrecognized_hint() {

@@ -1,3 +1,4 @@
+pub mod counted_handler;
 pub mod failing_endpoint;
 pub mod first_poll;
 pub mod fixture_issuer_routes;

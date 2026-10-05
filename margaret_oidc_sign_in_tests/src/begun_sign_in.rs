@@ -1,51 +1,38 @@
-use std::collections::HashMap;
-
 use cookie::Cookie;
-use url::Url;
+use http::header::SET_COOKIE;
 
 use margaret_http::response::Response;
-
-fn header<'response>(response: &'response Response, name: &str) -> &'response str {
-    response
-        .headers()
-        .iter()
-        .find(|header| header.name == name)
-        .map(|header| header.value.as_str())
-        .expect("the redirect carries the header")
-}
+use margaret_http_tests::redirection::Redirection;
 
 pub struct BegunSignIn {
-    pub authorization: HashMap<String, String>,
+    pub authorization: Redirection,
     pub cookie: Cookie<'static>,
-    pub status: u16,
 }
 
 impl BegunSignIn {
-    #[must_use]
     /// # Panics
     ///
-    /// Panics when the fixture it builds cannot be prepared.
+    /// Panics when the response is not a redirect carrying a transaction cookie.
+    #[must_use]
     pub fn of(response: &Response) -> Self {
         Self {
-            authorization: Url::parse(header(response, "location"))
-                .expect("the location is a url")
-                .query_pairs()
-                .into_owned()
-                .collect(),
-            cookie: Cookie::parse(header(response, "set-cookie").to_string())
-                .expect("the transaction cookie parses"),
-            status: response.status(),
+            authorization: Redirection::of(response),
+            cookie: Cookie::parse(
+                response
+                    .header_value(&SET_COOKIE)
+                    .expect("the redirect carries the transaction cookie")
+                    .to_string(),
+            )
+            .expect("the transaction cookie parses"),
         }
     }
 
     /// # Panics
     ///
-    /// Panics when the fixture it builds cannot be prepared.
+    /// Panics when the authorization request lacks the parameter.
+    #[must_use]
     pub fn authorization_parameter(&self, name: &str) -> &str {
-        self.authorization
-            .get(name)
-            .map(String::as_str)
-            .expect("the authorization request carries the parameter")
+        self.authorization.parameter(name)
     }
 
     #[must_use]

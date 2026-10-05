@@ -1,9 +1,10 @@
-use margaret_bearer_token_verification::bearer_token_admission::BearerTokenAdmission;
 use margaret_bearer_token_verification::bearer_token_routing::BearerTokenRouting;
 use margaret_bearer_token_verification::route_bearer_token::route_bearer_token;
 use margaret_http::request_authorization::RequestAuthorization;
+use margaret_http::token_admission::TokenAdmission;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
+use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 /// # Panics
@@ -12,13 +13,13 @@ use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 pub async fn admit_access_token(
     trusted_issuer: &TrustedIssuer,
     authorization: &str,
-) -> BearerTokenAdmission<TestClaims, AccessTokenProfile> {
+) -> TokenAdmission<VerifiedJwt<TestClaims, AccessTokenProfile>> {
     let authorization = RequestAuthorization::parse(Some(authorization));
 
     match route_bearer_token(&authorization, &[trusted_issuer])
         .expect("the system clock reads as a numeric date")
     {
-        BearerTokenRouting::Refused(continuation) => BearerTokenAdmission::Refused(continuation),
+        BearerTokenRouting::Refused(continuation) => TokenAdmission::Refused(continuation),
         BearerTokenRouting::Routed(routed) => routed.admit(trusted_issuer).await,
     }
 }

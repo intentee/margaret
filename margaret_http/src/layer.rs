@@ -1,39 +1,15 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-
-use crate::handler::Handler;
-use crate::handler_error::HandlerError;
 use crate::http_middleware::HttpMiddleware;
-use crate::next::Next;
-use crate::request::Request;
-use crate::request_body::RequestBody;
-use crate::response_continuation::ResponseContinuation;
+use crate::layerable_handler::LayerableHandler;
 
-struct LayeredHandler<Middleware: HttpMiddleware + ?Sized> {
-    inner: Arc<dyn Handler>,
-    middleware: Arc<Middleware>,
-}
-
-#[async_trait]
-impl<Middleware> Handler for LayeredHandler<Middleware>
+pub fn layer<TMiddleware, THandler>(
+    middleware: Arc<TMiddleware>,
+    inner: Arc<THandler>,
+) -> Arc<THandler>
 where
-    Middleware: HttpMiddleware + Send + Sync + ?Sized + 'static,
+    TMiddleware: HttpMiddleware + Send + Sync + ?Sized + 'static,
+    THandler: LayerableHandler + ?Sized,
 {
-    async fn handle(
-        &self,
-        request: &Request,
-        body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
-        self.middleware
-            .process(request, Next::new(self.inner.clone(), body))
-            .await
-    }
-}
-
-pub fn layer<Middleware>(middleware: Arc<Middleware>, inner: Arc<dyn Handler>) -> Arc<dyn Handler>
-where
-    Middleware: HttpMiddleware + Send + Sync + ?Sized + 'static,
-{
-    Arc::new(LayeredHandler { inner, middleware })
+    THandler::layered(middleware, inner)
 }

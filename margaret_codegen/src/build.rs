@@ -1039,8 +1039,9 @@ impl GetIdentity {
             "ifletErr(error)=manager.register_bundle(spiffe_bundle).await{returnmargaret::framework::console::report_failure::report_failure(error);}"
         ));
         assert!(serve.contains(
-            "transport:margaret::framework::http::transport_config::TransportConfig::MutualTls{server_config:::std::sync::Arc::clone(spiffe_server_config),}"
+            "transport:matchmatches.get_one::<margaret::framework::service::transport_choice::TransportChoice"
         ));
+        assert!(serve.contains("{Some(value)=>value.config(spiffe_server_config),"));
         assert!(serve.contains(
             "forserver_serviceinserver_services{manager.register_service(margaret::framework::spiffe_svid_client::readiness_gated_service::ReadinessGatedService::new(spiffe_client_readiness.clone(),server_service,),);}"
         ));
@@ -1548,8 +1549,31 @@ impl PostConsent {
                 .split_whitespace()
                 .collect::<String>()
                 .contains(
-                    "container.margaret_oidc_provider_provider_endpoints().served_by(&origin_public)"
+                    "container.margaret_oidc_provider_provider_endpoints().served_by(origin_public)"
                 )
+        );
+    }
+
+    #[test]
+    fn injects_provider_handlers_imported_through_use_statements() {
+        let imported = OIDC_PROVIDER_CRATE
+            .replace(
+                "use margaret::framework::accepted_clients::declares_accepted_client::DeclaresAcceptedClient;\n",
+                "use margaret::framework::accepted_clients::declares_accepted_client::DeclaresAcceptedClient;\nuse std::sync::Arc;\n\nuse crate::margaret::jwks::PublicJwksHandler;\nuse crate::margaret::oidc_provider;\n",
+            )
+            .replace("std::sync::Arc<crate::margaret::oidc_provider::", "Arc<oidc_provider::")
+            .replace("std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>", "Arc<PublicJwksHandler>");
+        let expected = generate(OIDC_PROVIDER_CRATE).expect("the build succeeds");
+        let code = generate(&imported).expect("the build succeeds");
+
+        assert!(!imported.contains("crate::margaret::oidc_provider::"));
+        assert_eq!(
+            module(&code, "oidc_provider/provider_endpoint_paths"),
+            module(&expected, "oidc_provider/provider_endpoint_paths")
+        );
+        assert_eq!(
+            module(&code, "container/build/serve"),
+            module(&expected, "container/build/serve")
         );
     }
 

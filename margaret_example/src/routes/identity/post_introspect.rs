@@ -36,13 +36,13 @@ impl PostIntrospect {
 
     /// # Errors
     ///
-    /// Returns an error when the token cannot be verified before the first key roll.
+    /// Returns an error propagated from the work it performs.
     #[process]
     pub fn respond(
         &self,
         request: &Request,
         #[form_request(from = RequestInput::Form)] submission: ValidationResult<TokenSubmission>,
     ) -> anyhow::Result<Response> {
-        Ok(self.introspection_endpoint.respond(request, submission)?)
+        Ok(self.introspection_endpoint.respond(request, submission))
     }
 }

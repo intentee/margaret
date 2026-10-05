@@ -1,8 +1,10 @@
 use thiserror::Error;
+use url::Origin;
 use url::Url;
 
 use margaret_jwks_secret_store::jwks_secret_store_error::JwksSecretStoreError;
 use margaret_provider_state_storage::provider_state_error::ProviderStateError;
+use margaret_registered_claims::claims_merge_error::ClaimsMergeError;
 
 #[derive(Debug, Error)]
 pub enum ProviderError {
@@ -15,18 +17,13 @@ pub enum ProviderError {
     },
 
     #[error(
-        "the issuer at '{issuer_origin}' is not served by the provider server at '{server_origin}'"
+        "the issuer at '{}' is not served by the provider server at '{}'",
+        .issuer_origin.ascii_serialization(),
+        .server_origin.ascii_serialization()
     )]
     IssuerNotServed {
-        issuer_origin: String,
-        server_origin: String,
-    },
-
-    #[error("the url '{server_url}' of the provider server is not a url: {source}")]
-    ServerUrlMalformed {
-        server_url: String,
-        #[source]
-        source: url::ParseError,
+        issuer_origin: Origin,
+        server_origin: Origin,
     },
 
     #[error("the provider could not sign a token: {0}")]
@@ -35,6 +32,6 @@ pub enum ProviderError {
     #[error("the provider could not reach its state: {0}")]
     State(#[source] ProviderStateError),
 
-    #[error("the userinfo claims could not be serialized to json: {0}")]
-    UserinfoClaimsSerialization(#[source] serde_json::Error),
+    #[error("the userinfo claims could not be merged: {0}")]
+    UserinfoClaims(#[source] ClaimsMergeError),
 }

@@ -22,6 +22,7 @@ margaret_oauth_vocabulary = { workspace = true }
 margaret_oidc_discovery = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_trusted_issuer = { workspace = true }
+mime = { workspace = true }
 oauth2 = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -29,7 +30,6 @@ serde_json = { workspace = true }
 serde_path_to_error = { workspace = true }
 thiserror = { workspace = true }
 url = { workspace = true }
-uuid = { workspace = true, features = ["v4"] }
 
 [lints]
 workspace = true

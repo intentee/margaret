@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::portal_credentials::PORTAL_CREDENTIALS;
-use crate::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]
 async fn refuses_a_subject_token_that_is_not_a_jws() {

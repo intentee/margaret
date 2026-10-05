@@ -7,9 +7,11 @@ use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
 use crate::attributed_jwt::AttributedJwt;
 use crate::claims_rejection::ClaimsRejection;
+use crate::jwt_addressee::JwtAddressee;
 use crate::jwt_attribution::JwtAttribution;
 use crate::jwt_presentation::JwtPresentation;
 use crate::jwt_rejection::JwtRejection;
+use crate::jwt_routing::JwtRouting;
 
 #[derive(Deserialize)]
 struct IssuerMember {
@@ -65,5 +67,22 @@ impl<'token> PresentedJwt<'token> {
     #[must_use]
     pub fn issuer(&self) -> &str {
         &self.issuer
+    }
+
+    #[must_use]
+    pub fn route<'addressees, TAddressee: JwtAddressee>(
+        self,
+        addressees: impl IntoIterator<Item = &'addressees TAddressee>,
+    ) -> JwtRouting<'token, 'addressees, TAddressee> {
+        let mut presented = self;
+
+        for addressee in addressees {
+            match presented.attribute_to(addressee.jwt_issuer()) {
+                JwtAttribution::Attributed(jwt) => return JwtRouting::Routed { addressee, jwt },
+                JwtAttribution::Unattributed(unattributed) => presented = unattributed,
+            }
+        }
+
+        JwtRouting::Unrouted(presented)
     }
 }

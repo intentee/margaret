@@ -16,9 +16,13 @@ use crate::console_command::ConsoleCommand;
 
 fn transport_argument_registration(server: &HttpServer) -> TokenStream {
     let transport_argument = server.transport_argument();
-    let allowed_values = match server.transport_policy() {
-        ServerTransportPolicy::Negotiable => quote! { ["plain", "spiffe_mtls"] },
-        ServerTransportPolicy::PinnedSpiffeMtls => quote! { ["spiffe_mtls"] },
+    let value_parser = match server.transport_policy() {
+        ServerTransportPolicy::Negotiable => quote! {
+            clap::value_parser!(margaret::framework::service::transport_choice::TransportChoice)
+        },
+        ServerTransportPolicy::PinnedSpiffeMtls => quote! {
+            margaret::framework::service::transport_choice::TransportChoice::pinned_to_spiffe_mtls()
+        },
     };
 
     quote! {
@@ -26,7 +30,7 @@ fn transport_argument_registration(server: &HttpServer) -> TokenStream {
             clap::Arg::new(#transport_argument)
                 .long(#transport_argument)
                 .required(true)
-                .value_parser(#allowed_values)
+                .value_parser(#value_parser)
         )
     }
 }
@@ -58,7 +62,7 @@ fn serve_registration(http_servers: &[HttpServer], serve_inputs: &[ServeInput]) 
 
         quote! {
             .arg(clap::Arg::new(#address_argument).long(#address_argument).required(true))
-            .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true))
+            .arg(clap::Arg::new(#url_argument).long(#url_argument).required(true).value_parser(clap::value_parser!(margaret::framework::http::server_origin::ServerOrigin)))
             .arg(clap::Arg::new(#uploads_argument).long(#uploads_argument).action(clap::ArgAction::SetTrue))
             .arg(clap::Arg::new(#upload_dir_argument).long(#upload_dir_argument).required(false).requires(#uploads_argument))
             #transport_argument
@@ -148,10 +152,6 @@ struct SchemaTokens {
     registration: TokenStream,
 }
 
-pub(crate) struct RenderedConsole {
-    pub(crate) run: TokenStream,
-}
-
 fn schema_tokens(has_models: bool) -> SchemaTokens {
     let registration = if has_models {
         quote! {
@@ -186,7 +186,7 @@ pub(crate) fn render(
     http_servers: &[HttpServer],
     serve_inputs: &[ServeInput],
     bindings: &ContainerBindings,
-) -> RenderedConsole {
+) -> TokenStream {
     let dispatches_asynchronously = serves
         || commands.iter().any(|command| {
             command.takes_token
@@ -230,7 +230,7 @@ pub(crate) fn render(
     };
 
     let too_many_lines = too_many_lines_allow();
-    let run = quote! {
+    quote! {
         #too_many_lines
         pub #run_asyncness fn run<Arguments, Argument>(
             args: Arguments,
@@ -257,7 +257,5 @@ pub(crate) fn render(
                 }
             }
         }
-    };
-
-    RenderedConsole { run }
+    }
 }

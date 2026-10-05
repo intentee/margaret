@@ -1,4 +1,3 @@
-use crate::authorization_server_client_error::AuthorizationServerClientError;
 use crate::authorization_url::AuthorizationUrl;
 use crate::endpoint_outcome::EndpointOutcome;
 use crate::server_unavailability::ServerUnavailability;
@@ -14,11 +13,9 @@ impl UnavailableOutcome for AuthorizationUrl {
     }
 }
 
-impl<TAnswer> UnavailableOutcome
-    for Result<EndpointOutcome<TAnswer>, AuthorizationServerClientError>
-{
+impl<TAnswer> UnavailableOutcome for EndpointOutcome<TAnswer> {
     fn unavailable(unavailability: ServerUnavailability) -> Self {
-        Ok(EndpointOutcome::Unavailable(unavailability))
+        Self::Unavailable(unavailability)
     }
 }
 

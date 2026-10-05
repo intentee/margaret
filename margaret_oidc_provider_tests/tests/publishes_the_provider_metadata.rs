@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]
 async fn publishes_the_provider_metadata() {

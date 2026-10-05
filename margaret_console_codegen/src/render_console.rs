@@ -16,7 +16,7 @@ pub fn render_console(
     serve_inputs: &[ServeInput],
     bindings: &ContainerBindings,
 ) -> ConsoleArtifacts {
-    let rendered = render(
+    let run = render(
         &plan.commands,
         serves,
         has_models,
@@ -26,7 +26,7 @@ pub fn render_console(
     );
 
     ConsoleArtifacts {
-        modules: vec![GeneratedModuleTokens::new("run", rendered.run)],
+        modules: vec![GeneratedModuleTokens::new("run", run)],
         construction_roots: plan.construction_roots().to_vec(),
     }
 }

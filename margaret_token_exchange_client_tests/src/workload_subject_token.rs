@@ -1,7 +1,7 @@
 use zeroize::Zeroizing;
 
+use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_token_exchange_client::subject_token::SubjectToken;
-use margaret_token_exchange_client::subject_token_type::SubjectTokenType;
 
 #[must_use]
 pub fn workload_subject_token() -> SubjectToken {

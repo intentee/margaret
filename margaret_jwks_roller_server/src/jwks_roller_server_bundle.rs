@@ -6,8 +6,10 @@ use bytes::Bytes;
 use trzcina::Service;
 use trzcina::ServiceBundle;
 
+use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_keygen::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
+use margaret_jwks_roller::initial_secret::initial_secret;
 use margaret_jwks_roller::jwks_secret_storage::JwksSecretStorage;
 use margaret_jwks_roller::roll::roll;
 
@@ -18,6 +20,12 @@ use crate::jwks_roller_server_error::JwksRollerServerError;
 use crate::jwks_roller_service::JwksRollerService;
 use crate::public_jwks_handler::PublicJwksHandler;
 
+fn published_document(secret: &JwksSecret) -> Result<Bytes, JwksRollerServerError> {
+    serde_json::to_vec(secret.public_jwks())
+        .map(Bytes::from)
+        .map_err(JwksRollerServerError::DocumentSerialization)
+}
+
 pub struct JwksRollerServerBundle {
     jwks_document_holder: JwksDocumentHolder,
     jwks_secret_holder: JwksSecretHolder,
@@ -26,16 +34,23 @@ pub struct JwksRollerServerBundle {
 }
 
 impl JwksRollerServerBundle {
-    #[must_use]
+    /// # Errors
+    ///
+    /// Returns `JwksRollerServerError::SecretRoll` when the first secret cannot be loaded,
+    /// generated or persisted, and `JwksRollerServerError::DocumentSerialization` when its public
+    /// document cannot be serialized.
     pub fn new(
         JwksRollerServerBundleParams { rsa_keys, storage }: JwksRollerServerBundleParams,
-    ) -> Self {
-        Self {
-            jwks_document_holder: JwksDocumentHolder::default(),
-            jwks_secret_holder: JwksSecretHolder::default(),
+    ) -> Result<Self, JwksRollerServerError> {
+        let secret = initial_secret(storage.as_ref(), JWKS_CURVE, rsa_keys.as_ref())
+            .map_err(JwksRollerServerError::SecretRoll)?;
+
+        published_document(&secret).map(|document| Self {
+            jwks_document_holder: JwksDocumentHolder::new(document),
+            jwks_secret_holder: JwksSecretHolder::new(secret),
             rsa_keys,
             storage,
-        }
+        })
     }
 
     #[must_use]
@@ -57,17 +72,14 @@ impl JwksRollerServerBundle {
     ///
     /// Returns `JwksRollerServerError::SecretRoll` or `JwksRollerServerError::DocumentSerialization`.
     pub fn roll_and_publish(&self) -> Result<(), JwksRollerServerError> {
-        let rolled = roll(
+        roll(
             self.storage.as_ref(),
             &self.jwks_secret_holder,
-            JWKS_CURVE,
             self.rsa_keys.as_ref(),
         )
-        .map_err(JwksRollerServerError::SecretRoll)?;
-
-        serde_json::to_vec(rolled.public_jwks())
-            .map_err(JwksRollerServerError::DocumentSerialization)
-            .map(|document| self.jwks_document_holder.set(Some(Bytes::from(document))))
+        .map_err(JwksRollerServerError::SecretRoll)
+        .and_then(|rolled| published_document(&rolled))
+        .map(|document| self.jwks_document_holder.set(document))
     }
 }
 

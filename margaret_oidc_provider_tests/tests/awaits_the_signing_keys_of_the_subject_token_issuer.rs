@@ -1,7 +1,7 @@
-use crate::ci_issuer::CiIssuer;
-use crate::exchange_request::exchange_request;
-use crate::portal_credentials::PORTAL_CREDENTIALS;
-use crate::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::ci_issuer::CiIssuer;
+use margaret_oidc_provider_tests::exchange_request::exchange_request;
+use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]
 async fn awaits_the_signing_keys_of_the_subject_token_issuer() {

@@ -2,19 +2,14 @@ use serde_json::json;
 use sqlx::query;
 use uuid::Uuid;
 
-use margaret_provider_state_storage::code_redemption_request::CodeRedemptionRequest;
 use margaret_provider_state_storage::pending_decision::PendingDecision;
 use margaret_provider_state_storage::pending_verdict::PendingVerdict;
 use margaret_provider_state_storage::provider_state_error::ProviderStateError;
-use margaret_provider_state_storage::refresh_admission::RefreshAdmission;
-use margaret_provider_state_storage::refresh_issuance::RefreshIssuance;
-use margaret_provider_state_storage::refresh_scope::RefreshScope;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
-use margaret_provider_state_storage::token_digest::TokenDigest;
-use margaret_provider_state_storage_tests::admission_of::admission_of;
 use margaret_provider_state_storage_tests::fixture_client_id::fixture_client_id;
 use margaret_provider_state_storage_tests::fixture_grant::fixture_grant;
 use margaret_provider_state_storage_tests::postgres_state::PostgresState;
+use margaret_token_digest::token_digest::TokenDigest;
 
 async fn stored(postgres: &PostgresState, statement: &'static str, key: Vec<u8>, document: String) {
     query(statement)
@@ -31,15 +26,6 @@ async fn postgres_state_reports_unreadable_documents() {
     let state = &postgres.state;
     let grant = fixture_grant();
     let code = TokenDigest::of("code");
-    let redemption = || CodeRedemptionRequest {
-        admission: admission_of(&grant),
-        family: Uuid::new_v4(),
-        refresh: RefreshIssuance::Withheld,
-    };
-    let refresh = || RefreshAdmission {
-        client_id: &grant.client_id,
-        scope: &RefreshScope::Granted,
-    };
     let pending_id = Uuid::new_v4();
     let family = Uuid::new_v4();
     let refresh_token = TokenDigest::of("refresh");
@@ -81,8 +67,8 @@ async fn postgres_state_reports_unreadable_documents() {
     .await;
 
     assert!(matches!(
-        state.redeem_code(code, redemption()).await,
-        Err(ProviderStateError::RedeemCode { .. })
+        state.present_code(code).await,
+        Err(ProviderStateError::PresentCode { .. })
     ));
     assert!(matches!(
         state
@@ -97,9 +83,7 @@ async fn postgres_state_reports_unreadable_documents() {
         Err(ProviderStateError::DecidePendingAuthorization { .. })
     ));
     assert!(matches!(
-        state
-            .rotate_refresh_token(refresh_token, TokenDigest::of("next"), refresh())
-            .await,
-        Err(ProviderStateError::RotateRefreshToken { .. })
+        state.present_refresh_token(refresh_token).await,
+        Err(ProviderStateError::PresentRefreshToken { .. })
     ));
 }

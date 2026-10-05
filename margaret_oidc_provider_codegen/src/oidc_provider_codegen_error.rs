@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use margaret_oidc_discovery::oidc_discovery_path::OIDC_DISCOVERY_PATH;
 use margaret_route_method::route_method::RouteMethod;
 
 use crate::provider_endpoint::ProviderEndpoint;
@@ -12,6 +13,11 @@ pub enum OidcProviderCodegenError {
         paths: Vec<String>,
         server: String,
     },
+
+    #[error(
+        "the discovery document is served at '{path}', outside the '{OIDC_DISCOVERY_PATH}' location of its issuer"
+    )]
+    DiscoveryOutsideWellKnownPath { path: String },
 
     #[error("the discovery document is served by several servers: {servers:?}")]
     DiscoveryServedBySeveralServers { servers: Vec<String> },
@@ -28,6 +34,11 @@ pub enum OidcProviderCodegenError {
         endpoint: ProviderEndpoint,
         server: String,
     },
+
+    #[error(
+        "no route uses the consent endpoint, so the authorization endpoint cannot ask an end user for consent"
+    )]
+    MissingConsentRoute,
 
     #[error("no route serves the discovery document")]
     MissingDiscoveryRoute,

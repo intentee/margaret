@@ -1,6 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 
+use margaret_oauth_vocabulary::oauth_vocabulary_error::OAuthVocabularyError;
 use margaret_token_introspection::introspection_rejection::IntrospectionRejection;
 
 fn instant(seconds: i64) -> DateTime<Utc> {
@@ -21,6 +22,12 @@ fn describes_every_introspection_rejection() {
         IntrospectionRejection::Inactive,
         IntrospectionRejection::IssuerMismatch {
             found: "https://attacker.example".to_string(),
+        },
+        IntrospectionRejection::MalformedClientId {
+            source: OAuthVocabularyError::ClientIdInvisibleCharacter,
+        },
+        IntrospectionRejection::MalformedScope {
+            source: OAuthVocabularyError::ScopeCharacter,
         },
         IntrospectionRejection::NotYetValid {
             nbf: instant(30),
@@ -48,9 +55,17 @@ fn describes_every_introspection_rejection() {
     );
     assert_eq!(
         described[5],
+        "the introspected token names a malformed client identifier: the client identifier contains a character outside the visible ascii range"
+    );
+    assert_eq!(
+        described[6],
+        "the introspected token names a malformed scope: the scope contains a character outside the scope token grammar of RFC 6749"
+    );
+    assert_eq!(
+        described[7],
         "the introspected token is not valid before 1970-01-01 00:00:30 UTC, it is 1970-01-01 00:00:20 UTC"
     );
     assert!(
-        described[6].starts_with("the introspected token does not carry the expected claims: ")
+        described[8].starts_with("the introspected token does not carry the expected claims: ")
     );
 }

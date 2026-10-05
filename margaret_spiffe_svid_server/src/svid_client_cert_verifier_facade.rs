@@ -18,7 +18,7 @@ use crate::svid_client_cert_verifier::SvidClientCertVerifier;
 
 #[derive(Debug, Default)]
 pub struct SvidClientCertVerifierFacade {
-    current_verifier: SyncHolder<Arc<SvidClientCertVerifier>>,
+    current_verifier: SyncHolder<Option<Arc<SvidClientCertVerifier>>>,
 }
 
 impl SvidClientCertVerifierFacade {

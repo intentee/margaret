@@ -14,7 +14,9 @@ margaret_http_tests = { path = "../margaret_http_tests" }
 margaret_issuer_metadata = { workspace = true }
 margaret_issuer_request = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 margaret_oauth_client = { workspace = true }
+margaret_oauth_vocabulary = { workspace = true }
 margaret_oidc_discovery = { workspace = true }
 margaret_route_method = { workspace = true }
 margaret_token_trust = { workspace = true }
@@ -29,7 +31,6 @@ margaret_jose_parameters = { workspace = true }
 margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
 margaret_jws_verification = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
-reqwest = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_path_to_error = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }

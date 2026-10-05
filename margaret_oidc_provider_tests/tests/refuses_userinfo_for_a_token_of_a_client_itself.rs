@@ -1,35 +1,58 @@
-use serde_json::json;
+use std::time::Duration;
 
-use crate::answer::Answer;
-use crate::client_credentials::ClientCredentials;
-use crate::portal_credentials::PORTAL_CREDENTIALS;
-use crate::provider_fixture::ProviderFixture;
-use crate::provider_url::provider_url;
+use chrono::Utc;
+use uuid::Uuid;
 
-#[tokio::test]
-async fn refuses_userinfo_for_a_token_of_a_client_itself() {
-    let fixture = ProviderFixture::start(Vec::new()).await;
-    let access_token = fixture
-        .post_form(
-            "/token",
-            &PORTAL_CREDENTIALS,
-            &json!({"grant_type": "client_credentials", "scope": "openid"}),
-        )
-        .await
-        .body["access_token"]
+use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
+use margaret_jose_parameters::jwt_type::JwtType;
+use margaret_oauth_vocabulary::scope_list::ScopeList;
+use margaret_oidc_provider::userinfo_authentication::UserinfoAuthentication;
+use margaret_oidc_provider::userinfo_endpoint::UserinfoEndpoint;
+use margaret_oidc_provider_tests::request_authorized_by::request_authorized_by;
+use margaret_oidc_provider_tests::unserved_provider::UnservedProvider;
+use margaret_registered_claims::audience_claim::AudienceClaim;
+use margaret_registered_claims::numeric_date::NumericDate;
+use margaret_registered_claims::registered_claims::RegisteredClaims;
+
+#[test]
+fn refuses_userinfo_for_a_token_of_a_client_itself() {
+    let provider = UnservedProvider::create();
+    let issuer = provider
+        .issuance
+        .token_issuance()
+        .issuer
         .as_str()
-        .expect("the access token is a string")
         .to_string();
-    let answer = Answer::of(
-        ClientCredentials::Bearer(access_token)
-            .presented_on(fixture.client.get(provider_url("/userinfo")))
-            .send()
-            .await
-            .expect("the provider answers"),
-    )
-    .await;
+    let issued_at = NumericDate::from(Utc::now());
+    let access_token = provider
+        .roller
+        .jwks_secret_holder()
+        .get()
+        .current()
+        .sign_json(
+            &ResourceAccessTokenClaims {
+                client_id: "portal".parse().expect("the client identifier is visible"),
+                scope: "openid"
+                    .parse::<ScopeList>()
+                    .expect("the scope is a scope list"),
+                subject: "portal".to_string(),
+            }
+            .to_payload(
+                &RegisteredClaims {
+                    aud: AudienceClaim::Single(issuer.clone()),
+                    exp: issued_at.after(Duration::from_mins(1)),
+                    iat: issued_at,
+                    iss: issuer,
+                    nbf: None,
+                },
+                Uuid::new_v4(),
+            ),
+            JwtType::AccessToken,
+        );
+    let endpoint = UserinfoEndpoint::create(provider.secret_store, provider.issuance.as_ref());
 
-    assert_eq!(answer.status, 401);
-
-    fixture.stop().await;
+    assert!(matches!(
+        endpoint.authenticate(&request_authorized_by(&format!("Bearer {access_token}"))),
+        UserinfoAuthentication::Refused(response) if response.status() == 401
+    ));
 }

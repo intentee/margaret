@@ -20,8 +20,10 @@ use margaret_authorization_server_client::form_parameter::FormParameter;
 use margaret_authorization_server_client::target_audience::TargetAudience;
 use margaret_authorization_server_client::token_target::TokenTarget;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
+use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
 use margaret_authorization_server_client_tests::private_key_jwt_client::private_key_jwt_client;
 use margaret_http::body_limit::BodyLimit;
+use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::echo_wrapping::EchoWrapping;
 use margaret_http_tests::form_echo_handler::FormEchoHandler;
 use margaret_jose_parameters::jwt_type::JwtType;
@@ -31,7 +33,8 @@ use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::header_type::HeaderType;
 use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
-use margaret_route_method::route_method::RouteMethod;
+use margaret_oauth_vocabulary::grant_type::GrantType;
+use margaret_route_method::content_method::ContentMethod;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -43,12 +46,14 @@ impl ExtraTokenFields for EchoFields {}
 
 async fn echo_server(path: &'static str, wrapping: EchoWrapping) -> FixtureAuthorizationServer {
     FixtureAuthorizationServer::start(
-        RouteMethod::Post,
         path,
-        Arc::new(FormEchoHandler {
-            limit: BodyLimit::new(4096),
-            wrapping,
-        }),
+        MethodHandler::content(
+            ContentMethod::Post,
+            Arc::new(FormEchoHandler {
+                limit: BodyLimit::new(4096),
+                wrapping,
+            }),
+        ),
     )
     .await
 }
@@ -100,13 +105,14 @@ async fn authenticates_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(Arc::new(private_key_jwt_client(rolled_store(secret))))
+        .client(Arc::new(OAuthClientDeclaration {
+            client: private_key_jwt_client(rolled_store(secret)),
+        }))
         .client_credentials(&TokenTarget {
             audience: TargetAudience::Unspecified,
             scopes: BTreeSet::new(),
         })
-        .await
-        .expect("the client assertion is signed");
+        .await;
 
     server.stop().await;
 
@@ -131,16 +137,17 @@ async fn authenticates_a_grant_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(Arc::new(private_key_jwt_client(rolled_store(secret))))
+        .client(Arc::new(OAuthClientDeclaration {
+            client: private_key_jwt_client(rolled_store(secret)),
+        }))
         .request_grant::<EmptyExtraTokenFields>(
-            "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            GrantType::TokenExchange,
             vec![FormParameter {
-                name: "assertion",
-                value: "grant.assertion.value".to_string(),
+                name: "subject_token",
+                value: "grant.subject.token".to_string(),
             }],
         )
-        .await
-        .expect("the client assertion is signed");
+        .await;
 
     server.stop().await;
 
@@ -148,10 +155,10 @@ async fn authenticates_a_grant_with_private_key_jwt() {
 
     authenticated_claims(&echoed, &key_set);
 
-    assert_eq!(echoed["fields"]["assertion"], "grant.assertion.value");
+    assert_eq!(echoed["fields"]["subject_token"], "grant.subject.token");
     assert_eq!(
         echoed["fields"]["grant_type"],
-        "urn:ietf:params:oauth:grant-type:jwt-bearer"
+        "urn:ietf:params:oauth:grant-type:token-exchange"
     );
 }
 
@@ -162,7 +169,9 @@ async fn authenticates_a_code_exchange_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(Arc::new(private_key_jwt_client(rolled_store(secret))))
+        .client(Arc::new(OAuthClientDeclaration {
+            client: private_key_jwt_client(rolled_store(secret)),
+        }))
         .exchange_authorization_code::<EmptyExtraTokenFields>(
             AuthorizationCode::new("SplxlOBeZQQYbYS6WxSbIA".to_string()),
             PkceCodeVerifier::new("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_string()),
@@ -170,8 +179,7 @@ async fn authenticates_a_code_exchange_with_private_key_jwt() {
                 Url::parse("https://client.example/callback").expect("the callback is a url"),
             ),
         )
-        .await
-        .expect("the client assertion is signed");
+        .await;
 
     server.stop().await;
 
@@ -189,10 +197,11 @@ async fn authenticates_an_introspection_with_private_key_jwt() {
     let server = echo_server("/introspect", EchoWrapping::ActiveIntrospection).await;
 
     let outcome = server
-        .client(Arc::new(private_key_jwt_client(rolled_store(secret))))
+        .client(Arc::new(OAuthClientDeclaration {
+            client: private_key_jwt_client(rolled_store(secret)),
+        }))
         .introspect::<EchoFields>("opaque-token")
-        .await
-        .expect("the client assertion is signed");
+        .await;
 
     server.stop().await;
 

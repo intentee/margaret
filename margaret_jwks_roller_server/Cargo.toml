@@ -29,8 +29,9 @@ margaret_identity_session = { workspace = true }
 margaret_jwks_file_secret_storage = { workspace = true }
 margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
+margaret_jws_verification = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
+tokio = { workspace = true, features = ["macros", "rt", "test-util", "time"] }
 
 [[test]]
 name = "main"

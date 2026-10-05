@@ -22,7 +22,7 @@ async fn does_not_follow_a_redirect() {
         vec![
             RouteEntry::new(
                 "/document",
-                vec![MethodHandler::anonymous(
+                vec![MethodHandler::head(
                     RouteMethod::Get,
                     Arc::new(RedirectingHandler {
                         location: "/elsewhere",
@@ -31,7 +31,7 @@ async fn does_not_follow_a_redirect() {
             ),
             RouteEntry::new(
                 "/elsewhere",
-                vec![MethodHandler::anonymous(
+                vec![MethodHandler::head(
                     RouteMethod::Get,
                     Arc::new(StaticHandler {
                         body: br#"{"keys":[]}"#.to_vec(),

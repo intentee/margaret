@@ -14,7 +14,7 @@ async fn hides_a_responder_failure_behind_a_generic_server_error() {
         UploadConfig::Disabled,
         vec![RouteEntry::new(
             "/failing",
-            vec![MethodHandler::anonymous(
+            vec![MethodHandler::head(
                 RouteMethod::Get,
                 Arc::new(FailingHandler),
             )],

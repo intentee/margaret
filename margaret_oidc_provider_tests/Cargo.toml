@@ -5,16 +5,15 @@ edition = "2024"
 publish = false
 autotests = false
 
-[dev-dependencies]
-async-trait = { workspace = true }
-base64ct = { workspace = true, features = ["alloc"] }
+[dependencies]
+anyhow = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
-cookie = { workspace = true }
+headers = { workspace = true }
 http = { workspace = true }
 margaret_accepted_clients = { workspace = true }
 margaret_accepted_clients_tests = { path = "../margaret_accepted_clients_tests" }
 margaret_authorization_server_client = { workspace = true }
-margaret_client_credentials = { workspace = true }
+margaret_authorization_server_client_tests = { path = "../margaret_authorization_server_client_tests" }
 margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }
 margaret_issuer_directory_tests = { path = "../margaret_issuer_directory_tests" }
@@ -24,19 +23,19 @@ margaret_jose_parameters = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwks_roller_server = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
-margaret_jws_verification = { workspace = true }
 margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
+margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
+margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
 margaret_oauth_client = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_oidc_provider = { workspace = true }
 margaret_oidc_sign_in = { workspace = true }
+margaret_oidc_sign_in_tests = { path = "../margaret_oidc_sign_in_tests" }
 margaret_provider_state_storage = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_route_method = { workspace = true }
 margaret_subject_token_exchange = { workspace = true }
-margaret_token_exchange_client = { workspace = true }
-margaret_token_introspection = { workspace = true }
 margaret_token_issuance = { workspace = true }
 margaret_token_signer_tests = { path = "../margaret_token_signer_tests" }
 margaret_token_trust = { workspace = true }
@@ -46,11 +45,24 @@ oauth2 = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 url = { workspace = true }
 uuid = { workspace = true }
 validator = { workspace = true }
+
+[dev-dependencies]
+margaret_bearer_token_verification = { workspace = true }
+margaret_client_credentials = { workspace = true }
+margaret_identity_session = { workspace = true }
+margaret_provider_state_storage_tests = { path = "../margaret_provider_state_storage_tests" }
+margaret_token_digest = { workspace = true }
+margaret_token_exchange_client = { workspace = true }
+margaret_token_introspection = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 zeroize = { workspace = true }
+
+[features]
+tests_that_use_postgres = ["margaret_provider_state_storage_tests/tests_that_use_postgres"]
 
 [[test]]
 name = "main"

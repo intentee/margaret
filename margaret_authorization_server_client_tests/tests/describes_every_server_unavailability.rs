@@ -1,8 +1,11 @@
 use headers::Authorization;
+use http::HeaderValue;
+use http::StatusCode;
 use oauth2::basic::BasicTokenType;
 
 use margaret_authorization_server_client::server_endpoint::ServerEndpoint;
 use margaret_authorization_server_client::server_unavailability::ServerUnavailability;
+use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
 
 #[test]
 fn describes_every_server_unavailability() {
@@ -10,6 +13,10 @@ fn describes_every_server_unavailability() {
         ServerUnavailability::AccessTokenUnpresentable {
             source: Authorization::bearer("line\nbreak")
                 .expect_err("a line break is not a header value"),
+        },
+        ServerUnavailability::EmptyAnswer,
+        ServerUnavailability::EmptyRefusal {
+            status: StatusCode::SERVICE_UNAVAILABLE,
         },
         ServerUnavailability::EndpointUnadvertised {
             endpoint: ServerEndpoint::Authorization,
@@ -23,6 +30,7 @@ fn describes_every_server_unavailability() {
         ServerUnavailability::EndpointUnadvertised {
             endpoint: ServerEndpoint::Userinfo,
         },
+        ServerUnavailability::Exchange(IssuerExchangeError::Oversized { max_bytes: 16 }),
         ServerUnavailability::MalformedAnswer {
             source: serde_path_to_error::deserialize::<_, u8>(
                 &mut serde_json::Deserializer::from_str("x"),
@@ -30,15 +38,8 @@ fn describes_every_server_unavailability() {
             .expect_err("not json"),
         },
         ServerUnavailability::MetadataAwaited,
-        ServerUnavailability::Oversized { max_bytes: 16 },
-        ServerUnavailability::Transport(
-            reqwest::Client::new()
-                .get("not a url")
-                .build()
-                .expect_err("a relative url is not requestable"),
-        ),
-        ServerUnavailability::UnexpectedAnswer {
-            description: "server returned empty error response".to_string(),
+        ServerUnavailability::UnexpectedContentType {
+            content_type: HeaderValue::from_static("text/html"),
         },
         ServerUnavailability::UnsupportedTokenType {
             token_type: BasicTokenType::Extension("dpop".to_string()),
@@ -51,38 +52,45 @@ fn describes_every_server_unavailability() {
     ));
     assert_eq!(
         described[1],
-        "the authorization server does not advertise its authorization_endpoint"
+        "the authorization server answered with an empty body"
     );
     assert_eq!(
         described[2],
-        "the authorization server does not advertise its introspection_endpoint"
+        "the authorization server refused with status 503 Service Unavailable and an empty body"
     );
     assert_eq!(
         described[3],
-        "the authorization server does not advertise its token_endpoint"
+        "the authorization server does not advertise its authorization_endpoint"
     );
     assert_eq!(
         described[4],
-        "the authorization server does not advertise its userinfo_endpoint"
+        "the authorization server does not advertise its introspection_endpoint"
     );
-    assert!(
-        described[5].starts_with("the authorization server answered with a malformed response: ")
+    assert_eq!(
+        described[5],
+        "the authorization server does not advertise its token_endpoint"
     );
     assert_eq!(
         described[6],
-        "the metadata of the authorization server has not been discovered yet"
+        "the authorization server does not advertise its userinfo_endpoint"
     );
     assert_eq!(
         described[7],
-        "the authorization server answered with more than 16 bytes"
+        "the exchange with the authorization server failed: the issuer answered with more than 16 bytes"
     );
-    assert!(described[8].starts_with("the authorization server could not be reached: "));
+    assert!(
+        described[8].starts_with("the authorization server answered with a malformed response: ")
+    );
     assert_eq!(
         described[9],
-        "the authorization server answered unexpectedly: server returned empty error response"
+        "the metadata of the authorization server has not been discovered yet"
     );
     assert_eq!(
         described[10],
+        "the authorization server answered with the content type \"text/html\" instead of application/json"
+    );
+    assert_eq!(
+        described[11],
         "the authorization server issued a token of the unsupported type 'dpop'"
     );
 }

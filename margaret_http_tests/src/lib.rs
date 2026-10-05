@@ -25,6 +25,7 @@ pub mod numbered_request;
 pub mod path_param_echo_handler;
 pub mod raw_exchange;
 pub mod redirecting_handler;
+pub mod redirection;
 pub mod refusing_middleware;
 pub mod running_fixture_server;
 pub mod see_other_handler;

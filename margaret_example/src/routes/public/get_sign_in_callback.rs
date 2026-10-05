@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
+use margaret::framework::http::redirect::Redirect;
 use margaret::framework::http::request::Request;
 use margaret::framework::http::response::Response;
 use margaret::framework::macros::constructor;
@@ -43,12 +44,11 @@ impl GetSignInCallback {
 
     /// # Errors
     ///
-    /// Returns an error when the sign-in transaction cannot be verified or the client cannot
-    /// authenticate to the identity server.
+    /// Returns an error propagated from the work it performs.
     #[process]
     pub async fn respond(&self, request: &Request, routes: &Routes) -> anyhow::Result<Response> {
         Ok(
-            match self.sign_in_flow.complete::<SignInClaims>(request).await? {
+            match self.sign_in_flow.complete::<SignInClaims>(request).await {
                 SignInCompletion::SignedIn(SignedIn {
                     subject,
                     transaction_removal,
@@ -71,8 +71,8 @@ impl GetSignInCallback {
     fn signed_in(&self, subject: &str, routes: &Routes) -> Response {
         match Uuid::parse_str(subject) {
             Ok(user_id) => match self.users.start_session(user_id) {
-                Some(session) => Response::text(303, "")
-                    .header("location", routes.public.get_profile.url())
+                Some(session) => Redirect::see_other(routes.public.get_profile.url())
+                    .into_response()
                     .set_cookie(&SessionCookie::issued(session)),
                 None => Response::text(403, "The signed-in subject is not a reader of the blog"),
             },

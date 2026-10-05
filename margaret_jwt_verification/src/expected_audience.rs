@@ -6,7 +6,7 @@ use margaret_registered_claims::audience_claim::AudienceClaim;
 
 use crate::claims_rejection::ClaimsRejection;
 
-pub(crate) enum ExpectedAudience<'expectation> {
+pub enum ExpectedAudience<'expectation> {
     AnyOf(&'expectation BTreeSet<Audience>),
     One(&'expectation Audience),
 }

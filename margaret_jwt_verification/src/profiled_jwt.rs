@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
@@ -8,7 +7,6 @@ use serde::de::DeserializeOwned;
 use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification::verified_jws::VerifiedJws;
-use margaret_registered_claims::audience::Audience;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 
@@ -40,25 +38,6 @@ pub struct ProfiledJwt<'jwt, TProfile> {
 impl<TProfile: JwtProfile> ProfiledJwt<'_, TProfile> {
     #[must_use]
     pub fn verify<TClaims: DeserializeOwned>(
-        &self,
-        key_set: &VerificationKeySet,
-        audience: &Audience,
-        now: NumericDate,
-    ) -> JwtVerification<TClaims, TProfile> {
-        self.verified(key_set, &ExpectedAudience::One(audience), now)
-    }
-
-    #[must_use]
-    pub fn verify_for_any<TClaims: DeserializeOwned>(
-        &self,
-        key_set: &VerificationKeySet,
-        audiences: &BTreeSet<Audience>,
-        now: NumericDate,
-    ) -> JwtVerification<TClaims, TProfile> {
-        self.verified(key_set, &ExpectedAudience::AnyOf(audiences), now)
-    }
-
-    fn verified<TClaims: DeserializeOwned>(
         &self,
         key_set: &VerificationKeySet,
         expected_audience: &ExpectedAudience<'_>,

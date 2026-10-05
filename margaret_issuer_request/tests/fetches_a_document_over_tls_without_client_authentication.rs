@@ -19,7 +19,7 @@ async fn fetches_a_document_over_tls_without_client_authentication() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/document",
-            vec![MethodHandler::anonymous(
+            vec![MethodHandler::head(
                 RouteMethod::Get,
                 Arc::new(StaticHandler {
                     body: br#"{"keys":[]}"#.to_vec(),

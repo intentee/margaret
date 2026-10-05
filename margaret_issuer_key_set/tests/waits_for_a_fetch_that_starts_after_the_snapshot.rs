@@ -14,12 +14,12 @@ async fn waits_for_a_fetch_that_starts_after_the_snapshot() {
 
     let snapshot = issuer_key_set.snapshot();
     let (refresh, ()) = tokio::join!(issuer_key_set.refreshed_since(&snapshot), async {
-        issuer_key_set.hold(fresh_p256_secret().key_set().clone());
+        issuer_key_set.hold(Arc::new(fresh_p256_secret().key_set().clone()));
         issuer_key_set.refresh_requested().await;
         issuer_key_set.start_fetch();
         issuer_key_set.fail_fetch();
         issuer_key_set.start_fetch();
-        issuer_key_set.hold(fresh_p256_secret().key_set().clone());
+        issuer_key_set.hold(Arc::new(fresh_p256_secret().key_set().clone()));
     });
     let KeySetRefresh::Refreshed(KeySetHolding::Held(HeldKeySet {
         key_set: refreshed, ..

@@ -36,7 +36,7 @@ fn placeholders<'route>(named: &NamedRoute<'route>) -> Vec<&'route str> {
 }
 
 fn is_get(named: &NamedRoute<'_>) -> bool {
-    named.route.method == RouteMethod::Get
+    named.route.method() == RouteMethod::Get
 }
 
 fn server_layouts<'server>(

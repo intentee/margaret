@@ -9,7 +9,6 @@ use margaret_http::forward_targets::ForwardTargets;
 use margaret_http::http_middleware::HttpMiddleware;
 use margaret_http::route_entry::RouteEntry;
 use margaret_http::server::Server;
-use margaret_http::server_registry::ServerRegistry;
 use margaret_http::server_routes::ServerRoutes;
 use margaret_http::transport_config::TransportConfig;
 use margaret_http::web_socket_upgrade::WebSocketUpgrade;
@@ -38,7 +37,6 @@ impl RunningWebSocketServer {
         transport: TransportConfig,
     ) -> Self {
         let server = Server::new(
-            "public",
             "127.0.0.1:0".to_string(),
             transport,
             UploadConfig::Disabled,
@@ -46,9 +44,8 @@ impl RunningWebSocketServer {
                 .expect("the route entries register cleanly")
                 .router,
         );
-        let server_registry = Arc::new(ServerRegistry::new(vec![server]));
         let forward_targets = Arc::new(ForwardTargets::new(Vec::new()));
-        let bound = BoundServer::bind(server_registry, forward_targets, Arc::from("public"))
+        let bound = BoundServer::bind(Arc::new(server), forward_targets)
             .await
             .expect("the websocket server binds");
         let address = bound

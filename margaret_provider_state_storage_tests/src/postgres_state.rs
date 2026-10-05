@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ephemeral_postgres::database::Database;
 use sqlx::AssertSqlSafe;
 use sqlx::raw_sql;
@@ -18,7 +20,7 @@ fn quoted_table_names() -> String {
 
 pub struct PostgresState {
     pub database: Database,
-    pub state: PostgresProviderState,
+    pub state: Arc<PostgresProviderState>,
 }
 
 impl PostgresState {
@@ -35,7 +37,7 @@ impl PostgresState {
         .await
         .expect("the provider state tables apply to Postgres");
 
-        let state = PostgresProviderState::create(database.pool().clone());
+        let state = Arc::new(PostgresProviderState::create(database.pool().clone()));
 
         Self { database, state }
     }

@@ -1,6 +1,6 @@
-use crate::answer::Answer;
-use crate::provider_fixture::ProviderFixture;
-use crate::provider_url::provider_url;
+use margaret_oidc_provider_tests::answer::Answer;
+use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
+use margaret_oidc_provider_tests::provider_url::provider_url;
 
 #[tokio::test]
 async fn refuses_userinfo_with_malformed_credentials() {

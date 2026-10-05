@@ -3,6 +3,7 @@ use std::time::Duration;
 use anyhow::Result;
 use async_trait::async_trait;
 use tokio_util::sync::CancellationToken;
+use trzcina::FirstTickTiming;
 use trzcina::TickContext;
 use trzcina::Ticker;
 
@@ -15,6 +16,10 @@ pub struct JwksRollerService {
 
 #[async_trait]
 impl Ticker for JwksRollerService {
+    fn first_tick_timing(&self) -> FirstTickTiming {
+        FirstTickTiming::AfterInterval
+    }
+
     fn tick_interval(&self) -> Duration {
         JWKS_ROLL_INTERVAL
     }

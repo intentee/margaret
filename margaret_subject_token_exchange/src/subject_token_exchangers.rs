@@ -3,11 +3,11 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 
-use margaret_jwt_verification::jwt_attribution::JwtAttribution;
 use margaret_jwt_verification::jwt_presentation::JwtPresentation;
+use margaret_jwt_verification::jwt_routing::JwtRouting;
 use margaret_jwt_verification::presented_jwt::PresentedJwt;
+use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_token_exchange_client::subject_token_type::SubjectTokenType;
 
 use crate::exchanged_subject::ExchangedSubject;
 use crate::subject_token_exchanger::SubjectTokenExchanger;
@@ -29,32 +29,33 @@ impl SubjectTokenExchangers {
         token_type: SubjectTokenType,
         now: DateTime<Utc>,
     ) -> ExchangedSubject {
-        let mut presented = match PresentedJwt::present(subject_token) {
+        let presented = match PresentedJwt::present(subject_token) {
             JwtPresentation::Presented(presented) => presented,
             JwtPresentation::Rejected(rejection) => {
                 return ExchangedSubject::Refused(SubjectTokenRefusal::Rejected(rejection));
             }
         };
 
-        for exchanger in &self.exchangers {
-            match presented.attribute_to(&exchanger.trusted_issuer.trust.token_trust().issuer) {
-                JwtAttribution::Attributed(jwt) => {
-                    return exchanger
-                        .exchange
-                        .exchange(
-                            &exchanger.trusted_issuer,
-                            &jwt,
-                            token_type,
-                            NumericDate::from(now),
-                        )
-                        .await;
-                }
-                JwtAttribution::Unattributed(unattributed) => presented = unattributed,
+        match presented.route(self.exchangers.iter().map(Arc::as_ref)) {
+            JwtRouting::Routed {
+                addressee: exchanger,
+                jwt,
+            } => {
+                exchanger
+                    .exchange
+                    .exchange(
+                        &exchanger.trusted_issuer,
+                        &jwt,
+                        token_type,
+                        NumericDate::from(now),
+                    )
+                    .await
+            }
+            JwtRouting::Unrouted(unrouted) => {
+                ExchangedSubject::Refused(SubjectTokenRefusal::UntrustedIssuer {
+                    issuer: unrouted.issuer().to_string(),
+                })
             }
         }
-
-        ExchangedSubject::Refused(SubjectTokenRefusal::UntrustedIssuer {
-            issuer: presented.issuer().to_string(),
-        })
     }
 }

@@ -5,14 +5,16 @@ use chrono::Utc;
 use url::Url;
 use uuid::Uuid;
 
-use margaret_accepted_clients::accepted_client::AcceptedClient;
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
+use margaret_accepted_clients::authorization_code_grant::AuthorizationCodeGrant;
+use margaret_accepted_clients::code_grant_policy::CodeGrantPolicy;
 use margaret_accepted_clients::consent_policy::ConsentPolicy;
 use margaret_http::response::Response;
 use margaret_provider_state_storage::authorization_grant::AuthorizationGrant;
 use margaret_provider_state_storage::pending_authorization::PendingAuthorization;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
-use margaret_provider_state_storage::token_digest::TokenDigest;
+use margaret_token_digest::random_token::random_token;
+use margaret_token_digest::token_digest::TokenDigest;
 use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
 use margaret_validation::validation_result::ValidationResult;
 
@@ -26,13 +28,12 @@ use crate::frame_denied::frame_denied;
 use crate::prompt::Prompt;
 use crate::provider_endpoints::ProviderEndpoints;
 use crate::provider_error::ProviderError;
-use crate::random_token::random_token;
 use crate::redirection::Redirection;
 
-fn registered_redirect_uri(client: &AcceptedClient, requested: Option<&str>) -> Option<Url> {
+fn registered_redirect_uri(policy: &CodeGrantPolicy, requested: Option<&str>) -> Option<Url> {
     requested
         .and_then(|redirect_uri| Url::parse(redirect_uri).ok())
-        .filter(|redirect_uri| client.redirect_uris.contains(redirect_uri))
+        .filter(|redirect_uri| policy.redirect_uris.members().contains(redirect_uri))
 }
 
 fn rejected(reason: &str) -> AuthorizationOutcome {
@@ -80,7 +81,10 @@ impl AuthorizationEndpoint {
         else {
             return Ok(rejected("The client is not accepted"));
         };
-        let Some(redirect_uri) = registered_redirect_uri(client, request.redirect_uri.as_deref())
+        let AuthorizationCodeGrant::Granted(policy) = &client.authorization_code else {
+            return Ok(rejected("The client may not request authorization codes"));
+        };
+        let Some(redirect_uri) = registered_redirect_uri(policy, request.redirect_uri.as_deref())
         else {
             return Ok(rejected(
                 "The redirect uri is not registered for the client",
@@ -97,7 +101,7 @@ impl AuthorizationEndpoint {
             nonce,
             prompt,
             scopes,
-        } = match AuthorizationParameters::of(client, &request) {
+        } = match AuthorizationParameters::of(policy, &request) {
             ControlFlow::Break(error) => {
                 return Ok(AuthorizationOutcome::Redirected(redirection.error(error)));
             }
@@ -136,7 +140,7 @@ impl AuthorizationEndpoint {
             subject: end_user.subject,
         };
 
-        if client.consent == ConsentPolicy::Implicit && !prompt.forces_consent() {
+        if policy.consent == ConsentPolicy::Implicit && !prompt.forces_consent() {
             let code = random_token();
 
             return self

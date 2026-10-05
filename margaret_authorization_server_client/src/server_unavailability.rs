@@ -2,6 +2,8 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
+use http::HeaderValue;
+use http::StatusCode;
 use oauth2::basic::BasicTokenType;
 
 use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
@@ -13,19 +15,20 @@ pub enum ServerUnavailability {
     AccessTokenUnpresentable {
         source: headers::authorization::InvalidBearerToken,
     },
+    EmptyAnswer,
+    EmptyRefusal {
+        status: StatusCode,
+    },
     EndpointUnadvertised {
         endpoint: ServerEndpoint,
     },
+    Exchange(IssuerExchangeError),
     MalformedAnswer {
         source: serde_path_to_error::Error<serde_json::Error>,
     },
     MetadataAwaited,
-    Oversized {
-        max_bytes: usize,
-    },
-    Transport(reqwest::Error),
-    UnexpectedAnswer {
-        description: String,
+    UnexpectedContentType {
+        content_type: HeaderValue,
     },
     UnsupportedTokenType {
         token_type: BasicTokenType,
@@ -39,9 +42,20 @@ impl Display for ServerUnavailability {
                 formatter,
                 "the access token issued by the authorization server cannot be presented as a bearer credential: {source}"
             ),
+            Self::EmptyAnswer => {
+                formatter.write_str("the authorization server answered with an empty body")
+            }
+            Self::EmptyRefusal { status } => write!(
+                formatter,
+                "the authorization server refused with status {status} and an empty body"
+            ),
             Self::EndpointUnadvertised { endpoint } => write!(
                 formatter,
                 "the authorization server does not advertise its {endpoint}"
+            ),
+            Self::Exchange(failure) => write!(
+                formatter,
+                "the exchange with the authorization server failed: {failure}"
             ),
             Self::MalformedAnswer { source } => write!(
                 formatter,
@@ -49,32 +63,15 @@ impl Display for ServerUnavailability {
             ),
             Self::MetadataAwaited => formatter
                 .write_str("the metadata of the authorization server has not been discovered yet"),
-            Self::Oversized { max_bytes } => write!(
+            Self::UnexpectedContentType { content_type } => write!(
                 formatter,
-                "the authorization server answered with more than {max_bytes} bytes"
-            ),
-            Self::Transport(source) => write!(
-                formatter,
-                "the authorization server could not be reached: {source}"
-            ),
-            Self::UnexpectedAnswer { description } => write!(
-                formatter,
-                "the authorization server answered unexpectedly: {description}"
+                "the authorization server answered with the content type {content_type:?} instead of application/json"
             ),
             Self::UnsupportedTokenType { token_type } => write!(
                 formatter,
                 "the authorization server issued a token of the unsupported type '{}'",
                 token_type.as_ref()
             ),
-        }
-    }
-}
-
-impl From<IssuerExchangeError> for ServerUnavailability {
-    fn from(failure: IssuerExchangeError) -> Self {
-        match failure {
-            IssuerExchangeError::Oversized { max_bytes } => Self::Oversized { max_bytes },
-            IssuerExchangeError::Transport(source) => Self::Transport(source),
         }
     }
 }

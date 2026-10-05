@@ -20,7 +20,7 @@ async fn returns_cancelled_when_cancelled_during_a_hung_fetch() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/document",
-            vec![MethodHandler::anonymous(RouteMethod::Get, hanging.clone())],
+            vec![MethodHandler::head(RouteMethod::Get, hanging.clone())],
         )],
     )
     .await;

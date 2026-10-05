@@ -40,10 +40,10 @@ impl IssuerKeySet {
         self.complete_fetch(|_holding| {});
     }
 
-    pub fn hold(&self, key_set: VerificationKeySet) {
+    pub fn hold(&self, key_set: Arc<VerificationKeySet>) {
         let held = KeySetHolding::Held(HeldKeySet {
             fetched_at: Instant::now(),
-            key_set: Arc::new(key_set),
+            key_set,
         });
 
         self.complete_fetch(|holding| *holding = held);

@@ -13,6 +13,7 @@ use margaret_injection_codegen::process_method::process_method;
 use margaret_injection_codegen::request_binding_marker::request_binding_marker;
 use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
+use crate::first_tick::FirstTick;
 use crate::service_codegen_error::ServiceCodegenError;
 use crate::service_kind::ServiceKind;
 use crate::service_unit::ServiceUnit;
@@ -113,7 +114,11 @@ fn build_unit(
                 ItemNamingArgument::TickInterval.key(),
             )?;
 
-            ServiceKind::Ticker { behavior, interval }
+            ServiceKind::Ticker {
+                behavior,
+                first_tick: FirstTick::Immediate,
+                interval,
+            }
         }
     };
 

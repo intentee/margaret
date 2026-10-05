@@ -13,6 +13,7 @@ use margaret_request_binding_codegen::binding_context::BindingContext;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::classify_parameters::classify_parameters;
 use margaret_request_binding_codegen::responder_content::ResponderContent;
+use margaret_route_method::content_method::ContentMethod;
 use margaret_route_method::route_method::RouteMethod;
 use margaret_route_parameter_codegen::route_path::RoutePath;
 
@@ -30,21 +31,25 @@ fn route_content(
 ) -> Result<RouteContent, HttpCodegenError> {
     match responder_content {
         ResponderContent::Unread => match max_body_bytes {
-            None => Ok(RouteContent::Unread),
+            None => Ok(RouteContent::Unread { method }),
             Some(_) => Err(HttpCodegenError::UnusedBodyLimit {
                 responder: responder.to_string(),
             }),
         },
-        ResponderContent::Read(_) if method == RouteMethod::Get => {
-            Err(HttpCodegenError::ContentOnGetRoute {
-                responder: responder.to_string(),
-            })
-        }
-        ResponderContent::Read(binding) => match max_body_bytes {
-            None => Err(HttpCodegenError::MissingBodyLimit {
+        ResponderContent::Read(binding) => match ContentMethod::of(method) {
+            None => Err(HttpCodegenError::ContentOnGetRoute {
                 responder: responder.to_string(),
             }),
-            Some(limit) => Ok(RouteContent::Read { binding, limit }),
+            Some(content_method) => match max_body_bytes {
+                None => Err(HttpCodegenError::MissingBodyLimit {
+                    responder: responder.to_string(),
+                }),
+                Some(limit) => Ok(RouteContent::Read {
+                    binding,
+                    limit,
+                    method: content_method,
+                }),
+            },
         },
     }
 }
@@ -130,7 +135,6 @@ pub(crate) fn http_routes(
                 content,
                 is_async: handler_method.signature().asyncness.is_some(),
                 layers,
-                method,
                 method_name: format_ident!("{}", handler_method.identifier()),
                 name,
                 responder_field: format_ident!("{}", identifier.field()),

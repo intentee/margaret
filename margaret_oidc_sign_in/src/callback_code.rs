@@ -9,8 +9,8 @@ use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_metadata::metadata_holding::MetadataHolding;
 use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
+use margaret_token_digest::equal_in_constant_time::equal_in_constant_time;
 
-use crate::equal_in_constant_time::equal_in_constant_time;
 use crate::sign_in_completion::SignInCompletion;
 use crate::sign_in_refusal::SignInRefusal;
 
@@ -54,7 +54,7 @@ pub(crate) fn callback_code<TIdClaims>(
 ) -> ControlFlow<SignInCompletion<TIdClaims>, AuthorizationCode> {
     if !query
         .get("state")
-        .is_some_and(|state| equal_in_constant_time(state, &transaction.state))
+        .is_some_and(|state| equal_in_constant_time(state.as_bytes(), transaction.state.as_bytes()))
     {
         return refused(SignInRefusal::StateMismatch);
     }

@@ -65,7 +65,6 @@ impl FixtureRequest {
             .into_parts()
             .0;
         let server = Arc::new(Server::new(
-            "fixture",
             "127.0.0.1:0".to_string(),
             TransportConfig::Plain,
             self.upload_config,

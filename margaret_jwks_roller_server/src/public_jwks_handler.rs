@@ -1,11 +1,4 @@
-use async_trait::async_trait;
-
-use margaret_http::handler::Handler;
-use margaret_http::handler_error::HandlerError;
-use margaret_http::request::Request;
-use margaret_http::request_body::RequestBody;
 use margaret_http::response::Response;
-use margaret_http::response_continuation::ResponseContinuation;
 
 use crate::jwks_document_holder::JwksDocumentHolder;
 
@@ -25,20 +18,6 @@ impl PublicJwksHandler {
 
     #[must_use]
     pub fn respond(&self) -> Response {
-        match self.jwks_document_holder.get() {
-            None => Response::text(503, "The jwks document is not published yet"),
-            Some(document) => Response::bytes(200, JWKS_CONTENT_TYPE, document),
-        }
-    }
-}
-
-#[async_trait]
-impl Handler for PublicJwksHandler {
-    async fn handle(
-        &self,
-        _request: &Request,
-        _body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
-        Ok(self.respond().into())
+        Response::bytes(200, JWKS_CONTENT_TYPE, self.jwks_document_holder.get())
     }
 }

@@ -95,6 +95,33 @@ pub enum HttpCodegenError {
     },
 
     #[error(
+        "websocket session '{session}' serves '{path}' on server '{server}', which conflicts with the already registered route path '{conflicting_path}'"
+    )]
+    ConflictingWebSocketPath {
+        conflicting_path: String,
+        path: String,
+        server: String,
+        session: String,
+    },
+
+    #[error("websocket session '{session}' has a malformed path '{path}': {source}")]
+    InvalidWebSocketPath {
+        path: String,
+        session: String,
+        #[source]
+        source: InsertError,
+    },
+
+    #[error(
+        "websocket session '{session}' serves '{path}' on server '{server}', where a responder already serves that path"
+    )]
+    WebSocketPathOfResponder {
+        path: String,
+        server: String,
+        session: String,
+    },
+
+    #[error(
         "responder '{responder}' registers '{method:?} {path}' on server '{server}', which is already registered by responder '{existing_responder}'"
     )]
     DuplicateRoute {

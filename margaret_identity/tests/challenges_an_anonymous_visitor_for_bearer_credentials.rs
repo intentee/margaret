@@ -1,3 +1,4 @@
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -5,12 +6,10 @@ use reqwest::header::AUTHORIZATION;
 use reqwest::header::HeaderValue;
 use reqwest::header::WWW_AUTHENTICATE;
 
-use margaret_http::handler::Handler;
 use margaret_http::handler_error::HandlerError;
+use margaret_http::head_handler::HeadHandler;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request::Request;
-use margaret_http::request_authorization::RequestAuthorization;
-use margaret_http::request_body::RequestBody;
 use margaret_http::requirement::Requirement;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
@@ -25,19 +24,13 @@ use margaret_route_method::route_method::RouteMethod;
 struct BearerGreeting;
 
 #[async_trait]
-impl Handler for BearerGreeting {
-    async fn handle(
-        &self,
-        request: &Request,
-        _body: RequestBody,
-    ) -> Result<ResponseContinuation, HandlerError> {
-        let outcome = match request.inputs.server.authorization() {
-            RequestAuthorization::Bearer(token) => {
+impl HeadHandler for BearerGreeting {
+    async fn handle(&self, request: &Request) -> Result<ResponseContinuation, HandlerError> {
+        let outcome = match request.inputs.server.authorization().bearer() {
+            ControlFlow::Continue(token) => {
                 AuthenticatedUserOutcome::Authenticated(token.as_str().to_string())
             }
-            RequestAuthorization::Absent
-            | RequestAuthorization::Malformed
-            | RequestAuthorization::OtherScheme => AuthenticatedUserOutcome::Anonymous,
+            ControlFlow::Break(_) => AuthenticatedUserOutcome::Anonymous,
         };
 
         Ok(match require_bearer_authenticated_user(outcome) {
@@ -54,7 +47,7 @@ async fn challenges_an_anonymous_visitor_for_bearer_credentials() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/",
-            vec![MethodHandler::anonymous(
+            vec![MethodHandler::head(
                 RouteMethod::Get,
                 Arc::new(BearerGreeting),
             )],

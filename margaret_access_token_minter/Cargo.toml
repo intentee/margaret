@@ -15,7 +15,6 @@ margaret_http = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
 margaret_token_signer = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
 validator = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]

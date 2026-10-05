@@ -20,7 +20,7 @@ async fn reports_a_non_success_status() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/document",
-            vec![MethodHandler::anonymous(
+            vec![MethodHandler::head(
                 RouteMethod::Get,
                 Arc::new(StaticHandler {
                     body: br#"{"keys":[]}"#.to_vec(),

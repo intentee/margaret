@@ -3,6 +3,7 @@ use serde::de::DeserializeOwned;
 use margaret_issuer_key_set::held_key_set::HeldKeySet;
 use margaret_issuer_key_set::key_set_holding::KeySetHolding;
 use margaret_jws_verification::jws_rejection::JwsRejection;
+use margaret_jwt_verification::expected_audience::ExpectedAudience;
 use margaret_jwt_verification::jwt_profile::JwtProfile;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
@@ -27,7 +28,7 @@ pub(crate) fn verify_with_key_set<TClaims: DeserializeOwned, TProfile: JwtProfil
         return KeySetVerification::Settled(IssuerVerification::KeysAwaited);
     };
 
-    match jwt.verify(key_set, audience, now) {
+    match jwt.verify(key_set, &ExpectedAudience::One(audience), now) {
         JwtVerification::Rejected(
             rejection @ JwtRejection::Jws(JwsRejection::UnknownKeyId { .. }),
         ) => KeySetVerification::UnknownKey {

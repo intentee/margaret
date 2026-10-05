@@ -133,10 +133,10 @@ fn parameter_extraction(
         let #holder = match #routed
             .admit::<#claims, #profile>(self.#field.as_ref())
             .await
+            .into_requirement()
         {
-            margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Admitted(token) => ::std::option::Option::Some(token),
-            margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Refused(response) => #continuation_return,
-            margaret::framework::bearer_token_verification::bearer_token_admission::BearerTokenAdmission::Unaddressed => ::std::option::Option::None,
+            margaret::framework::http::requirement::Requirement::Met(token) => token,
+            margaret::framework::http::requirement::Requirement::Unmet(response) => #continuation_return,
         };
     }
 }
@@ -157,7 +157,6 @@ fn introspected_token_extraction(
     let field = format_ident!("{}", authorization_server.field);
     let request = context.request_local;
     let continuation_return = context.continuation_return;
-    let system_error_return = context.error_return;
 
     quote! {
         let #holder = match margaret::framework::token_introspection::introspect_bearer_token::introspect_bearer_token::<#claims>(
@@ -165,12 +164,10 @@ fn introspected_token_extraction(
             self.#field.as_ref(),
         )
         .await
-        .map_err(margaret::framework::anyhow::Error::from)
+        .into_requirement()
         {
-            ::std::result::Result::Ok(margaret::framework::token_introspection::introspection_admission::IntrospectionAdmission::Admitted(token)) => ::std::option::Option::Some(token),
-            ::std::result::Result::Ok(margaret::framework::token_introspection::introspection_admission::IntrospectionAdmission::Refused(response)) => #continuation_return,
-            ::std::result::Result::Ok(margaret::framework::token_introspection::introspection_admission::IntrospectionAdmission::Unaddressed) => ::std::option::Option::None,
-            ::std::result::Result::Err(error) => #system_error_return,
+            margaret::framework::http::requirement::Requirement::Met(token) => token,
+            margaret::framework::http::requirement::Requirement::Unmet(response) => #continuation_return,
         };
     }
 }

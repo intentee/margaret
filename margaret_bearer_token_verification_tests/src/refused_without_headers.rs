@@ -1,14 +1,11 @@
-use margaret_bearer_token_verification::bearer_token_admission::BearerTokenAdmission;
 use margaret_http::response_continuation::ResponseContinuation;
+use margaret_http::token_admission::TokenAdmission;
 
 #[must_use]
-pub fn refused_without_headers<TClaims, TProfile>(
-    admission: &BearerTokenAdmission<TClaims, TProfile>,
-    status: u16,
-) -> bool {
+pub fn refused_without_headers<TToken>(admission: &TokenAdmission<TToken>, status: u16) -> bool {
     matches!(
         admission,
-        BearerTokenAdmission::Refused(ResponseContinuation::Done(response))
+        TokenAdmission::Refused(ResponseContinuation::Done(response))
             if response.status() == status && response.headers().is_empty()
     )
 }

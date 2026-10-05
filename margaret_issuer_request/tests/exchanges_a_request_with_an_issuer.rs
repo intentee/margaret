@@ -17,7 +17,7 @@ use margaret_http_tests::form_echo_handler::FormEchoHandler;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_route_method::route_method::RouteMethod;
+use margaret_route_method::content_method::ContentMethod;
 
 #[tokio::test]
 async fn exchanges_a_request_with_an_issuer() {
@@ -26,8 +26,8 @@ async fn exchanges_a_request_with_an_issuer() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/token",
-            vec![MethodHandler::anonymous(
-                RouteMethod::Post,
+            vec![MethodHandler::content(
+                ContentMethod::Post,
                 Arc::new(FormEchoHandler {
                     limit: BodyLimit::new(1024),
                     wrapping: EchoWrapping::Bare,

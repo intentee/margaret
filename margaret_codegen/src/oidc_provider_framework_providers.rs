@@ -160,13 +160,15 @@ pub(crate) fn oidc_provider_framework_providers(
             vec![item(OidcProviderItem::AcceptedClients), secret_store()],
             OidcProviderItem::IntrospectionEndpoint,
         ),
-        endpoint(
+        constructed(
             vec![
                 borrowed_item(OidcProviderItem::AcceptedClients),
                 borrowed_item(OidcProviderItem::ProviderEndpoints),
                 FrameworkDependency::BorrowedTokenIssuance,
             ],
-            OidcProviderItem::ProviderMetadataHandler,
+            ConstructorOutcome::Fallible,
+            FrameworkEnablement::WhenReferenced,
+            oidc_provider_item_path(OidcProviderItem::ProviderMetadataHandler),
         ),
         endpoint(
             vec![item(OidcProviderItem::AcceptedClients), state()],

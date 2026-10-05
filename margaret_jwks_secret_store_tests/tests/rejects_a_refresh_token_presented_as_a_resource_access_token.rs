@@ -14,9 +14,7 @@ use margaret_token_signer_tests::unix_time::unix_time;
 #[test]
 fn rejects_a_refresh_token_presented_as_a_resource_access_token() {
     let store = rolled_store(fresh_p256_secret());
-    let refresh_token = store
-        .issue_refresh_token(Uuid::from_u128(7), unix_time(1_000))
-        .expect("the signing secret is usable");
+    let refresh_token = store.issue_refresh_token(Uuid::from_u128(7), unix_time(1_000));
 
     assert!(matches!(
         store.verify_resource_access_token(
@@ -24,11 +22,9 @@ fn rejects_a_refresh_token_presented_as_a_resource_access_token() {
             &BTreeSet::new(),
             unix_time(1_000)
         ),
-        Ok(JwtVerification::Rejected(JwtRejection::Type(
-            TypeRejection::Mismatch {
-                expected: JwtType::AccessToken,
-                found: HeaderType::Supported(JwtType::Refresh),
-            }
-        )))
+        JwtVerification::Rejected(JwtRejection::Type(TypeRejection::Mismatch {
+            expected: JwtType::AccessToken,
+            found: HeaderType::Supported(JwtType::Refresh),
+        }))
     ));
 }

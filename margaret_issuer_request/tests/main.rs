@@ -7,7 +7,6 @@ mod refuses_a_document_over_the_size_limit;
 mod refuses_a_plaintext_url;
 mod refuses_an_answer_over_the_size_limit;
 mod refuses_to_exchange_with_a_plaintext_url;
-mod refuses_to_exchange_without_an_absolute_url;
 mod reports_a_builder_that_openssl_cannot_satisfy;
 mod reports_a_non_success_status;
 mod reports_a_truncated_answer_as_a_transport_failure;

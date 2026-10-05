@@ -8,6 +8,7 @@ use serde::de::Error;
 
 use crate::oauth_vocabulary_error::OAuthVocabularyError;
 
+const OPENID_SCOPE: &str = "openid";
 const QUOTATION_MARK: u8 = 0x22;
 const REVERSE_SOLIDUS: u8 = 0x5c;
 const FIRST_SCOPE_OCTET: u8 = 0x21;
@@ -26,8 +27,26 @@ pub struct Scope {
 
 impl Scope {
     #[must_use]
+    pub fn openid() -> Self {
+        Self {
+            value: OPENID_SCOPE.to_string(),
+        }
+    }
+
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.value
+    }
+
+    #[must_use]
+    pub fn is_openid(&self) -> bool {
+        self.value == OPENID_SCOPE
+    }
+}
+
+impl From<&Scope> for oauth2::Scope {
+    fn from(scope: &Scope) -> Self {
+        Self::new(scope.value.clone())
     }
 }
 

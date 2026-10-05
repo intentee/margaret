@@ -125,6 +125,7 @@ members = [
     "margaret_syn_type_peeling",
     "margaret_sync_holder",
     "margaret_tag_codegen",
+    "margaret_token_digest",
     "margaret_token_exchange_client",
     "margaret_token_exchange_client_tests",
     "margaret_token_introspection",
@@ -295,6 +296,7 @@ margaret_subject_token_exchange = { path = "margaret_subject_token_exchange", ve
 margaret_syn_type_peeling = { path = "margaret_syn_type_peeling", version = "0.1.0" }
 margaret_sync_holder = { path = "margaret_sync_holder", version = "0.1.0" }
 margaret_tag_codegen = { path = "margaret_tag_codegen", version = "0.4.0" }
+margaret_token_digest = { path = "margaret_token_digest", version = "0.1.0" }
 margaret_token_exchange_client = { path = "margaret_token_exchange_client", version = "0.1.0" }
 margaret_token_introspection = { path = "margaret_token_introspection", version = "0.1.0" }
 margaret_token_issuance = { path = "margaret_token_issuance", version = "0.1.0" }

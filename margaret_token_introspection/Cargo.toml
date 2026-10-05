@@ -14,6 +14,7 @@ chrono = { workspace = true, features = ["clock"] }
 log = { workspace = true }
 margaret_authorization_server_client = { workspace = true }
 margaret_http = { workspace = true }
+margaret_oauth_vocabulary = { workspace = true }
 margaret_token_trust = { workspace = true }
 oauth2 = { workspace = true }
 serde = { workspace = true }

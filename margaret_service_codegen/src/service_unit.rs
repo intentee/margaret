@@ -35,8 +35,12 @@ impl ServiceUnit {
             is_async: *is_async,
             kind: match kind {
                 FrameworkServiceKind::Service => ServiceKind::Service,
-                FrameworkServiceKind::Ticker { interval } => ServiceKind::Ticker {
+                FrameworkServiceKind::Ticker {
+                    first_tick,
+                    interval,
+                } => ServiceKind::Ticker {
                     behavior: None,
+                    first_tick: *first_tick,
                     interval: interval.clone(),
                 },
             },

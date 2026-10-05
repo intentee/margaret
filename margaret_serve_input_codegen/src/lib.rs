@@ -1,3 +1,4 @@
+mod declared_serve_input_source;
 pub mod declared_serve_inputs;
 pub mod has_spiffe_http_client;
 pub mod registered_serve_input;

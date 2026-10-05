@@ -21,7 +21,7 @@ async fn refuses_an_answer_over_the_size_limit() {
         fixture.server_config.clone(),
         vec![RouteEntry::new(
             "/token",
-            vec![MethodHandler::anonymous(
+            vec![MethodHandler::head(
                 RouteMethod::Post,
                 Arc::new(StaticHandler {
                     body: vec![b' '; ISSUER_RESPONSE_MAX_BYTES + 1],

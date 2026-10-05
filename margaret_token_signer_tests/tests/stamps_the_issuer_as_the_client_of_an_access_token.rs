@@ -2,7 +2,6 @@ use serde::Deserialize;
 
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
 use margaret_token_signer::mint_access_token::mint_access_token;
@@ -31,10 +30,7 @@ fn stamps_the_issuer_as_the_client_of_an_access_token() {
     let JwksSecretVerificationResult::SignedWithCurrent(access) = secret
         .verify_jwt::<AccessTokenClient, AccessTokenProfile>(
             &access_token,
-            &JwtExpectation {
-                audience: &issuance.audience,
-                issuer: &issuance.issuer,
-            },
+            &issuance.expectation(),
             NumericDate::new(1_000),
         )
     else {

@@ -4,7 +4,6 @@ use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificatio
 use margaret_jwks_keygen::previous_key::PreviousKey;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
-use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::refresh_token_profile::RefreshTokenProfile;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
@@ -38,10 +37,7 @@ fn mints_from_a_previous_key_refresh_token() {
     let JwksSecretVerificationResult::SignedWithCurrent(access) = secret
         .verify_jwt::<AccessTokenClaims, AccessTokenProfile>(
             &access_token,
-            &JwtExpectation {
-                audience: &issuance.audience,
-                issuer: &issuance.issuer,
-            },
+            &issuance.expectation(),
             NumericDate::new(1_000),
         )
     else {
@@ -50,10 +46,7 @@ fn mints_from_a_previous_key_refresh_token() {
     let JwksSecretVerificationResult::SignedWithCurrent(migrated) = secret
         .verify_jwt::<RefreshTokenClaims, RefreshTokenProfile>(
             &refresh_token,
-            &JwtExpectation {
-                audience: &issuance.audience,
-                issuer: &issuance.issuer,
-            },
+            &issuance.expectation(),
             NumericDate::new(1_000),
         )
     else {

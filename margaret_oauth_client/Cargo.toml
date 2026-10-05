@@ -10,8 +10,12 @@ readme.workspace = true
 publish.workspace = true
 
 [dependencies]
+headers = { workspace = true }
+margaret_identity_session = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
+margaret_registered_claims = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 
 [lints]
 workspace = true
