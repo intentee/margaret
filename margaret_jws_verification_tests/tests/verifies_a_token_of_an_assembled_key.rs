@@ -4,6 +4,7 @@ use margaret_jose_parameters::curve::Curve;
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::jws_verification::JwsVerification;
+use margaret_jws_verification::key_id::KeyId;
 use margaret_jws_verification::key_set_assembly::KeySetAssembly;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
@@ -26,6 +27,6 @@ fn verifies_a_token_of_an_assembled_key() {
         panic!("the token verifies");
     };
 
-    assert_eq!(verified.kid.as_str(), "kid");
+    assert_eq!(verified.kid.map(KeyId::as_str), Some("kid"));
     assert_eq!(jws.payload(), br#"{"sub":"subject"}"#);
 }

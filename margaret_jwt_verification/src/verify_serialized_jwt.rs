@@ -16,16 +16,16 @@ use crate::jwt_verification::JwtVerification;
 pub fn verify_serialized_jwt<TClaims: DeserializeOwned, TProfile: JwtProfile>(
     key_set: &VerificationKeySet,
     token: &str,
-    JwtExpectation { audience, issuer }: &JwtExpectation,
+    expectation: &JwtExpectation,
     now: NumericDate,
 ) -> JwtVerification<TClaims, TProfile> {
-    let attributed = match attribute_serialized_jwt(token, issuer) {
+    let attributed = match attribute_serialized_jwt(token, expectation) {
         ControlFlow::Continue(attributed) => attributed,
         ControlFlow::Break(rejection) => return JwtVerification::Rejected(rejection),
     };
 
     match attributed.profile::<TProfile>() {
-        JwtProfiling::Profiled(profiled) => profiled.verify(key_set, audience, now),
+        JwtProfiling::Profiled(profiled) => profiled.verify(key_set, now),
         JwtProfiling::Rejected(rejection) => {
             JwtVerification::Rejected(JwtRejection::Type(rejection))
         }

@@ -4,6 +4,7 @@ use margaret_authorization_server_client::authorization_server_client::Authoriza
 use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
 use margaret_issuer_directory_tests::polled_directory::PolledDirectory;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
+use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
 use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_oauth_client::client_authentication::ClientAuthentication;
@@ -26,42 +27,48 @@ impl MargaretClient {
     ///
     /// Panics when the portal trust or credentials are malformed.
     pub async fn of_portal(fixture: &ProviderFixture) -> Self {
+        Self::signing_in(
+            || fixture.issuer_request_client(),
+            TokenTrust {
+                audience: "artifacts".parse().expect("the resource is an audience"),
+                issuer: "https://localhost"
+                    .parse()
+                    .expect("the provider issuer is an https url"),
+            },
+            OAuthClient {
+                authentication: ClientAuthentication::ClientSecretBasic(
+                    PORTAL_SECRET
+                        .parse()
+                        .expect("the portal secret is not empty"),
+                ),
+                client_id: "portal".parse().expect("the portal identifier is visible"),
+            },
+        )
+        .await
+    }
+
+    pub async fn signing_in(
+        request_client: impl Fn() -> IssuerRequestClient,
+        trust: TokenTrust,
+        client: OAuthClient,
+    ) -> Self {
         let metadata = Arc::new(IssuerMetadata::awaiting());
         let trusted_issuer = Arc::new(TrustedIssuer::for_oidc_issuer(
             Arc::clone(&metadata),
-            Arc::new(TokenTrustDeclaration {
-                trust: TokenTrust {
-                    audience: "artifacts".parse().expect("the resource is an audience"),
-                    issuer: "https://localhost"
-                        .parse()
-                        .expect("the provider issuer is an https url"),
-                },
-            }),
+            Arc::new(TokenTrustDeclaration { trust }),
         ));
         let snapshot = trusted_issuer.key_set.snapshot();
-        let directory = PolledDirectory::start(
-            vec![Arc::clone(&trusted_issuer)],
-            fixture.issuer_request_client(),
-        );
+        let directory = PolledDirectory::start(vec![Arc::clone(&trusted_issuer)], request_client());
 
         trusted_issuer.key_set.refreshed_since(&snapshot).await;
 
         Self {
             directory,
             server: Arc::new(AuthorizationServerClient::create(
-                Arc::new(fixture.issuer_request_client()),
+                Arc::new(request_client()),
                 metadata,
                 trusted_issuer,
-                Arc::new(OAuthClientDeclaration {
-                    client: OAuthClient {
-                        authentication: ClientAuthentication::ClientSecretBasic(
-                            PORTAL_SECRET
-                                .parse()
-                                .expect("the portal secret is not empty"),
-                        ),
-                        client_id: "portal".parse().expect("the portal identifier is visible"),
-                    },
-                }),
+                Arc::new(OAuthClientDeclaration { client }),
             )),
         }
     }

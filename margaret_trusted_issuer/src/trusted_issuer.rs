@@ -9,12 +9,11 @@ use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 use margaret_jwt_verification::attributed_jwt::AttributedJwt;
 use margaret_jwt_verification::jwt_addressee::JwtAddressee;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_profile::JwtProfile;
 use margaret_jwt_verification::jwt_profiling::JwtProfiling;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_oidc_discovery::oidc_discovery_url::oidc_discovery_url;
-use margaret_registered_claims::audience::Audience;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_trust::declares_token_trust::DeclaresTokenTrust;
 
@@ -60,7 +59,6 @@ impl TrustedIssuer {
     pub async fn verify<TClaims: DeserializeOwned, TProfile: JwtProfile>(
         &self,
         jwt: &AttributedJwt<'_>,
-        audience: &Audience,
         now: NumericDate,
     ) -> IssuerVerification<TClaims, TProfile> {
         let jwt = match jwt.profile::<TProfile>() {
@@ -71,7 +69,7 @@ impl TrustedIssuer {
         };
         let snapshot = self.key_set.snapshot();
 
-        match verify_with_key_set(&jwt, &snapshot.holding, audience, now) {
+        match verify_with_key_set(&jwt, &snapshot.holding, now) {
             KeySetVerification::UnknownKey {
                 fetched_at,
                 rejection,
@@ -79,7 +77,7 @@ impl TrustedIssuer {
                 match self.key_set.refreshed_since(&snapshot).await {
                     KeySetRefresh::PollingStopped => IssuerVerification::Rejected(rejection),
                     KeySetRefresh::Refreshed(holding) => {
-                        verify_with_key_set(&jwt, &holding, audience, now).settled()
+                        verify_with_key_set(&jwt, &holding, now).settled()
                     }
                 }
             }
@@ -89,7 +87,7 @@ impl TrustedIssuer {
 }
 
 impl JwtAddressee for TrustedIssuer {
-    fn jwt_issuer(&self) -> &IssuerIdentifier {
-        &self.trust.token_trust().issuer
+    fn jwt_expectation(&self) -> JwtExpectation<'_> {
+        self.trust.token_trust().expectation()
     }
 }

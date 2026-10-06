@@ -7,6 +7,7 @@ use margaret_issuer_directory_tests::first_poll::first_poll;
 use margaret_issuer_directory_tests::fixture_issuer_routes::FixtureIssuerRoutes;
 use margaret_issuer_directory_tests::json_handler::json_handler;
 use margaret_issuer_directory_tests::localhost_jwks_endpoint::localhost_jwks_endpoint;
+use margaret_issuer_directory_tests::localhost_trust::localhost_trust;
 use margaret_issuer_directory_tests::running_fixture_issuer::RunningFixtureIssuer;
 use margaret_issuer_key_set::key_set_holding::KeySetHolding;
 use margaret_issuer_key_set::key_set_refresh::KeySetRefresh;
@@ -25,7 +26,11 @@ async fn keeps_awaiting_an_oversized_key_set_document() {
     .await;
 
     assert!(matches!(
-        first_poll(&localhost_jwks_endpoint(), issuer.request_client()).await,
+        first_poll(
+            &localhost_jwks_endpoint(localhost_trust()),
+            issuer.request_client()
+        )
+        .await,
         KeySetRefresh::Refreshed(KeySetHolding::Awaiting)
     ));
 

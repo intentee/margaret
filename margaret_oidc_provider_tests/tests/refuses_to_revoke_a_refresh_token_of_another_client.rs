@@ -26,7 +26,7 @@ async fn refuses_to_revoke_a_refresh_token_of_another_client() {
         .await;
 
     assert_eq!(answer.status, 400);
-    assert_eq!(answer.body["error"], "unauthorized_client");
+    assert_eq!(answer.body["error"], "invalid_grant");
     assert_eq!(
         refreshed_tokens(&fixture, &refresh_token, None)
             .await

@@ -149,12 +149,14 @@ impl JwksSecret {
             JwtVerification::Verified(verified) => verified,
         };
 
-        if &verified.kid == self.current.kid() {
-            JwksSecretVerificationResult::SignedWithCurrent(verified)
-        } else if self.previous.is_retired_key(&verified.kid) {
-            JwksSecretVerificationResult::SignedWithPrevious(verified)
-        } else {
-            JwksSecretVerificationResult::SignedWithNextKey
+        match &verified.kid {
+            Some(kid) if kid == self.current.kid() => {
+                JwksSecretVerificationResult::SignedWithCurrent(verified)
+            }
+            Some(kid) if self.previous.is_retired_key(kid) => {
+                JwksSecretVerificationResult::SignedWithPrevious(verified)
+            }
+            Some(_) | None => JwksSecretVerificationResult::SignedWithNextKey,
         }
     }
 }

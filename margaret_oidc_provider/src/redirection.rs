@@ -1,4 +1,6 @@
 use url::Url;
+use url::UrlQuery;
+use url::form_urlencoded::Serializer;
 
 use margaret_http::redirect::Redirect;
 use margaret_http::response::Response;
@@ -15,14 +17,19 @@ pub(crate) struct Redirection<'issuer> {
 
 impl Redirection<'_> {
     pub(crate) fn code(self, code: &str) -> Response {
-        self.redirected("code", code)
+        self.redirected(|query| {
+            query.append_pair("code", code);
+        })
     }
 
     pub(crate) fn error(self, error: AuthorizationError) -> Response {
-        self.redirected("error", error.wire_name())
+        self.redirected(|query| {
+            query.append_pair("error", error.wire_name());
+            query.append_pair("error_description", error.description());
+        })
     }
 
-    fn redirected(self, name: &str, value: &str) -> Response {
+    fn redirected(self, outcome: impl FnOnce(&mut Serializer<UrlQuery<'_>>)) -> Response {
         let Self {
             issuer,
             mut redirect_uri,
@@ -32,7 +39,7 @@ impl Redirection<'_> {
         {
             let mut query = redirect_uri.query_pairs_mut();
 
-            query.append_pair(name, value);
+            outcome(&mut query);
             query.append_pair("iss", issuer.as_str());
 
             if let Some(state) = &state {

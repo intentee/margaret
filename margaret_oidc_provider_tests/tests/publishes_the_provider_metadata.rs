@@ -13,6 +13,7 @@ async fn publishes_the_provider_metadata() {
         json!({
             "authorization_endpoint": "https://localhost/authorize",
             "authorization_response_iss_parameter_supported": true,
+            "claims_supported": ["aud", "auth_time", "azp", "exp", "iat", "iss", "nonce", "sub"],
             "code_challenge_methods_supported": ["S256"],
             "grant_types_supported": [
                 "authorization_code",
@@ -25,6 +26,7 @@ async fn publishes_the_provider_metadata() {
             "introspection_endpoint_auth_methods_supported": ["client_secret_basic"],
             "issuer": "https://localhost",
             "jwks_uri": "https://localhost/jwks.json",
+            "prompt_values_supported": ["consent", "login", "none"],
             "response_modes_supported": ["query"],
             "response_types_supported": ["code"],
             "revocation_endpoint": "https://localhost/revoke",

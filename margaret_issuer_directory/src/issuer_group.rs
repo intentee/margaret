@@ -5,7 +5,6 @@ use futures_util::future::select_all;
 use tokio::time::Instant;
 
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
-use margaret_jwt_verification::jwt_addressee::JwtAddressee;
 use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_trusted_issuer::key_set_locator::KeySetLocator;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
@@ -43,8 +42,20 @@ impl IssuerGroup {
         &mut self,
         trusted_issuer: Arc<TrustedIssuer>,
     ) -> Result<(), IssuerDirectoryError> {
+        let trust = trusted_issuer.trust.token_trust();
+
+        if self
+            .members()
+            .any(|member| member.trust.token_trust().audience == trust.audience)
+        {
+            return Err(IssuerDirectoryError::TokenTrustDeclaredTwice {
+                audience: trust.audience.clone(),
+                issuer: Box::new(trust.issuer.clone()),
+            });
+        }
+
         let trusted_twice = || IssuerDirectoryError::JwksEndpointIssuerTrustedTwice {
-            issuer: trusted_issuer.jwt_issuer().clone(),
+            issuer: trust.issuer.clone(),
         };
         let KeySetLocator::Discovery { metadata, .. } = &trusted_issuer.locator else {
             return Err(trusted_twice());
@@ -75,7 +86,7 @@ impl IssuerGroup {
     }
 
     pub(crate) fn issuer(&self) -> &IssuerIdentifier {
-        self.lead.jwt_issuer()
+        &self.lead.trust.token_trust().issuer
     }
 
     pub(crate) fn next_fetch_due(&self, started_at: Instant) -> Instant {

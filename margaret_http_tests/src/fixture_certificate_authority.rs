@@ -1,4 +1,5 @@
 use rcgen::BasicConstraints;
+use rcgen::Certificate;
 use rcgen::CertificateParams;
 use rcgen::DistinguishedName;
 use rcgen::DnType;
@@ -12,6 +13,12 @@ use rustls::pki_types::CertificateDer;
 use rustls::pki_types::PrivateKeyDer;
 
 use crate::issued_certificate::IssuedCertificate;
+use crate::issued_pem_certificate::IssuedPemCertificate;
+
+struct SignedLeaf {
+    certificate: Certificate,
+    key: KeyPair,
+}
 
 fn named(common_name: &str) -> DistinguishedName {
     let mut distinguished_name = DistinguishedName::new();
@@ -64,21 +71,24 @@ impl FixtureCertificateAuthority {
     /// Panics when the fixture it builds cannot be prepared.
     #[must_use]
     pub fn issue(&self, common_name: &str, subject_alt_name: SanType) -> IssuedCertificate {
-        let key = KeyPair::generate().expect("the leaf key pair generates");
-        let mut params = CertificateParams::default();
-
-        params.distinguished_name = named(common_name);
-        params.subject_alt_names = vec![subject_alt_name];
-
-        let certificate_der = params
-            .signed_by(&key, &self.issuer)
-            .expect("the leaf certificate is signed by the CA")
-            .der()
-            .clone();
+        let SignedLeaf { certificate, key } = self.signed_leaf(common_name, subject_alt_name);
 
         IssuedCertificate {
-            certificate_der,
+            certificate_der: certificate.der().clone(),
             private_key: PrivateKeyDer::Pkcs8(key.serialize_der().into()),
+        }
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
+    #[must_use]
+    pub fn issue_pem(&self, common_name: &str, subject_alt_name: SanType) -> IssuedPemCertificate {
+        let SignedLeaf { certificate, key } = self.signed_leaf(common_name, subject_alt_name);
+
+        IssuedPemCertificate {
+            certificate_pem: certificate.pem(),
+            private_key_pem: key.serialize_pem(),
         }
     }
 
@@ -94,5 +104,20 @@ impl FixtureCertificateAuthority {
             .expect("the CA certificate is added to the root store");
 
         roots
+    }
+
+    fn signed_leaf(&self, common_name: &str, subject_alt_name: SanType) -> SignedLeaf {
+        let key = KeyPair::generate().expect("the leaf key pair generates");
+        let mut params = CertificateParams::default();
+
+        params.distinguished_name = named(common_name);
+        params.subject_alt_names = vec![subject_alt_name];
+
+        SignedLeaf {
+            certificate: params
+                .signed_by(&key, &self.issuer)
+                .expect("the leaf certificate is signed by the CA"),
+            key,
+        }
     }
 }

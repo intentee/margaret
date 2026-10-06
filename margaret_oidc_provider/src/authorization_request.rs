@@ -3,19 +3,31 @@ use url::Url;
 use validator::Validate;
 use validator::ValidationErrors;
 
+use margaret_oauth_vocabulary::optional_parameter::optional_parameter;
+
 use crate::named_parameter::NamedParameter;
 
 #[derive(Debug, Deserialize)]
 pub struct AuthorizationRequest {
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub client_id: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub code_challenge: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub code_challenge_method: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub max_age: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub nonce: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub prompt: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub redirect_uri: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub response_type: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub scope: Option<String>,
+    #[serde(default, deserialize_with = "optional_parameter")]
     pub state: Option<String>,
 }
 

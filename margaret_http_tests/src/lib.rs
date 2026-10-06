@@ -13,6 +13,7 @@ pub mod form_echo_handler;
 pub mod forwarding_handler;
 pub mod hanging_handler;
 pub mod issued_certificate;
+pub mod issued_pem_certificate;
 pub mod json_reading_handler;
 pub mod mtls_client_request;
 pub mod mtls_connect;

@@ -1,0 +1,46 @@
+use serde_json::json;
+
+use margaret_bearer_token_verification::bearer_token_routing::BearerTokenRouting;
+use margaret_bearer_token_verification::route_bearer_token::route_bearer_token;
+use margaret_bearer_token_verification_tests::held_trusted_issuer::held_trusted_issuer;
+use margaret_http::request_authorization::RequestAuthorization;
+use margaret_http::response_continuation::ResponseContinuation;
+use margaret_jose_parameters::jwt_type::JwtType;
+use margaret_jwks_keygen::jwks_secret::JwksSecret;
+use margaret_jwks_keygen::signing_curve::SigningCurve;
+use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
+use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
+use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
+use margaret_token_trust::token_trust::TokenTrust;
+
+#[test]
+fn refuses_a_token_addressed_to_two_declarations() {
+    let secret = JwksSecret::fresh(SigningCurve::P256, &FixtureRsaSigningKeys::default())
+        .expect("a fresh secret");
+    let trust = fixture_trust();
+    let token = secret.current().sign_json(
+        &json!({
+            "aud": [trust.audience.as_str(), "elsewhere"],
+            "exp": FAR_FUTURE_EXPIRY,
+            "iat": 0,
+            "iss": trust.issuer.as_str(),
+            "sub": "subject",
+        }),
+        JwtType::AccessToken,
+    );
+    let elsewhere = held_trusted_issuer(
+        TokenTrust {
+            audience: "elsewhere".parse().expect("the audience is not empty"),
+            issuer: trust.issuer.clone(),
+        },
+        secret.key_set().clone(),
+    );
+    let addressed = held_trusted_issuer(trust, secret.key_set().clone());
+    let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
+
+    assert!(matches!(
+        route_bearer_token(&authorization, &[&addressed, &elsewhere]),
+        Ok(BearerTokenRouting::Refused(ResponseContinuation::Done(response)))
+            if response.status() == 401
+    ));
+}

@@ -9,7 +9,11 @@ async fn refuses_a_subject_token_that_is_not_a_jws() {
     let answer = fixture.post_form("/token", &PORTAL_CREDENTIALS, &json!({"grant_type": "urn:ietf:params:oauth:grant-type:token-exchange", "subject_token": "a.b.c", "subject_token_type": "urn:ietf:params:oauth:token-type:id_token", "requested_token_type": "urn:ietf:params:oauth:token-type:access_token"})).await;
 
     assert_eq!(answer.status, 400);
-    assert_eq!(answer.body["error"], "invalid_grant");
+    assert_eq!(answer.body["error"], "invalid_request");
+    assert_eq!(
+        answer.body["error_description"],
+        "the subject token fails verification"
+    );
 
     fixture.stop().await;
 }

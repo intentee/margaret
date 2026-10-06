@@ -21,7 +21,15 @@ impl TlsFixture {
     /// Panics when the fixture it builds cannot be prepared.
     #[must_use]
     pub fn generate() -> Self {
-        let server_name = "localhost".to_string();
+        Self::serving("localhost")
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the fixture it builds cannot be prepared.
+    #[must_use]
+    pub fn serving(server_name: &str) -> Self {
+        let server_name = server_name.to_string();
         let certificate_authority = FixtureCertificateAuthority::generate();
         let IssuedCertificate {
             certificate_der,

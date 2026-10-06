@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
+use serde_json::Value;
 use serde_json::json;
 
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
@@ -14,6 +15,8 @@ use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 use crate::ci_exchanger::CiExchanger;
 
+const CI_AUDIENCE: &str = "https://localhost";
+
 pub struct CiIssuer {
     pub exchanger: Arc<SubjectTokenExchanger>,
     pub secret: JwksSecret,
@@ -22,27 +25,33 @@ pub struct CiIssuer {
 impl CiIssuer {
     #[must_use]
     pub fn awaiting_keys() -> Self {
-        Self::with_trusted_issuer(|_trusted_issuer, _secret| {})
+        Self::with_trusted_issuer(CI_AUDIENCE, |_trusted_issuer, _secret| {})
     }
 
     #[must_use]
     pub fn publishing_keys() -> Self {
-        Self::with_trusted_issuer(|trusted_issuer, secret| {
+        Self::publishing_keys_for(CI_AUDIENCE)
+    }
+
+    #[must_use]
+    pub fn publishing_keys_for(audience: &str) -> Self {
+        Self::with_trusted_issuer(audience, |trusted_issuer, secret| {
             trusted_issuer
                 .key_set
                 .hold(Arc::new(secret.key_set().clone()));
         })
     }
 
-    fn with_trusted_issuer(publish: impl FnOnce(&TrustedIssuer, &JwksSecret)) -> Self {
+    fn with_trusted_issuer(
+        audience: &str,
+        publish: impl FnOnce(&TrustedIssuer, &JwksSecret),
+    ) -> Self {
         let secret = fresh_p256_secret();
         let trusted_issuer = TrustedIssuer::for_oidc_issuer(
             Arc::new(IssuerMetadata::awaiting()),
             Arc::new(TokenTrustDeclaration {
                 trust: TokenTrust {
-                    audience: "https://localhost"
-                        .parse()
-                        .expect("the audience is not empty"),
+                    audience: audience.parse().expect("the audience is not empty"),
                     issuer: "https://ci.localhost"
                         .parse()
                         .expect("the ci issuer is an https url"),
@@ -63,11 +72,16 @@ impl CiIssuer {
 
     #[must_use]
     pub fn token(&self, repository: &str) -> String {
+        self.token_addressed_to(&json!(CI_AUDIENCE), repository)
+    }
+
+    #[must_use]
+    pub fn token_addressed_to(&self, audience: &Value, repository: &str) -> String {
         let now = Utc::now().timestamp();
 
         self.secret.current().sign_json(
             &json!({
-                "aud": "https://localhost",
+                "aud": audience,
                 "exp": now + 300,
                 "iat": now,
                 "iss": "https://ci.localhost",

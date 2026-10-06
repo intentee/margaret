@@ -17,3 +17,8 @@ threads-required = 'num-test-threads'
 [[profile.default.overrides]]
 filter = 'test(generates_an_rsa_signing_key_that_signs_verifiable_tokens)'
 threads-required = 'num-test-threads'
+
+[[profile.default.overrides]]
+filter = 'package(margaret_openid_conformance_tests)'
+slow-timeout = { period = "60s", terminate-after = 2 }
+threads-required = 'num-test-threads'

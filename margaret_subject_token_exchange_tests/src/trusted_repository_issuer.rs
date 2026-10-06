@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use serde_json::Value;
+use serde_json::json;
+
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
@@ -11,6 +14,7 @@ use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_trust::token_trust::TokenTrust;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
+use crate::provider_audience::PROVIDER_AUDIENCE;
 use crate::repository_exchanger::RepositoryExchanger;
 use crate::signed_by::signed_by;
 
@@ -33,7 +37,7 @@ impl TrustedRepositoryIssuer {
         &self,
     ) -> Arc<SubjectTokenExchanger> {
         Arc::new(SubjectTokenExchanger::create(
-            Arc::new(self.trusted_issuer()),
+            Arc::new(self.trusted_issuer(PROVIDER_AUDIENCE)),
             Arc::new(RepositoryExchanger::<TProfile> {
                 profile: PhantomData,
             }),
@@ -44,7 +48,15 @@ impl TrustedRepositoryIssuer {
     pub fn publishing_keys<TProfile: SubjectTokenProfile + Send + Sync + 'static>(
         &self,
     ) -> Arc<SubjectTokenExchanger> {
-        let trusted_issuer = self.trusted_issuer();
+        self.publishing_keys_for::<TProfile>(PROVIDER_AUDIENCE)
+    }
+
+    #[must_use]
+    pub fn publishing_keys_for<TProfile: SubjectTokenProfile + Send + Sync + 'static>(
+        &self,
+        audience: &str,
+    ) -> Arc<SubjectTokenExchanger> {
+        let trusted_issuer = self.trusted_issuer(audience);
 
         trusted_issuer
             .key_set
@@ -60,17 +72,20 @@ impl TrustedRepositoryIssuer {
 
     #[must_use]
     pub fn token(&self, repository: &str, jwt_type: JwtType) -> String {
-        signed_by(&self.secret, self.issuer, repository, jwt_type)
+        self.token_for(&json!(PROVIDER_AUDIENCE), repository, jwt_type)
     }
 
-    fn trusted_issuer(&self) -> TrustedIssuer {
+    #[must_use]
+    pub fn token_for(&self, audience: &Value, repository: &str, jwt_type: JwtType) -> String {
+        signed_by(&self.secret, self.issuer, audience, repository, jwt_type)
+    }
+
+    fn trusted_issuer(&self, audience: &str) -> TrustedIssuer {
         TrustedIssuer::for_oidc_issuer(
             Arc::new(IssuerMetadata::awaiting()),
             Arc::new(TokenTrustDeclaration {
                 trust: TokenTrust {
-                    audience: "https://provider.localhost"
-                        .parse()
-                        .expect("the audience is not empty"),
+                    audience: audience.parse().expect("the audience is not empty"),
                     issuer: self.issuer.parse().expect("the issuer is an https url"),
                 },
             }),

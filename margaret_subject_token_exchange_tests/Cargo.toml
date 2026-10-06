@@ -23,6 +23,7 @@ uuid = { workspace = true }
 [dev-dependencies]
 margaret_jws_verification = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
+margaret_registered_claims = { workspace = true }
 margaret_token_exchange_client = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 

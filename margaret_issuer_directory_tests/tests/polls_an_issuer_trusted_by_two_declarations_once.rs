@@ -17,6 +17,7 @@ use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_metadata::metadata_holding::MetadataHolding;
 use margaret_jws_verification_tests::fixture_rsa_key::FixtureRsaKey;
 use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
+use margaret_token_trust::token_trust::TokenTrust;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -41,11 +42,18 @@ async fn polls_an_issuer_trusted_by_two_declarations_once() {
         Arc::new(IssuerMetadata::awaiting()),
         Arc::new(IssuerMetadata::awaiting()),
     ];
-    let trusted_issuers = metadata.clone().map(|metadata| {
+    let trusts = [
+        localhost_trust(),
+        TokenTrust {
+            audience: "elsewhere".parse().expect("the audience is not empty"),
+            ..localhost_trust()
+        },
+    ];
+    let trusted_issuers = [0, 1].map(|member| {
         Arc::new(TrustedIssuer::for_oidc_issuer(
-            metadata,
+            Arc::clone(&metadata[member]),
             Arc::new(TokenTrustDeclaration {
-                trust: localhost_trust(),
+                trust: trusts[member].clone(),
             }),
         ))
     });

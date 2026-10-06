@@ -39,6 +39,9 @@ pub enum OAuthVocabularyError {
     #[error("the code challenge method '{value}' is not supported")]
     UnsupportedCodeChallengeMethod { value: String },
 
+    #[error("the prompt value '{value}' is not supported")]
+    UnsupportedPromptValue { value: String },
+
     #[error("the token type '{value}' is not supported")]
     UnsupportedTokenType { value: String },
 }

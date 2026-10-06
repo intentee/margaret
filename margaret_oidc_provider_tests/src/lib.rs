@@ -31,6 +31,7 @@ pub mod provider_parts;
 pub mod provider_url;
 pub mod refreshed_tokens;
 pub mod request_authorized_by;
+pub mod rfc_example_client;
 pub mod service_client;
 pub mod service_credentials;
 pub mod service_secret;

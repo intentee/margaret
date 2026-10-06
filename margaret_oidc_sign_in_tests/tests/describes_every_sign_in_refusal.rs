@@ -24,7 +24,9 @@ fn describes_every_sign_in_refusal() {
             found: "other".to_string(),
         },
         SignInRefusal::CodeMissing,
-        SignInRefusal::IdTokenRejected(JwtRejection::Jws(JwsRejection::MissingKeyId)),
+        SignInRefusal::IdTokenRejected(JwtRejection::Jws(JwsRejection::MissingKeyId {
+            candidates: 2,
+        })),
         SignInRefusal::IssuerMismatch {
             found: "https://attacker.example".to_string(),
         },
@@ -37,10 +39,12 @@ fn describes_every_sign_in_refusal() {
             None,
         )),
         SignInRefusal::TransactionMissing,
-        SignInRefusal::TransactionRejected(JwtRejection::Jws(JwsRejection::MissingKeyId)),
+        SignInRefusal::TransactionRejected(JwtRejection::Jws(JwsRejection::MissingKeyId {
+            candidates: 2,
+        })),
     ]
     .map(|refusal| refusal.to_string());
-    let missing_key_id = JwsRejection::MissingKeyId.to_string();
+    let missing_key_id = JwsRejection::MissingKeyId { candidates: 2 }.to_string();
 
     assert_eq!(
         described,

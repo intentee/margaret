@@ -11,8 +11,8 @@ use serde::de::Error;
 
 use crate::oauth_vocabulary_error::OAuthVocabularyError;
 use crate::scope::Scope;
-
-const SCOPE_DELIMITER: char = ' ';
+use crate::space_delimited::space_delimited;
+use crate::space_delimiter::SPACE_DELIMITER;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ScopeList {
@@ -27,7 +27,7 @@ impl Display for ScopeList {
                 .iter()
                 .map(Scope::as_str)
                 .collect::<Vec<&str>>()
-                .join(&SCOPE_DELIMITER.to_string()),
+                .join(&SPACE_DELIMITER.to_string()),
         )
     }
 }
@@ -36,15 +36,7 @@ impl FromStr for ScopeList {
     type Err = OAuthVocabularyError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        if value.is_empty() {
-            return Ok(Self::default());
-        }
-
-        value
-            .split(SCOPE_DELIMITER)
-            .map(str::parse)
-            .collect::<Result<BTreeSet<Scope>, OAuthVocabularyError>>()
-            .map(|scopes| Self { scopes })
+        space_delimited(value).map(|scopes| Self { scopes })
     }
 }
 

@@ -1,0 +1,34 @@
+services:
+  provider-relay:
+    image: ${CONFORMANCE_SUITE_NGINX_IMAGE:?run the conformance tests through make}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    networks:
+      default:
+        aliases:
+          - ${MARGARET_PROVIDER_HOST:?}
+    configs:
+      - source: provider_relay
+        target: /etc/nginx/nginx.conf
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - --output
+        - /dev/null
+        - --insecure
+        - https://localhost/.well-known/openid-configuration
+      start_interval: 1s
+      start_period: 60s
+configs:
+  provider_relay:
+    content: |
+      events {}
+      stream {
+        server {
+          listen 443;
+          proxy_pass host.docker.internal:${MARGARET_PROVIDER_PORT:?};
+        }
+      }

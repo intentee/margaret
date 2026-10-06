@@ -1,5 +1,5 @@
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
+use crate::jwt_expectation::JwtExpectation;
 
 pub trait JwtAddressee {
-    fn jwt_issuer(&self) -> &IssuerIdentifier;
+    fn jwt_expectation(&self) -> JwtExpectation<'_>;
 }

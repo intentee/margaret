@@ -92,6 +92,7 @@ members = [
     "margaret_oidc_provider_tests",
     "margaret_oidc_sign_in",
     "margaret_oidc_sign_in_tests",
+    "margaret_openid_conformance_tests",
     "margaret_peer_identity",
     "margaret_peer_identity_tests",
     "margaret_provider_state_postgres",

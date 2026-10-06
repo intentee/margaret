@@ -1,10 +1,13 @@
+use margaret_registered_claims::registered_claims::RegisteredClaims;
+
 use crate::attributed_jwt::AttributedJwt;
-use crate::presented_jwt::PresentedJwt;
 
 pub enum JwtRouting<'token, 'addressees, TAddressee> {
+    Ambiguous(RegisteredClaims),
+    Misaddressed(RegisteredClaims),
     Routed {
         addressee: &'addressees TAddressee,
         jwt: AttributedJwt<'token>,
     },
-    Unrouted(PresentedJwt<'token>),
+    UntrustedIssuer(RegisteredClaims),
 }

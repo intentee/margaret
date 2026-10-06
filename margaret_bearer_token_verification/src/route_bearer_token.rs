@@ -41,12 +41,16 @@ fn route_presented_at<'request, 'trusted>(
         JwtRouting::Routed {
             addressee: trusted_issuer,
             jwt,
-        } => BearerTokenRouting::Routed(RoutedBearerToken::Attributed(AttributedBearerToken {
-            jwt,
-            presented_at,
-            trusted_issuer,
-        })),
-        JwtRouting::Unrouted(_) => refused(BearerChallenge::InvalidToken),
+        } => BearerTokenRouting::Routed(RoutedBearerToken::Attributed(Box::new(
+            AttributedBearerToken {
+                jwt,
+                presented_at,
+                trusted_issuer,
+            },
+        ))),
+        JwtRouting::Ambiguous(_) | JwtRouting::Misaddressed(_) | JwtRouting::UntrustedIssuer(_) => {
+            refused(BearerChallenge::InvalidToken)
+        }
     }
 }
 

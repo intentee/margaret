@@ -4,17 +4,14 @@ use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 
 #[tokio::test]
-async fn accepts_the_revocation_of_an_unknown_token_with_an_unrecognized_hint() {
+async fn refuses_a_token_request_with_an_empty_grant_type() {
     let fixture = ProviderFixture::start(Vec::new()).await;
     let answer = fixture
-        .post_form(
-            "/revoke",
-            &PORTAL_CREDENTIALS,
-            &json!({"token": "unknown", "token_type_hint": "device_code"}),
-        )
+        .post_form("/token", &PORTAL_CREDENTIALS, &json!({"grant_type": ""}))
         .await;
 
-    assert_eq!(answer.status, 200);
+    assert_eq!(answer.status, 400);
+    assert_eq!(answer.body["error"], "invalid_request");
 
     fixture.stop().await;
 }

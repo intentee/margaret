@@ -12,21 +12,27 @@ pub enum ExpectedAudience<'expectation> {
 }
 
 impl ExpectedAudience<'_> {
-    pub(crate) fn admits(&self, found: &AudienceClaim) -> ControlFlow<ClaimsRejection> {
+    pub(crate) fn admits(&self, found: &AudienceClaim) -> bool {
         match self {
-            Self::AnyOf(expected) if !found.contains_any(expected) => {
-                ControlFlow::Break(ClaimsRejection::AudienceOutside {
-                    expected: (*expected).clone(),
-                    found: found.clone(),
-                })
-            }
-            Self::One(expected) if !found.contains(expected) => {
-                ControlFlow::Break(ClaimsRejection::AudienceMismatch {
-                    expected: (*expected).clone(),
-                    found: found.clone(),
-                })
-            }
-            Self::AnyOf(_) | Self::One(_) => ControlFlow::Continue(()),
+            Self::AnyOf(expected) => found.contains_any(expected),
+            Self::One(expected) => found.contains(expected),
         }
+    }
+
+    pub(crate) fn check(&self, found: &AudienceClaim) -> ControlFlow<ClaimsRejection> {
+        if self.admits(found) {
+            return ControlFlow::Continue(());
+        }
+
+        ControlFlow::Break(match self {
+            Self::AnyOf(expected) => ClaimsRejection::AudienceOutside {
+                expected: (*expected).clone(),
+                found: found.clone(),
+            },
+            Self::One(expected) => ClaimsRejection::AudienceMismatch {
+                expected: (*expected).clone(),
+                found: found.clone(),
+            },
+        })
     }
 }

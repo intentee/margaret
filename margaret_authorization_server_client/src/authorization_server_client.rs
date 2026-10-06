@@ -33,6 +33,7 @@ use margaret_issuer_request::issuer_request_timeout::ISSUER_REQUEST_TIMEOUT;
 use margaret_oauth_client::declares_oauth_client::DeclaresOAuthClient;
 use margaret_oauth_client::presented_client_authentication::PresentedClientAuthentication;
 use margaret_oauth_vocabulary::grant_type::GrantType;
+use margaret_oauth_vocabulary::token_type_hint::TokenTypeHint;
 use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
@@ -180,7 +181,7 @@ impl AuthorizationServerClient {
                 },
                 FormParameter {
                     name: "token_type_hint",
-                    value: "access_token".to_string(),
+                    value: TokenTypeHint::AccessToken.wire_name().to_string(),
                 },
             ],
         )

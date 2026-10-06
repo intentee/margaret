@@ -171,7 +171,11 @@ pub(crate) fn oidc_provider_framework_providers(
             oidc_provider_item_path(OidcProviderItem::ProviderMetadataHandler),
         ),
         endpoint(
-            vec![item(OidcProviderItem::AcceptedClients), state()],
+            vec![
+                item(OidcProviderItem::AcceptedClients),
+                secret_store(),
+                state(),
+            ],
             OidcProviderItem::RevocationEndpoint,
         ),
         endpoint(

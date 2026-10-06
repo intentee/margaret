@@ -72,6 +72,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_oidc_provider_tests \
 	-p margaret_oidc_sign_in \
 	-p margaret_oidc_sign_in_tests \
+	-p margaret_openid_conformance_tests \
 	-p margaret_peer_identity \
 	-p margaret_peer_identity_tests \
 	-p margaret_provider_state_postgres \
@@ -285,13 +286,24 @@ SPIRE_FEATURES := \
 	--features margaret_spiffe_svid_tests/tests_that_use_spire \
 	--features margaret_spiffe_svid_integration_tests/tests_that_use_spire
 
+OPENID_CONFORMANCE_FEATURES := \
+	--features margaret_openid_conformance_tests/tests_that_use_openid_conformance_suite
+
+CONFORMANCE_SUITE_MONGODB_IMAGE := mongo:6.0.13@sha256:b415b12f638e2685d06c58ab7fb5943577c50fadec6d9340ef67d21aeac72070
+CONFORMANCE_SUITE_NGINX_IMAGE := registry.gitlab.com/openid/conformance-suite/nginx:release-v5.3.1@sha256:6ea3f4b8854f1f3626c81350900962d9e5f86424791d8e72b378a26ee2f4c105
+CONFORMANCE_SUITE_SERVER_IMAGE := registry.gitlab.com/openid/conformance-suite:release-v5.3.1@sha256:69495f453a920c262f66e5e72abd12501c33e05ce88051cddf300c00621a4d70
+
+export CONFORMANCE_SUITE_MONGODB_IMAGE
+export CONFORMANCE_SUITE_NGINX_IMAGE
+export CONFORMANCE_SUITE_SERVER_IMAGE
+
 node_modules: package.json
 	npm install
 	touch node_modules
 
 .PHONY: clippy
 clippy:
-	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(SPIRE_FEATURES) -- -D warnings
+	cargo clippy --workspace --all-targets $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) -- -D warnings
 	cargo clippy $(RUNTIME_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy $(GENERATED_CODE_PACKAGES) --lib -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy -p margaret --all-targets --no-default-features -- -D warnings
@@ -302,12 +314,12 @@ clippy:
 	cargo clippy -p margaret --lib --all-features -- -D warnings $(RUNTIME_LINTS)
 
 .PHONY: coverage
-coverage: node_modules postgres-image
+coverage: node_modules openid-conformance-images postgres-image
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) --no-report --filterset 'none()' --no-tests pass
+	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset 'none()' --no-tests pass
 	docker run --rm --user postgres $(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG) initdb --auth trust --no-sync --pgdata /tmp/warm
-	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) --no-report --filterset '$(POSTGRES_TESTS)'
-	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) --no-report --filterset 'not ($(POSTGRES_TESTS))'
+	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset '$(POSTGRES_TESTS)'
+	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset 'not ($(POSTGRES_TESTS))'
 	cargo llvm-cov report --json --output-path target/llvm-cov.json
 	cargo llvm-cov report --lcov --output-path target/lcov.info
 	cargo llvm-cov report
@@ -386,6 +398,7 @@ coverage: node_modules postgres-image
 		--gated margaret_oidc_provider_tests=100 \
 		--gated margaret_oidc_sign_in=100 \
 		--gated margaret_oidc_sign_in_tests=100 \
+		--gated margaret_openid_conformance_tests=100 \
 		--gated margaret_peer_identity=100 \
 		--gated margaret_peer_identity_tests=100 \
 		--gated margaret_provider_state_postgres=100 \
@@ -444,6 +457,12 @@ coverage: node_modules postgres-image
 fmt:
 	cargo fmt
 
+.PHONY: openid-conformance-images
+openid-conformance-images:
+	docker pull $(CONFORMANCE_SUITE_MONGODB_IMAGE)
+	docker pull $(CONFORMANCE_SUITE_NGINX_IMAGE)
+	docker pull $(CONFORMANCE_SUITE_SERVER_IMAGE)
+
 .PHONY: postgres-image
 postgres-image:
 	docker pull $(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG)
@@ -451,9 +470,13 @@ postgres-image:
 .PHONY: test
 test: test.integration
 
+.PHONY: test.conformance
+test.conformance: openid-conformance-images
+	cargo nextest run -p margaret_openid_conformance_tests $(OPENID_CONFORMANCE_FEATURES)
+
 .PHONY: test.integration
-test.integration: postgres-image
-	cargo nextest run --workspace $(POSTGRES_FEATURES) $(SPIRE_FEATURES)
+test.integration: openid-conformance-images postgres-image
+	cargo nextest run --workspace $(POSTGRES_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES)
 
 .PHONY: test.unit
 test.unit:

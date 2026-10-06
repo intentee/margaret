@@ -10,10 +10,12 @@ use margaret_accepted_clients::authorization_code_grant::AuthorizationCodeGrant;
 use margaret_accepted_clients::client_credentials_grant::ClientCredentialsGrant;
 use margaret_accepted_clients::confidential_privileges::ConfidentialPrivileges;
 use margaret_http::response::Response;
+use margaret_identity_session::id_token_members::ID_TOKEN_MEMBERS;
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jwks_roller_server::jwks_curve::JWKS_CURVE;
 use margaret_oauth_vocabulary::code_challenge_method::CodeChallengeMethod;
 use margaret_oauth_vocabulary::grant_type::GrantType;
+use margaret_oauth_vocabulary::prompt_value::PromptValue;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oidc_discovery::provider_metadata_document::ProviderMetadataDocument;
 use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
@@ -79,6 +81,7 @@ impl ProviderMetadataHandler {
         serde_json::to_vec(&ProviderMetadataDocument {
             authorization_endpoint: Some(endpoints.authorization.to_string()),
             authorization_response_iss_parameter_supported: true,
+            claims_supported: Some(wire_values(ID_TOKEN_MEMBERS)),
             code_challenge_methods_supported: Some(wire_values([
                 CodeChallengeMethod::S256.wire_name()
             ])),
@@ -95,6 +98,9 @@ impl ProviderMetadataHandler {
             ])),
             issuer: issuance.token_issuance().issuer.as_str().to_string(),
             jwks_uri: endpoints.jwks.to_string(),
+            prompt_values_supported: Some(wire_values(
+                PromptValue::SUPPORTED.map(PromptValue::wire_name),
+            )),
             response_modes_supported: Some(wire_values(["query"])),
             response_types_supported: Some(wire_values(["code"])),
             revocation_endpoint: Some(endpoints.revocation.to_string()),

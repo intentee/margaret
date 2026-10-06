@@ -7,6 +7,7 @@ pub mod cookie_name_access_token;
 pub mod cookie_name_refresh_token;
 pub mod id_token_claims;
 pub mod id_token_lifetime_secs;
+pub mod id_token_members;
 pub mod identity_session_error;
 pub mod refresh_token_claims;
 pub mod refresh_token_claims_signed;

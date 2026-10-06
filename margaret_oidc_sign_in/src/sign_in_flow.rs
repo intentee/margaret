@@ -21,7 +21,9 @@ use margaret_http::request::Request;
 use margaret_identity_session::sign_in_transaction_claims::SignInTransactionClaims;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwt_verification::attribute_serialized_jwt::attribute_serialized_jwt;
+use margaret_jwt_verification::expected_audience::ExpectedAudience;
 use margaret_jwt_verification::id_token_profile::IdTokenProfile;
+use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
@@ -254,21 +256,22 @@ impl SignInFlow {
         VerifiedJwt<IdTokenClaims<TIdClaims>, IdTokenProfile>,
     > {
         let trusted_issuer = &self.server.trusted_issuer;
-        let attributed =
-            match attribute_serialized_jwt(id_token, &trusted_issuer.trust.token_trust().issuer) {
-                ControlFlow::Continue(attributed) => attributed,
-                ControlFlow::Break(rejection) => {
-                    return ControlFlow::Break(rejected_id_token(rejection));
-                }
-            };
-        match trusted_issuer
-            .verify(
-                &attributed,
-                self.server.declaration.oauth_client().client_id.audience(),
-                now,
-            )
-            .await
-        {
+        let attributed = match attribute_serialized_jwt(
+            id_token,
+            &JwtExpectation {
+                audience: ExpectedAudience::One(
+                    self.server.declaration.oauth_client().client_id.audience(),
+                ),
+                issuer: &trusted_issuer.trust.token_trust().issuer,
+            },
+        ) {
+            ControlFlow::Continue(attributed) => attributed,
+            ControlFlow::Break(rejection) => {
+                return ControlFlow::Break(rejected_id_token(rejection));
+            }
+        };
+
+        match trusted_issuer.verify(&attributed, now).await {
             IssuerVerification::KeysAwaited => {
                 ControlFlow::Break(SignInCompletion::SigningKeysAwaited)
             }

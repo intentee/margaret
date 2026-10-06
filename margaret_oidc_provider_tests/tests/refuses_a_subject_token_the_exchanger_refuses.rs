@@ -16,7 +16,7 @@ async fn refuses_a_subject_token_the_exchanger_refuses() {
         .await;
 
     assert_eq!(answer.status, 400);
-    assert_eq!(answer.body["error"], "invalid_grant");
+    assert_eq!(answer.body["error"], "invalid_request");
     assert_eq!(
         answer.body["error_description"],
         "the exchanger refused the subject token"

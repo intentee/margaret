@@ -33,11 +33,7 @@ impl<TExchanger: ExchangesSubjectTokens> ExchangesPresentedTokens for TypedExcha
         }
 
         match trusted_issuer
-            .verify::<TExchanger::Claims, TExchanger::Profile>(
-                jwt,
-                &trusted_issuer.trust.token_trust().audience,
-                now,
-            )
+            .verify::<TExchanger::Claims, TExchanger::Profile>(jwt, now)
             .await
         {
             IssuerVerification::KeysAwaited => ExchangedSubject::SigningKeysAwaited,

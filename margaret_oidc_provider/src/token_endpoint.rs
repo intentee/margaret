@@ -40,6 +40,7 @@ use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_subject_token_exchange::exchanged_subject::ExchangedSubject;
 use margaret_subject_token_exchange::subject_token_exchangers::SubjectTokenExchangers;
+use margaret_subject_token_exchange::subject_token_refusal::SubjectTokenRefusal;
 use margaret_token_digest::random_token::random_token;
 use margaret_token_digest::token_digest::TokenDigest;
 use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
@@ -57,8 +58,31 @@ use crate::target_resource::target_resource;
 use crate::token_issue::TokenIssue;
 use crate::token_request::TokenRequest;
 
-fn invalid_grant(description: &str) -> Response {
+fn invalid_grant(description: &'static str) -> Response {
     oauth_error(400, BasicErrorResponseType::InvalidGrant, description)
+}
+
+fn refused_subject_token(refusal: &SubjectTokenRefusal) -> Response {
+    oauth_error(
+        400,
+        BasicErrorResponseType::InvalidRequest,
+        match refusal {
+            SubjectTokenRefusal::Ambiguous { .. } => {
+                "the subject token is addressed to more than one exchanger"
+            }
+            SubjectTokenRefusal::ExchangeRefused => "the exchanger refused the subject token",
+            SubjectTokenRefusal::Misaddressed { .. } => {
+                "the subject token is addressed to no exchanger"
+            }
+            SubjectTokenRefusal::Rejected(_) => "the subject token fails verification",
+            SubjectTokenRefusal::TokenTypeMismatch => {
+                "the subject token type does not match the profile of its exchanger"
+            }
+            SubjectTokenRefusal::UntrustedIssuer { .. } => {
+                "the subject token issuer is trusted by no exchanger"
+            }
+        },
+    )
 }
 
 fn replayed_code() -> Response {
@@ -240,6 +264,11 @@ impl TokenEndpoint {
                     now,
                 )
                 .await),
+            TokenRequest::GrantTypeOmitted => Ok(oauth_error(
+                400,
+                BasicErrorResponseType::InvalidRequest,
+                "the token request names no grant type",
+            )),
             TokenRequest::Unsupported => Ok(oauth_error(
                 400,
                 BasicErrorResponseType::UnsupportedGrantType,
@@ -578,7 +607,7 @@ impl TokenEndpoint {
                         .response(),
                 }
             }
-            ExchangedSubject::Refused(refusal) => invalid_grant(&refusal.to_string()),
+            ExchangedSubject::Refused(refusal) => refused_subject_token(&refusal),
             ExchangedSubject::SigningKeysAwaited => oauth_error(
                 503,
                 BasicErrorResponseType::Extension("temporarily_unavailable".to_string()),

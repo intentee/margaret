@@ -8,7 +8,7 @@ use margaret_registered_claims::audience::Audience;
 
 use crate::oauth_error::oauth_error;
 
-fn invalid_target(description: &str) -> ControlFlow<Response, Audience> {
+fn invalid_target(description: &'static str) -> ControlFlow<Response, Audience> {
     ControlFlow::Break(oauth_error(
         400,
         BasicErrorResponseType::Extension("invalid_target".to_string()),

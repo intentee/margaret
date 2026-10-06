@@ -58,8 +58,8 @@ mod tests {
     #[test]
     fn describes_a_jws_rejection_as_the_jws_rejection() {
         assert_eq!(
-            JwtRejection::Jws(JwsRejection::MissingKeyId).to_string(),
-            JwsRejection::MissingKeyId.to_string()
+            JwtRejection::Jws(JwsRejection::MissingKeyId { candidates: 2 }).to_string(),
+            JwsRejection::MissingKeyId { candidates: 2 }.to_string()
         );
     }
 }

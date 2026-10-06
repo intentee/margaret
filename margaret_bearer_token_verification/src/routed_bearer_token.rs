@@ -15,7 +15,7 @@ use crate::attributed_bearer_token::AttributedBearerToken;
 
 pub enum RoutedBearerToken<'request, 'trusted> {
     Absent,
-    Attributed(AttributedBearerToken<'request, 'trusted>),
+    Attributed(Box<AttributedBearerToken<'request, 'trusted>>),
 }
 
 impl RoutedBearerToken<'_, '_> {
@@ -23,27 +23,20 @@ impl RoutedBearerToken<'_, '_> {
         &self,
         trusted_issuer: &TrustedIssuer,
     ) -> TokenAdmission<VerifiedJwt<TClaims, TProfile>> {
-        let Self::Attributed(AttributedBearerToken {
+        let Self::Attributed(attributed) = self else {
+            return TokenAdmission::Unaddressed;
+        };
+        let AttributedBearerToken {
             jwt,
             presented_at,
             trusted_issuer: addressee,
-        }) = self
-        else {
-            return TokenAdmission::Unaddressed;
-        };
+        } = attributed.as_ref();
 
         if !ptr::eq(*addressee, trusted_issuer) {
             return TokenAdmission::Unaddressed;
         }
 
-        match trusted_issuer
-            .verify(
-                jwt,
-                &trusted_issuer.trust.token_trust().audience,
-                *presented_at,
-            )
-            .await
-        {
+        match trusted_issuer.verify(jwt, *presented_at).await {
             IssuerVerification::KeysAwaited => {
                 TokenAdmission::Refused(ResponseContinuation::from(Response::text(
                     503,

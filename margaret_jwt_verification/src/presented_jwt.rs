@@ -1,31 +1,33 @@
+use std::ops::ControlFlow;
+
 use serde::Deserialize;
+use serde_json::Map;
 use serde_json::Value;
 
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
+use margaret_registered_claims::registered_claims::RegisteredClaims;
 
 use crate::attributed_jwt::AttributedJwt;
 use crate::claims_rejection::ClaimsRejection;
 use crate::jwt_addressee::JwtAddressee;
-use crate::jwt_attribution::JwtAttribution;
+use crate::jwt_expectation::JwtExpectation;
 use crate::jwt_presentation::JwtPresentation;
 use crate::jwt_rejection::JwtRejection;
 use crate::jwt_routing::JwtRouting;
 
 #[derive(Deserialize)]
-struct IssuerMember {
-    iss: String,
-}
-
-fn malformed<'token>(source: serde_json::Error) -> JwtPresentation<'token> {
-    JwtPresentation::Rejected(JwtRejection::Claims(ClaimsRejection::Malformed { source }))
+struct PresentedClaims {
+    #[serde(flatten)]
+    registered: RegisteredClaims,
+    #[serde(flatten)]
+    application: Map<String, Value>,
 }
 
 pub struct PresentedJwt<'token> {
-    issuer: String,
+    application: Value,
     jws: CompactJws<'token>,
-    payload: Value,
+    registered: RegisteredClaims,
 }
 
 impl<'token> PresentedJwt<'token> {
@@ -37,36 +39,40 @@ impl<'token> PresentedJwt<'token> {
                 return JwtPresentation::Rejected(JwtRejection::Jws(rejection));
             }
         };
-        let payload: Value = match serde_json::from_slice(jws.payload()) {
-            Ok(payload) => payload,
-            Err(source) => return malformed(source),
-        };
 
-        match IssuerMember::deserialize(&payload) {
-            Ok(IssuerMember { iss }) => JwtPresentation::Presented(Self {
-                issuer: iss,
+        match serde_json::from_slice::<PresentedClaims>(jws.payload()) {
+            Ok(PresentedClaims {
+                registered,
+                application,
+            }) => JwtPresentation::Presented(Self {
+                application: Value::Object(application),
                 jws,
-                payload,
+                registered,
             }),
-            Err(source) => malformed(source),
+            Err(source) => {
+                JwtPresentation::Rejected(JwtRejection::Claims(ClaimsRejection::Malformed {
+                    source,
+                }))
+            }
         }
     }
 
-    #[must_use]
-    pub fn attribute_to(self, issuer: &IssuerIdentifier) -> JwtAttribution<'token> {
-        if self.issuer == issuer.as_str() {
-            JwtAttribution::Attributed(AttributedJwt {
-                jws: self.jws,
-                payload: self.payload,
-            })
-        } else {
-            JwtAttribution::Unattributed(self)
+    pub fn attribute_to(
+        self,
+        JwtExpectation { audience, issuer }: &JwtExpectation,
+    ) -> ControlFlow<JwtRejection, AttributedJwt<'token>> {
+        if self.registered.iss != issuer.as_str() {
+            return ControlFlow::Break(JwtRejection::Claims(ClaimsRejection::IssuerMismatch {
+                expected: (*issuer).clone(),
+                found: self.registered.iss,
+            }));
         }
-    }
 
-    #[must_use]
-    pub fn issuer(&self) -> &str {
-        &self.issuer
+        if let ControlFlow::Break(rejection) = audience.check(&self.registered.aud) {
+            return ControlFlow::Break(JwtRejection::Claims(rejection));
+        }
+
+        ControlFlow::Continue(self.attributed())
     }
 
     #[must_use]
@@ -74,15 +80,37 @@ impl<'token> PresentedJwt<'token> {
         self,
         addressees: impl IntoIterator<Item = &'addressees TAddressee>,
     ) -> JwtRouting<'token, 'addressees, TAddressee> {
-        let mut presented = self;
+        let mut issuer_trusted = false;
+        let mut admitting = Vec::new();
 
         for addressee in addressees {
-            match presented.attribute_to(addressee.jwt_issuer()) {
-                JwtAttribution::Attributed(jwt) => return JwtRouting::Routed { addressee, jwt },
-                JwtAttribution::Unattributed(unattributed) => presented = unattributed,
+            let JwtExpectation { audience, issuer } = addressee.jwt_expectation();
+
+            if self.registered.iss == issuer.as_str() {
+                issuer_trusted = true;
+
+                if audience.admits(&self.registered.aud) {
+                    admitting.push(addressee);
+                }
             }
         }
 
-        JwtRouting::Unrouted(presented)
+        match admitting.as_slice() {
+            [addressee] => JwtRouting::Routed {
+                addressee: *addressee,
+                jwt: self.attributed(),
+            },
+            [] if issuer_trusted => JwtRouting::Misaddressed(self.registered),
+            [] => JwtRouting::UntrustedIssuer(self.registered),
+            [_, _, ..] => JwtRouting::Ambiguous(self.registered),
+        }
+    }
+
+    fn attributed(self) -> AttributedJwt<'token> {
+        AttributedJwt {
+            application: self.application,
+            jws: self.jws,
+            registered: self.registered,
+        }
     }
 }

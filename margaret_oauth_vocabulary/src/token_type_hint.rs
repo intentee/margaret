@@ -1,10 +1,13 @@
-use serde::Deserialize;
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TokenTypeHint {
     AccessToken,
-    RefreshToken,
-    #[serde(other)]
-    Unrecognized,
+}
+
+impl TokenTypeHint {
+    #[must_use]
+    pub fn wire_name(self) -> &'static str {
+        match self {
+            Self::AccessToken => "access_token",
+        }
+    }
 }

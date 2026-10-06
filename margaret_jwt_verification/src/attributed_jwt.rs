@@ -4,14 +4,16 @@ use std::ops::ControlFlow;
 use serde_json::Value;
 
 use margaret_jws_verification::compact_jws::CompactJws;
+use margaret_registered_claims::registered_claims::RegisteredClaims;
 
 use crate::jwt_profile::JwtProfile;
 use crate::jwt_profiling::JwtProfiling;
 use crate::profiled_jwt::ProfiledJwt;
 
 pub struct AttributedJwt<'token> {
+    pub(crate) application: Value,
     pub(crate) jws: CompactJws<'token>,
-    pub(crate) payload: Value,
+    pub(crate) registered: RegisteredClaims,
 }
 
 impl AttributedJwt<'_> {

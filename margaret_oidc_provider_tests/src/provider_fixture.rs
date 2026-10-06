@@ -1,5 +1,9 @@
+use std::net::IpAddr;
+use std::net::Ipv4Addr;
 use std::sync::Arc;
 
+use http::header::AUTHORIZATION;
+use http::header::CONTENT_TYPE;
 use reqwest::Client;
 use serde_json::Value;
 
@@ -20,8 +24,10 @@ use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
 use margaret_oidc_provider::provider_endpoints::ProviderEndpoints;
 use margaret_provider_state_storage::memory_provider_state::MemoryProviderState;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
+use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 use margaret_token_signer_tests::token_issuance_declaration::TokenIssuanceDeclaration;
 
 use crate::answer::Answer;
@@ -36,8 +42,26 @@ use crate::signed_in_end_user::signed_in_end_user;
 use crate::spa_client::spa_client;
 use crate::validated_form::validated_form;
 
+const FORM_CONTENT_TYPE: &str = "application/x-www-form-urlencoded";
+
 fn fixture_clients() -> Vec<AcceptedClient> {
     vec![portal_client(), service_client(), spa_client()]
+}
+
+struct ProviderPublication {
+    ip: IpAddr,
+    issuance: TokenIssuance,
+    tls: TlsFixture,
+}
+
+impl ProviderPublication {
+    fn on_localhost() -> Self {
+        Self {
+            ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            issuance: provider_issuance(),
+            tls: TlsFixture::generate(),
+        }
+    }
 }
 
 pub struct ProviderFixture {
@@ -53,10 +77,10 @@ impl ProviderFixture {
         clients: Vec<AcceptedClient>,
         exchangers: Vec<Arc<SubjectTokenExchanger>>,
         state: Arc<dyn StoresProviderState>,
+        ProviderPublication { ip, issuance, tls }: ProviderPublication,
     ) -> Self {
-        let issuance: Arc<dyn DeclaresTokenIssuance> = Arc::new(TokenIssuanceDeclaration {
-            issuance: provider_issuance(),
-        });
+        let issuance: Arc<dyn DeclaresTokenIssuance> =
+            Arc::new(TokenIssuanceDeclaration { issuance });
         let roller = fixture_roller();
         let secret_store = Arc::new(JwksSecretStore::create(
             Arc::clone(&roller),
@@ -87,9 +111,9 @@ impl ProviderFixture {
             secret_store,
             state,
         };
-        let tls = TlsFixture::generate();
         let server =
-            RunningFixtureServer::start(tls.server_config.clone(), parts.routes(exchangers)).await;
+            RunningFixtureServer::start_at(ip, tls.server_config.clone(), parts.routes(exchangers))
+                .await;
         let client = fixture_client_builder(&tls.certificate_authority)
             .resolve(&tls.server_name, server.address())
             .build()
@@ -113,7 +137,36 @@ impl ProviderFixture {
     ///
     /// Panics when the fixture clients, endpoints or tls client cannot be prepared.
     pub async fn over_state(state: Arc<dyn StoresProviderState>) -> Self {
-        Self::assembled(fixture_clients(), Vec::new(), state).await
+        Self::assembled(
+            fixture_clients(),
+            Vec::new(),
+            state,
+            ProviderPublication::on_localhost(),
+        )
+        .await
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the issuer names no host, or the fixture clients, endpoints or tls client
+    /// cannot be prepared.
+    pub async fn published(issuer: IssuerIdentifier, ip: IpAddr) -> Self {
+        let tls = TlsFixture::serving(issuer.url().host_str().expect("the issuer names a host"));
+
+        Self::assembled(
+            fixture_clients(),
+            Vec::new(),
+            Arc::new(MemoryProviderState::create()),
+            ProviderPublication {
+                ip,
+                issuance: TokenIssuance {
+                    issuer,
+                    ..provider_issuance()
+                },
+                tls,
+            },
+        )
+        .await
     }
 
     /// # Panics
@@ -123,7 +176,13 @@ impl ProviderFixture {
         clients: Vec<AcceptedClient>,
         exchangers: Vec<Arc<SubjectTokenExchanger>>,
     ) -> Self {
-        Self::assembled(clients, exchangers, Arc::new(MemoryProviderState::create())).await
+        Self::assembled(
+            clients,
+            exchangers,
+            Arc::new(MemoryProviderState::create()),
+            ProviderPublication::on_localhost(),
+        )
+        .await
     }
 
     /// # Panics
@@ -185,6 +244,23 @@ impl ProviderFixture {
             credentials
                 .presented_on(self.client.post(provider_url(path)))
                 .form(form)
+                .send()
+                .await
+                .expect("the provider answers"),
+        )
+        .await
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the provider does not answer.
+    pub async fn post_encoded_form(&self, path: &str, authorization: &str, form: &str) -> Answer {
+        Answer::of(
+            self.client
+                .post(provider_url(path))
+                .header(AUTHORIZATION, authorization)
+                .header(CONTENT_TYPE, FORM_CONTENT_TYPE)
+                .body(form.to_string())
                 .send()
                 .await
                 .expect("the provider answers"),

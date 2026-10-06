@@ -10,7 +10,7 @@ async fn refuses_client_credentials_for_a_resource_outside_the_client() {
         .post_form(
             "/token",
             &SERVICE_CREDENTIALS,
-            &json!({"grant_type": "client_credentials", "resource": ""}),
+            &json!({"grant_type": "client_credentials", "resource": "https://elsewhere.localhost"}),
         )
         .await;
 

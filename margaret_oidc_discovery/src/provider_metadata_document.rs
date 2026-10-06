@@ -8,6 +8,8 @@ pub struct ProviderMetadataDocument {
     #[serde(default)]
     pub authorization_response_iss_parameter_supported: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claims_supported: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_challenge_methods_supported: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grant_types_supported: Option<Vec<String>>,
@@ -19,6 +21,8 @@ pub struct ProviderMetadataDocument {
     pub introspection_endpoint_auth_methods_supported: Option<Vec<String>>,
     pub issuer: String,
     pub jwks_uri: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt_values_supported: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response_modes_supported: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -8,6 +8,7 @@ use margaret_jwt_verification::jwt_routing::JwtRouting;
 use margaret_jwt_verification::presented_jwt::PresentedJwt;
 use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_registered_claims::numeric_date::NumericDate;
+use margaret_registered_claims::registered_claims::RegisteredClaims;
 
 use crate::exchanged_subject::ExchangedSubject;
 use crate::subject_token_exchanger::SubjectTokenExchanger;
@@ -51,10 +52,20 @@ impl SubjectTokenExchangers {
                     )
                     .await
             }
-            JwtRouting::Unrouted(unrouted) => {
-                ExchangedSubject::Refused(SubjectTokenRefusal::UntrustedIssuer {
-                    issuer: unrouted.issuer().to_string(),
+            JwtRouting::Ambiguous(RegisteredClaims { aud, iss, .. }) => {
+                ExchangedSubject::Refused(SubjectTokenRefusal::Ambiguous {
+                    audience: aud,
+                    issuer: iss,
                 })
+            }
+            JwtRouting::Misaddressed(RegisteredClaims { aud, iss, .. }) => {
+                ExchangedSubject::Refused(SubjectTokenRefusal::Misaddressed {
+                    audience: aud,
+                    issuer: iss,
+                })
+            }
+            JwtRouting::UntrustedIssuer(RegisteredClaims { iss, .. }) => {
+                ExchangedSubject::Refused(SubjectTokenRefusal::UntrustedIssuer { issuer: iss })
             }
         }
     }

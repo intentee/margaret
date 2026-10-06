@@ -8,6 +8,7 @@ use margaret_jws_verification::header_type::HeaderType;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::type_rejection::TypeRejection;
+use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_signer_tests::unix_time::unix_time;
 
@@ -19,7 +20,7 @@ fn rejects_a_refresh_token_presented_as_a_resource_access_token() {
     assert!(matches!(
         store.verify_resource_access_token(
             &refresh_token.signed_claims,
-            &BTreeSet::new(),
+            &BTreeSet::from([fixture_issuance().audience]),
             unix_time(1_000)
         ),
         JwtVerification::Rejected(JwtRejection::Type(TypeRejection::Mismatch {

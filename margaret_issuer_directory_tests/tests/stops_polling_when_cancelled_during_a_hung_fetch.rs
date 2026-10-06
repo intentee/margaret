@@ -6,6 +6,7 @@ use margaret_http_tests::hanging_handler::HangingHandler;
 use margaret_issuer_directory_tests::fixture_issuer_routes::FixtureIssuerRoutes;
 use margaret_issuer_directory_tests::json_handler::json_handler;
 use margaret_issuer_directory_tests::localhost_jwks_endpoint::localhost_jwks_endpoint;
+use margaret_issuer_directory_tests::localhost_trust::localhost_trust;
 use margaret_issuer_directory_tests::polled_directory::PolledDirectory;
 use margaret_issuer_directory_tests::running_fixture_issuer::RunningFixtureIssuer;
 use margaret_issuer_key_set::key_set_refresh::KeySetRefresh;
@@ -18,7 +19,7 @@ async fn stops_polling_when_cancelled_during_a_hung_fetch() {
         key_set: hanging.clone(),
     })
     .await;
-    let trusted_issuer = localhost_jwks_endpoint();
+    let trusted_issuer = localhost_jwks_endpoint(localhost_trust());
     let snapshot = trusted_issuer.key_set.snapshot();
     let directory =
         PolledDirectory::start(vec![Arc::clone(&trusted_issuer)], issuer.request_client());

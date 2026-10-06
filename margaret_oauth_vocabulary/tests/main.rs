@@ -1,5 +1,6 @@
 mod accepts_a_scope_token;
 mod accepts_a_visible_client_id;
+mod encodes_the_rfc_6749_example_client_credentials;
 mod keeps_the_client_secret_out_of_its_debug_output;
 mod names_every_subject_token_type;
 mod parses_a_scope_list_delimited_by_spaces;
@@ -17,6 +18,7 @@ mod rejects_a_scope_outside_the_scope_token_grammar;
 mod rejects_an_empty_client_id;
 mod rejects_an_empty_client_secret;
 mod rejects_an_empty_scope;
+mod rejects_an_unsupported_prompt_value;
 mod rejects_openid_as_a_resource_scope;
 mod renders_a_scope_list_delimited_by_spaces;
 mod serializes_a_scope_list_as_one_string;

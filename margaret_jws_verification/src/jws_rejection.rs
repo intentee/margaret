@@ -21,7 +21,9 @@ pub enum JwsRejection {
     HeaderMalformed {
         source: serde_json::Error,
     },
-    MissingKeyId,
+    MissingKeyId {
+        candidates: usize,
+    },
     NotCompactJws,
     PayloadBase64 {
         source: base64ct::Error,
@@ -63,7 +65,10 @@ impl Display for JwsRejection {
             Self::HeaderMalformed { source } => {
                 write!(formatter, "the token header is not a jws header: {source}")
             }
-            Self::MissingKeyId => write!(formatter, "the token header names no key id"),
+            Self::MissingKeyId { candidates } => write!(
+                formatter,
+                "the token header names no key id, and {candidates} keys of the set verify its algorithm instead of exactly one"
+            ),
             Self::NotCompactJws => {
                 write!(
                     formatter,
@@ -125,7 +130,7 @@ mod tests {
             JwsRejection::HeaderMalformed {
                 source: serde_json::from_str::<u8>("x").expect_err("the fixture is not json"),
             },
-            JwsRejection::MissingKeyId,
+            JwsRejection::MissingKeyId { candidates: 2 },
             JwsRejection::NotCompactJws,
             JwsRejection::PayloadBase64 {
                 source: base64_error(),
@@ -157,7 +162,10 @@ mod tests {
         assert!(described[1].contains("header extensions"));
         assert!(described[2].contains("header segment is not valid base64url"));
         assert!(described[3].contains("header is not a jws header"));
-        assert_eq!(described[4], "the token header names no key id");
+        assert_eq!(
+            described[4],
+            "the token header names no key id, and 2 keys of the set verify its algorithm instead of exactly one"
+        );
         assert_eq!(
             described[5],
             "the token is not a compact jws of three segments"

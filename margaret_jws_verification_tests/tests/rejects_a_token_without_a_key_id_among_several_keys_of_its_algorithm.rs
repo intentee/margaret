@@ -10,21 +10,22 @@ use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jws_verification_tests::fixture_key::FixtureKey;
 
 #[test]
-fn rejects_a_token_without_a_key_id() {
-    let key = FixtureKey::generate(Curve::P256, "kid");
+fn rejects_a_token_without_a_key_id_among_several_keys_of_its_algorithm() {
+    let signer = FixtureKey::generate(Curve::P256, "signer");
+    let other = FixtureKey::generate(Curve::P256, "other");
     let KeySetAssembly::Assembled(key_set) =
-        VerificationKeySet::assemble(vec![key.verification_key()])
+        VerificationKeySet::assemble(vec![signer.verification_key(), other.verification_key()])
     else {
         panic!("the fixture key set is accepted");
     };
 
-    let token = key.token(&json!({ "alg": "ES256" }), &json!({}));
+    let token = signer.token(&json!({ "alg": "ES256" }), &json!({}));
     let CompactJwsParsing::Parsed(jws) = CompactJws::parse(&token) else {
         panic!("the token parses");
     };
 
     assert!(matches!(
         key_set.verify(&jws),
-        JwsVerification::Rejected(JwsRejection::MissingKeyId)
+        JwsVerification::Rejected(JwsRejection::MissingKeyId { candidates: 2 })
     ));
 }

@@ -1,4 +1,5 @@
 pub mod accepted_key_set_document;
+mod admitted_key;
 pub mod certificate_rejection;
 pub mod compact_jws;
 pub mod compact_jws_parsing;

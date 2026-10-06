@@ -8,7 +8,7 @@ use crate::no_store::no_store;
 pub(crate) fn oauth_error(
     status: u16,
     error: BasicErrorResponseType,
-    description: &str,
+    description: &'static str,
 ) -> Response {
     no_store(Response::json(
         status,

@@ -1,0 +1,39 @@
+[package]
+name = "margaret_openid_conformance_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_issuer_request = { workspace = true }
+margaret_oauth_client = { workspace = true }
+margaret_oauth_vocabulary = { workspace = true }
+margaret_oidc_provider_tests = { path = "../margaret_oidc_provider_tests" }
+margaret_oidc_sign_in = { workspace = true }
+margaret_oidc_sign_in_tests = { path = "../margaret_oidc_sign_in_tests" }
+margaret_registered_claims = { workspace = true }
+margaret_token_trust = { workspace = true }
+rcgen = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["process"] }
+url = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+margaret_jws_verification = { workspace = true }
+margaret_jwt_verification = { workspace = true }
+tokio = { workspace = true, features = ["macros", "process", "rt-multi-thread"] }
+
+[features]
+tests_that_use_openid_conformance_suite = []
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

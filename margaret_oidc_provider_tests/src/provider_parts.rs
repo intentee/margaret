@@ -176,6 +176,7 @@ impl ProviderParts {
                 FIXTURE_ENDPOINT_PATHS.revocation,
                 revocation(Arc::new(RevocationEndpoint::create(
                     Arc::clone(&self.clients),
+                    Arc::clone(&self.secret_store),
                     Arc::clone(&self.state),
                 ))),
             ),

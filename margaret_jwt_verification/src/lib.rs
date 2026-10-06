@@ -6,7 +6,6 @@ pub mod claims_rejection;
 pub mod expected_audience;
 pub mod id_token_profile;
 pub mod jwt_addressee;
-pub mod jwt_attribution;
 pub mod jwt_expectation;
 pub mod jwt_presentation;
 pub mod jwt_profile;

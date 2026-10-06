@@ -35,3 +35,44 @@ impl IdTokenClaims {
         Value::Object(payload)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use uuid::Uuid;
+
+    use margaret_registered_claims::audience_claim::AudienceClaim;
+    use margaret_registered_claims::numeric_date::NumericDate;
+    use margaret_registered_claims::registered_claims::RegisteredClaims;
+
+    use super::IdTokenClaims;
+    use crate::id_token_members::ID_TOKEN_MEMBERS;
+
+    #[test]
+    fn issues_exactly_the_members_it_advertises() {
+        let payload = IdTokenClaims {
+            auth_time: NumericDate::new(100),
+            client_id: "portal".parse().expect("the client id is visible ascii"),
+            nonce: Some("nonce".to_string()),
+            subject: Uuid::nil(),
+        }
+        .to_payload(&RegisteredClaims {
+            aud: AudienceClaim::Single("portal".to_string()),
+            exp: NumericDate::new(200),
+            iat: NumericDate::new(100),
+            iss: "https://issuer.localhost".to_string(),
+            nbf: None,
+        });
+
+        assert_eq!(
+            payload
+                .as_object()
+                .expect("an id token payload is an object")
+                .keys()
+                .map(String::as_str)
+                .collect::<BTreeSet<&str>>(),
+            BTreeSet::from(ID_TOKEN_MEMBERS)
+        );
+    }
+}

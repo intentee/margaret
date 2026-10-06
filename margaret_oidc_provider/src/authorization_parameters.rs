@@ -7,8 +7,10 @@ use chrono::TimeDelta;
 
 use margaret_accepted_clients::code_grant_policy::CodeGrantPolicy;
 use margaret_oauth_vocabulary::code_challenge_method::CodeChallengeMethod;
+use margaret_oauth_vocabulary::prompt_value::PromptValue;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oauth_vocabulary::scope_list::ScopeList;
+use margaret_oauth_vocabulary::space_delimited::space_delimited;
 
 use crate::authentication_age::AuthenticationAge;
 use crate::authorization_error::AuthorizationError;
@@ -22,26 +24,18 @@ fn prompt(request: &AuthorizationRequest) -> ControlFlow<AuthorizationError, Pro
     let Some(prompt) = &request.prompt else {
         return ControlFlow::Continue(Prompt::Interactive);
     };
-    let values = prompt.split(' ').collect::<BTreeSet<&str>>();
-    let consent = values.contains("consent");
-    let login = values.contains("login");
+    let Ok(values) = space_delimited::<PromptValue>(prompt) else {
+        return ControlFlow::Break(AuthorizationError::UnsupportedPromptValue);
+    };
 
-    if values.contains("none") {
-        if consent || login {
-            ControlFlow::Break(AuthorizationError::InvalidRequest)
-        } else {
-            ControlFlow::Continue(Prompt::NoInteraction)
+    match values.into_iter().collect::<Vec<PromptValue>>().as_slice() {
+        [PromptValue::Consent] => ControlFlow::Continue(Prompt::Consent),
+        [PromptValue::Consent, PromptValue::Login] => {
+            ControlFlow::Continue(Prompt::LoginAndConsent)
         }
-    } else if login {
-        ControlFlow::Continue(if consent {
-            Prompt::LoginAndConsent
-        } else {
-            Prompt::Login
-        })
-    } else if consent {
-        ControlFlow::Continue(Prompt::Consent)
-    } else {
-        ControlFlow::Continue(Prompt::Interactive)
+        [PromptValue::Login] => ControlFlow::Continue(Prompt::Login),
+        [PromptValue::None] => ControlFlow::Continue(Prompt::NoInteraction),
+        _ => ControlFlow::Break(AuthorizationError::ConflictingPromptValues),
     }
 }
 
@@ -53,20 +47,24 @@ fn authentication_age(
             Ok(seconds) => ControlFlow::Continue(AuthenticationAge::AtMost(TimeDelta::seconds(
                 i64::from(seconds),
             ))),
-            Err(_) => ControlFlow::Break(AuthorizationError::InvalidRequest),
+            Err(_) => ControlFlow::Break(AuthorizationError::MalformedMaxAge),
         },
         None => ControlFlow::Continue(AuthenticationAge::Unbounded),
     }
 }
 
 fn code_challenge(request: &AuthorizationRequest) -> ControlFlow<AuthorizationError, String> {
-    let Some(Ok(CodeChallengeMethod::S256)) = request
+    match request
         .code_challenge_method
         .as_deref()
         .map(str::parse::<CodeChallengeMethod>)
-    else {
-        return ControlFlow::Break(AuthorizationError::InvalidRequest);
-    };
+    {
+        Some(Ok(CodeChallengeMethod::S256)) => {}
+        Some(Err(_)) => {
+            return ControlFlow::Break(AuthorizationError::UnsupportedCodeChallengeMethod);
+        }
+        None => return ControlFlow::Break(AuthorizationError::MissingCodeChallengeMethod),
+    }
 
     match &request.code_challenge {
         Some(challenge)
@@ -75,7 +73,8 @@ fn code_challenge(request: &AuthorizationRequest) -> ControlFlow<AuthorizationEr
         {
             ControlFlow::Continue(challenge.clone())
         }
-        Some(_) | None => ControlFlow::Break(AuthorizationError::InvalidRequest),
+        Some(_) => ControlFlow::Break(AuthorizationError::MalformedCodeChallenge),
+        None => ControlFlow::Break(AuthorizationError::MissingCodeChallenge),
     }
 }
 
@@ -87,7 +86,8 @@ fn granted_scopes(
         Some(Ok(ScopeList { scopes })) if scopes.is_subset(&policy.scopes) => {
             ControlFlow::Continue(scopes)
         }
-        Some(Ok(_) | Err(_)) => ControlFlow::Break(AuthorizationError::InvalidScope),
+        Some(Ok(_)) => ControlFlow::Break(AuthorizationError::ScopeNotGranted),
+        Some(Err(_)) => ControlFlow::Break(AuthorizationError::MalformedScope),
         None => ControlFlow::Continue(BTreeSet::new()),
     }
 }
