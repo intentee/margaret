@@ -8,6 +8,7 @@ use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
+use margaret_subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_trust::token_trust::TokenTrust;
@@ -17,6 +18,12 @@ use crate::ci_exchanger::CiExchanger;
 
 const CI_AUDIENCE: &str = "https://localhost";
 
+fn publish_keys(trusted_issuer: &TrustedIssuer, secret: &JwksSecret) {
+    trusted_issuer
+        .key_set
+        .hold(Arc::new(secret.key_set().clone()));
+}
+
 pub struct CiIssuer {
     pub exchanger: Arc<SubjectTokenExchanger>,
     pub secret: JwksSecret,
@@ -25,7 +32,12 @@ pub struct CiIssuer {
 impl CiIssuer {
     #[must_use]
     pub fn awaiting_keys() -> Self {
-        Self::with_trusted_issuer(CI_AUDIENCE, |_trusted_issuer, _secret| {})
+        Self::with_trusted_issuer(CI_AUDIENCE, CiExchanger, |_trusted_issuer, _secret| {})
+    }
+
+    #[must_use]
+    pub fn exchanging_with<TExchanger: ExchangesSubjectTokens>(exchanger: TExchanger) -> Self {
+        Self::with_trusted_issuer(CI_AUDIENCE, exchanger, publish_keys)
     }
 
     #[must_use]
@@ -35,15 +47,12 @@ impl CiIssuer {
 
     #[must_use]
     pub fn publishing_keys_for(audience: &str) -> Self {
-        Self::with_trusted_issuer(audience, |trusted_issuer, secret| {
-            trusted_issuer
-                .key_set
-                .hold(Arc::new(secret.key_set().clone()));
-        })
+        Self::with_trusted_issuer(audience, CiExchanger, publish_keys)
     }
 
-    fn with_trusted_issuer(
+    fn with_trusted_issuer<TExchanger: ExchangesSubjectTokens>(
         audience: &str,
+        exchanger: TExchanger,
         publish: impl FnOnce(&TrustedIssuer, &JwksSecret),
     ) -> Self {
         let secret = fresh_p256_secret();
@@ -64,7 +73,7 @@ impl CiIssuer {
         Self {
             exchanger: Arc::new(SubjectTokenExchanger::create(
                 Arc::new(trusted_issuer),
-                Arc::new(CiExchanger),
+                Arc::new(exchanger),
             )),
             secret,
         }

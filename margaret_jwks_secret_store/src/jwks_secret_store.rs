@@ -64,15 +64,17 @@ impl JwksSecretStore {
             ..self
                 .issuance
                 .token_issuance()
-                .registered_claims(now, ACCESS_TOKEN_LIFETIME_SECS)
+                .identified_claims(now, ACCESS_TOKEN_LIFETIME_SECS)
         };
 
         AccessTokenClaimsSigned {
             exp: registered.exp.seconds_since_epoch(),
-            signed_claims: self.roller.jwks_secret_holder().get().current().sign_json(
-                &access.to_payload(&registered, Uuid::new_v4()),
-                JwtType::AccessToken,
-            ),
+            signed_claims: self
+                .roller
+                .jwks_secret_holder()
+                .get()
+                .current()
+                .sign_json(&access.to_payload(&registered), JwtType::AccessToken),
         }
     }
 
@@ -113,11 +115,8 @@ impl JwksSecretStore {
         let registered = self
             .issuance
             .token_issuance()
-            .registered_claims(now, REFRESH_TOKEN_LIFETIME_SECS);
-        let claims = RefreshTokenClaims {
-            jti: Uuid::new_v4(),
-            sub: subject,
-        };
+            .identified_claims(now, REFRESH_TOKEN_LIFETIME_SECS);
+        let claims = RefreshTokenClaims { sub: subject };
 
         RefreshTokenClaimsSigned {
             exp: registered.exp.seconds_since_epoch(),

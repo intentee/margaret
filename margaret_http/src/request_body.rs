@@ -10,6 +10,7 @@ use http_body_util::combinators::UnsyncBoxBody;
 use crate::body_limit::BodyLimit;
 use crate::body_reading::BodyReading;
 use crate::body_rejection::BodyRejection;
+use crate::stall_limited_body::StallLimitedBody;
 
 pub struct RequestBody {
     body: UnsyncBoxBody<Bytes, io::Error>,
@@ -23,7 +24,8 @@ impl RequestBody {
         Source::Error: Into<Box<dyn Error + Send + Sync>>,
     {
         Self {
-            body: source.map_err(io::Error::other).boxed_unsync(),
+            body: StallLimitedBody::new(source.map_err(io::Error::other).boxed_unsync())
+                .boxed_unsync(),
         }
     }
 

@@ -617,6 +617,21 @@ impl GetArticle {
         ));
     }
 
+    #[test]
+    fn authenticates_the_user_before_binding_a_route_model() {
+        let source: String = source_for(PROVIDER_THAT_ALSO_BINDS)
+            .split_whitespace()
+            .collect();
+        let authentication = source
+            .find("InfersAuthenticatedUser::infer(")
+            .expect("the user is authenticated");
+        let binding = source
+            .find("require_bound_route_parameter(")
+            .expect("the article is bound");
+
+        assert!(authentication < binding);
+    }
+
     const TWICE_BOUND_MODEL: &str = r#"
 struct User;
 

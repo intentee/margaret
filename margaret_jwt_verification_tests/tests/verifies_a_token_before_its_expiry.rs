@@ -43,6 +43,7 @@ fn verifies_a_token_before_its_expiry() {
             exp: NumericDate::new(1_000),
             iat: NumericDate::new(900),
             iss: trust.issuer.as_str().to_string(),
+            jti: None,
             nbf: None,
         }
     );

@@ -21,7 +21,6 @@ async fn refuses_a_refresh_token_under_the_access_token_profile() {
         .expect("a fresh secret");
     let refresh_token = secret.current().sign_json(
         &RefreshTokenClaims {
-            jti: Uuid::from_u128(1),
             sub: Uuid::from_u128(2),
         }
         .to_payload(&RegisteredClaims {
@@ -29,6 +28,7 @@ async fn refuses_a_refresh_token_under_the_access_token_profile() {
             exp: NumericDate::new(FAR_FUTURE_EXPIRY),
             iat: NumericDate::new(0),
             iss: trust.issuer.as_str().to_string(),
+            jti: Some(Uuid::from_u128(1).to_string()),
             nbf: None,
         }),
         JwtType::Refresh,

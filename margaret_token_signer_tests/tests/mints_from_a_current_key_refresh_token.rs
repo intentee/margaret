@@ -37,13 +37,18 @@ fn mints_from_a_current_key_refresh_token() {
     };
 
     assert_eq!(access.claims.sub, refresh.sub);
+    assert!(access.registered.jti.is_some());
     assert_eq!(
-        access.registered,
+        RegisteredClaims {
+            jti: None,
+            ..access.registered
+        },
         RegisteredClaims {
             aud: AudienceClaim::Single(issuance.audience.as_str().to_string()),
             exp: NumericDate::new(1_000 + i64::from(ACCESS_TOKEN_LIFETIME_SECS)),
             iat: NumericDate::new(1_000),
             iss: issuance.issuer.as_str().to_string(),
+            jti: None,
             nbf: None,
         }
     );

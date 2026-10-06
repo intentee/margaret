@@ -31,6 +31,7 @@ pub mod refusing_middleware;
 pub mod running_fixture_server;
 pub mod see_other_handler;
 pub mod static_handler;
+pub mod streamed_exchange;
 pub mod tls_fixture;
 pub mod truncated_response_server;
 pub mod uploaded_files_reading_handler;

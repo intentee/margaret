@@ -1523,6 +1523,19 @@ impl RespondsToWebSocketMessage for Poster {
     }
 
     #[test]
+    fn verifies_the_peer_before_binding_a_route_model() {
+        let source = generated(PARITY_SESSION);
+        let verification = source
+            .find("require_peer_spiffe_id::require_peer_spiffe_id")
+            .expect("the peer is verified");
+        let binding = source
+            .find("require_bound_route_parameter::require_bound_route_parameter")
+            .expect("the article is bound");
+
+        assert!(verification < binding);
+    }
+
+    #[test]
     fn rejects_a_form_body_request_in_a_session() {
         assert!(
             error(

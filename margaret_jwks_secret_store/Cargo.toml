@@ -22,7 +22,7 @@ margaret_token_signer = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-uuid = { workspace = true, features = ["v4"] }
+uuid = { workspace = true }
 
 [dev-dependencies]
 aws-lc-rs = { workspace = true }

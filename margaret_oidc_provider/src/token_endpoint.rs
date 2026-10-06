@@ -184,8 +184,9 @@ impl TokenEndpoint {
 
     /// # Errors
     ///
-    /// Returns `ProviderError::State` when the provider state cannot be reached, and
-    /// `ProviderError::Signing` when an id token cannot be signed.
+    /// Returns `ProviderError::State` when the provider state cannot be reached,
+    /// `ProviderError::Signing` when an id token cannot be signed, and
+    /// `ProviderError::SubjectTokenExchange` when a subject token exchanger fails.
     pub async fn respond(
         &self,
         request: &Request,
@@ -249,8 +250,8 @@ impl TokenEndpoint {
                 subject_token,
                 subject_token_type,
                 ..
-            } => Ok(self
-                .token_exchange(
+            } => {
+                self.token_exchange(
                     client,
                     TokenExchangeParameters {
                         actor_token,
@@ -263,7 +264,8 @@ impl TokenEndpoint {
                     },
                     now,
                 )
-                .await),
+                .await
+            }
             TokenRequest::GrantTypeOmitted => Ok(oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
@@ -550,17 +552,17 @@ impl TokenEndpoint {
             subject_token_type,
         }: TokenExchangeParameters,
         now: DateTime<Utc>,
-    ) -> Response {
+    ) -> Result<Response, ProviderError> {
         if client.token_exchange == TokenExchangeGrant::Withheld {
-            return unauthorized_client();
+            return Ok(unauthorized_client());
         }
 
         let Ok(token_type) = subject_token_type.parse::<SubjectTokenType>() else {
-            return oauth_error(
+            return Ok(oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
                 "the subject token type is not supported",
-            );
+            ));
         };
 
         if actor_token.is_some()
@@ -571,48 +573,51 @@ impl TokenEndpoint {
             })
             || (audience.is_some() && resource.is_some())
         {
-            return oauth_error(
+            return Ok(oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
                 "the token exchange asks for delegation, another token type or two targets",
-            );
+            ));
         }
 
         let resource = match target_resource(&client.resources, audience.or(resource).as_deref()) {
-            ControlFlow::Break(refusal) => return refusal,
+            ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(resource) => resource,
         };
 
-        match self
-            .exchangers
-            .exchange(&subject_token, token_type, now)
-            .await
-        {
-            ExchangedSubject::Granted { scopes, subject } => {
-                match RequestedScope::resolved(scope.as_deref(), &scopes) {
-                    ControlFlow::Break(refusal) => refusal,
-                    ControlFlow::Continue(scopes) => self
-                        .prepared_tokens(
-                            client,
-                            TokenIssue {
-                                id_token: None,
-                                issued_token_type: Some(SubjectTokenType::AccessToken),
-                                refresh: RefreshTokenIssue::Withheld,
-                                resource,
-                                scopes,
-                                subject: subject.to_string(),
-                            },
-                            now,
-                        )
-                        .response(),
+        Ok(
+            match self
+                .exchangers
+                .exchange(&subject_token, token_type, now)
+                .await
+                .map_err(ProviderError::SubjectTokenExchange)?
+            {
+                ExchangedSubject::Granted { scopes, subject } => {
+                    match RequestedScope::resolved(scope.as_deref(), &scopes) {
+                        ControlFlow::Break(refusal) => refusal,
+                        ControlFlow::Continue(scopes) => self
+                            .prepared_tokens(
+                                client,
+                                TokenIssue {
+                                    id_token: None,
+                                    issued_token_type: Some(SubjectTokenType::AccessToken),
+                                    refresh: RefreshTokenIssue::Withheld,
+                                    resource,
+                                    scopes,
+                                    subject: subject.to_string(),
+                                },
+                                now,
+                            )
+                            .response(),
+                    }
                 }
-            }
-            ExchangedSubject::Refused(refusal) => refused_subject_token(&refusal),
-            ExchangedSubject::SigningKeysAwaited => oauth_error(
-                503,
-                BasicErrorResponseType::Extension("temporarily_unavailable".to_string()),
-                "the signing keys of the subject token issuer are not available yet",
-            ),
-        }
+                ExchangedSubject::Refused(refusal) => refused_subject_token(&refusal),
+                ExchangedSubject::SigningKeysAwaited => oauth_error(
+                    503,
+                    BasicErrorResponseType::Extension("temporarily_unavailable".to_string()),
+                    "the signing keys of the subject token issuer are not available yet",
+                ),
+            },
+        )
     }
 }

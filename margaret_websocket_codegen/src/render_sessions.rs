@@ -13,10 +13,9 @@ use margaret_request_binding_codegen::binding_reads_request::binding_reads_reque
 use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
 use margaret_request_binding_codegen::captured_providers::CapturedProviders;
-use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::head_extraction_context::HeadExtractionContext;
 use margaret_request_binding_codegen::render_authenticated_user_wrapper_construction::render_authenticated_user_wrapper_construction;
-use margaret_request_binding_codegen::render_bound_request_extractions::render_bound_request_extractions;
-use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
+use margaret_request_binding_codegen::render_head_extractions::render_head_extractions;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 
 use crate::handler_binding::HandlerBinding;
@@ -148,42 +147,17 @@ fn create_extractions(
             ),
         )
     };
-    let owner = quote! { self. };
-    let bound = render_bound_request_extractions(
+
+    render_head_extractions(
         &session.parameters,
         captured,
-        &owner,
-        handshake,
-        &quote! { return ::std::result::Result::Err(error.into()) },
-        &quote! {
-            return ::std::result::Result::Ok(
-                margaret::framework::websocket_session::web_socket_session_creation_outcome::WebSocketSessionCreationOutcome::Interrupted(
-                    margaret::framework::http::response_continuation::ResponseContinuation::from(
-                        margaret::framework::http::response::Response::not_found(),
-                    ),
-                ),
-            )
+        &HeadExtractionContext {
+            continuation_return: &continuation_return,
+            error_return: &error_return,
+            owner: &quote! { self. },
+            request_local: handshake,
         },
-    );
-    let extractions = session.parameters.iter().map(|parameter| {
-        let provider_access = captured.access(&parameter.binding, &owner);
-
-        render_request_extraction(
-            &parameter.binding,
-            &parameter.holder,
-            &ExtractionContext {
-                continuation_return: &continuation_return,
-                error_return: &error_return,
-                provider_access: &provider_access,
-                request_local: handshake,
-            },
-        )
-    });
-
-    quote! {
-        #bound
-        #(#extractions)*
-    }
+    )
 }
 
 fn build_arguments(session: &WebSocketSession) -> TokenStream {

@@ -23,11 +23,11 @@ impl ClientAssertionClaims {
             exp: self.expires_at,
             iat: self.issued_at,
             iss: self.client_id.as_str().to_string(),
+            jti: Some(self.jti.to_string()),
             nbf: None,
         }
         .to_json();
 
-        payload.insert("jti".to_string(), Value::String(self.jti.to_string()));
         payload.insert(
             "sub".to_string(),
             Value::String(self.client_id.as_str().to_string()),

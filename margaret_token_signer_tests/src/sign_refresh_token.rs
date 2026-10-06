@@ -6,6 +6,8 @@ use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
+use crate::refresh_token_identifier::REFRESH_TOKEN_IDENTIFIER;
+
 #[must_use]
 pub fn sign_refresh_token(
     pair: &JwkPair,
@@ -19,6 +21,7 @@ pub fn sign_refresh_token(
             exp: NumericDate::new(exp),
             iat: NumericDate::new(0),
             iss: issuer.as_str().to_string(),
+            jti: Some(REFRESH_TOKEN_IDENTIFIER.to_string()),
             nbf: None,
         }),
         JwtType::Refresh,

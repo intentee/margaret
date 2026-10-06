@@ -22,7 +22,8 @@ async fn refuses_a_token_whose_type_header_the_profile_rejects() {
                 SubjectTokenType::AccessToken,
                 Utc::now()
             )
-            .await,
+            .await
+            .expect("the exchangers complete the exchange"),
         ExchangedSubject::Refused(SubjectTokenRefusal::Rejected(JwtRejection::Type(_)))
     ));
 }

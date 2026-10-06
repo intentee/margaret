@@ -24,7 +24,8 @@ async fn exchanges_through_the_exchanger_trusting_the_issuer() {
                 SubjectTokenType::IdToken,
                 Utc::now(),
             )
-            .await,
+            .await
+        .expect("the exchangers complete the exchange"),
         ExchangedSubject::Granted { subject, .. } if subject == EXCHANGED_SUBJECT
     ));
 }

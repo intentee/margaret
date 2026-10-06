@@ -1,6 +1,7 @@
 use chrono::Utc;
 use serde_json::Value;
 use serde_json::json;
+use uuid::Uuid;
 
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
@@ -21,6 +22,7 @@ pub fn signed_by(
             "exp": now + 300,
             "iat": now,
             "iss": issuer,
+            "jti": Uuid::new_v4().to_string(),
             "repository": repository,
             "sub": "repo:intentee/margaret:ref:refs/heads/main",
         }),

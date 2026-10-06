@@ -2,6 +2,7 @@ pub mod exchanged_subject;
 mod exchanges_presented_tokens;
 pub mod exchanges_subject_tokens;
 pub mod subject_token_exchange;
+pub mod subject_token_exchange_error;
 pub mod subject_token_exchanger;
 pub mod subject_token_exchangers;
 pub mod subject_token_profile;

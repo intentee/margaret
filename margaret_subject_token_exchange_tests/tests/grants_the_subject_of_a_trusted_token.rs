@@ -19,6 +19,7 @@ async fn grants_the_subject_of_a_trusted_token() {
             Utc::now(),
         )
         .await
+        .expect("the exchangers complete the exchange")
     else {
         panic!("the exchanger grants the trusted subject");
     };

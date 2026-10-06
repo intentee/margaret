@@ -8,6 +8,7 @@ use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
+use margaret_subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_subject_token_exchange::subject_token_profile::SubjectTokenProfile;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
@@ -45,6 +46,14 @@ impl TrustedRepositoryIssuer {
     }
 
     #[must_use]
+    pub fn exchanging_with<TExchanger: ExchangesSubjectTokens>(
+        &self,
+        exchanger: TExchanger,
+    ) -> Arc<SubjectTokenExchanger> {
+        self.published_exchanger(PROVIDER_AUDIENCE, exchanger)
+    }
+
+    #[must_use]
     pub fn publishing_keys<TProfile: SubjectTokenProfile + Send + Sync + 'static>(
         &self,
     ) -> Arc<SubjectTokenExchanger> {
@@ -56,18 +65,12 @@ impl TrustedRepositoryIssuer {
         &self,
         audience: &str,
     ) -> Arc<SubjectTokenExchanger> {
-        let trusted_issuer = self.trusted_issuer(audience);
-
-        trusted_issuer
-            .key_set
-            .hold(Arc::new(self.secret.key_set().clone()));
-
-        Arc::new(SubjectTokenExchanger::create(
-            Arc::new(trusted_issuer),
-            Arc::new(RepositoryExchanger::<TProfile> {
+        self.published_exchanger(
+            audience,
+            RepositoryExchanger::<TProfile> {
                 profile: PhantomData,
-            }),
-        ))
+            },
+        )
     }
 
     #[must_use]
@@ -78,6 +81,23 @@ impl TrustedRepositoryIssuer {
     #[must_use]
     pub fn token_for(&self, audience: &Value, repository: &str, jwt_type: JwtType) -> String {
         signed_by(&self.secret, self.issuer, audience, repository, jwt_type)
+    }
+
+    fn published_exchanger<TExchanger: ExchangesSubjectTokens>(
+        &self,
+        audience: &str,
+        exchanger: TExchanger,
+    ) -> Arc<SubjectTokenExchanger> {
+        let trusted_issuer = self.trusted_issuer(audience);
+
+        trusted_issuer
+            .key_set
+            .hold(Arc::new(self.secret.key_set().clone()));
+
+        Arc::new(SubjectTokenExchanger::create(
+            Arc::new(trusted_issuer),
+            Arc::new(exchanger),
+        ))
     }
 
     fn trusted_issuer(&self, audience: &str) -> TrustedIssuer {

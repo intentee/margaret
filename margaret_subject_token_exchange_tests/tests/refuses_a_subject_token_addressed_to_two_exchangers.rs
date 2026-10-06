@@ -29,7 +29,8 @@ async fn refuses_a_subject_token_addressed_to_two_exchangers() {
                 SubjectTokenType::IdToken,
                 Utc::now(),
             )
-            .await,
+            .await
+        .expect("the exchangers complete the exchange"),
         ExchangedSubject::Refused(SubjectTokenRefusal::Ambiguous { ref issuer, .. })
             if issuer == "https://ci.localhost"
     ));

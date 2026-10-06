@@ -12,6 +12,7 @@ use margaret_token_signer::minted_tokens::MintedTokens;
 use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_signer_tests::refresh_claims::refresh_claims;
+use margaret_token_signer_tests::refresh_token_identifier::REFRESH_TOKEN_IDENTIFIER;
 use margaret_token_signer_tests::sign_refresh_token::sign_refresh_token;
 use margaret_token_signer_tests::unix_time::unix_time;
 
@@ -54,5 +55,8 @@ fn mints_from_a_previous_key_refresh_token() {
     };
 
     assert_eq!(access.claims.sub, refresh.sub);
-    assert_eq!(migrated.claims.jti, refresh.jti);
+    assert_eq!(
+        migrated.registered.jti,
+        Some(REFRESH_TOKEN_IDENTIFIER.to_string())
+    );
 }

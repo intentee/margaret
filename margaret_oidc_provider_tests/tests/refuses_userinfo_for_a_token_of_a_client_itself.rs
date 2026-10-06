@@ -37,16 +37,14 @@ fn refuses_userinfo_for_a_token_of_a_client_itself() {
                     .expect("the scope is a scope list"),
                 subject: "portal".to_string(),
             }
-            .to_payload(
-                &RegisteredClaims {
-                    aud: AudienceClaim::Single(issuer.clone()),
-                    exp: issued_at.after(Duration::from_mins(1)),
-                    iat: issued_at,
-                    iss: issuer,
-                    nbf: None,
-                },
-                Uuid::new_v4(),
-            ),
+            .to_payload(&RegisteredClaims {
+                aud: AudienceClaim::Single(issuer.clone()),
+                exp: issued_at.after(Duration::from_mins(1)),
+                iat: issued_at,
+                iss: issuer,
+                jti: Some(Uuid::new_v4().to_string()),
+                nbf: None,
+            }),
             JwtType::AccessToken,
         );
     let endpoint = UserinfoEndpoint::create(provider.secret_store, provider.issuance.as_ref());

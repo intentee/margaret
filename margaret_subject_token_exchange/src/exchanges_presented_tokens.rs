@@ -6,6 +6,7 @@ use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 use crate::exchanged_subject::ExchangedSubject;
+use crate::subject_token_exchange_error::SubjectTokenExchangeError;
 
 #[async_trait]
 pub(crate) trait ExchangesPresentedTokens: Send + Sync {
@@ -15,5 +16,5 @@ pub(crate) trait ExchangesPresentedTokens: Send + Sync {
         jwt: &AttributedJwt<'_>,
         token_type: SubjectTokenType,
         now: NumericDate,
-    ) -> ExchangedSubject;
+    ) -> Result<ExchangedSubject, SubjectTokenExchangeError>;
 }

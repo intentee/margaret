@@ -27,7 +27,8 @@ async fn refuses_a_token_its_issuer_did_not_sign() {
     assert!(matches!(
         exchangers
             .exchange(&forged, SubjectTokenType::IdToken, Utc::now())
-            .await,
+            .await
+            .expect("the exchangers complete the exchange"),
         ExchangedSubject::Refused(SubjectTokenRefusal::Rejected(_))
     ));
 }

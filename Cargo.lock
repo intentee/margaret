@@ -2668,7 +2668,6 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
- "tower",
  "url",
 ]
 
@@ -3331,6 +3330,7 @@ name = "margaret_oidc_provider_tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "headers",
  "http",
@@ -3903,6 +3903,7 @@ dependencies = [
 name = "margaret_subject_token_exchange"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "margaret_jwt_verification",
@@ -3911,6 +3912,7 @@ dependencies = [
  "margaret_token_exchange_client",
  "margaret_trusted_issuer",
  "serde",
+ "thiserror 2.0.18",
  "uuid",
 ]
 
@@ -3918,6 +3920,8 @@ dependencies = [
 name = "margaret_subject_token_exchange_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "chrono",
  "margaret_issuer_metadata",
  "margaret_jose_parameters",
@@ -4050,6 +4054,7 @@ dependencies = [
  "chrono",
  "margaret_jwt_verification",
  "margaret_registered_claims",
+ "uuid",
 ]
 
 [[package]]

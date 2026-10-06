@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use async_trait::async_trait;
+
 use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 use margaret::framework::macros::constructor;
@@ -29,21 +31,22 @@ impl GithubActionsExchanger {
     }
 }
 
+#[async_trait]
 impl ExchangesSubjectTokens for GithubActionsExchanger {
     type Claims = GithubActionsClaims;
     type Profile = IdTokenProfile;
 
-    fn exchange(
+    async fn exchange(
         &self,
         token: &VerifiedJwt<GithubActionsClaims, IdTokenProfile>,
-    ) -> SubjectTokenExchange {
-        if self.trusted_workflow.admits(&token.claims) {
+    ) -> anyhow::Result<SubjectTokenExchange> {
+        Ok(if self.trusted_workflow.admits(&token.claims) {
             SubjectTokenExchange::Granted {
                 scopes: BTreeSet::new(),
                 subject: CI_PUBLISHER,
             }
         } else {
             SubjectTokenExchange::Refused
-        }
+        })
     }
 }

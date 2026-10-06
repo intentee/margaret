@@ -62,6 +62,7 @@ mod tests {
             exp: NumericDate::new(200),
             iat: NumericDate::new(100),
             iss: "https://issuer.localhost".to_string(),
+            jti: None,
             nbf: None,
         });
 

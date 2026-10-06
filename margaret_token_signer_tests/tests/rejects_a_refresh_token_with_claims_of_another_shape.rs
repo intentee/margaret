@@ -19,7 +19,8 @@ fn rejects_a_refresh_token_with_claims_of_another_shape() {
             "exp": 10_000,
             "iat": 0,
             "iss": issuance.issuer.as_str(),
-            "sub": "00000000-0000-0000-0000-000000000002",
+            "jti": "00000000-0000-0000-0000-000000000001",
+            "subject": "00000000-0000-0000-0000-000000000002",
         }),
         JwtType::Refresh,
     );

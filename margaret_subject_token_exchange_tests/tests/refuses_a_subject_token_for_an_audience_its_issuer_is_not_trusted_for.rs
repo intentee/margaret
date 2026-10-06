@@ -21,7 +21,8 @@ async fn refuses_a_subject_token_for_an_audience_its_issuer_is_not_trusted_for()
                 SubjectTokenType::IdToken,
                 Utc::now(),
             )
-            .await,
+            .await
+        .expect("the exchangers complete the exchange"),
         ExchangedSubject::Refused(SubjectTokenRefusal::Misaddressed { ref audience, ref issuer })
             if audience.to_string() == "https://elsewhere.localhost" && issuer == "https://ci.localhost"
     ));

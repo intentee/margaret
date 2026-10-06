@@ -19,7 +19,8 @@ async fn awaits_the_signing_keys_of_the_issuer() {
                 SubjectTokenType::IdToken,
                 Utc::now(),
             )
-            .await,
+            .await
+            .expect("the exchangers complete the exchange"),
         ExchangedSubject::SigningKeysAwaited
     ));
 }

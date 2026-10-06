@@ -11,6 +11,7 @@ use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 
 use crate::exchanged_subject::ExchangedSubject;
+use crate::subject_token_exchange_error::SubjectTokenExchangeError;
 use crate::subject_token_exchanger::SubjectTokenExchanger;
 use crate::subject_token_refusal::SubjectTokenRefusal;
 
@@ -24,16 +25,22 @@ impl SubjectTokenExchangers {
         Self { exchangers }
     }
 
+    /// # Errors
+    ///
+    /// Returns `SubjectTokenExchangeError::ExchangerFailed` when the exchanger the token is
+    /// addressed to fails.
     pub async fn exchange(
         &self,
         subject_token: &str,
         token_type: SubjectTokenType,
         now: DateTime<Utc>,
-    ) -> ExchangedSubject {
+    ) -> Result<ExchangedSubject, SubjectTokenExchangeError> {
         let presented = match PresentedJwt::present(subject_token) {
             JwtPresentation::Presented(presented) => presented,
             JwtPresentation::Rejected(rejection) => {
-                return ExchangedSubject::Refused(SubjectTokenRefusal::Rejected(rejection));
+                return Ok(ExchangedSubject::Refused(SubjectTokenRefusal::Rejected(
+                    rejection,
+                )));
             }
         };
 
@@ -53,20 +60,20 @@ impl SubjectTokenExchangers {
                     .await
             }
             JwtRouting::Ambiguous(RegisteredClaims { aud, iss, .. }) => {
-                ExchangedSubject::Refused(SubjectTokenRefusal::Ambiguous {
+                Ok(ExchangedSubject::Refused(SubjectTokenRefusal::Ambiguous {
                     audience: aud,
                     issuer: iss,
-                })
+                }))
             }
-            JwtRouting::Misaddressed(RegisteredClaims { aud, iss, .. }) => {
+            JwtRouting::Misaddressed(RegisteredClaims { aud, iss, .. }) => Ok(
                 ExchangedSubject::Refused(SubjectTokenRefusal::Misaddressed {
                     audience: aud,
                     issuer: iss,
-                })
-            }
-            JwtRouting::UntrustedIssuer(RegisteredClaims { iss, .. }) => {
-                ExchangedSubject::Refused(SubjectTokenRefusal::UntrustedIssuer { issuer: iss })
-            }
+                }),
+            ),
+            JwtRouting::UntrustedIssuer(RegisteredClaims { iss, .. }) => Ok(
+                ExchangedSubject::Refused(SubjectTokenRefusal::UntrustedIssuer { issuer: iss }),
+            ),
         }
     }
 }

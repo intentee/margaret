@@ -20,7 +20,8 @@ async fn refuses_a_token_type_the_profile_of_its_exchanger_does_not_admit() {
                 SubjectTokenType::AccessToken,
                 Utc::now()
             )
-            .await,
+            .await
+            .expect("the exchangers complete the exchange"),
         ExchangedSubject::Refused(SubjectTokenRefusal::TokenTypeMismatch)
     ));
 }

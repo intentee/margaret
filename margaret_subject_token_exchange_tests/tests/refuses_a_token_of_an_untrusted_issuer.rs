@@ -17,7 +17,8 @@ async fn refuses_a_token_of_an_untrusted_issuer() {
     assert!(matches!(
         exchangers
             .exchange(&stranger.token("intentee/margaret", JwtType::Jwt), SubjectTokenType::IdToken, Utc::now())
-            .await,
+            .await
+        .expect("the exchangers complete the exchange"),
         ExchangedSubject::Refused(SubjectTokenRefusal::UntrustedIssuer { ref issuer }) if issuer == "https://stranger.localhost"
     ));
 }

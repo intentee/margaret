@@ -20,13 +20,12 @@ use margaret_request_binding_codegen::captured_provider::CapturedProvider;
 use margaret_request_binding_codegen::captured_provider_kind::CapturedProviderKind;
 use margaret_request_binding_codegen::captured_providers::CapturedProviders;
 use margaret_request_binding_codegen::content_extraction_context::ContentExtractionContext;
-use margaret_request_binding_codegen::extraction_context::ExtractionContext;
+use margaret_request_binding_codegen::head_extraction_context::HeadExtractionContext;
 use margaret_request_binding_codegen::injects_routes::injects_routes;
 use margaret_request_binding_codegen::injects_views::injects_views;
 use margaret_request_binding_codegen::render_authenticated_user_wrapper_construction::render_authenticated_user_wrapper_construction;
-use margaret_request_binding_codegen::render_bound_request_extractions::render_bound_request_extractions;
 use margaret_request_binding_codegen::render_content_extraction::render_content_extraction;
-use margaret_request_binding_codegen::render_request_extraction::render_request_extraction;
+use margaret_request_binding_codegen::render_head_extractions::render_head_extractions;
 use margaret_request_binding_codegen::request_binding::RequestBinding;
 use margaret_route_method::route_method::RouteMethod;
 
@@ -173,24 +172,22 @@ fn responder_body(
         views_local,
     }: &HandlerNames,
 ) -> TokenStream {
-    let bound_bindings = render_bound_request_extractions(
+    let head_extractions = render_head_extractions(
         &route.arguments,
         captured,
-        &TokenStream::new(),
-        request_binding,
-        &quote! { return ::std::result::Result::Err(error.into()) },
-        &quote! {
-            return ::std::result::Result::Ok(
-                margaret::framework::http::response_continuation::ResponseContinuation::from(
-                    margaret::framework::http::response::Response::not_found(),
-                ),
-            )
+        &HeadExtractionContext {
+            continuation_return: &quote! {
+                return ::std::result::Result::Ok(response)
+            },
+            error_return: &quote! {
+                return ::std::result::Result::Err(
+                    margaret::framework::http::handler_error::HandlerError::consumer(error),
+                )
+            },
+            owner: &TokenStream::new(),
+            request_local: request_binding,
         },
     );
-    let bindings_tokens = route
-        .arguments
-        .iter()
-        .map(|argument| argument_binding(argument, request_binding, captured));
     let server = format_ident!("{}", route.server);
     let argument_values = route
         .arguments
@@ -204,8 +201,7 @@ fn responder_body(
     };
     let content_tokens = content_bindings(route, body_binding, content_local, request_binding);
     let body = quote! {
-        #bound_bindings
-        #(#bindings_tokens)*
+        #head_extractions
         #content_tokens
         margaret::framework::http::responded::responded(#respond_call)
     };
@@ -354,31 +350,6 @@ fn capture_binding(
             quote! { let #local = #binder_access; }
         }
     }
-}
-
-fn argument_binding(
-    argument: &BoundParameter,
-    request: &Ident,
-    captured: &CapturedProviders,
-) -> TokenStream {
-    let provider_access = captured.access(&argument.binding, &TokenStream::new());
-
-    render_request_extraction(
-        &argument.binding,
-        &argument.holder,
-        &ExtractionContext {
-            continuation_return: &quote! {
-                return ::std::result::Result::Ok(response)
-            },
-            error_return: &quote! {
-                return ::std::result::Result::Err(
-                    margaret::framework::http::handler_error::HandlerError::consumer(error),
-                )
-            },
-            provider_access: &provider_access,
-            request_local: request,
-        },
-    )
 }
 
 struct RenderedHandler {

@@ -31,6 +31,7 @@ pub enum BodyRejection {
     PayloadTooLarge {
         limit: usize,
     },
+    Stalled,
     UnexpectedFormField {
         name: String,
     },
@@ -53,6 +54,7 @@ impl BodyRejection {
 
         match self {
             Self::PayloadTooLarge { .. } => Response::text(413, "Payload Too Large"),
+            Self::Stalled => Response::text(408, "Request Timeout").header("connection", "close"),
             Self::MissingContentType | Self::UnsupportedMediaType { .. } => {
                 Response::text(415, "Unsupported Media Type")
             }
@@ -106,6 +108,7 @@ impl Display for BodyRejection {
             Self::PayloadTooLarge { limit } => {
                 write!(formatter, "the request body exceeds the {limit} byte limit")
             }
+            Self::Stalled => formatter.write_str("the client stopped sending the request body"),
             Self::UnexpectedFormField { name } => write!(
                 formatter,
                 "the route does not accept the form field '{name}'"
@@ -131,6 +134,7 @@ impl Display for BodyRejection {
 mod tests {
     use std::io;
 
+    use http::header::CONNECTION;
     use mime::Mime;
 
     use super::BodyRejection;
@@ -159,6 +163,7 @@ mod tests {
             BodyRejection::MissingMultipartBoundary,
             BodyRejection::NamelessMultipartField,
             BodyRejection::PayloadTooLarge { limit: 8 },
+            BodyRejection::Stalled,
             BodyRejection::UnexpectedFormField {
                 name: "title".to_string(),
             },
@@ -195,6 +200,14 @@ mod tests {
     }
 
     #[test]
+    fn answers_a_stalled_body_with_request_timeout_and_closes_the_connection() {
+        let response = BodyRejection::Stalled.into_response();
+
+        assert_eq!(response.status(), 408);
+        assert_eq!(response.header_value(&CONNECTION), Some("close"));
+    }
+
+    #[test]
     fn answers_an_undeclared_content_type_with_unsupported_media_type() {
         assert_eq!(status(BodyRejection::MissingContentType), 415);
     }
@@ -216,6 +229,7 @@ mod tests {
                 rejection,
                 BodyRejection::PayloadTooLarge { .. }
                     | BodyRejection::MissingContentType
+                    | BodyRejection::Stalled
                     | BodyRejection::UnsupportedMediaType { .. }
             ) {
                 continue;

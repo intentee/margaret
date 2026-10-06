@@ -20,7 +20,8 @@ async fn refuses_a_token_its_exchanger_refuses() {
                 SubjectTokenType::Jwt,
                 Utc::now()
             )
-            .await,
+            .await
+            .expect("the exchangers complete the exchange"),
         ExchangedSubject::Refused(SubjectTokenRefusal::ExchangeRefused)
     ));
 }

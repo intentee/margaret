@@ -12,6 +12,7 @@ use crate::exchanged_subject::ExchangedSubject;
 use crate::exchanges_presented_tokens::ExchangesPresentedTokens;
 use crate::exchanges_subject_tokens::ExchangesSubjectTokens;
 use crate::subject_token_exchange::SubjectTokenExchange;
+use crate::subject_token_exchange_error::SubjectTokenExchangeError;
 use crate::subject_token_profile::SubjectTokenProfile;
 use crate::subject_token_refusal::SubjectTokenRefusal;
 
@@ -27,27 +28,34 @@ impl<TExchanger: ExchangesSubjectTokens> ExchangesPresentedTokens for TypedExcha
         jwt: &AttributedJwt<'_>,
         token_type: SubjectTokenType,
         now: NumericDate,
-    ) -> ExchangedSubject {
+    ) -> Result<ExchangedSubject, SubjectTokenExchangeError> {
         if !TExchanger::Profile::admits(token_type) {
-            return ExchangedSubject::Refused(SubjectTokenRefusal::TokenTypeMismatch);
+            return Ok(ExchangedSubject::Refused(
+                SubjectTokenRefusal::TokenTypeMismatch,
+            ));
         }
 
-        match trusted_issuer
+        let verified = match trusted_issuer
             .verify::<TExchanger::Claims, TExchanger::Profile>(jwt, now)
             .await
         {
-            IssuerVerification::KeysAwaited => ExchangedSubject::SigningKeysAwaited,
+            IssuerVerification::KeysAwaited => return Ok(ExchangedSubject::SigningKeysAwaited),
             IssuerVerification::Rejected(rejection) => {
-                ExchangedSubject::Refused(SubjectTokenRefusal::Rejected(rejection))
+                return Ok(ExchangedSubject::Refused(SubjectTokenRefusal::Rejected(
+                    rejection,
+                )));
             }
-            IssuerVerification::Verified(verified) => match self.exchanger.exchange(&verified) {
-                SubjectTokenExchange::Granted { scopes, subject } => {
-                    ExchangedSubject::Granted { scopes, subject }
-                }
-                SubjectTokenExchange::Refused => {
-                    ExchangedSubject::Refused(SubjectTokenRefusal::ExchangeRefused)
-                }
-            },
+            IssuerVerification::Verified(verified) => verified,
+        };
+
+        match self.exchanger.exchange(&verified).await {
+            Ok(SubjectTokenExchange::Granted { scopes, subject }) => {
+                Ok(ExchangedSubject::Granted { scopes, subject })
+            }
+            Ok(SubjectTokenExchange::Refused) => Ok(ExchangedSubject::Refused(
+                SubjectTokenRefusal::ExchangeRefused,
+            )),
+            Err(source) => Err(SubjectTokenExchangeError::ExchangerFailed { source }),
         }
     }
 }

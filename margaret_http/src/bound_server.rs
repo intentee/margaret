@@ -1,32 +1,32 @@
 use std::convert::Infallible;
 use std::fmt::Display;
-use std::io::Error;
+use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use http_body_util::Full;
+use http_body_util::combinators::UnsyncBoxBody;
 use hyper::body::Incoming;
 use hyper::rt::Read;
 use hyper::rt::Write;
+use hyper::server::conn::http1::Builder;
+use hyper::service::service_fn;
 use hyper::upgrade;
 use hyper::upgrade::OnUpgrade;
-use hyper_util::rt::TokioExecutor;
 use hyper_util::rt::TokioIo;
-use hyper_util::server::conn::auto::Builder;
-use hyper_util::server::graceful::GracefulShutdown;
-use hyper_util::server::graceful::Watcher;
-use hyper_util::service::TowerToHyperService;
+use hyper_util::rt::TokioTimer;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::task::JoinError;
 use tokio::task::JoinSet;
+use tokio::time::timeout;
 use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 use tokio_util::sync::CancellationToken;
 
 use margaret_peer_identity::peer_identity::PeerIdentity;
 
+use crate::client_head_timeout::CLIENT_HEAD_TIMEOUT;
 use crate::drive_connection::drive_connection;
 use crate::forward_targets::ForwardTargets;
 use crate::one_shot_handler::OneShotHandler;
@@ -40,6 +40,7 @@ use crate::respond_once::respond_once;
 use crate::respond_recursively::respond_recursively;
 use crate::response::Response;
 use crate::route_resolution::RouteResolution;
+use crate::send_stall_limited_stream::SendStallLimitedStream;
 use crate::server::Server;
 use crate::transport_config::TransportConfig;
 use crate::upgrade_route::UpgradeRoute;
@@ -69,14 +70,14 @@ struct AcceptedConnection {
 
 fn accepted_connection(
     (stream, remote_addr): (TcpStream, SocketAddr),
-) -> Result<AcceptedConnection, Error> {
+) -> Result<AcceptedConnection, io::Error> {
     stream.set_nodelay(true).map(|()| AcceptedConnection {
         remote_addr,
         stream,
     })
 }
 
-fn accept_outcome<Accept>(accepted: Result<AcceptedConnection, Error>, accept: Accept)
+fn accept_outcome<Accept>(accepted: Result<AcceptedConnection, io::Error>, accept: Accept)
 where
     Accept: FnOnce(AcceptedConnection),
 {
@@ -88,7 +89,9 @@ where
     }
 }
 
-fn peer_identity_from_tls_stream(tls_stream: &TlsStream<TcpStream>) -> PeerIdentity {
+fn peer_identity_from_tls_stream(
+    tls_stream: &TlsStream<SendStallLimitedStream<TcpStream>>,
+) -> PeerIdentity {
     PeerIdentity::from_peer_certificate(
         tls_stream
             .get_ref()
@@ -99,7 +102,7 @@ fn peer_identity_from_tls_stream(tls_stream: &TlsStream<TcpStream>) -> PeerIdent
     )
 }
 
-fn report_connection_outcome<Error: Display>(outcome: Result<(), Error>) {
+fn report_connection_outcome<TError: Display>(outcome: Result<(), TError>) {
     if let Err(error) = outcome {
         eprintln!("margaret_http: connection error: {error}");
     }
@@ -117,31 +120,26 @@ fn rejection_response(rejection: &RequestRejection) -> Response {
     Response::text(400, "Bad Request")
 }
 
-async fn serve_connection<Io>(
-    builder: Arc<Builder<TokioExecutor>>,
-    watcher: Watcher,
-    io: Io,
+async fn serve_connection<TIo>(
+    builder: Arc<Builder>,
+    io: TIo,
     connection_context: ConnectionContext,
 ) where
-    Io: Read + Write + Unpin + Send + 'static,
+    TIo: Read + Write + Unpin + Send + 'static,
 {
     let WebSocketDriverChannel {
         receiver: driver_receiver,
         sender: driver_sender,
     } = WebSocketDriverChannel::new();
-    let service = TowerToHyperService::new(tower::service_fn(
-        move |request: http::Request<Incoming>| {
-            let connection_context = connection_context.clone();
-            let driver_sender = driver_sender.clone();
+    let cancellation_token = connection_context.cancellation_token.clone();
+    let service = service_fn(move |request: http::Request<Incoming>| {
+        let connection_context = connection_context.clone();
+        let driver_sender = driver_sender.clone();
 
-            async move {
-                Ok::<_, Infallible>(dispatch(connection_context, driver_sender, request).await)
-            }
-        },
-    ));
-
-    let connection = watcher.watch(builder.serve_connection_with_upgrades(io, service));
-    let outcome = drive_connection(connection, driver_receiver).await;
+        async move { Ok::<_, Infallible>(dispatch(connection_context, driver_sender, request).await) }
+    });
+    let connection = builder.serve_connection(io, service).with_upgrades();
+    let outcome = drive_connection(connection, driver_receiver, cancellation_token).await;
 
     report_connection_outcome(outcome);
 }
@@ -151,7 +149,7 @@ async fn complete_request(
     request: Request,
     body: RequestBody,
     forward_targets: &Arc<ForwardTargets>,
-) -> http::Response<Full<Bytes>> {
+) -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
     match route {
         RequestRoute::Handler {
             handler,
@@ -180,7 +178,7 @@ async fn dispatch_web_socket(
     }: UpgradeRoute,
     forward_targets: &Arc<ForwardTargets>,
     driver_sender: WebSocketDriverSender,
-) -> http::Response<Full<Bytes>> {
+) -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
     let mut onion: Box<dyn OneShotHandler> = Box::new(WebSocketUpgradeTerminal::new(
         upgrade,
         on_upgrade,
@@ -211,7 +209,7 @@ async fn dispatch(
     }: ConnectionContext,
     driver_sender: WebSocketDriverSender,
     mut request: http::Request<Incoming>,
-) -> http::Response<Full<Bytes>> {
+) -> http::Response<UnsyncBoxBody<Bytes, io::Error>> {
     let on_upgrade = upgrade::on(&mut request);
     let (parts, incoming) = request.into_parts();
     let request = match Request::from_head(server.clone(), parts, remote_addr, peer_identity) {
@@ -254,7 +252,7 @@ impl BoundServer {
     pub async fn bind(
         server: Arc<Server>,
         forward_targets: Arc<ForwardTargets>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, io::Error> {
         let transport = match server.transport() {
             TransportConfig::Plain => BoundTransport::Plain,
             TransportConfig::MutualTls { server_config } => BoundTransport::MutualTls {
@@ -274,13 +272,18 @@ impl BoundServer {
     /// # Errors
     ///
     /// Returns an error propagated from the work it performs.
-    pub fn local_addr(&self) -> Result<SocketAddr, Error> {
+    pub fn local_addr(&self) -> Result<SocketAddr, io::Error> {
         self.listener.local_addr()
     }
 
     pub async fn serve(self, cancellation_token: CancellationToken) {
-        let builder = Arc::new(Builder::new(TokioExecutor::new()));
-        let graceful = GracefulShutdown::new();
+        let mut builder = Builder::new();
+
+        builder
+            .timer(TokioTimer::new())
+            .header_read_timeout(CLIENT_HEAD_TIMEOUT);
+
+        let builder = Arc::new(builder);
         let mut connections = JoinSet::new();
 
         loop {
@@ -295,7 +298,6 @@ impl BoundServer {
                         self.spawn_connection(
                             &mut connections,
                             &builder,
-                            &graceful,
                             connection,
                             &cancellation_token,
                         );
@@ -303,8 +305,6 @@ impl BoundServer {
                 }
             }
         }
-
-        graceful.shutdown().await;
 
         while let Some(outcome) = connections.join_next().await {
             report_connection_task_outcome(outcome);
@@ -314,8 +314,7 @@ impl BoundServer {
     fn spawn_connection(
         &self,
         connections: &mut JoinSet<()>,
-        builder: &Arc<Builder<TokioExecutor>>,
-        graceful: &GracefulShutdown,
+        builder: &Arc<Builder>,
         AcceptedConnection {
             remote_addr,
             stream,
@@ -323,7 +322,7 @@ impl BoundServer {
         cancellation_token: &CancellationToken,
     ) {
         let builder = builder.clone();
-        let watcher = graceful.watcher();
+        let stream = SendStallLimitedStream::new(stream);
         let transport = self.transport.clone();
         let server = self.server.clone();
         let forward_targets = self.forward_targets.clone();
@@ -334,7 +333,6 @@ impl BoundServer {
                 BoundTransport::Plain => {
                     serve_connection(
                         builder,
-                        watcher,
                         TokioIo::new(stream),
                         ConnectionContext {
                             cancellation_token,
@@ -347,10 +345,17 @@ impl BoundServer {
                     .await;
                 }
                 BoundTransport::MutualTls { acceptor } => {
-                    let tls_stream = match acceptor.accept(stream).await {
-                        Ok(tls_stream) => tls_stream,
-                        Err(error) => {
+                    let tls_stream = match timeout(CLIENT_HEAD_TIMEOUT, acceptor.accept(stream))
+                        .await
+                    {
+                        Ok(Ok(tls_stream)) => tls_stream,
+                        Ok(Err(error)) => {
                             eprintln!("margaret_http: tls handshake error: {error}");
+
+                            return;
+                        }
+                        Err(elapsed) => {
+                            eprintln!("margaret_http: tls handshake did not complete: {elapsed}");
 
                             return;
                         }
@@ -359,7 +364,6 @@ impl BoundServer {
 
                     serve_connection(
                         builder,
-                        watcher,
                         TokioIo::new(tls_stream),
                         ConnectionContext {
                             cancellation_token,
@@ -391,6 +395,7 @@ mod tests {
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpListener;
     use tokio::net::TcpStream;
+    use tokio::time::Instant;
     use tokio_util::sync::CancellationToken;
 
     use margaret_http_uploaded_file::upload_config::UploadConfig;
@@ -400,6 +405,7 @@ mod tests {
     use super::accept_outcome;
     use super::accepted_connection;
     use super::report_connection_task_outcome;
+    use crate::client_head_timeout::CLIENT_HEAD_TIMEOUT;
     use crate::forward::Forward;
     use crate::forward_targets::ForwardTargets;
     use crate::handler_error::HandlerError;
@@ -639,6 +645,17 @@ mod tests {
 
         cancellation_token.cancel();
         serving.await.expect("the server task finishes cleanly");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn closes_a_connection_that_sends_no_request_head() {
+        serve(server_with_one(), |address| async move {
+            let connected = Instant::now();
+
+            assert!(exchange(address, b"", false).await.is_empty());
+            assert!(connected.elapsed() >= CLIENT_HEAD_TIMEOUT);
+        })
+        .await;
     }
 
     #[tokio::test]

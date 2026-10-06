@@ -5,6 +5,7 @@ use url::Url;
 use margaret_jwks_secret_store::jwks_secret_store_error::JwksSecretStoreError;
 use margaret_provider_state_storage::provider_state_error::ProviderStateError;
 use margaret_registered_claims::claims_merge_error::ClaimsMergeError;
+use margaret_subject_token_exchange::subject_token_exchange_error::SubjectTokenExchangeError;
 
 #[derive(Debug, Error)]
 pub enum ProviderError {
@@ -31,6 +32,9 @@ pub enum ProviderError {
 
     #[error("the provider could not reach its state: {0}")]
     State(#[source] ProviderStateError),
+
+    #[error("the provider could not exchange the subject token: {0}")]
+    SubjectTokenExchange(#[source] SubjectTokenExchangeError),
 
     #[error("the userinfo claims could not be merged: {0}")]
     UserinfoClaims(#[source] ClaimsMergeError),

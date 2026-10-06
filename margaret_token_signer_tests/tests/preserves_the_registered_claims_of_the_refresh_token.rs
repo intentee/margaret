@@ -11,6 +11,7 @@ use margaret_token_signer::minted_tokens::MintedTokens;
 use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_signer_tests::refresh_claims::refresh_claims;
+use margaret_token_signer_tests::refresh_token_identifier::REFRESH_TOKEN_IDENTIFIER;
 use margaret_token_signer_tests::unix_time::unix_time;
 
 #[test]
@@ -22,6 +23,7 @@ fn preserves_the_registered_claims_of_the_refresh_token() {
         exp: NumericDate::new(10_000),
         iat: NumericDate::new(0),
         iss: issuance.issuer.as_str().to_string(),
+        jti: Some(REFRESH_TOKEN_IDENTIFIER.to_string()),
         nbf: Some(NumericDate::new(500)),
     };
     let refresh_token = secret

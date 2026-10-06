@@ -23,7 +23,8 @@ async fn exchanges_through_the_exchanger_of_the_token_audience() {
                 SubjectTokenType::IdToken,
                 Utc::now(),
             )
-            .await,
+            .await
+        .expect("the exchangers complete the exchange"),
         ExchangedSubject::Granted { subject, .. } if subject == EXCHANGED_SUBJECT
     ));
 }

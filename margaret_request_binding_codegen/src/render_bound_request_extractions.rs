@@ -6,6 +6,7 @@ use quote::quote;
 
 use crate::bound_parameter::BoundParameter;
 use crate::captured_providers::CapturedProviders;
+use crate::head_extraction_context::HeadExtractionContext;
 use crate::request_binding::RequestBinding;
 
 struct BoundRouteParameter<'parameter> {
@@ -43,14 +44,15 @@ fn joined_pattern(first: &Ident, remaining: &[&Ident]) -> TokenStream {
     }
 }
 
-#[must_use]
-pub fn render_bound_request_extractions(
+pub(crate) fn render_bound_request_extractions(
     parameters: &[BoundParameter],
     captured: &CapturedProviders,
-    owner: &TokenStream,
-    request: &Ident,
-    error_return: &TokenStream,
-    not_found_return: &TokenStream,
+    HeadExtractionContext {
+        continuation_return,
+        owner,
+        request_local,
+        ..
+    }: &HeadExtractionContext,
 ) -> TokenStream {
     let bound: Vec<BoundRouteParameter<'_>> = parameters
         .iter()
@@ -73,7 +75,7 @@ pub fn render_bound_request_extractions(
 
         quote! {
             margaret::framework::http::require_bound_route_parameter::require_bound_route_parameter(
-                #request,
+                #request_local,
                 #path_key,
                 #provider.as_ref(),
             )
@@ -97,7 +99,11 @@ pub fn render_bound_request_extractions(
                         model,
                     ) => model,
                     margaret::framework::route_parameter_binding::route_parameter_binding_outcome::RouteParameterBindingOutcome::NotFound => {
-                        #not_found_return
+                        let response = margaret::framework::http::response_continuation::ResponseContinuation::from(
+                            margaret::framework::http::response::Response::not_found(),
+                        );
+
+                        #continuation_return
                     }
                 };
             }
@@ -107,7 +113,7 @@ pub fn render_bound_request_extractions(
         let #pattern = match #future.await {
             ::std::result::Result::Ok(outcomes) => outcomes,
             ::std::result::Result::Err(error) => {
-                #error_return
+                return ::std::result::Result::Err(error.into())
             }
         };
         #(#values)*

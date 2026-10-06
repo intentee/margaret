@@ -15,7 +15,8 @@ async fn refuses_a_subject_token_that_is_not_a_jws() {
     assert!(matches!(
         exchangers
             .exchange("a.b.c", SubjectTokenType::IdToken, Utc::now())
-            .await,
+            .await
+            .expect("the exchangers complete the exchange"),
         ExchangedSubject::Refused(SubjectTokenRefusal::Rejected(_))
     ));
 }

@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::io;
 
 use http_body_util::LengthLimitError;
 
@@ -9,11 +10,17 @@ pub(crate) fn read_failure_rejection(
     source: Box<dyn Error + Send + Sync>,
     limit: BodyLimit,
 ) -> BodyRejection {
-    match source.downcast::<LengthLimitError>() {
-        Ok(_) => BodyRejection::PayloadTooLarge {
+    if source.is::<LengthLimitError>() {
+        BodyRejection::PayloadTooLarge {
             limit: limit.max_bytes(),
-        },
-        Err(source) => BodyRejection::UnreadableBody { source },
+        }
+    } else if source
+        .downcast_ref::<io::Error>()
+        .is_some_and(|failure| failure.kind() == io::ErrorKind::TimedOut)
+    {
+        BodyRejection::Stalled
+    } else {
+        BodyRejection::UnreadableBody { source }
     }
 }
 
