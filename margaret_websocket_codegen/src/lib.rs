@@ -45,6 +45,7 @@ mod tests {
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_middleware_codegen::layer_application::LayerApplication;
     use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
+    use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::bound_parameter::BoundParameter;
     use margaret_request_binding_codegen::request_binding::RequestBinding;
@@ -52,6 +53,8 @@ mod tests {
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_tag_codegen::tag_pool::TagPool;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
+    use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
 
     use crate::handler_binding::HandlerBinding;
     use crate::render_websocket;
@@ -159,7 +162,7 @@ impl RespondsToWebSocketNotification for Typist {
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
+        render_container(index, &registry, &[], &DeclaredTokenIssuance::Absent)
             .expect("the container renders")
             .bindings
     }
@@ -170,7 +173,12 @@ impl RespondsToWebSocketNotification for Typist {
         BindingRegistries::collect(
             index,
             ViewsAvailability::Available,
-            &TagPool::collect(index).expect("the tags are collected"),
+            &TagPool::collect(
+                index,
+                &DeclaredTrusts::read(index).expect("the trusts are read"),
+                &DeclaredOAuthClients::read(index).expect("the oauth clients are read"),
+            )
+            .expect("the tags are collected"),
             &bindings(&IndexedSource::new("").index),
         )
     }
@@ -211,7 +219,12 @@ impl RespondsToWebSocketNotification for Typist {
     fn generated(source: &str) -> String {
         let index = IndexedSource::new(source).index;
         let registries = registries_for(&index);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
 
@@ -236,7 +249,12 @@ impl RespondsToWebSocketNotification for Typist {
             Ok(registries) => registries,
             Err(rejection) => return WebSocketCodegenError::from(rejection),
         };
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
 
@@ -415,7 +433,12 @@ impl RespondsToWebSocketMessage for Ponger {
         )
         .index;
         let registries = registries_for(&index);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
         let empty_index = IndexedSource::new("").index;
@@ -1031,7 +1054,12 @@ impl Bad {
         )
         .index;
         let registries = registries_for(&index);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
         let registry = scan(&index).expect("the console arguments are scanned");
@@ -1050,6 +1078,7 @@ impl Bad {
                     "TrustedIssuer".to_string(),
                 ]),
             }],
+            &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")
         .bindings;
@@ -2027,7 +2056,12 @@ impl Bad {
     fn transport_policies(source: &str) -> BTreeMap<String, ServerTransportPolicy> {
         let index = IndexedSource::new(source).index;
         let registries = registries_for(&index);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
 

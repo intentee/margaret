@@ -14,9 +14,6 @@ autotests = false
 margaret_oidc_discovery = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 
-[dev-dependencies]
-margaret_registered_claims = { workspace = true }
-
 [[test]]
 name = "main"
 path = "tests/main.rs"

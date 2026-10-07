@@ -1,6 +1,5 @@
 use thiserror::Error;
 
-use margaret_oidc_discovery::oidc_discovery_path::OIDC_DISCOVERY_PATH;
 use margaret_route_method::route_method::RouteMethod;
 
 use crate::provider_endpoint::ProviderEndpoint;
@@ -15,9 +14,9 @@ pub enum OidcProviderCodegenError {
     },
 
     #[error(
-        "the discovery document is served at '{path}', outside the '{OIDC_DISCOVERY_PATH}' location of its issuer"
+        "the discovery document is served at '{path}', but its issuer publishes it at '{expected}'"
     )]
-    DiscoveryOutsideWellKnownPath { path: String },
+    DiscoveryPathMismatch { expected: String, path: String },
 
     #[error("the discovery document is served by several servers: {servers:?}")]
     DiscoveryServedBySeveralServers { servers: Vec<String> },

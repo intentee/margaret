@@ -19,10 +19,10 @@ impl TestClaims {
 
         pair.sign_json(
             &json!({
-                "aud": trust.audience.as_str(),
+                "aud": trust.audience,
                 "exp": FAR_FUTURE_EXPIRY,
                 "iat": 0,
-                "iss": trust.issuer.as_str(),
+                "iss": trust.issuer,
                 "sub": self.sub,
             }),
             JwtType::AccessToken,

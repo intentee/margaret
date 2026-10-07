@@ -9,7 +9,7 @@ autotests = false
 http = { workspace = true }
 margaret_bearer_token_verification = { workspace = true }
 margaret_http = { workspace = true }
-margaret_issuer_metadata = { workspace = true }
+margaret_issuer_key_set = { workspace = true }
 margaret_jwks_keygen = { workspace = true }
 margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
 margaret_jws_verification = { workspace = true }
@@ -20,7 +20,6 @@ margaret_trusted_issuer = { workspace = true }
 
 [dev-dependencies]
 margaret_identity_session = { workspace = true }
-margaret_issuer_key_set = { workspace = true }
 margaret_jose_parameters = { workspace = true }
 margaret_registered_claims = { workspace = true }
 serde_json = { workspace = true }

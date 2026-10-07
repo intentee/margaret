@@ -11,8 +11,7 @@ use margaret_http_tests::static_handler::StaticHandler;
 use margaret_route_method::route_method::RouteMethod;
 
 use crate::fixture_authorization_server::FixtureAuthorizationServer;
-use crate::oauth_client_declaration::OAuthClientDeclaration;
-use crate::secret_basic_client::secret_basic_client;
+use crate::secret_basic_authentication::secret_basic_authentication;
 
 pub async fn answered_token_request(answer: StaticHandler) -> EndpointOutcome<BasicTokenResponse> {
     let server = FixtureAuthorizationServer::start(
@@ -21,9 +20,7 @@ pub async fn answered_token_request(answer: StaticHandler) -> EndpointOutcome<Ba
     )
     .await;
     let outcome = server
-        .client(Arc::new(OAuthClientDeclaration {
-            client: secret_basic_client(),
-        }))
+        .client(secret_basic_authentication())
         .client_credentials(&TokenTarget {
             audience: TargetAudience::Unspecified,
             scopes: BTreeSet::new(),

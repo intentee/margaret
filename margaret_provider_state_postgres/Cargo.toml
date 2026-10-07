@@ -14,6 +14,7 @@ async-trait = { workspace = true }
 margaret_model = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_provider_state_storage = { workspace = true }
+margaret_registered_claims = { workspace = true }
 margaret_token_digest = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }

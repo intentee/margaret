@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "margaret",
     "margaret_accepted_clients",
+    "margaret_accepted_clients_codegen",
     "margaret_accepted_clients_tests",
     "margaret_access_token_minter",
     "margaret_asset_bag",
@@ -42,6 +43,7 @@ members = [
     "margaret_construction",
     "margaret_container",
     "margaret_container_tests",
+    "margaret_declaration_anchor",
     "margaret_environment_variable",
     "margaret_environment_variable_codegen",
     "margaret_example",
@@ -51,6 +53,7 @@ members = [
     "margaret_http_tests",
     "margaret_http_uploaded_file",
     "margaret_http_validation",
+    "margaret_https_url",
     "margaret_identity",
     "margaret_identity_session",
     "margaret_injection_codegen",
@@ -63,7 +66,6 @@ members = [
     "margaret_item_naming_argument",
     "margaret_jose_parameters",
     "margaret_jwks_codegen",
-    "margaret_jwks_endpoint",
     "margaret_jwks_file_secret_storage",
     "margaret_jwks_file_secret_storage_tests",
     "margaret_jwks_keygen",
@@ -121,6 +123,7 @@ members = [
     "margaret_spiffe_svid_server",
     "margaret_spiffe_svid_server_tests",
     "margaret_spiffe_svid_tests",
+    "margaret_storage_uri",
     "margaret_subject_token_exchange",
     "margaret_subject_token_exchange_tests",
     "margaret_syn_type_peeling",
@@ -132,6 +135,7 @@ members = [
     "margaret_token_introspection",
     "margaret_token_introspection_tests",
     "margaret_token_issuance",
+    "margaret_token_issuance_codegen",
     "margaret_token_signer",
     "margaret_token_signer_tests",
     "margaret_token_trust",
@@ -222,6 +226,7 @@ zeroize = "1.9"
 
 margaret = { path = "margaret", version = "0.4.0", default-features = false }
 margaret_accepted_clients = { path = "margaret_accepted_clients", version = "0.1.0" }
+margaret_accepted_clients_codegen = { path = "margaret_accepted_clients_codegen", version = "0.1.0" }
 margaret_access_token_minter = { path = "margaret_access_token_minter", version = "0.1.0" }
 margaret_asset_bag = { path = "margaret_asset_bag", version = "0.1.0" }
 margaret_asset_bag_codegen = { path = "margaret_asset_bag_codegen", version = "0.4.0" }
@@ -237,6 +242,7 @@ margaret_console_argument_codegen = { path = "margaret_console_argument_codegen"
 margaret_console_codegen = { path = "margaret_console_codegen", version = "0.4.0" }
 margaret_construction = { path = "margaret_construction", version = "0.1.0" }
 margaret_container = { path = "margaret_container", version = "0.4.0" }
+margaret_declaration_anchor = { path = "margaret_declaration_anchor", version = "0.1.0" }
 margaret_environment_variable = { path = "margaret_environment_variable", version = "0.1.0" }
 margaret_environment_variable_codegen = { path = "margaret_environment_variable_codegen", version = "0.4.0" }
 margaret_generated_module = { path = "margaret_generated_module", version = "0.1.0" }
@@ -244,6 +250,7 @@ margaret_http = { path = "margaret_http", version = "0.1.0" }
 margaret_http_codegen = { path = "margaret_http_codegen", version = "0.4.0" }
 margaret_http_uploaded_file = { path = "margaret_http_uploaded_file", version = "0.1.0" }
 margaret_http_validation = { path = "margaret_http_validation", version = "0.1.0" }
+margaret_https_url = { path = "margaret_https_url", version = "0.1.0" }
 margaret_identity = { path = "margaret_identity", version = "0.1.0" }
 margaret_identity_session = { path = "margaret_identity_session", version = "0.1.0" }
 margaret_injection_codegen = { path = "margaret_injection_codegen", version = "0.4.0" }
@@ -255,7 +262,6 @@ margaret_issuer_request = { path = "margaret_issuer_request", version = "0.1.0" 
 margaret_item_naming_argument = { path = "margaret_item_naming_argument", version = "0.4.0" }
 margaret_jose_parameters = { path = "margaret_jose_parameters", version = "0.1.0" }
 margaret_jwks_codegen = { path = "margaret_jwks_codegen", version = "0.4.0" }
-margaret_jwks_endpoint = { path = "margaret_jwks_endpoint", version = "0.1.0" }
 margaret_jwks_file_secret_storage = { path = "margaret_jwks_file_secret_storage", version = "0.1.0" }
 margaret_jwks_keygen = { path = "margaret_jwks_keygen", version = "0.1.0" }
 margaret_jwks_roller = { path = "margaret_jwks_roller", version = "0.1.0" }
@@ -293,6 +299,7 @@ margaret_spiffe_svid = { path = "margaret_spiffe_svid", version = "0.1.0" }
 margaret_spiffe_svid_bundle = { path = "margaret_spiffe_svid_bundle", version = "0.1.0" }
 margaret_spiffe_svid_client = { path = "margaret_spiffe_svid_client", version = "0.1.0" }
 margaret_spiffe_svid_server = { path = "margaret_spiffe_svid_server", version = "0.1.0" }
+margaret_storage_uri = { path = "margaret_storage_uri", version = "0.1.0" }
 margaret_subject_token_exchange = { path = "margaret_subject_token_exchange", version = "0.1.0" }
 margaret_syn_type_peeling = { path = "margaret_syn_type_peeling", version = "0.1.0" }
 margaret_sync_holder = { path = "margaret_sync_holder", version = "0.1.0" }
@@ -301,6 +308,7 @@ margaret_token_digest = { path = "margaret_token_digest", version = "0.1.0" }
 margaret_token_exchange_client = { path = "margaret_token_exchange_client", version = "0.1.0" }
 margaret_token_introspection = { path = "margaret_token_introspection", version = "0.1.0" }
 margaret_token_issuance = { path = "margaret_token_issuance", version = "0.1.0" }
+margaret_token_issuance_codegen = { path = "margaret_token_issuance_codegen", version = "0.1.0" }
 margaret_token_signer = { path = "margaret_token_signer", version = "0.1.0" }
 margaret_token_trust = { path = "margaret_token_trust", version = "0.1.0" }
 margaret_toposort = { path = "margaret_toposort", version = "0.1.0" }

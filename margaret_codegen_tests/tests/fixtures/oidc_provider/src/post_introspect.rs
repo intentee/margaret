@@ -38,11 +38,14 @@ impl PostIntrospect {
     ///
     /// Returns an error propagated from the work it performs.
     #[process]
-    pub fn respond(
+    pub async fn respond(
         &self,
         request: &Request,
         #[form_request(from = RequestInput::Form)] submission: ValidationResult<TokenSubmission>,
     ) -> anyhow::Result<Response> {
-        Ok(self.introspection_endpoint.respond(request, submission))
+        Ok(self
+            .introspection_endpoint
+            .respond(request, submission)
+            .await?)
     }
 }

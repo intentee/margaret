@@ -19,7 +19,7 @@ fn verifies_a_token_before_its_expiry() {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
     } = SignedClaims::new(
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900 }),
+        &json!({ "aud": trust.audience, "iss": trust.issuer, "exp": 1_000, "iat": 900 }),
     )
     else {
         panic!("the fixture key set is accepted");
@@ -39,10 +39,10 @@ fn verifies_a_token_before_its_expiry() {
     assert_eq!(
         verified.registered,
         RegisteredClaims {
-            aud: AudienceClaim::Single(trust.audience.as_str().to_string()),
+            aud: AudienceClaim::Single(trust.audience.to_string()),
             exp: NumericDate::new(1_000),
-            iat: NumericDate::new(900),
-            iss: trust.issuer.as_str().to_string(),
+            iat: Some(NumericDate::new(900)),
+            iss: trust.issuer.to_string(),
             jti: None,
             nbf: None,
         }

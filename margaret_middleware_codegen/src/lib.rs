@@ -20,11 +20,14 @@ mod tests {
     use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
+    use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_tag_codegen::tag_pool::TagPool;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
+    use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
 
     use crate::fold_layers::fold_layers;
     use crate::layer_application::LayerApplication;
@@ -37,7 +40,7 @@ mod tests {
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
+        render_container(index, &registry, &[], &DeclaredTokenIssuance::Absent)
             .expect("the container renders")
             .bindings
     }
@@ -50,7 +53,12 @@ mod tests {
         BindingRegistries::collect(
             index,
             ViewsAvailability::Available,
-            &TagPool::collect(index).expect("the tags are collected"),
+            &TagPool::collect(
+                index,
+                &DeclaredTrusts::read(index).expect("the trusts are read"),
+                &DeclaredOAuthClients::read(index).expect("the oauth clients are read"),
+            )
+            .expect("the tags are collected"),
             &empty_bindings(),
         )
         .expect("the binding registries are collected")
@@ -58,7 +66,12 @@ mod tests {
 
     fn wrappers_for(lib_source: &str) -> String {
         let index = IndexedSource::new(lib_source).index;
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
             .expect("the middleware plans are collected");
 
@@ -76,7 +89,12 @@ mod tests {
         MiddlewarePlans::collect(
             &index,
             &registries_for(&index),
-            &TagPool::collect(&index).expect("the tags are collected"),
+            &TagPool::collect(
+                &index,
+                &DeclaredTrusts::read(&index).expect("the trusts are read"),
+                &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+            )
+            .expect("the tags are collected"),
         )
         .err()
         .expect("the middleware plans fail to collect")
@@ -88,7 +106,12 @@ mod tests {
 
     fn layers_for(lib_source: &str) -> Result<Vec<LayerApplication>, MiddlewareCodegenError> {
         let index = IndexedSource::new(lib_source).index;
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries_for(&index), &tags)
             .expect("the middleware plans are collected");
         let selected = index.select_framework_attribute(FrameworkAttribute::Middleware);
@@ -110,7 +133,7 @@ mod tests {
     fn rejects_a_middleware_reference_that_names_a_jwks_endpoint() {
         assert!(
             layers_error_for(
-                "#[singleton]\n#[provides_jwks_endpoint(auth)]\nstruct Endpoint;\n\n#[middleware(auth)]\nstruct Site;\n"
+                "#[provides_jwks_endpoint(auth, audience = \"api\", issuer = \"https://auth.example\", jwks_uri = \"https://auth.example/jwks\")]\nstruct Endpoint;\n\n#[middleware(auth)]\nstruct Site;\n"
             )
             .contains("which is a jwks endpoint provider, not a middleware handler")
         );
@@ -271,7 +294,12 @@ impl Guard {
         let index = IndexedSource::new(
             "#[handles_middleware_attribute(attribute = guard)]\nstruct Guard;\n\n#[middleware(guard)]\nstruct Site;\n",
         ).index;
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let site = index
             .select_framework_attribute(FrameworkAttribute::Middleware)
             .next()

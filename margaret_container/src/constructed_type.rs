@@ -8,7 +8,7 @@ use crate::provided_type::ProvidedType;
 pub(crate) fn constructed_type(provided: &ProvidedType) -> TokenStream {
     match provided {
         ProvidedType::Concrete(path) => path_tokens(path),
-        ProvidedType::UriSelected(trait_path) => {
+        ProvidedType::Resolved(trait_path) => {
             let interface = path_tokens(trait_path);
 
             quote! { dyn #interface }

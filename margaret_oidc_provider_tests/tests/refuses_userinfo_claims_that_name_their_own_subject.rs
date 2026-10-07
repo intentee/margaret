@@ -9,7 +9,7 @@ use margaret_registered_claims::claims_merge_error::ClaimsMergeError;
 #[test]
 fn refuses_userinfo_claims_that_name_their_own_subject() {
     let provider = UnservedProvider::create();
-    let endpoint = UserinfoEndpoint::create(provider.secret_store, provider.issuance.as_ref());
+    let endpoint = UserinfoEndpoint::create(provider.secret_store, provider.issuance);
 
     assert!(matches!(
         endpoint.answer(&userinfo_grant_of(), &json!({"sub": "someone"})),

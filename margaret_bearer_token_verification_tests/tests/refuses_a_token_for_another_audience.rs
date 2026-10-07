@@ -20,7 +20,7 @@ async fn refuses_a_token_for_another_audience() {
             "aud": "someone-else",
             "exp": FAR_FUTURE_EXPIRY,
             "iat": 0,
-            "iss": trust.issuer.as_str(),
+            "iss": trust.issuer,
             "sub": "subject",
         }),
         JwtType::AccessToken,

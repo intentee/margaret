@@ -2,12 +2,12 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
 use margaret_http::method_handler::MethodHandler;
+use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
-use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
-use margaret_oauth_client::oauth_client::OAuthClient;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
+use margaret_jwks_secret_store_tests::fixture_roller::fixture_roller;
+use margaret_oauth_client::client_authentication::ClientAuthentication;
 use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
 use margaret_route_method::route_method::RouteMethod;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
@@ -17,13 +17,13 @@ use crate::token_endpoint::TokenEndpoint;
 pub struct SignInFixture {
     pub flow: SignInFlow,
     pub issuer_secret: JwksSecret,
-    pub secret_store: Arc<JwksSecretStore>,
+    pub roller: Arc<JwksRoller>,
     pub server: FixtureAuthorizationServer,
     pub token_endpoint: Arc<TokenEndpoint>,
 }
 
 impl SignInFixture {
-    pub async fn start(declaration: OAuthClient) -> Self {
+    pub async fn start(authentication: ClientAuthentication) -> Self {
         let token_endpoint = Arc::new(TokenEndpoint {
             answer: OnceLock::new(),
         });
@@ -33,20 +33,17 @@ impl SignInFixture {
         )
         .await;
         let issuer_secret = fresh_p256_secret();
-        let client = server.client(Arc::new(OAuthClientDeclaration {
-            client: declaration,
-        }));
-        let secret_store = Arc::new(rolled_store(fresh_p256_secret()));
+        let key_set = Arc::new(IssuerKeySet::awaiting());
 
-        client
-            .trusted_issuer
-            .key_set
-            .hold(Arc::new(issuer_secret.key_set().clone()));
+        key_set.hold(Arc::new(issuer_secret.key_set().clone()));
+
+        let client = server.client_verifying_with(authentication, key_set);
+        let roller = fixture_roller();
 
         Self {
-            flow: SignInFlow::create(Arc::new(client), Arc::clone(&secret_store)),
+            flow: SignInFlow::create(Arc::new(client), Arc::clone(&roller)),
             issuer_secret,
-            secret_store,
+            roller,
             server,
             token_endpoint,
         }

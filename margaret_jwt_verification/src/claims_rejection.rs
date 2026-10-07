@@ -1,21 +1,22 @@
-use std::collections::BTreeSet;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
-use margaret_registered_claims::audience::Audience;
 use margaret_registered_claims::audience_claim::AudienceClaim;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_registered_claims::numeric_date::NumericDate;
 
 #[derive(Debug)]
 pub enum ClaimsRejection {
     AudienceMismatch {
-        expected: Audience,
+        expected: String,
+        found: AudienceClaim,
+    },
+    AudienceNotSole {
+        expected: String,
         found: AudienceClaim,
     },
     AudienceOutside {
-        expected: BTreeSet<Audience>,
+        expected: Vec<String>,
         found: AudienceClaim,
     },
     Expired {
@@ -23,12 +24,13 @@ pub enum ClaimsRejection {
         now: NumericDate,
     },
     IssuerMismatch {
-        expected: IssuerIdentifier,
+        expected: String,
         found: String,
     },
     Malformed {
         source: serde_json::Error,
     },
+    MissingIssuedAt,
     NotYetValid {
         nbf: NumericDate,
         now: NumericDate,
@@ -42,14 +44,14 @@ impl Display for ClaimsRejection {
                 formatter,
                 "the token's audience {found} does not include '{expected}'"
             ),
+            Self::AudienceNotSole { expected, found } => write!(
+                formatter,
+                "the token's audience {found} is not '{expected}' alone"
+            ),
             Self::AudienceOutside { expected, found } => write!(
                 formatter,
                 "the token's audience {found} includes none of [{}]",
-                expected
-                    .iter()
-                    .map(Audience::as_str)
-                    .collect::<Vec<&str>>()
-                    .join(", ")
+                expected.join(", ")
             ),
             Self::Expired { exp, now } => write!(
                 formatter,
@@ -62,6 +64,9 @@ impl Display for ClaimsRejection {
             Self::Malformed { source } => {
                 write!(formatter, "the token claims are malformed: {source}")
             }
+            Self::MissingIssuedAt => {
+                formatter.write_str("the token does not state when it was issued")
+            }
             Self::NotYetValid { nbf, now } => write!(
                 formatter,
                 "the token is not valid before {nbf}, and the current time is {now}"
@@ -72,11 +77,7 @@ impl Display for ClaimsRejection {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-
-    use margaret_registered_claims::audience::Audience;
     use margaret_registered_claims::audience_claim::AudienceClaim;
-    use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
     use margaret_registered_claims::numeric_date::NumericDate;
 
     use super::ClaimsRejection;
@@ -85,20 +86,15 @@ mod tests {
     fn describes_every_rejection() {
         let described = [
             ClaimsRejection::AudienceMismatch {
-                expected: "ours"
-                    .parse::<Audience>()
-                    .expect("the audience is not empty"),
+                expected: "ours".to_string(),
                 found: AudienceClaim::Multiple(vec!["theirs".to_string(), "others".to_string()]),
             },
+            ClaimsRejection::AudienceNotSole {
+                expected: "ours".to_string(),
+                found: AudienceClaim::Multiple(vec!["ours".to_string()]),
+            },
             ClaimsRejection::AudienceOutside {
-                expected: BTreeSet::from([
-                    "first"
-                        .parse::<Audience>()
-                        .expect("the audience is not empty"),
-                    "second"
-                        .parse::<Audience>()
-                        .expect("the audience is not empty"),
-                ]),
+                expected: vec!["first".to_string(), "second".to_string()],
                 found: AudienceClaim::Single("theirs".to_string()),
             },
             ClaimsRejection::Expired {
@@ -106,14 +102,13 @@ mod tests {
                 now: NumericDate::new(150),
             },
             ClaimsRejection::IssuerMismatch {
-                expected: "https://issuer.example"
-                    .parse::<IssuerIdentifier>()
-                    .expect("the issuer is an https url"),
+                expected: "https://issuer.example".to_string(),
                 found: "https://attacker.example".to_string(),
             },
             ClaimsRejection::Malformed {
                 source: serde_json::from_str::<u8>("x").expect_err("not json"),
             },
+            ClaimsRejection::MissingIssuedAt,
             ClaimsRejection::NotYetValid {
                 nbf: NumericDate::new(200),
                 now: NumericDate::new(150),
@@ -127,19 +122,24 @@ mod tests {
         );
         assert_eq!(
             described[1],
-            "the token's audience theirs includes none of [first, second]"
+            "the token's audience [ours] is not 'ours' alone"
         );
         assert_eq!(
             described[2],
-            "the token expired at 100, and the current time is 150"
+            "the token's audience theirs includes none of [first, second]"
         );
         assert_eq!(
             described[3],
+            "the token expired at 100, and the current time is 150"
+        );
+        assert_eq!(
+            described[4],
             "the token is issued by 'https://attacker.example' instead of 'https://issuer.example'"
         );
-        assert!(described[4].starts_with("the token claims are malformed: "));
+        assert!(described[5].starts_with("the token claims are malformed: "));
+        assert_eq!(described[6], "the token does not state when it was issued");
         assert_eq!(
-            described[5],
+            described[7],
             "the token is not valid before 200, and the current time is 150"
         );
     }

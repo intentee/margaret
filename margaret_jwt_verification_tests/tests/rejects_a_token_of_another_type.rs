@@ -22,7 +22,7 @@ fn rejects_a_token_of_another_type() {
         token,
     } = SignedClaims::typed(
         "at+jwt",
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900 }),
+        &json!({ "aud": trust.audience, "iss": trust.issuer, "exp": 1_000, "iat": 900 }),
     )
     else {
         panic!("the fixture key set is accepted");
@@ -35,8 +35,8 @@ fn rejects_a_token_of_another_type() {
             &trust.expectation(),
             NumericDate::new(950)
         ),
-        JwtVerification::Rejected(JwtRejection::Type(TypeRejection::Mismatch {
-            expected: JwtType::Jwt,
+        JwtVerification::Rejected(JwtRejection::Type(TypeRejection::Unaccepted {
+            accepted: [JwtType::Jwt],
             found: HeaderType::Supported(JwtType::AccessToken),
         }))
     ));

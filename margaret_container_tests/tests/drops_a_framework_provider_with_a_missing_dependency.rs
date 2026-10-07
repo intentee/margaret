@@ -10,6 +10,7 @@ use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_serve_input_codegen::scan::scan;
+use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
 fn dropped_provider() -> FrameworkProvider {
     FrameworkProvider {
@@ -33,9 +34,14 @@ fn drops_a_framework_provider_whose_dependency_is_not_buildable() {
         .build();
     let registry = scan(&index).expect("the console arguments are scanned");
 
-    let error = render_container(&index, &registry, &[dropped_provider()])
-        .err()
-        .expect("a framework provider with an unresolved dependency is dropped");
+    let error = render_container(
+        &index,
+        &registry,
+        &[dropped_provider()],
+        &DeclaredTokenIssuance::Absent,
+    )
+    .err()
+    .expect("a framework provider with an unresolved dependency is dropped");
 
     assert!(matches!(error, ContainerError::MissingProvider { .. }));
 }

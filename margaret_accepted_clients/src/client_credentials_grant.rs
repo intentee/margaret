@@ -1,8 +1,5 @@
-use std::collections::BTreeSet;
-
-use margaret_oauth_vocabulary::resource_scope::ResourceScope;
-
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClientCredentialsGrant {
-    Granted { scopes: BTreeSet<ResourceScope> },
+    Granted { scopes: &'static [&'static str] },
     Withheld,
 }

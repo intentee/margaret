@@ -1,3 +1,6 @@
+pub mod assertion_refusal;
+pub mod assertion_retention;
+pub mod assertion_spending;
 pub mod authorization_code_lifetime;
 pub mod authorization_grant;
 pub mod code_spending;
@@ -20,4 +23,7 @@ pub mod refresh_revocation;
 pub mod refresh_rotation;
 mod refresh_token_standing;
 mod refresh_token_state;
+mod spent_assertion;
+mod spent_assertion_expiry;
+mod spent_assertion_key;
 pub mod stores_provider_state;

@@ -1,3 +1,5 @@
+use margaret_accepted_clients_codegen::provider_aggregate::ProviderAggregate;
+use margaret_accepted_clients_codegen::provider_aggregate_path::provider_aggregate_path;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_container::constructor_outcome::ConstructorOutcome;
 use margaret_container::framework_construction::FrameworkConstruction;
@@ -5,12 +7,15 @@ use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
+use margaret_environment_variable_codegen::environment_variable_name::EnvironmentVariableName;
+use margaret_environment_variable_codegen::framework_environment_variable::FrameworkEnvironmentVariable;
 use margaret_oidc_provider_codegen::oidc_provider_item::OidcProviderItem;
 use margaret_oidc_provider_codegen::oidc_provider_item_path::oidc_provider_item_path;
-use margaret_oidc_provider_codegen::provider_endpoint_paths_path::provider_endpoint_paths_path;
+use margaret_oidc_provider_codegen::provider_endpoints_path::provider_endpoints_path;
 use margaret_oidc_provider_codegen::subject_token_exchanger_path::subject_token_exchanger_path;
 use margaret_tag_codegen::subject_token_exchanger_binding::SubjectTokenExchangerBinding;
-use margaret_trusted_issuer_codegen::trusted_issuer_canonical_path::trusted_issuer_canonical_path;
+use margaret_trusted_issuer_codegen::trusted_issuer_item::TrustedIssuerItem;
+use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_item_path;
 
 use crate::provider_state_canonical_path::provider_state_canonical_path;
 use crate::server_secret_store_canonical_path::server_secret_store_canonical_path;
@@ -48,10 +53,6 @@ fn item(provided: OidcProviderItem) -> FrameworkDependency {
     FrameworkDependency::Provider(oidc_provider_item_path(provided))
 }
 
-fn borrowed_item(provided: OidcProviderItem) -> FrameworkDependency {
-    FrameworkDependency::BorrowedProvider(oidc_provider_item_path(provided))
-}
-
 fn endpoint(
     dependencies: Vec<FrameworkDependency>,
     provided: OidcProviderItem,
@@ -66,17 +67,21 @@ fn endpoint(
 
 fn provider_state_storage() -> FrameworkProvider {
     FrameworkProvider {
-        construction: FrameworkConstruction::UriSelected {
-            argument_name: "oidc-provider-state-storage".to_string(),
+        construction: FrameworkConstruction::Resolved {
+            dependencies: vec![FrameworkDependency::EnvironmentVariable {
+                name: EnvironmentVariableName::from(
+                    FrameworkEnvironmentVariable::OidcProviderStateStorage,
+                ),
+                value_type: framework_path(&[
+                    "provider_state_storage_selection",
+                    "provider_state_storage_uri",
+                    "ProviderStateStorageUri",
+                ]),
+            }],
             resolver: framework_path(&[
                 "provider_state_storage_selection",
                 "resolve_provider_state_storage",
                 "resolve_provider_state_storage",
-            ]),
-            value_type: framework_path(&[
-                "provider_state_storage_selection",
-                "provider_state_storage_uri",
-                "ProviderStateStorageUri",
             ]),
         },
         enablement: FrameworkEnablement::Dependency,
@@ -90,17 +95,24 @@ fn subject_token_exchanger(
 ) -> FrameworkProvider {
     constructed(
         vec![
-            FrameworkDependency::Provider(trusted_issuer_canonical_path(&issuer.module_segment)),
+            FrameworkDependency::Provider(trusted_issuer_item_path(
+                &issuer.trust.tag,
+                TrustedIssuerItem::TrustedIssuer,
+            )),
             FrameworkDependency::SingletonView(declaring.clone()),
         ],
         ConstructorOutcome::Infallible,
         FrameworkEnablement::Dependency,
-        subject_token_exchanger_path(&issuer.module_segment),
+        subject_token_exchanger_path(&issuer.trust.tag),
     )
 }
 
+fn aggregate(aggregate: ProviderAggregate) -> FrameworkDependency {
+    FrameworkDependency::Constant(provider_aggregate_path(aggregate))
+}
+
 pub(crate) fn oidc_provider_framework_providers(
-    accepted_clients: &[CanonicalPath],
+    registered_clients: Vec<CanonicalPath>,
     exchangers: &[SubjectTokenExchangerBinding],
 ) -> Vec<FrameworkProvider> {
     let state = || FrameworkDependency::Provider(provider_state_canonical_path());
@@ -109,17 +121,10 @@ pub(crate) fn oidc_provider_framework_providers(
         provider_state_storage(),
         constructed(
             vec![
-                FrameworkDependency::SingletonViews {
-                    singletons: accepted_clients.to_vec(),
-                    view: framework_path(&[
-                        "accepted_clients",
-                        "declares_accepted_client",
-                        "DeclaresAcceptedClient",
-                    ]),
-                },
-                FrameworkDependency::BorrowedTokenIssuance,
+                FrameworkDependency::Providers(registered_clients),
+                FrameworkDependency::TokenIssuance,
             ],
-            ConstructorOutcome::Fallible,
+            ConstructorOutcome::Infallible,
             FrameworkEnablement::Dependency,
             oidc_provider_item_path(OidcProviderItem::AcceptedClients),
         ),
@@ -127,27 +132,18 @@ pub(crate) fn oidc_provider_framework_providers(
             vec![FrameworkDependency::Providers(
                 exchangers
                     .iter()
-                    .map(|binding| subject_token_exchanger_path(&binding.issuer.module_segment))
+                    .map(|binding| subject_token_exchanger_path(&binding.issuer.trust.tag))
                     .collect(),
             )],
             ConstructorOutcome::Infallible,
             FrameworkEnablement::Dependency,
             oidc_provider_item_path(OidcProviderItem::SubjectTokenExchangers),
         ),
-        constructed(
-            vec![
-                FrameworkDependency::BorrowedTokenIssuance,
-                FrameworkDependency::Constant(provider_endpoint_paths_path()),
-            ],
-            ConstructorOutcome::Fallible,
-            FrameworkEnablement::Dependency,
-            oidc_provider_item_path(OidcProviderItem::ProviderEndpoints),
-        ),
         endpoint(
             vec![
                 item(OidcProviderItem::AcceptedClients),
                 state(),
-                item(OidcProviderItem::ProviderEndpoints),
+                FrameworkDependency::Constant(provider_endpoints_path()),
                 FrameworkDependency::TokenIssuance,
             ],
             OidcProviderItem::AuthorizationEndpoint,
@@ -157,14 +153,18 @@ pub(crate) fn oidc_provider_framework_providers(
             OidcProviderItem::ConsentEndpoint,
         ),
         endpoint(
-            vec![item(OidcProviderItem::AcceptedClients), secret_store()],
+            vec![
+                item(OidcProviderItem::AcceptedClients),
+                secret_store(),
+                state(),
+            ],
             OidcProviderItem::IntrospectionEndpoint,
         ),
         constructed(
             vec![
-                borrowed_item(OidcProviderItem::AcceptedClients),
-                borrowed_item(OidcProviderItem::ProviderEndpoints),
-                FrameworkDependency::BorrowedTokenIssuance,
+                aggregate(ProviderAggregate::ProviderSupport),
+                FrameworkDependency::Constant(provider_endpoints_path()),
+                FrameworkDependency::TokenIssuance,
             ],
             ConstructorOutcome::Fallible,
             FrameworkEnablement::WhenReferenced,
@@ -175,6 +175,7 @@ pub(crate) fn oidc_provider_framework_providers(
                 item(OidcProviderItem::AcceptedClients),
                 secret_store(),
                 state(),
+                aggregate(ProviderAggregate::AcceptedResources),
             ],
             OidcProviderItem::RevocationEndpoint,
         ),
@@ -189,7 +190,7 @@ pub(crate) fn oidc_provider_framework_providers(
             OidcProviderItem::TokenEndpoint,
         ),
         endpoint(
-            vec![secret_store(), FrameworkDependency::BorrowedTokenIssuance],
+            vec![secret_store(), FrameworkDependency::TokenIssuance],
             OidcProviderItem::UserinfoEndpoint,
         ),
     ];

@@ -1,15 +1,13 @@
 use serde_json::json;
 
+use margaret_https_url::https_url_error::HttpsUrlError;
 use margaret_oidc_discovery::metadata_endpoint::MetadataEndpoint;
 use margaret_oidc_discovery::provider_metadata::ProviderMetadata;
 use margaret_oidc_discovery::provider_metadata_parsing::ProviderMetadataParsing;
 use margaret_oidc_discovery::provider_metadata_rejection::ProviderMetadataRejection;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
 fn rejects_a_plaintext(endpoint: MetadataEndpoint) -> bool {
-    let issuer = "https://server.example.com"
-        .parse::<IssuerIdentifier>()
-        .expect("the issuer is an https url");
+    let issuer = "https://server.example.com";
     let mut document = json!({
         "issuer": "https://server.example.com",
         "jwks_uri": "https://server.example.com/jwks.json",
@@ -24,8 +22,8 @@ fn rejects_a_plaintext(endpoint: MetadataEndpoint) -> bool {
         );
 
     matches!(
-        ProviderMetadata::parse(document.to_string().as_bytes(), &issuer),
-        ProviderMetadataParsing::Rejected(ProviderMetadataRejection::EndpointNotHttps { endpoint: rejected, .. })
+        ProviderMetadata::parse(document.to_string().as_bytes(), issuer),
+        ProviderMetadataParsing::Rejected(ProviderMetadataRejection::Endpoint { endpoint: rejected, source: HttpsUrlError::NotHttps { .. } })
             if rejected == endpoint
     )
 }

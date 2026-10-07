@@ -11,9 +11,6 @@ use uuid::Uuid;
 use margaret_jws_verification::jws_rejection::JwsRejection;
 use margaret_jwt_verification::claims_rejection::ClaimsRejection;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
-use margaret_oauth_client::client_authentication::ClientAuthentication;
-use margaret_oauth_client::oauth_client::OAuthClient;
-use margaret_oauth_vocabulary::client_id::ClientId;
 use margaret_oidc_provider_tests::margaret_client::MargaretClient;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
@@ -55,23 +52,16 @@ async fn sign_in_at_suite(
     suite: &ConformanceSuite,
     issuer: IssuerIdentifier,
 ) -> RelyingPartyOutcome {
-    let client_id = SUITE_CLIENT_ID
-        .parse::<ClientId>()
-        .expect("the suite client identifier is visible");
     let client = MargaretClient::signing_in(
         || suite.issuer_request_client(),
         TokenTrust {
-            audience: client_id.audience().clone(),
-            issuer,
+            audience: SUITE_CLIENT_ID,
+            issuer: String::leak(issuer.as_str().to_string()),
         },
-        OAuthClient {
-            authentication: ClientAuthentication::ClientSecretBasic(
-                SUITE_CLIENT_SECRET
-                    .parse()
-                    .expect("the suite client secret is not empty"),
-            ),
-            client_id,
-        },
+        SUITE_CLIENT_ID,
+        SUITE_CLIENT_SECRET
+            .parse()
+            .expect("the suite client secret is not empty"),
     )
     .await;
     let flow = client.sign_in_flow();
@@ -254,7 +244,7 @@ const EXPECTATIONS: [ModuleExpectation; 14] = [
             refused_id_token(outcome, |rejection| {
                 matches!(
                     rejection,
-                    JwtRejection::Claims(ClaimsRejection::Malformed { .. })
+                    JwtRejection::Claims(ClaimsRejection::MissingIssuedAt)
                 )
             })
         },

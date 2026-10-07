@@ -4,8 +4,7 @@ use std::sync::atomic::Ordering;
 
 use margaret_authorization_server_client_tests::counting_token_handler::CountingTokenHandler;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_client_credentials::acquired_token::AcquiredToken;
 use margaret_client_credentials::acquired_token_refresh_margin::ACQUIRED_TOKEN_REFRESH_MARGIN;
 use margaret_client_credentials::client_credentials::ClientCredentials;
@@ -25,9 +24,7 @@ async fn renews_a_token_that_expires_within_the_refresh_margin() {
     )
     .await;
     let client_credentials =
-        ClientCredentials::create(Arc::new(server.client(Arc::new(OAuthClientDeclaration {
-            client: secret_basic_client(),
-        }))));
+        ClientCredentials::create(Arc::new(server.client(secret_basic_authentication())));
 
     client_credentials
         .access_token(&artifact_store_target())

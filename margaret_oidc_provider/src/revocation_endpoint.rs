@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -12,7 +11,7 @@ use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_provider_state_storage::refresh_revocation::RefreshRevocation;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
-use margaret_registered_claims::audience::Audience;
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 use margaret_validation::validation_result::ValidationResult;
 
@@ -28,7 +27,7 @@ fn revoked_or_invalid() -> Response {
 
 pub struct RevocationEndpoint {
     clients: Arc<AcceptedClients>,
-    resources: BTreeSet<Audience>,
+    resources: &'static [&'static str],
     secret_store: Arc<JwksSecretStore>,
     state: Arc<dyn StoresProviderState>,
 }
@@ -39,13 +38,11 @@ impl RevocationEndpoint {
         clients: Arc<AcceptedClients>,
         secret_store: Arc<JwksSecretStore>,
         state: Arc<dyn StoresProviderState>,
+        resources: &'static [&'static str],
     ) -> Self {
         Self {
-            resources: clients
-                .clients()
-                .flat_map(|client| client.resources.members().iter().cloned())
-                .collect(),
             clients,
+            resources,
             secret_store,
             state,
         }
@@ -53,27 +50,41 @@ impl RevocationEndpoint {
 
     /// # Errors
     ///
-    /// Returns `ProviderError::State` when the refresh token families cannot be reached.
+    /// Returns `ProviderError::State` when the client assertion cannot be spent or the refresh
+    /// token families cannot be reached.
     pub async fn respond(
         &self,
         request: &Request,
         submission: ValidationResult<TokenSubmission>,
     ) -> Result<Response, ProviderError> {
-        let ValidationResult::Valid(TokenSubmission { client_id, token }) = submission else {
+        let ValidationResult::Valid(TokenSubmission {
+            client_authentication,
+            token,
+        }) = submission
+        else {
             return Ok(oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
                 "the revocation request is malformed",
             ));
         };
-        let client = match authenticated_client(&self.clients, request, client_id.as_deref()) {
+        let now = Utc::now();
+        let client = match authenticated_client(
+            &self.clients,
+            request,
+            &client_authentication,
+            self.state.as_ref(),
+            NumericDate::from(now),
+        )
+        .await?
+        {
             ControlFlow::Break(refusal) => return Ok(refusal),
-            ControlFlow::Continue(client) => client,
+            ControlFlow::Continue(registered) => registered.client(),
         };
 
         if let JwtVerification::Verified(_) =
             self.secret_store
-                .verify_resource_access_token(&token, &self.resources, Utc::now())
+                .verify_resource_access_token(&token, self.resources, now)
         {
             return Ok(oauth_error(
                 400,
@@ -83,7 +94,7 @@ impl RevocationEndpoint {
         }
 
         self.state
-            .revoke_refresh_token(TokenDigest::of(&token), &client.client_id)
+            .revoke_refresh_token(TokenDigest::of(&token), client.client_id)
             .await
             .map_err(ProviderError::State)
             .map(|revocation| match revocation {

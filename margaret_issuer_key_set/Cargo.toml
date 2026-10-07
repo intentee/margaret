@@ -12,6 +12,9 @@ autotests = false
 
 [dependencies]
 margaret_jws_verification = { workspace = true }
+margaret_jwt_verification = { workspace = true }
+margaret_registered_claims = { workspace = true }
+serde = { workspace = true }
 tokio = { workspace = true, features = ["macros", "sync", "time"] }
 
 [dev-dependencies]

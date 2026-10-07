@@ -46,6 +46,12 @@ pub enum ProviderStateError {
         source: Box<dyn Error + Send + Sync>,
     },
 
+    #[error("the provider state could not spend a client assertion: {source}")]
+    SpendClientAssertion {
+        #[source]
+        source: Box<dyn Error + Send + Sync>,
+    },
+
     #[error("the provider state could not spend an authorization code: {source}")]
     SpendCode {
         #[source]

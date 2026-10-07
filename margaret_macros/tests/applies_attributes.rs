@@ -81,16 +81,26 @@ struct Binder {
     prefix: String,
 }
 
-#[provides_jwks_endpoint]
+#[provides_jwks_endpoint(
+    ci,
+    audience = "api",
+    issuer = "https://ci.example",
+    jwks_uri = "https://ci.example/jwks"
+)]
 struct JwksEndpoint;
 
-#[issues_tokens]
+#[issues_tokens(audience = "session", issuer = "https://issuer.example")]
 struct TokenIssuer;
 
-#[trusts_oidc_issuer(partner)]
+#[trusts_oidc_issuer(partner, audience = "api", issuer = "https://partner.example")]
 struct PartnerIssuer;
 
-#[oauth_client(partner_client, issuer = partner)]
+#[oauth_client(
+    partner_client,
+    authentication = private_key_jwt,
+    client_id = "partner",
+    issuer = partner
+)]
 struct PartnerClient;
 
 #[accepts_oauth_client]

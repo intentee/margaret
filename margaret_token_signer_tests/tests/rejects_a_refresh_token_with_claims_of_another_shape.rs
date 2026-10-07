@@ -15,10 +15,10 @@ fn rejects_a_refresh_token_with_claims_of_another_shape() {
     let secret = fresh_p256_secret();
     let token = secret.current().sign_json(
         &json!({
-            "aud": issuance.audience.as_str(),
+            "aud": issuance.audience,
             "exp": 10_000,
             "iat": 0,
-            "iss": issuance.issuer.as_str(),
+            "iss": issuance.issuer,
             "jti": "00000000-0000-0000-0000-000000000001",
             "subject": "00000000-0000-0000-0000-000000000002",
         }),

@@ -7,8 +7,8 @@ use serde::Serializer;
 use serde::de::Error;
 
 use crate::oauth_vocabulary_error::OAuthVocabularyError;
+use crate::openid_scope::OPENID_SCOPE;
 
-const OPENID_SCOPE: &str = "openid";
 const QUOTATION_MARK: u8 = 0x22;
 const REVERSE_SOLIDUS: u8 = 0x5c;
 const FIRST_SCOPE_OCTET: u8 = 0x21;

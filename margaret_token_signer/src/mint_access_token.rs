@@ -9,6 +9,7 @@ use margaret_jwks_keygen::jwks_secret::JwksSecret;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwt_verification::refresh_token_profile::RefreshTokenProfile;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::access_token_minting::AccessTokenMinting;
@@ -22,6 +23,7 @@ pub fn mint_access_token(
     now: DateTime<Utc>,
 ) -> AccessTokenMinting {
     let access_stamp = AccessTokenStamp::issued_by(issuance, now);
+    let verified_at = NumericDate::from(now);
     let VerifiedJwt {
         claims: refresh_claims,
         registered: refresh_registered,
@@ -29,7 +31,7 @@ pub fn mint_access_token(
     } = match secret.verify_jwt::<RefreshTokenClaims, RefreshTokenProfile>(
         refresh_token,
         &issuance.expectation(),
-        access_stamp.registered.iat,
+        verified_at,
     ) {
         JwksSecretVerificationResult::Rejected(rejection) => {
             return AccessTokenMinting::RejectedRefreshToken(rejection);

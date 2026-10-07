@@ -4,7 +4,6 @@ use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
 use margaret_oidc_discovery::provider_metadata::ProviderMetadata;
 use margaret_oidc_discovery::provider_metadata_parsing::ProviderMetadataParsing;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
 const DISCOVERY_SPECIFICATION_EXAMPLE_METADATA: &[u8] =
     include_bytes!("fixtures/openid_connect_discovery_example.json");
@@ -15,12 +14,9 @@ fn advertised(url: &str) -> AdvertisedEndpoint {
 
 #[test]
 fn accepts_the_discovery_specification_example_metadata() {
-    let issuer = "https://server.example.com"
-        .parse::<IssuerIdentifier>()
-        .expect("the issuer is an https url");
-
+    let issuer = "https://server.example.com";
     let ProviderMetadataParsing::Accepted(metadata) =
-        ProviderMetadata::parse(DISCOVERY_SPECIFICATION_EXAMPLE_METADATA, &issuer)
+        ProviderMetadata::parse(DISCOVERY_SPECIFICATION_EXAMPLE_METADATA, issuer)
     else {
         panic!("the discovery specification example metadata is accepted");
     };

@@ -16,10 +16,10 @@ async fn refuses_an_expired_token() {
         .expect("a fresh secret");
     let token = secret.current().sign_json(
         &json!({
-            "aud": trust.audience.as_str(),
+            "aud": trust.audience,
             "exp": 1,
             "iat": 0,
-            "iss": trust.issuer.as_str(),
+            "iss": trust.issuer,
             "sub": "subject",
         }),
         JwtType::AccessToken,

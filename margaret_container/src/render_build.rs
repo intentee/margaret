@@ -71,15 +71,6 @@ fn dependency_expression(
     arc_clone: ArcClone,
 ) -> TokenStream {
     match dependency {
-        PlannedDependency::Borrowed(PlannedField {
-            field_name,
-            provided,
-        }) => {
-            let dependency = format_ident!("{field_name}");
-            let value_type = constructed_type(provided);
-
-            quote! { ::std::sync::Arc::<#value_type>::as_ref(&#dependency) }
-        }
         PlannedDependency::Collection(fields) => {
             let elements = fields
                 .iter()
@@ -90,16 +81,6 @@ fn dependency_expression(
         PlannedDependency::Constant(path) => path_tokens(path),
         PlannedDependency::ServeInput { input, slot } => weaver.weave(input, *slot),
         PlannedDependency::Single(field) => field_expression(field, arc_clone),
-        PlannedDependency::ViewCollection { fields, view } => {
-            let view = path_tokens(view);
-            let elements = fields.iter().map(|field| {
-                let element = field_expression(field, ArcClone::Typed);
-
-                quote! { #element as ::std::sync::Arc<dyn #view> }
-            });
-
-            quote! { ::std::vec::Vec::from([#(#elements),*]) }
-        }
     }
 }
 

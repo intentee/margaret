@@ -1,14 +1,14 @@
-use std::collections::BTreeSet;
 use std::ops::ControlFlow;
 
-use margaret_registered_claims::audience::Audience;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 
 use crate::claims_rejection::ClaimsRejection;
 
+#[derive(Clone, Copy)]
 pub enum ExpectedAudience<'expectation> {
-    AnyOf(&'expectation BTreeSet<Audience>),
-    One(&'expectation Audience),
+    AnyOf(&'expectation [&'expectation str]),
+    One(&'expectation str),
+    Sole(&'expectation str),
 }
 
 impl ExpectedAudience<'_> {
@@ -16,6 +16,9 @@ impl ExpectedAudience<'_> {
         match self {
             Self::AnyOf(expected) => found.contains_any(expected),
             Self::One(expected) => found.contains(expected),
+            Self::Sole(expected) => {
+                matches!(found, AudienceClaim::Single(audience) if audience == expected)
+            }
         }
     }
 
@@ -26,11 +29,18 @@ impl ExpectedAudience<'_> {
 
         ControlFlow::Break(match self {
             Self::AnyOf(expected) => ClaimsRejection::AudienceOutside {
-                expected: (*expected).clone(),
+                expected: expected
+                    .iter()
+                    .map(|audience| (*audience).to_string())
+                    .collect(),
                 found: found.clone(),
             },
             Self::One(expected) => ClaimsRejection::AudienceMismatch {
-                expected: (*expected).clone(),
+                expected: (*expected).to_string(),
+                found: found.clone(),
+            },
+            Self::Sole(expected) => ClaimsRejection::AudienceNotSole {
+                expected: (*expected).to_string(),
                 found: found.clone(),
             },
         })

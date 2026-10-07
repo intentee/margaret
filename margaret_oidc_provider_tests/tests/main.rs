@@ -9,6 +9,8 @@ mod asks_consent_when_an_implicitly_consenting_client_prompts_for_it;
 mod asks_to_authenticate_again_after_the_maximum_authentication_age;
 mod asks_to_authenticate_again_and_keeps_the_consent_prompt;
 mod asks_to_authenticate_again_when_login_is_prompted;
+mod authenticates_the_client_before_refusing_an_unsupported_grant;
+mod awaits_the_signing_keys_of_a_client;
 mod awaits_the_signing_keys_of_the_subject_token_issuer;
 mod exchanges_a_code_of_a_public_client_for_a_named_resource;
 mod exchanges_a_code_without_openid_for_an_access_token_alone;
@@ -34,9 +36,17 @@ mod postgres_provider_refuses_a_refresh_token_revoked_while_its_tokens_are_prepa
 #[cfg(feature = "tests_that_use_postgres")]
 mod postgres_provider_refuses_a_refresh_token_rotated_concurrently;
 #[cfg(feature = "tests_that_use_postgres")]
+mod postgres_provider_reports_a_client_authentication_without_its_state_as_a_server_error;
+#[cfg(feature = "tests_that_use_postgres")]
 mod postgres_provider_reports_a_code_exchange_without_its_state_as_a_server_error;
 #[cfg(feature = "tests_that_use_postgres")]
 mod postgres_provider_reports_a_refresh_without_its_state_as_a_server_error;
+#[cfg(feature = "tests_that_use_postgres")]
+mod postgres_provider_reports_a_revocation_without_its_state_as_a_server_error;
+#[cfg(feature = "tests_that_use_postgres")]
+mod postgres_provider_reports_an_introspection_without_its_state_as_a_server_error;
+#[cfg(feature = "tests_that_use_postgres")]
+mod postgres_provider_spends_a_client_assertion_presented_concurrently_once;
 mod publishes_the_provider_metadata;
 mod redeems_a_code_with_the_rfc_7636_example_verifier;
 mod redeems_an_authorization_code_once;
@@ -54,7 +64,6 @@ mod redirects_a_scope_the_client_may_not_request;
 mod redirects_an_anonymous_end_user_asked_for_no_interaction;
 mod redirects_an_unsupported_response_type;
 mod refreshes_with_the_granted_scopes_when_the_scope_is_empty;
-mod refuses_a_client_with_a_wrong_secret_with_a_basic_challenge;
 mod refuses_a_client_without_credentials_without_a_challenge;
 mod refuses_a_code_exchange_for_a_resource_outside_the_client;
 mod refuses_a_code_exchange_that_names_no_resource_of_several;
@@ -71,6 +80,7 @@ mod refuses_a_refresh_by_a_client_without_the_grant;
 mod refuses_a_refresh_for_a_resource_outside_the_client;
 mod refuses_a_refresh_token_of_another_client;
 mod refuses_a_refresh_with_a_malformed_scope;
+mod refuses_a_replayed_client_assertion;
 mod refuses_a_revocation_by_an_unauthenticated_client;
 mod refuses_a_subject_token_addressed_to_no_exchanger;
 mod refuses_a_subject_token_addressed_to_two_exchangers;
@@ -92,6 +102,7 @@ mod refuses_an_introspection_by_an_unauthenticated_client;
 mod refuses_an_unknown_authorization_code;
 mod refuses_an_unsupported_grant_type;
 mod refuses_an_unsupported_subject_token_type;
+mod refuses_client_authentication_in_the_authorization_header_with_a_basic_challenge;
 mod refuses_client_credentials_beyond_the_client_scope;
 mod refuses_client_credentials_for_a_resource_outside_the_client;
 mod refuses_client_credentials_to_a_client_without_the_grant;
@@ -107,7 +118,6 @@ mod refuses_userinfo_with_a_rejected_token;
 mod refuses_userinfo_with_malformed_credentials;
 mod refuses_userinfo_without_credentials;
 mod rejects_a_client_that_may_not_request_codes;
-mod rejects_a_discovery_route_outside_the_issuer;
 mod rejects_a_malformed_authorization_request;
 mod rejects_a_provider_server_at_another_origin;
 mod rejects_an_authorization_request_of_an_unknown_client;

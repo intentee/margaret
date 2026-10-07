@@ -1,13 +1,12 @@
 use serde_json::Value;
 use uuid::Uuid;
 
-use margaret_oauth_vocabulary::client_id::ClientId;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
 
 pub struct IdTokenClaims {
     pub auth_time: NumericDate,
-    pub client_id: ClientId,
+    pub client_id: &'static str,
     pub nonce: Option<String>,
     pub subject: Uuid,
 }
@@ -21,10 +20,7 @@ impl IdTokenClaims {
             "auth_time".to_string(),
             Value::Number(self.auth_time.seconds_since_epoch().into()),
         );
-        payload.insert(
-            "azp".to_string(),
-            Value::String(self.client_id.as_str().to_string()),
-        );
+        payload.insert("azp".to_string(), Value::String(self.client_id.to_string()));
 
         if let Some(nonce) = &self.nonce {
             payload.insert("nonce".to_string(), Value::String(nonce.clone()));
@@ -53,14 +49,14 @@ mod tests {
     fn issues_exactly_the_members_it_advertises() {
         let payload = IdTokenClaims {
             auth_time: NumericDate::new(100),
-            client_id: "portal".parse().expect("the client id is visible ascii"),
+            client_id: "portal",
             nonce: Some("nonce".to_string()),
             subject: Uuid::nil(),
         }
         .to_payload(&RegisteredClaims {
             aud: AudienceClaim::Single("portal".to_string()),
             exp: NumericDate::new(200),
-            iat: NumericDate::new(100),
+            iat: Some(NumericDate::new(100)),
             iss: "https://issuer.localhost".to_string(),
             jti: None,
             nbf: None,

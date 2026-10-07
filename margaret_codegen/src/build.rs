@@ -2,11 +2,16 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use margaret_accepted_clients_codegen::accepted_client_item::AcceptedClientItem;
+use margaret_accepted_clients_codegen::accepted_client_item_path::accepted_client_item_path;
+use margaret_accepted_clients_codegen::declared_accepted_authentication::DeclaredAcceptedAuthentication;
+use margaret_accepted_clients_codegen::declared_accepted_clients::DeclaredAcceptedClients;
+use margaret_accepted_clients_codegen::provider_aggregate::ProviderAggregate;
+use margaret_accepted_clients_codegen::render_accepted_clients::render_accepted_clients;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::crate_root::CrateRoot;
-use margaret_attributes::framework_attribute::FrameworkAttribute;
 use margaret_console_codegen::console_plan::ConsolePlan;
 use margaret_console_codegen::render_console::render_console;
 use margaret_container::container_bindings::ContainerBindings;
@@ -23,6 +28,9 @@ use margaret_http_codegen::render_http::render_http;
 use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers;
 use margaret_model_codegen::models::models;
+use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
+use margaret_oidc_provider_codegen::oidc_provider_item::OidcProviderItem;
+use margaret_oidc_provider_codegen::oidc_provider_item_path::oidc_provider_item_path;
 use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
 use margaret_request_binding_codegen::views_availability::ViewsAvailability;
@@ -36,7 +44,11 @@ use margaret_service_codegen::service_plan::ServicePlan;
 use margaret_tag_codegen::oauth_client_binding::OAuthClientBinding;
 use margaret_tag_codegen::subject_token_exchanger_binding::SubjectTokenExchangerBinding;
 use margaret_tag_codegen::tag_pool::TagPool;
-use margaret_tag_codegen::trusted_issuer_binding::TrustedIssuerBinding;
+use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
+use margaret_token_issuance_codegen::render_token_issuance::render_token_issuance;
+use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
+use margaret_trusted_issuer_codegen::trusted_issuer_item::TrustedIssuerItem;
+use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_item_path;
 use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 use margaret_views_codegen::render_views::render_views;
 use margaret_views_codegen::views_artifacts::ViewsArtifacts;
@@ -45,6 +57,7 @@ use margaret_websocket_codegen::render_websocket::render_websocket;
 use margaret_websocket_codegen::web_socket_artifacts::WebSocketArtifacts;
 use margaret_websocket_codegen::web_socket_plan::WebSocketPlan;
 
+use crate::accepted_client_framework_providers::accepted_client_framework_providers;
 use crate::asset_bag_modules::asset_bag_modules;
 use crate::asset_responder_canonical_path::asset_responder_canonical_path;
 use crate::build_jwks_artifacts::build_jwks_artifacts;
@@ -56,6 +69,8 @@ use crate::format_pass::format_pass;
 use crate::generated_code::GeneratedCode;
 use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
+use crate::issuer_directory_framework_providers::issuer_directory_framework_providers;
+use crate::issuer_directory_services::issuer_directory_services;
 use crate::jwks_framework_providers::jwks_framework_providers;
 use crate::jwks_secret_storage_provider::jwks_secret_storage_provider;
 use crate::oauth_client_framework_providers::oauth_client_framework_providers;
@@ -71,9 +86,9 @@ use crate::umbrella::umbrella;
 ///
 /// Returns `CodegenError` propagated from the work it performs.
 fn framework_providers(
-    trusted_issuer_bindings: &[TrustedIssuerBinding],
+    trusts: &DeclaredTrusts,
     oauth_client_bindings: &[OAuthClientBinding],
-    accepted_clients: &[CanonicalPath],
+    accepted_clients: &DeclaredAcceptedClients,
     exchanger_bindings: &[SubjectTokenExchangerBinding],
 ) -> Vec<FrameworkProvider> {
     let mut framework_providers = vec![
@@ -86,42 +101,94 @@ fn framework_providers(
         jwks_secret_storage_provider(),
     ];
     framework_providers.extend(jwks_framework_providers());
-    framework_providers.extend(trusted_issuer_framework_providers(trusted_issuer_bindings));
+    framework_providers.extend(trusted_issuer_framework_providers(trusts));
+    framework_providers.extend(
+        accepted_clients
+            .clients
+            .iter()
+            .flat_map(accepted_client_framework_providers),
+    );
+    framework_providers.extend(issuer_directory_framework_providers(
+        trusts
+            .groups
+            .iter()
+            .map(|group| {
+                trusted_issuer_item_path(&group.lead().tag, TrustedIssuerItem::PolledKeySet)
+            })
+            .chain(
+                accepted_clients
+                    .clients
+                    .iter()
+                    .filter(|client| {
+                        matches!(
+                            client.authentication,
+                            DeclaredAcceptedAuthentication::PrivateKeyJwt(_)
+                        )
+                    })
+                    .map(|client| {
+                        accepted_client_item_path(
+                            client.anchor.identifier,
+                            AcceptedClientItem::PolledKeySet,
+                        )
+                    }),
+            )
+            .collect(),
+    ));
     framework_providers.extend(oauth_client_framework_providers(oauth_client_bindings));
     framework_providers.extend(oidc_provider_framework_providers(
-        accepted_clients,
+        accepted_clients
+            .clients
+            .iter()
+            .map(|client| {
+                accepted_client_item_path(
+                    client.anchor.identifier,
+                    AcceptedClientItem::RegisteredClient,
+                )
+            })
+            .collect(),
         exchanger_bindings,
     ));
 
     framework_providers
 }
 
-fn accepted_client_declarations(index: &AttributeIndex) -> Vec<CanonicalPath> {
-    let mut declarations: Vec<CanonicalPath> = index
-        .select_framework_attribute(FrameworkAttribute::AcceptsOAuthClient)
-        .map(|matched| matched.item().canonical_path().clone())
-        .collect();
-
-    declarations.sort();
-
-    declarations
+fn aggregate_consumer(aggregate: ProviderAggregate) -> OidcProviderItem {
+    match aggregate {
+        ProviderAggregate::AcceptedResources => OidcProviderItem::RevocationEndpoint,
+        ProviderAggregate::ProviderSupport => OidcProviderItem::ProviderMetadataHandler,
+    }
 }
 
 fn framework_modules(
     bindings: &ContainerBindings,
-    trusted_issuer_bindings: &[TrustedIssuerBinding],
-    oauth_client_bindings: &[OAuthClientBinding],
+    declarations: &FrameworkDeclarations,
     exchanger_bindings: &[SubjectTokenExchangerBinding],
     features: &mut GeneratedFeatures,
 ) -> FrameworkModules {
     let jwks = build_jwks_artifacts(bindings);
-    let trusted_issuers = build_trusted_issuer_artifacts(bindings, trusted_issuer_bindings);
-    let oauth_clients = build_oauth_client_artifacts(oauth_client_bindings);
+    let trusted_issuers = build_trusted_issuer_artifacts(declarations.trusts);
+    let oauth_clients = build_oauth_client_artifacts(declarations.oauth_clients);
+    let accepted_clients = render_accepted_clients(
+        declarations.accepted_clients,
+        &ProviderAggregate::ALL
+            .into_iter()
+            .filter(|aggregate| {
+                bindings.provides(&oidc_provider_item_path(aggregate_consumer(*aggregate)))
+            })
+            .collect::<Vec<ProviderAggregate>>(),
+    );
     let oidc_provider = build_oidc_provider_artifacts(bindings, exchanger_bindings);
 
     features.enable_if(GeneratedFeature::Jwks, jwks.enabled);
-    features.enable_if(GeneratedFeature::TrustedIssuers, trusted_issuers.enabled);
+    features.enable_if(
+        GeneratedFeature::TrustedIssuers,
+        !trusted_issuers.is_empty(),
+    );
     features.enable_if(GeneratedFeature::OAuthClients, !oauth_clients.is_empty());
+    features.enable_if(
+        GeneratedFeature::AcceptedClients,
+        !accepted_clients.is_empty(),
+    );
     features.enable_if(GeneratedFeature::OidcProvider, !oidc_provider.is_empty());
     features.enable_if(
         GeneratedFeature::Schema,
@@ -131,12 +198,46 @@ fn framework_modules(
     let mut modules = jwks.modules;
     let mut services = jwks.services;
 
-    modules.extend(trusted_issuers.modules);
+    modules.extend(trusted_issuers);
     modules.extend(oauth_clients);
+    modules.extend(accepted_clients);
     modules.extend(oidc_provider);
-    services.extend(trusted_issuers.services);
+    services.extend(issuer_directory_services(bindings));
 
     FrameworkModules { modules, services }
+}
+
+fn render_wrapper_modules<'tags>(
+    index: &AttributeIndex,
+    bindings: &ContainerBindings,
+    features: &GeneratedFeatures,
+    tags: &'tags TagPool<'tags>,
+) -> Result<WrapperModules<'tags>, CodegenError> {
+    let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
+    let serves_requests = features.contains(GeneratedFeature::Http)
+        || features.contains(GeneratedFeature::Websockets);
+    let views_availability = if features.contains(GeneratedFeature::Views) {
+        ViewsAvailability::Available
+    } else {
+        ViewsAvailability::Unavailable
+    };
+    let registries = BindingRegistries::collect(index, views_availability, tags, bindings)?;
+
+    if features.contains(GeneratedFeature::AuthenticatedUsers) && serves_requests {
+        modules.extend(render_authenticated_user_wrappers(&registries.providers()));
+    }
+
+    let middleware_plans = MiddlewarePlans::collect(index, &registries, tags)?;
+
+    if features.contains(GeneratedFeature::Middleware) && serves_requests {
+        modules.extend(render_middleware_wrappers(&middleware_plans.plans));
+    }
+
+    Ok(WrapperModules {
+        middleware_plans,
+        modules,
+        registries,
+    })
 }
 
 fn render_serving_modules(
@@ -145,6 +246,7 @@ fn render_serving_modules(
     features: &GeneratedFeatures,
     middleware_plans: &MiddlewarePlans,
     registries: &BindingRegistries,
+    token_issuance: &DeclaredTokenIssuance,
 ) -> Result<ServingModules, CodegenError> {
     let websockets = if features.contains(GeneratedFeature::Websockets) {
         render_websocket(
@@ -178,7 +280,8 @@ fn render_serving_modules(
             bindings,
             registries,
         )?;
-        let provider_endpoints = provider_endpoint_modules(&plan.route_locations(), bindings)?;
+        let provider_endpoints =
+            provider_endpoint_modules(&plan.route_locations(), bindings, token_issuance)?;
 
         HttpModules {
             artifacts: render_http(plan, bindings),
@@ -192,7 +295,7 @@ fn render_serving_modules(
                 server_serve_inputs: BTreeMap::new(),
                 servers: Vec::new(),
             },
-            provider_endpoints: provider_endpoint_modules(&[], bindings)?,
+            provider_endpoints: provider_endpoint_modules(&[], bindings, token_issuance)?,
         }
     };
 
@@ -209,7 +312,6 @@ fn render_serving_modules(
         retained_roots: [
             websockets.retained_roots,
             views.retained_roots,
-            http.provider_endpoints.retained_roots,
             http.artifacts.retained_roots,
         ]
         .concat(),
@@ -278,9 +380,21 @@ fn render_role_modules(
     })
 }
 
+struct FrameworkDeclarations<'declarations, 'index> {
+    accepted_clients: &'declarations DeclaredAcceptedClients<'index>,
+    oauth_clients: &'declarations DeclaredOAuthClients<'index>,
+    trusts: &'declarations DeclaredTrusts<'index>,
+}
+
 struct FrameworkModules {
     modules: Vec<GeneratedModuleTokens>,
     services: Vec<FrameworkService>,
+}
+
+struct WrapperModules<'tags> {
+    middleware_plans: MiddlewarePlans<'tags>,
+    modules: Vec<GeneratedModuleTokens>,
+    registries: BindingRegistries,
 }
 
 struct ServingModules {
@@ -316,18 +430,21 @@ pub fn build(
         .build();
     let mut features = GeneratedFeatures::from_index(&index);
     let registry = scan(&index)?;
-    let tags = TagPool::collect(&index)?;
-    let trusted_issuer_bindings = tags.trusted_issuer_bindings();
-    let oauth_client_bindings = tags.oauth_client_bindings(&trusted_issuer_bindings)?;
-    let exchanger_bindings =
-        tags.subject_token_exchanger_bindings(&index, &trusted_issuer_bindings)?;
+    let token_issuance = DeclaredTokenIssuance::read(&index)?;
+    let trusts = DeclaredTrusts::read(&index)?;
+    let oauth_clients = DeclaredOAuthClients::read(&index)?;
+    let accepted_clients = DeclaredAcceptedClients::read(&index, &token_issuance)?;
+    let tags = TagPool::collect(&index, &trusts, &oauth_clients)?;
+    let oauth_client_bindings = tags.oauth_client_bindings(&trusts, &oauth_clients)?;
+    let exchanger_bindings = tags.subject_token_exchanger_bindings(&index, &trusts)?;
     let framework_providers = framework_providers(
-        &trusted_issuer_bindings,
+        &trusts,
         &oauth_client_bindings,
-        &accepted_client_declarations(&index),
+        &accepted_clients,
         &exchanger_bindings,
     );
-    let planned_container = plan_container(&index, &registry, &framework_providers)?;
+    let planned_container =
+        plan_container(&index, &registry, &framework_providers, &token_issuance)?;
     let bindings = planned_container.bindings();
     let application_roots = planned_container.roots();
     let mut module_tokens = asset_bag_modules(
@@ -338,46 +455,48 @@ pub fn build(
         embed_relative,
     )?;
     features.enable_if(GeneratedFeature::AssetBag, !module_tokens.is_empty());
+
+    if let DeclaredTokenIssuance::Declared(declaration) = &token_issuance {
+        module_tokens.push(render_token_issuance(declaration));
+        features.enable(GeneratedFeature::TokenIssuance);
+    }
     let FrameworkModules {
         modules: framework_modules,
         services: framework_services,
     } = framework_modules(
         bindings,
-        &trusted_issuer_bindings,
-        &oauth_client_bindings,
+        &FrameworkDeclarations {
+            accepted_clients: &accepted_clients,
+            oauth_clients: &oauth_clients,
+            trusts: &trusts,
+        },
         &exchanger_bindings,
         &mut features,
     );
 
     module_tokens.extend(framework_modules);
 
-    let views_availability = if features.contains(GeneratedFeature::Views) {
-        ViewsAvailability::Available
-    } else {
-        ViewsAvailability::Unavailable
-    };
-    let registries = BindingRegistries::collect(&index, views_availability, &tags, bindings)?;
-    if features.contains(GeneratedFeature::AuthenticatedUsers)
-        && (features.contains(GeneratedFeature::Http)
-            || features.contains(GeneratedFeature::Websockets))
-    {
-        module_tokens.extend(render_authenticated_user_wrappers(&registries.providers()));
-    }
+    let WrapperModules {
+        middleware_plans,
+        modules: wrapper_modules,
+        registries,
+    } = render_wrapper_modules(&index, bindings, &features, &tags)?;
 
-    let middleware_plans = MiddlewarePlans::collect(&index, &registries, &tags)?;
-    if features.contains(GeneratedFeature::Middleware)
-        && (features.contains(GeneratedFeature::Http)
-            || features.contains(GeneratedFeature::Websockets))
-    {
-        module_tokens.extend(render_middleware_wrappers(&middleware_plans.plans));
-    }
+    module_tokens.extend(wrapper_modules);
 
     let ServingModules {
         modules: serving_modules,
         retained_roots: serving_roots,
         served_origin_checks,
         servers,
-    } = render_serving_modules(&index, bindings, &features, &middleware_plans, &registries)?;
+    } = render_serving_modules(
+        &index,
+        bindings,
+        &features,
+        &middleware_plans,
+        &registries,
+        &token_issuance,
+    )?;
 
     module_tokens.extend(serving_modules);
 
@@ -423,6 +542,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
+    use margaret_accepted_clients_codegen::accepted_clients_codegen_error::AcceptedClientsCodegenError;
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_attributes_tests::source_crate::SourceCrate;
@@ -802,24 +922,16 @@ impl GetJwks {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
-use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-#[singleton]
-#[provides_jwks_endpoint(auth)]
+#[provides_jwks_endpoint(auth, audience = \"api\", issuer = \"https://auth.example\", jwks_uri = \"https://auth.example/jwks\")]
 struct AuthJwksEndpoint;
 
-impl ProvidesEndpoint for AuthJwksEndpoint {}
 
-impl DeclaresTokenTrust for AuthJwksEndpoint {}
 
-#[singleton]
-#[provides_jwks_endpoint(partner)]
+#[provides_jwks_endpoint(partner, audience = \"api\", issuer = \"https://partner.example\", jwks_uri = \"https://partner.example/jwks\")]
 struct PartnerJwksEndpoint;
 
-impl ProvidesEndpoint for PartnerJwksEndpoint {}
 
-impl DeclaresTokenTrust for PartnerJwksEndpoint {}
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/verify\", server = \"public\")]
@@ -835,13 +947,9 @@ impl GetVerify {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret::framework::token_issuance::declares_token_issuance::DeclaresTokenIssuance;
 
-#[singleton]
-#[issues_tokens]
+#[issues_tokens(audience = \"session\", issuer = \"https://issuer.fixture\")]
 struct Issuer;
-
-impl DeclaresTokenIssuance for Issuer {}
 
 #[singleton]
 #[responds_to_http(method = \"post\", path = \"/mint\", server = \"internal\")]
@@ -1138,15 +1246,20 @@ impl GetIdentity {
             .collect();
 
         assert!(module(&code, "mod").contains("pub mod trusted_issuers;"));
-        assert!(module(&code, "trusted_issuers").contains("pub mod auth_jwks_endpoint;"));
-        assert!(module(&code, "trusted_issuers").contains("pub mod partner_jwks_endpoint;"));
+        assert!(module(&code, "trusted_issuers").contains("pub mod auth;"));
+        assert!(module(&code, "trusted_issuers").contains("pub mod partner;"));
+        assert!(module(&code, "trusted_issuers/auth").contains(
+            "pub use margaret::framework::trusted_issuer::trusted_issuer::TrustedIssuer;"
+        ));
         assert!(
-            module(&code, "trusted_issuers/auth_jwks_endpoint").contains(
-                "pub use margaret::framework::trusted_issuer::trusted_issuer::TrustedIssuer;"
-            )
+            module(&code, "trusted_issuers/auth/jwks_endpoint_issuer")
+                .contains("jwks_uri: \"https://auth.example/jwks\",")
         );
         assert!(construction.contains(
-            "crate::margaret::trusted_issuers::auth_jwks_endpoint::TrustedIssuer::for_jwks_endpoint(::std::sync::Arc::<crate::AuthJwksEndpoint>::clone(&auth_jwks_endpoint),::std::sync::Arc::<crate::AuthJwksEndpoint>::clone(&auth_jwks_endpoint),)"
+            "crate::margaret::trusted_issuers::auth::PolledKeySet::published(crate::margaret::trusted_issuers::auth::jwks_endpoint_issuer::JWKS_ENDPOINT_ISSUER,::std::sync::Arc::<crate::margaret::trusted_issuers::auth::IssuerKeySet,>::clone(&margaret_trusted_issuers_auth_issuer_key_set),)"
+        ));
+        assert!(construction.contains(
+            "crate::margaret::trusted_issuers::auth::TrustedIssuer::create(::std::sync::Arc::<crate::margaret::trusted_issuers::auth::IssuerKeySet,>::clone(&margaret_trusted_issuers_auth_issuer_key_set),crate::margaret::trusted_issuers::auth::token_trust::TOKEN_TRUST,)"
         ));
         assert!(!concatenated(&code).contains("PublicJwksHandler"));
     }
@@ -1159,22 +1272,9 @@ impl GetIdentity {
             .collect();
         let serve: String = module(&code, "serve").split_whitespace().collect();
 
-        let collected = construction
-            .split_once(
-                "margaret::framework::issuer_directory::issuer_directory::IssuerDirectory::create(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::vec::Vec::from([",
-            )
-            .expect("the directory collects its trusted issuers")
-            .1;
-
-        let auth = collected
-            .find("::clone(&margaret_trusted_issuers_auth_jwks_endpoint_trusted_issuer")
-            .expect("the directory collects the auth issuer");
-        let partner = collected
-            .find("::clone(&margaret_trusted_issuers_partner_jwks_endpoint_trusted_issuer")
-            .expect("the directory collects the partner issuer");
-
-        assert!(auth < partner);
-        assert!(collected.contains(".map_err(margaret::framework::anyhow::Error::from),)?;"));
+        assert!(construction.contains(
+            "letframework_issuer_directory_issuer_directory_issuer_directory=::std::sync::Arc::new(margaret::framework::issuer_directory::issuer_directory::IssuerDirectory::create(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::vec::Vec::from([::std::sync::Arc::<crate::margaret::trusted_issuers::auth::PolledKeySet,>::clone(&margaret_trusted_issuers_auth_polled_key_set),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::PolledKeySet,>::clone(&margaret_trusted_issuers_partner_polled_key_set),]),),);"
+        ));
         assert!(construction.contains(
             "margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient::create().map_err(margaret::framework::anyhow::Error::from),)?;"
         ));
@@ -1204,7 +1304,7 @@ impl GetIdentity {
             .split_whitespace()
             .collect();
         assert!(construction.contains("crate::margaret::jwks::JwksSecretStore::create("));
-        assert!(construction.contains("::std::sync::Arc::<crate::Issuer>::clone(&issuer)"));
+        assert!(construction.contains("crate::margaret::token_issuance::TOKEN_ISSUANCE,"));
         assert!(construction.contains("crate::margaret::jwks::MintAccessTokenHandler::create("));
     }
 
@@ -1213,23 +1313,17 @@ impl GetIdentity {
 pub mod margaret;
 
 mod first {
-    use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-    #[singleton]
-    #[trusts_oidc_issuer(first)]
+    #[trusts_oidc_issuer(first, audience = \"api\", issuer = \"https://first.example\")]
     pub struct Issuer;
 
-    impl DeclaresTokenTrust for Issuer {}
 }
 
 mod second {
-    use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-    #[singleton]
-    #[trusts_oidc_issuer(second)]
+    #[trusts_oidc_issuer(second, audience = \"api\", issuer = \"https://second.example\")]
     pub struct Issuer;
 
-    impl DeclaresTokenTrust for Issuer {}
 }
 
 #[singleton]
@@ -1249,16 +1343,16 @@ impl Page {
             .split_whitespace()
             .collect();
 
-        assert!(module(&code, "trusted_issuers").contains("pub mod first_issuer;"));
-        assert!(module(&code, "trusted_issuers").contains("pub mod second_issuer;"));
+        assert!(module(&code, "trusted_issuers").contains("pub mod first;"));
+        assert!(module(&code, "trusted_issuers").contains("pub mod second;"));
         assert!(construction.contains(
-            "letmargaret_trusted_issuers_first_issuer_issuer_metadata=::std::sync::Arc::new(crate::margaret::trusted_issuers::first_issuer::IssuerMetadata::awaiting(),);"
+            "letmargaret_trusted_issuers_first_issuer_metadata=::std::sync::Arc::new(crate::margaret::trusted_issuers::first::IssuerMetadata::awaiting(),);"
         ));
         assert!(construction.contains(
-            "crate::margaret::trusted_issuers::first_issuer::TrustedIssuer::for_oidc_issuer(::std::sync::Arc::<crate::margaret::trusted_issuers::first_issuer::IssuerMetadata,>::clone(&margaret_trusted_issuers_first_issuer_issuer_metadata),::std::sync::Arc::<crate::first::Issuer>::clone(&first_issuer),)"
+            "crate::margaret::trusted_issuers::first::PolledKeySet::discovered(crate::margaret::trusted_issuers::first::discovered_issuer::DISCOVERED_ISSUER,::std::sync::Arc::<crate::margaret::trusted_issuers::first::IssuerMetadata,>::clone(&margaret_trusted_issuers_first_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::first::IssuerKeySet,>::clone(&margaret_trusted_issuers_first_issuer_key_set),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::trusted_issuers::second_issuer::TrustedIssuer::for_oidc_issuer(::std::sync::Arc::<crate::margaret::trusted_issuers::second_issuer::IssuerMetadata,>::clone(&margaret_trusted_issuers_second_issuer_issuer_metadata),::std::sync::Arc::<crate::second::Issuer>::clone(&second_issuer),)"
+            "crate::margaret::trusted_issuers::second::TrustedIssuer::create(::std::sync::Arc::<crate::margaret::trusted_issuers::second::IssuerKeySet,>::clone(&margaret_trusted_issuers_second_issuer_key_set),crate::margaret::trusted_issuers::second::token_trust::TOKEN_TRUST,)"
         ));
     }
 
@@ -1267,20 +1361,13 @@ impl Page {
 pub mod margaret;
 
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret::framework::oauth_client::declares_oauth_client::DeclaresOAuthClient;
-use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-#[singleton]
-#[trusts_oidc_issuer(partner)]
+#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]
 struct PartnerIssuer;
 
-impl DeclaresTokenTrust for PartnerIssuer {}
 
-#[singleton]
-#[oauth_client(partner_client, issuer = partner)]
+#[oauth_client(partner_client, authentication = client_secret_basic(client_secret_from = \"PARTNER_CLIENT_SECRET\"), client_id = \"partner\", issuer = partner)]
 struct PartnerClient;
-
-impl DeclaresOAuthClient for PartnerClient {}
 
 #[singleton]
 struct Uploader {
@@ -1331,27 +1418,16 @@ impl Page {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret::framework::oauth_client::declares_oauth_client::DeclaresOAuthClient;
-use margaret::framework::token_issuance::declares_token_issuance::DeclaresTokenIssuance;
-use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-#[singleton]
-#[issues_tokens]
+#[issues_tokens(audience = \"session\", issuer = \"https://issuer.fixture\")]
 struct Issuer;
 
-impl DeclaresTokenIssuance for Issuer {}
-
-#[singleton]
-#[trusts_oidc_issuer(partner)]
+#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]
 struct PartnerIssuer;
 
-impl DeclaresTokenTrust for PartnerIssuer {}
 
-#[singleton]
-#[oauth_client(partner_client, issuer = partner)]
+#[oauth_client(partner_client, authentication = private_key_jwt, client_id = \"partner\", issuer = partner)]
 struct PartnerClient;
-
-impl DeclaresOAuthClient for PartnerClient {}
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/sign-in\", server = \"public\")]
@@ -1374,22 +1450,14 @@ impl SignIn {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret::framework::accepted_clients::declares_accepted_client::DeclaresAcceptedClient;
 use margaret::framework::subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;
-use margaret::framework::token_issuance::declares_token_issuance::DeclaresTokenIssuance;
-use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-#[singleton]
-#[issues_tokens]
+#[issues_tokens(audience = \"session\", issuer = \"https://issuer.fixture\")]
 struct Issuer;
 
-impl DeclaresTokenIssuance for Issuer {}
-
-#[singleton]
-#[trusts_oidc_issuer(ci)]
+#[trusts_oidc_issuer(ci, audience = \"api\", issuer = \"https://ci.example\")]
 struct CiIssuer;
 
-impl DeclaresTokenTrust for CiIssuer {}
 
 #[singleton]
 #[exchanges_subject_tokens(issuer = ci)]
@@ -1397,11 +1465,16 @@ struct CiExchanger;
 
 impl ExchangesSubjectTokens for CiExchanger {}
 
-#[singleton]
-#[accepts_oauth_client]
+#[accepts_oauth_client(
+    authentication = private_key_jwt(introspection, jwks_uri = \"https://portal.fixture/jwks.json\"),
+    authorization_code(consent = prompted, id_token_signing = rsa, redirect_uris = [\"https://portal.fixture/callback\"], scopes = [\"openid\"]),
+    client_id = \"portal\",
+    resources = [\"artifacts\"],
+)]
 struct PortalClient;
 
-impl DeclaresAcceptedClient for PortalClient {}
+#[accepts_oauth_client(authentication = none, client_id = \"spa\", resources = [\"reports\"])]
+struct SpaClient;
 
 #[singleton]
 #[responds_to_http(method = \"get\", path = \"/authorize\", server = \"public\")]
@@ -1521,26 +1594,38 @@ impl PostConsent {
             .collect();
 
         assert!(module(&code, "mod").contains("pub mod oidc_provider;"));
+        assert!(module(&code, "mod").contains("pub mod token_issuance;"));
+        assert!(module(&code, "token_issuance").contains("issuer: \"https://issuer.fixture\","));
         assert!(
-            module(&code, "oidc_provider/provider_endpoint_paths")
-                .contains("authorization: \"/authorize\",")
+            module(&code, "oidc_provider/provider_endpoints")
+                .contains("authorization: \"https://issuer.fixture/authorize\",")
+        );
+        assert!(module(&code, "oidc_provider/subject_token_exchangers").contains("pub mod ci;"));
+        assert!(construction.contains(
+            "crate::margaret::oidc_provider::AcceptedClients::create(::std::vec::Vec::from([::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::RegisteredClient,>::clone(&margaret_accepted_clients_clients_portal_client_registered_client,),::std::sync::Arc::<crate::margaret::accepted_clients::clients::spa_client::RegisteredClient,>::clone(&margaret_accepted_clients_clients_spa_client_registered_client),]),crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
+        ));
+        assert!(construction.contains(
+            "crate::margaret::oidc_provider::IntrospectionEndpoint::create(::std::sync::Arc::<crate::margaret::oidc_provider::AcceptedClients,>::clone(&margaret_oidc_provider_accepted_clients),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),::std::sync::Arc::<dynmargaret::framework::provider_state_storage::stores_provider_state::StoresProviderState,>::clone(&framework_provider_state_storage_stores_provider_state_stores_provider_state,),)"
+        ));
+        assert!(construction.contains(
+            "crate::margaret::oidc_provider::subject_token_exchangers::ci::SubjectTokenExchanger::create(::std::sync::Arc::<crate::margaret::trusted_issuers::ci::TrustedIssuer,>::clone(&margaret_trusted_issuers_ci_trusted_issuer),::std::sync::Arc::<crate::CiExchanger>::clone(&ci_exchanger),)"
+        ));
+        assert!(construction.contains(
+            "crate::margaret::oidc_provider::ConsentEndpoint::create(::std::sync::Arc::<dynmargaret::framework::provider_state_storage::stores_provider_state::StoresProviderState,>::clone(&framework_provider_state_storage_stores_provider_state_stores_provider_state,),crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
+        ));
+        assert!(
+            module(&code, "serve")
+                .split_whitespace()
+                .collect::<String>()
+                .contains("read_required::<margaret::framework::provider_state_storage_selection::provider_state_storage_uri::ProviderStateStorageUri,>(\"MARGARET_OIDC_PROVIDER_STATE_STORAGE\")")
         );
         assert!(
-            module(&code, "oidc_provider/subject_token_exchangers").contains("pub mod ci_issuer;")
+            module(&code, "serve")
+                .split_whitespace()
+                .collect::<String>()
+                .contains("read_required::<margaret::framework::jwks_secret_storage_selection::jwks_secret_storage_uri::JwksSecretStorageUri,>(\"MARGARET_JWKS_SECRET_STORAGE\")")
         );
-        assert!(construction.contains(
-            "crate::margaret::oidc_provider::AcceptedClients::create(::std::vec::Vec::from([::std::sync::Arc::<crate::PortalClient>::clone(&portal_client)as::std::sync::Arc<dynmargaret::framework::accepted_clients::declares_accepted_client::DeclaresAcceptedClient,>,]),::std::sync::Arc::<crate::Issuer>::as_ref(&issuer),)"
-        ));
-        assert!(construction.contains(
-            "crate::margaret::oidc_provider::ProviderEndpoints::create(::std::sync::Arc::<crate::Issuer>::as_ref(&issuer),crate::margaret::oidc_provider::provider_endpoint_paths::PROVIDER_ENDPOINT_PATHS,)"
-        ));
-        assert!(construction.contains(
-            "crate::margaret::oidc_provider::subject_token_exchangers::ci_issuer::SubjectTokenExchanger::create(::std::sync::Arc::<crate::margaret::trusted_issuers::ci_issuer::TrustedIssuer,>::clone(&margaret_trusted_issuers_ci_issuer_trusted_issuer),::std::sync::Arc::<crate::CiExchanger>::clone(&ci_exchanger),)"
-        ));
-        assert!(construction.contains(
-            "crate::margaret::oidc_provider::ConsentEndpoint::create(::std::sync::Arc::<dynmargaret::framework::provider_state_storage::stores_provider_state::StoresProviderState,>::clone(&framework_provider_state_storage_stores_provider_state_stores_provider_state,),::std::sync::Arc::<crate::Issuer>::clone(&issuer),)"
-        ));
-        assert!(module(&code, "run").contains("clap::Arg::new(\"oidc-provider-state-storage\")"));
+        assert!(!module(&code, "run").contains("storage"));
         assert!(module(&code, "schema").contains(
             "margaret::framework::provider_state_postgres::provider_state_tables::provider_state_tables()"
         ));
@@ -1549,17 +1634,83 @@ impl PostConsent {
                 .split_whitespace()
                 .collect::<String>()
                 .contains(
-                    "container.margaret_oidc_provider_provider_endpoints().served_by(origin_public)"
+                    "crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.served_by(origin_public)"
                 )
         );
+    }
+
+    #[test]
+    fn registers_each_accepted_client_by_how_it_authenticates() {
+        let code = generate(OIDC_PROVIDER_CRATE).expect("the build succeeds");
+        let construction: String = module(&code, "container/build/serve")
+            .split_whitespace()
+            .collect();
+
+        assert!(module(&code, "mod").contains("pub mod accepted_clients;"));
+        assert!(construction.contains(
+            "crate::margaret::accepted_clients::clients::portal_client::RegisteredClient::private_key_jwt(crate::margaret::accepted_clients::clients::portal_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::portal_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::IssuerKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_issuer_key_set),)"
+        ));
+        assert!(construction.contains(
+            "crate::margaret::accepted_clients::clients::spa_client::RegisteredClient::public(crate::margaret::accepted_clients::clients::spa_client::accepted_client::ACCEPTED_CLIENT,)"
+        ));
+    }
+
+    #[test]
+    fn polls_the_keys_of_confidential_clients_beside_trusted_issuers() {
+        let construction: String = module(
+            &generate(OIDC_PROVIDER_CRATE).expect("the build succeeds"),
+            "container/build/serve",
+        )
+        .split_whitespace()
+        .collect();
+
+        assert!(construction.contains(
+            "crate::margaret::accepted_clients::clients::portal_client::PolledKeySet::published(crate::margaret::accepted_clients::clients::portal_client::jwks_endpoint_issuer::JWKS_ENDPOINT_ISSUER,::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::IssuerKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_issuer_key_set),)"
+        ));
+        assert!(construction.contains(
+            "margaret::framework::issuer_directory::issuer_directory::IssuerDirectory::create(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::vec::Vec::from([::std::sync::Arc::<crate::margaret::trusted_issuers::ci::PolledKeySet,>::clone(&margaret_trusted_issuers_ci_polled_key_set),::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::PolledKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_polled_key_set),]),)"
+        ));
+    }
+
+    #[test]
+    fn describes_the_provider_by_the_aggregates_of_its_accepted_clients() {
+        let construction: String = module(
+            &generate(OIDC_PROVIDER_CRATE).expect("the build succeeds"),
+            "container/build/serve",
+        )
+        .split_whitespace()
+        .collect();
+
+        assert!(construction.contains(
+            "crate::margaret::oidc_provider::ProviderMetadataHandler::create(crate::margaret::accepted_clients::provider_support::PROVIDER_SUPPORT,crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS,crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
+        ));
+        assert!(construction.contains(
+            "crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
+        ));
+    }
+
+    #[test]
+    fn rejects_an_accepted_client_of_an_application_that_issues_no_tokens() {
+        let error = generate(&OIDC_PROVIDER_CRATE.replace(
+            "#[issues_tokens(audience = \"session\", issuer = \"https://issuer.fixture\")]\nstruct Issuer;\n",
+            "",
+        ))
+        .expect_err("an accepted client needs a token issuance");
+
+        assert!(matches!(
+            error,
+            CodegenError::AcceptedClients {
+                source: AcceptedClientsCodegenError::AcceptedWithoutTokenIssuance { anchor }
+            } if anchor == "crate::PortalClient"
+        ));
     }
 
     #[test]
     fn injects_provider_handlers_imported_through_use_statements() {
         let imported = OIDC_PROVIDER_CRATE
             .replace(
-                "use margaret::framework::accepted_clients::declares_accepted_client::DeclaresAcceptedClient;\n",
-                "use margaret::framework::accepted_clients::declares_accepted_client::DeclaresAcceptedClient;\nuse std::sync::Arc;\n\nuse crate::margaret::jwks::PublicJwksHandler;\nuse crate::margaret::oidc_provider;\n",
+                "use margaret::framework::subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;\n",
+                "use margaret::framework::subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;\nuse std::sync::Arc;\n\nuse crate::margaret::jwks::PublicJwksHandler;\nuse crate::margaret::oidc_provider;\n",
             )
             .replace("std::sync::Arc<crate::margaret::oidc_provider::", "Arc<oidc_provider::")
             .replace("std::sync::Arc<crate::margaret::jwks::PublicJwksHandler>", "Arc<PublicJwksHandler>");
@@ -1568,8 +1719,8 @@ impl PostConsent {
 
         assert!(!imported.contains("crate::margaret::oidc_provider::"));
         assert_eq!(
-            module(&code, "oidc_provider/provider_endpoint_paths"),
-            module(&expected, "oidc_provider/provider_endpoint_paths")
+            module(&code, "oidc_provider/provider_endpoints"),
+            module(&expected, "oidc_provider/provider_endpoints")
         );
         assert_eq!(
             module(&code, "container/build/serve"),
@@ -1598,13 +1749,9 @@ impl PostConsent {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret::framework::token_issuance::declares_token_issuance::DeclaresTokenIssuance;
 
-#[singleton]
-#[issues_tokens]
+#[issues_tokens(audience = \"session\", issuer = \"https://issuer.fixture\")]
 struct Issuer;
-
-impl DeclaresTokenIssuance for Issuer {}
 
 #[singleton]
 struct Watcher;
@@ -1633,19 +1780,20 @@ impl Watcher {
             .collect();
 
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),)"
+            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client),::std::sync::Arc::<crate::margaret::jwks::JwksRoller,>::clone(&margaret_jwks_jwks_roller),)"
         ));
     }
 
     #[test]
-    fn rejects_a_sign_in_flow_of_an_application_that_issues_no_tokens() {
-        let error = generate(&SIGN_IN_CRATE.replace("#[issues_tokens]\n", ""))
-            .expect_err("the sign-in flow needs the secret store");
+    fn signs_in_an_application_that_issues_no_tokens() {
+        let code = generate(&SIGN_IN_CRATE.replace(
+            "#[issues_tokens(audience = \"session\", issuer = \"https://issuer.fixture\")]\nstruct Issuer;\n",
+            "",
+        ))
+        .expect("the sign-in flow signs its transactions with the rolled keys");
 
-        assert_eq!(
-            error.to_string(),
-            "failed to generate the dependency container: the framework provider 'crate::margaret::jwks::JwksSecretStore' stamps issued tokens, but no singleton is declared with #[issues_tokens]"
-        );
+        assert!(!has_module(&code, "token_issuance"));
+        assert!(module(&code, "container/build/serve").contains("SignInFlow::create("));
     }
 
     #[test]
@@ -1661,7 +1809,7 @@ impl Watcher {
             "pub use margaret::framework::client_credentials::client_credentials::ClientCredentials;"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::AuthorizationServerClient::create(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::trusted_issuers::partner_issuer::IssuerMetadata,>::clone(&margaret_trusted_issuers_partner_issuer_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::partner_issuer::TrustedIssuer,>::clone(&margaret_trusted_issuers_partner_issuer_trusted_issuer),::std::sync::Arc::<crate::PartnerClient>::clone(&partner_client),)"
+            "crate::margaret::oauth_clients::partner_client::AuthorizationServerClient::with_client_secret_basic(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::IssuerMetadata,>::clone(&margaret_trusted_issuers_partner_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::partner::TrustedIssuer,>::clone(&margaret_trusted_issuers_partner_trusted_issuer),crate::margaret::oauth_clients::partner_client::client_id::CLIENT_ID,serve_input_0"
         ));
         assert!(construction.contains(
             "crate::margaret::oauth_clients::partner_client::ClientCredentials::create("
@@ -1681,10 +1829,21 @@ impl Watcher {
     }
 
     #[test]
+    fn reads_the_client_secret_from_the_declared_environment_variable() {
+        let code: String = concatenated(&generate(OAUTH_CLIENT_CRATE).expect("the build succeeds"))
+            .split_whitespace()
+            .collect();
+
+        assert!(code.contains(
+            "margaret::framework::environment_variable::read_required::read_required::<margaret::framework::oauth_vocabulary::client_secret::ClientSecret,>(\"PARTNER_CLIENT_SECRET\")"
+        ));
+    }
+
+    #[test]
     fn rejects_an_oauth_client_of_an_issuer_without_discovery() {
         assert!(matches!(
             generate(
-                "#[rustfmt::skip]\npub mod margaret;\n\n#[singleton]\n#[provides_jwks_endpoint(partner)]\nstruct Endpoint;\n\n#[singleton]\n#[oauth_client(partner_client, issuer = partner)]\nstruct PartnerClient;\n"
+                "#[rustfmt::skip]\npub mod margaret;\n\n#[provides_jwks_endpoint(partner, audience = \"api\", issuer = \"https://partner.example\", jwks_uri = \"https://partner.example/jwks\")]\nstruct Endpoint;\n\n#[oauth_client(partner_client, authentication = private_key_jwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n"
             ),
             Err(CodegenError::Tag {
                 source: TagError::OAuthClientIssuerNotDiscovered { ref issuer, .. }
@@ -1711,13 +1870,10 @@ pub mod margaret;
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
 use margaret::framework::jwt_verification::id_token_profile::IdTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
-use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-#[singleton]
-#[trusts_oidc_issuer(partner)]
+#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]
 struct Issuer;
 
-impl DeclaresTokenTrust for Issuer {}
 
 struct Claims;
 
@@ -1750,7 +1906,7 @@ impl RunnerPage {
             .collect();
 
         assert!(server.contains(
-            "margaret_trusted_issuers_issuer_trusted_issuer:container.margaret_trusted_issuers_issuer_trusted_issuer(),"
+            "margaret_trusted_issuers_partner_trusted_issuer:container.margaret_trusted_issuers_partner_trusted_issuer(),"
         ));
         assert!(server.contains(
             "margaret::framework::identity::require_bearer_authenticated_user::require_bearer_authenticated_user("
@@ -1764,22 +1920,19 @@ impl RunnerPage {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-#[singleton]
-#[trusts_oidc_issuer(partner)]
+#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]
 struct Issuer;
 
-impl DeclaresTokenTrust for Issuer {}
 
 #[singleton]
 struct Consumer {
-    trusted_issuer: std::sync::Arc<crate::margaret::trusted_issuers::issuer::TrustedIssuer>,
+    trusted_issuer: std::sync::Arc<crate::margaret::trusted_issuers::partner::TrustedIssuer>,
 }
 
 impl Consumer {
     #[constructor]
-    fn create(trusted_issuer: std::sync::Arc<crate::margaret::trusted_issuers::issuer::TrustedIssuer>) -> anyhow::Result<Self> {}
+    fn create(trusted_issuer: std::sync::Arc<crate::margaret::trusted_issuers::partner::TrustedIssuer>) -> anyhow::Result<Self> {}
 }
 ",
         )
@@ -1794,23 +1947,13 @@ impl Consumer {
 pub mod margaret;
 
 use margaret::framework::identity::authenticated_user_outcome::AuthenticatedUserOutcome;
-use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
 use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
-use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-#[singleton]
-#[provides_jwks_endpoint(auth)]
+#[provides_jwks_endpoint(auth, audience = \"api\", issuer = \"https://auth.example\", jwks_uri = \"https://auth.example/jwks\")]
 struct AuthJwksEndpoint;
 
-impl AuthJwksEndpoint {
-    #[constructor]
-    fn create(#[console_argument(from = \"issuer-url\")] issuer_url: String) -> anyhow::Result<Self> {}
-}
 
-impl ProvidesEndpoint for AuthJwksEndpoint {}
-
-impl DeclaresTokenTrust for AuthJwksEndpoint {}
 
 struct Claims;
 
@@ -1843,9 +1986,8 @@ impl HolderPage {
             .collect();
 
         assert!(server.contains(
-            "margaret_trusted_issuers_auth_jwks_endpoint_trusted_issuer:container.margaret_trusted_issuers_auth_jwks_endpoint_trusted_issuer(),"
+            "margaret_trusted_issuers_auth_trusted_issuer:container.margaret_trusted_issuers_auth_trusted_issuer(),"
         ));
-        assert!(module(&code, "run").contains(r#"clap::Arg::new("issuer-url")"#));
     }
 
     const JWKS_NAME_COLLISION_CRATE: &str = "\
@@ -1945,24 +2087,16 @@ impl GetJwks {
 #[rustfmt::skip]
 pub mod margaret;
 
-use margaret::framework::jwks_endpoint::provides_endpoint::ProvidesEndpoint;
-use margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;
 
-#[singleton]
-#[provides_jwks_endpoint(auth)]
+#[provides_jwks_endpoint(auth, audience = \"api\", issuer = \"https://first.example\", jwks_uri = \"https://first.example/jwks\")]
 struct FirstEndpoint;
 
-impl ProvidesEndpoint for FirstEndpoint {}
 
-impl DeclaresTokenTrust for FirstEndpoint {}
 
-#[singleton]
-#[provides_jwks_endpoint(auth)]
+#[provides_jwks_endpoint(auth, audience = \"api\", issuer = \"https://second.example\", jwks_uri = \"https://second.example/jwks\")]
 struct SecondEndpoint;
 
-impl ProvidesEndpoint for SecondEndpoint {}
 
-impl DeclaresTokenTrust for SecondEndpoint {}
 ";
 
     #[test]
@@ -2629,6 +2763,39 @@ impl New {
         assert!(!run.contains("pubasyncfnrun"));
         assert!(command.contains("\"schema\""));
         assert!(run.contains("super::schema::schema()"));
+    }
+
+    #[test]
+    fn propagates_a_token_issuance_failure() {
+        let message = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[issues_tokens(issuer = \"https://issuer.fixture\")]\nstruct Issuer;\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(message.contains("failed to read the token issuance"));
+    }
+
+    #[test]
+    fn propagates_a_trusted_issuer_failure() {
+        let message = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[trusts_oidc_issuer(partner, issuer = \"https://partner.fixture\")]\nstruct Partner;\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(message.contains("failed to read the trusted issuers"));
+    }
+
+    #[test]
+    fn propagates_an_oauth_client_failure() {
+        let message = generate(
+            "#[rustfmt::skip]\npub mod margaret;\n\n#[oauth_client(partner_client, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n",
+        )
+        .expect_err("the build fails")
+        .to_string();
+
+        assert!(message.contains("failed to read the oauth clients"));
     }
 
     #[test]

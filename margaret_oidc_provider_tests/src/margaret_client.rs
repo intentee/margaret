@@ -1,47 +1,48 @@
 use std::sync::Arc;
 
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
+use margaret_issuer_directory::discovered_issuer::DiscoveredIssuer;
 use margaret_issuer_directory_tests::polled_directory::PolledDirectory;
+use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
-use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
-use margaret_oauth_client::client_authentication::ClientAuthentication;
-use margaret_oauth_client::oauth_client::OAuthClient;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
+use margaret_jwks_secret_store_tests::fixture_roller::fixture_roller;
+use margaret_oauth_vocabulary::client_secret::ClientSecret;
+use margaret_oidc_discovery::oidc_discovery_url::oidc_discovery_url;
 use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
-use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 use margaret_token_trust::token_trust::TokenTrust;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
-use crate::portal_secret::PORTAL_SECRET;
 use crate::provider_fixture::ProviderFixture;
+
+const PORTAL_CLIENT_ID: &str = "portal";
 
 pub struct MargaretClient {
     pub directory: PolledDirectory,
+    pub roller: Arc<JwksRoller>,
     pub server: Arc<AuthorizationServerClient>,
 }
 
 impl MargaretClient {
-    /// # Panics
-    ///
-    /// Panics when the portal trust or credentials are malformed.
     pub async fn of_portal(fixture: &ProviderFixture) -> Self {
-        Self::signing_in(
+        let roller = Arc::clone(&fixture.clients.asserting(PORTAL_CLIENT_ID).roller);
+
+        Self::discovering(
             || fixture.issuer_request_client(),
             TokenTrust {
-                audience: "artifacts".parse().expect("the resource is an audience"),
-                issuer: "https://localhost"
-                    .parse()
-                    .expect("the provider issuer is an https url"),
+                audience: "artifacts",
+                issuer: fixture.issuer,
             },
-            OAuthClient {
-                authentication: ClientAuthentication::ClientSecretBasic(
-                    PORTAL_SECRET
-                        .parse()
-                        .expect("the portal secret is not empty"),
-                ),
-                client_id: "portal".parse().expect("the portal identifier is visible"),
+            Arc::clone(&roller),
+            |request_client, metadata, trusted_issuer| {
+                AuthorizationServerClient::with_private_key_jwt(
+                    request_client,
+                    metadata,
+                    trusted_issuer,
+                    PORTAL_CLIENT_ID,
+                    roller,
+                )
             },
         )
         .await
@@ -50,38 +51,74 @@ impl MargaretClient {
     pub async fn signing_in(
         request_client: impl Fn() -> IssuerRequestClient,
         trust: TokenTrust,
-        client: OAuthClient,
+        client_id: &'static str,
+        client_secret: ClientSecret,
     ) -> Self {
-        let metadata = Arc::new(IssuerMetadata::awaiting());
-        let trusted_issuer = Arc::new(TrustedIssuer::for_oidc_issuer(
-            Arc::clone(&metadata),
-            Arc::new(TokenTrustDeclaration { trust }),
-        ));
-        let snapshot = trusted_issuer.key_set.snapshot();
-        let directory = PolledDirectory::start(vec![Arc::clone(&trusted_issuer)], request_client());
-
-        trusted_issuer.key_set.refreshed_since(&snapshot).await;
-
-        Self {
-            directory,
-            server: Arc::new(AuthorizationServerClient::create(
-                Arc::new(request_client()),
-                metadata,
-                trusted_issuer,
-                Arc::new(OAuthClientDeclaration { client }),
-            )),
-        }
+        Self::discovering(
+            request_client,
+            trust,
+            fixture_roller(),
+            |request_client, metadata, trusted_issuer| {
+                AuthorizationServerClient::with_client_secret_basic(
+                    request_client,
+                    metadata,
+                    trusted_issuer,
+                    client_id,
+                    client_secret,
+                )
+            },
+        )
+        .await
     }
 
     #[must_use]
     pub fn sign_in_flow(&self) -> SignInFlow {
-        SignInFlow::create(
-            Arc::clone(&self.server),
-            Arc::new(rolled_store(fresh_p256_secret())),
-        )
+        SignInFlow::create(Arc::clone(&self.server), Arc::clone(&self.roller))
     }
 
     pub async fn stop(self) {
         self.directory.stop().await;
+    }
+
+    async fn discovering(
+        request_client: impl Fn() -> IssuerRequestClient,
+        trust: TokenTrust,
+        roller: Arc<JwksRoller>,
+        server: impl FnOnce(
+            Arc<IssuerRequestClient>,
+            Arc<IssuerMetadata>,
+            Arc<TrustedIssuer>,
+        ) -> AuthorizationServerClient,
+    ) -> Self {
+        let metadata = Arc::new(IssuerMetadata::awaiting());
+        let polled = PolledFixture::discovered(
+            DiscoveredIssuer {
+                discovery_url: String::leak(
+                    oidc_discovery_url(
+                        &trust
+                            .issuer
+                            .parse()
+                            .expect("the trusted issuer is an https url"),
+                    )
+                    .to_string(),
+                ),
+                issuer: trust.issuer,
+            },
+            Arc::clone(&metadata),
+        );
+        let snapshot = polled.key_set.snapshot();
+        let directory = PolledDirectory::start(vec![Arc::clone(&polled.polled)], request_client());
+
+        polled.key_set.refreshed_since(&snapshot).await;
+
+        Self {
+            directory,
+            roller,
+            server: Arc::new(server(
+                Arc::new(request_client()),
+                metadata,
+                Arc::new(polled.trusted(trust)),
+            )),
+        }
     }
 }

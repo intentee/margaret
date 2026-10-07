@@ -11,21 +11,21 @@ use oauth2::basic::BasicErrorResponseType;
 use url::Url;
 
 use margaret_accepted_clients::accepted_client::AcceptedClient;
-use margaret_accepted_clients::accepted_client_authentication::AcceptedClientAuthentication;
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
 use margaret_accepted_clients::authorization_code_grant::AuthorizationCodeGrant;
 use margaret_accepted_clients::client_credentials_grant::ClientCredentialsGrant;
 use margaret_accepted_clients::code_grant_policy::CodeGrantPolicy;
 use margaret_accepted_clients::confidential_privileges::ConfidentialPrivileges;
 use margaret_accepted_clients::refresh_token_grant::RefreshTokenGrant;
+use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_accepted_clients::token_exchange_grant::TokenExchangeGrant;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_identity_session::id_token_claims::IdTokenClaims;
-use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
+use margaret_identity_session::issued_access_token_claims::IssuedAccessTokenClaims;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
+use margaret_oauth_vocabulary::openid_scope::OPENID_SCOPE;
 use margaret_oauth_vocabulary::scope::Scope;
-use margaret_oauth_vocabulary::scope_list::ScopeList;
 use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_provider_state_storage::authorization_grant::AuthorizationGrant;
 use margaret_provider_state_storage::code_spending::CodeSpending;
@@ -35,7 +35,6 @@ use margaret_provider_state_storage::refresh_family::RefreshFamily;
 use margaret_provider_state_storage::refresh_issuance::RefreshIssuance;
 use margaret_provider_state_storage::refresh_rotation::RefreshRotation;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
-use margaret_registered_claims::audience::Audience;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_subject_token_exchange::exchanged_subject::ExchangedSubject;
@@ -43,7 +42,7 @@ use margaret_subject_token_exchange::subject_token_exchangers::SubjectTokenExcha
 use margaret_subject_token_exchange::subject_token_refusal::SubjectTokenRefusal;
 use margaret_token_digest::random_token::random_token;
 use margaret_token_digest::token_digest::TokenDigest;
-use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::authenticated_client::authenticated_client;
@@ -55,6 +54,8 @@ use crate::provider_token_fields::ProviderTokenFields;
 use crate::refresh_token_issue::RefreshTokenIssue;
 use crate::requested_scope::RequestedScope;
 use crate::target_resource::target_resource;
+use crate::temporarily_unavailable::temporarily_unavailable;
+use crate::token_grant::TokenGrant;
 use crate::token_issue::TokenIssue;
 use crate::token_request::TokenRequest;
 
@@ -130,7 +131,7 @@ fn redeemed_issue(
     AuthorizationGrant {
         scopes, subject, ..
     }: AuthorizationGrant,
-    resource: Audience,
+    resource: &'static str,
     id_token: Option<String>,
 ) -> TokenIssue {
     TokenIssue {
@@ -141,7 +142,10 @@ fn redeemed_issue(
             RefreshTokenGrant::Withheld => RefreshTokenIssue::Withheld,
         },
         resource,
-        scopes,
+        scopes: scopes
+            .iter()
+            .map(|scope| scope.as_str().to_string())
+            .collect(),
         subject: subject.to_string(),
     }
 }
@@ -159,7 +163,7 @@ struct TokenExchangeParameters {
 pub struct TokenEndpoint {
     clients: Arc<AcceptedClients>,
     exchangers: Arc<SubjectTokenExchangers>,
-    issuance: Arc<dyn DeclaresTokenIssuance>,
+    issuance: TokenIssuance,
     secret_store: Arc<JwksSecretStore>,
     state: Arc<dyn StoresProviderState>,
 }
@@ -171,7 +175,7 @@ impl TokenEndpoint {
         state: Arc<dyn StoresProviderState>,
         exchangers: Arc<SubjectTokenExchangers>,
         secret_store: Arc<JwksSecretStore>,
-        issuance: Arc<dyn DeclaresTokenIssuance>,
+        issuance: TokenIssuance,
     ) -> Self {
         Self {
             clients,
@@ -192,26 +196,38 @@ impl TokenEndpoint {
         request: &Request,
         token_request: ValidationResult<TokenRequest>,
     ) -> Result<Response, ProviderError> {
-        let ValidationResult::Valid(token_request) = token_request else {
+        let ValidationResult::Valid(TokenRequest {
+            client_authentication,
+            grant,
+        }) = token_request
+        else {
             return Ok(oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
                 "the token request is malformed",
             ));
         };
-        let client = match authenticated_client(&self.clients, request, token_request.client_id()) {
-            ControlFlow::Break(refusal) => return Ok(refusal),
-            ControlFlow::Continue(client) => client,
-        };
         let now = Utc::now();
+        let registered = match authenticated_client(
+            &self.clients,
+            request,
+            &client_authentication,
+            self.state.as_ref(),
+            NumericDate::from(now),
+        )
+        .await?
+        {
+            ControlFlow::Break(refusal) => return Ok(refusal),
+            ControlFlow::Continue(registered) => registered,
+        };
+        let client = registered.client();
 
-        match token_request {
-            TokenRequest::AuthorizationCode {
+        match grant {
+            TokenGrant::AuthorizationCode {
                 code,
                 code_verifier,
                 redirect_uri,
                 resource,
-                ..
             } => {
                 self.authorization_code(
                     client,
@@ -223,14 +239,13 @@ impl TokenEndpoint {
                 )
                 .await
             }
-            TokenRequest::ClientCredentials {
-                resource, scope, ..
-            } => Ok(self.client_credentials(client, resource.as_deref(), scope.as_deref(), now)),
-            TokenRequest::RefreshToken {
+            TokenGrant::ClientCredentials { resource, scope } => {
+                Ok(self.client_credentials(registered, resource.as_deref(), scope.as_deref(), now))
+            }
+            TokenGrant::RefreshToken {
                 refresh_token,
                 resource,
                 scope,
-                ..
             } => {
                 self.refresh_token(
                     client,
@@ -241,7 +256,7 @@ impl TokenEndpoint {
                 )
                 .await
             }
-            TokenRequest::TokenExchange {
+            TokenGrant::TokenExchange {
                 actor_token,
                 audience,
                 requested_token_type,
@@ -249,7 +264,6 @@ impl TokenEndpoint {
                 scope,
                 subject_token,
                 subject_token_type,
-                ..
             } => {
                 self.token_exchange(
                     client,
@@ -266,12 +280,12 @@ impl TokenEndpoint {
                 )
                 .await
             }
-            TokenRequest::GrantTypeOmitted => Ok(oauth_error(
+            TokenGrant::GrantTypeOmitted => Ok(oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
                 "the token request names no grant type",
             )),
-            TokenRequest::Unsupported => Ok(oauth_error(
+            TokenGrant::Unsupported => Ok(oauth_error(
                 400,
                 BasicErrorResponseType::UnsupportedGrantType,
                 "the grant type is not supported",
@@ -294,7 +308,7 @@ impl TokenEndpoint {
         let Ok(redirect_uri) = Url::parse(redirect_uri) else {
             return Ok(invalid_grant("the redirect uri is not a url"));
         };
-        let resource = match target_resource(&client.resources, resource) {
+        let resource = match target_resource(client.resources, resource) {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(resource) => resource,
         };
@@ -313,7 +327,7 @@ impl TokenEndpoint {
             PkceCodeChallenge::from_code_verifier_sha256(&PkceCodeVerifier::new(code_verifier));
 
         if !(CodeAdmission {
-            client_id: &client.client_id,
+            client_id: client.client_id,
             code_challenge: code_challenge.as_str(),
             redirect_uri: &redirect_uri,
         })
@@ -349,27 +363,28 @@ impl TokenEndpoint {
 
     fn client_credentials(
         &self,
-        client: &AcceptedClient,
+        registered: &RegisteredClient,
         resource: Option<&str>,
         scope: Option<&str>,
         now: DateTime<Utc>,
     ) -> Response {
-        let AcceptedClientAuthentication::ClientSecretBasic {
+        let RegisteredClient::Confidential {
+            client,
             privileges:
                 ConfidentialPrivileges {
                     client_credentials: ClientCredentialsGrant::Granted { scopes: granted },
                     ..
                 },
             ..
-        } = &client.authentication
+        } = registered
         else {
             return unauthorized_client();
         };
-        let scopes = match RequestedScope::resolved(scope, granted) {
+        let scopes = match RequestedScope::resolved(scope, &granted.iter().copied().collect()) {
             ControlFlow::Break(refusal) => return refusal,
             ControlFlow::Continue(scopes) => scopes,
         };
-        let resource = match target_resource(&client.resources, resource) {
+        let resource = match target_resource(client.resources, resource) {
             ControlFlow::Break(refusal) => return refusal,
             ControlFlow::Continue(resource) => resource,
         };
@@ -382,7 +397,7 @@ impl TokenEndpoint {
                 refresh: RefreshTokenIssue::Withheld,
                 resource,
                 scopes,
-                subject: client.client_id.as_str().to_string(),
+                subject: client.client_id.to_string(),
             },
             now,
         )
@@ -407,7 +422,7 @@ impl TokenEndpoint {
             .any(Scope::is_openid)
             .then(|| IdTokenClaims {
                 auth_time: NumericDate::from(*auth_time),
-                client_id: client.client_id.clone(),
+                client_id: client.client_id,
                 nonce: nonce.clone(),
                 subject: *subject,
             })
@@ -432,17 +447,14 @@ impl TokenEndpoint {
         }: TokenIssue,
         now: DateTime<Utc>,
     ) -> PreparedTokens {
-        let audience = if scopes.iter().any(Scope::is_openid) {
-            AudienceClaim::Multiple(vec![
-                resource.as_str().to_string(),
-                self.issuance.token_issuance().issuer.as_str().to_string(),
-            ])
+        let audience = if scopes.contains(OPENID_SCOPE) {
+            AudienceClaim::Multiple(vec![resource.to_string(), self.issuance.issuer.to_string()])
         } else {
-            AudienceClaim::Single(resource.as_str().to_string())
+            AudienceClaim::Single(resource.to_string())
         };
-        let claims = ResourceAccessTokenClaims {
-            client_id: client.client_id.clone(),
-            scope: ScopeList { scopes },
+        let claims = IssuedAccessTokenClaims {
+            client_id: client.client_id,
+            scopes,
             subject,
         };
 
@@ -453,7 +465,7 @@ impl TokenEndpoint {
                 issued_token_type: issued_token_type.map(|token_type| token_type.urn().to_string()),
             },
             refresh,
-            scope: claims.scope,
+            scopes: claims.scopes,
         }
     }
 
@@ -476,7 +488,7 @@ impl TokenEndpoint {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(requested) => requested,
         };
-        let resource = match target_resource(&client.resources, resource) {
+        let resource = match target_resource(client.resources, resource) {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(resource) => resource,
         };
@@ -501,7 +513,7 @@ impl TokenEndpoint {
             return Ok(unknown_refresh_token());
         }
 
-        let scopes = match requested.within(&granted) {
+        let scopes = match requested.within(&granted.iter().map(Scope::as_str).collect()) {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(scopes) => scopes,
         };
@@ -580,7 +592,7 @@ impl TokenEndpoint {
             ));
         }
 
-        let resource = match target_resource(&client.resources, audience.or(resource).as_deref()) {
+        let resource = match target_resource(client.resources, audience.or(resource).as_deref()) {
             ControlFlow::Break(refusal) => return Ok(refusal),
             ControlFlow::Continue(resource) => resource,
         };
@@ -593,7 +605,10 @@ impl TokenEndpoint {
                 .map_err(ProviderError::SubjectTokenExchange)?
             {
                 ExchangedSubject::Granted { scopes, subject } => {
-                    match RequestedScope::resolved(scope.as_deref(), &scopes) {
+                    match RequestedScope::resolved(
+                        scope.as_deref(),
+                        &scopes.iter().map(Scope::as_str).collect(),
+                    ) {
                         ControlFlow::Break(refusal) => refusal,
                         ControlFlow::Continue(scopes) => self
                             .prepared_tokens(
@@ -612,9 +627,7 @@ impl TokenEndpoint {
                     }
                 }
                 ExchangedSubject::Refused(refusal) => refused_subject_token(&refusal),
-                ExchangedSubject::SigningKeysAwaited => oauth_error(
-                    503,
-                    BasicErrorResponseType::Extension("temporarily_unavailable".to_string()),
+                ExchangedSubject::SigningKeysAwaited => temporarily_unavailable(
                     "the signing keys of the subject token issuer are not available yet",
                 ),
             },

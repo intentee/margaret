@@ -19,7 +19,7 @@ fn rejects_a_token_of_another_issuer() {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
     } = SignedClaims::new(
-        &json!({ "aud": trust.audience.as_str(), "iss": "https://attacker.example", "exp": 1_000, "iat": 900 }),
+        &json!({ "aud": trust.audience, "iss": "https://attacker.example", "exp": 1_000, "iat": 900 }),
     )
     else {
         panic!("the fixture key set is accepted");

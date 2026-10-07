@@ -3,7 +3,6 @@ use std::sync::Arc;
 use serde_json::json;
 
 use margaret_http_tests::static_handler::StaticHandler;
-use margaret_issuer_directory_tests::first_poll::first_poll;
 use margaret_issuer_directory_tests::fixture_issuer_routes::FixtureIssuerRoutes;
 use margaret_issuer_directory_tests::json_handler::json_handler;
 use margaret_issuer_directory_tests::localhost_oidc_issuer::localhost_oidc_issuer;
@@ -25,7 +24,9 @@ async fn keeps_awaiting_an_oversized_discovery_document() {
     .await;
 
     assert!(matches!(
-        first_poll(&localhost_oidc_issuer(), issuer.request_client()).await,
+        localhost_oidc_issuer()
+            .first_poll(issuer.request_client())
+            .await,
         KeySetRefresh::Refreshed(KeySetHolding::Awaiting)
     ));
 

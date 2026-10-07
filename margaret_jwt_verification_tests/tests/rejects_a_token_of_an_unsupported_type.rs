@@ -22,7 +22,7 @@ fn rejects_a_token_of_an_unsupported_type() {
         token,
     } = SignedClaims::typed(
         "dpop+jwt",
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900 }),
+        &json!({ "aud": trust.audience, "iss": trust.issuer, "exp": 1_000, "iat": 900 }),
     )
     else {
         panic!("the fixture key set is accepted");

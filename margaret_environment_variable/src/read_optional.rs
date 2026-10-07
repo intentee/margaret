@@ -4,6 +4,8 @@ use std::env::var;
 use std::error::Error;
 use std::str::FromStr;
 
+use zeroize::Zeroizing;
+
 use crate::environment_variable_error::EnvironmentVariableError;
 
 /// # Errors
@@ -16,9 +18,11 @@ where
     <Value as FromStr>::Err: Error + Send + Sync + 'static,
 {
     let raw = match var(name) {
-        Ok(raw) => raw,
+        Ok(raw) => Zeroizing::new(raw),
         Err(VarError::NotPresent) => return Ok(None),
-        Err(VarError::NotUnicode(_)) => {
+        Err(VarError::NotUnicode(raw)) => {
+            drop(Zeroizing::new(raw.into_encoded_bytes()));
+
             return Err(EnvironmentVariableError::NotUnicode {
                 name: name.to_string(),
             });

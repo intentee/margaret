@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use url::Url;
 
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
+use margaret_https_url::https_url::HttpsUrl;
 
 use crate::advertised_endpoint::AdvertisedEndpoint;
 use crate::authorization_response_issuer::AuthorizationResponseIssuer;
@@ -12,21 +12,13 @@ use crate::provider_metadata_document::ProviderMetadataDocument;
 use crate::provider_metadata_parsing::ProviderMetadataParsing;
 use crate::provider_metadata_rejection::ProviderMetadataRejection;
 
-const ENDPOINT_SCHEME: &str = "https";
-
 fn https_endpoint(
     endpoint: MetadataEndpoint,
     declared: &str,
 ) -> ControlFlow<ProviderMetadataRejection, Url> {
-    match Url::parse(declared) {
-        Ok(url) if url.scheme() == ENDPOINT_SCHEME => ControlFlow::Continue(url),
-        Ok(url) => ControlFlow::Break(ProviderMetadataRejection::EndpointNotHttps {
-            endpoint,
-            scheme: url.scheme().to_string(),
-        }),
-        Err(source) => {
-            ControlFlow::Break(ProviderMetadataRejection::EndpointMalformed { endpoint, source })
-        }
+    match declared.parse::<HttpsUrl>() {
+        Ok(url) => ControlFlow::Continue(Url::from(url)),
+        Err(source) => ControlFlow::Break(ProviderMetadataRejection::Endpoint { endpoint, source }),
     }
 }
 
@@ -71,11 +63,11 @@ impl ProviderMetadata {
             userinfo_endpoint,
             ..
         }: ProviderMetadataDocument,
-        issuer: &IssuerIdentifier,
+        issuer: &'static str,
     ) -> ControlFlow<ProviderMetadataRejection, Self> {
-        if declared_issuer != issuer.as_str() {
+        if declared_issuer != issuer {
             return ControlFlow::Break(ProviderMetadataRejection::IssuerMismatch {
-                expected: issuer.clone(),
+                expected: issuer,
                 found: declared_issuer,
             });
         }
@@ -102,7 +94,7 @@ impl ProviderMetadata {
     }
 
     #[must_use]
-    pub fn parse(document: &[u8], issuer: &IssuerIdentifier) -> ProviderMetadataParsing {
+    pub fn parse(document: &[u8], issuer: &'static str) -> ProviderMetadataParsing {
         match serde_json::from_slice(document) {
             Ok(document) => match Self::from_document(document, issuer) {
                 ControlFlow::Continue(metadata) => {

@@ -18,8 +18,8 @@ async fn admits_a_token_through_the_declaration_of_its_audience() {
     let addressed = fixture_trust();
     let elsewhere = held_trusted_issuer(
         TokenTrust {
-            audience: "elsewhere".parse().expect("the audience is not empty"),
-            issuer: addressed.issuer.clone(),
+            audience: "elsewhere",
+            issuer: addressed.issuer,
         },
         secret.key_set().clone(),
     );

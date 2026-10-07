@@ -4,9 +4,12 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use margaret_oauth_vocabulary::client_id::ClientId;
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 
+use crate::assertion_refusal::AssertionRefusal;
+use crate::assertion_retention::AssertionRetention;
+use crate::assertion_spending::AssertionSpending;
 use crate::authorization_grant::AuthorizationGrant;
 use crate::code_spending::CodeSpending;
 use crate::code_state::CodeState;
@@ -25,6 +28,8 @@ use crate::refresh_revocation::RefreshRevocation;
 use crate::refresh_rotation::RefreshRotation;
 use crate::refresh_token_standing::RefreshTokenStanding;
 use crate::refresh_token_state::RefreshTokenState;
+use crate::spent_assertion::SpentAssertion;
+use crate::spent_assertion_key::SpentAssertionKey;
 use crate::stores_provider_state::StoresProviderState;
 
 pub struct MemoryProviderState {
@@ -140,7 +145,7 @@ impl StoresProviderState for MemoryProviderState {
     async fn revoke_refresh_token(
         &self,
         presented: TokenDigest,
-        client_id: &ClientId,
+        client_id: &str,
     ) -> Result<RefreshRevocation, ProviderStateError> {
         let caches = self.caches.lock().await;
 
@@ -154,7 +159,7 @@ impl StoresProviderState for MemoryProviderState {
                         family,
                         standing: RefreshTokenStanding::Current,
                     },
-            }) if owner == *client_id => {
+            }) if owner == client_id => {
                 caches.families.invalidate(&family).await;
 
                 RefreshRevocation::Revoked
@@ -231,6 +236,44 @@ impl StoresProviderState for MemoryProviderState {
                 RefreshRotation::Replayed
             }
             None => RefreshRotation::Revoked,
+        })
+    }
+
+    async fn spend_client_assertion(
+        &self,
+        client_id: &str,
+        assertion: TokenDigest,
+        expires_at: NumericDate,
+        now: NumericDate,
+    ) -> Result<AssertionSpending, ProviderStateError> {
+        let AssertionRetention::Retained(retained_for) = AssertionRetention::of(expires_at, now)
+        else {
+            return Ok(AssertionSpending::Refused(AssertionRefusal::Expired));
+        };
+        let key = SpentAssertionKey {
+            assertion,
+            client_id: client_id.to_string(),
+        };
+        let caches = self.caches.lock().await;
+
+        Ok(match caches.assertions.get(&key).await {
+            Some(spent) if spent.expires_at > now => {
+                AssertionSpending::Refused(AssertionRefusal::Replayed)
+            }
+            Some(_) | None => {
+                caches
+                    .assertions
+                    .insert(
+                        key,
+                        SpentAssertion {
+                            expires_at,
+                            retained_for,
+                        },
+                    )
+                    .await;
+
+                AssertionSpending::Spent
+            }
         })
     }
 

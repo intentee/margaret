@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use oauth2::basic::BasicErrorResponseType;
 use serde_json::json;
 
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
@@ -16,7 +16,7 @@ use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
 
 #[tokio::test]
 async fn relays_a_refused_code_exchange() {
-    let fixture = SignInFixture::start(secret_basic_client()).await;
+    let fixture = SignInFixture::start(secret_basic_authentication()).await;
     let SignInBeginning::Redirected(response) = begin_sign_in(&fixture.flow).await else {
         panic!("the sign-in redirects to the authorization endpoint");
     };

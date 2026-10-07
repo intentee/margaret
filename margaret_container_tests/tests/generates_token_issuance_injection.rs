@@ -14,6 +14,7 @@ use margaret_container::render_container::render_container;
 use margaret_container::rendered_container::RenderedContainer;
 use margaret_container_tests::container_module_source::container_module_source;
 use margaret_serve_input_codegen::scan::scan;
+use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
 fn issued_token_store() -> FrameworkProvider {
     FrameworkProvider {
@@ -39,11 +40,16 @@ fn render(fixture: &str) -> Result<RenderedContainer, ContainerError> {
         .build();
     let serve_inputs = scan(&index).expect("the serve inputs are scanned");
 
-    render_container(&index, &serve_inputs, &[issued_token_store()])
+    render_container(
+        &index,
+        &serve_inputs,
+        &[issued_token_store()],
+        &DeclaredTokenIssuance::read(&index).expect("the token issuance is read"),
+    )
 }
 
 #[test]
-fn passes_the_declared_issuer_as_the_token_issuance() {
+fn passes_the_declared_token_issuance_constant() {
     let source: String = container_module_source(
         render("token_issuance")
             .expect("the issuance fixture renders")
@@ -53,15 +59,7 @@ fn passes_the_declared_issuer_as_the_token_issuance() {
     .collect();
 
     assert!(source.contains(
-        "crate::IssuedTokenStore::create(::std::sync::Arc::<crate::Issuer>::clone(&issuer),)"
-    ));
-}
-
-#[test]
-fn rejects_two_singletons_that_issue_tokens() {
-    assert!(matches!(
-        render("token_issuance_ambiguous"),
-        Err(ContainerError::AmbiguousTokenIssuance { .. })
+        "crate::IssuedTokenStore::create(crate::margaret::token_issuance::TOKEN_ISSUANCE)"
     ));
 }
 
@@ -70,16 +68,5 @@ fn rejects_a_token_issuance_without_a_declared_issuer() {
     assert!(matches!(
         render("token_issuance_absent"),
         Err(ContainerError::MissingTokenIssuance { .. })
-    ));
-}
-
-#[test]
-fn rejects_an_issuer_without_the_issuance_trait() {
-    assert!(matches!(
-        render("token_issuance_missing_trait"),
-        Err(ContainerError::DeclarationMissingTrait {
-            attribute: "issues_tokens",
-            ..
-        })
     ));
 }

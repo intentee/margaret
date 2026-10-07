@@ -7,13 +7,12 @@ use serde::Serialize;
 use url::Url;
 use uuid::Uuid;
 
-use margaret_oauth_vocabulary::client_id::ClientId;
 use margaret_oauth_vocabulary::scope::Scope;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AuthorizationGrant {
     pub auth_time: DateTime<Utc>,
-    pub client_id: ClientId,
+    pub client_id: String,
     pub code_challenge: String,
     pub nonce: Option<String>,
     pub redirect_uri: Url,

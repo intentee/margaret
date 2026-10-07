@@ -54,6 +54,7 @@ mod tests {
     use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
     use margaret_serve_input_codegen::scan::scan;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use super::render_authenticated_user_wrapper_construction;
     use crate::authenticated_user_application::AuthenticatedUserApplication;
@@ -87,6 +88,7 @@ mod tests {
             &index,
             &scan(&index).expect("the serve inputs are scanned"),
             &[],
+            &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")
         .bindings

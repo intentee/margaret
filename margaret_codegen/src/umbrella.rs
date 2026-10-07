@@ -13,6 +13,10 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
         source.push_str("#[rustfmt::skip]\npub mod asset_bag;\n");
     }
 
+    if features.contains(GeneratedFeature::TokenIssuance) {
+        source.push_str("#[rustfmt::skip]\npub mod token_issuance;\n");
+    }
+
     if features.contains(GeneratedFeature::Jwks) {
         source.push_str("#[rustfmt::skip]\npub mod jwks;\n");
     }
@@ -23,6 +27,10 @@ pub(crate) fn umbrella(features: &GeneratedFeatures) -> GeneratedModule {
 
     if features.contains(GeneratedFeature::OAuthClients) {
         source.push_str("#[rustfmt::skip]\npub mod oauth_clients;\n");
+    }
+
+    if features.contains(GeneratedFeature::AcceptedClients) {
+        source.push_str("#[rustfmt::skip]\npub mod accepted_clients;\n");
     }
 
     if features.contains(GeneratedFeature::OidcProvider) {

@@ -1,10 +1,13 @@
 pub mod held_key_set;
 pub mod issuer_fetch_spacing;
 pub mod issuer_key_set;
+pub mod issuer_verification;
 pub mod key_set_holding;
 pub mod key_set_poll_interval_after_ready;
 mod key_set_polling;
 pub mod key_set_refresh;
 pub mod key_set_snapshot;
 mod key_set_state;
+mod key_set_verification;
 mod refresh_progress;
+mod verify_with_key_set;

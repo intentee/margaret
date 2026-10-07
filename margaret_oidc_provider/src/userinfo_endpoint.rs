@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -16,9 +15,8 @@ use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
 use margaret_oauth_vocabulary::scope_list::ScopeList;
-use margaret_registered_claims::audience::Audience;
 use margaret_registered_claims::merge_claims::merge_claims;
-use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::no_store::no_store;
 use crate::provider_error::ProviderError;
@@ -32,18 +30,15 @@ fn refused(challenge: BearerChallenge) -> UserinfoAuthentication {
 }
 
 pub struct UserinfoEndpoint {
-    audiences: BTreeSet<Audience>,
+    issuance: TokenIssuance,
     secret_store: Arc<JwksSecretStore>,
 }
 
 impl UserinfoEndpoint {
     #[must_use]
-    pub fn create(
-        secret_store: Arc<JwksSecretStore>,
-        issuance: &dyn DeclaresTokenIssuance,
-    ) -> Self {
+    pub fn create(secret_store: Arc<JwksSecretStore>, issuance: TokenIssuance) -> Self {
         Self {
-            audiences: BTreeSet::from([Audience::from(&issuance.token_issuance().issuer)]),
+            issuance,
             secret_store,
         }
     }
@@ -76,7 +71,7 @@ impl UserinfoEndpoint {
 
         match self.secret_store.verify_resource_access_token(
             token.as_str(),
-            &self.audiences,
+            &[self.issuance.issuer],
             Utc::now(),
         ) {
             JwtVerification::Rejected(_) => refused(BearerChallenge::InvalidToken),

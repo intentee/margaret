@@ -83,7 +83,11 @@ fn granted_scopes(
     request: &AuthorizationRequest,
 ) -> ControlFlow<AuthorizationError, BTreeSet<Scope>> {
     match request.scope.as_deref().map(str::parse::<ScopeList>) {
-        Some(Ok(ScopeList { scopes })) if scopes.is_subset(&policy.scopes) => {
+        Some(Ok(ScopeList { scopes }))
+            if scopes
+                .iter()
+                .all(|scope| policy.scopes.contains(&scope.as_str())) =>
+        {
             ControlFlow::Continue(scopes)
         }
         Some(Ok(_)) => ControlFlow::Break(AuthorizationError::ScopeNotGranted),

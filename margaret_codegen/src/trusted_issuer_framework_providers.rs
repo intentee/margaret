@@ -4,107 +4,107 @@ use margaret_container::framework_dependency::FrameworkDependency;
 use margaret_container::framework_enablement::FrameworkEnablement;
 use margaret_container::framework_injection_role::FrameworkInjectionRole;
 use margaret_container::framework_provider::FrameworkProvider;
-use margaret_tag_codegen::trusted_issuer_binding::TrustedIssuerBinding;
-use margaret_tag_codegen::trusted_issuer_kind::TrustedIssuerKind;
-use margaret_trusted_issuer_codegen::issuer_metadata_canonical_path::issuer_metadata_canonical_path;
-use margaret_trusted_issuer_codegen::trusted_issuer_canonical_path::trusted_issuer_canonical_path;
+use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
+use margaret_trusted_issuer_codegen::trusted_issuer_constant::TrustedIssuerConstant;
+use margaret_trusted_issuer_codegen::trusted_issuer_constant_path::trusted_issuer_constant_path;
+use margaret_trusted_issuer_codegen::trusted_issuer_group::TrustedIssuerGroup;
+use margaret_trusted_issuer_codegen::trusted_issuer_item::TrustedIssuerItem;
+use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_item_path;
 
-use crate::issuer_directory_canonical_path::issuer_directory_canonical_path;
-use crate::issuer_request_client_canonical_path::issuer_request_client_canonical_path;
-
-fn trusted_issuer_providers(
-    TrustedIssuerBinding {
-        declaring,
-        kind,
-        module_segment,
-        tag,
-    }: &TrustedIssuerBinding,
-) -> Vec<FrameworkProvider> {
-    let trusted_issuer = |dependencies: Vec<FrameworkDependency>, method: &str| FrameworkProvider {
-        construction: FrameworkConstruction::Constructor {
-            dependencies,
-            is_async: false,
-            method: method.to_string(),
-            outcome: ConstructorOutcome::Infallible,
-        },
-        enablement: FrameworkEnablement::Always,
-        injection: FrameworkInjectionRole::TrustedIssuer(tag.clone()),
-        provided: trusted_issuer_canonical_path(module_segment),
-    };
-
-    match kind {
-        TrustedIssuerKind::JwksEndpoint => vec![trusted_issuer(
-            vec![
-                FrameworkDependency::SingletonView(declaring.clone()),
-                FrameworkDependency::SingletonView(declaring.clone()),
-            ],
-            "for_jwks_endpoint",
-        )],
-        TrustedIssuerKind::OidcIssuer => vec![
-            FrameworkProvider {
-                construction: FrameworkConstruction::Constructor {
-                    dependencies: Vec::new(),
-                    is_async: false,
-                    method: "awaiting".to_string(),
-                    outcome: ConstructorOutcome::Infallible,
-                },
-                enablement: FrameworkEnablement::Dependency,
-                injection: FrameworkInjectionRole::Unmarked,
-                provided: issuer_metadata_canonical_path(module_segment),
-            },
-            trusted_issuer(
-                vec![
-                    FrameworkDependency::Provider(issuer_metadata_canonical_path(module_segment)),
-                    FrameworkDependency::SingletonView(declaring.clone()),
-                ],
-                "for_oidc_issuer",
-            ),
-        ],
+fn constructed(
+    dependencies: Vec<FrameworkDependency>,
+    method: &str,
+    outcome: ConstructorOutcome,
+) -> FrameworkConstruction {
+    FrameworkConstruction::Constructor {
+        dependencies,
+        is_async: false,
+        method: method.to_string(),
+        outcome,
     }
 }
 
-pub(crate) fn trusted_issuer_framework_providers(
-    trusted_issuer_bindings: &[TrustedIssuerBinding],
-) -> Vec<FrameworkProvider> {
-    if trusted_issuer_bindings.is_empty() {
-        return Vec::new();
+fn awaiting(provided: TrustedIssuerItem, group: &TrustedIssuerGroup) -> FrameworkProvider {
+    FrameworkProvider {
+        construction: constructed(Vec::new(), "awaiting", ConstructorOutcome::Infallible),
+        enablement: FrameworkEnablement::Dependency,
+        injection: FrameworkInjectionRole::Unmarked,
+        provided: trusted_issuer_item_path(&group.lead().tag, provided),
     }
+}
 
-    let mut providers: Vec<FrameworkProvider> = trusted_issuer_bindings
-        .iter()
-        .flat_map(trusted_issuer_providers)
-        .collect();
+fn group_providers(group: &TrustedIssuerGroup) -> Vec<FrameworkProvider> {
+    let lead = &group.lead().tag;
+    let key_set = || {
+        FrameworkDependency::Provider(trusted_issuer_item_path(
+            lead,
+            TrustedIssuerItem::IssuerKeySet,
+        ))
+    };
+    let (mut providers, polled_key_set) = match group {
+        TrustedIssuerGroup::Discovered { .. } => (
+            vec![awaiting(TrustedIssuerItem::IssuerMetadata, group)],
+            constructed(
+                vec![
+                    FrameworkDependency::Constant(trusted_issuer_constant_path(
+                        lead,
+                        TrustedIssuerConstant::DiscoveredIssuer,
+                    )),
+                    FrameworkDependency::Provider(trusted_issuer_item_path(
+                        lead,
+                        TrustedIssuerItem::IssuerMetadata,
+                    )),
+                    key_set(),
+                ],
+                "discovered",
+                ConstructorOutcome::Infallible,
+            ),
+        ),
+        TrustedIssuerGroup::JwksEndpoint { .. } => (
+            Vec::new(),
+            constructed(
+                vec![
+                    FrameworkDependency::Constant(trusted_issuer_constant_path(
+                        lead,
+                        TrustedIssuerConstant::JwksEndpointIssuer,
+                    )),
+                    key_set(),
+                ],
+                "published",
+                ConstructorOutcome::Infallible,
+            ),
+        ),
+    };
 
+    providers.push(awaiting(TrustedIssuerItem::IssuerKeySet, group));
     providers.push(FrameworkProvider {
-        construction: FrameworkConstruction::Constructor {
-            dependencies: Vec::new(),
-            is_async: false,
-            method: "create".to_string(),
-            outcome: ConstructorOutcome::Fallible,
-        },
-        enablement: FrameworkEnablement::Always,
+        construction: polled_key_set,
+        enablement: FrameworkEnablement::Dependency,
         injection: FrameworkInjectionRole::Unmarked,
-        provided: issuer_request_client_canonical_path(),
+        provided: trusted_issuer_item_path(lead, TrustedIssuerItem::PolledKeySet),
     });
-    providers.push(FrameworkProvider {
-        construction: FrameworkConstruction::Constructor {
-            dependencies: vec![
-                FrameworkDependency::Provider(issuer_request_client_canonical_path()),
-                FrameworkDependency::Providers(
-                    trusted_issuer_bindings
-                        .iter()
-                        .map(|binding| trusted_issuer_canonical_path(&binding.module_segment))
-                        .collect(),
-                ),
+    providers.extend(group.members().map(|trust| FrameworkProvider {
+        construction: constructed(
+            vec![
+                key_set(),
+                FrameworkDependency::Constant(trusted_issuer_constant_path(
+                    &trust.tag,
+                    TrustedIssuerConstant::TokenTrust,
+                )),
             ],
-            is_async: false,
-            method: "create".to_string(),
-            outcome: ConstructorOutcome::Fallible,
-        },
+            "create",
+            ConstructorOutcome::Infallible,
+        ),
         enablement: FrameworkEnablement::Always,
-        injection: FrameworkInjectionRole::Unmarked,
-        provided: issuer_directory_canonical_path(),
-    });
+        injection: FrameworkInjectionRole::TrustedIssuer(trust.tag.clone()),
+        provided: trusted_issuer_item_path(&trust.tag, TrustedIssuerItem::TrustedIssuer),
+    }));
 
     providers
+}
+
+pub(crate) fn trusted_issuer_framework_providers(
+    trusts: &DeclaredTrusts,
+) -> Vec<FrameworkProvider> {
+    trusts.groups.iter().flat_map(group_providers).collect()
 }

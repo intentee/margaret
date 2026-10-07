@@ -36,6 +36,7 @@ impl Display for DiscoveryFailure {
 mod tests {
     use reqwest::StatusCode;
 
+    use margaret_https_url::https_url_error::HttpsUrlError;
     use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
     use margaret_oidc_discovery::metadata_endpoint::MetadataEndpoint;
     use margaret_oidc_discovery::provider_metadata_rejection::ProviderMetadataRejection;
@@ -46,9 +47,11 @@ mod tests {
     fn describes_every_failure() {
         let described = [
             DiscoveryFailure::Exchange(IssuerExchangeError::Oversized { max_bytes: 16 }),
-            DiscoveryFailure::MetadataRejected(ProviderMetadataRejection::EndpointNotHttps {
+            DiscoveryFailure::MetadataRejected(ProviderMetadataRejection::Endpoint {
                 endpoint: MetadataEndpoint::JwksUri,
-                scheme: "http".to_string(),
+                source: HttpsUrlError::NotHttps {
+                    scheme: "http".to_string(),
+                },
             }),
             DiscoveryFailure::Status(StatusCode::NOT_FOUND),
         ]
@@ -60,7 +63,7 @@ mod tests {
         );
         assert_eq!(
             described[1],
-            "the provider metadata is rejected: the provider jwks_uri uses the 'http' scheme instead of https"
+            "the provider metadata is rejected: the provider jwks_uri is rejected: the url uses the 'http' scheme instead of https"
         );
         assert_eq!(
             described[2],

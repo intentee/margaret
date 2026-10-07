@@ -2,7 +2,6 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::str::FromStr;
 
-use crate::issuer_identifier::IssuerIdentifier;
 use crate::registered_claims_error::RegisteredClaimsError;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -34,13 +33,5 @@ impl FromStr for Audience {
         Ok(Self {
             value: value.to_string(),
         })
-    }
-}
-
-impl From<&IssuerIdentifier> for Audience {
-    fn from(issuer: &IssuerIdentifier) -> Self {
-        Self {
-            value: issuer.as_str().to_string(),
-        }
     }
 }

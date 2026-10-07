@@ -15,10 +15,8 @@ fn refuses_a_token_of_an_untrusted_issuer() {
         .expect("a fresh secret");
     let trusted_issuer = held_trusted_issuer(
         TokenTrust {
-            audience: "margaret".parse().expect("the audience is not empty"),
-            issuer: "https://other.example"
-                .parse()
-                .expect("the issuer is an https url"),
+            audience: "margaret",
+            issuer: "https://other.example",
         },
         secret.key_set().clone(),
     );

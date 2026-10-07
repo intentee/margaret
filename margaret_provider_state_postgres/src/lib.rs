@@ -1,4 +1,5 @@
 mod authorization_codes_table;
+mod client_assertions_table;
 mod decide_pending_authorization_statement;
 mod decided_row;
 mod hold_pending_authorization_statement;
@@ -17,4 +18,5 @@ mod revoke_refresh_family_statement;
 mod revoke_refresh_token_statement;
 mod rotate_refresh_token_statement;
 mod settlement_row;
+mod spend_client_assertion_statement;
 mod spend_code_statement;

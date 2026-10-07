@@ -1,3 +1,4 @@
+mod accepted_client_framework_providers;
 mod asset_bag_modules;
 mod asset_macro_canonical_path;
 mod asset_responder_canonical_path;
@@ -15,6 +16,8 @@ pub mod generated_code;
 mod generated_feature;
 mod generated_features;
 mod issuer_directory_canonical_path;
+mod issuer_directory_framework_providers;
+mod issuer_directory_services;
 mod issuer_request_client_canonical_path;
 mod jwks_framework_providers;
 mod jwks_framework_services;

@@ -42,18 +42,16 @@ pub async fn introspect_bearer_token<TClaims: DeserializeOwned>(
     };
 
     match server.introspect::<ExtensionMembers>(token.as_str()).await {
-        EndpointOutcome::Answered(introspection) => match judge_introspection(
-            &introspection,
-            server.trusted_issuer.trust.token_trust(),
-            Utc::now(),
-        ) {
-            IntrospectionVerdict::Accepted(token) => TokenAdmission::Admitted(token),
-            IntrospectionVerdict::Rejected(rejection) => {
-                warn!("Refusing an introspected bearer token: {rejection}");
+        EndpointOutcome::Answered(introspection) => {
+            match judge_introspection(&introspection, &server.trusted_issuer.trust, Utc::now()) {
+                IntrospectionVerdict::Accepted(token) => TokenAdmission::Admitted(token),
+                IntrospectionVerdict::Rejected(rejection) => {
+                    warn!("Refusing an introspected bearer token: {rejection}");
 
-                refused(BearerChallenge::InvalidToken.response())
+                    refused(BearerChallenge::InvalidToken.response())
+                }
             }
-        },
+        }
         EndpointOutcome::Refused(refusal) => {
             error!("The introspection endpoint refused to introspect a bearer token: {refusal}");
 

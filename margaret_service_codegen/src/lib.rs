@@ -29,6 +29,7 @@ mod tests {
     use margaret_http_codegen::server_transport_policy::ServerTransportPolicy;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
     use crate::first_tick::FirstTick;
     use crate::framework_service::FrameworkService;
@@ -42,7 +43,7 @@ mod tests {
     fn bindings(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
+        render_container(index, &registry, &[], &DeclaredTokenIssuance::Absent)
             .expect("the container is rendered")
             .bindings
     }
@@ -131,7 +132,13 @@ mod tests {
             false,
             &bindings,
             &[ServedOriginCheck {
-                accessor_field: "health".to_string(),
+                endpoints: CanonicalPath::new(vec![
+                    "crate".to_string(),
+                    "margaret".to_string(),
+                    "oidc_provider".to_string(),
+                    "provider_endpoints".to_string(),
+                    "PROVIDER_ENDPOINTS".to_string(),
+                ]),
                 server: "public".to_string(),
             }],
         )
@@ -142,7 +149,7 @@ mod tests {
         .collect();
 
         assert!(source.contains(
-            "iflet::std::result::Result::Err(error)=container.health().served_by(origin_public){return::std::result::Result::Err(margaret::framework::console::report_failure::report_failure(error),);}"
+            "iflet::std::result::Result::Err(error)=crate::margaret::oidc_provider::provider_endpoints::PROVIDER_ENDPOINTS.served_by(origin_public){return::std::result::Result::Err(margaret::framework::console::report_failure::report_failure(error),);}"
         ));
     }
 

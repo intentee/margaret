@@ -4,10 +4,9 @@ use std::sync::Arc;
 use serde_json::Value;
 use serde_json::json;
 
-use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
+use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_subject_token_exchange::subject_token_profile::SubjectTokenProfile;
@@ -38,7 +37,7 @@ impl TrustedRepositoryIssuer {
         &self,
     ) -> Arc<SubjectTokenExchanger> {
         Arc::new(SubjectTokenExchanger::create(
-            Arc::new(self.trusted_issuer(PROVIDER_AUDIENCE)),
+            Arc::new(self.trusted_issuer(Arc::new(IssuerKeySet::awaiting()), PROVIDER_AUDIENCE)),
             Arc::new(RepositoryExchanger::<TProfile> {
                 profile: PhantomData,
             }),
@@ -63,7 +62,7 @@ impl TrustedRepositoryIssuer {
     #[must_use]
     pub fn publishing_keys_for<TProfile: SubjectTokenProfile + Send + Sync + 'static>(
         &self,
-        audience: &str,
+        audience: &'static str,
     ) -> Arc<SubjectTokenExchanger> {
         self.published_exchanger(
             audience,
@@ -85,30 +84,26 @@ impl TrustedRepositoryIssuer {
 
     fn published_exchanger<TExchanger: ExchangesSubjectTokens>(
         &self,
-        audience: &str,
+        audience: &'static str,
         exchanger: TExchanger,
     ) -> Arc<SubjectTokenExchanger> {
-        let trusted_issuer = self.trusted_issuer(audience);
+        let key_set = Arc::new(IssuerKeySet::awaiting());
 
-        trusted_issuer
-            .key_set
-            .hold(Arc::new(self.secret.key_set().clone()));
+        key_set.hold(Arc::new(self.secret.key_set().clone()));
 
         Arc::new(SubjectTokenExchanger::create(
-            Arc::new(trusted_issuer),
+            Arc::new(self.trusted_issuer(key_set, audience)),
             Arc::new(exchanger),
         ))
     }
 
-    fn trusted_issuer(&self, audience: &str) -> TrustedIssuer {
-        TrustedIssuer::for_oidc_issuer(
-            Arc::new(IssuerMetadata::awaiting()),
-            Arc::new(TokenTrustDeclaration {
-                trust: TokenTrust {
-                    audience: audience.parse().expect("the audience is not empty"),
-                    issuer: self.issuer.parse().expect("the issuer is an https url"),
-                },
-            }),
+    fn trusted_issuer(&self, key_set: Arc<IssuerKeySet>, audience: &'static str) -> TrustedIssuer {
+        TrustedIssuer::create(
+            key_set,
+            TokenTrust {
+                audience,
+                issuer: self.issuer,
+            },
         )
     }
 }

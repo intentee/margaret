@@ -6,7 +6,9 @@ use sqlx::query_scalar;
 use sqlx::types::Json;
 use uuid::Uuid;
 
-use margaret_oauth_vocabulary::client_id::ClientId;
+use margaret_provider_state_storage::assertion_refusal::AssertionRefusal;
+use margaret_provider_state_storage::assertion_retention::AssertionRetention;
+use margaret_provider_state_storage::assertion_spending::AssertionSpending;
 use margaret_provider_state_storage::authorization_code_lifetime::AUTHORIZATION_CODE_LIFETIME;
 use margaret_provider_state_storage::authorization_grant::AuthorizationGrant;
 use margaret_provider_state_storage::code_spending::CodeSpending;
@@ -24,6 +26,7 @@ use margaret_provider_state_storage::refresh_issuance::RefreshIssuance;
 use margaret_provider_state_storage::refresh_revocation::RefreshRevocation;
 use margaret_provider_state_storage::refresh_rotation::RefreshRotation;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 
 use crate::decided_row::DecidedRow;
@@ -148,11 +151,11 @@ impl StoresProviderState for PostgresProviderState {
     async fn revoke_refresh_token(
         &self,
         presented: TokenDigest,
-        client_id: &ClientId,
+        client_id: &str,
     ) -> Result<RefreshRevocation, ProviderStateError> {
         query_scalar::<_, bool>(self.statements.revoke_refresh_token.clone())
             .bind(presented.as_bytes().as_slice())
-            .bind(client_id.as_str())
+            .bind(client_id)
             .fetch_optional(&self.pool)
             .await
             .map_err(|source| ProviderStateError::RevokeRefreshToken {
@@ -239,6 +242,33 @@ impl StoresProviderState for PostgresProviderState {
             }) => Ok(RefreshRotation::Rotated),
             None => Ok(RefreshRotation::Revoked),
         }
+    }
+
+    async fn spend_client_assertion(
+        &self,
+        client_id: &str,
+        assertion: TokenDigest,
+        expires_at: NumericDate,
+        now: NumericDate,
+    ) -> Result<AssertionSpending, ProviderStateError> {
+        if let AssertionRetention::Expired = AssertionRetention::of(expires_at, now) {
+            return Ok(AssertionSpending::Refused(AssertionRefusal::Expired));
+        }
+
+        query_scalar::<_, bool>(self.statements.spend_client_assertion.clone())
+            .bind(client_id)
+            .bind(assertion.as_bytes().as_slice())
+            .bind(expires_at.seconds_since_epoch())
+            .bind(now.seconds_since_epoch())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|source| ProviderStateError::SpendClientAssertion {
+                source: Box::new(source),
+            })
+            .map(|spent| match spent {
+                Some(_) => AssertionSpending::Spent,
+                None => AssertionSpending::Refused(AssertionRefusal::Replayed),
+            })
     }
 
     async fn spend_code(

@@ -1,5 +1,4 @@
 pub mod basic_challenged;
-pub mod basic_credentials;
 pub mod bearer_challenge;
 pub mod bearer_token;
 pub mod body_limit;

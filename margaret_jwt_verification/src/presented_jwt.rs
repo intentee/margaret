@@ -44,11 +44,11 @@ impl<'token> PresentedJwt<'token> {
             Ok(PresentedClaims {
                 registered,
                 application,
-            }) => JwtPresentation::Presented(Self {
+            }) => JwtPresentation::Presented(Box::new(Self {
                 application: Value::Object(application),
                 jws,
                 registered,
-            }),
+            })),
             Err(source) => {
                 JwtPresentation::Rejected(JwtRejection::Claims(ClaimsRejection::Malformed {
                     source,
@@ -61,9 +61,9 @@ impl<'token> PresentedJwt<'token> {
         self,
         JwtExpectation { audience, issuer }: &JwtExpectation,
     ) -> ControlFlow<JwtRejection, AttributedJwt<'token>> {
-        if self.registered.iss != issuer.as_str() {
+        if self.registered.iss != *issuer {
             return ControlFlow::Break(JwtRejection::Claims(ClaimsRejection::IssuerMismatch {
-                expected: (*issuer).clone(),
+                expected: (*issuer).to_string(),
                 found: self.registered.iss,
             }));
         }
@@ -73,6 +73,11 @@ impl<'token> PresentedJwt<'token> {
         }
 
         ControlFlow::Continue(self.attributed())
+    }
+
+    #[must_use]
+    pub fn claimed_issuer(&self) -> &str {
+        &self.registered.iss
     }
 
     #[must_use]
@@ -86,7 +91,7 @@ impl<'token> PresentedJwt<'token> {
         for addressee in addressees {
             let JwtExpectation { audience, issuer } = addressee.jwt_expectation();
 
-            if self.registered.iss == issuer.as_str() {
+            if self.registered.iss == issuer {
                 issuer_trusted = true;
 
                 if audience.admits(&self.registered.aud) {

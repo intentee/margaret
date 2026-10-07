@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use margaret_issuer_key_set::issuer_verification::IssuerVerification;
 use margaret_jwt_verification::attributed_jwt::AttributedJwt;
 use margaret_oauth_vocabulary::subject_token_type::SubjectTokenType;
 use margaret_registered_claims::numeric_date::NumericDate;
-use margaret_trusted_issuer::issuer_verification::IssuerVerification;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 use crate::exchanged_subject::ExchangedSubject;

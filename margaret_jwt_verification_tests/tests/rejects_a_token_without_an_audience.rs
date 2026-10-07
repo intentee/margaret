@@ -18,7 +18,7 @@ fn rejects_a_token_without_an_audience() {
     let SignedClaims {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
-    } = SignedClaims::new(&json!({ "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900 }))
+    } = SignedClaims::new(&json!({ "iss": trust.issuer, "exp": 1_000, "iat": 900 }))
     else {
         panic!("the fixture key set is accepted");
     };

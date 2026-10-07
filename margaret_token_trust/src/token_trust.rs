@@ -1,20 +1,18 @@
 use margaret_jwt_verification::expected_audience::ExpectedAudience;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
-use margaret_registered_claims::audience::Audience;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TokenTrust {
-    pub audience: Audience,
-    pub issuer: IssuerIdentifier,
+    pub audience: &'static str,
+    pub issuer: &'static str,
 }
 
 impl TokenTrust {
     #[must_use]
-    pub fn expectation(&self) -> JwtExpectation<'_> {
+    pub fn expectation(&self) -> JwtExpectation<'static> {
         JwtExpectation {
-            audience: ExpectedAudience::One(&self.audience),
-            issuer: &self.issuer,
+            audience: ExpectedAudience::One(self.audience),
+            issuer: self.issuer,
         }
     }
 }

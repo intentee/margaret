@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use heck::ToUpperCamelCase;
 
 use crate::identifier::Identifier;
+use crate::is_identifier::is_identifier;
 
 #[derive(Default)]
 pub struct NameAllocator {
@@ -22,7 +23,10 @@ impl NameAllocator {
         loop {
             let type_name = candidate.to_upper_camel_case();
 
-            if self.taken.insert(type_name.clone()) {
+            if is_identifier(&candidate)
+                && is_identifier(&type_name)
+                && self.taken.insert(type_name.clone())
+            {
                 return Identifier::new(candidate, type_name);
             }
 
@@ -68,6 +72,15 @@ mod tests {
         assert_eq!(first.type_name(), "V2");
         assert_eq!(second.field(), "v_2_2");
         assert_eq!(second.type_name(), "V22");
+    }
+
+    #[test]
+    fn steps_over_a_keyword() {
+        let mut allocator = NameAllocator::new();
+        let identifier = allocator.allocate("self");
+
+        assert_eq!(identifier.field(), "self_2");
+        assert_eq!(identifier.type_name(), "Self2");
     }
 
     #[test]

@@ -4,18 +4,17 @@ use url::form_urlencoded::Serializer;
 
 use margaret_http::redirect::Redirect;
 use margaret_http::response::Response;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 
 use crate::authorization_error::AuthorizationError;
 use crate::frame_denied::frame_denied;
 
-pub(crate) struct Redirection<'issuer> {
-    pub(crate) issuer: &'issuer IssuerIdentifier,
+pub(crate) struct Redirection {
+    pub(crate) issuer: &'static str,
     pub(crate) redirect_uri: Url,
     pub(crate) state: Option<String>,
 }
 
-impl Redirection<'_> {
+impl Redirection {
     pub(crate) fn code(self, code: &str) -> Response {
         self.redirected(|query| {
             query.append_pair("code", code);
@@ -40,7 +39,7 @@ impl Redirection<'_> {
             let mut query = redirect_uri.query_pairs_mut();
 
             outcome(&mut query);
-            query.append_pair("iss", issuer.as_str());
+            query.append_pair("iss", issuer);
 
             if let Some(state) = &state {
                 query.append_pair("state", state);

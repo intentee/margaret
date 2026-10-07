@@ -3,5 +3,4 @@ pub mod fresh_p256_secret;
 pub mod refresh_claims;
 pub mod refresh_token_identifier;
 pub mod sign_refresh_token;
-pub mod token_issuance_declaration;
 pub mod unix_time;

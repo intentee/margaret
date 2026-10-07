@@ -4,10 +4,9 @@ use chrono::Utc;
 use serde_json::Value;
 use serde_json::json;
 
-use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
+use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret::JwksSecret;
-use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_subject_token_exchange::exchanges_subject_tokens::ExchangesSubjectTokens;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
@@ -18,10 +17,8 @@ use crate::ci_exchanger::CiExchanger;
 
 const CI_AUDIENCE: &str = "https://localhost";
 
-fn publish_keys(trusted_issuer: &TrustedIssuer, secret: &JwksSecret) {
-    trusted_issuer
-        .key_set
-        .hold(Arc::new(secret.key_set().clone()));
+fn publish_keys(key_set: &IssuerKeySet, secret: &JwksSecret) {
+    key_set.hold(Arc::new(secret.key_set().clone()));
 }
 
 pub struct CiIssuer {
@@ -32,7 +29,7 @@ pub struct CiIssuer {
 impl CiIssuer {
     #[must_use]
     pub fn awaiting_keys() -> Self {
-        Self::with_trusted_issuer(CI_AUDIENCE, CiExchanger, |_trusted_issuer, _secret| {})
+        Self::with_trusted_issuer(CI_AUDIENCE, CiExchanger, |_key_set, _secret| {})
     }
 
     #[must_use]
@@ -46,29 +43,27 @@ impl CiIssuer {
     }
 
     #[must_use]
-    pub fn publishing_keys_for(audience: &str) -> Self {
+    pub fn publishing_keys_for(audience: &'static str) -> Self {
         Self::with_trusted_issuer(audience, CiExchanger, publish_keys)
     }
 
     fn with_trusted_issuer<TExchanger: ExchangesSubjectTokens>(
-        audience: &str,
+        audience: &'static str,
         exchanger: TExchanger,
-        publish: impl FnOnce(&TrustedIssuer, &JwksSecret),
+        publish: impl FnOnce(&IssuerKeySet, &JwksSecret),
     ) -> Self {
         let secret = fresh_p256_secret();
-        let trusted_issuer = TrustedIssuer::for_oidc_issuer(
-            Arc::new(IssuerMetadata::awaiting()),
-            Arc::new(TokenTrustDeclaration {
-                trust: TokenTrust {
-                    audience: audience.parse().expect("the audience is not empty"),
-                    issuer: "https://ci.localhost"
-                        .parse()
-                        .expect("the ci issuer is an https url"),
-                },
-            }),
-        );
+        let key_set = Arc::new(IssuerKeySet::awaiting());
 
-        publish(&trusted_issuer, &secret);
+        publish(&key_set, &secret);
+
+        let trusted_issuer = TrustedIssuer::create(
+            key_set,
+            TokenTrust {
+                audience,
+                issuer: "https://ci.localhost",
+            },
+        );
 
         Self {
             exchanger: Arc::new(SubjectTokenExchanger::create(

@@ -1,7 +1,7 @@
 use margaret_provider_state_storage::refresh_revocation::RefreshRevocation;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 
-use crate::fixture_client_id::fixture_client_id;
+use crate::fixture_client_id::FIXTURE_CLIENT_ID;
 use crate::fresh_digest::fresh_digest;
 
 /// # Panics
@@ -10,7 +10,7 @@ use crate::fresh_digest::fresh_digest;
 pub async fn reports_the_revocation_of_an_unknown_refresh_token(state: &dyn StoresProviderState) {
     assert_eq!(
         state
-            .revoke_refresh_token(fresh_digest(), &fixture_client_id())
+            .revoke_refresh_token(fresh_digest(), FIXTURE_CLIENT_ID)
             .await
             .expect("the backend revokes the token"),
         RefreshRevocation::Unknown

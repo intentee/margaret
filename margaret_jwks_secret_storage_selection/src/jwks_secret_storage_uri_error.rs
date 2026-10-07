@@ -1,15 +1,14 @@
 use thiserror::Error;
 
+use margaret_storage_uri::storage_uri_error::StorageUriError;
+
 #[derive(Debug, Error)]
 pub enum JwksSecretStorageUriError {
     #[error(
-        "the 'file' jwks secret storage uri requires a path, e.g. 'file:/var/lib/app/jwks.json'"
+        "the jwks secret storage cannot be kept in postgres; use 'memory:' or a 'file:///' path"
     )]
-    FileRequiresPath,
+    PostgresUnsupported,
 
-    #[error("the 'memory' jwks secret storage uri does not take a path, but '{path}' was given")]
-    MemoryTakesNoPath { path: String },
-
-    #[error("unknown jwks secret storage scheme '{scheme}'; expected 'memory' or 'file:<path>'")]
-    UnknownScheme { scheme: String },
+    #[error("the jwks secret storage uri is malformed: {0}")]
+    StorageUri(#[from] StorageUriError),
 }

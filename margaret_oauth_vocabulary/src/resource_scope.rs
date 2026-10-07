@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::str::FromStr;
 
 use crate::oauth_vocabulary_error::OAuthVocabularyError;
@@ -9,9 +8,10 @@ pub struct ResourceScope {
     scope: Scope,
 }
 
-impl Borrow<Scope> for ResourceScope {
-    fn borrow(&self) -> &Scope {
-        &self.scope
+impl ResourceScope {
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.scope.as_str()
     }
 }
 

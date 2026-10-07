@@ -6,18 +6,14 @@ use margaret_provider_state_storage_selection::provider_state_storage_uri_error:
 #[test]
 fn provider_state_storage_uri_rejects_invalid_postgres_options() {
     let rejection = ProviderStateStorageUri::from_str(
-        "postgres://database.localhost/provider?sslmode=sometimes",
+        "postgres://oidc:hunter2@database.localhost/provider?sslmode=sometimes",
     )
-    .expect_err("an unknown ssl mode is rejected");
+    .err()
+    .expect("an unknown ssl mode is rejected");
 
     assert!(matches!(
-        &rejection,
-        ProviderStateStorageUriError::PostgresOptions { uri, .. }
-            if uri == "postgres://database.localhost/provider?sslmode=sometimes"
+        rejection,
+        ProviderStateStorageUriError::PostgresOptions { .. }
     ));
-    assert!(
-        rejection
-            .to_string()
-            .starts_with("the openid connect provider state storage 'postgres://database.localhost/provider?sslmode=sometimes' is not valid postgres options: ")
-    );
+    assert!(!rejection.to_string().contains("hunter2"));
 }

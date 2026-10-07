@@ -1,3 +1,5 @@
+use url::Url;
+
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
@@ -27,7 +29,8 @@ async fn asks_to_authenticate_again_and_keeps_the_consent_prompt() {
     };
 
     assert_eq!(
-        return_to
+        Url::parse(&return_to)
+            .expect("the return location is a url")
             .query_pairs()
             .find(|(name, _)| name == "prompt")
             .map(|(_, value)| value.into_owned()),

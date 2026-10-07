@@ -20,19 +20,18 @@ use margaret_authorization_server_client::form_parameter::FormParameter;
 use margaret_authorization_server_client::target_audience::TargetAudience;
 use margaret_authorization_server_client::token_target::TokenTarget;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::private_key_jwt_client::private_key_jwt_client;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::echo_wrapping::EchoWrapping;
 use margaret_http_tests::form_echo_handler::FormEchoHandler;
 use margaret_jose_parameters::jwt_type::JwtType;
-use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
+use margaret_jwks_secret_store_tests::rolled_roller::rolled_roller;
 use margaret_jws_verification::compact_jws::CompactJws;
 use margaret_jws_verification::compact_jws_parsing::CompactJwsParsing;
 use margaret_jws_verification::header_type::HeaderType;
 use margaret_jws_verification::jws_verification::JwsVerification;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
+use margaret_oauth_client::client_authentication::ClientAuthentication;
 use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_route_method::content_method::ContentMethod;
 use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
@@ -105,9 +104,7 @@ async fn authenticates_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(Arc::new(OAuthClientDeclaration {
-            client: private_key_jwt_client(rolled_store(secret)),
-        }))
+        .client(ClientAuthentication::PrivateKeyJwt(rolled_roller(secret)))
         .client_credentials(&TokenTarget {
             audience: TargetAudience::Unspecified,
             scopes: BTreeSet::new(),
@@ -137,9 +134,7 @@ async fn authenticates_a_grant_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(Arc::new(OAuthClientDeclaration {
-            client: private_key_jwt_client(rolled_store(secret)),
-        }))
+        .client(ClientAuthentication::PrivateKeyJwt(rolled_roller(secret)))
         .request_grant::<EmptyExtraTokenFields>(
             GrantType::TokenExchange,
             vec![FormParameter {
@@ -169,9 +164,7 @@ async fn authenticates_a_code_exchange_with_private_key_jwt() {
     let server = echo_server("/token", EchoWrapping::AccessToken).await;
 
     let outcome = server
-        .client(Arc::new(OAuthClientDeclaration {
-            client: private_key_jwt_client(rolled_store(secret)),
-        }))
+        .client(ClientAuthentication::PrivateKeyJwt(rolled_roller(secret)))
         .exchange_authorization_code::<EmptyExtraTokenFields>(
             AuthorizationCode::new("SplxlOBeZQQYbYS6WxSbIA".to_string()),
             PkceCodeVerifier::new("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_string()),
@@ -197,9 +190,7 @@ async fn authenticates_an_introspection_with_private_key_jwt() {
     let server = echo_server("/introspect", EchoWrapping::ActiveIntrospection).await;
 
     let outcome = server
-        .client(Arc::new(OAuthClientDeclaration {
-            client: private_key_jwt_client(rolled_store(secret)),
-        }))
+        .client(ClientAuthentication::PrivateKeyJwt(rolled_roller(secret)))
         .introspect::<EchoFields>("opaque-token")
         .await;
 

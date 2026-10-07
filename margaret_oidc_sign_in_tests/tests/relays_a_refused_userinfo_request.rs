@@ -5,17 +5,15 @@ use http::StatusCode;
 use oauth2::AccessToken;
 
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::static_handler::StaticHandler;
-use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
+use margaret_jwks_secret_store_tests::fixture_roller::fixture_roller;
 use margaret_oidc_sign_in::sign_in_flow::SignInFlow;
 use margaret_oidc_sign_in::signed_in::SignedIn;
 use margaret_oidc_sign_in::userinfo_fetch::UserinfoFetch;
 use margaret_oidc_sign_in_tests::email_claims::EmailClaims;
 use margaret_route_method::route_method::RouteMethod;
-use margaret_token_signer_tests::fresh_p256_secret::fresh_p256_secret;
 
 #[tokio::test]
 async fn relays_a_refused_userinfo_request() {
@@ -32,10 +30,8 @@ async fn relays_a_refused_userinfo_request() {
     )
     .await;
     let flow = SignInFlow::create(
-        Arc::new(server.client(Arc::new(OAuthClientDeclaration {
-            client: secret_basic_client(),
-        }))),
-        Arc::new(rolled_store(fresh_p256_secret())),
+        Arc::new(server.client(secret_basic_authentication())),
+        fixture_roller(),
     );
 
     let fetched = flow

@@ -16,7 +16,6 @@ bytes = { workspace = true }
 cookie = { workspace = true }
 form_urlencoded = { workspace = true }
 futures-util = { workspace = true }
-headers = { workspace = true }
 http = { workspace = true }
 http-body = { workspace = true }
 http-body-util = { workspace = true }

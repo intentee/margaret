@@ -17,7 +17,7 @@ fn keeps_registered_claims_out_of_the_application_claims() {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
     } = SignedClaims::new(
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900, "nbf": 900, "sub": "subject" }),
+        &json!({ "aud": trust.audience, "iss": trust.issuer, "exp": 1_000, "iat": 900, "nbf": 900, "sub": "subject" }),
     )
     else {
         panic!("the fixture key set is accepted");

@@ -13,10 +13,8 @@ use margaret_token_signer_tests::unix_time::unix_time;
 fn rejects_a_refresh_token_of_another_issuer() {
     let issuance = fixture_issuance();
     let foreign = TokenIssuance {
-        audience: issuance.audience.clone(),
-        issuer: "https://other.example"
-            .parse()
-            .expect("the foreign issuer is an https url"),
+        issuer: "https://other.example",
+        ..issuance
     };
     let secret = fresh_p256_secret();
     let refresh_token = sign_refresh_token(secret.current(), &foreign, &refresh_claims(), 10_000);

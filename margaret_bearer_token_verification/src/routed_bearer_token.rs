@@ -6,9 +6,9 @@ use margaret_http::bearer_challenge::BearerChallenge;
 use margaret_http::response::Response;
 use margaret_http::response_continuation::ResponseContinuation;
 use margaret_http::token_admission::TokenAdmission;
+use margaret_issuer_key_set::issuer_verification::IssuerVerification;
 use margaret_jwt_verification::bearer_token_profile::BearerTokenProfile;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
-use margaret_trusted_issuer::issuer_verification::IssuerVerification;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 use crate::attributed_bearer_token::AttributedBearerToken;

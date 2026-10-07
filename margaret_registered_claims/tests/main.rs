@@ -1,6 +1,7 @@
 mod adds_a_lifetime_to_a_numeric_date;
 mod keeps_the_issuer_exactly_as_written;
 mod merges_application_claims_into_the_registered_members;
+mod omits_an_absent_issued_at;
 mod rejects_an_empty_audience;
 mod rejects_an_issuer_over_plain_http;
 mod rejects_an_issuer_that_is_not_a_url;

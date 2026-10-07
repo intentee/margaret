@@ -11,6 +11,7 @@ use margaret_issuer_directory_tests::fixture_issuer_routes::FixtureIssuerRoutes;
 use margaret_issuer_directory_tests::json_handler::json_handler;
 use margaret_issuer_directory_tests::localhost_discovery::localhost_discovery;
 use margaret_issuer_directory_tests::localhost_oidc_issuer::localhost_oidc_issuer;
+use margaret_issuer_directory_tests::localhost_trust::localhost_trust;
 use margaret_issuer_directory_tests::polled_directory::PolledDirectory;
 use margaret_issuer_directory_tests::running_fixture_issuer::RunningFixtureIssuer;
 use margaret_jws_verification_tests::fixture_rsa_key::FixtureRsaKey;
@@ -24,12 +25,14 @@ async fn admits_a_token_of_a_discovered_issuer() {
         key_set: json_handler(200, &json!({ "keys": [key.jwk()] })),
     })
     .await;
-    let trusted_issuer = localhost_oidc_issuer();
-    let snapshot = trusted_issuer.key_set.snapshot();
+    let polled = localhost_oidc_issuer();
+    let snapshot = polled.key_set.snapshot();
     let directory =
-        PolledDirectory::start(vec![Arc::clone(&trusted_issuer)], issuer.request_client());
+        PolledDirectory::start(vec![Arc::clone(&polled.polled)], issuer.request_client());
 
-    trusted_issuer.key_set.refreshed_since(&snapshot).await;
+    polled.key_set.refreshed_since(&snapshot).await;
+
+    let trusted_issuer = polled.trusted(localhost_trust());
 
     let token = key.token(
         &key.header(),
@@ -42,9 +45,8 @@ async fn admits_a_token_of_a_discovered_issuer() {
         }),
     );
     let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
-    let BearerTokenRouting::Routed(routed) =
-        route_bearer_token(&authorization, &[trusted_issuer.as_ref()])
-            .expect("the system clock reads as a numeric date")
+    let BearerTokenRouting::Routed(routed) = route_bearer_token(&authorization, &[&trusted_issuer])
+        .expect("the system clock reads as a numeric date")
     else {
         panic!("the token routes to the discovered issuer");
     };

@@ -9,6 +9,7 @@ use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::attributed_jwt::AttributedJwt;
 use crate::claims_rejection::ClaimsRejection;
+use crate::issued_at_requirement::IssuedAtRequirement;
 use crate::jwt_profile::JwtProfile;
 use crate::jwt_rejection::JwtRejection;
 use crate::jwt_verification::JwtVerification;
@@ -49,6 +50,10 @@ impl<TProfile: JwtProfile> ProfiledJwt<'_, TProfile> {
             && now < nbf
         {
             return rejected(ClaimsRejection::NotYetValid { nbf, now });
+        }
+
+        if TProfile::ISSUED_AT == IssuedAtRequirement::Required && registered.iat.is_none() {
+            return rejected(ClaimsRejection::MissingIssuedAt);
         }
 
         match TClaims::deserialize(&self.jwt.application) {

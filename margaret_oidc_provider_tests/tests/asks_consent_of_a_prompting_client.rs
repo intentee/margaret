@@ -14,7 +14,7 @@ async fn asks_consent_of_a_prompting_client() {
         panic!("the end user is asked for consent");
     };
 
-    assert_eq!(client_id.as_str(), "spa");
+    assert_eq!(client_id, "spa");
     assert_eq!(scopes, fixture_scopes(&["openid"]));
 
     fixture.stop().await;

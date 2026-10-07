@@ -19,7 +19,7 @@ fn rejects_a_token_listing_only_other_audiences() {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
     } = SignedClaims::new(
-        &json!({ "aud": ["someone-else", "another-one"], "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900 }),
+        &json!({ "aud": ["someone-else", "another-one"], "iss": trust.issuer, "exp": 1_000, "iat": 900 }),
     )
     else {
         panic!("the fixture key set is accepted");

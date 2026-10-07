@@ -23,18 +23,30 @@ async fn publishes_the_provider_metadata() {
             ],
             "id_token_signing_alg_values_supported": ["ES256", "RS256"],
             "introspection_endpoint": "https://localhost/introspect",
-            "introspection_endpoint_auth_methods_supported": ["client_secret_basic"],
+            "introspection_endpoint_auth_methods_supported": ["private_key_jwt"],
+            "introspection_endpoint_auth_signing_alg_values_supported": [
+                "ES256", "ES384", "ES512", "EdDSA", "Ed25519", "PS256", "PS384", "PS512", "RS256",
+                "RS384", "RS512",
+            ],
             "issuer": "https://localhost",
             "jwks_uri": "https://localhost/jwks.json",
             "prompt_values_supported": ["consent", "login", "none"],
             "response_modes_supported": ["query"],
             "response_types_supported": ["code"],
             "revocation_endpoint": "https://localhost/revoke",
-            "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "none"],
+            "revocation_endpoint_auth_methods_supported": ["private_key_jwt", "none"],
+            "revocation_endpoint_auth_signing_alg_values_supported": [
+                "ES256", "ES384", "ES512", "EdDSA", "Ed25519", "PS256", "PS384", "PS512", "RS256",
+                "RS384", "RS512",
+            ],
             "scopes_supported": ["artifacts:read", "openid", "profile"],
             "subject_types_supported": ["public"],
             "token_endpoint": "https://localhost/token",
-            "token_endpoint_auth_methods_supported": ["client_secret_basic", "none"],
+            "token_endpoint_auth_methods_supported": ["private_key_jwt", "none"],
+            "token_endpoint_auth_signing_alg_values_supported": [
+                "ES256", "ES384", "ES512", "EdDSA", "Ed25519", "PS256", "PS384", "PS512", "RS256",
+                "RS384", "RS512",
+            ],
             "userinfo_endpoint": "https://localhost/userinfo",
         })
     );

@@ -1,30 +1,26 @@
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::fmt::Result;
+use margaret_jwt_verification::jwt_rejection::JwtRejection;
+use margaret_provider_state_storage::assertion_refusal::AssertionRefusal;
+use margaret_registered_claims::numeric_date::NumericDate;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum ClientRefusal {
+    AssertionIdentifierMissing,
+    AssertionMissing,
+    AssertionOutlivesLimit {
+        exp: NumericDate,
+        limit: NumericDate,
+    },
+    AssertionRefused(AssertionRefusal),
+    AssertionRejected(JwtRejection),
+    AssertionRequired,
+    AssertionTypeMissing,
     ConflictingClientIds,
-    MalformedCredentials,
+    HeaderAuthentication,
     MissingCredentials,
-    SecretRequired,
-    UnexpectedSecret,
+    PublicClientAssertion,
+    SubjectMismatch {
+        found: String,
+    },
     UnknownClient,
-    WrongSecret,
-}
-
-impl Display for ClientRefusal {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
-        formatter.write_str(match self {
-            Self::ConflictingClientIds => {
-                "the basic credentials and the form name different clients"
-            }
-            Self::MalformedCredentials => "the client credentials are malformed",
-            Self::MissingCredentials => "the request carries no client credentials",
-            Self::SecretRequired => "the confidential client presented no secret",
-            Self::UnexpectedSecret => "the public client presented a secret",
-            Self::UnknownClient => "the client is not accepted",
-            Self::WrongSecret => "the client secret does not match",
-        })
-    }
+    UnsupportedAssertionType,
 }

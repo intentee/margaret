@@ -33,7 +33,6 @@ margaret_issuer_key_set = { workspace = true, optional = true }
 margaret_issuer_metadata = { workspace = true, optional = true }
 margaret_issuer_request = { workspace = true, optional = true }
 margaret_jose_parameters = { workspace = true, optional = true }
-margaret_jwks_endpoint = { workspace = true, optional = true }
 margaret_jwks_file_secret_storage = { workspace = true, optional = true }
 margaret_jwks_keygen = { workspace = true, optional = true }
 margaret_jwks_roller = { workspace = true, optional = true }
@@ -98,7 +97,6 @@ runtime = [
     "dep:margaret_issuer_metadata",
     "dep:margaret_issuer_request",
     "dep:margaret_jose_parameters",
-    "dep:margaret_jwks_endpoint",
     "dep:margaret_jwks_file_secret_storage",
     "dep:margaret_jwks_keygen",
     "dep:margaret_jwks_roller",

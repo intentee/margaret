@@ -11,6 +11,7 @@ http = { workspace = true }
 margaret_authorization_server_client = { workspace = true }
 margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_issuer_key_set = { workspace = true }
 margaret_issuer_metadata = { workspace = true }
 margaret_issuer_request = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }

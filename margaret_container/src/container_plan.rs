@@ -81,9 +81,6 @@ impl DependencyCollector {
         input_registry: &mut ServeInputRegistry,
     ) -> Result<PlannedDependency, ContainerError> {
         match dependency {
-            DependencyKind::Borrowed { provider_key } => self
-                .field(positions, ordered, provider_key)
-                .map(PlannedDependency::Borrowed),
             DependencyKind::Collection { provider_keys } => self
                 .fields(positions, ordered, provider_keys)
                 .map(PlannedDependency::Collection),
@@ -102,15 +99,6 @@ impl DependencyCollector {
             DependencyKind::Single { provider_key } => self
                 .field(positions, ordered, provider_key)
                 .map(PlannedDependency::Single),
-            DependencyKind::ViewCollection {
-                provider_keys,
-                view,
-            } => self
-                .fields(positions, ordered, provider_keys)
-                .map(|fields| PlannedDependency::ViewCollection {
-                    fields,
-                    view: view.clone(),
-                }),
         }
     }
 }

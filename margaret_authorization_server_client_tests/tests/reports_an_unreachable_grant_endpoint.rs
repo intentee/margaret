@@ -5,8 +5,7 @@ use oauth2::EmptyExtraTokenFields;
 use margaret_authorization_server_client::endpoint_outcome::EndpointOutcome;
 use margaret_authorization_server_client::server_unavailability::ServerUnavailability;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_issuer_request::issuer_exchange_error::IssuerExchangeError;
@@ -27,9 +26,7 @@ async fn reports_an_unreachable_grant_endpoint() {
         ),
     )
     .await;
-    let client = server.client(Arc::new(OAuthClientDeclaration {
-        client: secret_basic_client(),
-    }));
+    let client = server.client(secret_basic_authentication());
 
     server.stop().await;
 

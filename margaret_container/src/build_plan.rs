@@ -13,16 +13,17 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::indexed_method::IndexedMethod;
 use margaret_attributes::item_kind::ItemKind;
 use margaret_attributes::matched_attribute::MatchedAttribute;
-use margaret_console_argument_codegen::console_argument::ConsoleArgument;
+use margaret_environment_variable_codegen::environment_variable::EnvironmentVariable;
 use margaret_input_weaving::input_value::InputValue;
 use margaret_input_weaving::weaving_kind::WeavingKind;
 use margaret_serve_input_codegen::declared_serve_inputs::DeclaredServeInputs;
 use margaret_serve_input_codegen::serve_input::ServeInput;
+use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
+use margaret_token_issuance_codegen::token_issuance_path::token_issuance_path;
 
 use crate::construction_source::ConstructionSource;
 use crate::container_error::ContainerError;
 use crate::container_plan::ContainerPlan;
-use crate::declared_token_issuance::DeclaredTokenIssuance;
 use crate::dependency_kind::DependencyKind;
 use crate::direct_construction::DirectConstruction;
 use crate::draft_parameter::DraftParameter;
@@ -67,27 +68,6 @@ fn check_declared_item(
     Ok(())
 }
 
-fn declared_token_issuance(
-    index: &AttributeIndex,
-) -> Result<DeclaredTokenIssuance, ContainerError> {
-    let issuers: Vec<CanonicalPath> = index
-        .select_framework_attribute(FrameworkAttribute::IssuesTokens)
-        .map(|matched| matched.item().canonical_path().clone())
-        .collect();
-
-    match issuers.as_slice() {
-        [] => Ok(DeclaredTokenIssuance::Absent),
-        [issuer] => Ok(DeclaredTokenIssuance::Declared(issuer.clone())),
-        _ => Err(ContainerError::AmbiguousTokenIssuance {
-            paths: issuers
-                .iter()
-                .map(CanonicalPath::to_string)
-                .collect::<Vec<String>>()
-                .join(", "),
-        }),
-    }
-}
-
 fn build_drafts(index: &AttributeIndex) -> Result<DraftedContainer<'_>, ContainerError> {
     for declaration in SingletonDeclaration::ALL {
         for matched in index.select_framework_attribute(declaration.attribute()) {
@@ -95,7 +75,6 @@ fn build_drafts(index: &AttributeIndex) -> Result<DraftedContainer<'_>, Containe
         }
     }
 
-    let token_issuance = declared_token_issuance(index)?;
     let mut provider_drafts: Vec<Draft> = Vec::new();
 
     for matched in index.select_framework_attribute(FrameworkAttribute::Singleton) {
@@ -132,7 +111,6 @@ fn build_drafts(index: &AttributeIndex) -> Result<DraftedContainer<'_>, Containe
         construction_drafts,
         provided_keys,
         provider_drafts,
-        token_issuance,
     })
 }
 
@@ -200,17 +178,17 @@ fn check_declaration(
         });
     }
 
-    for required in declaration.required_traits() {
-        if !implements_trait(index, item, &required) {
-            return Err(ContainerError::DeclarationMissingTrait {
-                attribute,
-                path: item.canonical_path().to_string(),
-                required: required.to_string(),
-            });
-        }
-    }
+    let required = declaration.required_trait();
 
-    Ok(())
+    if implements_trait(index, item, &required) {
+        Ok(())
+    } else {
+        Err(ContainerError::DeclarationMissingTrait {
+            attribute,
+            path: item.canonical_path().to_string(),
+            required: required.to_string(),
+        })
+    }
 }
 
 fn build_construction_draft<'index>(
@@ -410,13 +388,13 @@ struct DraftedContainer<'index> {
     construction_drafts: Vec<Draft<'index>>,
     provided_keys: HashMap<CanonicalPath, CanonicalPath>,
     provider_drafts: Vec<Draft<'index>>,
-    token_issuance: DeclaredTokenIssuance,
 }
 
 fn resolve_framework_providers(
     index: &AttributeIndex,
     drafted: &mut DraftedContainer,
     framework_providers: &[FrameworkProvider],
+    token_issuance: &DeclaredTokenIssuance,
 ) -> Result<Vec<Provider>, ContainerError> {
     let buildable = buildable_providers(framework_providers);
     let included = included_framework_providers(
@@ -448,7 +426,7 @@ fn resolve_framework_providers(
         }
 
         let construction =
-            resolve_framework_construction(index, framework_provider, &drafted.token_issuance)?;
+            resolve_framework_construction(index, framework_provider, token_issuance)?;
         let identifier = allocator.allocate(&field_base(&path));
         let field_name = identifier.field().to_string();
         let type_name = identifier.type_name().to_string();
@@ -469,7 +447,7 @@ fn resolve_framework_providers(
 
 fn framework_provided_type(construction: &DirectConstruction, path: CanonicalPath) -> ProvidedType {
     match construction {
-        DirectConstruction::Resolved { .. } => ProvidedType::UriSelected(path),
+        DirectConstruction::Resolved { .. } => ProvidedType::Resolved(path),
         DirectConstruction::Constructor { .. }
         | DirectConstruction::Fieldless { .. }
         | DirectConstruction::FrameworkConstructor { .. }
@@ -511,22 +489,25 @@ fn buildable_providers(
 }
 
 fn framework_dependency_kind(
+    index: &AttributeIndex,
     dependency: &FrameworkDependency,
     token_issuance: &DeclaredTokenIssuance,
     provided: &CanonicalPath,
 ) -> Result<DependencyKind, ContainerError> {
     match dependency {
-        FrameworkDependency::BorrowedProvider(provider_key) => Ok(DependencyKind::Borrowed {
-            provider_key: provider_key.clone(),
-        }),
-        FrameworkDependency::BorrowedTokenIssuance => {
-            required_token_issuer(token_issuance, provided).map(|provider_key| {
-                DependencyKind::Borrowed {
-                    provider_key: provider_key.clone(),
-                }
+        FrameworkDependency::Constant(path) => Ok(DependencyKind::Constant { path: path.clone() }),
+        FrameworkDependency::EnvironmentVariable { name, value_type } => {
+            Ok(DependencyKind::ServeInput {
+                input: Box::new(ServeInput::EnvironmentVariable(EnvironmentVariable {
+                    name: name.clone(),
+                    value: InputValue {
+                        required: true,
+                        value_type: value_type.clone(),
+                        weaving: WeavingKind::from_canonical(index, value_type, true),
+                    },
+                })),
             })
         }
-        FrameworkDependency::Constant(path) => Ok(DependencyKind::Constant { path: path.clone() }),
         FrameworkDependency::Provider(provider_key)
         | FrameworkDependency::SingletonView(provider_key) => Ok(DependencyKind::Single {
             provider_key: provider_key.clone(),
@@ -534,32 +515,27 @@ fn framework_dependency_kind(
         FrameworkDependency::Providers(provider_keys) => Ok(DependencyKind::Collection {
             provider_keys: provider_keys.clone(),
         }),
-        FrameworkDependency::SingletonViews { singletons, view } => {
-            Ok(DependencyKind::ViewCollection {
-                provider_keys: singletons.clone(),
-                view: view.clone(),
-            })
-        }
-        FrameworkDependency::TokenIssuance => {
-            required_token_issuer(token_issuance, provided).map(|provider_key| {
-                DependencyKind::Single {
-                    provider_key: provider_key.clone(),
-                }
-            })
-        }
+        FrameworkDependency::TokenIssuance => match token_issuance {
+            DeclaredTokenIssuance::Absent => Err(ContainerError::MissingTokenIssuance {
+                provider: provided.to_string(),
+            }),
+            DeclaredTokenIssuance::Declared(_) => Ok(DependencyKind::Constant {
+                path: token_issuance_path(),
+            }),
+        },
     }
 }
 
-fn required_token_issuer<'issuance>(
-    token_issuance: &'issuance DeclaredTokenIssuance,
+fn framework_dependency_kinds(
+    index: &AttributeIndex,
+    dependencies: &[FrameworkDependency],
+    token_issuance: &DeclaredTokenIssuance,
     provided: &CanonicalPath,
-) -> Result<&'issuance CanonicalPath, ContainerError> {
-    match token_issuance {
-        DeclaredTokenIssuance::Absent => Err(ContainerError::MissingTokenIssuance {
-            provider: provided.to_string(),
-        }),
-        DeclaredTokenIssuance::Declared(issuer) => Ok(issuer),
-    }
+) -> Result<Vec<DependencyKind>, ContainerError> {
+    dependencies
+        .iter()
+        .map(|dependency| framework_dependency_kind(index, dependency, token_issuance, provided))
+        .collect()
 }
 
 fn resolve_framework_construction(
@@ -586,29 +562,26 @@ fn resolve_framework_construction(
             method,
             outcome,
         } => DirectConstruction::FrameworkConstructor {
-            dependencies: dependencies
-                .iter()
-                .map(|dependency| framework_dependency_kind(dependency, token_issuance, provided))
-                .collect::<Result<Vec<DependencyKind>, ContainerError>>()?,
+            dependencies: framework_dependency_kinds(
+                index,
+                dependencies,
+                token_issuance,
+                provided,
+            )?,
             is_async: *is_async,
             method: method.clone(),
             outcome: *outcome,
         },
-        FrameworkConstruction::UriSelected {
-            argument_name,
+        FrameworkConstruction::Resolved {
+            dependencies,
             resolver,
-            value_type,
         } => DirectConstruction::Resolved {
-            dependencies: vec![DependencyKind::ServeInput {
-                input: Box::new(ServeInput::ConsoleArgument(ConsoleArgument::Named {
-                    name: argument_name.clone(),
-                    value: InputValue {
-                        required: true,
-                        value_type: value_type.clone(),
-                        weaving: WeavingKind::from_canonical(index, value_type, true),
-                    },
-                })),
-            }],
+            dependencies: framework_dependency_kinds(
+                index,
+                dependencies,
+                token_issuance,
+                provided,
+            )?,
             resolver: resolver.clone(),
         },
         FrameworkConstruction::Unit => DirectConstruction::FrameworkUnit,
@@ -618,20 +591,19 @@ fn resolve_framework_construction(
 fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<&CanonicalPath> {
     match construction {
         FrameworkConstruction::Accessor { source, .. } => vec![source],
-        FrameworkConstruction::Constructor { dependencies, .. } => dependencies
+        FrameworkConstruction::Constructor { dependencies, .. }
+        | FrameworkConstruction::Resolved { dependencies, .. } => dependencies
             .iter()
             .flat_map(|dependency| match dependency {
-                FrameworkDependency::BorrowedProvider(provider_key)
-                | FrameworkDependency::Provider(provider_key) => std::slice::from_ref(provider_key),
+                FrameworkDependency::Provider(provider_key) => std::slice::from_ref(provider_key),
                 FrameworkDependency::Providers(provider_keys) => provider_keys.as_slice(),
-                FrameworkDependency::BorrowedTokenIssuance
-                | FrameworkDependency::Constant(_)
+                FrameworkDependency::Constant(_)
+                | FrameworkDependency::EnvironmentVariable { .. }
                 | FrameworkDependency::SingletonView(_)
-                | FrameworkDependency::SingletonViews { .. }
                 | FrameworkDependency::TokenIssuance => &[],
             })
             .collect(),
-        FrameworkConstruction::UriSelected { .. } | FrameworkConstruction::Unit => Vec::new(),
+        FrameworkConstruction::Unit => Vec::new(),
     }
 }
 
@@ -706,10 +678,11 @@ pub(crate) fn build_plan(
     index: &AttributeIndex,
     serve_inputs: &DeclaredServeInputs,
     framework_providers: &[FrameworkProvider],
+    token_issuance: &DeclaredTokenIssuance,
 ) -> Result<ContainerPlan, ContainerError> {
     let mut drafted = build_drafts(index)?;
     let resolved_framework_providers =
-        resolve_framework_providers(index, &mut drafted, framework_providers)?;
+        resolve_framework_providers(index, &mut drafted, framework_providers, token_issuance)?;
     let DraftedContainer {
         construction_drafts,
         provided_keys,

@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use uuid::Uuid;
 
 use margaret_jose_parameters::jwt_type::JwtType;
@@ -20,7 +18,7 @@ fn rejects_a_refresh_token_presented_as_a_resource_access_token() {
     assert!(matches!(
         store.verify_resource_access_token(
             &refresh_token.signed_claims,
-            &BTreeSet::from([fixture_issuance().audience]),
+            &[fixture_issuance().audience],
             unix_time(1_000)
         ),
         JwtVerification::Rejected(JwtRejection::Type(TypeRejection::Mismatch {

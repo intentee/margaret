@@ -1,4 +1,6 @@
+use margaret_attributes::canonical_path::CanonicalPath;
+
 pub struct ServedOriginCheck {
-    pub accessor_field: String,
+    pub endpoints: CanonicalPath,
     pub server: String,
 }

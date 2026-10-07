@@ -20,11 +20,11 @@ pub enum TagError {
         source: AttributeError,
     },
 
-    #[error("the {kind} '{concrete}' does not name a tag")]
-    MissingTag { concrete: String, kind: TagKind },
+    #[error("the middleware handler '{concrete}' does not name a tag")]
+    MissingMiddlewareTag { concrete: String },
 
-    #[error("the {kind} '{concrete}' names a tag that is not a single plain name")]
-    MalformedTag { concrete: String, kind: TagKind },
+    #[error("the middleware handler '{concrete}' names a tag that is not a single plain name")]
+    MalformedMiddlewareTag { concrete: String },
 
     #[error("the tag '{tag}' is declared more than once: by '{first}' and by '{second}'")]
     DuplicateTag {
@@ -57,8 +57,15 @@ pub enum TagError {
     #[error("{site} must be `client = <tag>`")]
     MalformedIntrospectedBearerToken { site: String },
 
-    #[error("the oauth client '{concrete}' must name its issuer as `issuer = <tag>`")]
-    MalformedOAuthClientIssuer { concrete: String },
+    #[error(
+        "the oauth clients '{first}' and '{second}' both identify as '{client_id}' at the issuer '{issuer}', so the issuer cannot tell them apart"
+    )]
+    DuplicateOAuthClient {
+        client_id: String,
+        first: String,
+        issuer: String,
+        second: String,
+    },
 
     #[error("{site} names the issuer '{issuer}', which publishes no discovery document")]
     OAuthClientIssuerNotDiscovered { issuer: String, site: String },

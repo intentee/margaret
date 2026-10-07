@@ -17,10 +17,8 @@ async fn routes_a_token_to_the_trusted_issuer_it_names() {
         .expect("a fresh secret");
     let other = held_trusted_issuer(
         TokenTrust {
-            audience: "margaret".parse().expect("the audience is not empty"),
-            issuer: "https://other.example"
-                .parse()
-                .expect("the issuer is an https url"),
+            audience: "margaret",
+            issuer: "https://other.example",
         },
         secret.key_set().clone(),
     );

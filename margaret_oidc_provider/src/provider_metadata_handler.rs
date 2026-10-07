@@ -1,55 +1,41 @@
-use std::borrow::Borrow;
-use std::collections::BTreeSet;
-
 use bytes::Bytes;
 
-use margaret_accepted_clients::accepted_client::AcceptedClient;
-use margaret_accepted_clients::accepted_client_authentication::AcceptedClientAuthentication;
-use margaret_accepted_clients::accepted_clients::AcceptedClients;
-use margaret_accepted_clients::authorization_code_grant::AuthorizationCodeGrant;
-use margaret_accepted_clients::client_credentials_grant::ClientCredentialsGrant;
-use margaret_accepted_clients::confidential_privileges::ConfidentialPrivileges;
 use margaret_http::response::Response;
 use margaret_identity_session::id_token_members::ID_TOKEN_MEMBERS;
 use margaret_jose_parameters::jws_algorithm::JwsAlgorithm;
 use margaret_jwks_roller_server::jwks_curve::JWKS_CURVE;
+use margaret_oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;
 use margaret_oauth_vocabulary::code_challenge_method::CodeChallengeMethod;
 use margaret_oauth_vocabulary::grant_type::GrantType;
 use margaret_oauth_vocabulary::prompt_value::PromptValue;
-use margaret_oauth_vocabulary::scope::Scope;
 use margaret_oidc_discovery::provider_metadata_document::ProviderMetadataDocument;
-use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::provider_endpoints::ProviderEndpoints;
+use crate::provider_support::ProviderSupport;
+
+const ASSERTED_AUTHENTICATION: [ClientAuthenticationMethod; 1] =
+    [ClientAuthenticationMethod::PrivateKeyJwt];
+const ASSERTED_OR_PUBLIC_AUTHENTICATION: [ClientAuthenticationMethod; 2] = [
+    ClientAuthenticationMethod::PrivateKeyJwt,
+    ClientAuthenticationMethod::None,
+];
 
 fn wire_values<'value>(values: impl IntoIterator<Item = &'value str>) -> Vec<String> {
     values.into_iter().map(str::to_string).collect()
 }
 
-fn supported_scopes(client: &AcceptedClient) -> impl Iterator<Item = &str> {
-    let code_scopes = match &client.authorization_code {
-        AuthorizationCodeGrant::Granted(policy) => {
-            policy.scopes.iter().map(Scope::as_str).collect()
-        }
-        AuthorizationCodeGrant::Withheld => Vec::new(),
-    };
-    let client_credentials_scopes = match &client.authentication {
-        AcceptedClientAuthentication::ClientSecretBasic {
-            privileges:
-                ConfidentialPrivileges {
-                    client_credentials: ClientCredentialsGrant::Granted { scopes },
-                    ..
-                },
-            ..
-        } => scopes
+fn authentication_methods(methods: &[ClientAuthenticationMethod]) -> Vec<String> {
+    wire_values(
+        methods
             .iter()
-            .map(|scope| Borrow::<Scope>::borrow(scope).as_str())
-            .collect(),
-        AcceptedClientAuthentication::ClientSecretBasic { .. }
-        | AcceptedClientAuthentication::Public => Vec::new(),
-    };
+            .copied()
+            .map(ClientAuthenticationMethod::wire_name),
+    )
+}
 
-    code_scopes.into_iter().chain(client_credentials_scopes)
+fn assertion_signing_algorithms() -> Vec<String> {
+    wire_values(JwsAlgorithm::ALL.map(JwsAlgorithm::wire_name))
 }
 
 pub struct ProviderMetadataHandler {
@@ -61,23 +47,13 @@ impl ProviderMetadataHandler {
     ///
     /// Returns the `serde_json::Error` of a provider metadata document that cannot be serialized.
     pub fn create(
-        clients: &AcceptedClients,
-        endpoints: &ProviderEndpoints,
-        issuance: &dyn DeclaresTokenIssuance,
+        ProviderSupport {
+            grant_types,
+            scopes,
+        }: ProviderSupport,
+        endpoints: ProviderEndpoints,
+        issuance: TokenIssuance,
     ) -> Result<Self, serde_json::Error> {
-        let grant_types = clients
-            .clients()
-            .flat_map(|client| {
-                GrantType::ALL
-                    .into_iter()
-                    .filter(|grant_type| client.grants(*grant_type))
-            })
-            .collect::<BTreeSet<GrantType>>();
-        let scopes = clients
-            .clients()
-            .flat_map(supported_scopes)
-            .collect::<BTreeSet<&str>>();
-
         serde_json::to_vec(&ProviderMetadataDocument {
             authorization_endpoint: Some(endpoints.authorization.to_string()),
             authorization_response_iss_parameter_supported: true,
@@ -86,17 +62,20 @@ impl ProviderMetadataHandler {
                 CodeChallengeMethod::S256.wire_name()
             ])),
             grant_types_supported: Some(wire_values(
-                grant_types.into_iter().map(GrantType::wire_name),
+                grant_types.iter().copied().map(GrantType::wire_name),
             )),
             id_token_signing_alg_values_supported: Some(wire_values([
                 JWKS_CURVE.curve().algorithm().wire_name(),
                 JwsAlgorithm::Rs256.wire_name(),
             ])),
             introspection_endpoint: Some(endpoints.introspection.to_string()),
-            introspection_endpoint_auth_methods_supported: Some(wire_values([
-                "client_secret_basic",
-            ])),
-            issuer: issuance.token_issuance().issuer.as_str().to_string(),
+            introspection_endpoint_auth_methods_supported: Some(authentication_methods(
+                &ASSERTED_AUTHENTICATION,
+            )),
+            introspection_endpoint_auth_signing_alg_values_supported: Some(
+                assertion_signing_algorithms(),
+            ),
+            issuer: issuance.issuer.to_string(),
             jwks_uri: endpoints.jwks.to_string(),
             prompt_values_supported: Some(wire_values(
                 PromptValue::SUPPORTED.map(PromptValue::wire_name),
@@ -104,17 +83,19 @@ impl ProviderMetadataHandler {
             response_modes_supported: Some(wire_values(["query"])),
             response_types_supported: Some(wire_values(["code"])),
             revocation_endpoint: Some(endpoints.revocation.to_string()),
-            revocation_endpoint_auth_methods_supported: Some(wire_values([
-                "client_secret_basic",
-                "none",
-            ])),
-            scopes_supported: Some(wire_values(scopes)),
+            revocation_endpoint_auth_methods_supported: Some(authentication_methods(
+                &ASSERTED_OR_PUBLIC_AUTHENTICATION,
+            )),
+            revocation_endpoint_auth_signing_alg_values_supported: Some(
+                assertion_signing_algorithms(),
+            ),
+            scopes_supported: Some(wire_values(scopes.iter().copied())),
             subject_types_supported: Some(wire_values(["public"])),
             token_endpoint: Some(endpoints.token.to_string()),
-            token_endpoint_auth_methods_supported: Some(wire_values([
-                "client_secret_basic",
-                "none",
-            ])),
+            token_endpoint_auth_methods_supported: Some(authentication_methods(
+                &ASSERTED_OR_PUBLIC_AUTHENTICATION,
+            )),
+            token_endpoint_auth_signing_alg_values_supported: Some(assertion_signing_algorithms()),
             userinfo_endpoint: Some(endpoints.userinfo.to_string()),
         })
         .map(|document| Self {

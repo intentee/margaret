@@ -1,4 +1,9 @@
 use margaret_provider_state_storage_tests::postgres_state::PostgresState;
+use margaret_provider_state_storage_tests::scenarios::spends_a_client_assertion_once::spends_a_client_assertion_once;
+use margaret_provider_state_storage_tests::scenarios::spends_the_assertions_of_distinct_clients_independently::spends_the_assertions_of_distinct_clients_independently;
+use margaret_provider_state_storage_tests::scenarios::spends_an_assertion_again_once_its_record_expired::spends_an_assertion_again_once_its_record_expired;
+use margaret_provider_state_storage_tests::scenarios::reports_an_expired_client_assertion::reports_an_expired_client_assertion;
+use margaret_provider_state_storage_tests::scenarios::spends_a_client_assertion_presented_concurrently_once::spends_a_client_assertion_presented_concurrently_once;
 use margaret_provider_state_storage_tests::scenarios::approves_a_pending_authorization_into_a_code::approves_a_pending_authorization_into_a_code;
 use margaret_provider_state_storage_tests::scenarios::denies_a_pending_authorization::denies_a_pending_authorization;
 use margaret_provider_state_storage_tests::scenarios::forgets_a_pending_authorization_decided_by_another_subject::forgets_a_pending_authorization_decided_by_another_subject;
@@ -54,4 +59,14 @@ async fn postgres_state_honours_the_storage_contract() {
     rotates_a_current_refresh_token(postgres.state.as_ref()).await;
 
     spends_an_authorization_code_once(postgres.state.as_ref()).await;
+
+    spends_a_client_assertion_once(postgres.state.as_ref()).await;
+
+    spends_the_assertions_of_distinct_clients_independently(postgres.state.as_ref()).await;
+
+    spends_an_assertion_again_once_its_record_expired(postgres.state.as_ref()).await;
+
+    reports_an_expired_client_assertion(postgres.state.as_ref()).await;
+
+    spends_a_client_assertion_presented_concurrently_once(postgres.state.as_ref()).await;
 }

@@ -1,12 +1,9 @@
-use std::collections::BTreeSet;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
 use serde::Deserialize;
 use serde_json::Value;
-
-use crate::audience::Audience;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
@@ -17,15 +14,15 @@ pub enum AudienceClaim {
 
 impl AudienceClaim {
     #[must_use]
-    pub fn contains(&self, audience: &Audience) -> bool {
+    pub fn contains(&self, audience: &str) -> bool {
         match self {
-            Self::Multiple(values) => values.iter().any(|value| value == audience.as_str()),
-            Self::Single(value) => value == audience.as_str(),
+            Self::Multiple(values) => values.iter().any(|value| value == audience),
+            Self::Single(value) => value == audience,
         }
     }
 
     #[must_use]
-    pub fn contains_any(&self, audiences: &BTreeSet<Audience>) -> bool {
+    pub fn contains_any(&self, audiences: &[&str]) -> bool {
         audiences.iter().any(|audience| self.contains(audience))
     }
 

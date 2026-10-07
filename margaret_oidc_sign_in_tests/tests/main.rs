@@ -9,6 +9,7 @@ mod refuses_a_callback_without_a_transaction;
 mod refuses_a_forged_transaction;
 mod refuses_a_response_of_another_issuer;
 mod refuses_a_response_without_the_advertised_issuer;
+mod refuses_a_transaction_sealed_for_another_client;
 mod refuses_an_id_token_that_is_not_a_jws;
 mod refuses_userinfo_of_another_subject;
 mod relays_a_denied_authorization;

@@ -1,19 +1,29 @@
 use std::pin::pin;
 use std::sync::Arc;
 
+use serde::de::DeserializeOwned;
 use tokio::sync::Notify;
 use tokio::sync::watch;
 use tokio::time::Instant;
 
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
+use margaret_jwt_verification::attributed_jwt::AttributedJwt;
+use margaret_jwt_verification::jwt_profile::JwtProfile;
+use margaret_jwt_verification::jwt_profiling::JwtProfiling;
+use margaret_jwt_verification::jwt_rejection::JwtRejection;
+use margaret_registered_claims::numeric_date::NumericDate;
 
 use crate::held_key_set::HeldKeySet;
+use crate::issuer_fetch_spacing::ISSUER_FETCH_SPACING;
+use crate::issuer_verification::IssuerVerification;
 use crate::key_set_holding::KeySetHolding;
 use crate::key_set_polling::KeySetPolling;
 use crate::key_set_refresh::KeySetRefresh;
 use crate::key_set_snapshot::KeySetSnapshot;
 use crate::key_set_state::KeySetState;
+use crate::key_set_verification::KeySetVerification;
 use crate::refresh_progress::RefreshProgress;
+use crate::verify_with_key_set::verify_with_key_set;
 
 pub struct IssuerKeySet {
     completion: Notify,
@@ -88,6 +98,35 @@ impl IssuerKeySet {
         self.state
             .send_modify(|state| state.polling = KeySetPolling::Stopped);
         self.completion.notify_waiters();
+    }
+
+    pub async fn verify<TClaims: DeserializeOwned, TProfile: JwtProfile>(
+        &self,
+        jwt: &AttributedJwt<'_>,
+        now: NumericDate,
+    ) -> IssuerVerification<TClaims, TProfile> {
+        let jwt = match jwt.profile::<TProfile>() {
+            JwtProfiling::Profiled(profiled) => profiled,
+            JwtProfiling::Rejected(rejection) => {
+                return IssuerVerification::Rejected(JwtRejection::Type(rejection));
+            }
+        };
+        let snapshot = self.snapshot();
+
+        match verify_with_key_set(&jwt, &snapshot.holding, now) {
+            KeySetVerification::UnknownKey {
+                fetched_at,
+                rejection,
+            } if fetched_at.elapsed() >= ISSUER_FETCH_SPACING => {
+                match self.refreshed_since(&snapshot).await {
+                    KeySetRefresh::PollingStopped => IssuerVerification::Rejected(rejection),
+                    KeySetRefresh::Refreshed(holding) => {
+                        verify_with_key_set(&jwt, &holding, now).settled()
+                    }
+                }
+            }
+            verification => verification.settled(),
+        }
     }
 
     fn complete_fetch(&self, update: impl FnOnce(&mut KeySetHolding)) {

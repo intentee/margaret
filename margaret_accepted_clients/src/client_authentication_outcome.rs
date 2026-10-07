@@ -1,7 +1,8 @@
-use crate::accepted_client::AcceptedClient;
 use crate::client_refusal::ClientRefusal;
+use crate::registered_client::RegisteredClient;
 
 pub enum ClientAuthenticationOutcome<'clients> {
-    Authenticated(&'clients AcceptedClient),
+    Authenticated(&'clients RegisteredClient),
+    KeysAwaited,
     Refused(ClientRefusal),
 }

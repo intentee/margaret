@@ -1,23 +1,39 @@
 use serde_json::json;
 
+use margaret_accepted_clients::accepted_client::AcceptedClient;
+use margaret_accepted_clients_tests::asserting_client::AssertingClient;
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
-use margaret_oidc_provider_tests::client_credentials::ClientCredentials;
+use margaret_oidc_provider_tests::fixture_clients::FixtureClients;
 use margaret_oidc_provider_tests::issued_code::issued_code;
-use margaret_oidc_provider_tests::portal_client::portal_client;
+use margaret_oidc_provider_tests::portal_client::PORTAL_CLIENT;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
+use margaret_oidc_provider_tests::portal_privileges::PORTAL_PRIVILEGES;
 use margaret_oidc_provider_tests::portal_tokens::portal_tokens;
 use margaret_oidc_provider_tests::provider_fixture::ProviderFixture;
 use margaret_oidc_provider_tests::refreshed_tokens::refreshed_tokens;
-use margaret_oidc_provider_tests::service_client::service_client;
-use margaret_oidc_provider_tests::service_secret::SERVICE_SECRET;
+use margaret_oidc_provider_tests::service_client::SERVICE_CLIENT;
+use margaret_oidc_provider_tests::service_credentials::SERVICE_CREDENTIALS;
+use margaret_oidc_provider_tests::service_privileges::SERVICE_PRIVILEGES;
 
 #[tokio::test]
 async fn refuses_a_refresh_token_of_another_client() {
-    let mut service = service_client();
-
-    service.authorization_code = portal_client().authorization_code;
-
-    let fixture = ProviderFixture::serving(vec![portal_client(), service], Vec::new()).await;
+    let fixture = ProviderFixture::serving(
+        FixtureClients {
+            asserting: vec![
+                AssertingClient::holding_its_keys(PORTAL_CLIENT, PORTAL_PRIVILEGES),
+                AssertingClient::holding_its_keys(
+                    AcceptedClient {
+                        authorization_code: PORTAL_CLIENT.authorization_code,
+                        ..SERVICE_CLIENT
+                    },
+                    SERVICE_PRIVILEGES,
+                ),
+            ],
+            public: Vec::new(),
+        },
+        Vec::new(),
+    )
+    .await;
     let AuthorizationOutcome::Redirected(redirect) = fixture.authorized(&portal_parameters()).await
     else {
         panic!("the portal is issued a code");
@@ -27,10 +43,7 @@ async fn refuses_a_refresh_token_of_another_client() {
     let foreign = fixture
         .post_form(
             "/token",
-            &ClientCredentials::Basic {
-                client_id: "service",
-                secret: SERVICE_SECRET,
-            },
+            &SERVICE_CREDENTIALS,
             &json!({"grant_type": "refresh_token", "refresh_token": refresh_token}),
         )
         .await;

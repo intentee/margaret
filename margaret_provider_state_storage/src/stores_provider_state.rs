@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use margaret_oauth_vocabulary::client_id::ClientId;
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::token_digest::TokenDigest;
 
+use crate::assertion_spending::AssertionSpending;
 use crate::authorization_grant::AuthorizationGrant;
 use crate::code_spending::CodeSpending;
 use crate::decided_authorization::DecidedAuthorization;
@@ -66,7 +67,7 @@ pub trait StoresProviderState: Send + Sync {
     async fn revoke_refresh_token(
         &self,
         presented: TokenDigest,
-        client_id: &ClientId,
+        client_id: &str,
     ) -> Result<RefreshRevocation, ProviderStateError>;
 
     /// # Errors
@@ -77,6 +78,17 @@ pub trait StoresProviderState: Send + Sync {
         presented: TokenDigest,
         next: TokenDigest,
     ) -> Result<RefreshRotation, ProviderStateError>;
+
+    /// # Errors
+    ///
+    /// Returns `ProviderStateError` when the backend cannot spend the client assertion.
+    async fn spend_client_assertion(
+        &self,
+        client_id: &str,
+        assertion: TokenDigest,
+        expires_at: NumericDate,
+        now: NumericDate,
+    ) -> Result<AssertionSpending, ProviderStateError>;
 
     /// # Errors
     ///

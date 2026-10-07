@@ -4,7 +4,6 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 
-use margaret_oauth_vocabulary::client_id::ClientId;
 use margaret_oauth_vocabulary::scope::Scope;
 
 use crate::authorization_grant::AuthorizationGrant;
@@ -12,7 +11,7 @@ use crate::authorization_grant::AuthorizationGrant;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RefreshFamily {
     pub auth_time: DateTime<Utc>,
-    pub client_id: ClientId,
+    pub client_id: String,
     pub scopes: BTreeSet<Scope>,
     pub subject: Uuid,
 }

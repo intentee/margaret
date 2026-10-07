@@ -28,7 +28,7 @@ fn admitted(
     }
 
     match introspection.aud() {
-        Some(found) if !found.iter().any(|value| value == audience.as_str()) => {
+        Some(found) if !found.iter().any(|value| value == audience) => {
             return ControlFlow::Break(IntrospectionRejection::AudienceMismatch {
                 found: found.clone(),
             });
@@ -38,7 +38,7 @@ fn admitted(
     }
 
     if let Some(found) = introspection.iss()
-        && found != issuer.as_str()
+        && found != *issuer
     {
         return ControlFlow::Break(IntrospectionRejection::IssuerMismatch {
             found: found.to_string(),

@@ -9,6 +9,7 @@ autotests = false
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
+form_urlencoded = { workspace = true }
 headers = { workspace = true }
 http = { workspace = true }
 margaret_accepted_clients = { workspace = true }
@@ -17,7 +18,9 @@ margaret_authorization_server_client = { workspace = true }
 margaret_authorization_server_client_tests = { path = "../margaret_authorization_server_client_tests" }
 margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }
+margaret_issuer_directory = { workspace = true }
 margaret_issuer_directory_tests = { path = "../margaret_issuer_directory_tests" }
+margaret_issuer_key_set = { workspace = true }
 margaret_issuer_metadata = { workspace = true }
 margaret_issuer_request = { workspace = true }
 margaret_jose_parameters = { workspace = true }
@@ -28,8 +31,8 @@ margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
 margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
-margaret_oauth_client = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
+margaret_oidc_discovery = { workspace = true }
 margaret_oidc_provider = { workspace = true }
 margaret_oidc_sign_in = { workspace = true }
 margaret_oidc_sign_in_tests = { path = "../margaret_oidc_sign_in_tests" }

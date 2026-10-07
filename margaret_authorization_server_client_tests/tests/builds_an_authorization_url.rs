@@ -11,8 +11,7 @@ use url::Url;
 use margaret_authorization_server_client::authorization_request::AuthorizationRequest;
 use margaret_authorization_server_client::authorization_url::AuthorizationUrl;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_route_method::route_method::RouteMethod;
@@ -36,9 +35,7 @@ async fn builds_an_authorization_url() {
     ));
 
     let built = server
-        .client(Arc::new(OAuthClientDeclaration {
-            client: secret_basic_client(),
-        }))
+        .client(secret_basic_authentication())
         .authorization_url(AuthorizationRequest {
             nonce: "n-0S6_WzA2Mj".to_string(),
             pkce_challenge,

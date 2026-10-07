@@ -45,7 +45,7 @@ impl GetAuthorize {
                 .await?
             {
                 AuthorizationOutcome::AuthenticationRequired { return_to } => {
-                    Response::text(401, return_to.to_string())
+                    Response::text(401, return_to)
                 }
                 AuthorizationOutcome::ConsentRequired(consent) => {
                     Response::text(200, consent.id.to_string())

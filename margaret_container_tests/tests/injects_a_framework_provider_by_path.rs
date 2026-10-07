@@ -16,6 +16,7 @@ use margaret_container::rendered_container::RenderedContainer;
 use margaret_container::resolve_injectable::resolve_injectable;
 use margaret_container_tests::container_module_source::container_module_source;
 use margaret_serve_input_codegen::scan::scan;
+use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
 fn framework_provider(injection: FrameworkInjectionRole, name: &str) -> FrameworkProvider {
     FrameworkProvider {
@@ -56,6 +57,7 @@ fn render(
         index,
         &scan(index).expect("the serve inputs are scanned"),
         providers,
+        &DeclaredTokenIssuance::Absent,
     )
 }
 

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 use serde_json::json;
 
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwt_verification::claims_rejection::ClaimsRejection;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
@@ -23,7 +23,7 @@ async fn completed_with(
     adjust: impl FnOnce(&mut Value),
     jwt_type: JwtType,
 ) -> SignInCompletion<EmailClaims> {
-    let fixture = SignInFixture::start(secret_basic_client()).await;
+    let fixture = SignInFixture::start(secret_basic_authentication()).await;
     let SignInBeginning::Redirected(response) = begin_sign_in(&fixture.flow).await else {
         panic!("the sign-in redirects to the authorization endpoint");
     };

@@ -15,7 +15,6 @@ serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 tokio-util = { workspace = true }
 trzcina = { workspace = true }
-url = { workspace = true }
 
 [build-dependencies]
 margaret = { workspace = true, default-features = false, features = ["codegen"] }

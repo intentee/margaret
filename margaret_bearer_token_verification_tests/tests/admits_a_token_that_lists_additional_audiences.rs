@@ -17,10 +17,10 @@ async fn admits_a_token_that_lists_additional_audiences() {
         .expect("a fresh secret");
     let token = secret.current().sign_json(
         &json!({
-            "aud": ["someone-else", trust.audience.as_str()],
+            "aud": ["someone-else", trust.audience],
             "exp": FAR_FUTURE_EXPIRY,
             "iat": 0,
-            "iss": trust.issuer.as_str(),
+            "iss": trust.issuer,
             "sub": "subject",
         }),
         JwtType::AccessToken,

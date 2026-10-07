@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::ops::ControlFlow;
 
@@ -32,26 +31,30 @@ impl RequestedScope {
         }
     }
 
-    pub(crate) fn resolved<TGranted: Borrow<Scope> + Ord>(
+    pub(crate) fn resolved(
         scope: Option<&str>,
-        granted: &BTreeSet<TGranted>,
-    ) -> ControlFlow<Response, BTreeSet<Scope>> {
+        granted: &BTreeSet<&str>,
+    ) -> ControlFlow<Response, BTreeSet<String>> {
         Self::of(scope)?.within(granted)
     }
 
-    pub(crate) fn within<TGranted: Borrow<Scope> + Ord>(
+    pub(crate) fn within(
         self,
-        granted: &BTreeSet<TGranted>,
-    ) -> ControlFlow<Response, BTreeSet<Scope>> {
+        granted: &BTreeSet<&str>,
+    ) -> ControlFlow<Response, BTreeSet<String>> {
         match self {
-            Self::Granted => ControlFlow::Continue(
-                granted
-                    .iter()
-                    .map(|scope| Scope::clone(scope.borrow()))
-                    .collect(),
-            ),
-            Self::Narrowed(scopes) if scopes.iter().all(|scope| granted.contains(scope)) => {
-                ControlFlow::Continue(scopes)
+            Self::Granted => {
+                ControlFlow::Continue(granted.iter().map(ToString::to_string).collect())
+            }
+            Self::Narrowed(scopes)
+                if scopes.iter().all(|scope| granted.contains(scope.as_str())) =>
+            {
+                ControlFlow::Continue(
+                    scopes
+                        .iter()
+                        .map(|scope| scope.as_str().to_string())
+                        .collect(),
+                )
             }
             Self::Narrowed(_) => ControlFlow::Break(invalid_scope()),
         }

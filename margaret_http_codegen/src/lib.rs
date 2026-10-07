@@ -36,12 +36,15 @@ mod tests {
     use margaret_container::container_bindings::ContainerBindings;
     use margaret_container::render_container::render_container;
     use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
+    use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
     use margaret_request_binding_codegen::binding_registries::BindingRegistries;
     use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
     use margaret_request_binding_codegen::views_availability::ViewsAvailability;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_serve_input_codegen::serve_input::ServeInput;
     use margaret_tag_codegen::tag_pool::TagPool;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
+    use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
 
     use crate::http_artifacts::HttpArtifacts;
     use crate::http_codegen_error::HttpCodegenError;
@@ -74,7 +77,7 @@ mod tests {
     fn bindings_for(index: &AttributeIndex) -> ContainerBindings {
         let registry = scan(index).expect("the console arguments are scanned");
 
-        render_container(index, &registry, &[])
+        render_container(index, &registry, &[], &DeclaredTokenIssuance::Absent)
             .expect("the container renders")
             .bindings
     }
@@ -112,7 +115,12 @@ mod tests {
         BindingRegistries::collect(
             index,
             views_availability(has_views),
-            &TagPool::collect(index).expect("the tags are collected"),
+            &TagPool::collect(
+                index,
+                &DeclaredTrusts::read(index).expect("the trusts are read"),
+                &DeclaredOAuthClients::read(index).expect("the oauth clients are read"),
+            )
+            .expect("the tags are collected"),
             &bindings_for(&IndexedSource::new("").index),
         )
     }
@@ -124,7 +132,12 @@ mod tests {
     fn error_with_container_source(source: &str, container_source: &str) -> String {
         let index = IndexedSource::new(source).index;
         let registries = registries_for(&index, false);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
         let container_index = IndexedSource::new(container_source).index;
@@ -146,7 +159,12 @@ mod tests {
     fn http_source(lib_source: &str, has_views: bool) -> Result<String, HttpCodegenError> {
         let index = IndexedSource::try_new(lib_source)?.index;
         let registries = collect_registries(&index, has_views)?;
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)?;
         let bindings = bindings_for(&index);
 
@@ -270,7 +288,12 @@ impl Resource {
     fn web_socket_session_error(lib_source: &str, session_path: &str) -> String {
         let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
 
@@ -338,7 +361,12 @@ impl Resource {
                 transport_policy: ServerTransportPolicy::Negotiable,
             },
         )]);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let middleware_plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
         let error = render_http(
@@ -821,7 +849,12 @@ impl Health {
     ) -> String {
         let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
@@ -879,7 +912,12 @@ impl Health {
     ) -> BTreeMap<String, ServerTransportPolicy> {
         let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
@@ -976,7 +1014,12 @@ impl GetWorkload {
     fn routes_source_for(lib_source: &str) -> String {
         let index = IndexedSource::new(lib_source).index;
         let registries = registries_for(&index, false);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);
@@ -2212,7 +2255,12 @@ impl Guard {
         )
         .index;
         let registries = registries_for(&index, false);
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let plans = MiddlewarePlans::collect(&index, &registries, &tags)
             .expect("the middleware plans are collected");
         let bindings = bindings_for(&index);

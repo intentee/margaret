@@ -10,9 +10,9 @@ use margaret_http_tests::fixture_client_builder::fixture_client_builder;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::static_handler::StaticHandler;
 use margaret_http_tests::tls_fixture::TlsFixture;
-use margaret_issuer_directory_tests::first_poll::first_poll;
+use margaret_issuer_directory::jwks_endpoint_issuer::JwksEndpointIssuer;
+use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_jwks_endpoint::static_endpoint::StaticEndpoint;
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_keygen_tests::test_claims::TestClaims;
 use margaret_jwks_roller::memory_jwks_secret_storage::MemoryJwksSecretStorage;
@@ -21,9 +21,7 @@ use margaret_jwks_roller_server::jwks_roller_server_bundle::JwksRollerServerBund
 use margaret_jwks_roller_server::jwks_roller_server_bundle_params::JwksRollerServerBundleParams;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification_tests::fixture_trust::fixture_trust;
-use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_route_method::route_method::RouteMethod;
-use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn admits_a_token_of_a_rolling_margaret_issuer() {
@@ -48,30 +46,31 @@ async fn admits_a_token_of_a_rolling_margaret_issuer() {
         )],
     )
     .await;
-    let trusted_issuer = Arc::new(TrustedIssuer::for_jwks_endpoint(
-        Arc::new(StaticEndpoint::new(
-            fixture.url(jwks_server.port(), WELL_KNOWN_JWKS_PATH),
-        )),
-        Arc::new(TokenTrustDeclaration {
-            trust: fixture_trust(),
-        }),
-    ));
+    let polled = PolledFixture::published(JwksEndpointIssuer {
+        issuer: fixture_trust().issuer,
+        jwks_uri: String::leak(
+            fixture
+                .url(jwks_server.port(), WELL_KNOWN_JWKS_PATH)
+                .to_string(),
+        ),
+    });
 
-    first_poll(
-        &trusted_issuer,
-        IssuerRequestClient::build(fixture_client_builder(&fixture.certificate_authority))
-            .expect("the fixture request client builds"),
-    )
-    .await;
+    polled
+        .first_poll(
+            IssuerRequestClient::build(fixture_client_builder(&fixture.certificate_authority))
+                .expect("the fixture request client builds"),
+        )
+        .await;
+
+    let trusted_issuer = polled.trusted(fixture_trust());
 
     let claims = TestClaims {
         sub: "subject".to_string(),
     };
     let token = claims.signed_by(server_bundle.jwks_secret_holder().get().current());
     let authorization = RequestAuthorization::parse(Some(&format!("Bearer {token}")));
-    let BearerTokenRouting::Routed(routed) =
-        route_bearer_token(&authorization, &[trusted_issuer.as_ref()])
-            .expect("the system clock reads as a numeric date")
+    let BearerTokenRouting::Routed(routed) = route_bearer_token(&authorization, &[&trusted_issuer])
+        .expect("the system clock reads as a numeric date")
     else {
         panic!("the token routes to the rolling issuer");
     };

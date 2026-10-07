@@ -3,11 +3,21 @@ use std::str::FromStr;
 
 use quote::ToTokens;
 use syn::Expr;
+use syn::ExprCall;
+use syn::Ident;
 use syn::Lit;
 use syn::Path;
 
+use crate::attribute_args::AttributeArgs;
 use crate::attribute_arguments_error::AttributeArgumentsError;
 use crate::named_argument::NamedArgument;
+
+fn call_name(call: &ExprCall) -> Option<&Ident> {
+    match call.func.as_ref() {
+        Expr::Path(function) => function.path.get_ident(),
+        _ => None,
+    }
+}
 
 pub struct AttributeArgumentsReader {
     attribute_path: String,
@@ -38,6 +48,76 @@ impl AttributeArgumentsReader {
                 true
             }
             None => false,
+        }
+    }
+
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::DuplicateGroup` when the group is written twice,
+    /// and the errors of reading the group or of its leftover arguments.
+    pub fn take_group<Interpreted, InterpretError>(
+        &mut self,
+        name: &str,
+        read: impl FnOnce(&mut Self) -> Result<Interpreted, InterpretError>,
+    ) -> Result<Option<Interpreted>, InterpretError>
+    where
+        InterpretError: From<AttributeArgumentsError>,
+    {
+        let mut groups = Vec::new();
+        let mut remaining = Vec::with_capacity(self.positional.len());
+
+        for expression in self.positional.drain(..) {
+            match expression {
+                Expr::Call(call) if call_name(&call).is_some_and(|called| called == name) => {
+                    groups.push(call);
+                }
+                other => remaining.push(other),
+            }
+        }
+
+        self.positional = remaining;
+
+        let mut groups = groups.into_iter();
+        let Some(group) = groups.next() else {
+            return Ok(None);
+        };
+
+        if groups.next().is_some() {
+            return Err(AttributeArgumentsError::DuplicateGroup {
+                attribute_path: self.attribute_path.clone(),
+                group: name.to_string(),
+            }
+            .into());
+        }
+
+        AttributeArgs::from_expressions(self.nested_path(name), group.args)?
+            .interpret(read)
+            .map(Some)
+    }
+
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::UnexpectedArgument` when the value is not a keyword,
+    /// and the errors of reading the keyword or of its leftover arguments.
+    pub fn take_keyword<Interpreted, InterpretError>(
+        &mut self,
+        key: &str,
+        read: impl FnOnce(&Ident, &mut Self) -> Result<Interpreted, InterpretError>,
+    ) -> Result<Option<Interpreted>, InterpretError>
+    where
+        InterpretError: From<AttributeArgumentsError>,
+    {
+        match self.take_named(key) {
+            None => Ok(None),
+            Some(Expr::Path(expression)) => match expression.path.get_ident() {
+                Some(keyword) => self.read_keyword(keyword, Vec::new(), read),
+                None => Err(self.unexpected_argument(key, "keyword").into()),
+            },
+            Some(Expr::Call(call)) => match call_name(&call).cloned() {
+                Some(keyword) => self.read_keyword(&keyword, call.args.into_iter().collect(), read),
+                None => Err(self.unexpected_argument(key, "keyword").into()),
+            },
+            Some(_) => Err(self.unexpected_argument(key, "keyword").into()),
         }
     }
 
@@ -109,6 +189,46 @@ impl AttributeArgumentsReader {
     /// # Errors
     ///
     /// Returns `AttributeArgumentsError::UnexpectedArgument` or
+    /// `AttributeArgumentsError::DuplicateArrayElement`.
+    pub fn take_string_array(
+        &mut self,
+        key: &str,
+    ) -> Result<Option<Vec<String>>, AttributeArgumentsError> {
+        let Some(expression) = self.take_named(key) else {
+            return Ok(None);
+        };
+        let Expr::Array(array) = expression else {
+            return Err(self.unexpected_argument(key, "array of string literals"));
+        };
+
+        let mut strings: Vec<String> = Vec::with_capacity(array.elems.len());
+
+        for element in array.elems {
+            let Expr::Lit(literal) = element else {
+                return Err(self.unexpected_argument(key, "array of string literals"));
+            };
+            let Lit::Str(literal) = literal.lit else {
+                return Err(self.unexpected_argument(key, "array of string literals"));
+            };
+            let value = literal.value();
+
+            if strings.contains(&value) {
+                return Err(AttributeArgumentsError::DuplicateArrayElement {
+                    attribute_path: self.attribute_path.clone(),
+                    element: value,
+                    key: key.to_string(),
+                });
+            }
+
+            strings.push(value);
+        }
+
+        Ok(Some(strings))
+    }
+
+    /// # Errors
+    ///
+    /// Returns `AttributeArgumentsError::UnexpectedArgument` or
     /// `AttributeArgumentsError::MalformedUnsignedInteger`.
     pub fn take_unsigned_integer<Integer>(
         &mut self,
@@ -151,6 +271,24 @@ impl AttributeArgumentsReader {
         }
 
         Ok(())
+    }
+
+    fn read_keyword<Interpreted, InterpretError>(
+        &self,
+        keyword: &Ident,
+        arguments: Vec<Expr>,
+        read: impl FnOnce(&Ident, &mut Self) -> Result<Interpreted, InterpretError>,
+    ) -> Result<Option<Interpreted>, InterpretError>
+    where
+        InterpretError: From<AttributeArgumentsError>,
+    {
+        AttributeArgs::from_expressions(self.nested_path(&keyword.to_string()), arguments)?
+            .interpret(|reader| read(keyword, reader))
+            .map(Some)
+    }
+
+    fn nested_path(&self, name: &str) -> String {
+        format!("{}::{name}", self.attribute_path)
     }
 
     fn take_named(&mut self, key: &str) -> Option<Expr> {

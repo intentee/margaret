@@ -1,5 +1,3 @@
-use std::str::Utf8Error;
-
 use thiserror::Error;
 
 use margaret_registered_claims::registered_claims_error::RegisteredClaimsError;
@@ -13,12 +11,6 @@ pub enum OAuthVocabularyError {
     ClientIdNotAnAudience {
         #[source]
         source: RegisteredClaimsError,
-    },
-
-    #[error("the form-encoded basic client credentials do not decode to utf-8: {source}")]
-    ClientSecretBasicNotUtf8 {
-        #[source]
-        source: Utf8Error,
     },
 
     #[error("the client secret contains a character outside the visible ascii range")]
@@ -35,6 +27,9 @@ pub enum OAuthVocabularyError {
 
     #[error("the scope contains a character outside the scope token grammar of RFC 6749")]
     ScopeCharacter,
+
+    #[error("the client authentication method '{value}' is not supported")]
+    UnsupportedClientAuthenticationMethod { value: String },
 
     #[error("the code challenge method '{value}' is not supported")]
     UnsupportedCodeChallengeMethod { value: String },

@@ -12,6 +12,7 @@ use margaret_container::framework_provider::FrameworkProvider;
 use margaret_container::render_container::render_container;
 use margaret_container_tests::container_module_source::container_module_source;
 use margaret_serve_input_codegen::scan::scan;
+use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
 
 fn path(name: &str) -> CanonicalPath {
     CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
@@ -27,10 +28,10 @@ fn member(name: &str) -> FrameworkProvider {
 }
 
 fn container_source() -> String {
-    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/endpoints");
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/viewed_singleton");
     let index = AttributeIndexBuilder::new()
         .index_crate(&CrateRoot::new("crate", &directory))
-        .expect("the endpoint fixture is indexed")
+        .expect("the viewed singleton fixture is indexed")
         .build();
     let serve_inputs = scan(&index).expect("the serve inputs are scanned");
     let directory_provider = FrameworkProvider {
@@ -57,6 +58,7 @@ fn container_source() -> String {
                 member("SecondMember"),
                 directory_provider,
             ],
+            &DeclaredTokenIssuance::Absent,
         )
         .expect("the directory renders")
         .modules,

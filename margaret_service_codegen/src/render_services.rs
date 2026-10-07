@@ -156,21 +156,16 @@ fn bundle_registration(
     }
 }
 
-fn origin_checks(
-    server: &HttpServer,
-    served_origin_checks: &[ServedOriginCheck],
-    bindings: &ContainerBindings,
-) -> TokenStream {
+fn origin_checks(server: &HttpServer, served_origin_checks: &[ServedOriginCheck]) -> TokenStream {
     let origin_variable = format_ident!("origin_{}", server.name());
     let checks = served_origin_checks
         .iter()
         .filter(|check| check.server == server.name())
         .map(|check| {
-            let provider =
-                bindings.accessor_invocation(&format_ident!("container"), &check.accessor_field);
+            let endpoints = path_tokens(&check.endpoints);
 
             quote! {
-                if let ::std::result::Result::Err(error) = #provider.served_by(#origin_variable) {
+                if let ::std::result::Result::Err(error) = #endpoints.served_by(#origin_variable) {
                     return ::std::result::Result::Err(
                         margaret::framework::console::report_failure::report_failure(error),
                     );
@@ -186,7 +181,6 @@ fn server_registration(
     has_views: bool,
     activation: SpiffeActivation,
     served_origin_checks: &[ServedOriginCheck],
-    bindings: &ContainerBindings,
 ) -> TokenStream {
     let origins = servers.iter().map(|server| {
         let origin_variable = format_ident!("origin_{}", server.name());
@@ -196,7 +190,7 @@ fn server_registration(
             &quote! { value },
             &failed_registration(),
         );
-        let checks = origin_checks(server, served_origin_checks, bindings);
+        let checks = origin_checks(server, served_origin_checks);
 
         quote! {
             let #origin_variable: &margaret::framework::http::server_origin::ServerOrigin = #origin_read;
@@ -430,19 +424,12 @@ fn register_servers_definition(
     has_views: bool,
     activation: SpiffeActivation,
     served_origin_checks: &[ServedOriginCheck],
-    bindings: &ContainerBindings,
 ) -> TokenStream {
     if servers.is_empty() {
         return TokenStream::new();
     }
 
-    let body = server_registration(
-        servers,
-        has_views,
-        activation,
-        served_origin_checks,
-        bindings,
-    );
+    let body = server_registration(servers, has_views, activation, served_origin_checks);
     let spiffe_server_parameter = activation
         .server_active
         .then(|| quote! { spiffe_server_config: &::std::sync::Arc<margaret::framework::spiffe_svid::rustls::ServerConfig>, });
@@ -517,13 +504,8 @@ pub fn render_services(
         .map(|unit| registration(unit, bindings, activation.client_active));
     let identity_prelude = svid_identity_prelude(activation);
     let bundle_registration = bundle_registration(activation);
-    let register_servers = register_servers_definition(
-        servers,
-        has_views,
-        activation,
-        served_origin_checks,
-        bindings,
-    );
+    let register_servers =
+        register_servers_definition(servers, has_views, activation, served_origin_checks);
     let server_registration = register_servers_invocation(servers, activation);
     let construction_invocation = bindings.serve_invocation(&plan.construction_arguments);
     let construction = quote! {

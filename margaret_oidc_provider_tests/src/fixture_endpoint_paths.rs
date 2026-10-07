@@ -1,6 +1,6 @@
-use margaret_oidc_provider::provider_endpoint_paths::ProviderEndpointPaths;
+use crate::provider_route_paths::ProviderRoutePaths;
 
-pub const FIXTURE_ENDPOINT_PATHS: ProviderEndpointPaths = ProviderEndpointPaths {
+pub const FIXTURE_ENDPOINT_PATHS: ProviderRoutePaths = ProviderRoutePaths {
     authorization: "/authorize",
     discovery: "/.well-known/openid-configuration",
     introspection: "/introspect",

@@ -15,7 +15,6 @@ form_urlencoded = { workspace = true }
 headers = { workspace = true }
 margaret_registered_claims = { workspace = true }
 oauth2 = { workspace = true }
-percent-encoding = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 zeroize = { workspace = true }

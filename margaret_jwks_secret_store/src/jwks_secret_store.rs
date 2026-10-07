@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use chrono::DateTime;
@@ -11,15 +10,13 @@ use uuid::Uuid;
 use margaret_identity_session::access_token_claims_signed::AccessTokenClaimsSigned;
 use margaret_identity_session::access_token_lifetime_secs::ACCESS_TOKEN_LIFETIME_SECS;
 use margaret_identity_session::access_token_stamp::AccessTokenStamp;
-use margaret_identity_session::client_assertion_claims::ClientAssertionClaims;
 use margaret_identity_session::id_token_claims::IdTokenClaims;
 use margaret_identity_session::id_token_lifetime_secs::ID_TOKEN_LIFETIME_SECS;
+use margaret_identity_session::issued_access_token_claims::IssuedAccessTokenClaims;
 use margaret_identity_session::refresh_token_claims::RefreshTokenClaims;
 use margaret_identity_session::refresh_token_claims_signed::RefreshTokenClaimsSigned;
 use margaret_identity_session::refresh_token_lifetime_secs::REFRESH_TOKEN_LIFETIME_SECS;
 use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
-use margaret_identity_session::sign_in_transaction_claims::SignInTransactionClaims;
-use margaret_identity_session::sign_in_transaction_lifetime_secs::SIGN_IN_TRANSACTION_LIFETIME_SECS;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_roller_server::jwks_roller::JwksRoller;
@@ -27,14 +24,12 @@ use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification::expected_audience::ExpectedAudience;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
-use margaret_jwt_verification::sign_in_transaction_profile::SignInTransactionProfile;
 use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
-use margaret_registered_claims::audience::Audience;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::merge_claims::merge_claims;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_registered_claims::registered_claims::RegisteredClaims;
-use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
 use margaret_token_signer::mint_access_token::mint_access_token;
 
@@ -42,20 +37,20 @@ use crate::id_token_signing::IdTokenSigning;
 use crate::jwks_secret_store_error::JwksSecretStoreError;
 
 pub struct JwksSecretStore {
-    issuance: Arc<dyn DeclaresTokenIssuance>,
+    issuance: TokenIssuance,
     roller: Arc<JwksRoller>,
 }
 
 impl JwksSecretStore {
     #[must_use]
-    pub fn create(roller: Arc<JwksRoller>, issuance: Arc<dyn DeclaresTokenIssuance>) -> Self {
+    pub fn create(roller: Arc<JwksRoller>, issuance: TokenIssuance) -> Self {
         Self { issuance, roller }
     }
 
     #[must_use]
     pub fn issue_access_token(
         &self,
-        access: &ResourceAccessTokenClaims,
+        access: &IssuedAccessTokenClaims,
         audience: AudienceClaim,
         now: DateTime<Utc>,
     ) -> AccessTokenClaimsSigned {
@@ -63,7 +58,6 @@ impl JwksSecretStore {
             aud: audience,
             ..self
                 .issuance
-                .token_issuance()
                 .identified_claims(now, ACCESS_TOKEN_LIFETIME_SECS)
         };
 
@@ -88,11 +82,8 @@ impl JwksSecretStore {
         now: DateTime<Utc>,
     ) -> Result<String, JwksSecretStoreError> {
         let payload = claims.to_payload(&RegisteredClaims {
-            aud: AudienceClaim::Single(claims.client_id.as_str().to_string()),
-            ..self
-                .issuance
-                .token_issuance()
-                .registered_claims(now, ID_TOKEN_LIFETIME_SECS)
+            aud: AudienceClaim::Single(claims.client_id.to_string()),
+            ..self.issuance.registered_claims(now, ID_TOKEN_LIFETIME_SECS)
         });
         let secret = self.roller.jwks_secret_holder().get();
 
@@ -114,7 +105,6 @@ impl JwksSecretStore {
     ) -> RefreshTokenClaimsSigned {
         let registered = self
             .issuance
-            .token_issuance()
             .identified_claims(now, REFRESH_TOKEN_LIFETIME_SECS);
         let claims = RefreshTokenClaims { sub: subject };
 
@@ -130,27 +120,10 @@ impl JwksSecretStore {
     }
 
     #[must_use]
-    pub fn issue_sign_in_transaction(
-        &self,
-        transaction: &SignInTransactionClaims,
-        now: DateTime<Utc>,
-    ) -> String {
-        let registered = self
-            .issuance
-            .token_issuance()
-            .registered_claims(now, SIGN_IN_TRANSACTION_LIFETIME_SECS);
-
-        self.roller.jwks_secret_holder().get().current().sign_json(
-            &transaction.to_payload(&registered),
-            JwtType::SignInTransaction,
-        )
-    }
-
-    #[must_use]
     pub fn mint_access_token(&self, refresh_token: &str, now: DateTime<Utc>) -> AccessTokenMinting {
         mint_access_token(
             &self.roller.jwks_secret_holder().get(),
-            self.issuance.token_issuance(),
+            &self.issuance,
             refresh_token,
             now,
         )
@@ -165,7 +138,7 @@ impl JwksSecretStore {
         claims: &TClaims,
         now: DateTime<Utc>,
     ) -> Result<AccessTokenClaimsSigned, JwksSecretStoreError> {
-        let stamp = AccessTokenStamp::issued_by(self.issuance.token_issuance(), now);
+        let stamp = AccessTokenStamp::issued_by(&self.issuance, now);
 
         merge_claims(stamp.to_json(), claims)
             .map_err(JwksSecretStoreError::AccessTokenClaims)
@@ -181,15 +154,6 @@ impl JwksSecretStore {
     }
 
     #[must_use]
-    pub fn sign_client_assertion(&self, claims: &ClientAssertionClaims) -> String {
-        self.roller
-            .jwks_secret_holder()
-            .get()
-            .current()
-            .sign_json(&claims.to_payload(), JwtType::ClientAuthentication)
-    }
-
-    #[must_use]
     pub fn verify_access_token<TClaims: DeserializeOwned>(
         &self,
         token: &str,
@@ -197,7 +161,7 @@ impl JwksSecretStore {
     ) -> JwksSecretVerificationResult<TClaims, AccessTokenProfile> {
         self.roller.jwks_secret_holder().get().verify_jwt(
             token,
-            &self.issuance.token_issuance().expectation(),
+            &self.issuance.expectation(),
             NumericDate::from(now),
         )
     }
@@ -206,7 +170,7 @@ impl JwksSecretStore {
     pub fn verify_resource_access_token(
         &self,
         token: &str,
-        audiences: &BTreeSet<Audience>,
+        audiences: &[&str],
         now: DateTime<Utc>,
     ) -> JwtVerification<ResourceAccessTokenClaims, AccessTokenProfile> {
         verify_serialized_jwt(
@@ -214,22 +178,8 @@ impl JwksSecretStore {
             token,
             &JwtExpectation {
                 audience: ExpectedAudience::AnyOf(audiences),
-                issuer: &self.issuance.token_issuance().issuer,
+                issuer: self.issuance.issuer,
             },
-            NumericDate::from(now),
-        )
-    }
-
-    #[must_use]
-    pub fn verify_sign_in_transaction(
-        &self,
-        token: &str,
-        now: DateTime<Utc>,
-    ) -> JwtVerification<SignInTransactionClaims, SignInTransactionProfile> {
-        verify_serialized_jwt(
-            self.roller.jwks_secret_holder().get().key_set(),
-            token,
-            &self.issuance.token_issuance().expectation(),
             NumericDate::from(now),
         )
     }

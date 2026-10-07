@@ -16,3 +16,4 @@ pub mod post_introspect;
 pub mod post_revoke;
 pub mod post_token;
 pub mod provider_issuer;
+pub mod spa_client;

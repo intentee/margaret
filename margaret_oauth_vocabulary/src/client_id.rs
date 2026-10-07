@@ -24,11 +24,6 @@ impl ClientId {
     pub fn as_str(&self) -> &str {
         self.audience.as_str()
     }
-
-    #[must_use]
-    pub fn audience(&self) -> &Audience {
-        &self.audience
-    }
 }
 
 impl Display for ClientId {

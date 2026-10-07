@@ -1,7 +1,7 @@
 use headers::Header;
 use headers::HeaderValue;
 
-use margaret_oauth_vocabulary::client_secret_basic::ClientSecretBasic;
+use margaret_oauth_vocabulary::client_secret_basic::client_secret_basic;
 
 const AUTHORIZATION: &str = include_str!("../fixtures/rfc6749/section_2_3_1_authorization.txt");
 
@@ -9,10 +9,8 @@ const AUTHORIZATION: &str = include_str!("../fixtures/rfc6749/section_2_3_1_auth
 fn encodes_the_rfc_6749_example_client_credentials() {
     let mut encoded = Vec::<HeaderValue>::new();
 
-    ClientSecretBasic::authorization(
-        &"s6BhdRkqt3"
-            .parse()
-            .expect("the example identifier is visible"),
+    client_secret_basic(
+        "s6BhdRkqt3",
         &"gX1fBat3bV"
             .parse()
             .expect("the example secret is not empty"),

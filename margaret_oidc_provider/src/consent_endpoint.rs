@@ -9,7 +9,7 @@ use margaret_provider_state_storage::pending_verdict::PendingVerdict;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 use margaret_token_digest::random_token::random_token;
 use margaret_token_digest::token_digest::TokenDigest;
-use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::authenticated_end_user::AuthenticatedEndUser;
 use crate::authorization_error::AuthorizationError;
@@ -19,16 +19,13 @@ use crate::provider_error::ProviderError;
 use crate::redirection::Redirection;
 
 pub struct ConsentEndpoint {
-    issuance: Arc<dyn DeclaresTokenIssuance>,
+    issuance: TokenIssuance,
     state: Arc<dyn StoresProviderState>,
 }
 
 impl ConsentEndpoint {
     #[must_use]
-    pub fn create(
-        state: Arc<dyn StoresProviderState>,
-        issuance: Arc<dyn DeclaresTokenIssuance>,
-    ) -> Self {
+    pub fn create(state: Arc<dyn StoresProviderState>, issuance: TokenIssuance) -> Self {
         Self { issuance, state }
     }
 
@@ -74,9 +71,9 @@ impl ConsentEndpoint {
     fn redirection(
         &self,
         PendingAuthorization { grant, state }: PendingAuthorization,
-    ) -> Redirection<'_> {
+    ) -> Redirection {
         Redirection {
-            issuer: &self.issuance.token_issuance().issuer,
+            issuer: self.issuance.issuer,
             redirect_uri: grant.redirect_uri,
             state,
         }

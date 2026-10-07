@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use margaret_provider_state_storage::authorization_grant::AuthorizationGrant;
 
-use crate::fixture_client_id::fixture_client_id;
+use crate::fixture_client_id::FIXTURE_CLIENT_ID;
 
 /// # Panics
 ///
@@ -15,7 +15,7 @@ use crate::fixture_client_id::fixture_client_id;
 pub fn fixture_grant() -> AuthorizationGrant {
     AuthorizationGrant {
         auth_time: DateTime::from_timestamp(1_700_000_000, 0).expect("the instant is valid"),
-        client_id: fixture_client_id(),
+        client_id: FIXTURE_CLIENT_ID.to_string(),
         code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM".to_string(),
         nonce: Some("nonce".to_string()),
         redirect_uri: Url::parse("https://client.example/callback").expect("the callback is a url"),

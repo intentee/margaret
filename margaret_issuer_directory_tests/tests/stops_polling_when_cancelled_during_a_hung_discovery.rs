@@ -18,16 +18,16 @@ async fn stops_polling_when_cancelled_during_a_hung_discovery() {
         key_set: json_handler(404, &json!({})),
     })
     .await;
-    let trusted_issuer = localhost_oidc_issuer();
-    let snapshot = trusted_issuer.key_set.snapshot();
+    let polled = localhost_oidc_issuer();
+    let snapshot = polled.key_set.snapshot();
     let directory =
-        PolledDirectory::start(vec![Arc::clone(&trusted_issuer)], issuer.request_client());
+        PolledDirectory::start(vec![Arc::clone(&polled.polled)], issuer.request_client());
 
     hanging.request_received.cancelled().await;
     directory.stop().await;
 
     assert!(matches!(
-        trusted_issuer.key_set.refreshed_since(&snapshot).await,
+        polled.key_set.refreshed_since(&snapshot).await,
         KeySetRefresh::PollingStopped
     ));
 

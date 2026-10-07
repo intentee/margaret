@@ -17,7 +17,7 @@ fn exposes_the_token_identifier_of_a_presented_jwt() {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
     } = SignedClaims::new(
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900, "jti": "run-42-attempt-1" }),
+        &json!({ "aud": trust.audience, "iss": trust.issuer, "exp": 1_000, "iat": 900, "jti": "run-42-attempt-1" }),
     )
     else {
         panic!("the fixture key set is accepted");

@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
@@ -17,12 +16,10 @@ use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
 
 #[tokio::test]
 async fn awaits_the_signing_keys_of_the_issuer() {
-    let fixture = SignInFixture::start(secret_basic_client()).await;
+    let fixture = SignInFixture::start(secret_basic_authentication()).await;
     let keyless = SignInFlow::create(
-        Arc::new(fixture.server.client(Arc::new(OAuthClientDeclaration {
-            client: secret_basic_client(),
-        }))),
-        Arc::clone(&fixture.secret_store),
+        Arc::new(fixture.server.client(secret_basic_authentication())),
+        Arc::clone(&fixture.roller),
     );
     let SignInBeginning::Redirected(response) = begin_sign_in(&keyless).await else {
         panic!("the sign-in redirects to the authorization endpoint");

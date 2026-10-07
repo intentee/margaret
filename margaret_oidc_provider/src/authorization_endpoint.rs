@@ -9,13 +9,14 @@ use margaret_accepted_clients::accepted_clients::AcceptedClients;
 use margaret_accepted_clients::authorization_code_grant::AuthorizationCodeGrant;
 use margaret_accepted_clients::code_grant_policy::CodeGrantPolicy;
 use margaret_accepted_clients::consent_policy::ConsentPolicy;
+use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_http::response::Response;
 use margaret_provider_state_storage::authorization_grant::AuthorizationGrant;
 use margaret_provider_state_storage::pending_authorization::PendingAuthorization;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 use margaret_token_digest::random_token::random_token;
 use margaret_token_digest::token_digest::TokenDigest;
-use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::authorization_error::AuthorizationError;
@@ -33,7 +34,7 @@ use crate::redirection::Redirection;
 fn registered_redirect_uri(policy: &CodeGrantPolicy, requested: Option<&str>) -> Option<Url> {
     requested
         .and_then(|redirect_uri| Url::parse(redirect_uri).ok())
-        .filter(|redirect_uri| policy.redirect_uris.members().contains(redirect_uri))
+        .filter(|redirect_uri| policy.redirect_uris.contains(&redirect_uri.as_str()))
 }
 
 fn rejected(reason: &str) -> AuthorizationOutcome {
@@ -42,8 +43,8 @@ fn rejected(reason: &str) -> AuthorizationOutcome {
 
 pub struct AuthorizationEndpoint {
     clients: Arc<AcceptedClients>,
-    endpoints: Arc<ProviderEndpoints>,
-    issuance: Arc<dyn DeclaresTokenIssuance>,
+    endpoints: ProviderEndpoints,
+    issuance: TokenIssuance,
     state: Arc<dyn StoresProviderState>,
 }
 
@@ -52,8 +53,8 @@ impl AuthorizationEndpoint {
     pub fn create(
         clients: Arc<AcceptedClients>,
         state: Arc<dyn StoresProviderState>,
-        endpoints: Arc<ProviderEndpoints>,
-        issuance: Arc<dyn DeclaresTokenIssuance>,
+        endpoints: ProviderEndpoints,
+        issuance: TokenIssuance,
     ) -> Self {
         Self {
             clients,
@@ -78,6 +79,7 @@ impl AuthorizationEndpoint {
             .client_id
             .as_deref()
             .and_then(|client_id| self.clients.find(client_id))
+            .map(RegisteredClient::client)
         else {
             return Ok(rejected("The client is not accepted"));
         };
@@ -91,7 +93,7 @@ impl AuthorizationEndpoint {
             ));
         };
         let redirection = Redirection {
-            issuer: &self.issuance.token_issuance().issuer,
+            issuer: self.issuance.issuer,
             redirect_uri,
             state: request.state.clone(),
         };
@@ -124,7 +126,7 @@ impl AuthorizationEndpoint {
                     | Prompt::Login
                     | Prompt::LoginAndConsent => AuthorizationOutcome::AuthenticationRequired {
                         return_to: request
-                            .continued_at(&self.endpoints.authorization, prompt.after_login()),
+                            .continued_at(self.endpoints.authorization, prompt.after_login()),
                     },
                 });
             }
@@ -132,7 +134,7 @@ impl AuthorizationEndpoint {
 
         let grant = AuthorizationGrant {
             auth_time: end_user.authenticated_at,
-            client_id: client.client_id.clone(),
+            client_id: client.client_id.to_string(),
             code_challenge,
             nonce,
             redirect_uri: redirection.redirect_uri.clone(),
@@ -140,7 +142,19 @@ impl AuthorizationEndpoint {
             subject: end_user.subject,
         };
 
-        if policy.consent == ConsentPolicy::Implicit && !prompt.forces_consent() {
+        self.concluded(client.client_id, policy.consent, prompt, redirection, grant)
+            .await
+    }
+
+    async fn concluded(
+        &self,
+        client_id: &'static str,
+        consent: ConsentPolicy,
+        prompt: Prompt,
+        redirection: Redirection,
+        grant: AuthorizationGrant,
+    ) -> Result<AuthorizationOutcome, ProviderError> {
+        if consent == ConsentPolicy::Implicit && !prompt.forces_consent() {
             let code = random_token();
 
             return self
@@ -159,7 +173,7 @@ impl AuthorizationEndpoint {
 
         let id = Uuid::new_v4();
         let consent = ConsentRequest {
-            client_id: grant.client_id.clone(),
+            client_id,
             id,
             scopes: grant.scopes.clone(),
         };

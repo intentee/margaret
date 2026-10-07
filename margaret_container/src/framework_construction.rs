@@ -14,10 +14,9 @@ pub enum FrameworkConstruction {
         method: String,
         outcome: ConstructorOutcome,
     },
-    UriSelected {
-        argument_name: String,
+    Resolved {
+        dependencies: Vec<FrameworkDependency>,
         resolver: CanonicalPath,
-        value_type: CanonicalPath,
     },
     Unit,
 }

@@ -11,15 +11,15 @@ publish.workspace = true
 
 [dependencies]
 margaret_http = { workspace = true }
+margaret_issuer_key_set = { workspace = true }
 margaret_jwks_secret_store = { workspace = true }
+margaret_jwt_verification = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
+margaret_provider_state_storage = { workspace = true }
 margaret_registered_claims = { workspace = true }
 margaret_token_digest = { workspace = true }
 margaret_token_issuance = { workspace = true }
-thiserror = { workspace = true }
-url = { workspace = true }
-uuid = { workspace = true }
-zeroize = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

@@ -1,3 +1,4 @@
+pub mod assertion_clock;
 #[cfg(feature = "tests_that_use_postgres")]
 pub mod await_blocked_sessions;
 pub mod fixture_client_id;

@@ -19,20 +19,25 @@ use margaret_authorization_server_client::userinfo_outcome::UserinfoOutcome;
 use margaret_http::redirect::Redirect;
 use margaret_http::request::Request;
 use margaret_identity_session::sign_in_transaction_claims::SignInTransactionClaims;
-use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
+use margaret_identity_session::sign_in_transaction_lifetime_secs::SIGN_IN_TRANSACTION_LIFETIME_SECS;
+use margaret_issuer_key_set::issuer_verification::IssuerVerification;
+use margaret_jose_parameters::jwt_type::JwtType;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
 use margaret_jwt_verification::attribute_serialized_jwt::attribute_serialized_jwt;
 use margaret_jwt_verification::expected_audience::ExpectedAudience;
 use margaret_jwt_verification::id_token_profile::IdTokenProfile;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
+use margaret_jwt_verification::sign_in_transaction_profile::SignInTransactionProfile;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
+use margaret_jwt_verification::verify_serialized_jwt::verify_serialized_jwt;
 use margaret_oauth_vocabulary::scope::Scope;
 use margaret_registered_claims::audience_claim::AudienceClaim;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::equal_in_constant_time::equal_in_constant_time;
 use margaret_token_digest::random_token::random_token;
-use margaret_trusted_issuer::issuer_verification::IssuerVerification;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::callback_code::callback_code;
 use crate::id_token_claims::IdTokenClaims;
@@ -60,26 +65,25 @@ fn requested_scopes(scopes: &BTreeSet<Scope>) -> Vec<oauth2::Scope> {
 }
 
 pub struct SignInFlow {
-    secret_store: Arc<JwksSecretStore>,
+    roller: Arc<JwksRoller>,
     server: Arc<AuthorizationServerClient>,
     transaction_cookie: TransactionCookie,
+    transaction_issuance: TokenIssuance,
 }
 
 impl SignInFlow {
     #[must_use]
-    pub fn create(
-        server: Arc<AuthorizationServerClient>,
-        secret_store: Arc<JwksSecretStore>,
-    ) -> Self {
-        let transaction_cookie = TransactionCookie::of(
-            &server.trusted_issuer.trust.token_trust().issuer,
-            &server.declaration.oauth_client().client_id,
-        );
+    pub fn create(server: Arc<AuthorizationServerClient>, roller: Arc<JwksRoller>) -> Self {
+        let transaction_issuance = TokenIssuance {
+            audience: server.client_id,
+            issuer: server.trusted_issuer.trust.issuer,
+        };
 
         Self {
-            secret_store,
+            roller,
+            transaction_cookie: TransactionCookie::of(&transaction_issuance),
             server,
-            transaction_cookie,
+            transaction_issuance,
         }
     }
 
@@ -112,10 +116,9 @@ impl SignInFlow {
                 Redirect::see_other(authorization_url.to_string())
                     .into_response()
                     .set_cookie(
-                        &self.transaction_cookie.holding(
-                            self.secret_store
-                                .issue_sign_in_transaction(&transaction, Utc::now()),
-                        ),
+                        &self
+                            .transaction_cookie
+                            .holding(self.sealed_transaction(&transaction)),
                     ),
             ),
             AuthorizationUrl::Unavailable(unavailability) => {
@@ -132,7 +135,7 @@ impl SignInFlow {
         let Some(presented) = request.inputs.cookies.get(&self.transaction_cookie.name) else {
             return SignInCompletion::Refused(SignInRefusal::TransactionMissing);
         };
-        let transaction = match self.secret_store.verify_sign_in_transaction(presented, now) {
+        let transaction = match self.verified_transaction(presented, NumericDate::from(now)) {
             JwtVerification::Rejected(rejection) => {
                 return SignInCompletion::Refused(SignInRefusal::TransactionRejected(rejection));
             }
@@ -141,7 +144,7 @@ impl SignInFlow {
         let code = match callback_code(
             &request.inputs.query,
             &transaction,
-            &self.server.trusted_issuer.trust.token_trust().issuer,
+            self.server.trusted_issuer.trust.issuer,
             &self.server.metadata,
         ) {
             ControlFlow::Break(completion) => return completion,
@@ -203,6 +206,17 @@ impl SignInFlow {
         }
     }
 
+    fn sealed_transaction(&self, transaction: &SignInTransactionClaims) -> String {
+        let registered = self
+            .transaction_issuance
+            .registered_claims(Utc::now(), SIGN_IN_TRANSACTION_LIFETIME_SECS);
+
+        self.roller.jwks_secret_holder().get().current().sign_json(
+            &transaction.to_payload(&registered),
+            JwtType::SignInTransaction,
+        )
+    }
+
     fn signed_in<TIdClaims>(
         &self,
         VerifiedJwt {
@@ -219,8 +233,6 @@ impl SignInFlow {
         transaction_nonce: &str,
         access_token: oauth2::AccessToken,
     ) -> SignInCompletion<TIdClaims> {
-        let client_id = &self.server.declaration.oauth_client().client_id;
-
         if let AudienceClaim::Multiple(audiences) = &registered.aud
             && audiences.len() != 1
         {
@@ -230,7 +242,7 @@ impl SignInFlow {
         }
 
         if let Some(found) = azp
-            && found != client_id.as_str()
+            && found != self.server.client_id
         {
             return SignInCompletion::Refused(SignInRefusal::AuthorizedPartyMismatch { found });
         }
@@ -247,6 +259,19 @@ impl SignInFlow {
         })
     }
 
+    fn verified_transaction(
+        &self,
+        presented: &str,
+        now: NumericDate,
+    ) -> JwtVerification<SignInTransactionClaims, SignInTransactionProfile> {
+        verify_serialized_jwt(
+            self.roller.jwks_secret_holder().get().key_set(),
+            presented,
+            &self.transaction_issuance.expectation(),
+            now,
+        )
+    }
+
     async fn verified_id_token<TIdClaims: DeserializeOwned>(
         &self,
         id_token: &str,
@@ -259,10 +284,8 @@ impl SignInFlow {
         let attributed = match attribute_serialized_jwt(
             id_token,
             &JwtExpectation {
-                audience: ExpectedAudience::One(
-                    self.server.declaration.oauth_client().client_id.audience(),
-                ),
-                issuer: &trusted_issuer.trust.token_trust().issuer,
+                audience: ExpectedAudience::One(self.server.client_id),
+                issuer: trusted_issuer.trust.issuer,
             },
         ) {
             ControlFlow::Continue(attributed) => attributed,

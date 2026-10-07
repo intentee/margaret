@@ -11,8 +11,7 @@ use url::Url;
 
 use margaret_authorization_server_client::endpoint_outcome::EndpointOutcome;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::echo_wrapping::EchoWrapping;
@@ -34,9 +33,7 @@ async fn exchanges_an_authorization_code() {
     .await;
 
     let outcome = server
-        .client(Arc::new(OAuthClientDeclaration {
-            client: secret_basic_client(),
-        }))
+        .client(secret_basic_authentication())
         .exchange_authorization_code::<EmptyExtraTokenFields>(
             AuthorizationCode::new("SplxlOBeZQQYbYS6WxSbIA".to_string()),
             PkceCodeVerifier::new("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_string()),

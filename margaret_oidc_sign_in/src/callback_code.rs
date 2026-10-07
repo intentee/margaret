@@ -8,7 +8,6 @@ use margaret_identity_session::sign_in_transaction_claims::SignInTransactionClai
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_metadata::metadata_holding::MetadataHolding;
 use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_token_digest::equal_in_constant_time::equal_in_constant_time;
 
 use crate::sign_in_completion::SignInCompletion;
@@ -22,7 +21,7 @@ fn refused<TIdClaims, TContinuation>(
 
 fn named_issuer<TIdClaims>(
     query: &HashMap<String, String>,
-    issuer: &IssuerIdentifier,
+    issuer: &str,
     metadata: &IssuerMetadata,
 ) -> ControlFlow<SignInCompletion<TIdClaims>> {
     let advertised = match metadata.holding() {
@@ -35,7 +34,7 @@ fn named_issuer<TIdClaims>(
     };
 
     match query.get("iss") {
-        Some(found) if found != issuer.as_str() => refused(SignInRefusal::IssuerMismatch {
+        Some(found) if found != issuer => refused(SignInRefusal::IssuerMismatch {
             found: found.clone(),
         }),
         Some(_) => ControlFlow::Continue(()),
@@ -49,7 +48,7 @@ fn named_issuer<TIdClaims>(
 pub(crate) fn callback_code<TIdClaims>(
     query: &HashMap<String, String>,
     transaction: &SignInTransactionClaims,
-    issuer: &IssuerIdentifier,
+    issuer: &str,
     metadata: &IssuerMetadata,
 ) -> ControlFlow<SignInCompletion<TIdClaims>, AuthorizationCode> {
     if !query

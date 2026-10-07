@@ -14,7 +14,7 @@ async fn asks_consent_when_an_implicitly_consenting_client_prompts_for_it() {
         panic!("the end user is asked for consent");
     };
 
-    assert_eq!(client_id.as_str(), "portal");
+    assert_eq!(client_id, "portal");
 
     fixture.stop().await;
 }

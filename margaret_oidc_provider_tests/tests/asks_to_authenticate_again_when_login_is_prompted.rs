@@ -1,3 +1,5 @@
+use url::Url;
+
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider::end_user_authentication::EndUserAuthentication;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
@@ -22,7 +24,12 @@ async fn asks_to_authenticate_again_when_login_is_prompted() {
         panic!("a login prompt forces the end user to authenticate again");
     };
 
-    assert!(!return_to.query_pairs().any(|(name, _)| name == "prompt"));
+    assert!(
+        !Url::parse(&return_to)
+            .expect("the return location is a url")
+            .query_pairs()
+            .any(|(name, _)| name == "prompt")
+    );
 
     fixture.stop().await;
 }

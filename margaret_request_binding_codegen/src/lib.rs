@@ -66,9 +66,12 @@ mod tests {
     use margaret_container::injected_dependency::InjectedDependency;
     use margaret_container::render_container::render_container;
     use margaret_injection_codegen::process_method::process_method;
+    use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
     use margaret_route_parameter_codegen::route_path::RoutePath;
     use margaret_serve_input_codegen::scan::scan;
     use margaret_tag_codegen::tag_pool::TagPool;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
+    use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
 
     use crate::authenticated_user_application::AuthenticatedUserApplication;
     use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
@@ -101,7 +104,7 @@ struct User;
         let index = IndexedSource::new("").index;
         let registry = scan(&index).expect("the empty console argument registry is scanned");
 
-        render_container(&index, &registry, &[])
+        render_container(&index, &registry, &[], &DeclaredTokenIssuance::Absent)
             .expect("the empty container is rendered")
             .bindings
     }
@@ -110,7 +113,7 @@ struct User;
         CanonicalPath::new(vec!["crate".to_string(), "Missing".to_string()])
     }
 
-    fn trusted_issuer_provider(tag: &str, module_segment: &str) -> FrameworkProvider {
+    fn trusted_issuer_provider(tag: &str) -> FrameworkProvider {
         let path: Path = syn::parse_str(tag).expect("the tag path parses");
 
         FrameworkProvider {
@@ -120,16 +123,10 @@ struct User;
                 Tag::from_path(&path).expect("the tag is a plain name"),
             ),
             provided: CanonicalPath::new(
-                [
-                    "crate",
-                    "margaret",
-                    "trusted_issuers",
-                    module_segment,
-                    "TrustedIssuer",
-                ]
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
+                ["crate", "margaret", "trusted_issuers", tag, "TrustedIssuer"]
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
             ),
         }
     }
@@ -165,12 +162,13 @@ struct User;
             &index,
             &scan(&index).expect("the serve inputs are scanned"),
             &[
-                trusted_issuer_provider("partner", "partner"),
-                trusted_issuer_provider("upstream", "upstream"),
-                trusted_issuer_provider("auth", "auth_endpoint"),
+                trusted_issuer_provider("partner"),
+                trusted_issuer_provider("upstream"),
+                trusted_issuer_provider("auth"),
                 oauth_client_provider("partner_client"),
                 oauth_client_provider("second_client"),
             ],
+            &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")
         .bindings
@@ -183,7 +181,12 @@ struct User;
         BindingRegistries::collect(
             index,
             views,
-            &TagPool::collect(index).expect("the tags are collected"),
+            &TagPool::collect(
+                index,
+                &DeclaredTrusts::read(index).expect("the trusts are read"),
+                &DeclaredOAuthClients::read(index).expect("the oauth clients are read"),
+            )
+            .expect("the tags are collected"),
             &trusted_issuer_bindings(),
         )
     }
@@ -651,7 +654,7 @@ impl SessionUserProvider {
     fn collects_the_console_arguments_a_binding_pulls_in() {
         let index = IndexedSource::new(&provider_source(CONSOLE_ARGUMENT_PROVIDER)).index;
         let registry = scan(&index).expect("the console arguments are scanned");
-        let bindings = render_container(&index, &registry, &[])
+        let bindings = render_container(&index, &registry, &[], &DeclaredTokenIssuance::Absent)
             .expect("the container renders")
             .bindings;
         let registries = collect_registries(&index, ViewsAvailability::Available)
@@ -788,8 +791,7 @@ impl SessionUserProvider {
 use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;
 
-#[singleton]
-#[trusts_oidc_issuer(partner)]
+#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]
 struct PartnerIssuer;
 
 struct Claims;
@@ -831,12 +833,10 @@ struct Claims;
     const PARTNER_CLIENTS: &str = "\
 use margaret::framework::token_introspection::introspected_token::IntrospectedToken;
 
-#[singleton]
-#[oauth_client(partner_client, issuer = partner)]
+#[oauth_client(partner_client, authentication = private_key_jwt, client_id = \"partner\", issuer = partner)]
 struct PartnerClient;
 
-#[singleton]
-#[oauth_client(second_client, issuer = partner)]
+#[oauth_client(second_client, authentication = private_key_jwt, client_id = \"second\", issuer = partner)]
 struct SecondClient;
 ";
 
@@ -956,14 +956,18 @@ struct SecondClient;
         .index;
 
         assert!(matches!(
-            BindingRegistries::collect(
-                &index,
-                ViewsAvailability::Available,
-                &TagPool::collect(&index).expect("the tags are collected"),
-                &empty_bindings(),
-            ),
-            Err(RequestBindingError::UnplannedOAuthClient { ref client, .. }) if client == "partner_client"
-        ));
+                    BindingRegistries::collect(
+                        &index,
+                        ViewsAvailability::Available,
+                        &TagPool::collect(
+        &index,
+        &DeclaredTrusts::read(&index).expect("the trusts are read"),
+        &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        ).expect("the tags are collected"),
+                        &empty_bindings(),
+                    ),
+                    Err(RequestBindingError::UnplannedOAuthClient { ref client, .. }) if client == "partner_client"
+                ));
     }
 
     #[test]
@@ -978,12 +982,12 @@ struct SecondClient;
     fn binds_a_bearer_token_to_the_trusted_issuer_of_its_jwks_endpoint() {
         assert!(verifies_with(
             &registries_for(&format!(
-                "#[singleton]\n#[provides_jwks_endpoint(auth)]\nstruct AuthEndpoint;\n\n{}",
+                "#[provides_jwks_endpoint(auth, audience = \"api\", issuer = \"https://auth.example\", jwks_uri = \"https://auth.example/jwks\")]\nstruct AuthEndpoint;\n\n{}",
                 bearer_provider(
                     "#[bearer_token(issuer = auth)] token: Option<VerifiedJwt<Claims, AccessTokenProfile>>"
                 )
             )),
-            "crate::margaret::trusted_issuers::auth_endpoint::TrustedIssuer"
+            "crate::margaret::trusted_issuers::auth::TrustedIssuer"
         ));
     }
 
@@ -1012,7 +1016,7 @@ struct SecondClient;
     #[test]
     fn resolves_the_bearer_token_type_and_claims_through_use_statements() {
         let source = wrapper_source(&registries_for(
-            "use margaret::framework::jwt_verification::access_token_profile;\nuse margaret::framework::jwt_verification::verified_jwt;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<verified_jwt::VerifiedJwt<Claims, access_token_profile::AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::jwt_verification::access_token_profile;\nuse margaret::framework::jwt_verification::verified_jwt;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]\nstruct PartnerIssuer;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(issuer = partner)] token: Option<verified_jwt::VerifiedJwt<Claims, access_token_profile::AccessTokenProfile>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         ));
 
         assert!(source.contains(
@@ -1023,7 +1027,7 @@ struct SecondClient;
     #[test]
     fn resolves_the_introspected_token_type_and_claims_through_use_statements() {
         let source = wrapper_source(&registries_for(
-            "use margaret::framework::token_introspection::introspected_token;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\n#[singleton]\n#[oauth_client(partner_client, issuer = partner)]\nstruct PartnerClient;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(client = partner_client)] token: Option<introspected_token::IntrospectedToken<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
+            "use margaret::framework::token_introspection::introspected_token;\n\nmod ci {\n    mod claims {\n        pub struct Claims;\n    }\n\n    pub use claims::Claims;\n}\n\nuse crate::ci::Claims;\n\n#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]\nstruct PartnerIssuer;\n\n#[oauth_client(partner_client, authentication = private_key_jwt, client_id = \"partner\", issuer = partner)]\nstruct PartnerClient;\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {\n    #[infer_from_request]\n    fn infer(&self, #[bearer_token(client = partner_client)] token: Option<introspected_token::IntrospectedToken<Claims>>) -> anyhow::Result<AuthenticatedUserOutcome<User>> {}\n}\n",
         ));
 
         assert!(source.contains(
@@ -1177,7 +1181,7 @@ struct SecondClient;
     #[test]
     fn routes_the_bearer_token_among_the_trusted_issuers_of_one_provider() {
         let source = wrapper_source(&registries_for(&format!(
-            "#[singleton]\n#[trusts_oidc_issuer(upstream)]\nstruct UpstreamIssuer;\n\n{}",
+            "#[trusts_oidc_issuer(upstream, audience = \"api\", issuer = \"https://upstream.example\")]\nstruct UpstreamIssuer;\n\n{}",
             bearer_provider(&format!(
                 "{PARTNER_TOKEN}, #[bearer_token(issuer = upstream)] upstream: Option<VerifiedJwt<Claims, IdTokenProfile>>"
             ))
@@ -1231,7 +1235,12 @@ struct SecondClient;
         let rejection = BindingRegistries::collect(
             &index,
             ViewsAvailability::Available,
-            &TagPool::collect(&index).expect("the tags are collected"),
+            &TagPool::collect(
+                &index,
+                &DeclaredTrusts::read(&index).expect("the trusts are read"),
+                &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+            )
+            .expect("the tags are collected"),
             &empty_bindings(),
         )
         .err()
@@ -1334,24 +1343,30 @@ struct SecondClient;
     #[test]
     fn collects_the_console_arguments_of_the_trusted_issuer_a_bearer_provider_verifies() {
         let index = IndexedSource::new(&provider_source(&format!(
-            "use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;\nuse margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\nuse margaret::framework::token_trust::declares_token_trust::DeclaresTokenTrust;\n\nstruct Claims;\n\n#[singleton]\n#[trusts_oidc_issuer(partner)]\nstruct PartnerIssuer;\n\nimpl DeclaresTokenTrust for PartnerIssuer {{}}\n\nimpl PartnerIssuer {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
+            "use margaret::framework::jwt_verification::access_token_profile::AccessTokenProfile;\nuse margaret::framework::jwt_verification::verified_jwt::VerifiedJwt;\n\nstruct Claims;\n\n#[trusts_oidc_issuer(partner, audience = \"api\", issuer = \"https://partner.example\")]\nstruct PartnerIssuer;\n\n#[singleton]\nstruct PartnerSettings;\n\nimpl PartnerSettings {{\n    #[constructor]\n    fn create(#[console_argument(from = \"audience\")] audience: String) -> anyhow::Result<Self> {{}}\n}}\n\n#[singleton]\n#[infers_authenticated_user(user_model = User)]\nstruct RunnerProvider;\n\nimpl RunnerProvider {{\n    #[infer_from_request]\n    fn infer(&self, {PARTNER_TOKEN}) -> anyhow::Result<AuthenticatedUserOutcome<User>> {{}}\n}}\n"
         )))
         .index;
-        let tags = TagPool::collect(&index).expect("the tags are collected");
+        let tags = TagPool::collect(
+            &index,
+            &DeclaredTrusts::read(&index).expect("the trusts are read"),
+            &DeclaredOAuthClients::read(&index).expect("the oauth clients are read"),
+        )
+        .expect("the tags are collected");
         let bindings = render_container(
             &index,
             &scan(&index).expect("the console arguments are scanned"),
             &[FrameworkProvider {
                 construction: FrameworkConstruction::Constructor {
                     dependencies: vec![FrameworkDependency::SingletonView(CanonicalPath::new(
-                        vec!["crate".to_string(), "PartnerIssuer".to_string()],
+                        vec!["crate".to_string(), "PartnerSettings".to_string()],
                     ))],
                     is_async: false,
                     method: "create".to_string(),
                     outcome: ConstructorOutcome::Infallible,
                 },
-                ..trusted_issuer_provider("partner", "partner")
+                ..trusted_issuer_provider("partner")
             }],
+            &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")
         .bindings;
@@ -1380,6 +1395,7 @@ struct SecondClient;
             &index,
             &scan(&index).expect("the console arguments are scanned"),
             &[],
+            &DeclaredTokenIssuance::Absent,
         )
         .expect("the container renders")
         .bindings;

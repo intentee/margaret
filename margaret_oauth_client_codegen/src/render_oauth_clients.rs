@@ -1,78 +1,72 @@
+use quote::format_ident;
 use quote::quote;
 use syn::ext::IdentExt;
 
 use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-use margaret_tag_codegen::oauth_client_binding::OAuthClientBinding;
 
+use crate::client_id_module_name::CLIENT_ID_MODULE_NAME;
+use crate::declared_oauth_clients::DeclaredOAuthClients;
+use crate::oauth_client_declaration::OAuthClientDeclaration;
 use crate::oauth_client_item::OAuthClientItem;
 use crate::oauth_clients_module_name::OAUTH_CLIENTS_MODULE_NAME;
 
-#[must_use]
-pub fn render_oauth_clients(bindings: &[OAuthClientBinding]) -> Vec<GeneratedModuleTokens> {
-    let submodules = bindings.iter().map(|binding| {
-        let module = binding.tag.ident();
-
-        quote! { pub mod #module; }
-    });
+fn client_modules(
+    OAuthClientDeclaration { client_id, tag, .. }: &OAuthClientDeclaration,
+) -> [GeneratedModuleTokens; 2] {
+    let client_module = format!("{OAUTH_CLIENTS_MODULE_NAME}/{}", tag.ident().unraw());
+    let client_id_module = format_ident!("{CLIENT_ID_MODULE_NAME}");
+    let client_id = client_id.as_str();
     let exports = OAuthClientItem::ALL.map(|item| {
         let framework_path = item.framework_path();
 
         quote! { pub use #framework_path; }
+    });
+
+    [
+        GeneratedModuleTokens::new(
+            format!("{client_module}/{CLIENT_ID_MODULE_NAME}"),
+            quote! { pub const CLIENT_ID: &str = #client_id; },
+        ),
+        GeneratedModuleTokens::new(
+            client_module,
+            quote! { pub mod #client_id_module; #(#exports)* },
+        ),
+    ]
+}
+
+#[must_use]
+pub fn render_oauth_clients(clients: &DeclaredOAuthClients) -> Vec<GeneratedModuleTokens> {
+    let submodules = clients.clients.iter().map(|client| {
+        let module = client.tag.ident();
+
+        quote! { pub mod #module; }
     });
     let mut modules = vec![GeneratedModuleTokens::new(
         OAUTH_CLIENTS_MODULE_NAME,
         quote! { #(#submodules)* },
     )];
 
-    modules.extend(bindings.iter().map(|binding| {
-        GeneratedModuleTokens::new(
-            format!(
-                "{OAUTH_CLIENTS_MODULE_NAME}/{}",
-                binding.tag.ident().unraw()
-            ),
-            quote! { #(#exports)* },
-        )
-    }));
+    modules.extend(clients.clients.iter().flat_map(client_modules));
 
     modules
 }
 
 #[cfg(test)]
 mod tests {
-    use margaret_attributes::canonical_path::CanonicalPath;
-    use margaret_attributes::tag::Tag;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
     use margaret_generated_module::generated_module_tokens::GeneratedModuleTokens;
-    use margaret_tag_codegen::oauth_client_binding::OAuthClientBinding;
-    use margaret_tag_codegen::trusted_issuer_binding::TrustedIssuerBinding;
-    use margaret_tag_codegen::trusted_issuer_kind::TrustedIssuerKind;
-    use syn::Path;
 
     use super::render_oauth_clients;
+    use crate::declared_oauth_clients::DeclaredOAuthClients;
 
-    fn tag(name: &str) -> Tag {
-        let path: Path = syn::parse_str(name).expect("the tag path parses");
+    const TWO_CLIENTS: &str = "#[oauth_client(ci, authentication = private_key_jwt, client_id = \"ci\", issuer = partner)]\npub struct Ci;\n#[oauth_client(billing, authentication = client_secret_basic(client_secret_from = \"BILLING_SECRET\"), client_id = \"billing:app\", issuer = partner)]\npub struct Billing;\n";
 
-        Tag::from_path(&path).expect("the tag is a plain name")
-    }
+    fn modules(lib_source: &str) -> Vec<GeneratedModuleTokens> {
+        let indexed = IndexedSource::new(lib_source);
 
-    fn issuer() -> TrustedIssuerBinding {
-        TrustedIssuerBinding {
-            declaring: CanonicalPath::new(vec!["crate".to_string(), "Issuer".to_string()]),
-            kind: TrustedIssuerKind::OidcIssuer,
-            module_segment: "issuer".to_string(),
-            tag: tag("partner"),
-        }
-    }
-
-    fn client<'bindings>(
-        issuer: &'bindings TrustedIssuerBinding,
-        client_tag: &str,
-    ) -> OAuthClientBinding<'bindings> {
-        OAuthClientBinding {
-            declaring: CanonicalPath::new(vec!["crate".to_string(), "Client".to_string()]),
-            issuer,
-            tag: tag(client_tag),
-        }
+        render_oauth_clients(
+            &DeclaredOAuthClients::read(&indexed.index).expect("the clients are read"),
+        )
     }
 
     fn module_source(modules: Vec<GeneratedModuleTokens>, name: &str) -> String {
@@ -87,46 +81,43 @@ mod tests {
     }
 
     #[test]
-    fn declares_a_submodule_per_oauth_client() {
-        let issuer = issuer();
-
+    fn declares_a_submodule_per_oauth_client_in_tag_order() {
         assert_eq!(
-            module_source(
-                render_oauth_clients(&[client(&issuer, "billing"), client(&issuer, "ci")]),
-                "oauth_clients",
-            )
-            .trim(),
-            "pub mod billing;\npub mod ci;"
+            module_source(modules(TWO_CLIENTS), "oauth_clients"),
+            "pub mod billing;\npub mod ci;\n"
+        );
+    }
+
+    #[test]
+    fn re_exports_the_client_runtime_beside_its_client_id() {
+        assert_eq!(
+            module_source(modules(TWO_CLIENTS), "oauth_clients/billing"),
+            "pub mod client_id;\npub use margaret::framework::authorization_server_client::authorization_server_client::AuthorizationServerClient;\npub use margaret::framework::client_credentials::client_credentials::ClientCredentials;\npub use margaret::framework::oidc_sign_in::sign_in_flow::SignInFlow;\npub use margaret::framework::token_exchange_client::token_exchange::TokenExchange;\n"
+        );
+    }
+
+    #[test]
+    fn renders_the_declared_client_id() {
+        assert_eq!(
+            module_source(modules(TWO_CLIENTS), "oauth_clients/billing/client_id"),
+            "pub const CLIENT_ID: &str = \"billing:app\";\n"
         );
     }
 
     #[test]
     fn names_the_module_of_a_raw_identifier_tag_after_its_identifier() {
-        let issuer = issuer();
-        let modules = render_oauth_clients(&[client(&issuer, "r#async")]);
+        let modules = modules(
+            "#[oauth_client(r#async, authentication = private_key_jwt, client_id = \"async\", issuer = partner)]\npub struct Async;\n",
+        );
 
         assert!(
             modules
                 .iter()
-                .any(|module| module.name() == "oauth_clients/async")
+                .any(|module| module.name() == "oauth_clients/async/client_id")
         );
         assert_eq!(
-            module_source(modules, "oauth_clients").trim(),
-            "pub mod r#async;"
-        );
-    }
-
-    #[test]
-    fn re_exports_the_client_runtime_in_its_submodule() {
-        let issuer = issuer();
-
-        assert_eq!(
-            module_source(
-                render_oauth_clients(&[client(&issuer, "billing")]),
-                "oauth_clients/billing",
-            )
-            .trim(),
-            "pub use margaret::framework::authorization_server_client::authorization_server_client::AuthorizationServerClient;\npub use margaret::framework::client_credentials::client_credentials::ClientCredentials;\npub use margaret::framework::oidc_sign_in::sign_in_flow::SignInFlow;\npub use margaret::framework::token_exchange_client::token_exchange::TokenExchange;"
+            module_source(modules, "oauth_clients"),
+            "pub mod r#async;\n"
         );
     }
 }

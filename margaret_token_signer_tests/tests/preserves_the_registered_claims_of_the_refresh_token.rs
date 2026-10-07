@@ -19,10 +19,10 @@ fn preserves_the_registered_claims_of_the_refresh_token() {
     let issuance = fixture_issuance();
     let secret = fresh_p256_secret();
     let original = RegisteredClaims {
-        aud: AudienceClaim::Multiple(vec![issuance.audience.as_str().to_string()]),
+        aud: AudienceClaim::Multiple(vec![issuance.audience.to_string()]),
         exp: NumericDate::new(10_000),
-        iat: NumericDate::new(0),
-        iss: issuance.issuer.as_str().to_string(),
+        iat: Some(NumericDate::new(0)),
+        iss: issuance.issuer.to_string(),
         jti: Some(REFRESH_TOKEN_IDENTIFIER.to_string()),
         nbf: Some(NumericDate::new(500)),
     };

@@ -3,6 +3,7 @@ use tokio::join;
 
 use margaret_oidc_provider::authorization_outcome::AuthorizationOutcome;
 use margaret_oidc_provider_tests::code_exchange::code_exchange;
+use margaret_oidc_provider_tests::fixture_clients::FixtureClients;
 use margaret_oidc_provider_tests::issued_code::issued_code;
 use margaret_oidc_provider_tests::portal_credentials::PORTAL_CREDENTIALS;
 use margaret_oidc_provider_tests::portal_parameters::portal_parameters;
@@ -15,7 +16,8 @@ use margaret_token_digest::token_digest::TokenDigest;
 async fn postgres_provider_refuses_a_code_that_expires_while_its_tokens_are_prepared() {
     let postgres = PostgresState::with_tables().await;
     let pool = postgres.database.pool();
-    let fixture = ProviderFixture::over_state(postgres.state.clone()).await;
+    let fixture =
+        ProviderFixture::over_state(FixtureClients::standard(), postgres.state.clone()).await;
     let AuthorizationOutcome::Redirected(redirect) = fixture.authorized(&portal_parameters()).await
     else {
         panic!("the portal is issued a code");

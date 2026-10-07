@@ -9,7 +9,7 @@ use margaret_registered_claims::claims_merge_error::ClaimsMergeError;
 #[test]
 fn reports_userinfo_claims_that_cannot_be_serialized() {
     let provider = UnservedProvider::create();
-    let endpoint = UserinfoEndpoint::create(provider.secret_store, provider.issuance.as_ref());
+    let endpoint = UserinfoEndpoint::create(provider.secret_store, provider.issuance);
 
     assert!(matches!(
         endpoint.answer(&userinfo_grant_of(), &BTreeMap::from([(vec![1_u8], 1_u8)])),

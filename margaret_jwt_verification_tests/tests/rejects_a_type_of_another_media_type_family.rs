@@ -21,7 +21,7 @@ fn rejects_a_type_of_another_media_type_family() {
         token,
     } = SignedClaims::typed(
         "text/at+jwt",
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900 }),
+        &json!({ "aud": trust.audience, "iss": trust.issuer, "exp": 1_000, "iat": 900 }),
     )
     else {
         panic!("the fixture key set is accepted");

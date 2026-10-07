@@ -18,9 +18,7 @@ fn rejects_a_token_without_an_expiry() {
     let SignedClaims {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
-    } = SignedClaims::new(
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "iat": 900 }),
-    )
+    } = SignedClaims::new(&json!({ "aud": trust.audience, "iss": trust.issuer, "iat": 900 }))
     else {
         panic!("the fixture key set is accepted");
     };

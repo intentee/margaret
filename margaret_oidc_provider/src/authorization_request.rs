@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use url::Url;
+use url::form_urlencoded::Serializer;
 use validator::Validate;
 use validator::ValidationErrors;
 
@@ -32,11 +32,10 @@ pub struct AuthorizationRequest {
 }
 
 impl AuthorizationRequest {
-    pub(crate) fn continued_at(&self, endpoint: &Url, prompt: Option<&str>) -> Url {
-        let mut continuation = Url::clone(endpoint);
+    pub(crate) fn continued_at(&self, endpoint: &str, prompt: Option<&str>) -> String {
+        let mut pairs = Serializer::new(String::new());
 
         {
-            let mut pairs = continuation.query_pairs_mut();
             let parameters = [
                 NamedParameter {
                     name: "client_id",
@@ -87,7 +86,7 @@ impl AuthorizationRequest {
             }
         }
 
-        continuation
+        format!("{endpoint}?{}", pairs.finish())
     }
 }
 

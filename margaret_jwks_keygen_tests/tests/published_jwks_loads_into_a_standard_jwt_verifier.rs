@@ -37,8 +37,8 @@ fn published_jwks_loads_into_a_standard_jwt_verifier() -> Result<()> {
     let trust = fixture_trust();
     let mut validation = Validation::new(Algorithm::ES256);
 
-    validation.set_audience(&[trust.audience.as_str()]);
-    validation.set_issuer(&[trust.issuer.as_str()]);
+    validation.set_audience(&[trust.audience]);
+    validation.set_issuer(&[trust.issuer]);
 
     let verified = decode::<TestClaims>(&token, &DecodingKey::from_jwk(signing_key)?, &validation)?;
 

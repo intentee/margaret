@@ -29,9 +29,11 @@ use margaret_route_method::content_method::ContentMethod;
 use margaret_route_method::route_method::RouteMethod;
 use margaret_subject_token_exchange::subject_token_exchanger::SubjectTokenExchanger;
 use margaret_subject_token_exchange::subject_token_exchangers::SubjectTokenExchangers;
-use margaret_token_issuance::declares_token_issuance::DeclaresTokenIssuance;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 
+use crate::fixture_accepted_resources::FIXTURE_ACCEPTED_RESOURCES;
 use crate::fixture_endpoint_paths::FIXTURE_ENDPOINT_PATHS;
+use crate::fixture_provider_support::FIXTURE_PROVIDER_SUPPORT;
 use crate::form_answer::form_answer;
 
 fn content_route(path: &'static str, handler: Arc<dyn ContentHandler>) -> RouteEntry {
@@ -53,9 +55,12 @@ fn introspection(endpoint: Arc<IntrospectionEndpoint>) -> Arc<dyn ContentHandler
          body: RequestBody|
          -> HandlerFuture<'_> {
             Box::pin(form_answer(request, body, move |submission| async move {
-                Ok(ResponseContinuation::from(
-                    endpoint.respond(request, submission),
-                ))
+                responded(
+                    endpoint
+                        .respond(request, submission)
+                        .await
+                        .map_err(anyhow::Error::from),
+                )
             }))
         },
     )
@@ -136,8 +141,8 @@ fn userinfo(endpoint: Arc<UserinfoEndpoint>) -> Arc<dyn HeadHandler> {
 
 pub struct ProviderParts {
     pub clients: Arc<AcceptedClients>,
-    pub endpoints: Arc<ProviderEndpoints>,
-    pub issuance: Arc<dyn DeclaresTokenIssuance>,
+    pub endpoints: ProviderEndpoints,
+    pub issuance: TokenIssuance,
     pub roller: Arc<JwksRoller>,
     pub secret_store: Arc<JwksSecretStore>,
     pub state: Arc<dyn StoresProviderState>,
@@ -154,9 +159,9 @@ impl ProviderParts {
                 FIXTURE_ENDPOINT_PATHS.discovery,
                 metadata(Arc::new(
                     ProviderMetadataHandler::create(
-                        &self.clients,
-                        &self.endpoints,
-                        self.issuance.as_ref(),
+                        FIXTURE_PROVIDER_SUPPORT,
+                        self.endpoints,
+                        self.issuance,
                     )
                     .expect("the provider metadata serializes"),
                 )),
@@ -166,6 +171,7 @@ impl ProviderParts {
                 introspection(Arc::new(IntrospectionEndpoint::create(
                     Arc::clone(&self.clients),
                     Arc::clone(&self.secret_store),
+                    Arc::clone(&self.state),
                 ))),
             ),
             head_route(
@@ -178,6 +184,7 @@ impl ProviderParts {
                     Arc::clone(&self.clients),
                     Arc::clone(&self.secret_store),
                     Arc::clone(&self.state),
+                    FIXTURE_ACCEPTED_RESOURCES,
                 ))),
             ),
             content_route(
@@ -187,14 +194,14 @@ impl ProviderParts {
                     Arc::clone(&self.state),
                     Arc::new(SubjectTokenExchangers::create(exchangers)),
                     Arc::clone(&self.secret_store),
-                    Arc::clone(&self.issuance),
+                    self.issuance,
                 ))),
             ),
             head_route(
                 FIXTURE_ENDPOINT_PATHS.userinfo,
                 userinfo(Arc::new(UserinfoEndpoint::create(
                     Arc::clone(&self.secret_store),
-                    self.issuance.as_ref(),
+                    self.issuance,
                 ))),
             ),
         ]

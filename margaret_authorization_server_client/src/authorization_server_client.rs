@@ -30,9 +30,12 @@ use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_metadata::metadata_holding::MetadataHolding;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_issuer_request::issuer_request_timeout::ISSUER_REQUEST_TIMEOUT;
-use margaret_oauth_client::declares_oauth_client::DeclaresOAuthClient;
+use margaret_jwks_roller_server::jwks_roller::JwksRoller;
+use margaret_oauth_client::client_authentication::ClientAuthentication;
 use margaret_oauth_client::presented_client_authentication::PresentedClientAuthentication;
+use margaret_oauth_vocabulary::client_secret::ClientSecret;
 use margaret_oauth_vocabulary::grant_type::GrantType;
+use margaret_oauth_vocabulary::jwt_bearer_client_assertion_type::JWT_BEARER_CLIENT_ASSERTION_TYPE;
 use margaret_oauth_vocabulary::token_type_hint::TokenTypeHint;
 use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_registered_claims::numeric_date::NumericDate;
@@ -50,7 +53,6 @@ use crate::userinfo_outcome::UserinfoOutcome;
 
 const FORM_CONTENT_TYPE: &str = "application/x-www-form-urlencoded";
 const JSON_CONTENT_TYPE: &str = "application/json";
-const JWT_BEARER_ASSERTION_TYPE: &str = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
 fn form_body(parameters: impl IntoIterator<Item = FormParameter>) -> Vec<u8> {
     let mut form = form_urlencoded::Serializer::new(String::new());
@@ -81,7 +83,8 @@ fn userinfo_answer<TUserinfo: DeserializeOwned>(
 }
 
 pub struct AuthorizationServerClient {
-    pub declaration: Arc<dyn DeclaresOAuthClient>,
+    authentication: ClientAuthentication,
+    pub client_id: &'static str,
     pub metadata: Arc<IssuerMetadata>,
     request_client: Arc<IssuerRequestClient>,
     pub trusted_issuer: Arc<TrustedIssuer>,
@@ -89,14 +92,33 @@ pub struct AuthorizationServerClient {
 
 impl AuthorizationServerClient {
     #[must_use]
-    pub fn create(
+    pub fn with_client_secret_basic(
         request_client: Arc<IssuerRequestClient>,
         metadata: Arc<IssuerMetadata>,
         trusted_issuer: Arc<TrustedIssuer>,
-        declaration: Arc<dyn DeclaresOAuthClient>,
+        client_id: &'static str,
+        client_secret: ClientSecret,
     ) -> Self {
         Self {
-            declaration,
+            authentication: ClientAuthentication::ClientSecretBasic(client_secret),
+            client_id,
+            metadata,
+            request_client,
+            trusted_issuer,
+        }
+    }
+
+    #[must_use]
+    pub fn with_private_key_jwt(
+        request_client: Arc<IssuerRequestClient>,
+        metadata: Arc<IssuerMetadata>,
+        trusted_issuer: Arc<TrustedIssuer>,
+        client_id: &'static str,
+        roller: Arc<JwksRoller>,
+    ) -> Self {
+        Self {
+            authentication: ClientAuthentication::PrivateKeyJwt(roller),
+            client_id,
             metadata,
             request_client,
             trusted_issuer,
@@ -114,20 +136,14 @@ impl AuthorizationServerClient {
         }: AuthorizationRequest,
     ) -> AuthorizationUrl {
         self.at_endpoint(ServerEndpoint::Authorization, async |authorization_url| {
-            let (url, _state) = BasicClient::new(oauth2::ClientId::new(
-                self.declaration
-                    .oauth_client()
-                    .client_id
-                    .as_str()
-                    .to_string(),
-            ))
-            .set_auth_uri(AuthUrl::from_url(authorization_url))
-            .authorize_url(|| state)
-            .add_scopes(scopes)
-            .set_pkce_challenge(pkce_challenge)
-            .set_redirect_uri(Cow::Owned(redirect_uri))
-            .add_extra_param("nonce", nonce)
-            .url();
+            let (url, _state) = BasicClient::new(oauth2::ClientId::new(self.client_id.to_string()))
+                .set_auth_uri(AuthUrl::from_url(authorization_url))
+                .authorize_url(|| state)
+                .add_scopes(scopes)
+                .set_pkce_challenge(pkce_challenge)
+                .set_redirect_uri(Cow::Owned(redirect_uri))
+                .add_extra_param("nonce", nonce)
+                .url();
 
             AuthorizationUrl::Built(url)
         })
@@ -260,11 +276,11 @@ impl AuthorizationServerClient {
         parameters: Vec<FormParameter>,
     ) -> EndpointOutcome<TAnswer> {
         self.at_endpoint(endpoint, async |endpoint_url| {
-            let client = self.declaration.oauth_client();
             let issued_at = NumericDate::from(Utc::now());
             let mut request = Request::new(Method::POST, endpoint_url);
-            let authentication_parameters = match client.presented_to(
-                &self.trusted_issuer.trust.token_trust().issuer,
+            let authentication_parameters = match self.authentication.presented_to(
+                self.trusted_issuer.trust.issuer,
+                self.client_id,
                 issued_at,
                 issued_at.after(ISSUER_REQUEST_TIMEOUT),
             ) {
@@ -281,11 +297,11 @@ impl AuthorizationServerClient {
                         },
                         FormParameter {
                             name: "client_assertion_type",
-                            value: JWT_BEARER_ASSERTION_TYPE.to_string(),
+                            value: JWT_BEARER_CLIENT_ASSERTION_TYPE.to_string(),
                         },
                         FormParameter {
                             name: "client_id",
-                            value: client.client_id.as_str().to_string(),
+                            value: self.client_id.to_string(),
                         },
                     ]
                 }

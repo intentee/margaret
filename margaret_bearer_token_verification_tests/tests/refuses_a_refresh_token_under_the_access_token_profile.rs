@@ -24,10 +24,10 @@ async fn refuses_a_refresh_token_under_the_access_token_profile() {
             sub: Uuid::from_u128(2),
         }
         .to_payload(&RegisteredClaims {
-            aud: AudienceClaim::Single(trust.audience.as_str().to_string()),
+            aud: AudienceClaim::Single(trust.audience.to_string()),
             exp: NumericDate::new(FAR_FUTURE_EXPIRY),
-            iat: NumericDate::new(0),
-            iss: trust.issuer.as_str().to_string(),
+            iat: Some(NumericDate::new(0)),
+            iss: trust.issuer.to_string(),
             jti: Some(Uuid::from_u128(1).to_string()),
             nbf: None,
         }),

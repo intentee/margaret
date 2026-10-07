@@ -18,9 +18,7 @@ fn rejects_a_token_without_an_issue_time() {
     let SignedClaims {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
-    } = SignedClaims::new(
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "exp": 1_000 }),
-    )
+    } = SignedClaims::new(&json!({ "aud": trust.audience, "iss": trust.issuer, "exp": 1_000 }))
     else {
         panic!("the fixture key set is accepted");
     };
@@ -32,6 +30,6 @@ fn rejects_a_token_without_an_issue_time() {
             &trust.expectation(),
             NumericDate::new(950)
         ),
-        JwtVerification::Rejected(JwtRejection::Claims(ClaimsRejection::Malformed { .. }))
+        JwtVerification::Rejected(JwtRejection::Claims(ClaimsRejection::MissingIssuedAt))
     ));
 }

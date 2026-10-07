@@ -1,11 +1,11 @@
 use http::Response;
 use reqwest::Client;
 use reqwest::ClientBuilder;
+use reqwest::IntoUrl;
 use reqwest::Request;
 use reqwest::RequestBuilder;
 use reqwest::redirect::Policy;
 use tokio_util::sync::CancellationToken;
-use url::Url;
 
 use crate::issuer_document::IssuerDocument;
 use crate::issuer_exchange_error::IssuerExchangeError;
@@ -98,7 +98,7 @@ impl IssuerRequestClient {
 
     pub async fn fetch_document(
         &self,
-        url: Url,
+        url: impl IntoUrl,
         cancellation_token: &CancellationToken,
     ) -> IssuerDocument {
         let request = self.http_client.get(url).timeout(ISSUER_REQUEST_TIMEOUT);

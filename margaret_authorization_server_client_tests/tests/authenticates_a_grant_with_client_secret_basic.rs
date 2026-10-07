@@ -8,8 +8,7 @@ use serde_json::json;
 use margaret_authorization_server_client::endpoint_outcome::EndpointOutcome;
 use margaret_authorization_server_client::form_parameter::FormParameter;
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::body_limit::BodyLimit;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http_tests::echo_wrapping::EchoWrapping;
@@ -32,9 +31,7 @@ async fn authenticates_a_grant_with_client_secret_basic() {
     .await;
 
     let outcome = server
-        .client(Arc::new(OAuthClientDeclaration {
-            client: secret_basic_client(),
-        }))
+        .client(secret_basic_authentication())
         .request_grant::<EmptyExtraTokenFields>(
             GrantType::TokenExchange,
             vec![FormParameter {

@@ -7,6 +7,7 @@ use margaret_model::on_delete::OnDelete;
 use margaret_model::table::Table;
 
 use crate::authorization_codes_table::AUTHORIZATION_CODES_TABLE;
+use crate::client_assertions_table::CLIENT_ASSERTIONS_TABLE;
 use crate::pending_authorizations_table::PENDING_AUTHORIZATIONS_TABLE;
 use crate::refresh_families_table::REFRESH_FAMILIES_TABLE;
 use crate::refresh_tokens_table::REFRESH_TOKENS_TABLE;
@@ -63,6 +64,18 @@ pub fn provider_state_tables() -> Vec<Table> {
         .push(index(REFRESH_TOKENS_TABLE, "family"));
 
     vec![
+        Table {
+            columns: vec![
+                column("client_id", ColumnType::Text, false),
+                column("digest", ColumnType::Bytea, false),
+                column("expires_at", ColumnType::Timestamptz, false),
+            ],
+            foreign_keys: Vec::new(),
+            indexes: vec![index(CLIENT_ASSERTIONS_TABLE, "expires_at")],
+            name: CLIENT_ASSERTIONS_TABLE.to_string(),
+            primary_key: vec!["client_id".to_string(), "digest".to_string()],
+            unique_constraints: Vec::new(),
+        },
         table(
             AUTHORIZATION_CODES_TABLE,
             "digest",

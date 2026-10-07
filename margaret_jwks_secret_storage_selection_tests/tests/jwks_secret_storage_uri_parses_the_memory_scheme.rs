@@ -5,10 +5,6 @@ use margaret_jwks_secret_storage_selection::jwks_secret_storage_uri::JwksSecretS
 #[test]
 fn jwks_secret_storage_uri_parses_the_memory_scheme() {
     assert!(matches!(
-        JwksSecretStorageUri::from_str("memory"),
-        Ok(JwksSecretStorageUri::Memory)
-    ));
-    assert!(matches!(
         JwksSecretStorageUri::from_str("memory:"),
         Ok(JwksSecretStorageUri::Memory)
     ));

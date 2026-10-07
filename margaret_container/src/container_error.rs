@@ -52,11 +52,8 @@ pub enum ContainerError {
         required: String,
     },
 
-    #[error("more than one singleton is declared with #[issues_tokens]: {paths}")]
-    AmbiguousTokenIssuance { paths: String },
-
     #[error(
-        "the framework provider '{provider}' stamps issued tokens, but no singleton is declared with #[issues_tokens]"
+        "the framework provider '{provider}' stamps issued tokens, but no struct declares #[issues_tokens]"
     )]
     MissingTokenIssuance { provider: String },
 

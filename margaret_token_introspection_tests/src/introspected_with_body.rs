@@ -3,8 +3,7 @@ use std::sync::Arc;
 use serde::de::DeserializeOwned;
 
 use margaret_authorization_server_client_tests::fixture_authorization_server::FixtureAuthorizationServer;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http::method_handler::MethodHandler;
 use margaret_http::request_authorization::RequestAuthorization;
 use margaret_http::token_admission::TokenAdmission;
@@ -31,9 +30,7 @@ pub async fn introspected_with_body<TClaims: DeserializeOwned>(
     .await;
     let admission = introspect_bearer_token(
         &RequestAuthorization::parse(Some("Bearer opaque-token")),
-        &server.client(Arc::new(OAuthClientDeclaration {
-            client: secret_basic_client(),
-        })),
+        &server.client(secret_basic_authentication()),
     )
     .await;
 

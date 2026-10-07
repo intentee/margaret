@@ -1,10 +1,7 @@
-use margaret_attributes::canonical_path::CanonicalPath;
-use margaret_attributes::tag::Tag;
+use margaret_oauth_client_codegen::oauth_client_declaration::OAuthClientDeclaration;
+use margaret_trusted_issuer_codegen::trusted_issuer_binding::TrustedIssuerBinding;
 
-use crate::trusted_issuer_binding::TrustedIssuerBinding;
-
-pub struct OAuthClientBinding<'bindings> {
-    pub declaring: CanonicalPath,
-    pub issuer: &'bindings TrustedIssuerBinding,
-    pub tag: Tag,
+pub struct OAuthClientBinding<'declarations, 'index> {
+    pub client: &'declarations OAuthClientDeclaration<'index>,
+    pub issuer: TrustedIssuerBinding<'declarations, 'index>,
 }

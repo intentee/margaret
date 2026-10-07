@@ -5,6 +5,7 @@ use margaret_provider_state_storage::pending_verdict::PendingVerdict;
 use margaret_provider_state_storage::provider_state_error::ProviderStateError;
 use margaret_provider_state_storage::refresh_issuance::RefreshIssuance;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
+use margaret_provider_state_storage_tests::assertion_clock::AssertionClock;
 use margaret_provider_state_storage_tests::fixture_grant::fixture_grant;
 use margaret_provider_state_storage_tests::fresh_digest::fresh_digest;
 use margaret_provider_state_storage_tests::pending_of::pending_of;
@@ -17,6 +18,7 @@ async fn postgres_state_reports_every_operation_without_its_tables() {
     let grant = fixture_grant();
     let code = fresh_digest();
     let refresh_token = fresh_digest();
+    let clock = AssertionClock::start();
 
     postgres.dropped().await;
 
@@ -65,5 +67,11 @@ async fn postgres_state_reports_every_operation_without_its_tables() {
             .revoke_refresh_token(refresh_token, &grant.client_id)
             .await,
         Err(ProviderStateError::RevokeRefreshToken { .. })
+    ));
+    assert!(matches!(
+        state
+            .spend_client_assertion("portal", code, clock.in_seconds(60), clock.now)
+            .await,
+        Err(ProviderStateError::SpendClientAssertion { .. })
     ));
 }

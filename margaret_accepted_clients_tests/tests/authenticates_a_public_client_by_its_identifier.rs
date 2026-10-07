@@ -1,20 +1,35 @@
-use margaret_accepted_clients::accepted_client_authentication::AcceptedClientAuthentication;
+use std::sync::Arc;
+
+use chrono::Utc;
+
 use margaret_accepted_clients::client_authentication_outcome::ClientAuthenticationOutcome;
-use margaret_accepted_clients::presented_client_credentials::PresentedClientCredentials;
+use margaret_accepted_clients::client_authentication_parameters::ClientAuthenticationParameters;
+use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_accepted_clients_tests::accepted_clients_of::accepted_clients_of;
 use margaret_accepted_clients_tests::fixture_client::fixture_client;
 use margaret_http::request_authorization::RequestAuthorization;
+use margaret_provider_state_storage::memory_provider_state::MemoryProviderState;
+use margaret_registered_claims::numeric_date::NumericDate;
 
-#[test]
-fn authenticates_a_public_client_by_its_identifier() {
-    let clients = accepted_clients_of(vec![fixture_client(
-        "client:id",
-        AcceptedClientAuthentication::Public,
-    )])
-    .expect("the client is accepted");
+#[tokio::test]
+async fn authenticates_a_public_client_by_its_identifier() {
+    let clients = accepted_clients_of(vec![Arc::new(RegisteredClient::public(fixture_client(
+        "blog",
+    )))]);
 
     assert!(matches!(
-        clients.authenticate(&PresentedClientCredentials::of(&RequestAuthorization::Absent, Some("client:id"))),
-        ClientAuthenticationOutcome::Authenticated(client) if client.client_id.as_str() == "client:id"
+        clients
+            .authenticate(
+                &RequestAuthorization::Absent,
+                &ClientAuthenticationParameters {
+                    client_id: Some("blog".to_string()),
+                    ..ClientAuthenticationParameters::default()
+                },
+                &MemoryProviderState::create(),
+                NumericDate::from(Utc::now()),
+            )
+            .await,
+        Ok(ClientAuthenticationOutcome::Authenticated(registered))
+            if registered.client().client_id == "blog"
     ));
 }

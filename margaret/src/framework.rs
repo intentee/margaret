@@ -43,7 +43,6 @@ pub use margaret_issuer_request as issuer_request;
 #[cfg(feature = "runtime")]
 pub use margaret_jose_parameters as jose_parameters;
 #[cfg(feature = "runtime")]
-pub use margaret_jwks_endpoint as jwks_endpoint;
 #[cfg(feature = "runtime")]
 pub use margaret_jwks_file_secret_storage as jwks_file_secret_storage;
 #[cfg(feature = "runtime")]

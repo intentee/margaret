@@ -6,7 +6,7 @@ use margaret_provider_state_storage::pending_decision::PendingDecision;
 use margaret_provider_state_storage::pending_verdict::PendingVerdict;
 use margaret_provider_state_storage::provider_state_error::ProviderStateError;
 use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
-use margaret_provider_state_storage_tests::fixture_client_id::fixture_client_id;
+use margaret_provider_state_storage_tests::fixture_client_id::FIXTURE_CLIENT_ID;
 use margaret_provider_state_storage_tests::fixture_grant::fixture_grant;
 use margaret_provider_state_storage_tests::postgres_state::PostgresState;
 use margaret_token_digest::token_digest::TokenDigest;
@@ -54,7 +54,7 @@ async fn postgres_state_reports_unreadable_documents() {
         r#"INSERT INTO "margaret-oidc-refresh-families" ("id", "grant_document", "expires_at") VALUES ($1, $2, now() + interval '1 minute')"#,
     )
     .bind(family)
-    .bind(json!({"client_id": fixture_client_id().as_str(), "scopes": []}).to_string())
+    .bind(json!({"client_id": FIXTURE_CLIENT_ID, "scopes": []}).to_string())
     .execute(postgres.database.pool())
     .await
     .expect("the incomplete family is stored");
@@ -62,7 +62,7 @@ async fn postgres_state_reports_unreadable_documents() {
         &postgres,
         r#"INSERT INTO "margaret-oidc-refresh-tokens" ("digest", "family", "superseded", "expires_at") SELECT $1, "id", FALSE, now() + interval '1 minute' FROM "margaret-oidc-refresh-families" WHERE "grant_document" = $2"#,
         refresh_token.as_bytes().to_vec(),
-        json!({"client_id": fixture_client_id().as_str(), "scopes": []}).to_string(),
+        json!({"client_id": FIXTURE_CLIENT_ID, "scopes": []}).to_string(),
     )
     .await;
 

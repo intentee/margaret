@@ -1,6 +1,6 @@
 use http::Method;
 
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
 use margaret_http_tests::fixture_request::FixtureRequest;
 use margaret_oidc_sign_in::sign_in_completion::SignInCompletion;
 use margaret_oidc_sign_in::sign_in_refusal::SignInRefusal;
@@ -9,7 +9,7 @@ use margaret_oidc_sign_in_tests::sign_in_fixture::SignInFixture;
 
 #[tokio::test]
 async fn refuses_a_callback_without_a_transaction() {
-    let fixture = SignInFixture::start(secret_basic_client()).await;
+    let fixture = SignInFixture::start(secret_basic_authentication()).await;
 
     let completion = fixture
         .flow

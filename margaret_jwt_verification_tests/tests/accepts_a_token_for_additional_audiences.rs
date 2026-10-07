@@ -17,7 +17,7 @@ fn accepts_a_token_for_additional_audiences() {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
     } = SignedClaims::new(
-        &json!({ "aud": [trust.audience.as_str(), "someone-else"], "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900 }),
+        &json!({ "aud": [trust.audience, "someone-else"], "iss": trust.issuer, "exp": 1_000, "iat": 900 }),
     )
     else {
         panic!("the fixture key set is accepted");

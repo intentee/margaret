@@ -12,6 +12,7 @@ publish.workspace = true
 [dependencies]
 margaret_jwks_file_secret_storage = { workspace = true }
 margaret_jwks_roller = { workspace = true }
+margaret_storage_uri = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

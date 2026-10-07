@@ -13,9 +13,11 @@ margaret_container = { workspace = true }
 margaret_generated_module = { workspace = true }
 margaret_input_weaving = { workspace = true }
 margaret_serve_input_codegen = { workspace = true }
+margaret_token_issuance_codegen = { workspace = true }
 syn = { workspace = true }
 
 [dev-dependencies]
+margaret_environment_variable_codegen = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 

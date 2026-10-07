@@ -1,0 +1,73 @@
+use std::path::Path;
+
+use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
+use margaret_attributes::attribute_error::AttributeError;
+use margaret_container::container_error::ContainerError;
+use margaret_container_tests::generate_container_source::generate_container_source;
+
+fn error(fixture: &str) -> ContainerError {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(fixture);
+
+    generate_container_source(fixture, &directory).expect_err("the fixture must be rejected")
+}
+
+#[test]
+fn rejects_a_subject_token_exchanger_on_a_non_struct() {
+    assert!(matches!(
+        error("exchanger_not_a_struct"),
+        ContainerError::DeclarationNotAStruct {
+            attribute: "exchanges_subject_tokens",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn rejects_a_subject_token_exchanger_that_is_also_a_service() {
+    assert!(matches!(
+        error("exchanger_conflicting_role"),
+        ContainerError::ConflictingDeclarationRole {
+            attribute: "exchanges_subject_tokens",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn rejects_a_subject_token_exchanger_without_a_singleton() {
+    assert!(matches!(
+        error("exchanger_without_singleton"),
+        ContainerError::DeclarationRequiresSingleton {
+            attribute: "exchanges_subject_tokens",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn rejects_a_subject_token_exchanger_that_carries_singleton_arguments() {
+    assert!(matches!(
+        error("exchanger_singleton_with_arguments"),
+        ContainerError::SingletonHasArguments { .. }
+    ));
+}
+
+#[test]
+fn rejects_a_subject_token_exchanger_with_malformed_singleton_arguments() {
+    assert!(matches!(
+        error("exchanger_malformed_singleton_arguments"),
+        ContainerError::Index {
+            source: AttributeError::Arguments(AttributeArgumentsError::Malformed { .. })
+        }
+    ));
+}
+
+#[test]
+fn rejects_a_subject_token_exchanger_with_fields_but_no_constructor() {
+    assert!(matches!(
+        error("exchanger_requires_constructor"),
+        ContainerError::SingletonRequiresConstructor { .. }
+    ));
+}

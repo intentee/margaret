@@ -17,10 +17,10 @@ pub fn sign_refresh_token(
 ) -> String {
     pair.sign_json(
         &claims.to_payload(&RegisteredClaims {
-            aud: AudienceClaim::Single(audience.as_str().to_string()),
+            aud: AudienceClaim::Single((*audience).to_string()),
             exp: NumericDate::new(exp),
-            iat: NumericDate::new(0),
-            iss: issuer.as_str().to_string(),
+            iat: Some(NumericDate::new(0)),
+            iss: (*issuer).to_string(),
             jti: Some(REFRESH_TOKEN_IDENTIFIER.to_string()),
             nbf: None,
         }),

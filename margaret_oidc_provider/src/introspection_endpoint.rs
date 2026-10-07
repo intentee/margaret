@@ -9,22 +9,25 @@ use oauth2::StandardTokenIntrospectionResponse;
 use oauth2::basic::BasicErrorResponseType;
 use oauth2::basic::BasicTokenType;
 
-use margaret_accepted_clients::accepted_client_authentication::AcceptedClientAuthentication;
 use margaret_accepted_clients::accepted_clients::AcceptedClients;
 use margaret_accepted_clients::confidential_privileges::ConfidentialPrivileges;
 use margaret_accepted_clients::introspection_permission::IntrospectionPermission;
+use margaret_accepted_clients::registered_client::RegisteredClient;
 use margaret_http::request::Request;
 use margaret_http::response::Response;
 use margaret_identity_session::resource_access_token_claims::ResourceAccessTokenClaims;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
 use margaret_jwt_verification::jwt_verification::JwtVerification;
 use margaret_jwt_verification::verified_jwt::VerifiedJwt;
+use margaret_provider_state_storage::stores_provider_state::StoresProviderState;
 use margaret_registered_claims::audience_claim::AudienceClaim;
+use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_validation::validation_result::ValidationResult;
 
 use crate::authenticated_client::authenticated_client;
 use crate::no_store::no_store;
 use crate::oauth_error::oauth_error;
+use crate::provider_error::ProviderError;
 use crate::token_submission::TokenSubmission;
 
 fn active_introspection<TProfile>(
@@ -50,10 +53,11 @@ fn active_introspection<TProfile>(
         registered.exp.seconds_since_epoch(),
         0,
     ));
-    introspection.set_iat(DateTime::from_timestamp(
-        registered.iat.seconds_since_epoch(),
-        0,
-    ));
+    introspection.set_iat(
+        registered
+            .iat
+            .and_then(|iat| DateTime::from_timestamp(iat.seconds_since_epoch(), 0)),
+    );
     introspection.set_iss(Some(registered.iss));
     introspection.set_scopes(Some(scope.scopes.iter().map(oauth2::Scope::from).collect()));
     introspection.set_sub(Some(subject));
@@ -65,60 +69,78 @@ fn active_introspection<TProfile>(
 pub struct IntrospectionEndpoint {
     clients: Arc<AcceptedClients>,
     secret_store: Arc<JwksSecretStore>,
+    state: Arc<dyn StoresProviderState>,
 }
 
 impl IntrospectionEndpoint {
     #[must_use]
-    pub fn create(clients: Arc<AcceptedClients>, secret_store: Arc<JwksSecretStore>) -> Self {
+    pub fn create(
+        clients: Arc<AcceptedClients>,
+        secret_store: Arc<JwksSecretStore>,
+        state: Arc<dyn StoresProviderState>,
+    ) -> Self {
         Self {
             clients,
             secret_store,
+            state,
         }
     }
 
-    #[must_use]
-    pub fn respond(
+    /// # Errors
+    ///
+    /// Returns `ProviderError::State` when the client assertion cannot be spent.
+    pub async fn respond(
         &self,
         request: &Request,
         submission: ValidationResult<TokenSubmission>,
-    ) -> Response {
+    ) -> Result<Response, ProviderError> {
         let ValidationResult::Valid(TokenSubmission {
-            client_id, token, ..
+            client_authentication,
+            token,
         }) = submission
         else {
-            return oauth_error(
+            return Ok(oauth_error(
                 400,
                 BasicErrorResponseType::InvalidRequest,
                 "the introspection request is malformed",
-            );
+            ));
         };
-        let client = match authenticated_client(&self.clients, request, client_id.as_deref()) {
-            ControlFlow::Break(refusal) => return refusal,
-            ControlFlow::Continue(client) => client,
+        let now = Utc::now();
+        let registered = match authenticated_client(
+            &self.clients,
+            request,
+            &client_authentication,
+            self.state.as_ref(),
+            NumericDate::from(now),
+        )
+        .await?
+        {
+            ControlFlow::Break(refusal) => return Ok(refusal),
+            ControlFlow::Continue(registered) => registered,
         };
-        let AcceptedClientAuthentication::ClientSecretBasic {
+        let RegisteredClient::Confidential {
+            client,
             privileges:
                 ConfidentialPrivileges {
                     introspection: IntrospectionPermission::Permitted,
                     ..
                 },
             ..
-        } = &client.authentication
+        } = registered
         else {
-            return oauth_error(
+            return Ok(oauth_error(
                 403,
                 BasicErrorResponseType::UnauthorizedClient,
                 "the client may not introspect tokens",
-            );
+            ));
         };
 
-        no_store(Response::json(
+        Ok(no_store(Response::json(
             200,
-            &match self.secret_store.verify_resource_access_token(
-                &token,
-                client.resources.members(),
-                Utc::now(),
-            ) {
+            &match self
+                .secret_store
+                .verify_resource_access_token(&token, client.resources, now)
+            {
                 JwtVerification::Rejected(_) => {
                     StandardTokenIntrospectionResponse::<EmptyExtraTokenFields, BasicTokenType>::new(
                         false,
@@ -127,6 +149,6 @@ impl IntrospectionEndpoint {
                 }
                 JwtVerification::Verified(verified) => active_introspection(verified),
             },
-        ))
+        )))
     }
 }

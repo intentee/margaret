@@ -1,9 +1,8 @@
-use syn::Ident;
+use crate::is_identifier::is_identifier;
 
 #[must_use]
 pub fn is_snake_case_identifier(name: &str) -> bool {
-    syn::parse_str::<Ident>(name).is_ok()
-        && !name.chars().any(|character| character.is_ascii_uppercase())
+    is_identifier(name) && !name.chars().any(|character| character.is_ascii_uppercase())
 }
 
 #[cfg(test)]

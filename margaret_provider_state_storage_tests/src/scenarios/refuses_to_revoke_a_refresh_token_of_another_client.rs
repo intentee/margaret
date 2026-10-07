@@ -13,10 +13,7 @@ pub async fn refuses_to_revoke_a_refresh_token_of_another_client(state: &dyn Sto
 
     assert_eq!(
         state
-            .revoke_refresh_token(
-                token,
-                &"other".parse().expect("the client identifier is visible"),
-            )
+            .revoke_refresh_token(token, "other",)
             .await
             .expect("the backend revokes the token"),
         RefreshRevocation::ForeignClient

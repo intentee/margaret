@@ -1,7 +1,2 @@
-use margaret::framework::token_issuance::declares_token_issuance::DeclaresTokenIssuance;
-
-#[singleton]
-#[issues_tokens]
+#[issues_tokens(audience = "session", issuer = "https://issuer.fixture")]
 struct Issuer;
-
-impl DeclaresTokenIssuance for Issuer {}

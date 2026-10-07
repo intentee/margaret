@@ -37,5 +37,5 @@ fn stamps_the_issuer_as_the_client_of_an_access_token() {
         panic!("the minted access token verifies");
     };
 
-    assert_eq!(access.claims.client_id, issuance.issuer.as_str());
+    assert_eq!(access.claims.client_id, issuance.issuer);
 }

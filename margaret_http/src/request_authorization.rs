@@ -1,15 +1,8 @@
-use std::iter;
 use std::ops::ControlFlow;
 
-use headers::Authorization;
-use headers::Header;
-use http::HeaderValue;
-
-use crate::basic_credentials::BasicCredentials;
 use crate::bearer_challenge::BearerChallenge;
 use crate::bearer_token::BearerToken;
 
-const BASIC_SCHEME: &str = "Basic";
 const BEARER_SCHEME: &str = "Bearer";
 const TOKEN_SYMBOLS: &[u8] = b"!#$%&'*+-.^_`|~";
 const B64TOKEN_SYMBOLS: &[u8] = b"-._~+/";
@@ -32,19 +25,9 @@ fn is_b64token(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || B64TOKEN_SYMBOLS.contains(&byte))
 }
 
-fn basic_credentials(field_value: &str) -> RequestAuthorization {
-    HeaderValue::from_str(field_value)
-        .ok()
-        .and_then(|value| Authorization::decode(&mut iter::once(&value)).ok())
-        .map_or(RequestAuthorization::Malformed, |authorization| {
-            RequestAuthorization::Basic(BasicCredentials::new(authorization))
-        })
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RequestAuthorization {
     Absent,
-    Basic(BasicCredentials),
     Bearer(BearerToken),
     Malformed,
     OtherScheme,
@@ -57,9 +40,7 @@ impl RequestAuthorization {
             None => Self::Absent,
             Some(credentials) => match credentials.split_once(SEPARATOR) {
                 None => Self::scheme_only(credentials),
-                Some((scheme, parameters)) => {
-                    Self::scheme_with_parameters(credentials, scheme, parameters)
-                }
+                Some((scheme, parameters)) => Self::scheme_with_parameters(scheme, parameters),
             },
         }
     }
@@ -70,7 +51,7 @@ impl RequestAuthorization {
     /// malformed one.
     pub fn bearer(&self) -> ControlFlow<BearerChallenge, &BearerToken> {
         match self {
-            Self::Absent | Self::Basic(_) | Self::OtherScheme => {
+            Self::Absent | Self::OtherScheme => {
                 ControlFlow::Break(BearerChallenge::MissingCredentials)
             }
             Self::Bearer(token) => ControlFlow::Continue(token),
@@ -79,23 +60,16 @@ impl RequestAuthorization {
     }
 
     fn scheme_only(scheme: &str) -> Self {
-        if is_token(scheme)
-            && !scheme.eq_ignore_ascii_case(BASIC_SCHEME)
-            && !scheme.eq_ignore_ascii_case(BEARER_SCHEME)
-        {
+        if is_token(scheme) && !scheme.eq_ignore_ascii_case(BEARER_SCHEME) {
             Self::OtherScheme
         } else {
             Self::Malformed
         }
     }
 
-    fn scheme_with_parameters(field_value: &str, scheme: &str, parameters: &str) -> Self {
+    fn scheme_with_parameters(scheme: &str, parameters: &str) -> Self {
         if !is_token(scheme) {
             return Self::Malformed;
-        }
-
-        if scheme.eq_ignore_ascii_case(BASIC_SCHEME) {
-            return basic_credentials(field_value);
         }
 
         if !scheme.eq_ignore_ascii_case(BEARER_SCHEME) {
@@ -116,10 +90,7 @@ impl RequestAuthorization {
 mod tests {
     use std::ops::ControlFlow;
 
-    use headers::Authorization;
-
     use super::RequestAuthorization;
-    use crate::basic_credentials::BasicCredentials;
     use crate::bearer_challenge::BearerChallenge;
     use crate::bearer_token::BearerToken;
 
@@ -210,61 +181,8 @@ mod tests {
     #[test]
     fn reads_another_scheme_with_parameters() {
         assert_eq!(
-            RequestAuthorization::parse(Some("Digest username=\"user\"")),
+            RequestAuthorization::parse(Some("Basic dXNlcjpwYXNz")),
             RequestAuthorization::OtherScheme
-        );
-    }
-
-    #[test]
-    fn reads_basic_credentials() {
-        assert_eq!(
-            RequestAuthorization::parse(Some("bASIC dXNlcjpwYTpzcw==")),
-            RequestAuthorization::Basic(BasicCredentials::new(Authorization::basic(
-                "user", "pa:ss"
-            )))
-        );
-    }
-
-    #[test]
-    fn keeps_the_basic_password_out_of_its_debug_output() {
-        assert_eq!(
-            format!(
-                "{:?}",
-                RequestAuthorization::parse(Some("Basic dXNlcjpwYXNz"))
-            ),
-            "Basic(BasicCredentials { user_id: \"user\", .. })"
-        );
-    }
-
-    #[test]
-    fn rejects_basic_credentials_that_are_not_base64() {
-        assert_eq!(
-            RequestAuthorization::parse(Some("Basic !!!")),
-            RequestAuthorization::Malformed
-        );
-    }
-
-    #[test]
-    fn rejects_basic_credentials_without_a_password_separator() {
-        assert_eq!(
-            RequestAuthorization::parse(Some("Basic dXNlcg==")),
-            RequestAuthorization::Malformed
-        );
-    }
-
-    #[test]
-    fn rejects_a_basic_scheme_without_credentials() {
-        assert_eq!(
-            RequestAuthorization::parse(Some("Basic")),
-            RequestAuthorization::Malformed
-        );
-    }
-
-    #[test]
-    fn rejects_basic_credentials_that_are_not_a_header_value() {
-        assert_eq!(
-            RequestAuthorization::parse(Some("Basic dXNlcjpwYXNz\n")),
-            RequestAuthorization::Malformed
         );
     }
 

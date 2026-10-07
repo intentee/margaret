@@ -19,7 +19,7 @@ fn rejects_a_null_not_before() {
         key_set: KeySetAssembly::Assembled(key_set),
         token,
     } = SignedClaims::new(
-        &json!({ "aud": trust.audience.as_str(), "iss": trust.issuer.as_str(), "exp": 1_000, "iat": 900, "nbf": null }),
+        &json!({ "aud": trust.audience, "iss": trust.issuer, "exp": 1_000, "iat": 900, "nbf": null }),
     )
     else {
         panic!("the fixture key set is accepted");

@@ -5,9 +5,8 @@ use cookie::time::Duration;
 
 use margaret_http::host_cookie::host_cookie;
 use margaret_identity_session::sign_in_transaction_lifetime_secs::SIGN_IN_TRANSACTION_LIFETIME_SECS;
-use margaret_oauth_vocabulary::client_id::ClientId;
-use margaret_registered_claims::issuer_identifier::IssuerIdentifier;
 use margaret_token_digest::token_digest::TokenDigest;
+use margaret_token_issuance::token_issuance::TokenIssuance;
 
 const TRANSACTION_COOKIE_PREFIX: &str = "__Host-margaret-sign-in-";
 
@@ -16,8 +15,8 @@ pub(crate) struct TransactionCookie {
 }
 
 impl TransactionCookie {
-    pub(crate) fn of(issuer: &IssuerIdentifier, client_id: &ClientId) -> Self {
-        let digest = TokenDigest::of(&format!("{}\0{}", issuer.as_str(), client_id.as_str()));
+    pub(crate) fn of(TokenIssuance { audience, issuer }: &TokenIssuance) -> Self {
+        let digest = TokenDigest::of(&format!("{issuer}\0{audience}"));
 
         Self {
             name: format!(

@@ -1,5 +1,6 @@
 #[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum GeneratedFeature {
+    AcceptedClients,
     AssetBag,
     AuthenticatedUsers,
     Console,
@@ -10,6 +11,7 @@ pub(crate) enum GeneratedFeature {
     OidcProvider,
     Schema,
     Serves,
+    TokenIssuance,
     TrustedIssuers,
     Views,
     Websockets,

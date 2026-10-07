@@ -1,4 +1,14 @@
-pub mod issuer_metadata_canonical_path;
+pub mod declared_trust;
+pub mod declared_trusts;
 pub mod render_trusted_issuers;
-pub mod trusted_issuer_canonical_path;
+mod trust_attribute;
+mod trust_declaration;
+mod trust_source;
+pub mod trusted_issuer_binding;
+pub mod trusted_issuer_codegen_error;
+pub mod trusted_issuer_constant;
+pub mod trusted_issuer_constant_path;
+pub mod trusted_issuer_group;
+pub mod trusted_issuer_item;
+pub mod trusted_issuer_item_path;
 pub mod trusted_issuers_module_name;

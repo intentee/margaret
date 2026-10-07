@@ -8,14 +8,15 @@ use margaret_http::route_entry::RouteEntry;
 use margaret_http_tests::fixture_client_builder::fixture_client_builder;
 use margaret_http_tests::running_fixture_server::RunningFixtureServer;
 use margaret_http_tests::tls_fixture::TlsFixture;
+use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
-use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
-use margaret_oauth_client::declares_oauth_client::DeclaresOAuthClient;
+use margaret_oauth_client::client_authentication::ClientAuthentication;
 use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
 use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
+use crate::fixture_client_id::FIXTURE_CLIENT_ID;
 use crate::localhost_discovery_metadata::localhost_discovery_metadata;
 use crate::localhost_trust::localhost_trust;
 
@@ -40,7 +41,19 @@ impl FixtureAuthorizationServer {
     ///
     /// Panics when the fixture request client cannot be built.
     #[must_use]
-    pub fn client(&self, declaration: Arc<dyn DeclaresOAuthClient>) -> AuthorizationServerClient {
+    pub fn client(&self, authentication: ClientAuthentication) -> AuthorizationServerClient {
+        self.client_verifying_with(authentication, Arc::new(IssuerKeySet::awaiting()))
+    }
+
+    /// # Panics
+    ///
+    /// Panics when the fixture request client cannot be built.
+    #[must_use]
+    pub fn client_verifying_with(
+        &self,
+        authentication: ClientAuthentication,
+        key_set: Arc<IssuerKeySet>,
+    ) -> AuthorizationServerClient {
         let metadata = Arc::new(IssuerMetadata::awaiting());
 
         metadata.hold(localhost_discovery_metadata(
@@ -51,17 +64,28 @@ impl FixtureAuthorizationServer {
             ),
         ));
 
-        AuthorizationServerClient::create(
-            self.request_client(),
-            Arc::clone(&metadata),
-            Arc::new(TrustedIssuer::for_oidc_issuer(
-                metadata,
-                Arc::new(TokenTrustDeclaration {
-                    trust: localhost_trust(),
-                }),
-            )),
-            declaration,
-        )
+        let trusted_issuer = Arc::new(TrustedIssuer::create(key_set, localhost_trust()));
+
+        match authentication {
+            ClientAuthentication::ClientSecretBasic(secret) => {
+                AuthorizationServerClient::with_client_secret_basic(
+                    self.request_client(),
+                    metadata,
+                    trusted_issuer,
+                    FIXTURE_CLIENT_ID,
+                    secret,
+                )
+            }
+            ClientAuthentication::PrivateKeyJwt(roller) => {
+                AuthorizationServerClient::with_private_key_jwt(
+                    self.request_client(),
+                    metadata,
+                    trusted_issuer,
+                    FIXTURE_CLIENT_ID,
+                    roller,
+                )
+            }
+        }
     }
 
     /// # Panics

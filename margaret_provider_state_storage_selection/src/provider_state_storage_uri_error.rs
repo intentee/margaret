@@ -1,18 +1,20 @@
 use thiserror::Error;
 
+use margaret_storage_uri::storage_uri_error::StorageUriError;
+
 #[derive(Debug, Error)]
 pub enum ProviderStateStorageUriError {
     #[error(
-        "the openid connect provider state storage '{uri}' is not valid postgres options: {source}"
+        "the openid connect provider state cannot be kept in a file; use 'memory:' or a 'postgres://' url"
     )]
+    FileUnsupported,
+
+    #[error("the openid connect provider state storage is not valid postgres options: {source}")]
     PostgresOptions {
-        uri: String,
         #[source]
         source: sqlx::Error,
     },
 
-    #[error(
-        "unknown openid connect provider state storage '{uri}'; expected 'memory' or a 'postgres://' url"
-    )]
-    UnknownStorage { uri: String },
+    #[error("the openid connect provider state storage uri is malformed: {0}")]
+    StorageUri(#[from] StorageUriError),
 }

@@ -20,18 +20,18 @@ fn refuses_a_token_addressed_to_two_declarations() {
     let trust = fixture_trust();
     let token = secret.current().sign_json(
         &json!({
-            "aud": [trust.audience.as_str(), "elsewhere"],
+            "aud": [trust.audience, "elsewhere"],
             "exp": FAR_FUTURE_EXPIRY,
             "iat": 0,
-            "iss": trust.issuer.as_str(),
+            "iss": trust.issuer,
             "sub": "subject",
         }),
         JwtType::AccessToken,
     );
     let elsewhere = held_trusted_issuer(
         TokenTrust {
-            audience: "elsewhere".parse().expect("the audience is not empty"),
-            issuer: trust.issuer.clone(),
+            audience: "elsewhere",
+            issuer: trust.issuer,
         },
         secret.key_set().clone(),
     );

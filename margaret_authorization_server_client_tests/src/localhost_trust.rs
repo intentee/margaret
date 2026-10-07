@@ -6,11 +6,7 @@ use margaret_token_trust::token_trust::TokenTrust;
 #[must_use]
 pub fn localhost_trust() -> TokenTrust {
     TokenTrust {
-        audience: "margaret"
-            .parse()
-            .expect("the fixture audience is not empty"),
-        issuer: "https://localhost"
-            .parse()
-            .expect("the fixture issuer is an https url"),
+        audience: "margaret",
+        issuer: "https://localhost",
     }
 }

@@ -2,12 +2,13 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use margaret_authorization_server_client::authorization_server_client::AuthorizationServerClient;
+use margaret_authorization_server_client_tests::fixture_client_id::FIXTURE_CLIENT_ID;
+use margaret_authorization_server_client_tests::fixture_client_secret::fixture_client_secret;
 use margaret_authorization_server_client_tests::localhost_discovery_metadata::localhost_discovery_metadata;
 use margaret_authorization_server_client_tests::localhost_trust::localhost_trust;
-use margaret_authorization_server_client_tests::oauth_client_declaration::OAuthClientDeclaration;
-use margaret_authorization_server_client_tests::secret_basic_client::secret_basic_client;
+use margaret_authorization_server_client_tests::secret_basic_authentication::secret_basic_authentication;
+use margaret_issuer_key_set::issuer_key_set::IssuerKeySet;
 use margaret_issuer_metadata::issuer_metadata::IssuerMetadata;
-use margaret_jwt_verification_tests::token_trust_declaration::TokenTrustDeclaration;
 use margaret_oidc_discovery::advertised_endpoint::AdvertisedEndpoint;
 use margaret_oidc_discovery::authorization_response_issuer::AuthorizationResponseIssuer;
 use margaret_oidc_sign_in::sign_in_beginning::SignInBeginning;
@@ -23,7 +24,7 @@ use margaret_trusted_issuer::trusted_issuer::TrustedIssuer;
 
 #[tokio::test]
 async fn refuses_a_response_without_the_advertised_issuer() {
-    let fixture = SignInFixture::start(secret_basic_client()).await;
+    let fixture = SignInFixture::start(secret_basic_authentication()).await;
     let metadata = Arc::new(IssuerMetadata::awaiting());
 
     metadata.hold(localhost_discovery_metadata(
@@ -32,20 +33,17 @@ async fn refuses_a_response_without_the_advertised_issuer() {
     ));
 
     let advertising = SignInFlow::create(
-        Arc::new(AuthorizationServerClient::create(
+        Arc::new(AuthorizationServerClient::with_client_secret_basic(
             fixture.server.request_client(),
             Arc::clone(&metadata),
-            Arc::new(TrustedIssuer::for_oidc_issuer(
-                metadata,
-                Arc::new(TokenTrustDeclaration {
-                    trust: localhost_trust(),
-                }),
+            Arc::new(TrustedIssuer::create(
+                Arc::new(IssuerKeySet::awaiting()),
+                localhost_trust(),
             )),
-            Arc::new(OAuthClientDeclaration {
-                client: secret_basic_client(),
-            }),
+            FIXTURE_CLIENT_ID,
+            fixture_client_secret(),
         )),
-        Arc::clone(&fixture.secret_store),
+        Arc::clone(&fixture.roller),
     );
     let SignInBeginning::Redirected(response) = begin_sign_in(&advertising).await else {
         panic!("the sign-in redirects to the authorization endpoint");
