@@ -25,7 +25,7 @@ async fn assets_are_identical_on_every_instance() {
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             response.bytes().await.expect("the asset is read"),
-            include_bytes!("../fixture/assets/cluster_C1A2B3C4.css").as_slice()
+            include_bytes!("../../margaret_cluster_fixture/assets/cluster_C1A2B3C4.css").as_slice()
         );
     }
 

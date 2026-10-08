@@ -32,7 +32,6 @@ use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::render_http::render_http;
 use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers;
-use margaret_model_codegen::models::models;
 use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
 use margaret_oidc_provider_codegen::oidc_provider_item::OidcProviderItem;
 use margaret_oidc_provider_codegen::oidc_provider_item_path::oidc_provider_item_path;
@@ -75,7 +74,6 @@ use crate::enabled_framework_schemas::enabled_framework_schemas;
 use crate::format_pass::format_pass;
 use crate::framework_declarations::FrameworkDeclarations;
 use crate::framework_modules::FrameworkModules;
-use crate::framework_schema_models::framework_schema_models;
 use crate::framework_state_providers::framework_state_providers;
 use crate::generated_code::GeneratedCode;
 use crate::generated_feature::GeneratedFeature;
@@ -92,6 +90,7 @@ use crate::provider_declarations::ProviderDeclarations;
 use crate::provider_endpoint_modules::provider_endpoint_modules;
 use crate::role_modules::RoleModules;
 use crate::role_roots::RoleRoots;
+use crate::schema_models::SchemaModels;
 use crate::served_modules::ServedModules;
 use crate::serving_modules::ServingModules;
 use crate::trusted_issuer_framework_providers::trusted_issuer_framework_providers;
@@ -556,15 +555,21 @@ pub fn build(
         &token_issuance,
     )?;
     let bindings = planned_container.bindings();
-    let framework_models = framework_schema_models(&enabled_framework_schemas(bindings))?;
+    let schema_models = SchemaModels::of(&index, &enabled_framework_schemas(bindings))?;
     let mut module_tokens =
         asset_bag_modules(&index, metafile_contents, bindings, assets_directory)?;
     features.enable_if(GeneratedFeature::AssetBag, !module_tokens.is_empty());
-    features.enable_if(GeneratedFeature::Schema, !framework_models.is_empty());
+    features.enable_if(
+        GeneratedFeature::Schema,
+        !schema_models.framework.is_empty(),
+    );
     features.enable_console(&index);
 
     if features.contains(GeneratedFeature::Schema) {
-        module_tokens.push(render_schema(&models(&index)?, &framework_models));
+        module_tokens.push(render_schema(
+            &schema_models.application,
+            &schema_models.framework,
+        ));
     }
 
     module_tokens.extend(issuance_modules(

@@ -21,7 +21,7 @@ cookie = { workspace = true }
 futures-util = { workspace = true }
 margaret = { workspace = true, features = ["runtime"] }
 margaret_accepted_clients_tests = { path = "../margaret_accepted_clients_tests" }
-margaret_cluster_fixture = { path = "fixture" }
+margaret_cluster_fixture = { path = "../margaret_cluster_fixture" }
 margaret_database_tests = { path = "../margaret_database_tests" }
 margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }

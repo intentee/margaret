@@ -1582,18 +1582,24 @@ struct FragmentMetadata {
         );
 
         let columns = resolved_model(&source, "fragment").columns;
-        let derived: Vec<(String, ColumnType)> = columns
-            .into_iter()
+        let derived: Vec<_> = columns
+            .iter()
             .filter(|column| column.name.starts_with("metadata_"))
-            .map(|column| (column.name, column.inferred.column_type))
             .collect();
 
         assert_eq!(
-            derived,
-            vec![
-                ("metadata_partition".to_string(), ColumnType::Uuid),
-                ("metadata_hash".to_string(), ColumnType::Bytea),
-            ]
+            derived
+                .iter()
+                .map(|column| column.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["metadata_partition", "metadata_hash"]
+        );
+        assert_eq!(
+            derived
+                .iter()
+                .map(|column| column.inferred.column_type)
+                .collect::<Vec<_>>(),
+            vec![ColumnType::Uuid, ColumnType::Bytea]
         );
     }
 

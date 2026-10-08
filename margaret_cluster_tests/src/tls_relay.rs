@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use futures_util::TryFutureExt as _;
 use rustls::ServerConfig;
 use tokio::io::copy_bidirectional;
 use tokio::net::TcpListener;
@@ -17,19 +18,24 @@ async fn relayed(
     stream: TcpStream,
     destination: Arc<RelayDestination>,
 ) -> Result<(), RelayError> {
-    let mut client = acceptor
+    acceptor
         .accept(stream)
+        .map_err(RelayError::Handshake)
+        .and_then(async |mut client| match destination.next() {
+            None => Err(RelayError::NoAdmittedBackend),
+            Some(backend) => {
+                TcpStream::connect(backend)
+                    .map_err(RelayError::BackendConnect)
+                    .and_then(async |mut upstream| {
+                        copy_bidirectional(&mut client, &mut upstream)
+                            .await
+                            .map_err(RelayError::Transfer)
+                            .map(|_transferred| ())
+                    })
+                    .await
+            }
+        })
         .await
-        .map_err(RelayError::Handshake)?;
-    let backend = destination.next().ok_or(RelayError::NoAdmittedBackend)?;
-    let mut upstream = TcpStream::connect(backend)
-        .await
-        .map_err(RelayError::BackendConnect)?;
-
-    copy_bidirectional(&mut client, &mut upstream)
-        .await
-        .map_err(RelayError::Transfer)
-        .map(|_transferred| ())
 }
 
 async fn accept_connections(

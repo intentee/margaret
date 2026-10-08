@@ -12,7 +12,6 @@ publish.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-chrono = { workspace = true }
 futures-util = { workspace = true }
 margaret_authorization_grants = { workspace = true }
 margaret_authorization_grants_schema = { workspace = true }

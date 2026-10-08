@@ -7,6 +7,7 @@ use margaret_store_contract_tests::concurrent_pending_authorization_takes_admit_
 use margaret_store_contract_tests::concurrent_refresh_rotations_admit_one::concurrent_refresh_rotations_admit_one;
 use margaret_store_contract_tests::holding_a_pending_authorization_sweeps_expired_ones::holding_a_pending_authorization_sweeps_expired_ones;
 use margaret_store_contract_tests::issuing_a_code_sweeps_expired_codes::issuing_a_code_sweeps_expired_codes;
+use margaret_store_contract_tests::issuing_a_code_sweeps_expired_redeemed_codes::issuing_a_code_sweeps_expired_redeemed_codes;
 use margaret_store_contract_tests::opened_refresh_family_resolves_its_first_token::opened_refresh_family_resolves_its_first_token;
 use margaret_store_contract_tests::opening_a_refresh_family_sweeps_expired_families::opening_a_refresh_family_sweeps_expired_families;
 use margaret_store_contract_tests::opening_a_refresh_family_sweeps_expired_revocations::opening_a_refresh_family_sweeps_expired_revocations;
@@ -178,5 +179,15 @@ async fn opening_a_refresh_family_sweeps_expired_revocations_for_the_database_st
     opening_a_refresh_family_sweeps_expired_revocations(&DatabaseAuthorizationGrants::create(
         Arc::clone(&started.database),
     ))
+    .await;
+}
+
+#[tokio::test]
+async fn issuing_a_code_sweeps_expired_redeemed_codes_for_the_database_store() {
+    let started = framework_state_database().await;
+
+    issuing_a_code_sweeps_expired_redeemed_codes(&DatabaseAuthorizationGrants::create(Arc::clone(
+        &started.database,
+    )))
     .await;
 }

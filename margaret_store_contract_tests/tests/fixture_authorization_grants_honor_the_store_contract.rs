@@ -1,5 +1,6 @@
 use margaret_store_contract_tests::holding_a_pending_authorization_sweeps_expired_ones::holding_a_pending_authorization_sweeps_expired_ones;
 use margaret_store_contract_tests::issuing_a_code_sweeps_expired_codes::issuing_a_code_sweeps_expired_codes;
+use margaret_store_contract_tests::issuing_a_code_sweeps_expired_redeemed_codes::issuing_a_code_sweeps_expired_redeemed_codes;
 use margaret_store_contract_tests::opening_a_refresh_family_sweeps_expired_families::opening_a_refresh_family_sweeps_expired_families;
 use margaret_store_contract_tests::rotating_a_refresh_token_sweeps_expired_families::rotating_a_refresh_token_sweeps_expired_families;
 use margaret_store_contract_tests::revoking_an_unopened_family_bars_it_for_the_refresh_family_lifetime::revoking_an_unopened_family_bars_it_for_the_refresh_family_lifetime;
@@ -110,4 +111,9 @@ async fn revoking_an_unopened_family_bars_it_for_the_refresh_family_lifetime_for
 async fn opening_a_refresh_family_sweeps_expired_revocations_for_the_fixture_store() {
     opening_a_refresh_family_sweeps_expired_revocations(&FixtureAuthorizationGrants::undisturbed())
         .await;
+}
+
+#[tokio::test]
+async fn issuing_a_code_sweeps_expired_redeemed_codes_for_the_fixture_store() {
+    issuing_a_code_sweeps_expired_redeemed_codes(&FixtureAuthorizationGrants::undisturbed()).await;
 }

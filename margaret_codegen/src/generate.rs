@@ -263,9 +263,7 @@ impl AssetRoute {
             || {
                 assert!(matches!(
                     generate(),
-                    Err(CodegenError::ManifestDirectory {
-                        source: VarError::NotPresent,
-                    })
+                    Err(CodegenError::ManifestDirectory { source }) if source == VarError::NotPresent
                 ));
             },
         );

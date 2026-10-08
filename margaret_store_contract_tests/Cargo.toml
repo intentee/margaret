@@ -24,7 +24,7 @@ anyhow = { workspace = true }
 margaret_accepted_clients_tests = { path = "../margaret_accepted_clients_tests" }
 margaret_authorization_grants_database = { workspace = true }
 margaret_client_assertions_database = { workspace = true }
-margaret_cluster_fixture = { path = "../margaret_cluster_tests/fixture" }
+margaret_cluster_fixture = { path = "../margaret_cluster_fixture" }
 margaret_database_tests = { path = "../margaret_database_tests" }
 margaret_jwks_roller_tests = { path = "../margaret_jwks_roller_tests" }
 margaret_model = { workspace = true }

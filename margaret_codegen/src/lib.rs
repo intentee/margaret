@@ -45,6 +45,7 @@ mod provider_server;
 mod role_modules;
 mod role_roots;
 mod rsa_signing_keys_canonical_path;
+mod schema_models;
 mod served_modules;
 mod server_secret_store_canonical_path;
 mod serving_modules;

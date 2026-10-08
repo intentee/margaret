@@ -18,6 +18,7 @@ pub mod contract_revision;
 pub mod contract_token;
 pub mod holding_a_pending_authorization_sweeps_expired_ones;
 pub mod issuing_a_code_sweeps_expired_codes;
+pub mod issuing_a_code_sweeps_expired_redeemed_codes;
 pub mod opened_refresh_family_resolves_its_first_token;
 pub mod opening_a_refresh_family_sweeps_expired_families;
 pub mod opening_a_refresh_family_sweeps_expired_revocations;
