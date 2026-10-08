@@ -1,7 +1,6 @@
 pub mod accepted_client;
 pub mod accepted_clients;
 pub mod accepted_clients_error;
-pub mod assertion_memory;
 pub mod assertion_signing;
 mod assertion_subject;
 pub mod client_assertion_max_lifetime;
@@ -19,5 +18,4 @@ pub mod refresh_token_grant;
 pub mod registered_authentication;
 pub mod registered_client;
 pub mod registered_code_grant;
-pub mod remembers_client_assertions;
 pub mod token_exchange_grant;

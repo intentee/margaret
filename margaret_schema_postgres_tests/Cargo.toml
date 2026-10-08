@@ -6,13 +6,18 @@ publish = false
 autotests = false
 
 [dev-dependencies]
-chrono = { workspace = true, features = ["clock"] }
+chrono = { workspace = true }
+margaret = { workspace = true }
+margaret_authorization_grants = { workspace = true }
+margaret_client_assertions = { workspace = true }
 margaret_database_tests = { path = "../margaret_database_tests" }
 margaret_model = { workspace = true }
 margaret_schema_postgres_fixture = { path = "fixture" }
-rust_decimal = { workspace = true, features = ["db-tokio-postgres"] }
+margaret_signing_keys = { workspace = true }
+margaret_sql_identifier = { workspace = true }
+rust_decimal = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tokio-postgres = { workspace = true, features = ["with-chrono-0_4", "with-uuid-1"] }
+tokio-postgres = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
 [features]

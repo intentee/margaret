@@ -7,6 +7,10 @@ use margaret_attributes::indexed_item::IndexedItem;
 use margaret_container::is_singleton::is_singleton;
 
 use crate::request_binding_error::RequestBindingError;
+use crate::route_database::RouteDatabase;
+use crate::route_model::RouteModel;
+use crate::route_model_key::RouteModelKey;
+use crate::route_model_resolution::RouteModelResolution;
 use crate::route_parameter_binder::RouteParameterBinder;
 use crate::route_parameter_resolution::RouteParameterResolution;
 
@@ -63,6 +67,12 @@ fn insert_binder(
                 second: provider.to_string(),
             });
         }
+        Some(RouteParameterResolution::Model(_)) => {
+            return Err(RequestBindingError::RouteModelWithBinder {
+                model: model.to_string(),
+                binder: provider.to_string(),
+            });
+        }
         Some(RouteParameterResolution::Value) => {
             return Err(RequestBindingError::ConflictingRouteParameterResolution {
                 value_type: model.to_string(),
@@ -92,11 +102,19 @@ fn insert_value(
         });
     }
 
-    if let Some(RouteParameterResolution::Binder(existing)) = resolutions.get(&value_type) {
-        return Err(RequestBindingError::ConflictingRouteParameterResolution {
-            value_type: value_type.to_string(),
-            binder: existing.provider.to_string(),
-        });
+    match resolutions.get(&value_type) {
+        Some(RouteParameterResolution::Binder(existing)) => {
+            return Err(RequestBindingError::ConflictingRouteParameterResolution {
+                value_type: value_type.to_string(),
+                binder: existing.provider.to_string(),
+            });
+        }
+        Some(RouteParameterResolution::Model(_)) => {
+            return Err(RequestBindingError::RouteModelDeclaredAsValue {
+                model: value_type.to_string(),
+            });
+        }
+        Some(RouteParameterResolution::Value) | None => {}
     }
 
     resolutions.insert(value_type, RouteParameterResolution::Value);
@@ -104,13 +122,41 @@ fn insert_value(
     Ok(())
 }
 
+fn model_resolution(primary_key: RouteModelKey, database: &RouteDatabase) -> RouteModelResolution {
+    match primary_key {
+        RouteModelKey::Composite => RouteModelResolution::CompositePrimaryKey,
+        RouteModelKey::Single => match database {
+            RouteDatabase::Declared(binder) => {
+                RouteModelResolution::Bindable(RouteParameterBinder {
+                    field: binder.field.clone(),
+                    provider: binder.provider.clone(),
+                })
+            }
+            RouteDatabase::Undeclared => RouteModelResolution::DatabaseUndeclared,
+        },
+    }
+}
+
 /// # Errors
 ///
 /// Returns `RequestBindingError` propagated from the work it performs.
 pub fn route_parameter_resolutions(
     index: &AttributeIndex,
+    route_models: &[RouteModel],
+    database: &RouteDatabase,
 ) -> Result<HashMap<CanonicalPath, RouteParameterResolution>, RequestBindingError> {
     let mut resolutions = HashMap::from([(string_path(), RouteParameterResolution::Value)]);
+
+    for RouteModel {
+        loaded,
+        primary_key,
+    } in route_models
+    {
+        resolutions.insert(
+            loaded.clone(),
+            RouteParameterResolution::Model(model_resolution(*primary_key, database)),
+        );
+    }
 
     for item in index.items() {
         if item.has_framework_attribute(FrameworkAttribute::ProvidesRouteParameter) {
@@ -134,6 +180,10 @@ mod tests {
 
     use super::route_parameter_resolutions;
     use crate::request_binding_error::RequestBindingError;
+    use crate::route_database::RouteDatabase;
+    use crate::route_model::RouteModel;
+    use crate::route_model_key::RouteModelKey;
+    use crate::route_model_resolution::RouteModelResolution;
     use crate::route_parameter_binder::RouteParameterBinder;
     use crate::route_parameter_resolution::RouteParameterResolution;
 
@@ -142,14 +192,74 @@ mod tests {
     #[derive(Debug, Eq, PartialEq)]
     enum ResolvedBy {
         Binder(String),
+        CompositePrimaryKey,
+        Database(String),
+        DatabaseUndeclared,
         Nothing,
         Value,
+    }
+
+    fn article() -> CanonicalPath {
+        CanonicalPath::new(vec!["crate".to_string(), "Article".to_string()])
+    }
+
+    fn database() -> RouteDatabase {
+        RouteDatabase::Declared(RouteParameterBinder {
+            field: "framework_database".to_string(),
+            provider: CanonicalPath::new(vec!["margaret".to_string(), "Database".to_string()]),
+        })
+    }
+
+    fn model_resolutions_for(
+        lib_source: &str,
+        primary_key: RouteModelKey,
+        database: &RouteDatabase,
+    ) -> Result<HashMap<CanonicalPath, RouteParameterResolution>, RequestBindingError> {
+        route_parameter_resolutions(
+            &IndexedSource::new(lib_source).index,
+            &[RouteModel {
+                loaded: article(),
+                primary_key,
+            }],
+            database,
+        )
     }
 
     fn resolutions_for(
         lib_source: &str,
     ) -> Result<HashMap<CanonicalPath, RouteParameterResolution>, RequestBindingError> {
-        route_parameter_resolutions(&IndexedSource::new(lib_source).index)
+        route_parameter_resolutions(
+            &IndexedSource::new(lib_source).index,
+            &[],
+            &RouteDatabase::Undeclared,
+        )
+    }
+
+    fn resolved(resolution: Option<RouteParameterResolution>) -> ResolvedBy {
+        match resolution {
+            Some(RouteParameterResolution::Binder(RouteParameterBinder { provider, .. })) => {
+                ResolvedBy::Binder(provider.to_string())
+            }
+            Some(RouteParameterResolution::Model(RouteModelResolution::Bindable(
+                RouteParameterBinder { field, .. },
+            ))) => ResolvedBy::Database(field),
+            Some(RouteParameterResolution::Model(RouteModelResolution::CompositePrimaryKey)) => {
+                ResolvedBy::CompositePrimaryKey
+            }
+            Some(RouteParameterResolution::Model(RouteModelResolution::DatabaseUndeclared)) => {
+                ResolvedBy::DatabaseUndeclared
+            }
+            Some(RouteParameterResolution::Value) => ResolvedBy::Value,
+            None => ResolvedBy::Nothing,
+        }
+    }
+
+    fn model_resolved_by(primary_key: RouteModelKey, database: &RouteDatabase) -> ResolvedBy {
+        resolved(
+            model_resolutions_for("struct Article;\n", primary_key, database)
+                .expect("the crate is accepted")
+                .remove(&article()),
+        )
     }
 
     fn rejection_for(lib_source: &str) -> String {
@@ -160,17 +270,13 @@ mod tests {
     }
 
     fn resolved_by(lib_source: &str, segments: &[&str]) -> ResolvedBy {
-        let mut resolutions = resolutions_for(lib_source).expect("the crate is accepted");
-
-        match resolutions.remove(&CanonicalPath::new(
-            segments.iter().map(ToString::to_string).collect(),
-        )) {
-            Some(RouteParameterResolution::Binder(RouteParameterBinder { provider, .. })) => {
-                ResolvedBy::Binder(provider.to_string())
-            }
-            Some(RouteParameterResolution::Value) => ResolvedBy::Value,
-            None => ResolvedBy::Nothing,
-        }
+        resolved(
+            resolutions_for(lib_source)
+                .expect("the crate is accepted")
+                .remove(&CanonicalPath::new(
+                    segments.iter().map(ToString::to_string).collect(),
+                )),
+        )
     }
 
     #[test]
@@ -283,5 +389,50 @@ mod tests {
             rejection_for("#[singleton]\n#[provides_route_parameter]\nstruct Bare;\n")
                 .contains("has no `type Model = <struct>` associated type")
         );
+    }
+
+    #[test]
+    fn resolves_a_single_keyed_model_through_the_database() {
+        assert_eq!(
+            model_resolved_by(RouteModelKey::Single, &database()),
+            ResolvedBy::Database("framework_database".to_string())
+        );
+    }
+
+    #[test]
+    fn resolves_a_single_keyed_model_without_a_database_as_unbindable() {
+        assert_eq!(
+            model_resolved_by(RouteModelKey::Single, &RouteDatabase::Undeclared),
+            ResolvedBy::DatabaseUndeclared
+        );
+    }
+
+    #[test]
+    fn resolves_a_composite_keyed_model_as_unbindable() {
+        assert_eq!(
+            model_resolved_by(RouteModelKey::Composite, &database()),
+            ResolvedBy::CompositePrimaryKey
+        );
+    }
+
+    #[test]
+    fn rejects_a_binder_for_a_model_bound_by_its_primary_key() {
+        assert!(matches!(
+            model_resolutions_for(BINDER, RouteModelKey::Single, &database()),
+            Err(RequestBindingError::RouteModelWithBinder { model, binder })
+                if model == "crate::Article" && binder == "crate::ArticleStore"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_value_declaration_for_a_model_bound_by_its_primary_key() {
+        assert!(matches!(
+            model_resolutions_for(
+                "#[route_parameter_value]\nstruct Article;\n",
+                RouteModelKey::Single,
+                &database()
+            ),
+            Err(RequestBindingError::RouteModelDeclaredAsValue { model }) if model == "crate::Article"
+        ));
     }
 }

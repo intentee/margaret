@@ -492,7 +492,7 @@ fn framework_dependency_kind(
                 })),
             })
         }
-        FrameworkDependency::Database => match database {
+        FrameworkDependency::Database { .. } => match database {
             DeclaredPostgresDatabase::Absent => Err(ContainerError::MissingPostgresDatabase {
                 provider: provided.to_string(),
             }),
@@ -588,7 +588,7 @@ fn framework_provider_dependencies(construction: &FrameworkConstruction) -> Vec<
                 FrameworkDependency::Provider(provider_key) => std::slice::from_ref(provider_key),
                 FrameworkDependency::Providers(provider_keys) => provider_keys.as_slice(),
                 FrameworkDependency::Constant(_)
-                | FrameworkDependency::Database
+                | FrameworkDependency::Database { .. }
                 | FrameworkDependency::EnvironmentVariable { .. }
                 | FrameworkDependency::RouteUrl(_)
                 | FrameworkDependency::SingletonView(_)

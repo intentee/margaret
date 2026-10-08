@@ -6,11 +6,10 @@ use margaret_jwt_verification::jwt_rejection::JwtRejection;
 use margaret_token_signer::access_token_minting::AccessTokenMinting;
 use margaret_token_signer_tests::unix_time::unix_time;
 
-#[tokio::test]
-async fn reports_a_malformed_refresh_token_as_a_minting_outcome() {
+#[test]
+fn reports_a_malformed_refresh_token_as_a_minting_outcome() {
     assert!(matches!(
         rolled_store(fresh_secret(SigningCurve::P256))
-            .await
             .mint_access_token("not-a-valid-jwt", unix_time(500)),
         AccessTokenMinting::RejectedRefreshToken(JwtRejection::Jws(JwsRejection::NotCompactJws))
     ));

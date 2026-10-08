@@ -8,8 +8,17 @@ mod composite_foreign_key_rejects_an_orphan_row;
 mod composite_unique_rejects_a_duplicate_row;
 #[cfg(feature = "tests_that_use_postgres")]
 mod foreign_key_cascade_deletes_dependent_rows;
+mod framework_tables_render_their_pinned_ddl;
+#[cfg(feature = "tests_that_use_postgres")]
+mod inserted_author;
+#[cfg(feature = "tests_that_use_postgres")]
+mod inserted_fragment_metadata;
+#[cfg(feature = "tests_that_use_postgres")]
+mod joined_at;
 #[cfg(feature = "tests_that_use_postgres")]
 mod numeric_and_float_columns_round_trip;
+#[cfg(feature = "tests_that_use_postgres")]
+mod started_with_fixture;
 #[cfg(feature = "tests_that_use_postgres")]
 mod structure_matches_the_declared_schema;
 #[cfg(feature = "tests_that_use_postgres")]

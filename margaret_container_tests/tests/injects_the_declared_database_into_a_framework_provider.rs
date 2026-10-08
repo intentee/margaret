@@ -29,7 +29,9 @@ fn database() -> FrameworkProvider {
 fn key_roller() -> FrameworkProvider {
     FrameworkProvider {
         construction: FrameworkConstruction::Constructor {
-            dependencies: vec![FrameworkDependency::Database],
+            dependencies: vec![FrameworkDependency::Database {
+                framework_tables: Vec::new(),
+            }],
             is_async: false,
             method: "create".to_string(),
             outcome: ConstructorOutcome::Infallible,

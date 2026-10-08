@@ -3,6 +3,7 @@ pub mod external_caller;
 pub mod message;
 pub mod note;
 pub mod notes_caller;
+pub mod session_with_user;
 pub mod token_acquisition;
 pub mod token_acquisition_outcome;
 pub mod upload;

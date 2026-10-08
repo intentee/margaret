@@ -15,9 +15,9 @@ use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
 use margaret_token_signer_tests::unix_time::unix_time;
 
-#[tokio::test]
-async fn verifies_its_own_id_token_signed_with_rsa() {
-    let store = rolled_store(fresh_secret(SigningCurve::P256)).await;
+#[test]
+fn verifies_its_own_id_token_signed_with_rsa() {
+    let store = rolled_store(fresh_secret(SigningCurve::P256));
     let id_token = store
         .issue_id_token(
             &IdTokenClaims {

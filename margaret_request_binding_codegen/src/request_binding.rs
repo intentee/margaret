@@ -6,6 +6,7 @@ use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
 use crate::extraction_phase::ExtractionPhase;
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::head_input_source::HeadInputSource;
+use crate::route_parameter_lookup::RouteParameterLookup;
 
 pub enum RequestBinding {
     AssetBag,
@@ -21,6 +22,7 @@ pub enum RequestBinding {
     BoundRouteParameter {
         binder_field: String,
         binder_provider: CanonicalPath,
+        lookup: RouteParameterLookup,
         path_key: String,
     },
     CurrentRequest,

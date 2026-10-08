@@ -15,6 +15,7 @@ margaret_attributes = { workspace = true }
 margaret_item_naming_argument = { workspace = true }
 margaret_model = { workspace = true }
 margaret_schema_identifier_naming = { workspace = true }
+margaret_sql_identifier = { workspace = true }
 margaret_syn_type_peeling = { workspace = true }
 margaret_toposort = { workspace = true }
 proc-macro2 = { workspace = true }

@@ -168,6 +168,7 @@ impl RespondsToWebSocketNotification for Typist {
             ViewsAvailability::Available,
             &collected_tags(index),
             &bindings(&IndexedSource::new("").index),
+            &[],
         )
     }
 

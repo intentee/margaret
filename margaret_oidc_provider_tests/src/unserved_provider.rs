@@ -1,27 +1,28 @@
 use std::sync::Arc;
 
-use margaret_jwks_roller_server::jwks_roller::JwksRoller;
+use margaret_jwks_keygen::jwks_secret_holder::JwksSecretHolder;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
-use margaret_jwks_secret_store_tests::fixture_roller::fixture_roller;
+use margaret_jwks_secret_store_tests::fixture_secrets::fixture_secrets;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::provider_issuance::provider_issuance;
 
 pub struct UnservedProvider {
     pub issuance: TokenIssuance,
-    pub roller: Arc<JwksRoller>,
     pub secret_store: Arc<JwksSecretStore>,
+    pub secrets: Arc<JwksSecretHolder>,
 }
 
 impl UnservedProvider {
-    pub async fn create() -> Self {
+    #[must_use]
+    pub fn create() -> Self {
         let issuance = provider_issuance();
-        let roller = fixture_roller().await;
+        let secrets = fixture_secrets();
 
         Self {
-            secret_store: Arc::new(JwksSecretStore::create(Arc::clone(&roller), issuance)),
+            secret_store: Arc::new(JwksSecretStore::create(Arc::clone(&secrets), issuance)),
             issuance,
-            roller,
+            secrets,
         }
     }
 }

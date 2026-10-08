@@ -1,3 +1,6 @@
+use margaret::framework::active_record::model::Model;
+use margaret::framework::active_record::page::Page;
+use margaret_cluster_fixture::models::token_acquisition::TokenAcquisition;
 use margaret_cluster_fixture::models::token_acquisition_outcome::TokenAcquisitionOutcome;
 use margaret_cluster_tests::cluster::Cluster;
 use margaret_cluster_tests::instance_admission::InstanceAdmission;
@@ -5,33 +8,30 @@ use margaret_cluster_tests::instance_admission::InstanceAdmission;
 use crate::cluster_binary::cluster_binary;
 use crate::poll_until::poll_until;
 
-async fn attempts(cluster: &Cluster) -> i64 {
-    cluster
-        .database
-        .database
-        .client()
+async fn attempts(cluster: &Cluster) -> usize {
+    let Page { records, .. } = TokenAcquisition::query()
+        .id
+        .ascending()
+        .limit::<3>()
+        .fetch(cluster.database.database.as_ref())
         .await
-        .expect("a connection is checked out")
-        .query_one("SELECT count(*) AS attempts FROM token_acquisitions", &[])
-        .await
-        .expect("the attempts are counted")
-        .get("attempts")
+        .expect("the attempts are read");
+
+    records.len()
 }
 
-async fn acquired_tokens(cluster: &Cluster) -> i64 {
-    cluster
-        .database
-        .database
-        .client()
+async fn acquired_tokens(cluster: &Cluster) -> usize {
+    let Page { records, .. } = TokenAcquisition::query()
+        .outcome
+        .eq(TokenAcquisitionOutcome::Acquired)
+        .id
+        .ascending()
+        .limit::<3>()
+        .fetch(cluster.database.database.as_ref())
         .await
-        .expect("a connection is checked out")
-        .query_one(
-            "SELECT count(*) AS acquired FROM token_acquisitions WHERE outcome = $1",
-            &[&TokenAcquisitionOutcome::Acquired.stored()],
-        )
-        .await
-        .expect("the acquisitions are counted")
-        .get("acquired")
+        .expect("the acquisitions are read");
+
+    records.len()
 }
 
 #[tokio::test]

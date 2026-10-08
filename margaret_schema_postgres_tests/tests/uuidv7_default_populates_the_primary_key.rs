@@ -1,30 +1,23 @@
-use chrono::Utc;
-use uuid::Uuid;
+use margaret::framework::active_record::creatable::Creatable;
+use margaret_schema_postgres_fixture::author::Author;
+use margaret_schema_postgres_fixture::margaret::models::author_author::draft::Draft;
 
-use margaret_database_tests::apply_schema::apply_schema;
-use margaret_database_tests::started_database::StartedDatabase;
-use margaret_schema_postgres_fixture::margaret::schema::schema;
+use crate::joined_at::joined_at;
+use crate::started_with_fixture::started_with_fixture;
 
 #[tokio::test]
 async fn the_uuidv7_default_populates_an_omitted_primary_key() {
-    let started = StartedDatabase::start().await;
+    let started = started_with_fixture().await;
 
-    apply_schema(&started.database, &schema()).await;
+    let author = Author::create(Draft {
+        name: "Grace Hopper".to_string(),
+        active: true,
+        joined_at: joined_at(),
+        bio: None,
+    })
+    .run(started.database.as_ref())
+    .await
+    .expect("the author is created with a defaulted primary key");
 
-    let client = started
-        .database
-        .client()
-        .await
-        .expect("a connection is checked out");
-
-    let generated_id: Uuid = client
-        .query_one(
-            "INSERT INTO authors (name, is_active, joined_at, bio) VALUES ($1, $2, $3, $4) RETURNING id",
-            &[&"Grace Hopper", &true, &Utc::now(), &None::<String>],
-        )
-        .await
-        .expect("the author is inserted with a defaulted primary key")
-        .get("id");
-
-    assert_eq!(generated_id.get_version_num(), 7);
+    assert_eq!(author.id.get_version_num(), 7);
 }

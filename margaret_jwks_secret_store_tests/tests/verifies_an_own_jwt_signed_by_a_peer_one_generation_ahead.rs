@@ -4,7 +4,7 @@ use serde_json::json;
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen_tests::far_future_expiry::FAR_FUTURE_EXPIRY;
 use margaret_jwks_secret_store::jwks_secret_store::JwksSecretStore;
-use margaret_jwks_secret_store_tests::peer_rollers::PeerRollers;
+use margaret_jwks_secret_store_tests::peer_secrets::PeerSecrets;
 use margaret_jwt_verification::attribute_serialized_jwt::attribute_serialized_jwt;
 use margaret_jwt_verification::client_assertion_profile::ClientAssertionProfile;
 use margaret_jwt_verification::expected_audience::ExpectedAudience;
@@ -16,10 +16,10 @@ use margaret_token_signer_tests::fixture_issuance::fixture_issuance;
 const CLIENT: &str = "portal";
 const TOKEN_ENDPOINT: &str = "https://issuer.example/token";
 
-#[tokio::test]
-async fn verifies_an_own_jwt_signed_by_a_peer_one_generation_ahead() {
-    let peers = PeerRollers::one_generation_apart().await;
-    let assertion = peers.rolled.jwks_secret_holder().get().current().sign_json(
+#[test]
+fn verifies_an_own_jwt_signed_by_a_peer_one_generation_ahead() {
+    let peers = PeerSecrets::one_generation_apart();
+    let assertion = peers.rolled.get().current().sign_json(
         &json!({
             "aud": TOKEN_ENDPOINT,
             "exp": FAR_FUTURE_EXPIRY,

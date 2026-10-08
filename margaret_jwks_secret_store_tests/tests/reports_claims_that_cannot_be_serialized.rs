@@ -20,11 +20,10 @@ impl Serialize for Unserializable {
     }
 }
 
-#[tokio::test]
-async fn reports_claims_that_cannot_be_serialized() {
+#[test]
+fn reports_claims_that_cannot_be_serialized() {
     assert!(matches!(
         rolled_store(fresh_secret(SigningCurve::P256))
-            .await
             .sign_access_token(&Unserializable, unix_time(500)),
         Err(JwksSecretStoreError::AccessTokenClaims(
             ClaimsMergeError::Serialization(_)

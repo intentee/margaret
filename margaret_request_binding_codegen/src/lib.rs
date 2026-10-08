@@ -42,8 +42,13 @@ pub mod request_injectable;
 pub mod request_input_source;
 mod request_inputs;
 pub mod responder_content;
+pub mod route_database;
+pub mod route_model;
+pub mod route_model_key;
+pub mod route_model_resolution;
 mod route_parameter_arguments;
 pub mod route_parameter_binder;
+pub mod route_parameter_lookup;
 pub mod route_parameter_resolution;
 pub mod route_parameter_resolutions;
 pub mod views_availability;
@@ -65,6 +70,7 @@ mod tests {
     use margaret_container::framework_injection_role::FrameworkInjectionRole;
     use margaret_container::framework_provider::FrameworkProvider;
     use margaret_container::render_container::render_container;
+    use margaret_database_codegen::database_canonical_path::database_canonical_path;
     use margaret_database_codegen::declared_postgres_database::DeclaredPostgresDatabase;
     use margaret_injection_codegen::process_method::process_method;
     use margaret_route_parameter_codegen::route_path::RoutePath;
@@ -84,6 +90,9 @@ mod tests {
     use crate::render_request_extraction::render_request_extraction;
     use crate::request_binding::RequestBinding;
     use crate::request_binding_error::RequestBindingError;
+    use crate::route_model::RouteModel;
+    use crate::route_model_key::RouteModelKey;
+    use crate::route_parameter_lookup::RouteParameterLookup;
     use crate::views_availability::ViewsAvailability;
 
     const PRELUDE: &str = "\
@@ -184,6 +193,7 @@ struct User;
             views,
             &collected_tags(index),
             &trusted_issuer_bindings(),
+            &[],
         )
     }
 
@@ -435,6 +445,93 @@ impl SessionUserProvider {
             },
             &registries,
         )
+    }
+
+    fn database_bindings() -> ContainerBindings {
+        let index = IndexedSource::new("").index;
+
+        render_container(
+            &index,
+            &scan(&index).expect("the serve inputs are scanned"),
+            &[FrameworkProvider {
+                construction: FrameworkConstruction::Unit,
+                enablement: FrameworkEnablement::Declared,
+                injection: FrameworkInjectionRole::Unmarked,
+                provided: database_canonical_path(),
+            }],
+            &DeclaredPostgresDatabase::Absent,
+            &DeclaredTokenIssuance::Absent,
+        )
+        .expect("the container renders")
+        .bindings
+    }
+
+    fn route_model_binding(
+        container_bindings: &ContainerBindings,
+        primary_key: RouteModelKey,
+    ) -> Result<Vec<BoundParameter>, RequestBindingError> {
+        let indexed = IndexedSource::new(
+            "struct Article;\n\nstruct Page;\n\nimpl Page {\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"x\")] article: Article) -> anyhow::Result<Response> {}\n}\n",
+        );
+        let index = &indexed.index;
+        let registries = BindingRegistries::collect(
+            index,
+            ViewsAvailability::Available,
+            &collected_tags(index),
+            container_bindings,
+            &[RouteModel {
+                loaded: CanonicalPath::new(vec!["crate".to_string(), "Article".to_string()]),
+                primary_key,
+            }],
+        )
+        .expect("the binding registries are collected");
+        let item = indexed.item("Page");
+        let route_path = RoutePath::parse("/{x}");
+
+        classify_parameters(
+            index,
+            item,
+            process_method(item).expect("the responder has a #[process] method"),
+            &BindingContext::Responder {
+                route_path: &route_path,
+                server: "public",
+                subject: "responder 'Page'",
+            },
+            &registries,
+        )
+    }
+
+    #[test]
+    fn binds_a_single_keyed_model_route_parameter_through_the_database() {
+        let bound = route_model_binding(&database_bindings(), RouteModelKey::Single)
+            .expect("the route model binds");
+
+        assert!(matches!(
+            &bound[0].binding,
+            RequestBinding::BoundRouteParameter {
+                binder_provider,
+                lookup: RouteParameterLookup::PrimaryKey { loaded },
+                ..
+            } if *binder_provider == database_canonical_path() && loaded.to_string() == "crate::Article"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_composite_keyed_model_route_parameter() {
+        assert!(matches!(
+            route_model_binding(&database_bindings(), RouteModelKey::Composite),
+            Err(RequestBindingError::RouteModelWithCompositePrimaryKey { model, .. })
+                if model == "crate::Article"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_model_route_parameter_without_a_database() {
+        assert!(matches!(
+            route_model_binding(&empty_bindings(), RouteModelKey::Single),
+            Err(RequestBindingError::RouteModelWithoutDatabase { model, .. })
+                if model == "crate::Article"
+        ));
     }
 
     fn responder_rejection(declaration: &str) -> String {
@@ -908,7 +1005,7 @@ struct SecondClient;
                 &index,
                 ViewsAvailability::Available,
                 &collected_tags(&index),
-                &empty_bindings(),
+                &empty_bindings(), &[],
             ),
             Err(RequestBindingError::UnplannedOAuthClient { ref client, .. }) if client == "partner_client"
         ));
@@ -1154,6 +1251,7 @@ struct SecondClient;
             ViewsAvailability::Available,
             &collected_tags(&index),
             &empty_bindings(),
+            &[],
         )
         .err()
         .expect("the binding registries are rejected")
@@ -1308,7 +1406,7 @@ struct SecondClient;
         .expect("the container renders")
         .bindings;
         let registries =
-            BindingRegistries::collect(&index, ViewsAvailability::Available, &tags, &bindings)
+            BindingRegistries::collect(&index, ViewsAvailability::Available, &tags, &bindings, &[])
                 .expect("the binding registries are collected");
         let roots: Vec<CanonicalPath> = binding_roots(&RequestBinding::AuthenticatedUser {
             application: registries.providers()[0].application.clone(),

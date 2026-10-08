@@ -2,31 +2,28 @@ use std::sync::Arc;
 
 use margaret_jwks_keygen::signing_keys_generation::SigningKeysGeneration;
 use margaret_jwks_roller::held_secret::HeldSecret;
-use margaret_jwks_roller::stored_signing_keys::StoredSigningKeys;
-use margaret_jwks_roller::stores_signing_keys::StoresSigningKeys as _;
-use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
 use margaret_jwks_roller_tests::fixture_synchronizer::fixture_synchronizer;
 use margaret_registered_claims::numeric_date::NumericDate;
+use margaret_signing_keys::signing_keys_revision::SigningKeysRevision;
+use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
+use margaret_signing_keys_tests::stored_revision::StoredRevision;
 
 #[tokio::test]
 async fn synchronizer_creates_fresh_keys_in_an_empty_store() {
-    let storage = Arc::new(FixtureSigningKeys::empty());
+    let started = started_with_signing_keys().await;
     let now = NumericDate::new(0);
-    let created = fixture_synchronizer(storage.clone())
+    let created = fixture_synchronizer(Arc::clone(&started.database))
         .synchronized(&HeldSecret::Unheld, now)
         .await
         .expect("fresh keys are created");
-    let StoredSigningKeys::Stored(revision) = storage
-        .load_signing_keys()
-        .await
-        .expect("the store is reachable")
-    else {
-        panic!("the created keys are stored");
-    };
 
     assert_eq!(created.generation(), SigningKeysGeneration::FIRST);
     assert_eq!(created.rolled_at(), now);
     assert!(created.retired().is_empty());
-    assert_eq!(revision.generation, SigningKeysGeneration::FIRST);
-    assert_eq!(storage.accepted_writes().await, 1);
+    assert_eq!(
+        StoredRevision::loaded(&started.database).await,
+        StoredRevision::of(
+            &SigningKeysRevision::from_secret(&created).expect("the keys serialize")
+        )
+    );
 }

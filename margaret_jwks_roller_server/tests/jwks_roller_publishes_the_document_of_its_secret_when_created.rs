@@ -4,12 +4,13 @@ use bytes::Bytes;
 
 use margaret_jwks_keygen_tests::fixture_rsa_signing_keys::FixtureRsaSigningKeys;
 use margaret_jwks_roller_server::jwks_roller::JwksRoller;
-use margaret_jwks_roller_tests::fixture_signing_keys::FixtureSigningKeys;
+use margaret_signing_keys_tests::started_with_signing_keys::started_with_signing_keys;
 
 #[tokio::test]
 async fn jwks_roller_publishes_the_document_of_its_secret_when_created() {
+    let started = started_with_signing_keys().await;
     let roller = JwksRoller::create(
-        Arc::new(FixtureSigningKeys::empty()),
+        Arc::clone(&started.database),
         Arc::new(FixtureRsaSigningKeys::default()),
     )
     .await

@@ -5,9 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-anyhow = { workspace = true }
 chrono = { workspace = true }
-clap = { workspace = true }
 margaret = { workspace = true, features = ["runtime"] }
 rust_decimal = { workspace = true }
 uuid = { workspace = true }

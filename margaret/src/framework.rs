@@ -5,17 +5,17 @@ pub use margaret_accepted_clients as accepted_clients;
 #[cfg(feature = "runtime")]
 pub use margaret_access_token_minter as access_token_minter;
 #[cfg(feature = "runtime")]
+pub use margaret_active_record as active_record;
+#[cfg(feature = "runtime")]
 pub use margaret_asset_bag as asset_bag;
 #[cfg(feature = "runtime")]
 pub use margaret_authorization_grants as authorization_grants;
-#[cfg(feature = "runtime")]
-pub use margaret_authorization_grants_database as authorization_grants_database;
 #[cfg(feature = "runtime")]
 pub use margaret_authorization_server_client as authorization_server_client;
 #[cfg(feature = "runtime")]
 pub use margaret_bearer_token_verification as bearer_token_verification;
 #[cfg(feature = "runtime")]
-pub use margaret_client_assertions_database as client_assertions_database;
+pub use margaret_client_assertions as client_assertions;
 #[cfg(feature = "runtime")]
 pub use margaret_client_credentials as client_credentials;
 #[cfg(feature = "codegen")]
@@ -87,7 +87,7 @@ pub use margaret_route_parameter_binding as route_parameter_binding;
 #[cfg(feature = "runtime")]
 pub use margaret_service as service;
 #[cfg(feature = "runtime")]
-pub use margaret_signing_keys_database as signing_keys_database;
+pub use margaret_signing_keys as signing_keys;
 #[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid as spiffe_svid;
 #[cfg(feature = "runtime")]
@@ -96,6 +96,8 @@ pub use margaret_spiffe_svid_bundle as spiffe_svid_bundle;
 pub use margaret_spiffe_svid_client as spiffe_svid_client;
 #[cfg(feature = "runtime")]
 pub use margaret_spiffe_svid_server as spiffe_svid_server;
+#[cfg(feature = "runtime")]
+pub use margaret_sql_identifier as sql_identifier;
 #[cfg(feature = "runtime")]
 pub use margaret_subject_token_exchange as subject_token_exchange;
 #[cfg(feature = "runtime")]
@@ -124,24 +126,22 @@ pub use margaret_websocket as websocket;
 pub use margaret_websocket_session as websocket_session;
 #[cfg(feature = "runtime")]
 pub use oauth2;
-#[cfg(feature = "runtime")]
-pub use tokio_postgres;
 
 #[cfg(all(test, feature = "runtime"))]
 mod tests {
     use crate::framework::macros::model;
 
     #[model(table = "facade_probes")]
-    #[primary_key(columns = [id, slot])]
-    #[unique(columns = [slot, label])]
-    #[index(name = "facade_probes_label_slot", columns = [label, slot])]
+    #[primary_key(fields = [id, slot])]
+    #[unique(fields = [slot, label])]
+    #[index(name = "facade_probes_label_slot", fields = [label, slot])]
     struct FacadeProbe {
         #[column]
-        id: u32,
+        id: i32,
         #[column]
-        slot: u32,
+        slot: i32,
         #[column]
-        label: u32,
+        label: i32,
     }
 
     #[test]

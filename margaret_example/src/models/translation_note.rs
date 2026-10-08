@@ -1,5 +1,6 @@
 use uuid::Uuid;
 
+use margaret::framework::active_record::key::Key;
 use margaret::framework::macros::model;
 use margaret::framework::model::on_delete::OnDelete;
 
@@ -15,5 +16,5 @@ pub struct TranslationNote {
     #[column]
     #[foreign_key(on_delete = OnDelete::Cascade)]
     #[index]
-    pub source: ArticleTranslation,
+    pub source: Key<ArticleTranslation>,
 }

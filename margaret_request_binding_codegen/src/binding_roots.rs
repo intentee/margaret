@@ -52,6 +52,7 @@ mod tests {
     use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
     use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
     use crate::request_binding::RequestBinding;
+    use crate::route_parameter_lookup::RouteParameterLookup;
 
     fn path(name: &str) -> CanonicalPath {
         CanonicalPath::new(vec!["crate".to_string(), name.to_string()])
@@ -64,6 +65,7 @@ mod tests {
         let binding = RequestBinding::BoundRouteParameter {
             binder_field: "user_binder".to_string(),
             binder_provider: binder_provider.clone(),
+            lookup: RouteParameterLookup::Binder,
             path_key: "user".to_string(),
         };
 

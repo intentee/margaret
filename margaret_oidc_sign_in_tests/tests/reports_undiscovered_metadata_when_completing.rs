@@ -37,7 +37,7 @@ async fn reports_undiscovered_metadata_when_completing() {
             FIXTURE_CLIENT_ID,
             fixture_client_secret(),
         )),
-        Arc::clone(&fixture.roller),
+        Arc::clone(&fixture.secrets),
     );
 
     let completion = undiscovered

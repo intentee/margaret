@@ -24,7 +24,7 @@ use margaret_trusted_issuer_codegen::trusted_issuer_item::TrustedIssuerItem;
 use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_item_path;
 
 use crate::issuer_request_client_canonical_path::issuer_request_client_canonical_path;
-use crate::jwks_roller_canonical_path::jwks_roller_canonical_path;
+use crate::jwks_secret_holder_canonical_path::jwks_secret_holder_canonical_path;
 
 fn created(dependencies: Vec<FrameworkDependency>, method: &str) -> FrameworkConstruction {
     FrameworkConstruction::Constructor {
@@ -80,7 +80,9 @@ fn external_construction(
             "with_client_secret_basic",
         ),
         DeclaredClientAuthentication::PrivateKeyJwt => created(
-            dependencies(FrameworkDependency::Provider(jwks_roller_canonical_path())),
+            dependencies(FrameworkDependency::Provider(
+                jwks_secret_holder_canonical_path(),
+            )),
             "with_private_key_jwt",
         ),
     }
@@ -98,7 +100,7 @@ fn own_construction(tag: &Tag, issuance: &TokenIssuanceDeclaration) -> Framework
                 TrustedIssuerItem::TrustedIssuer,
             )),
             FrameworkDependency::Constant(oauth_client_id_path(tag)),
-            FrameworkDependency::Provider(jwks_roller_canonical_path()),
+            FrameworkDependency::Provider(jwks_secret_holder_canonical_path()),
         ],
         "with_private_key_jwt",
     )
@@ -131,7 +133,7 @@ fn sign_in_flow_providers(
         construction: FrameworkConstruction::Constructor {
             dependencies: vec![
                 FrameworkDependency::Provider(authorization_server.clone()),
-                FrameworkDependency::Provider(jwks_roller_canonical_path()),
+                FrameworkDependency::Provider(jwks_secret_holder_canonical_path()),
                 FrameworkDependency::RouteUrl(
                     routes
                         .redirect_target(redirect_route, binding.client.anchor.canonical_path())?,

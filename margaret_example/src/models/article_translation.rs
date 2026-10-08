@@ -1,21 +1,16 @@
-use uuid::Uuid;
-
+use margaret::framework::active_record::key::Key;
 use margaret::framework::macros::model;
 use margaret::framework::model::on_delete::OnDelete;
 
 use crate::models::article::Article;
 
 #[model(table = "article_translations")]
-#[primary_key(columns = [article_id, locale])]
-#[foreign_key(
-    columns = [article_id],
-    references = Article,
-    on_delete = OnDelete::Cascade
-)]
+#[primary_key(fields = [article, locale])]
 #[derive(Clone)]
 pub struct ArticleTranslation {
     #[column]
-    pub article_id: Uuid,
+    #[foreign_key(on_delete = OnDelete::Cascade)]
+    pub article: Key<Article>,
     #[column]
     pub locale: String,
     #[column]

@@ -1,6 +1,4 @@
-#[rustfmt::skip]
-#[path = "../margaret/mod.rs"]
-pub mod margaret;
+include!(concat!(env!("OUT_DIR"), "/margaret.rs"));
 
 pub mod article;
 pub mod article_status;

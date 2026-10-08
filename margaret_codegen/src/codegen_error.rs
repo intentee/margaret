@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use margaret_accepted_clients_codegen::accepted_clients_codegen_error::AcceptedClientsCodegenError;
+use margaret_active_record_codegen::active_record_codegen_error::ActiveRecordCodegenError;
 use margaret_asset_bag_codegen::asset_bag_codegen_error::AssetBagCodegenError;
 use margaret_attributes::attribute_error::AttributeError;
 use margaret_console_codegen::console_codegen_error::ConsoleCodegenError;
@@ -37,19 +38,6 @@ pub enum CodegenError {
     AssetBag {
         #[from]
         source: AssetBagCodegenError,
-    },
-
-    #[error("failed to index the framework schema crate {schema}: {source}")]
-    FrameworkSchemaIndex {
-        schema: String,
-        #[source]
-        source: AttributeError,
-    },
-
-    #[error("failed to generate the framework models: {source}")]
-    FrameworkSchemaModels {
-        #[source]
-        source: ModelCodegenError,
     },
 
     #[error("failed to read the postgres database: {source}")]
@@ -152,6 +140,12 @@ pub enum CodegenError {
         source: ModelCodegenError,
     },
 
+    #[error("failed to generate the eager loading shapes: {source}")]
+    Shapes {
+        #[from]
+        source: ActiveRecordCodegenError,
+    },
+
     #[error("failed to generate the views: {source}")]
     Views {
         #[from]
@@ -175,6 +169,15 @@ pub enum CodegenError {
         #[source]
         source: VarError,
     },
+
+    #[error("the OUT_DIR environment variable is not available: {source}")]
+    OutDirectory {
+        #[source]
+        source: VarError,
+    },
+
+    #[error("failed to write the generated module include '{path}': {source}")]
+    WriteInclude { path: PathBuf, source: io::Error },
 
     #[error("failed to create the generated directory '{path}': {source}")]
     CreateDirectory { path: PathBuf, source: io::Error },

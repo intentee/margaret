@@ -15,8 +15,11 @@ http = { workspace = true }
 margaret_accepted_clients = { workspace = true }
 margaret_accepted_clients_tests = { path = "../margaret_accepted_clients_tests" }
 margaret_authorization_grants = { workspace = true }
+margaret_authorization_grants_tests = { path = "../margaret_authorization_grants_tests" }
 margaret_authorization_server_client = { workspace = true }
-margaret_authorization_server_client_tests = { path = "../margaret_authorization_server_client_tests" }
+margaret_client_assertions = { workspace = true }
+margaret_database = { workspace = true }
+margaret_database_tests = { path = "../margaret_database_tests" }
 margaret_http = { workspace = true }
 margaret_http_tests = { path = "../margaret_http_tests" }
 margaret_issuer_directory = { workspace = true }
@@ -32,7 +35,7 @@ margaret_jwks_secret_store = { workspace = true }
 margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
 margaret_jws_verification = { workspace = true }
 margaret_jwt_verification = { workspace = true }
-margaret_jwt_verification_tests = { path = "../margaret_jwt_verification_tests" }
+margaret_model = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_oidc_discovery = { workspace = true }
 margaret_oidc_provider = { workspace = true }
@@ -40,6 +43,7 @@ margaret_oidc_sign_in = { workspace = true }
 margaret_oidc_sign_in_tests = { path = "../margaret_oidc_sign_in_tests" }
 margaret_registered_claims = { workspace = true }
 margaret_route_method = { workspace = true }
+margaret_sql_identifier = { workspace = true }
 margaret_subject_token_exchange = { workspace = true }
 margaret_token_digest = { workspace = true }
 margaret_token_issuance = { workspace = true }
@@ -57,12 +61,16 @@ uuid = { workspace = true }
 validator = { workspace = true }
 
 [dev-dependencies]
+margaret = { workspace = true, features = ["runtime"] }
 margaret_bearer_token_verification = { workspace = true }
 margaret_client_credentials = { workspace = true }
 margaret_identity_session = { workspace = true }
 margaret_token_exchange_client = { workspace = true }
 margaret_token_introspection = { workspace = true }
 zeroize = { workspace = true }
+
+[features]
+tests_that_use_postgres = []
 
 [[test]]
 name = "main"

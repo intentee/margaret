@@ -1,6 +1,6 @@
 use crate::table::Table;
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct Schema {
-    pub framework_tables: Vec<Table>,
-    pub tables: Vec<Table>,
+    pub table_sets: &'static [&'static [&'static Table]],
 }

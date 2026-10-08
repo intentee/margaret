@@ -2,6 +2,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use margaret_authorization_grants::pending_authorization::PendingAuthorization;
+use margaret_authorization_grants::pending_authorization_record::PendingAuthorizationRecord;
 use margaret_oidc_provider::consent_decision::ConsentDecision;
 use margaret_oidc_provider::consent_outcome::ConsentOutcome;
 use margaret_oidc_provider_tests::fixture_authorization_grant::fixture_authorization_grant;
@@ -16,20 +17,18 @@ async fn forgets_an_expired_pending_consent() {
     let id = Uuid::new_v4();
     let now = NumericDate::from(Utc::now());
 
-    fixture
-        .clients
-        .grants
-        .hold_pending_authorization(
-            id,
-            PendingAuthorization {
-                expires_at: now,
-                grant: fixture_authorization_grant("spa", SPA_CALLBACK),
-                state: None,
-            },
-            now,
-        )
-        .await
-        .expect("the fixture store holds the consent");
+    PendingAuthorizationRecord::hold(
+        &fixture.storage.database,
+        id,
+        PendingAuthorization {
+            expires_at: now,
+            grant: fixture_authorization_grant("spa", SPA_CALLBACK),
+            state: None,
+        },
+        now,
+    )
+    .await
+    .expect("the fixture database holds the consent");
 
     assert!(matches!(
         fixture

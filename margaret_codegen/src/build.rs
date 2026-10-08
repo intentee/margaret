@@ -10,6 +10,10 @@ use margaret_accepted_clients_codegen::declared_client_keys::DeclaredClientKeys;
 use margaret_accepted_clients_codegen::declared_confidential_client::DeclaredConfidentialClient;
 use margaret_accepted_clients_codegen::provider_aggregate::ProviderAggregate;
 use margaret_accepted_clients_codegen::render_accepted_clients::render_accepted_clients;
+use margaret_active_record_codegen::collect_shapes::collect_shapes;
+use margaret_active_record_codegen::render_models::render_models;
+use margaret_active_record_codegen::render_shapes::render_shapes;
+use margaret_active_record_codegen::shape_declaration::ShapeDeclaration;
 use margaret_attributes::attribute_index::AttributeIndex;
 use margaret_attributes::attribute_index_builder::AttributeIndexBuilder;
 use margaret_attributes::canonical_path::CanonicalPath;
@@ -32,6 +36,8 @@ use margaret_http_codegen::http_server::HttpServer;
 use margaret_http_codegen::render_http::render_http;
 use margaret_middleware_codegen::middleware_plans::MiddlewarePlans;
 use margaret_middleware_codegen::render_middleware_wrappers::render_middleware_wrappers;
+use margaret_model_codegen::model::Model;
+use margaret_model_codegen::models::models;
 use margaret_oauth_client_codegen::declared_oauth_clients::DeclaredOAuthClients;
 use margaret_oidc_provider_codegen::oidc_provider_item::OidcProviderItem;
 use margaret_oidc_provider_codegen::oidc_provider_item_path::oidc_provider_item_path;
@@ -39,10 +45,13 @@ use margaret_request_binding_codegen::binding_registries::BindingRegistries;
 use margaret_request_binding_codegen::render_authenticated_user_wrappers::render_authenticated_user_wrappers;
 use margaret_request_binding_codegen::views_availability::ViewsAvailability;
 use margaret_schema_codegen::render_schema::render_schema;
+use margaret_schema_codegen::render_table::render_table;
+use margaret_schema_codegen::render_tables::render_tables;
 use margaret_serve_input_codegen::scan::scan;
 use margaret_service_codegen::framework_service::FrameworkService;
 use margaret_service_codegen::render_services::render_services;
 use margaret_service_codegen::service_plan::ServicePlan;
+use margaret_sql_identifier::table_namespace::TableNamespace;
 use margaret_tag_codegen::oauth_client_binding::OAuthClientBinding;
 use margaret_tag_codegen::subject_token_exchanger_binding::SubjectTokenExchangerBinding;
 use margaret_tag_codegen::tag_pool::TagPool;
@@ -54,6 +63,7 @@ use margaret_trusted_issuer_codegen::declared_trusts::DeclaredTrusts;
 use margaret_trusted_issuer_codegen::own_trust::OwnTrust;
 use margaret_trusted_issuer_codegen::trusted_issuer_item::TrustedIssuerItem;
 use margaret_trusted_issuer_codegen::trusted_issuer_item_path::trusted_issuer_item_path;
+use margaret_umbrella_path::umbrella_item_path::umbrella_item_path;
 use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 use margaret_views_codegen::render_views::render_views;
 use margaret_views_codegen::views_artifacts::ViewsArtifacts;
@@ -65,16 +75,17 @@ use margaret_websocket_codegen::web_socket_plan::WebSocketPlan;
 use crate::accepted_client_framework_providers::accepted_client_framework_providers;
 use crate::asset_bag_modules::asset_bag_modules;
 use crate::asset_responder_canonical_path::asset_responder_canonical_path;
+use crate::binding_declarations::BindingDeclarations;
 use crate::build_jwks_artifacts::build_jwks_artifacts;
 use crate::build_oauth_client_artifacts::build_oauth_client_artifacts;
 use crate::build_oidc_provider_artifacts::build_oidc_provider_artifacts;
 use crate::build_trusted_issuer_artifacts::build_trusted_issuer_artifacts;
 use crate::codegen_error::CodegenError;
-use crate::enabled_framework_schemas::enabled_framework_schemas;
+use crate::database_providers::database_providers;
+use crate::enabled_framework_tables::enabled_framework_tables;
 use crate::format_pass::format_pass;
 use crate::framework_declarations::FrameworkDeclarations;
 use crate::framework_modules::FrameworkModules;
-use crate::framework_state_providers::framework_state_providers;
 use crate::generated_code::GeneratedCode;
 use crate::generated_feature::GeneratedFeature;
 use crate::generated_features::GeneratedFeatures;
@@ -90,7 +101,7 @@ use crate::provider_declarations::ProviderDeclarations;
 use crate::provider_endpoint_modules::provider_endpoint_modules;
 use crate::role_modules::RoleModules;
 use crate::role_roots::RoleRoots;
-use crate::schema_models::SchemaModels;
+use crate::route_models::route_models;
 use crate::served_modules::ServedModules;
 use crate::serving_modules::ServingModules;
 use crate::trusted_issuer_framework_providers::trusted_issuer_framework_providers;
@@ -115,7 +126,7 @@ fn framework_providers(
         injection: FrameworkInjectionRole::Unmarked,
         provided: asset_responder_canonical_path(),
     }];
-    framework_providers.extend(framework_state_providers(database));
+    framework_providers.extend(database_providers(database));
     framework_providers.extend(jwks_framework_providers());
     framework_providers.extend(trusted_issuer_framework_providers(trusts));
     framework_providers.extend(own_trusted_issuer_framework_providers(own_trusts));
@@ -174,6 +185,36 @@ fn framework_providers(
     Ok(framework_providers)
 }
 
+fn model_modules(
+    models: &[Model],
+    shapes: &[ShapeDeclaration],
+    mut table_sets: Vec<CanonicalPath>,
+    features: &mut GeneratedFeatures,
+) -> Vec<GeneratedModuleTokens> {
+    let mut modules = Vec::new();
+
+    if features.contains(GeneratedFeature::Models) {
+        modules.extend(render_models(models));
+        modules.extend(models.iter().map(render_table));
+        modules.push(render_tables(models));
+        table_sets.push(umbrella_item_path(&["tables", "TABLES"]));
+    }
+
+    features.enable_if(GeneratedFeature::Shapes, !shapes.is_empty());
+    modules.extend(render_shapes(shapes));
+
+    features.enable_if(
+        GeneratedFeature::Schema,
+        features.contains(GeneratedFeature::Console) && !table_sets.is_empty(),
+    );
+
+    if features.contains(GeneratedFeature::Schema) {
+        modules.push(render_schema(&table_sets));
+    }
+
+    modules
+}
+
 fn aggregate_consumer(aggregate: ProviderAggregate) -> OidcProviderItem {
     match aggregate {
         ProviderAggregate::AcceptedResources => OidcProviderItem::RevocationEndpoint,
@@ -230,7 +271,7 @@ fn render_wrapper_modules<'tags>(
     index: &AttributeIndex,
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
-    tags: &'tags TagPool<'tags>,
+    BindingDeclarations { route_models, tags }: &BindingDeclarations<'_, 'tags>,
 ) -> Result<WrapperModules<'tags>, CodegenError> {
     let mut modules: Vec<GeneratedModuleTokens> = Vec::new();
     let serves_requests = features.contains(GeneratedFeature::Http)
@@ -240,7 +281,8 @@ fn render_wrapper_modules<'tags>(
     } else {
         ViewsAvailability::Unavailable
     };
-    let registries = BindingRegistries::collect(index, views_availability, tags, bindings)?;
+    let registries =
+        BindingRegistries::collect(index, views_availability, tags, bindings, route_models)?;
 
     if features.contains(GeneratedFeature::AuthenticatedUsers) && serves_requests {
         modules.extend(render_authenticated_user_wrappers(&registries.providers()));
@@ -394,14 +436,14 @@ fn served_modules(
     bindings: &ContainerBindings,
     features: &GeneratedFeatures,
     framework_services: &[FrameworkService],
-    tags: &TagPool,
+    binding: &BindingDeclarations,
     provider: &ProviderDeclarations,
 ) -> Result<ServedModules, CodegenError> {
     let WrapperModules {
         middleware_plans,
         modules: wrapper_modules,
         registries,
-    } = render_wrapper_modules(index, bindings, features, tags)?;
+    } = render_wrapper_modules(index, bindings, features, binding)?;
     let ServingModules {
         modules: serving_modules,
         retained_roots: serving_roots,
@@ -472,7 +514,7 @@ fn rendered(
         service,
     }: &RoleRoots,
     mut module_tokens: Vec<GeneratedModuleTokens>,
-    features: &GeneratedFeatures,
+    mut features: GeneratedFeatures,
 ) -> Result<GeneratedCode, CodegenError> {
     let served_roots = service
         .iter()
@@ -486,12 +528,16 @@ fn rendered(
         .render(&served_roots, console)
         .map_err(CodegenError::from)
         .and_then(|rendered_container| {
+            features.enable_if(
+                GeneratedFeature::Container,
+                !rendered_container.modules.is_empty(),
+            );
             module_tokens.extend(rendered_container.modules);
 
             format_pass(module_tokens)
                 .map_err(CodegenError::from)
                 .map(|mut modules| {
-                    modules.push(umbrella(features));
+                    modules.push(umbrella(&features));
 
                     GeneratedCode::new(modules)
                 })
@@ -505,12 +551,17 @@ pub fn build(
     crate_root: &CrateRoot,
     metafile_contents: Option<&str>,
     assets_directory: &Path,
+    namespace: TableNamespace,
 ) -> Result<GeneratedCode, CodegenError> {
     let index = AttributeIndexBuilder::new()
         .exclude_root_module(UMBRELLA_MODULE_NAME)
         .index_crate(crate_root)?
         .build();
+    let models = models(&index, namespace)?;
+    let shapes = collect_shapes(&index, &models)?;
     let mut features = GeneratedFeatures::from_index(&index);
+
+    features.enable_if(GeneratedFeature::Models, !models.is_empty());
     let registry = scan(&index)?;
     let database = DeclaredPostgresDatabase::read(&index)?;
     let token_issuance = DeclaredTokenIssuance::read(&index)?;
@@ -555,22 +606,16 @@ pub fn build(
         &token_issuance,
     )?;
     let bindings = planned_container.bindings();
-    let schema_models = SchemaModels::of(&index, &enabled_framework_schemas(bindings))?;
     let mut module_tokens =
         asset_bag_modules(&index, metafile_contents, bindings, assets_directory)?;
     features.enable_if(GeneratedFeature::AssetBag, !module_tokens.is_empty());
-    features.enable_if(
-        GeneratedFeature::Schema,
-        !schema_models.framework.is_empty(),
-    );
     features.enable_console(&index);
-
-    if features.contains(GeneratedFeature::Schema) {
-        module_tokens.push(render_schema(
-            &schema_models.application,
-            &schema_models.framework,
-        ));
-    }
+    module_tokens.extend(model_modules(
+        &models,
+        &shapes,
+        enabled_framework_tables(&framework_providers, bindings),
+        &mut features,
+    ));
 
     module_tokens.extend(issuance_modules(
         &token_issuance,
@@ -600,7 +645,10 @@ pub fn build(
         bindings,
         &features,
         &framework_services,
-        &tags,
+        &BindingDeclarations {
+            route_models: &route_models(&models, &shapes),
+            tags: &tags,
+        },
         &ProviderDeclarations {
             accepted: &accepted_clients,
             token_issuance: &token_issuance,
@@ -609,7 +657,7 @@ pub fn build(
 
     module_tokens.extend(modules);
 
-    rendered(planned_container, &roots, module_tokens, &features)
+    rendered(planned_container, &roots, module_tokens, features)
 }
 
 #[cfg(test)]
@@ -618,6 +666,7 @@ mod tests {
     use std::path::Path;
 
     use margaret_accepted_clients_codegen::accepted_clients_codegen_error::AcceptedClientsCodegenError;
+    use margaret_active_record_codegen::active_record_codegen_error::ActiveRecordCodegenError;
     use margaret_attribute_arguments::attribute_arguments_error::AttributeArgumentsError;
     use margaret_attributes::crate_root::CrateRoot;
     use margaret_attributes_tests::source_crate::SourceCrate;
@@ -625,6 +674,8 @@ mod tests {
     use margaret_database_codegen::database_codegen_error::DatabaseCodegenError;
     use margaret_generated_module::generated_module::GeneratedModule;
     use margaret_http_codegen::http_codegen_error::HttpCodegenError;
+    use margaret_request_binding_codegen::request_binding_error::RequestBindingError;
+    use margaret_sql_identifier::table_namespace::TableNamespace;
     use margaret_tag_codegen::tag_error::TagError;
     use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
@@ -663,10 +714,7 @@ impl Config {
 }
 ";
 
-    const COMMAND_CRATE: &str = "\
-#[rustfmt::skip]
-pub mod margaret;
-
+    const COMMAND_ITEMS: &str = "
 #[singleton]
 #[console_command(name = \"greet\")]
 struct Greet;
@@ -765,6 +813,7 @@ struct Room;
             &CrateRoot::new("crate", source_crate.source_directory()),
             None,
             &source_crate.root().join("assets"),
+            TableNamespace::Application,
         )
     }
 
@@ -773,6 +822,7 @@ struct Room;
             &CrateRoot::new("crate", source),
             None,
             &source.join("assets"),
+            TableNamespace::Application,
         )
         .expect("the crate generates")
     }
@@ -815,7 +865,10 @@ struct Room;
 
     #[test]
     fn generates_a_console_for_commands_without_http() {
-        let code = generate(COMMAND_CRATE).expect("the build succeeds");
+        let code = generate(&format!(
+            "#[rustfmt::skip]\npub mod margaret;\n{COMMAND_ITEMS}"
+        ))
+        .expect("the build succeeds");
 
         assert!(module(&code, "mod").contains("pub mod run;"));
         assert!(!module(&code, "mod").contains("pub mod http;"));
@@ -831,6 +884,7 @@ struct Room;
             &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &source_crate.root().join("assets"),
+            TableNamespace::Application,
         )
         .expect("the build succeeds");
 
@@ -867,6 +921,7 @@ impl Config {
             &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &source_crate.root().join("assets"),
+            TableNamespace::Application,
         )
         .expect("the build succeeds");
 
@@ -914,6 +969,7 @@ impl AssetRoute {
             &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &assets,
+            TableNamespace::Application,
         )
         .expect("the build succeeds");
 
@@ -945,6 +1001,7 @@ impl AssetRoute {
             &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &assets,
+            TableNamespace::Application,
         )
         .expect("the build succeeds");
         let asset_bag = module(&code, "asset_bag");
@@ -962,6 +1019,7 @@ impl AssetRoute {
             &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{"outputs":{"assets/app_ABC.js":{"imports":[],"entryPoint":"src/app.ts"}}}"#),
             &source_crate.root().join("assets"),
+            TableNamespace::Application,
         )
         .expect_err("a missing asset directory is rejected")
         .to_string();
@@ -1004,6 +1062,7 @@ impl AssetRoute {
             &CrateRoot::new("crate", source_crate.source_directory()),
             Some(r#"{ "outputs": {} }"#),
             &source_crate.root().join("assets"),
+            TableNamespace::Application,
         )
         .expect_err("an invalid metafile is rejected")
         .to_string();
@@ -1333,6 +1392,18 @@ impl GetIdentity {
     }
 
     #[test]
+    fn rejects_a_singleton_that_injects_the_signing_keys_of_the_framework() {
+        assert_eq!(
+            generate(&format!(
+                "{JWKS_ROLLER_CRATE}#[singleton]\n#[console_command(name = \"sign\")]\nstruct Sign {{\n    secrets: std::sync::Arc<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder>,\n}}\n\nimpl Sign {{\n    #[constructor]\n    fn create(secrets: std::sync::Arc<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder>) -> anyhow::Result<Self> {{}}\n\n    #[process]\n    fn run(&self) -> anyhow::Result<CommandOutcome> {{}}\n}}\n"
+            ))
+            .expect_err("only the framework holds the signing keys")
+            .to_string(),
+            "failed to generate the dependency container: parameter 'secrets' of singleton 'crate::Sign' injects 'margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder', which only the framework may inject"
+        );
+    }
+
+    #[test]
     fn generates_the_jwks_roller_when_the_handler_is_injected() {
         let code = generate(JWKS_ROLLER_CRATE).expect("the build succeeds");
 
@@ -1355,7 +1426,7 @@ impl GetIdentity {
         ));
         assert!(construction.contains(".public_jwks_handler()"));
         assert!(construction.contains(
-            "crate::margaret::jwks::JwksRoller::create(::std::sync::Arc::<margaret::framework::signing_keys_database::database_signing_keys::DatabaseSigningKeys,>::clone(&framework_signing_keys_database_database_signing_keys_database_signing_keys,),"
+            "crate::margaret::jwks::JwksRoller::create(::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),"
         ));
 
         let serve: String = module(&code, "serve").split_whitespace().collect();
@@ -1812,10 +1883,10 @@ struct ApplicationDatabase;
             "crate::margaret::oidc_provider::subject_token_exchangers::ci::SubjectTokenExchanger::create(::std::sync::Arc::<crate::margaret::trusted_issuers::ci::TrustedIssuer,>::clone(&margaret_trusted_issuers_ci_trusted_issuer),::std::sync::Arc::<crate::CiExchanger>::clone(&ci_exchanger),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::ConsentEndpoint::create(::std::sync::Arc::<margaret::framework::authorization_grants_database::database_authorization_grants::DatabaseAuthorizationGrants,>::clone(&framework_authorization_grants_database_database_authorization_grants_database_authorization_grants,),crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
+            "crate::margaret::oidc_provider::ConsentEndpoint::create(::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::token_issuance::TOKEN_ISSUANCE,)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oidc_provider::RevocationEndpoint::create(::std::sync::Arc::<crate::margaret::oidc_provider::AcceptedClients,>::clone(&margaret_oidc_provider_accepted_clients),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),::std::sync::Arc::<margaret::framework::authorization_grants_database::database_authorization_grants::DatabaseAuthorizationGrants,>::clone(&framework_authorization_grants_database_database_authorization_grants_database_authorization_grants,),crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
+            "crate::margaret::oidc_provider::RevocationEndpoint::create(::std::sync::Arc::<crate::margaret::oidc_provider::AcceptedClients,>::clone(&margaret_oidc_provider_accepted_clients),::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::accepted_resources::ACCEPTED_RESOURCES,)"
         ));
         assert!(
             module(&code, "serve")
@@ -1824,10 +1895,12 @@ struct ApplicationDatabase;
                 .contains("letserve_input_0=matchmargaret::framework::environment_variable::read_required::read_required::<margaret::framework::database::database_url::DatabaseUrl,>(\"APPLICATION_DATABASE_URL\")")
         );
         assert!(!module(&code, "serve").contains("serve_input_1"));
-        assert!(module(&code, "schema").contains("framework_tables"));
-        assert!(module(&code, "schema").contains("\"pending_authorizations\""));
-        assert!(module(&code, "schema").contains("\"client_assertions\""));
-        assert!(module(&code, "schema").contains("\"signing_key_sets\""));
+        assert!(
+            module(&code, "schema")
+                .split_whitespace()
+                .collect::<String>()
+                .contains("table_sets:&[margaret::framework::signing_keys::margaret::tables::TABLES,margaret::framework::authorization_grants::margaret::tables::TABLES,margaret::framework::client_assertions::margaret::tables::TABLES,]")
+        );
         assert!(
             module(&code, "serve")
                 .split_whitespace()
@@ -1848,13 +1921,13 @@ struct ApplicationDatabase;
 
         assert!(module(&code, "mod").contains("pub mod accepted_clients;"));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::portal_client::RegisteredClient::private_key_jwt_with_code_grant(crate::margaret::accepted_clients::clients::portal_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::portal_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_client_key_set),::std::sync::Arc::<margaret::framework::client_assertions_database::database_client_assertions::DatabaseClientAssertions,>::clone(&framework_client_assertions_database_database_client_assertions_database_client_assertions,),crate::margaret::accepted_clients::clients::portal_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://portal.fixture/callback\"),]),::std::sync::Arc::<margaret::framework::authorization_grants_database::database_authorization_grants::DatabaseAuthorizationGrants,>::clone(&framework_authorization_grants_database_database_authorization_grants_database_authorization_grants,),)"
+            "crate::margaret::accepted_clients::clients::portal_client::RegisteredClient::private_key_jwt_with_code_grant(crate::margaret::accepted_clients::clients::portal_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::portal_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::portal_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_portal_client_client_key_set),::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::clients::portal_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://portal.fixture/callback\"),]),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::service_client::RegisteredClient::private_key_jwt(crate::margaret::accepted_clients::clients::service_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::service_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::service_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_service_client_client_key_set),::std::sync::Arc::<margaret::framework::client_assertions_database::database_client_assertions::DatabaseClientAssertions,>::clone(&framework_client_assertions_database_database_client_assertions_database_client_assertions,),)"
+            "crate::margaret::accepted_clients::clients::service_client::RegisteredClient::private_key_jwt(crate::margaret::accepted_clients::clients::service_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::service_client::confidential_privileges::CONFIDENTIAL_PRIVILEGES,::std::sync::Arc::<crate::margaret::accepted_clients::clients::service_client::ClientKeySet,>::clone(&margaret_accepted_clients_clients_service_client_client_key_set),::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),)"
         ));
         assert!(construction.contains(
-            "crate::margaret::accepted_clients::clients::kiosk_client::RegisteredClient::public_with_code_grant(crate::margaret::accepted_clients::clients::kiosk_client::accepted_client::ACCEPTED_CLIENT,crate::margaret::accepted_clients::clients::kiosk_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://kiosk.fixture/callback\"),]),::std::sync::Arc::<margaret::framework::authorization_grants_database::database_authorization_grants::DatabaseAuthorizationGrants,>::clone(&framework_authorization_grants_database_database_authorization_grants_database_authorization_grants,),)"
+            "crate::margaret::accepted_clients::clients::kiosk_client::RegisteredClient::public_with_code_grant(crate::margaret::accepted_clients::clients::kiosk_client::accepted_client::ACCEPTED_CLIENT,::std::sync::Arc::<margaret::framework::database::database::Database,>::clone(&framework_database_database_database),crate::margaret::accepted_clients::clients::kiosk_client::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([::std::string::String::from(\"https://kiosk.fixture/callback\"),]),)"
         ));
         assert!(!module(&code, "serve").contains("serve_input_1"));
         assert!(construction.contains(
@@ -2037,7 +2110,7 @@ impl GetDiscovery {
             .collect();
 
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client,),::std::sync::Arc::<crate::margaret::jwks::JwksRoller,>::clone(&margaret_jwks_jwks_roller),serve_input_1,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,).map_err(margaret::framework::anyhow::Error::from)"
+            "crate::margaret::oauth_clients::partner_client::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::partner_client::AuthorizationServerClient,>::clone(&margaret_oauth_clients_partner_client_authorization_server_client,),::std::sync::Arc::<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_1,crate::margaret::oauth_clients::partner_client::sign_in_scopes::SIGN_IN_SCOPES,).map_err(margaret::framework::anyhow::Error::from)"
         ));
         assert!(
             module(&code, "serve")
@@ -2186,7 +2259,7 @@ impl GetDiscovery {
             "crate::margaret::trusted_issuers::provider::TrustedIssuer::own(::std::sync::Arc::<crate::margaret::jwks::JwksSecretStore,>::clone(&margaret_jwks_jwks_secret_store),crate::margaret::trusted_issuers::provider::token_trust::TOKEN_TRUST,)"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::service_client::AuthorizationServerClient::with_private_key_jwt(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::oidc_provider::IssuerMetadata,>::clone(&margaret_oidc_provider_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::provider::TrustedIssuer,>::clone(&margaret_trusted_issuers_provider_trusted_issuer),crate::margaret::oauth_clients::service_client::client_id::CLIENT_ID,::std::sync::Arc::<crate::margaret::jwks::JwksRoller,>::clone(&margaret_jwks_jwks_roller),)"
+            "crate::margaret::oauth_clients::service_client::AuthorizationServerClient::with_private_key_jwt(::std::sync::Arc::<margaret::framework::issuer_request::issuer_request_client::IssuerRequestClient,>::clone(&framework_issuer_request_issuer_request_client_issuer_request_client,),::std::sync::Arc::<crate::margaret::oidc_provider::IssuerMetadata,>::clone(&margaret_oidc_provider_issuer_metadata),::std::sync::Arc::<crate::margaret::trusted_issuers::provider::TrustedIssuer,>::clone(&margaret_trusted_issuers_provider_trusted_issuer),crate::margaret::oauth_clients::service_client::client_id::CLIENT_ID,::std::sync::Arc::<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),)"
         ));
     }
 
@@ -2213,7 +2286,7 @@ impl GetDiscovery {
             "crate::margaret::accepted_clients::clients::blog_app::code_grant_policy::CODE_GRANT_POLICY,::std::vec::Vec::from([serve_input_1.clone()]),"
         ));
         assert!(construction.contains(
-            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<crate::margaret::jwks::JwksRoller,>::clone(&margaret_jwks_jwks_roller),serve_input_1,crate::margaret::oauth_clients::blog::sign_in_scopes::SIGN_IN_SCOPES,)"
+            "crate::margaret::oauth_clients::blog::SignInFlow::create(::std::sync::Arc::<crate::margaret::oauth_clients::blog::AuthorizationServerClient,>::clone(&margaret_oauth_clients_blog_authorization_server_client),::std::sync::Arc::<margaret::framework::jwks_keygen::jwks_secret_holder::JwksSecretHolder,>::clone(&framework_jwks_keygen_jwks_secret_holder_jwks_secret_holder),serve_input_1,crate::margaret::oauth_clients::blog::sign_in_scopes::SIGN_IN_SCOPES,)"
         ));
         assert_eq!(
             module(&code, "oauth_clients/blog/sign_in_scopes"),
@@ -3252,34 +3325,132 @@ impl New {
     }
 
     #[test]
-    fn generates_the_schema_module_and_command_when_models_exist() {
+    fn generates_only_the_models_and_tables_of_a_models_only_crate() {
         let code = generate(MODELS_CRATE).expect("the build succeeds");
+        let umbrella: String = module(&code, "mod").split_whitespace().collect();
+
+        assert_eq!(
+            umbrella,
+            "#![forbid(unsafe_code)]#[rustfmt::skip]pubmodmodels;#[rustfmt::skip]pubmodtables;#[rustfmt::skip]pubuse::margaret::framework;"
+        );
+        assert!(module(&code, "models/widget/table").contains("\"widgets\""));
+        assert!(module(&code, "models/widget/table").contains("ColumnType::Uuid"));
+        assert!(has_module(&code, "models/widget/record"));
+    }
+
+    const ROUTE_MODEL_CRATE: &str = "\
+#[rustfmt::skip]
+pub mod margaret;
+
+#[model(table = \"widgets\")]
+struct Widget {
+    #[column(primary_key)]
+    id: uuid::Uuid,
+}
+
+#[model(table = \"slots\")]
+#[primary_key(fields = [shelf, position])]
+struct Slot {
+    #[column]
+    shelf: i32,
+    #[column]
+    position: i32,
+}
+
+#[eager_load(model = Widget)]
+struct LoadedWidget {
+    #[base]
+    widget: Widget,
+}
+
+#[postgres_database(url_from = \"APPLICATION_DATABASE_URL\")]
+struct ApplicationDatabase;
+";
+
+    fn route_model_responder(parameter: &str) -> String {
+        format!(
+            "{ROUTE_MODEL_CRATE}\n#[singleton]\n#[responds_to_http(method = margaret::framework::route_method::route_method::RouteMethod::Get, path = \"/items/{{item}}\", server = \"public\")]\nstruct GetItem;\n\nimpl GetItem {{\n    #[process]\n    fn respond(&self, #[route_parameter(from = \"item\")] item: {parameter}) -> anyhow::Result<Response> {{}}\n}}\n"
+        )
+    }
+
+    #[test]
+    fn binds_a_route_model_by_its_primary_key() {
+        let code = generate(&route_model_responder("Widget")).expect("the build succeeds");
+
+        assert!(concatenated(&code).split_whitespace().collect::<String>().contains(
+            "&margaret::framework::active_record::primary_key_binder::PrimaryKeyBinder::<crate::Widget,>::new("
+        ));
+    }
+
+    #[test]
+    fn binds_a_route_shape_by_the_primary_key_of_its_model() {
+        let code = generate(&route_model_responder("LoadedWidget")).expect("the build succeeds");
+
+        assert!(concatenated(&code).split_whitespace().collect::<String>().contains(
+            "&margaret::framework::active_record::primary_key_binder::PrimaryKeyBinder::<crate::LoadedWidget,>::new("
+        ));
+    }
+
+    #[test]
+    fn rejects_a_route_model_with_a_composite_primary_key() {
+        assert!(matches!(
+            generate(&route_model_responder("Slot")),
+            Err(CodegenError::Http {
+                source: HttpCodegenError::Binding {
+                    source: RequestBindingError::RouteModelWithCompositePrimaryKey { model, .. }
+                }
+            }) if model == "crate::Slot"
+        ));
+    }
+
+    #[test]
+    fn generates_the_shapes_of_a_crate_that_declares_them() {
+        let code = generate(&format!(
+            "{MODELS_CRATE}\n#[eager_load(model = Widget)]\nstruct LoadedWidget {{\n    #[base]\n    widget: Widget,\n}}\n"
+        ))
+        .expect("the build succeeds");
+
+        assert!(module(&code, "mod").contains("pub mod shapes;"));
+        assert!(module(&code, "shapes").contains("pub mod loaded_widget;"));
+        assert!(has_module(&code, "shapes/loaded_widget"));
+    }
+
+    #[test]
+    fn propagates_a_rejected_shape() {
+        assert!(matches!(
+            generate(&format!("{MODELS_CRATE}\n#[eager_load]\nstruct LoadedWidget {{}}\n")),
+            Err(CodegenError::Shapes {
+                source: ActiveRecordCodegenError::EagerLoadRequiresModel { shape }
+            }) if shape == "crate::LoadedWidget"
+        ));
+    }
+
+    #[test]
+    fn generates_the_schema_command_when_models_and_commands_exist() {
+        let code = generate(&format!("{MODELS_CRATE}{COMMAND_ITEMS}")).expect("the build succeeds");
+        let schema: String = module(&code, "schema").split_whitespace().collect();
+        let run: String = module(&code, "run").split_whitespace().collect();
 
         assert!(module(&code, "mod").contains("pub mod schema;"));
         assert!(module(&code, "mod").contains("pub mod run;"));
         assert!(!has_module(&code, "http"));
-        assert!(module(&code, "schema").contains("pub fn schema"));
-        assert!(module(&code, "schema").contains("\"widgets\""));
-        assert!(module(&code, "schema").contains("ColumnType::Uuid"));
-
-        let command: String = module(&code, "run").split_whitespace().collect();
-        let run: String = module(&code, "run").split_whitespace().collect();
-
-        assert!(run.contains("pubfnrun"));
-        assert!(!run.contains("pubasyncfnrun"));
-        assert!(command.contains("\"schema\""));
-        assert!(run.contains("super::schema::schema()"));
+        assert!(schema.contains("table_sets:&[crate::margaret::tables::TABLES]"));
+        assert!(run.contains("\"schema\""));
+        assert!(run.contains("super::schema::SCHEMA"));
     }
 
     #[test]
     fn generates_only_the_framework_tables_of_the_enabled_stores() {
         let code = generate(JWKS_ROLLER_CRATE).expect("the build succeeds");
+        let schema: String = module(&code, "schema").split_whitespace().collect();
         let run: String = module(&code, "run").split_whitespace().collect();
 
-        assert!(module(&code, "schema").contains("\"signing_key_sets\""));
-        assert!(!module(&code, "schema").contains("\"pending_authorizations\""));
-        assert!(!module(&code, "schema").contains("\"client_assertions\""));
-        assert!(run.contains("super::schema::schema()"));
+        assert!(
+            schema.contains(
+                "table_sets:&[margaret::framework::signing_keys::margaret::tables::TABLES]"
+            )
+        );
+        assert!(run.contains("super::schema::SCHEMA"));
     }
 
     #[test]

@@ -61,11 +61,11 @@ mod tests {
         )
     }
 
-    #[tokio::test]
-    async fn mints_tokens_for_a_valid_refresh_token() {
+    #[test]
+    fn mints_tokens_for_a_valid_refresh_token() {
         let secret = fresh_secret(SigningCurve::P256);
         let refresh_token = signed_refresh_token(&secret, 1_000);
-        let handler = MintAccessTokenHandler::create(Arc::new(rolled_store(secret).await));
+        let handler = MintAccessTokenHandler::create(Arc::new(rolled_store(secret)));
 
         assert_eq!(
             handler
@@ -75,11 +75,11 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn reports_unauthorized_for_an_expired_refresh_token() {
+    #[test]
+    fn reports_unauthorized_for_an_expired_refresh_token() {
         let secret = fresh_secret(SigningCurve::P256);
         let refresh_token = signed_refresh_token(&secret, 1_000);
-        let handler = MintAccessTokenHandler::create(Arc::new(rolled_store(secret).await));
+        let handler = MintAccessTokenHandler::create(Arc::new(rolled_store(secret)));
 
         assert_eq!(
             handler

@@ -1,23 +1,21 @@
 use uuid::Uuid;
 
+use margaret::framework::active_record::key::Key;
 use margaret::framework::macros::model;
 use margaret::framework::model::on_delete::OnDelete;
 
 use crate::fragment_metadata::FragmentMetadata;
 
 #[model(table = "fragment")]
-#[primary_key(columns = [partition, hash, context])]
-#[unique(columns = [hash, context])]
-#[foreign_key(
-    columns = [partition, hash],
-    references = FragmentMetadata,
-    on_delete = OnDelete::Cascade
-)]
+#[primary_key(fields = [metadata, context])]
+#[unique(fields = [context, slot])]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Fragment {
     #[column]
-    pub partition: Uuid,
-    #[column]
-    pub hash: Vec<u8>,
+    #[foreign_key(on_delete = OnDelete::Cascade)]
+    pub metadata: Key<FragmentMetadata>,
     #[column]
     pub context: Uuid,
+    #[column]
+    pub slot: i32,
 }

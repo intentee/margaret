@@ -4,13 +4,13 @@ use crate::named_item::NamedItem;
 pub enum ItemNamingArgument {
     ClientAuthentication,
     Consent,
-    ForeignKeyReferences,
     FormRequestSource,
     IdTokenSigning,
     Keys,
     OnDelete,
     RedirectRoute,
     RedirectRoutes,
+    RelationModel,
     RouteMethod,
     Signing,
     TickBehavior,
@@ -25,13 +25,13 @@ impl ItemNamingArgument {
         match self {
             Self::ClientAuthentication => "authentication",
             Self::Consent => "consent",
-            Self::ForeignKeyReferences => "references",
             Self::FormRequestSource => "from",
             Self::IdTokenSigning => "id_token_signing",
             Self::Keys => "keys",
             Self::OnDelete => "on_delete",
             Self::RedirectRoute => "redirect_route",
             Self::RedirectRoutes => "redirect_routes",
+            Self::RelationModel => "model",
             Self::RouteMethod => "method",
             Self::Signing => "signing",
             Self::TickBehavior => "behavior",
@@ -44,10 +44,9 @@ impl ItemNamingArgument {
     #[must_use]
     pub fn named_item(self) -> NamedItem {
         match self {
-            Self::ForeignKeyReferences
-            | Self::RedirectRoute
-            | Self::RedirectRoutes
-            | Self::UserModel => NamedItem::Type,
+            Self::RedirectRoute | Self::RedirectRoutes | Self::RelationModel | Self::UserModel => {
+                NamedItem::Type
+            }
             Self::ClientAuthentication
             | Self::Consent
             | Self::FormRequestSource
@@ -72,9 +71,9 @@ mod tests {
     fn an_argument_naming_a_model_or_a_route_names_a_type() {
         assert_eq!(
             [
-                ItemNamingArgument::ForeignKeyReferences,
                 ItemNamingArgument::RedirectRoute,
                 ItemNamingArgument::RedirectRoutes,
+                ItemNamingArgument::RelationModel,
                 ItemNamingArgument::UserModel,
             ]
             .map(ItemNamingArgument::named_item),

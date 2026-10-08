@@ -18,7 +18,7 @@ async fn awaits_the_signing_keys_of_the_issuer() {
     let fixture = SignInFixture::start(secret_basic_authentication()).await;
     let keyless = fixture_sign_in_flow(
         Arc::new(fixture.server.client(secret_basic_authentication())),
-        Arc::clone(&fixture.roller),
+        Arc::clone(&fixture.secrets),
     );
     let SignInBeginning::Redirected(response) = keyless.begin().await else {
         panic!("the sign-in redirects to the authorization endpoint");

@@ -33,12 +33,11 @@ fn argument_error(error: &AttributeArgumentsError) -> Error {
 
 fn marker_item_naming_arguments(attribute: &Attribute) -> &'static [ItemNamingArgument] {
     if attribute.path().is_ident("foreign_key") {
-        &[
-            ItemNamingArgument::ForeignKeyReferences,
-            ItemNamingArgument::OnDelete,
-        ]
+        &[ItemNamingArgument::OnDelete]
     } else if attribute.path().is_ident("form_request") {
         &[ItemNamingArgument::FormRequestSource]
+    } else if attribute.path().is_ident("has_many") || attribute.path().is_ident("has_one") {
+        &[ItemNamingArgument::RelationModel]
     } else {
         &[]
     }
@@ -91,6 +90,20 @@ fn referencing_named_items_or_compile_error(
             })
             .map_err(|error| argument_error(&error)),
     )
+}
+
+fn eager_load_or_compile_error(
+    attributes: proc_macro2::TokenStream,
+    item: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    or_compile_error(strip_struct(item, &["base", "relation"]).map(|stripped| {
+        referencing_named_items_or_compile_error(
+            "eager_load",
+            attributes,
+            &stripped,
+            &[ItemNamingArgument::RelationModel],
+        )
+    }))
 }
 
 fn or_compile_error(result: Result<proc_macro2::TokenStream, Error>) -> proc_macro2::TokenStream {
@@ -226,10 +239,23 @@ pub fn renders_view(_attributes: TokenStream, item: TokenStream) -> TokenStream 
 }
 
 #[proc_macro_attribute]
+pub fn eager_load(attributes: TokenStream, item: TokenStream) -> TokenStream {
+    eager_load_or_compile_error(attributes.into(), item.into()).into()
+}
+
+#[proc_macro_attribute]
 pub fn model(_attributes: TokenStream, item: TokenStream) -> TokenStream {
     strip_struct_markers(
         item,
-        &["column", "foreign_key", "index", "primary_key", "unique"],
+        &[
+            "column",
+            "foreign_key",
+            "has_many",
+            "has_one",
+            "index",
+            "primary_key",
+            "unique",
+        ],
     )
 }
 
@@ -359,6 +385,7 @@ mod tests {
 
     use margaret_item_naming_argument::item_naming_argument::ItemNamingArgument;
 
+    use super::eager_load_or_compile_error;
     use super::referencing_named_items_or_compile_error;
     use super::strip_or_compile_error;
     use super::strip_struct_or_compile_error;
@@ -566,24 +593,26 @@ mod tests {
     }
 
     #[test]
-    fn removes_foreign_key_markers_from_the_struct_itself() {
+    fn removes_relation_markers_from_the_struct_itself() {
         let stripped = strip_struct_or_compile_error(
             quote! {
-                #[foreign_key(columns = [partition, hash], references = crate::Metadata)]
+                #[has_many(name = "translations", model = crate::Translation, key = article)]
+                #[has_one(name = "cover", model = crate::Cover, key = article)]
                 #[derive(Clone)]
-                pub struct FragmentAssociation {
+                pub struct Article {
                     #[column(primary_key)]
-                    pub partition: Uuid,
+                    pub id: Uuid,
                 }
             },
-            &["column", "foreign_key", "index"],
+            &["column", "has_many", "has_one"],
         )
         .to_string();
 
-        assert!(!stripped.contains("foreign_key"));
+        assert!(!stripped.contains("has_many"));
+        assert!(!stripped.contains("has_one"));
         assert!(!stripped.contains("column"));
         assert!(stripped.contains("derive"));
-        assert!(stripped.contains("partition"));
+        assert!(stripped.contains("id"));
     }
 
     #[test]
@@ -606,32 +635,73 @@ mod tests {
     }
 
     #[test]
-    fn references_the_model_named_by_a_struct_foreign_key() {
-        let stripped: String = strip_struct_or_compile_error(
+    fn strips_shape_markers_and_references_the_shaped_model() {
+        let shaped: String = eager_load_or_compile_error(
+            quote!(model = ArticleWithAuthor),
             quote! {
-                #[foreign_key(columns = [partition], references = Metadata)]
-                pub struct FragmentAssociation {
-                    #[column]
-                    pub partition: Uuid,
+                pub struct Loaded {
+                    #[base]
+                    pub article: Article,
+                    #[relation(author)]
+                    pub author: Author,
                 }
             },
-            &["column", "foreign_key"],
         )
         .to_string()
         .split_whitespace()
         .collect();
 
-        assert!(stripped.contains("const_:()={let_:::core::marker::PhantomData<Metadata>"));
+        assert!(!shaped.contains("#[base]"));
+        assert!(!shaped.contains("#[relation"));
+        assert!(shaped.contains(
+            "const_:()={let_:::core::marker::PhantomData<ArticleWithAuthor>=::core::marker::PhantomData;};"
+        ));
     }
 
     #[test]
-    fn turns_malformed_foreign_key_arguments_into_a_compile_error() {
+    fn turns_malformed_shape_arguments_into_a_compile_error() {
+        assert!(
+            eager_load_or_compile_error(
+                quote!(model =),
+                quote! {
+                    pub struct Loaded {
+                        #[base]
+                        pub article: Article,
+                    }
+                },
+            )
+            .to_string()
+            .contains("compile_error")
+        );
+    }
+
+    #[test]
+    fn references_the_model_named_by_a_relation() {
+        let stripped: String = strip_struct_or_compile_error(
+            quote! {
+                #[has_many(name = "translations", model = Translation, key = article)]
+                pub struct Article {
+                    #[column]
+                    pub id: Uuid,
+                }
+            },
+            &["column", "has_many"],
+        )
+        .to_string()
+        .split_whitespace()
+        .collect();
+
+        assert!(stripped.contains("const_:()={let_:::core::marker::PhantomData<Translation>"));
+    }
+
+    #[test]
+    fn turns_malformed_relation_arguments_into_a_compile_error() {
         let output = strip_struct_or_compile_error(
             quote! {
-                #[foreign_key(= 5)]
-                pub struct FragmentAssociation;
+                #[has_one(= 5)]
+                pub struct Article;
             },
-            &["foreign_key"],
+            &["has_one"],
         )
         .to_string();
 

@@ -1,0 +1,29 @@
+[package]
+name = "margaret_signing_keys_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+margaret_database = { workspace = true }
+margaret_database_tests = { path = "../margaret_database_tests" }
+margaret_jwks_keygen = { workspace = true }
+margaret_jwks_keygen_tests = { path = "../margaret_jwks_keygen_tests" }
+margaret_model = { workspace = true }
+margaret_signing_keys = { workspace = true }
+
+[dev-dependencies]
+futures-util = { workspace = true }
+margaret = { workspace = true, features = ["runtime"] }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[features]
+tests_that_use_postgres = []
+
+[[test]]
+name = "postgres"
+path = "tests/main.rs"
+
+[lints]
+workspace = true

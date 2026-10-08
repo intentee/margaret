@@ -4,18 +4,22 @@ COVERAGE_PACKAGES := \
 	-p margaret_accepted_clients_codegen \
 	-p margaret_accepted_clients_tests \
 	-p margaret_access_token_minter \
+	-p margaret_active_record \
+	-p margaret_active_record_codegen \
+	-p margaret_active_record_tests \
 	-p margaret_asset_bag \
 	-p margaret_asset_bag_codegen \
 	-p margaret_attribute_arguments \
 	-p margaret_attributes \
 	-p margaret_attributes_tests \
 	-p margaret_authorization_grants \
-	-p margaret_authorization_grants_database \
+	-p margaret_authorization_grants_tests \
 	-p margaret_authorization_server_client \
 	-p margaret_authorization_server_client_tests \
 	-p margaret_bearer_token_verification \
 	-p margaret_bearer_token_verification_tests \
-	-p margaret_client_assertions_database \
+	-p margaret_client_assertions \
+	-p margaret_client_assertions_tests \
 	-p margaret_client_credentials \
 	-p margaret_client_credentials_tests \
 	-p margaret_cluster_tests \
@@ -96,7 +100,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_service \
 	-p margaret_service_codegen \
 	-p margaret_service_tests \
-	-p margaret_signing_keys_database \
+	-p margaret_signing_keys \
+	-p margaret_signing_keys_tests \
 	-p margaret_spiffe_svid \
 	-p margaret_spiffe_svid_bundle \
 	-p margaret_spiffe_svid_bundle_tests \
@@ -106,7 +111,8 @@ COVERAGE_PACKAGES := \
 	-p margaret_spiffe_svid_server \
 	-p margaret_spiffe_svid_server_tests \
 	-p margaret_spiffe_svid_tests \
-	-p margaret_store_contract_tests \
+	-p margaret_sql \
+	-p margaret_sql_identifier \
 	-p margaret_subject_token_exchange \
 	-p margaret_subject_token_exchange_tests \
 	-p margaret_syn_type_peeling \
@@ -135,6 +141,7 @@ COVERAGE_PACKAGES := \
 	-p margaret_websocket_session \
 	-p margaret_websocket_tests
 COVERAGE_EXCLUDED_PACKAGES := \
+	--exclude-from-report margaret_active_record_tests \
 	--exclude-from-report margaret_cluster_fixture \
 	--exclude-from-report margaret_codegen_collisions_and_diamonds_fixture \
 	--exclude-from-report margaret_codegen_copy_console_arguments_fixture \
@@ -156,6 +163,7 @@ COVERAGE_EXCLUDED_PACKAGES := \
 	--exclude-from-report margaret_self_referential_model_fixture \
 	--exclude-from-report margaret_spiffe_http_client_fixture
 GENERATED_CODE_PACKAGES := \
+	-p margaret_active_record_tests \
 	-p margaret_cluster_fixture \
 	-p margaret_codegen_collisions_and_diamonds_fixture \
 	-p margaret_codegen_copy_console_arguments_fixture \
@@ -179,18 +187,18 @@ GENERATED_CODE_PACKAGES := \
 RUNTIME_PACKAGES := \
 	-p margaret \
 	-p margaret_accepted_clients \
+	-p margaret_accepted_clients_codegen \
 	-p margaret_access_token_minter \
+	-p margaret_active_record \
+	-p margaret_active_record_codegen \
 	-p margaret_asset_bag \
 	-p margaret_asset_bag_codegen \
 	-p margaret_attribute_arguments \
 	-p margaret_attributes \
 	-p margaret_authorization_grants \
-	-p margaret_authorization_grants_database \
-	-p margaret_authorization_grants_schema \
 	-p margaret_authorization_server_client \
 	-p margaret_bearer_token_verification \
-	-p margaret_client_assertions_database \
-	-p margaret_client_assertions_schema \
+	-p margaret_client_assertions \
 	-p margaret_client_credentials \
 	-p margaret_codegen \
 	-p margaret_codegen_tokens \
@@ -232,6 +240,7 @@ RUNTIME_PACKAGES := \
 	-p margaret_middleware_codegen \
 	-p margaret_model \
 	-p margaret_model_codegen \
+	-p margaret_model_facade \
 	-p margaret_oauth_client \
 	-p margaret_oauth_client_codegen \
 	-p margaret_oauth_vocabulary \
@@ -251,12 +260,13 @@ RUNTIME_PACKAGES := \
 	-p margaret_serve_input_codegen \
 	-p margaret_service \
 	-p margaret_service_codegen \
-	-p margaret_signing_keys_database \
-	-p margaret_signing_keys_schema \
+	-p margaret_signing_keys \
 	-p margaret_spiffe_svid \
 	-p margaret_spiffe_svid_bundle \
 	-p margaret_spiffe_svid_client \
 	-p margaret_spiffe_svid_server \
+	-p margaret_sql \
+	-p margaret_sql_identifier \
 	-p margaret_subject_token_exchange \
 	-p margaret_syn_type_peeling \
 	-p margaret_sync_holder \
@@ -289,16 +299,40 @@ RUNTIME_LINTS := \
 	-D clippy::unwrap-used
 
 POSTGRES_FEATURES := \
+	--features margaret_accepted_clients_tests/tests_that_use_postgres \
+	--features margaret_active_record_tests/tests_that_use_postgres \
+	--features margaret_authorization_grants_tests/tests_that_use_postgres \
+	--features margaret_client_assertions_tests/tests_that_use_postgres \
+	--features margaret_database_tests/tests_that_use_postgres \
+	--features margaret_jwks_roller_server/tests_that_use_postgres \
+	--features margaret_jwks_roller_tests/tests_that_use_postgres \
+	--features margaret_oidc_provider_tests/tests_that_use_postgres \
 	--features margaret_schema_postgres_tests/tests_that_use_postgres \
-	--features margaret_store_contract_tests/tests_that_use_postgres
+	--features margaret_signing_keys_tests/tests_that_use_postgres
 
-POSTGRES_TESTS := package(margaret_schema_postgres_tests) | binary_id(margaret_store_contract_tests::database) | binary_id(margaret_cluster_tests::integration)
+POSTGRES_TESTS := package(margaret_accepted_clients_tests) | package(margaret_active_record_tests) | package(margaret_authorization_grants_tests) | package(margaret_client_assertions_tests) | package(margaret_database_tests) | binary_id(margaret_jwks_roller_server::main) | package(margaret_jwks_roller_tests) | package(margaret_oidc_provider_tests) | package(margaret_signing_keys_tests) | package(margaret_schema_postgres_tests) | binary_id(margaret_cluster_tests::integration)
 
 POSTGRES_IMAGE_NAME := postgres
 POSTGRES_IMAGE_TAG := 18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
 
 export POSTGRES_IMAGE_NAME
 export POSTGRES_IMAGE_TAG
+
+TEST_POSTGRES_COMPOSE := docker compose --file margaret_database_tests/compose.yml --project-name margaret_test_postgres
+
+TEST_POSTGRES_URL = postgresql://postgres@$$($(TEST_POSTGRES_COMPOSE) port postgres 5432)/postgres
+
+define with_test_postgres
+	$(TEST_POSTGRES_COMPOSE) up --detach --force-recreate --renew-anon-volumes --wait; \
+	status=$$?; \
+	if [ $$status -eq 0 ]; then \
+		export MARGARET_TEST_POSTGRES_URL=$(TEST_POSTGRES_URL); \
+		$(1); \
+		status=$$?; \
+	fi; \
+	$(TEST_POSTGRES_COMPOSE) down --volumes; \
+	exit $$status
+endef
 
 CLUSTER_FEATURES := --features margaret_cluster_tests/tests_that_use_cluster
 
@@ -339,13 +373,13 @@ clippy:
 	cargo clippy -p margaret --lib --no-default-features --features codegen -- -D warnings $(RUNTIME_LINTS)
 	cargo clippy -p margaret --lib --all-features -- -D warnings $(RUNTIME_LINTS)
 
+coverage: export CARGO_TARGET_DIR = $(CURDIR)/target/coverage
+
 .PHONY: coverage
-coverage: node_modules openid-conformance-images postgres-image
+coverage: node_modules openid-conformance-images
 	cargo llvm-cov clean --workspace
 	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset 'none()' --no-tests pass
-	docker run --rm --user postgres $(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG) initdb --auth trust --no-sync --pgdata /tmp/warm
-	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset '$(POSTGRES_TESTS)'
-	cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset 'not ($(POSTGRES_TESTS))'
+	$(call with_test_postgres,cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset '$(POSTGRES_TESTS)' && cargo llvm-cov nextest $(COVERAGE_EXCLUDED_PACKAGES) $(COVERAGE_PACKAGES) $(POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES) --no-report --filterset 'not ($(POSTGRES_TESTS))')
 	cargo llvm-cov report --json --output-path target/llvm-cov.json
 	cargo llvm-cov report --lcov --output-path target/lcov.info
 	cargo llvm-cov report
@@ -356,18 +390,21 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_accepted_clients_codegen=100 \
 		--gated margaret_accepted_clients_tests=100 \
 		--gated margaret_access_token_minter=100 \
+		--gated margaret_active_record=100 \
+		--gated margaret_active_record_codegen=100 \
 		--gated margaret_asset_bag=100 \
 		--gated margaret_asset_bag_codegen=100 \
 		--gated margaret_attribute_arguments=100 \
 		--gated margaret_attributes=100 \
 		--gated margaret_attributes_tests=100 \
 		--gated margaret_authorization_grants=100 \
-		--gated margaret_authorization_grants_database=100 \
+		--gated margaret_authorization_grants_tests=100 \
 		--gated margaret_authorization_server_client=100 \
 		--gated margaret_authorization_server_client_tests=100 \
 		--gated margaret_bearer_token_verification=100 \
 		--gated margaret_bearer_token_verification_tests=100 \
-		--gated margaret_client_assertions_database=100 \
+		--gated margaret_client_assertions=100 \
+		--gated margaret_client_assertions_tests=100 \
 		--gated margaret_client_credentials=100 \
 		--gated margaret_client_credentials_tests=100 \
 		--gated margaret_cluster_tests=100 \
@@ -448,7 +485,8 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_service=100 \
 		--gated margaret_service_codegen=100 \
 		--gated margaret_service_tests=100 \
-		--gated margaret_signing_keys_database=100 \
+		--gated margaret_signing_keys=100 \
+		--gated margaret_signing_keys_tests=100 \
 		--gated margaret_spiffe_svid=100 \
 		--gated margaret_spiffe_svid_bundle=100 \
 		--gated margaret_spiffe_svid_bundle_tests=100 \
@@ -458,7 +496,8 @@ coverage: node_modules openid-conformance-images postgres-image
 		--gated margaret_spiffe_svid_server=100 \
 		--gated margaret_spiffe_svid_server_tests=100 \
 		--gated margaret_spiffe_svid_tests=100 \
-		--gated margaret_store_contract_tests=100 \
+		--gated margaret_sql=100 \
+		--gated margaret_sql_identifier=100 \
 		--gated margaret_subject_token_exchange=100 \
 		--gated margaret_subject_token_exchange_tests=100 \
 		--gated margaret_syn_type_peeling=100 \
@@ -511,24 +550,24 @@ openid-conformance-images:
 	docker pull $(CONFORMANCE_SUITE_NGINX_IMAGE)
 	docker pull $(CONFORMANCE_SUITE_SERVER_IMAGE)
 
-.PHONY: postgres-image
-postgres-image:
-	docker pull $(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG)
-
 .PHONY: test
 test: test.integration
 
 .PHONY: test.cluster
-test.cluster: postgres-image
-	cargo nextest run -p margaret_cluster_tests $(CLUSTER_FEATURES)
+test.cluster:
+	$(call with_test_postgres,cargo nextest run -p margaret_cluster_tests $(CLUSTER_FEATURES))
 
 .PHONY: test.conformance
 test.conformance: openid-conformance-images
-	cargo nextest run -p margaret_openid_conformance_tests $(OPENID_CONFORMANCE_FEATURES)
+	$(call with_test_postgres,cargo nextest run -p margaret_openid_conformance_tests $(OPENID_CONFORMANCE_FEATURES))
 
 .PHONY: test.integration
-test.integration: openid-conformance-images postgres-image
-	cargo nextest run --workspace $(POSTGRES_FEATURES) $(EXAMPLE_POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES)
+test.integration: openid-conformance-images
+	$(call with_test_postgres,cargo nextest run --workspace $(POSTGRES_FEATURES) $(EXAMPLE_POSTGRES_FEATURES) $(CLUSTER_FEATURES) $(SPIRE_FEATURES) $(OPENID_CONFORMANCE_FEATURES))
+
+.PHONY: test.postgres
+test.postgres:
+	$(call with_test_postgres,cargo nextest run --workspace $(POSTGRES_FEATURES) $(EXAMPLE_POSTGRES_FEATURES) --filterset '$(POSTGRES_TESTS) | package(margaret_example_tests)')
 
 .PHONY: test.unit
 test.unit:

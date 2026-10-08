@@ -1,10 +1,12 @@
 use uuid::Uuid;
 
 use margaret_accepted_clients::consent_policy::ConsentPolicy;
+use margaret_authorization_grants::authorization_code_record::AuthorizationCodeRecord;
 use margaret_authorization_grants::authorization_grant::AuthorizationGrant;
 use margaret_authorization_grants::issued_code::IssuedCode;
 use margaret_authorization_grants::pending_authorization::PendingAuthorization;
-use margaret_authorization_grants::stores_authorization_grants::StoresAuthorizationGrants;
+use margaret_authorization_grants::pending_authorization_record::PendingAuthorizationRecord;
+use margaret_database::database::Database;
 use margaret_registered_claims::numeric_date::NumericDate;
 use margaret_token_digest::random_token::random_token;
 use margaret_token_digest::token_digest::TokenDigest;
@@ -28,7 +30,7 @@ pub(crate) struct AuthorizationConclusion {
 impl AuthorizationConclusion {
     pub(crate) async fn concluded(
         self,
-        grants: &dyn StoresAuthorizationGrants,
+        database: &Database,
     ) -> Result<AuthorizationOutcome, ProviderError> {
         let Self {
             client_id,
@@ -42,15 +44,15 @@ impl AuthorizationConclusion {
         if consent == ConsentPolicy::Implicit && !prompt.forces_consent() {
             let code = random_token();
 
-            return grants
-                .issue_code(
-                    TokenDigest::of(&code),
-                    IssuedCode::issued_at(now, grant),
-                    now,
-                )
-                .await
-                .map_err(ProviderError::IssueCode)
-                .map(|()| AuthorizationOutcome::Redirected(redirection.code(&code)));
+            return AuthorizationCodeRecord::issue(
+                database,
+                TokenDigest::of(&code),
+                IssuedCode::issued_at(now, grant),
+                now,
+            )
+            .await
+            .map_err(ProviderError::AuthorizationGrants)
+            .map(|()| AuthorizationOutcome::Redirected(redirection.code(&code)));
         }
 
         if prompt == Prompt::NoInteraction {
@@ -66,14 +68,14 @@ impl AuthorizationConclusion {
             scopes: grant.scopes.clone(),
         };
 
-        grants
-            .hold_pending_authorization(
-                id,
-                PendingAuthorization::held_at(now, grant, redirection.state),
-                now,
-            )
-            .await
-            .map_err(ProviderError::HoldPendingAuthorization)
-            .map(|()| AuthorizationOutcome::ConsentRequired(consent))
+        PendingAuthorizationRecord::hold(
+            database,
+            id,
+            PendingAuthorization::held_at(now, grant, redirection.state),
+            now,
+        )
+        .await
+        .map_err(ProviderError::AuthorizationGrants)
+        .map(|()| AuthorizationOutcome::ConsentRequired(consent))
     }
 }

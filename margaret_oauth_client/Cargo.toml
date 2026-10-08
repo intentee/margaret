@@ -14,7 +14,7 @@ autotests = false
 headers = { workspace = true }
 margaret_identity_session = { workspace = true }
 margaret_jose_parameters = { workspace = true }
-margaret_jwks_roller_server = { workspace = true }
+margaret_jwks_keygen = { workspace = true }
 margaret_oauth_vocabulary = { workspace = true }
 margaret_registered_claims = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
@@ -22,7 +22,6 @@ uuid = { workspace = true, features = ["v4"] }
 [dev-dependencies]
 margaret_jwks_secret_store_tests = { path = "../margaret_jwks_secret_store_tests" }
 margaret_jws_verification = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
 
 [[test]]
 name = "main"

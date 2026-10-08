@@ -1,0 +1,199 @@
+use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::field_identifier::FieldIdentifier;
+use margaret_attributes::framework_attribute::FrameworkAttribute;
+use margaret_attributes::indexed_field::IndexedField;
+use margaret_attributes::indexed_item::IndexedItem;
+use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
+use margaret_attributes::select_framework_attributes::select_framework_attributes;
+use margaret_model::on_delete::OnDelete;
+use margaret_schema_identifier_naming::validate_identifier_length::validate_identifier_length;
+
+use crate::classified_field_type::ClassifiedFieldType;
+use crate::classify_field_type::classify_field_type;
+use crate::collected_column::CollectedColumn;
+use crate::collected_field::CollectedField;
+use crate::collected_field_shape::CollectedFieldShape;
+use crate::column_arguments::ColumnArguments;
+use crate::declared_field_index::declared_field_index;
+use crate::enum_variants::EnumVariants;
+use crate::field_index::FieldIndex;
+use crate::field_type_shape::FieldTypeShape;
+use crate::foreign_key_arguments::ForeignKeyArguments;
+use crate::model_codegen_error::ModelCodegenError;
+
+fn field_name(field: &IndexedField, model: &str) -> Result<String, ModelCodegenError> {
+    match field.identifier() {
+        FieldIdentifier::Named(name) if is_snake_case_identifier(name) => Ok(name.clone()),
+        FieldIdentifier::Named(name) => Err(ModelCodegenError::FieldNameNotSnakeCase {
+            field: name.clone(),
+            model: model.to_string(),
+        }),
+        FieldIdentifier::Positional(position) => Err(ModelCodegenError::ModelRequiresNamedFields {
+            model: model.to_string(),
+            position: *position,
+        }),
+    }
+}
+
+fn reject_model_attributes(field: &IndexedField, model: &str) -> Result<(), ModelCodegenError> {
+    if !select_framework_attributes(field.attributes(), FrameworkAttribute::PrimaryKey).is_empty() {
+        return Err(ModelCodegenError::PrimaryKeyIsNotAFieldAttribute {
+            field: field.identifier().to_string(),
+            model: model.to_string(),
+        });
+    }
+
+    if !select_framework_attributes(field.attributes(), FrameworkAttribute::Unique).is_empty() {
+        return Err(ModelCodegenError::UniqueIsNotAFieldAttribute {
+            field: field.identifier().to_string(),
+            model: model.to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+fn field_index(
+    field: &IndexedField,
+    name: &str,
+    model: &str,
+) -> Result<FieldIndex, ModelCodegenError> {
+    match field.framework_attribute(FrameworkAttribute::Index) {
+        None => Ok(FieldIndex::Absent),
+        Some(declared) => declared_field_index(declared.args()?, model, name),
+    }
+}
+
+fn column_name(
+    declared: Option<String>,
+    field: &str,
+    model: &str,
+) -> Result<String, ModelCodegenError> {
+    let name = declared.unwrap_or_else(|| field.to_string());
+
+    if !is_snake_case_identifier(&name) {
+        return Err(ModelCodegenError::InvalidColumnName {
+            column: name,
+            model: model.to_string(),
+        });
+    }
+
+    validate_identifier_length(&name).map_err(|source| ModelCodegenError::ColumnNameTooLong {
+        model: model.to_string(),
+        source,
+    })?;
+
+    Ok(name)
+}
+
+fn key_on_delete(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    field: &IndexedField,
+    name: &str,
+    nullable: bool,
+    model: &str,
+) -> Result<OnDelete, ModelCodegenError> {
+    let on_delete = match field.framework_attribute(FrameworkAttribute::ForeignKey) {
+        None => OnDelete::NoAction,
+        Some(declared) => {
+            ForeignKeyArguments::parse(declared.args()?, index, item, model, name)?.on_delete
+        }
+    };
+
+    if on_delete == OnDelete::SetNull && !nullable {
+        return Err(ModelCodegenError::SetNullRequiresNullableKey {
+            field: name.to_string(),
+            model: model.to_string(),
+        });
+    }
+
+    Ok(on_delete)
+}
+
+pub(crate) fn collect_field(
+    index: &AttributeIndex,
+    item: &IndexedItem,
+    field: &IndexedField,
+    enum_variants: &mut EnumVariants,
+    table: &str,
+    model: &str,
+) -> Result<CollectedField, ModelCodegenError> {
+    reject_model_attributes(field, model)?;
+
+    let name = field_name(field, model)?;
+    let column_attribute = field
+        .framework_attribute(FrameworkAttribute::Column)
+        .ok_or_else(|| ModelCodegenError::UnattributedField {
+            field: name.clone(),
+            model: model.to_string(),
+        })?;
+    let ColumnArguments {
+        check,
+        name: declared_column,
+        numeric_digits,
+        primary_key,
+        unique,
+    } = ColumnArguments::parse(column_attribute.args()?, model, &name)?;
+    let index_declaration = field_index(field, &name, model)?;
+    let ClassifiedFieldType { nullable, shape } = classify_field_type(
+        index,
+        item,
+        field.ty(),
+        &numeric_digits,
+        enum_variants,
+        model,
+        &name,
+    )?;
+    let shape = match shape {
+        FieldTypeShape::Column { column_type, value } => {
+            if field
+                .framework_attribute(FrameworkAttribute::ForeignKey)
+                .is_some()
+            {
+                return Err(ModelCodegenError::ForeignKeyRequiresKeyField {
+                    field: name,
+                    model: model.to_string(),
+                });
+            }
+
+            let column = column_name(declared_column, &name, model)?;
+
+            CollectedFieldShape::Column(CollectedColumn {
+                checks: check.resolve(column_type, table, &column, model)?,
+                column_type,
+                name: column,
+                value,
+            })
+        }
+        FieldTypeShape::Key { target } => {
+            if declared_column.is_some() {
+                return Err(ModelCodegenError::ForeignKeyColumnNameIsDerived {
+                    field: name,
+                    model: model.to_string(),
+                });
+            }
+
+            if check.is_declared() {
+                return Err(ModelCodegenError::ForeignKeyCannotDeclareCheckConstraint {
+                    field: name,
+                    model: model.to_string(),
+                });
+            }
+
+            CollectedFieldShape::Key {
+                on_delete: key_on_delete(index, item, field, &name, nullable, model)?,
+                target,
+            }
+        }
+    };
+
+    Ok(CollectedField {
+        index: index_declaration,
+        name,
+        nullable,
+        primary_key,
+        shape,
+        unique,
+    })
+}

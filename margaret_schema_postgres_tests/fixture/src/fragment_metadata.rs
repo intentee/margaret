@@ -3,7 +3,8 @@ use uuid::Uuid;
 use margaret::framework::macros::model;
 
 #[model(table = "fragment_metadata")]
-#[primary_key(columns = [partition, hash])]
+#[primary_key(fields = [partition, hash])]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FragmentMetadata {
     #[column]
     pub partition: Uuid,

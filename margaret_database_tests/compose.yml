@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE_NAME}:${POSTGRES_IMAGE_TAG}
+    command:
+      - postgres
+      - -c
+      - fsync=off
+      - -c
+      - full_page_writes=off
+      - -c
+      - synchronous_commit=off
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - --dbname
+        - postgres
+        - --host
+        - 127.0.0.1
+        - --username
+        - postgres
+      interval: 1s
+      start_interval: 1s
+      start_period: 60s
+    ports:
+      - 127.0.0.1::5432

@@ -5,12 +5,10 @@ use margaret_jwks_secret_store_tests::rolled_store::rolled_store;
 use margaret_registered_claims::claims_merge_error::ClaimsMergeError;
 use margaret_token_signer_tests::unix_time::unix_time;
 
-#[tokio::test]
-async fn rejects_application_claims_that_are_not_an_object() {
+#[test]
+fn rejects_application_claims_that_are_not_an_object() {
     assert!(matches!(
-        rolled_store(fresh_secret(SigningCurve::P256))
-            .await
-            .sign_access_token(&"demo", unix_time(500)),
+        rolled_store(fresh_secret(SigningCurve::P256)).sign_access_token(&"demo", unix_time(500)),
         Err(JwksSecretStoreError::AccessTokenClaims(
             ClaimsMergeError::NotAnObject
         ))

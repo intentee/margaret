@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
+use margaret_client_assertions::assertion_memory::AssertionMemory;
+use margaret_client_assertions::client_assertion::ClientAssertion;
 use margaret_http::request_authorization::RequestAuthorization;
 use margaret_issuer_key_set::issuer_verification::IssuerVerification;
 use margaret_jwt_verification::client_assertion_profile::ClientAssertionProfile;
@@ -16,7 +18,6 @@ use margaret_token_digest::token_digest::TokenDigest;
 use margaret_token_issuance::token_issuance::TokenIssuance;
 
 use crate::accepted_clients_error::AcceptedClientsError;
-use crate::assertion_memory::AssertionMemory;
 use crate::assertion_subject::AssertionSubject;
 use crate::client_assertion_max_lifetime::CLIENT_ASSERTION_MAX_LIFETIME;
 use crate::client_authentication_outcome::ClientAuthenticationOutcome;
@@ -117,10 +118,7 @@ impl AcceptedClients {
             ));
         };
         let RegisteredClient {
-            authentication:
-                RegisteredAuthentication::PrivateKeyJwt {
-                    assertions, keys, ..
-                },
+            authentication: RegisteredAuthentication::PrivateKeyJwt { database, keys, .. },
             client,
             ..
         } = registered
@@ -182,13 +180,18 @@ impl AcceptedClients {
             ));
         };
 
-        match assertions
-            .remember_client_assertion(client.client_id, TokenDigest::of(&jti), claims.exp, now)
-            .await
-            .map_err(|source| AcceptedClientsError::RememberClientAssertion {
-                client_id: client.client_id,
-                source,
-            })? {
+        match ClientAssertion::remember(
+            database,
+            client.client_id,
+            TokenDigest::of(&jti),
+            claims.exp,
+            now,
+        )
+        .await
+        .map_err(|source| AcceptedClientsError::RememberClientAssertion {
+            client_id: client.client_id,
+            source,
+        })? {
             AssertionMemory::First => Ok(ClientAuthenticationOutcome::Authenticated(registered)),
             AssertionMemory::Seen => Ok(ClientAuthenticationOutcome::Refused(
                 ClientRefusal::AssertionReplayed,
