@@ -61,14 +61,18 @@ pub fn generate() -> Result<(), CodegenError> {
 #[cfg(test)]
 mod tests {
     use std::env;
+    use std::env::VarError;
     use std::fs;
     use std::path::Path;
 
     use margaret_attributes_tests::source_crate::SourceCrate;
+    use margaret_process_tests::child_variable::ChildVariable;
+    use margaret_process_tests::in_child_process::in_child_process;
     use margaret_umbrella_path::umbrella_module_name::UMBRELLA_MODULE_NAME;
 
     use super::generate;
     use super::generate_into;
+    use crate::codegen_error::CodegenError;
 
     const HOST_CRATE: &str = "\
 #[rustfmt::skip]
@@ -228,24 +232,43 @@ impl AssetRoute {
     fn reads_the_manifest_directory_from_the_environment() {
         let host = host_crate(HOST_CRATE);
 
-        unsafe {
-            env::set_var("CARGO_MANIFEST_DIR", host.root());
-        }
+        in_child_process(
+            "generate::tests::reads_the_manifest_directory_from_the_environment",
+            &[ChildVariable::Set {
+                name: "CARGO_MANIFEST_DIR",
+                value: host.root().into(),
+            }],
+            || {
+                generate().expect("the crate generates from the environment");
 
-        generate().expect("the crate generates from the environment");
-
-        assert!(read_generated(host.root(), "container.rs").contains("struct Container"));
+                assert!(
+                    read_generated(
+                        Path::new(
+                            &env::var_os("CARGO_MANIFEST_DIR")
+                                .expect("the manifest directory is set")
+                        ),
+                        "container.rs"
+                    )
+                    .contains("struct Container")
+                );
+            },
+        );
     }
 
     #[test]
     fn reports_a_missing_manifest_directory() {
-        unsafe {
-            env::remove_var("CARGO_MANIFEST_DIR");
-        }
-
-        let error = generate().expect_err("a missing manifest directory is reported");
-
-        assert!(error.to_string().contains("CARGO_MANIFEST_DIR"));
+        in_child_process(
+            "generate::tests::reports_a_missing_manifest_directory",
+            &[ChildVariable::Removed("CARGO_MANIFEST_DIR")],
+            || {
+                assert!(matches!(
+                    generate(),
+                    Err(CodegenError::ManifestDirectory {
+                        source: VarError::NotPresent,
+                    })
+                ));
+            },
+        );
     }
 
     #[test]

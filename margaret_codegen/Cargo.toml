@@ -43,6 +43,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 margaret_attributes_tests = { path = "../margaret_attributes_tests" }
+margaret_process_tests = { path = "../margaret_process_tests" }
 quote = { workspace = true }
 tempfile = { workspace = true }
 

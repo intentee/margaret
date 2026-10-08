@@ -41,19 +41,23 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::env;
+    use std::ffi::OsString;
     #[cfg(unix)]
-    use std::ffi::OsStr;
-    #[cfg(unix)]
-    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::ffi::OsStringExt;
     use std::path::PathBuf;
+
+    use margaret_process_tests::child_variable::ChildVariable;
+    use margaret_process_tests::in_child_process::in_child_process;
 
     use crate::environment_variable_error::EnvironmentVariableError;
 
     use super::read_optional;
 
-    fn set(name: &str, value: &str) {
-        unsafe { env::set_var(name, value) };
+    fn set(name: &'static str, value: &str) -> ChildVariable {
+        ChildVariable::Set {
+            name,
+            value: OsString::from(value),
+        }
     }
 
     #[test]
@@ -66,67 +70,87 @@ mod tests {
 
     #[test]
     fn reads_a_present_string() {
-        set("MARGARET_OPTIONAL_PRESENT", "postgres://localhost");
-
-        assert_eq!(
-            read_optional::<String>("MARGARET_OPTIONAL_PRESENT").expect("the variable reads"),
-            Some("postgres://localhost".to_string())
+        in_child_process(
+            "read_optional::tests::reads_a_present_string",
+            &[set("MARGARET_OPTIONAL_PRESENT", "postgres://localhost")],
+            || {
+                assert_eq!(
+                    read_optional::<String>("MARGARET_OPTIONAL_PRESENT")
+                        .expect("the variable reads"),
+                    Some("postgres://localhost".to_string())
+                );
+            },
         );
     }
 
     #[test]
     fn parses_a_present_value_into_its_declared_type() {
-        set("MARGARET_OPTIONAL_PORT", "8443");
-
-        assert_eq!(
-            read_optional::<u16>("MARGARET_OPTIONAL_PORT").expect("the variable parses"),
-            Some(8443)
+        in_child_process(
+            "read_optional::tests::parses_a_present_value_into_its_declared_type",
+            &[set("MARGARET_OPTIONAL_PORT", "8443")],
+            || {
+                assert_eq!(
+                    read_optional::<u16>("MARGARET_OPTIONAL_PORT").expect("the variable parses"),
+                    Some(8443)
+                );
+            },
         );
     }
 
     #[test]
     fn parses_a_present_path() {
-        set("MARGARET_OPTIONAL_ROOT", "/srv/uploads");
-
-        assert_eq!(
-            read_optional::<PathBuf>("MARGARET_OPTIONAL_ROOT").expect("the variable parses"),
-            Some(PathBuf::from("/srv/uploads"))
+        in_child_process(
+            "read_optional::tests::parses_a_present_path",
+            &[set("MARGARET_OPTIONAL_ROOT", "/srv/uploads")],
+            || {
+                assert_eq!(
+                    read_optional::<PathBuf>("MARGARET_OPTIONAL_ROOT")
+                        .expect("the variable parses"),
+                    Some(PathBuf::from("/srv/uploads"))
+                );
+            },
         );
     }
 
     #[test]
     fn reports_a_value_that_does_not_parse() {
-        set("MARGARET_OPTIONAL_MALFORMED", "not-a-number");
+        in_child_process(
+            "read_optional::tests::reports_a_value_that_does_not_parse",
+            &[set("MARGARET_OPTIONAL_MALFORMED", "not-a-number")],
+            || {
+                let error = read_optional::<u16>("MARGARET_OPTIONAL_MALFORMED")
+                    .expect_err("an unparseable value is rejected");
 
-        let error = read_optional::<u16>("MARGARET_OPTIONAL_MALFORMED")
-            .expect_err("an unparseable value is rejected");
-
-        assert!(matches!(
-            error,
-            EnvironmentVariableError::Malformed {
-                ref name,
-                value_type,
-                ..
-            } if name == "MARGARET_OPTIONAL_MALFORMED" && value_type == "u16"
-        ));
-        assert!(!error.to_string().contains("not-a-number"));
+                assert!(matches!(
+                    error,
+                    EnvironmentVariableError::Malformed {
+                        ref name,
+                        value_type,
+                        ..
+                    } if name == "MARGARET_OPTIONAL_MALFORMED" && value_type == "u16"
+                ));
+                assert!(!error.to_string().contains("not-a-number"));
+            },
+        );
     }
 
     #[cfg(unix)]
     #[test]
     fn reports_a_value_that_is_not_unicode() {
-        unsafe {
-            env::set_var(
-                "MARGARET_OPTIONAL_NOT_UNICODE",
-                OsStr::from_bytes(&[0x66, 0x80, 0x6f]),
-            );
-        };
-
-        assert!(matches!(
-            read_optional::<String>("MARGARET_OPTIONAL_NOT_UNICODE")
-                .expect_err("a non-unicode value is rejected"),
-            EnvironmentVariableError::NotUnicode { ref name }
-                if name == "MARGARET_OPTIONAL_NOT_UNICODE"
-        ));
+        in_child_process(
+            "read_optional::tests::reports_a_value_that_is_not_unicode",
+            &[ChildVariable::Set {
+                name: "MARGARET_OPTIONAL_NOT_UNICODE",
+                value: OsString::from_vec(vec![0x66, 0x80, 0x6f]),
+            }],
+            || {
+                assert!(matches!(
+                    read_optional::<String>("MARGARET_OPTIONAL_NOT_UNICODE")
+                        .expect_err("a non-unicode value is rejected"),
+                    EnvironmentVariableError::NotUnicode { ref name }
+                        if name == "MARGARET_OPTIONAL_NOT_UNICODE"
+                ));
+            },
+        );
     }
 }

@@ -2405,6 +2405,7 @@ dependencies = [
  "margaret_oauth_client_codegen",
  "margaret_oauth_vocabulary",
  "margaret_oidc_provider_codegen",
+ "margaret_process_tests",
  "margaret_request_binding_codegen",
  "margaret_schema_codegen",
  "margaret_serve_input_codegen",
@@ -2807,6 +2808,7 @@ dependencies = [
 name = "margaret_environment_variable"
 version = "0.1.0"
 dependencies = [
+ "margaret_process_tests",
  "thiserror 2.0.18",
  "zeroize",
 ]
@@ -3747,6 +3749,9 @@ dependencies = [
 [[package]]
 name = "margaret_process_tests"
 version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
 
 [[package]]
 name = "margaret_registered_claims"
