@@ -4,6 +4,7 @@ use syn::Type;
 use syn::Attribute;
 
 use crate::field_identifier::FieldIdentifier;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 
 pub struct IndexedField {
@@ -40,6 +41,13 @@ impl IndexedField {
     #[must_use]
     pub fn attributes(&self) -> &[IndexedAttribute] {
         &self.attributes
+    }
+
+    #[must_use]
+    pub fn framework_attribute(&self, attribute: FrameworkAttribute) -> Option<&IndexedAttribute> {
+        self.attributes
+            .iter()
+            .find(|indexed| indexed.framework_attribute() == Some(attribute))
     }
 
     #[must_use]

@@ -54,6 +54,13 @@ impl<'index> TokenIssuanceDeclaration<'index> {
                     source,
                 })?;
 
+            if audience.as_str() == issuer.as_str() {
+                return Err(TokenIssuanceCodegenError::SessionAudienceNamesIssuer {
+                    anchor: path.to_string(),
+                    audience: audience.to_string(),
+                });
+            }
+
             Ok(Self {
                 anchor,
                 audience,

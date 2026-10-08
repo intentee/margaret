@@ -13,7 +13,7 @@ async fn waits_for_a_fetch_that_starts_after_the_snapshot() {
     issuer_key_set.start_fetch();
 
     let snapshot = issuer_key_set.snapshot();
-    let (refresh, ()) = tokio::join!(issuer_key_set.refreshed_since(&snapshot), async {
+    let (refresh, ()) = tokio::join!(issuer_key_set.request_refresh_after(&snapshot), async {
         issuer_key_set.hold(Arc::new(fresh_p256_secret().key_set().clone()));
         issuer_key_set.refresh_requested().await;
         issuer_key_set.start_fetch();

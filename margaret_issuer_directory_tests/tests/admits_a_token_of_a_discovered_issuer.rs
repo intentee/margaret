@@ -30,7 +30,7 @@ async fn admits_a_token_of_a_discovered_issuer() {
     let directory =
         PolledDirectory::start(vec![Arc::clone(&polled.polled)], issuer.request_client());
 
-    polled.key_set.refreshed_since(&snapshot).await;
+    polled.key_set.request_refresh_after(&snapshot).await;
 
     let trusted_issuer = polled.trusted(localhost_trust());
 

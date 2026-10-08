@@ -29,8 +29,8 @@ struct AliasedSingleton;
 #[ns::singleton]
 struct UnrelatedSingleton;
 
-#[singleton]
-#[singleton]
+#[middleware(logged)]
+#[middleware(traced)]
 struct RepeatedAttrs;
 
 use std::collections::{HashMap, HashSet};

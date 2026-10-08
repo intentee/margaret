@@ -9,7 +9,7 @@ async fn reports_polling_that_stopped_before_the_refetch() {
     issuer_key_set.stop_polling();
 
     assert!(matches!(
-        issuer_key_set.refreshed_since(&snapshot).await,
+        issuer_key_set.request_refresh_after(&snapshot).await,
         KeySetRefresh::PollingStopped
     ));
 }

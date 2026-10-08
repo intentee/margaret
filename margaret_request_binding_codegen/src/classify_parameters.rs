@@ -17,7 +17,6 @@ use margaret_injection_codegen::optional_parameter::OptionalParameter;
 use margaret_injection_codegen::parameter_view::ParameterView;
 use margaret_injection_codegen::parameters::parameters;
 
-use crate::authenticated_user_challenge::AuthenticatedUserChallenge;
 use crate::authenticated_user_provider::AuthenticatedUserProvider;
 use crate::authenticated_user_requirement::AuthenticatedUserRequirement;
 use crate::bearer_token_marker::BearerTokenMarker;
@@ -26,6 +25,7 @@ use crate::binding_context::BindingContext;
 use crate::binding_registries::BindingRegistries;
 use crate::bound_bearer_tokens::BoundBearerTokens;
 use crate::bound_parameter::BoundParameter;
+use crate::exclusive_bindings::ExclusiveBindings;
 use crate::form_request_arguments::FormRequestArguments;
 use crate::form_request_extraction::FormRequestExtraction;
 use crate::head_input_source::HeadInputSource;
@@ -339,70 +339,6 @@ fn classify_route_parameter(
     }
 }
 
-fn verify_single_inference(
-    bound: &[BoundParameter],
-    subject: &str,
-) -> Result<(), RequestBindingError> {
-    let mut inferred: HashSet<&CanonicalPath> = HashSet::new();
-    let mut bearer_inferences = 0_usize;
-
-    for parameter in bound {
-        let RequestBinding::AuthenticatedUser { application, .. } = &parameter.binding else {
-            continue;
-        };
-
-        if !inferred.insert(&application.model) {
-            return Err(RequestBindingError::MultipleAuthenticatedUserParameters {
-                subject: subject.to_string(),
-                model: application.model.to_string(),
-            });
-        }
-
-        match application.challenge {
-            AuthenticatedUserChallenge::Bearer { .. }
-            | AuthenticatedUserChallenge::Introspection { .. } => bearer_inferences += 1,
-            AuthenticatedUserChallenge::Unchallenged => {}
-        }
-    }
-
-    if bearer_inferences > 1 {
-        return Err(RequestBindingError::MultipleBearerAuthenticatedUsers {
-            subject: subject.to_string(),
-        });
-    }
-
-    Ok(())
-}
-
-fn verify_single_request_parameters(
-    bound: &[BoundParameter],
-    subject: &str,
-) -> Result<(), RequestBindingError> {
-    let next_count = bound
-        .iter()
-        .filter(|parameter| matches!(parameter.binding, RequestBinding::Next))
-        .count();
-
-    if next_count > 1 {
-        return Err(RequestBindingError::MultipleNextParameters {
-            subject: subject.to_string(),
-        });
-    }
-
-    let peer_spiffe_id_count = bound
-        .iter()
-        .filter(|parameter| matches!(parameter.binding, RequestBinding::PeerSpiffeId))
-        .count();
-
-    if peer_spiffe_id_count > 1 {
-        return Err(RequestBindingError::MultiplePeerSpiffeIdParameters {
-            subject: subject.to_string(),
-        });
-    }
-
-    verify_single_inference(bound, subject)
-}
-
 fn classify_bearer_token(
     index: &AttributeIndex,
     item: &IndexedItem,
@@ -525,6 +461,21 @@ fn parameter_marker<'marker>(
     })
 }
 
+fn classify_next(
+    context: &BindingContext,
+    position: usize,
+) -> Result<RequestBinding, RequestBindingError> {
+    match context {
+        BindingContext::Middleware { .. } => Ok(RequestBinding::Next),
+        BindingContext::AuthenticatedUserProvider { .. }
+        | BindingContext::Handshake { .. }
+        | BindingContext::Responder { .. } => Err(RequestBindingError::NextOutsideMiddleware {
+            subject: context.subject().to_string(),
+            parameter: position.to_string(),
+        }),
+    }
+}
+
 enum ParameterMarker<'marker> {
     AuthenticatedUser,
     BearerToken(BearerTokenMarker<'marker>),
@@ -545,6 +496,7 @@ pub fn classify_parameters(
 ) -> Result<Vec<BoundParameter>, RequestBindingError> {
     let subject = context.subject();
     let mut bound = Vec::new();
+    let mut exclusive = ExclusiveBindings::default();
     let mut bound_bearer_tokens = BoundBearerTokens::Unbound;
     let mut bound_route_parameters = HashSet::new();
 
@@ -597,17 +549,7 @@ pub fn classify_parameters(
             )?,
             ParameterMarker::Unmarked => {
                 if matches!(injectable, Some(RequestInjectable::Next)) {
-                    match context {
-                        BindingContext::Middleware { .. } => RequestBinding::Next,
-                        BindingContext::AuthenticatedUserProvider { .. }
-                        | BindingContext::Handshake { .. }
-                        | BindingContext::Responder { .. } => {
-                            return Err(RequestBindingError::NextOutsideMiddleware {
-                                subject: subject.to_string(),
-                                parameter: position.to_string(),
-                            });
-                        }
-                    }
+                    classify_next(context, position)?
                 } else if is_peer_spiffe_id {
                     RequestBinding::PeerSpiffeId
                 } else if matches!(injectable, Some(RequestInjectable::Routes)) {
@@ -640,13 +582,12 @@ pub fn classify_parameters(
             }
         };
 
+        exclusive.admit(&binding, subject)?;
         bound.push(BoundParameter {
             binding,
             holder: format_ident!("argument_{position}"),
         });
     }
-
-    verify_single_request_parameters(&bound, subject)?;
 
     Ok(bound)
 }

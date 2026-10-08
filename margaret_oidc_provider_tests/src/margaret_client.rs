@@ -118,7 +118,7 @@ impl MargaretClient {
         let snapshot = polled.key_set.snapshot();
         let directory = PolledDirectory::start(vec![Arc::clone(&polled.polled)], request_client());
 
-        polled.key_set.refreshed_since(&snapshot).await;
+        polled.key_set.request_refresh_after(&snapshot).await;
 
         Self {
             directory,

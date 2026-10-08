@@ -18,7 +18,9 @@ pub async fn verified_while_polling(
     let verification_settled = Notify::new();
     let (verification, refresh) = tokio::join!(
         async {
-            let verification = issuer_key_set.verify(attributed, fixture_now()).await;
+            let verification = issuer_key_set
+                .verify_refetching_rotated_keys(attributed, fixture_now())
+                .await;
 
             verification_settled.notify_one();
 

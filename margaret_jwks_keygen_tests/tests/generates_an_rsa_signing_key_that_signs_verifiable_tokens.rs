@@ -17,7 +17,7 @@ fn generates_an_rsa_signing_key_that_signs_verifiable_tokens() -> Result<()> {
     let pair = RsaJwkPair::new(
         KeyId::new("generated".to_string()),
         GeneratedRsaSigningKeys.rsa_signing_key()?,
-    );
+    )?;
     let token = pair.sign_jwt(&json!({ "sub": "subject" }))?;
     let KeySetDocumentParsing::Accepted(AcceptedKeySetDocument { key_set, .. }) =
         VerificationKeySet::parse(&serde_json::to_vec(

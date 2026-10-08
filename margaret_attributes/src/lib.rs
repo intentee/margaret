@@ -1,4 +1,5 @@
 pub mod attribute_error;
+mod attribute_host;
 pub mod attribute_index;
 pub mod attribute_index_builder;
 pub mod attribute_query;
@@ -41,7 +42,6 @@ mod scanned_item;
 mod scanned_method;
 mod scanned_parameter;
 pub mod select_framework_attributes;
-pub mod select_unique_framework_attribute;
 pub mod standard_library_item;
 pub mod struct_shape;
 pub mod tag;

@@ -5,6 +5,8 @@ use syn::Pat;
 use syn::Path;
 use syn::Type;
 
+use crate::attribute_error::AttributeError;
+use crate::attribute_host::AttributeHost;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_parameter::IndexedParameter;
 use crate::scanned_attribute::ScannedAttribute;
@@ -38,13 +40,21 @@ impl ScannedParameter {
 
     pub(crate) fn resolve(
         self,
+        method: &str,
         resolve: impl Copy + Fn(&Path) -> CanonicalPath,
-    ) -> IndexedParameter {
-        IndexedParameter::from_parts(
-            ScannedAttribute::resolve_all(self.attributes, resolve),
+    ) -> Result<IndexedParameter, AttributeError> {
+        let attributes = ScannedAttribute::resolve_all(
+            self.attributes,
+            AttributeHost::Member,
+            || format!("argument #{} of '{method}'", self.position),
+            resolve,
+        )?;
+
+        Ok(IndexedParameter::from_parts(
+            attributes,
             self.declared,
             self.name,
             self.position,
-        )
+        ))
     }
 }

@@ -1,3 +1,5 @@
+use syn::Path;
+
 use crate::canonical_path::CanonicalPath;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -87,21 +89,34 @@ impl FrameworkAttribute {
     ];
 
     #[must_use]
-    pub fn from_canonical_path(path: &CanonicalPath) -> Option<Self> {
-        let name = match path.segments() {
-            [name] => name.as_str(),
-            [crate_name, name] if crate_name == "margaret_macros" => name.as_str(),
-            [crate_name, framework, macros, name]
-                if crate_name == "margaret" && framework == "framework" && macros == "macros" =>
-            {
-                name.as_str()
-            }
-            _ => return None,
-        };
+    pub fn recognize(written: &Path, canonical: &CanonicalPath) -> Option<Self> {
+        written
+            .get_ident()
+            .and_then(|identifier| {
+                Self::ALL
+                    .into_iter()
+                    .find(|attribute| attribute.is_marker() && identifier == attribute.name())
+            })
+            .or_else(|| Self::macro_at(canonical))
+    }
 
-        Self::ALL
-            .into_iter()
-            .find(|attribute| attribute.name() == name)
+    #[must_use]
+    pub const fn is_marker(self) -> bool {
+        matches!(
+            self,
+            Self::AuthenticatedUser
+                | Self::BearerToken
+                | Self::Column
+                | Self::ConsoleArgument
+                | Self::EnvironmentVariable
+                | Self::ForeignKey
+                | Self::FormRequest
+                | Self::Index
+                | Self::PrimaryKey
+                | Self::RouteParameter
+                | Self::SpiffeHttpClient
+                | Self::Unique
+        )
     }
 
     #[must_use]
@@ -148,10 +163,37 @@ impl FrameworkAttribute {
             Self::WebsocketSession => "websocket_session",
         }
     }
+
+    pub(crate) const fn repeats_on_items(self) -> bool {
+        matches!(
+            self,
+            Self::ForeignKey | Self::Index | Self::Middleware | Self::Unique
+        )
+    }
+
+    fn macro_at(canonical: &CanonicalPath) -> Option<Self> {
+        let name = match canonical.segments() {
+            [name] => name.as_str(),
+            [crate_name, name] if crate_name == "margaret_macros" => name.as_str(),
+            [crate_name, framework, macros, name]
+                if crate_name == "margaret" && framework == "framework" && macros == "macros" =>
+            {
+                name.as_str()
+            }
+            _ => return None,
+        };
+
+        Self::ALL
+            .into_iter()
+            .find(|attribute| !attribute.is_marker() && attribute.name() == name)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use syn::Path;
+    use syn::parse_str;
+
     use super::FrameworkAttribute;
     use crate::canonical_path::CanonicalPath;
 
@@ -159,41 +201,75 @@ mod tests {
         CanonicalPath::new(segments.iter().map(ToString::to_string).collect())
     }
 
+    fn written(source: &str) -> Path {
+        parse_str(source).expect("the attribute path parses")
+    }
+
+    fn shadowing_item() -> CanonicalPath {
+        path(&["crate", "models", "shadowing_item"])
+    }
+
     #[test]
-    fn recognizes_every_supported_attribute_through_each_canonical_macro_path() {
-        for attribute in FrameworkAttribute::ALL {
+    fn recognizes_every_macro_through_each_canonical_macro_path() {
+        for attribute in FrameworkAttribute::ALL
+            .into_iter()
+            .filter(|attribute| !attribute.is_marker())
+        {
             let name = attribute.name();
 
+            for canonical in [
+                path(&[name]),
+                path(&["margaret_macros", name]),
+                path(&["margaret", "framework", "macros", name]),
+            ] {
+                assert_eq!(
+                    FrameworkAttribute::recognize(&written(name), &canonical),
+                    Some(attribute)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn recognizes_every_marker_by_its_written_name_whatever_it_resolves_to() {
+        for attribute in FrameworkAttribute::ALL
+            .into_iter()
+            .filter(|attribute| attribute.is_marker())
+        {
             assert_eq!(
-                FrameworkAttribute::from_canonical_path(&path(&[name])),
-                Some(attribute)
-            );
-            assert_eq!(
-                FrameworkAttribute::from_canonical_path(&path(&["margaret_macros", name])),
-                Some(attribute)
-            );
-            assert_eq!(
-                FrameworkAttribute::from_canonical_path(&path(&[
-                    "margaret",
-                    "framework",
-                    "macros",
-                    name,
-                ])),
+                FrameworkAttribute::recognize(&written(attribute.name()), &shadowing_item()),
                 Some(attribute)
             );
         }
     }
 
     #[test]
-    fn rejects_paths_that_do_not_identify_a_supported_framework_attribute() {
+    fn ignores_a_marker_spelled_as_a_macro_path() {
         assert_eq!(
-            FrameworkAttribute::from_canonical_path(&path(&["other", "singleton"])),
+            FrameworkAttribute::recognize(
+                &written("margaret::framework::macros::column"),
+                &path(&["margaret", "framework", "macros", "column"]),
+            ),
             None
         );
+    }
+
+    #[test]
+    fn ignores_a_macro_name_that_resolves_to_another_item() {
         assert_eq!(
-            FrameworkAttribute::from_canonical_path(&path(&["unknown"])),
+            FrameworkAttribute::recognize(&written("singleton"), &shadowing_item()),
             None
         );
-        assert_eq!(FrameworkAttribute::from_canonical_path(&path(&[])), None);
+    }
+
+    #[test]
+    fn ignores_a_path_that_names_no_framework_attribute() {
+        assert_eq!(
+            FrameworkAttribute::recognize(
+                &written("other::singleton"),
+                &path(&["other", "singleton"])
+            ),
+            None
+        );
     }
 }

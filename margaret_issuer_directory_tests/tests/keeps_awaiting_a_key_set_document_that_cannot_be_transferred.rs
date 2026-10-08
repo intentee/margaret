@@ -3,7 +3,6 @@ use margaret_http_tests::tls_fixture::TlsFixture;
 use margaret_http_tests::truncated_response_server::TruncatedResponseServer;
 use margaret_issuer_directory::jwks_endpoint_issuer::JwksEndpointIssuer;
 use margaret_issuer_directory_tests::polled_fixture::PolledFixture;
-use margaret_issuer_key_set::key_set_holding::KeySetHolding;
 use margaret_issuer_key_set::key_set_refresh::KeySetRefresh;
 use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 
@@ -23,7 +22,7 @@ async fn keeps_awaiting_a_key_set_document_that_cannot_be_transferred() {
                     .expect("the fixture request client builds")
             )
             .await,
-        KeySetRefresh::Refreshed(KeySetHolding::Awaiting)
+        KeySetRefresh::Unchanged
     ));
 
     server.finish().await;

@@ -10,7 +10,7 @@ use crate::discovered_issuer::DiscoveredIssuer;
 use crate::discovered_key_set_location::DiscoveredKeySetLocation;
 use crate::discovery_failure::DiscoveryFailure;
 
-pub(crate) async fn discover_key_set_location(
+pub(crate) async fn refresh_discovered_metadata(
     client: &IssuerRequestClient,
     DiscoveredIssuer {
         discovery_url,

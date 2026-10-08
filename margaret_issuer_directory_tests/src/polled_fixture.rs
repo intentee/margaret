@@ -45,7 +45,7 @@ impl PolledFixture {
     pub async fn first_poll(&self, request_client: IssuerRequestClient) -> KeySetRefresh {
         let snapshot = self.key_set.snapshot();
         let directory = PolledDirectory::start(vec![Arc::clone(&self.polled)], request_client);
-        let refresh = self.key_set.refreshed_since(&snapshot).await;
+        let refresh = self.key_set.request_refresh_after(&snapshot).await;
 
         directory.stop().await;
 

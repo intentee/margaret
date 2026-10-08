@@ -75,6 +75,13 @@ struct Author {
         rejection_for(lib_source).to_string()
     }
 
+    fn indexing_rejection(lib_source: &str) -> String {
+        IndexedSource::try_new(lib_source)
+            .err()
+            .expect("the repeated attribute is rejected while indexing")
+            .to_string()
+    }
+
     fn with_author(referencing: &str) -> String {
         format!("{AUTHOR_MODEL}\n{referencing}")
     }
@@ -86,9 +93,9 @@ struct Author {
 
     #[test]
     fn rejects_a_model_declared_more_than_once() {
-        assert!(
-            error_message("#[model(table = \"a\")]\n#[model(table = \"b\")]\nstruct S;\n")
-                .contains("duplicate #[model]")
+        assert_eq!(
+            indexing_rejection("#[model(table = \"a\")]\n#[model(table = \"b\")]\nstruct S;\n"),
+            "attribute 'model' is repeated on 'crate::S' but a single occurrence was expected"
         );
     }
 
@@ -282,11 +289,11 @@ struct S {
 
     #[test]
     fn rejects_a_field_with_repeated_column_attributes() {
-        assert!(
-            error_message(
+        assert_eq!(
+            indexing_rejection(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[column]\n    id: i64,\n}\n"
-            )
-            .contains("failed to read the model attributes")
+            ),
+            "attribute 'column' is repeated on 'crate::S::id' but a single occurrence was expected"
         );
     }
 
@@ -377,11 +384,11 @@ struct S {
 
     #[test]
     fn rejects_a_repeated_foreign_key_attribute() {
-        assert!(
-            error_message(&with_author(
+        assert_eq!(
+            indexing_rejection(&with_author(
                 "#[model(table = \"articles\")]\nstruct Article {\n    #[column(primary_key)]\n    id: uuid::Uuid,\n    #[column]\n    #[foreign_key]\n    #[foreign_key]\n    author: Author,\n}\n",
-            ))
-            .contains("failed to read the model attributes")
+            )),
+            "attribute 'foreign_key' is repeated on 'crate::Article::author' but a single occurrence was expected"
         );
     }
 
@@ -479,21 +486,21 @@ struct S {
 
     #[test]
     fn rejects_a_repeated_field_index() {
-        assert!(
-            error_message(
+        assert_eq!(
+            indexing_rejection(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index]\n    #[index]\n    value: String,\n}\n",
-            )
-            .contains("carries more than one #[index]")
+            ),
+            "attribute 'index' is repeated on 'crate::S::value' but a single occurrence was expected"
         );
     }
 
     #[test]
     fn rejects_a_repeated_named_index_on_a_column() {
-        assert!(
-            error_message(
+        assert_eq!(
+            indexing_rejection(
                 "#[model(table = \"t\")]\nstruct S {\n    #[column]\n    #[index(name = \"combo\")]\n    #[index(name = \"combo\")]\n    value: String,\n}\n",
-            )
-            .contains("carries more than one #[index]")
+            ),
+            "attribute 'index' is repeated on 'crate::S::value' but a single occurrence was expected"
         );
     }
 
@@ -1384,7 +1391,10 @@ struct FragmentMetadata {
     fn rejects_more_than_one_model_primary_key() {
         let source = "#[model(table = \"locks\")]\n#[primary_key(columns = [repository, branch])]\n#[primary_key(columns = [branch, repository])]\nstruct Lock {\n    #[column]\n    repository: String,\n    #[column]\n    branch: String,\n}\n";
 
-        assert!(error_message(source).contains("declares more than one #[primary_key]"));
+        assert_eq!(
+            indexing_rejection(source),
+            "attribute 'primary_key' is repeated on 'crate::Lock' but a single occurrence was expected"
+        );
     }
 
     #[test]

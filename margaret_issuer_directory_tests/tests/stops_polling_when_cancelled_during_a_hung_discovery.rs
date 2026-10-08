@@ -27,7 +27,7 @@ async fn stops_polling_when_cancelled_during_a_hung_discovery() {
     directory.stop().await;
 
     assert!(matches!(
-        polled.key_set.refreshed_since(&snapshot).await,
+        polled.key_set.request_refresh_after(&snapshot).await,
         KeySetRefresh::PollingStopped
     ));
 

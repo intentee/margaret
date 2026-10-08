@@ -20,6 +20,7 @@ use margaret_identity_session::resource_access_token_claims::ResourceAccessToken
 use margaret_jose_parameters::jwt_type::JwtType;
 use margaret_jwks_keygen::jwks_secret_verification_result::JwksSecretVerificationResult;
 use margaret_jwks_roller_server::jwks_roller::JwksRoller;
+use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jwt_verification::access_token_profile::AccessTokenProfile;
 use margaret_jwt_verification::attributed_jwt::AttributedJwt;
 use margaret_jwt_verification::expected_audience::ExpectedAudience;
@@ -39,6 +40,19 @@ use margaret_token_signer::mint_access_token::mint_access_token;
 
 use crate::id_token_signing::IdTokenSigning;
 use crate::jwks_secret_store_error::JwksSecretStoreError;
+
+fn verify_attributed<TClaims: DeserializeOwned, TProfile: JwtProfile>(
+    jwt: &AttributedJwt<'_>,
+    key_set: &VerificationKeySet,
+    now: NumericDate,
+) -> JwtVerification<TClaims, TProfile> {
+    match jwt.profile::<TProfile>() {
+        JwtProfiling::Profiled(profiled) => profiled.verify(key_set, now),
+        JwtProfiling::Rejected(rejection) => {
+            JwtVerification::Rejected(JwtRejection::Type(rejection))
+        }
+    }
+}
 
 pub struct JwksSecretStore {
     issuance: TokenIssuance,
@@ -171,19 +185,25 @@ impl JwksSecretStore {
     }
 
     #[must_use]
+    pub fn verify_issued_jwt<TClaims: DeserializeOwned, TProfile: JwtProfile>(
+        &self,
+        jwt: &AttributedJwt<'_>,
+        now: NumericDate,
+    ) -> JwtVerification<TClaims, TProfile> {
+        verify_attributed(
+            jwt,
+            self.roller.jwks_secret_holder().get().published_key_set(),
+            now,
+        )
+    }
+
+    #[must_use]
     pub fn verify_own_jwt<TClaims: DeserializeOwned, TProfile: JwtProfile>(
         &self,
         jwt: &AttributedJwt<'_>,
         now: NumericDate,
     ) -> JwtVerification<TClaims, TProfile> {
-        match jwt.profile::<TProfile>() {
-            JwtProfiling::Profiled(profiled) => {
-                profiled.verify(self.roller.jwks_secret_holder().get().key_set(), now)
-            }
-            JwtProfiling::Rejected(rejection) => {
-                JwtVerification::Rejected(JwtRejection::Type(rejection))
-            }
-        }
+        verify_attributed(jwt, self.roller.jwks_secret_holder().get().key_set(), now)
     }
 
     #[must_use]

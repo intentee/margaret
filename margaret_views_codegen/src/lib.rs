@@ -127,11 +127,14 @@ impl Banner {
 
     #[test]
     fn rejects_a_struct_declaring_more_than_one_view() {
-        assert!(
-            rejection(
+        assert_eq!(
+            IndexedSource::try_new(
                 "#[renders_view(name = \"one\")]\n#[renders_view(name = \"two\")]\n#[singleton]\nstruct Bad;\n"
             )
-            .contains("is declared more than once")
+            .err()
+            .expect("the repeated view is rejected while indexing")
+            .to_string(),
+            "attribute 'renders_view' is repeated on 'crate::Bad' but a single occurrence was expected"
         );
     }
 

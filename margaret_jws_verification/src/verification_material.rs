@@ -122,6 +122,13 @@ impl VerificationMaterial {
         }
     }
 
+    pub fn from_rs256_components(
+        modulus: &[u8],
+        exponent: &[u8],
+    ) -> ControlFlow<KeyMaterialRejection, Self> {
+        Self::from_rsa_integers(modulus, exponent, RsaSignatureScheme::Pkcs1Sha256)
+    }
+
     pub(crate) fn from_rsa_components(
         n: &str,
         e: &str,
@@ -129,7 +136,16 @@ impl VerificationMaterial {
     ) -> ControlFlow<KeyMaterialRejection, Self> {
         let modulus = decoded(n, KeyMaterialRejection::ModulusBase64)?;
         let exponent = decoded(e, KeyMaterialRejection::ExponentBase64)?;
-        let bits = significant_bits(&modulus);
+
+        Self::from_rsa_integers(&modulus, &exponent, scheme)
+    }
+
+    fn from_rsa_integers(
+        modulus: &[u8],
+        exponent: &[u8],
+        scheme: RsaSignatureScheme,
+    ) -> ControlFlow<KeyMaterialRejection, Self> {
+        let bits = significant_bits(modulus);
         let parameters = scheme.parameters();
 
         if bits < u64::from(parameters.min_modulus_len())
@@ -140,8 +156,8 @@ impl VerificationMaterial {
 
         let public_key = flow(
             RsaPublicKeyComponents {
-                n: modulus.as_slice(),
-                e: exponent.as_slice(),
+                n: modulus,
+                e: exponent,
             }
             .as_der(),
             KeyMaterialRejection::RsaComponentsNotMinimal,

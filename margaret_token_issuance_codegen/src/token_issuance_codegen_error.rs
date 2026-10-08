@@ -70,6 +70,16 @@ pub enum TokenIssuanceCodegenError {
     ResourceAudienceOfSessions { anchor: String, audience: String },
 
     #[error(
+        "#[issues_resource_tokens] on '{anchor}' declares the audience '{audience}', which names the issuer, so its tokens would pass where the issuer is addressed"
+    )]
+    ResourceAudienceNamesIssuer { anchor: String, audience: String },
+
+    #[error(
+        "#[issues_tokens] on '{anchor}' declares the session audience '{audience}', which names its own issuer, so the tokens the provider addresses to the issuer would pass as sessions"
+    )]
+    SessionAudienceNamesIssuer { anchor: String, audience: String },
+
+    #[error(
         "#[issues_resource_tokens] on '{anchor}' declares resource tokens, but no #[issues_tokens] declares the issuer that signs them"
     )]
     ResourceWithoutTokenIssuance { anchor: String },

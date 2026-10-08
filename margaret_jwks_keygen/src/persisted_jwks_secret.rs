@@ -73,7 +73,7 @@ impl PersistedRsaPair {
             .map(Zeroizing::new)
             .map_err(|source| JwksKeyError::RsaKeyBase64 { source })?;
 
-        RsaSigningKey::from_pkcs8(pkcs8).map(|signing_key| RsaJwkPair::new(kid, signing_key))
+        RsaSigningKey::from_pkcs8(pkcs8).and_then(|signing_key| RsaJwkPair::new(kid, signing_key))
     }
 }
 

@@ -1,9 +1,7 @@
-use crate::attribute_error::AttributeError;
 use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_item::IndexedItem;
 use crate::matched_attribute::MatchedAttribute;
 use crate::select_framework_attributes::select_framework_attributes;
-use crate::select_unique_framework_attribute::select_unique_framework_attribute;
 
 pub struct AttributeQuery<'index> {
     item: &'index IndexedItem,
@@ -26,19 +24,16 @@ impl<'index> AttributeQuery<'index> {
             .collect()
     }
 
-    /// # Errors
-    ///
-    /// Returns `AttributeError` propagated from the work it performs.
+    #[must_use]
     pub fn find_framework(
         &self,
         framework_attribute: FrameworkAttribute,
-    ) -> Result<Option<MatchedAttribute<'index>>, AttributeError> {
-        let unique =
-            select_unique_framework_attribute(self.item.attributes(), framework_attribute, || {
-                self.item.canonical_path().to_string()
-            })?;
-
-        Ok(unique.map(|attribute| MatchedAttribute::new(self.item, attribute)))
+    ) -> Option<MatchedAttribute<'index>> {
+        self.item
+            .attributes()
+            .iter()
+            .find(|attribute| attribute.framework_attribute() == Some(framework_attribute))
+            .map(|attribute| MatchedAttribute::new(self.item, attribute))
     }
 }
 
@@ -73,7 +68,6 @@ mod tests {
         assert!(
             AttributeQuery::new(&item)
                 .find_framework(FrameworkAttribute::Singleton)
-                .expect("the lookup succeeds")
                 .is_some()
         );
     }
@@ -85,30 +79,20 @@ mod tests {
         assert!(
             AttributeQuery::new(&item)
                 .find_framework(FrameworkAttribute::Model)
-                .expect("the lookup succeeds")
                 .is_none()
         );
     }
 
     #[test]
-    fn find_rejects_a_repeated_sibling() {
-        let item = item(vec![parse_quote!(#[singleton]), parse_quote!(#[singleton])]);
-        let message = AttributeQuery::new(&item)
-            .find_framework(FrameworkAttribute::Singleton)
-            .err()
-            .expect("a repeated sibling is rejected")
-            .to_string();
-
-        assert!(message.contains("is repeated"));
-    }
-
-    #[test]
     fn find_all_returns_every_matching_sibling() {
-        let item = item(vec![parse_quote!(#[singleton]), parse_quote!(#[singleton])]);
+        let item = item(vec![
+            parse_quote!(#[middleware(logged)]),
+            parse_quote!(#[middleware(traced)]),
+        ]);
 
         assert_eq!(
             AttributeQuery::new(&item)
-                .find_all_framework(FrameworkAttribute::Singleton)
+                .find_all_framework(FrameworkAttribute::Middleware)
                 .len(),
             2
         );

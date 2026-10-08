@@ -78,7 +78,7 @@ async fn polls_an_issuer_trusted_by_two_declarations_once() {
     let directory =
         PolledDirectory::start(vec![Arc::clone(&polled.polled)], issuer.request_client());
 
-    polled.key_set.refreshed_since(&snapshot).await;
+    polled.key_set.request_refresh_after(&snapshot).await;
     directory.stop().await;
     issuer.stop().await;
 

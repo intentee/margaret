@@ -20,11 +20,6 @@ pub enum ViewsCodegenError {
     #[error("#[renders_view] is only supported on structs, but '{view}' is not a struct")]
     ViewNotAStruct { view: String },
 
-    #[error(
-        "#[renders_view] '{view}' is declared more than once; a view struct maps to exactly one view"
-    )]
-    DuplicateViewDeclaration { view: String },
-
     #[error("view '{view}' is missing the 'name' argument")]
     ViewMissingName { view: String },
 

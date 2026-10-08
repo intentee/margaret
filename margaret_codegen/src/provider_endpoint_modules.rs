@@ -85,3 +85,78 @@ pub(crate) fn provider_endpoint_modules(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use margaret_accepted_clients_codegen::declared_accepted_clients::DeclaredAcceptedClients;
+    use margaret_attributes_tests::indexed_source::IndexedSource;
+    use margaret_oidc_provider_codegen::provider_endpoint::ProviderEndpoint;
+    use margaret_token_issuance_codegen::declared_resource_issuances::DeclaredResourceIssuances;
+    use margaret_token_issuance_codegen::declared_token_issuance::DeclaredTokenIssuance;
+
+    use super::capable_endpoints;
+
+    fn capable(authentication: &str, grants: &str) -> Vec<ProviderEndpoint> {
+        let indexed = IndexedSource::new(&format!(
+            "use margaret::framework::accepted_clients::client_keys::ClientKeys;\nuse margaret::framework::accepted_clients::consent_policy::ConsentPolicy;\nuse margaret::framework::jose_parameters::jws_algorithm::JwsAlgorithm;\nuse margaret::framework::jwks_secret_store::id_token_signing::IdTokenSigning;\nuse margaret::framework::oauth_vocabulary::client_authentication_method::ClientAuthenticationMethod;\n\n#[issues_tokens(provider, audience = \"session\", issuer = \"https://issuer.example\")]\npub struct Issuer;\n#[issues_resource_tokens(artifacts, audience = \"artifacts\")]\npub struct Artifacts;\n#[admits_oauth_client(portal_app, authentication = ClientAuthenticationMethod::PrivateKeyJwt({authentication}keys = ClientKeys::Published(jwks_uri = \"https://portal.example/jwks.json\", signing = JwsAlgorithm::Es256)), {grants}client_id = \"portal\", resources = [artifacts])]\npub struct Portal;\n"
+        ));
+        let issuance =
+            DeclaredTokenIssuance::read(&indexed.index).expect("the token issuance is read");
+        let resources = DeclaredResourceIssuances::read(&indexed.index, &issuance)
+            .expect("the resources are read");
+
+        capable_endpoints(
+            &DeclaredAcceptedClients::read(&indexed.index, &issuance, &resources)
+                .expect("the admitted client is read"),
+        )
+    }
+
+    fn code_grant(scopes: &str, refresh_token: &str) -> String {
+        format!(
+            "authorization_code(consent = ConsentPolicy::Implicit, id_token_signing = IdTokenSigning::Rsa, redirect_uris = [\"https://portal.example/callback\"], scopes = [{scopes}]{refresh_token}), "
+        )
+    }
+
+    #[test]
+    fn needs_no_endpoint_for_a_client_that_only_requests_client_credentials() {
+        assert_eq!(
+            capable("client_credentials(scopes = [\"artifacts:read\"]), ", ""),
+            Vec::<ProviderEndpoint>::new()
+        );
+    }
+
+    #[test]
+    fn needs_the_authorization_endpoint_for_a_client_granted_codes() {
+        assert_eq!(
+            capable("", &code_grant("\"profile\"", "")),
+            vec![ProviderEndpoint::Authorization]
+        );
+    }
+
+    #[test]
+    fn needs_the_introspection_endpoint_for_a_client_that_introspects() {
+        assert_eq!(
+            capable("introspection, ", ""),
+            vec![ProviderEndpoint::Introspection]
+        );
+    }
+
+    #[test]
+    fn needs_the_revocation_endpoint_for_a_client_granted_refresh_tokens() {
+        assert_eq!(
+            capable("", &code_grant("\"profile\"", ", refresh_token")),
+            vec![
+                ProviderEndpoint::Authorization,
+                ProviderEndpoint::Revocation
+            ]
+        );
+    }
+
+    #[test]
+    fn needs_the_userinfo_endpoint_for_a_client_granted_the_openid_scope() {
+        assert_eq!(
+            capable("", &code_grant("\"openid\", \"profile\"", "")),
+            vec![ProviderEndpoint::Authorization, ProviderEndpoint::Userinfo]
+        );
+    }
+}

@@ -1,7 +1,12 @@
+use std::collections::BTreeSet;
+
 use syn::Attribute;
 use syn::Path;
 
+use crate::attribute_error::AttributeError;
+use crate::attribute_host::AttributeHost;
 use crate::canonical_path::CanonicalPath;
+use crate::framework_attribute::FrameworkAttribute;
 use crate::indexed_attribute::IndexedAttribute;
 
 pub(crate) struct ScannedAttribute {
@@ -15,14 +20,31 @@ impl ScannedAttribute {
 
     pub(crate) fn resolve_all(
         attributes: Vec<Self>,
+        host: AttributeHost,
+        target: impl Fn() -> String,
         resolve: impl Copy + Fn(&Path) -> CanonicalPath,
-    ) -> Vec<IndexedAttribute> {
+    ) -> Result<Vec<IndexedAttribute>, AttributeError> {
+        let mut held: BTreeSet<FrameworkAttribute> = BTreeSet::new();
+
         attributes
             .into_iter()
             .map(|attribute| {
-                let canonical_path = resolve(attribute.attribute.path());
+                let indexed = IndexedAttribute::from_canonical(
+                    &attribute.attribute,
+                    &resolve(attribute.attribute.path()),
+                );
 
-                IndexedAttribute::from_canonical(&attribute.attribute, &canonical_path)
+                match indexed.framework_attribute() {
+                    Some(framework)
+                        if !host.admits_repetition(framework) && !held.insert(framework) =>
+                    {
+                        Err(AttributeError::RepeatedAttribute {
+                            attribute_path: framework.name().to_string(),
+                            target: target(),
+                        })
+                    }
+                    Some(_) | None => Ok(indexed),
+                }
             })
             .collect()
     }

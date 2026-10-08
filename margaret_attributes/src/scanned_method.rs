@@ -3,6 +3,8 @@ use syn::FnArg;
 use syn::Path;
 use syn::Signature;
 
+use crate::attribute_error::AttributeError;
+use crate::attribute_host::AttributeHost;
 use crate::canonical_path::CanonicalPath;
 use crate::indexed_method::IndexedMethod;
 use crate::scanned_attribute::ScannedAttribute;
@@ -53,18 +55,28 @@ impl ScannedMethod {
 
     pub(crate) fn resolve(
         self,
+        owner: &CanonicalPath,
         resolve: impl Copy + Fn(&[String], &Path) -> CanonicalPath,
-    ) -> IndexedMethod {
+    ) -> Result<IndexedMethod, AttributeError> {
         let resolve_path = |path: &Path| resolve(&self.module_path, path);
+        let method = format!("{owner}::{}", self.identifier);
+        let attributes = ScannedAttribute::resolve_all(
+            self.attributes,
+            AttributeHost::Member,
+            || method.clone(),
+            resolve_path,
+        )?;
+        let parameters = self
+            .parameters
+            .into_iter()
+            .map(|parameter| parameter.resolve(&method, resolve_path))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        IndexedMethod::from_parts(
-            ScannedAttribute::resolve_all(self.attributes, resolve_path),
+        Ok(IndexedMethod::from_parts(
+            attributes,
             self.identifier,
-            self.parameters
-                .into_iter()
-                .map(|parameter| parameter.resolve(resolve_path))
-                .collect(),
+            parameters,
             self.signature,
-        )
+        ))
     }
 }

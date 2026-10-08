@@ -73,7 +73,10 @@ mod tests {
                 started_at + KEY_SET_POLL_INTERVAL_AFTER_READY,
                 &cancellation_token
             ),
-            timeout(ISSUER_FETCH_SPACING / 2, key_set.refreshed_since(&snapshot))
+            timeout(
+                ISSUER_FETCH_SPACING / 2,
+                key_set.request_refresh_after(&snapshot)
+            )
         );
 
         assert_eq!(next_fetch, NextFetch::Due);
@@ -116,9 +119,12 @@ mod tests {
             ),
             async {
                 assert!(
-                    timeout(ISSUER_FETCH_SPACING / 2, key_set.refreshed_since(&snapshot))
-                        .await
-                        .is_err()
+                    timeout(
+                        ISSUER_FETCH_SPACING / 2,
+                        key_set.request_refresh_after(&snapshot)
+                    )
+                    .await
+                    .is_err()
                 );
                 cancellation_token.cancel();
             }

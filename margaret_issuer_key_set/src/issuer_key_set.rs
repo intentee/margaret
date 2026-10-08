@@ -39,6 +39,7 @@ impl IssuerKeySet {
             refresh: Notify::new(),
             state: watch::Sender::new(KeySetState {
                 completed_fetches: 0,
+                held_fetches: 0,
                 holding: KeySetHolding::Awaiting,
                 polling: KeySetPolling::Active,
                 started_fetches: 0,
@@ -47,7 +48,7 @@ impl IssuerKeySet {
     }
 
     pub fn fail_fetch(&self) {
-        self.complete_fetch(|_holding| {});
+        self.complete_fetch(|_state| {});
     }
 
     pub fn hold(&self, key_set: Arc<VerificationKeySet>) {
@@ -56,14 +57,17 @@ impl IssuerKeySet {
             key_set,
         });
 
-        self.complete_fetch(|holding| *holding = held);
+        self.complete_fetch(|state| {
+            state.holding = held;
+            state.held_fetches += 1;
+        });
     }
 
     pub async fn refresh_requested(&self) {
         self.refresh.notified().await;
     }
 
-    pub async fn refreshed_since(&self, snapshot: &KeySetSnapshot) -> KeySetRefresh {
+    pub async fn request_refresh_after(&self, snapshot: &KeySetSnapshot) -> KeySetRefresh {
         let mut completion = pin!(self.completion.notified());
 
         self.refresh.notify_one();
@@ -85,6 +89,7 @@ impl IssuerKeySet {
         let state = self.state.borrow();
 
         KeySetSnapshot {
+            held_fetches: state.held_fetches,
             holding: state.holding.clone(),
             started_fetches: state.started_fetches,
         }
@@ -100,7 +105,7 @@ impl IssuerKeySet {
         self.completion.notify_waiters();
     }
 
-    pub async fn verify<TClaims: DeserializeOwned, TProfile: JwtProfile>(
+    pub async fn verify_refetching_rotated_keys<TClaims: DeserializeOwned, TProfile: JwtProfile>(
         &self,
         jwt: &AttributedJwt<'_>,
         now: NumericDate,
@@ -118,8 +123,10 @@ impl IssuerKeySet {
                 fetched_at,
                 rejection,
             } if fetched_at.elapsed() >= ISSUER_FETCH_SPACING => {
-                match self.refreshed_since(&snapshot).await {
-                    KeySetRefresh::PollingStopped => IssuerVerification::Rejected(rejection),
+                match self.request_refresh_after(&snapshot).await {
+                    KeySetRefresh::PollingStopped | KeySetRefresh::Unchanged => {
+                        IssuerVerification::Rejected(rejection)
+                    }
                     KeySetRefresh::Refreshed(holding) => {
                         verify_with_key_set(&jwt, &holding, now).settled()
                     }
@@ -129,9 +136,9 @@ impl IssuerKeySet {
         }
     }
 
-    fn complete_fetch(&self, update: impl FnOnce(&mut KeySetHolding)) {
+    fn complete_fetch(&self, update: impl FnOnce(&mut KeySetState)) {
         self.state.send_modify(|state| {
-            update(&mut state.holding);
+            update(state);
             state.completed_fetches = state.started_fetches;
         });
         self.completion.notify_waiters();
@@ -140,7 +147,11 @@ impl IssuerKeySet {
     fn refresh_progress(&self, snapshot: &KeySetSnapshot) -> RefreshProgress {
         let state = self.state.borrow();
 
-        if state.completed_fetches > snapshot.started_fetches {
+        if state.completed_fetches > snapshot.started_fetches
+            && state.held_fetches == snapshot.held_fetches
+        {
+            RefreshProgress::Finished(KeySetRefresh::Unchanged)
+        } else if state.completed_fetches > snapshot.started_fetches {
             RefreshProgress::Finished(KeySetRefresh::Refreshed(state.holding.clone()))
         } else if state.polling == KeySetPolling::Stopped {
             RefreshProgress::Finished(KeySetRefresh::PollingStopped)

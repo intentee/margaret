@@ -14,3 +14,4 @@ mod reports_claims_that_cannot_be_serialized;
 mod signs_access_token_claims_that_verify_with_the_current_key;
 mod signs_access_tokens_for_the_access_token_lifetime;
 mod verifies_an_access_token_signed_with_the_retired_key;
+mod verifies_its_own_id_token_signed_with_rsa;

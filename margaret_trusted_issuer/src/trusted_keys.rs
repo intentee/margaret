@@ -21,8 +21,8 @@ impl TrustedKeys {
         now: NumericDate,
     ) -> IssuerVerification<TClaims, TProfile> {
         match self {
-            Self::Own(store) => IssuerVerification::from(store.verify_own_jwt(jwt, now)),
-            Self::Polled(key_set) => key_set.verify(jwt, now).await,
+            Self::Own(store) => IssuerVerification::from(store.verify_issued_jwt(jwt, now)),
+            Self::Polled(key_set) => key_set.verify_refetching_rotated_keys(jwt, now).await,
         }
     }
 }

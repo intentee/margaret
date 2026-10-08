@@ -44,6 +44,14 @@ impl<'index> DeclaredResourceIssuances<'index> {
                         audience: declared.audience.to_string(),
                     });
                 }
+                DeclaredTokenIssuance::Declared(session)
+                    if session.issuer.as_str() == declared.audience.as_str() =>
+                {
+                    return Err(TokenIssuanceCodegenError::ResourceAudienceNamesIssuer {
+                        anchor: declared.anchor.canonical_path().to_string(),
+                        audience: declared.audience.to_string(),
+                    });
+                }
                 DeclaredTokenIssuance::Declared(_) => {}
             }
 
@@ -212,6 +220,15 @@ mod tests {
             TokenIssuanceCodegenError::ResourceAudienceOfSessions { anchor, audience }
                 if anchor == "crate::Attachments" && audience == "session"
         ));
+    }
+
+    #[test]
+    fn rejects_a_resource_addressed_like_the_issuer() {
+        assert_eq!(
+            rejection("#[issues_resource_tokens(attachments, audience = \"https://issuer.example\")]\npub struct Attachments;\n")
+                .to_string(),
+            "#[issues_resource_tokens] on 'crate::Attachments' declares the audience 'https://issuer.example', which names the issuer, so its tokens would pass where the issuer is addressed"
+        );
     }
 
     #[test]

@@ -1,3 +1,4 @@
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use aws_lc_rs::encoding::AsDer;
@@ -18,6 +19,7 @@ use margaret_jose_parameters::key_use::KeyUse;
 use margaret_jws_verification::jwk::Jwk;
 use margaret_jws_verification::key_id::KeyId;
 use margaret_jws_verification::rsa_jwk::RsaJwk;
+use margaret_jws_verification::verification_material::VerificationMaterial;
 
 use crate::jwks_key_error::JwksKeyError;
 
@@ -38,6 +40,18 @@ fn generated(key_pair: Result<RsaKeyPair, Unspecified>) -> Result<RsaSigningKey,
                 pkcs8,
             })
         })
+}
+
+fn rsa_verification_material(
+    modulus: &[u8],
+    exponent: &[u8],
+) -> Result<VerificationMaterial, JwksKeyError> {
+    match VerificationMaterial::from_rs256_components(modulus, exponent) {
+        ControlFlow::Continue(material) => Ok(material),
+        ControlFlow::Break(rejection) => {
+            Err(JwksKeyError::RsaVerificationKeyRejected { rejection })
+        }
+    }
 }
 
 fn signed(signature: Vec<u8>, outcome: Result<(), Unspecified>) -> Result<Vec<u8>, JwksKeyError> {
@@ -104,6 +118,13 @@ impl RsaSigningKey {
 
         signed(signature, outcome)
     }
+
+    pub(crate) fn verification_material(&self) -> Result<VerificationMaterial, JwksKeyError> {
+        let RsaPublicKeyComponents { n, e } =
+            RsaPublicKeyComponents::<Vec<u8>>::from(self.key_pair.public_key());
+
+        rsa_verification_material(&n, &e)
+    }
 }
 
 #[cfg(test)]
@@ -112,6 +133,7 @@ mod tests {
 
     use super::generated;
     use super::pkcs8_of;
+    use super::rsa_verification_material;
     use super::signed;
 
     #[test]
@@ -133,6 +155,17 @@ mod tests {
                 .expect_err("the encoding failure is reported")
                 .to_string(),
             format!("the rsa signing key could not be encoded to pkcs#8: {Unspecified}")
+        );
+    }
+
+    #[test]
+    fn reports_a_public_key_that_does_not_verify_signatures() {
+        assert_eq!(
+            rsa_verification_material(&[1], &[1, 0, 1])
+                .map(drop)
+                .expect_err("a one-bit modulus is rejected")
+                .to_string(),
+            "the public key of the rsa signing key does not verify signatures: the key modulus has 1 bits, outside the supported range"
         );
     }
 

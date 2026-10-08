@@ -14,14 +14,9 @@ enum IndexedAttributeArgs {
     Rejected(AttributeArgumentsError),
 }
 
-fn derive_path() -> CanonicalPath {
-    CanonicalPath::new(vec!["derive".to_string()])
-}
-
 pub struct IndexedAttribute {
     args: IndexedAttributeArgs,
     attribute: Attribute,
-    canonical_path: CanonicalPath,
     framework_attribute: Option<FrameworkAttribute>,
 }
 
@@ -32,12 +27,11 @@ impl IndexedAttribute {
             Err(rejected) => IndexedAttributeArgs::Rejected(rejected),
         };
 
-        let framework_attribute = FrameworkAttribute::from_canonical_path(canonical_path);
+        let framework_attribute = FrameworkAttribute::recognize(attribute.path(), canonical_path);
 
         Self {
             args,
             attribute: attribute.clone(),
-            canonical_path: canonical_path.clone(),
             framework_attribute,
         }
     }
@@ -70,7 +64,7 @@ impl IndexedAttribute {
     ///
     /// Returns `AttributeError::Arguments`.
     pub fn derived_paths(&self) -> Result<Vec<Path>, AttributeError> {
-        if self.canonical_path != derive_path() {
+        if !self.attribute.path().is_ident("derive") {
             return Ok(Vec::new());
         }
 

@@ -1,5 +1,4 @@
 mod await_next_fetch;
-mod discover_key_set_location;
 pub mod discovered_issuer;
 mod discovered_key_set_location;
 mod discovery_failure;
@@ -12,3 +11,4 @@ mod key_set_source;
 mod next_fetch;
 mod poll_key_set;
 pub mod polled_key_set;
+mod refresh_discovered_metadata;

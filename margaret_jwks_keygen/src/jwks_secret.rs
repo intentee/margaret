@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 use margaret_jws_verification::key_id::KeyId;
 use margaret_jws_verification::key_set_assembly::KeySetAssembly;
+use margaret_jws_verification::verification_key::VerificationKey;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 use margaret_jwt_verification::jwt_expectation::JwtExpectation;
 use margaret_jwt_verification::jwt_profile::JwtProfile;
@@ -20,6 +21,15 @@ use crate::public_jwks::PublicJwks;
 use crate::rsa_key_ring::RsaKeyRing;
 use crate::signing_curve::SigningCurve;
 
+fn assembled(keys: Vec<VerificationKey>) -> Result<VerificationKeySet, JwksKeyError> {
+    match VerificationKeySet::assemble(keys) {
+        KeySetAssembly::Assembled(key_set) => Ok(key_set),
+        KeySetAssembly::DuplicateKeyId(duplicate) => {
+            Err(JwksKeyError::DuplicateKeyId { duplicate })
+        }
+    }
+}
+
 fn random_pair(curve: SigningCurve) -> Result<JwkPair, JwksKeyError> {
     EcSigningKey::generate(curve)
         .and_then(|signing_key| JwkPair::new(KeyId::new(Uuid::new_v4().to_string()), signing_key))
@@ -32,6 +42,7 @@ pub struct JwksSecret {
     next: JwkPair,
     previous: PreviousKey<JwkPair>,
     public_jwks: PublicJwks,
+    published_key_set: VerificationKeySet,
     rsa: RsaKeyRing,
 }
 
@@ -60,31 +71,43 @@ impl JwksSecret {
         previous: PreviousKey<JwkPair>,
         rsa: RsaKeyRing,
     ) -> Result<Self, JwksKeyError> {
-        let mut published = vec![current.public_jwk().clone()];
-        let mut verification_keys = vec![current.verification_key().clone()];
+        let mut ec_pairs = vec![&current];
 
         if let PreviousKey::Retired(retired) = &previous {
-            published.push(retired.public_jwk().clone());
-            verification_keys.push(retired.verification_key().clone());
+            ec_pairs.push(retired);
         }
 
-        published.push(next.public_jwk().clone());
-        published.extend(rsa.published());
-        verification_keys.push(next.verification_key().clone());
+        ec_pairs.push(&next);
 
-        let key_set = match VerificationKeySet::assemble(verification_keys) {
-            KeySetAssembly::Assembled(key_set) => key_set,
-            KeySetAssembly::DuplicateKeyId(duplicate) => {
-                return Err(JwksKeyError::DuplicateKeyId { duplicate });
-            }
-        };
+        let rsa_pairs = rsa.pairs();
+        let key_set = assembled(
+            ec_pairs
+                .iter()
+                .map(|pair| pair.verification_key().clone())
+                .collect(),
+        )?;
+        let published_key_set = assembled(
+            ec_pairs
+                .iter()
+                .map(|pair| pair.verification_key().clone())
+                .chain(rsa_pairs.iter().map(|pair| pair.verification_key().clone()))
+                .collect(),
+        )?;
+        let public_jwks = PublicJwks::new(
+            ec_pairs
+                .iter()
+                .map(|pair| pair.public_jwk().clone())
+                .chain(rsa_pairs.iter().map(|pair| pair.public_jwk().clone()))
+                .collect(),
+        );
 
         Ok(Self {
             current,
             key_set,
             next,
             previous,
-            public_jwks: PublicJwks::new(published),
+            public_jwks,
+            published_key_set,
             rsa,
         })
     }
@@ -112,6 +135,11 @@ impl JwksSecret {
     #[must_use]
     pub fn public_jwks(&self) -> &PublicJwks {
         &self.public_jwks
+    }
+
+    #[must_use]
+    pub fn published_key_set(&self) -> &VerificationKeySet {
+        &self.published_key_set
     }
 
     /// # Errors

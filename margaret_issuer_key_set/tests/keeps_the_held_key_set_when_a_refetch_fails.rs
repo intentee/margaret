@@ -14,20 +14,19 @@ async fn keeps_the_held_key_set_when_a_refetch_fails() {
     issuer_key_set.hold(Arc::new(fresh_p256_secret().key_set().clone()));
 
     let snapshot = issuer_key_set.snapshot();
-    let (refresh, ()) = tokio::join!(issuer_key_set.refreshed_since(&snapshot), async {
+    let (refresh, ()) = tokio::join!(issuer_key_set.request_refresh_after(&snapshot), async {
         issuer_key_set.refresh_requested().await;
         issuer_key_set.start_fetch();
         issuer_key_set.fail_fetch();
     });
-    let KeySetRefresh::Refreshed(KeySetHolding::Held(HeldKeySet {
-        key_set: refreshed, ..
-    })) = refresh
+    let KeySetHolding::Held(HeldKeySet { key_set: kept, .. }) = issuer_key_set.snapshot().holding
     else {
-        panic!("the refresh holds a key set");
+        panic!("the key set is still held");
     };
-    let KeySetHolding::Held(HeldKeySet { key_set: kept, .. }) = snapshot.holding else {
+    let KeySetHolding::Held(HeldKeySet { key_set: held, .. }) = snapshot.holding else {
         panic!("the snapshot holds a key set");
     };
 
-    assert!(Arc::ptr_eq(&refreshed, &kept));
+    assert!(matches!(refresh, KeySetRefresh::Unchanged));
+    assert!(Arc::ptr_eq(&kept, &held));
 }

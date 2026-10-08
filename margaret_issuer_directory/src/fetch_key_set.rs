@@ -7,11 +7,11 @@ use margaret_issuer_request::issuer_request_client::IssuerRequestClient;
 use margaret_jws_verification::key_set_document_parsing::KeySetDocumentParsing;
 use margaret_jws_verification::verification_key_set::VerificationKeySet;
 
-use crate::discover_key_set_location::discover_key_set_location;
 use crate::discovered_key_set_location::DiscoveredKeySetLocation;
 use crate::key_set_poll::KeySetPoll;
 use crate::key_set_poll_failure::KeySetPollFailure;
 use crate::key_set_source::KeySetSource;
+use crate::refresh_discovered_metadata::refresh_discovered_metadata;
 
 async fn fetched_key_set_document(
     client: &IssuerRequestClient,
@@ -20,7 +20,7 @@ async fn fetched_key_set_document(
 ) -> ControlFlow<KeySetPoll, IssuerDocument> {
     match source {
         KeySetSource::Discovered { issuer, metadata } => {
-            match discover_key_set_location(client, *issuer, metadata, cancellation_token).await {
+            match refresh_discovered_metadata(client, *issuer, metadata, cancellation_token).await {
                 DiscoveredKeySetLocation::Cancelled => ControlFlow::Break(KeySetPoll::Cancelled),
                 DiscoveredKeySetLocation::Failed(failure) => {
                     ControlFlow::Break(KeySetPoll::Failed(KeySetPollFailure::Discovery(failure)))

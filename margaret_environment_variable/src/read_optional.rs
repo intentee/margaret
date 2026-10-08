@@ -53,8 +53,6 @@ mod tests {
     use super::read_optional;
 
     fn set(name: &str, value: &str) {
-        // SAFETY: `cargo nextest` runs every test in its own process, so no
-        // other thread observes the process environment while it is mutated.
         unsafe { env::set_var(name, value) };
     }
 
@@ -117,8 +115,6 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn reports_a_value_that_is_not_unicode() {
-        // SAFETY: `cargo nextest` runs every test in its own process, so no
-        // other thread observes the process environment while it is mutated.
         unsafe {
             env::set_var(
                 "MARGARET_OPTIONAL_NOT_UNICODE",

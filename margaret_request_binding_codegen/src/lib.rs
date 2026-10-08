@@ -17,6 +17,7 @@ pub mod captured_providers;
 pub mod classify_parameters;
 pub mod content_binding;
 pub mod content_extraction_context;
+mod exclusive_bindings;
 pub mod extraction_context;
 mod extraction_phase;
 mod form_request_arguments;
@@ -257,11 +258,14 @@ impl SessionUserProvider {
 
     #[test]
     fn rejects_a_repeated_provider_attribute() {
-        assert!(
-            rejection_for(
+        assert_eq!(
+            IndexedSource::try_new(&provider_source(
                 "#[singleton]\n#[infers_authenticated_user(user_model = User)]\n#[infers_authenticated_user(user_model = User)]\nstruct Bad;\n"
-            )
-            .contains("is repeated on")
+            ))
+            .err()
+            .expect("the repeated provider attribute is rejected while indexing")
+            .to_string(),
+            "attribute 'infers_authenticated_user' is repeated on 'crate::Bad' but a single occurrence was expected"
         );
     }
 

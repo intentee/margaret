@@ -1,6 +1,5 @@
 use uuid::Uuid;
 
-use margaret_jws_verification::jwk::Jwk;
 use margaret_jws_verification::key_id::KeyId;
 
 use crate::jwks_key_error::JwksKeyError;
@@ -9,8 +8,9 @@ use crate::provides_rsa_signing_keys::ProvidesRsaSigningKeys;
 use crate::rsa_jwk_pair::RsaJwkPair;
 
 fn provided_pair(keys: &dyn ProvidesRsaSigningKeys) -> Result<RsaJwkPair, JwksKeyError> {
-    keys.rsa_signing_key()
-        .map(|signing_key| RsaJwkPair::new(KeyId::new(Uuid::new_v4().to_string()), signing_key))
+    keys.rsa_signing_key().and_then(|signing_key| {
+        RsaJwkPair::new(KeyId::new(Uuid::new_v4().to_string()), signing_key)
+    })
 }
 
 #[derive(Clone)]
@@ -67,15 +67,15 @@ impl RsaKeyRing {
         })
     }
 
-    pub(crate) fn published(&self) -> Vec<Jwk> {
-        let mut published = vec![self.current.public_jwk().clone()];
+    pub(crate) fn pairs(&self) -> Vec<&RsaJwkPair> {
+        let mut pairs = vec![&self.current];
 
         if let PreviousKey::Retired(retired) = &self.previous {
-            published.push(retired.public_jwk().clone());
+            pairs.push(retired);
         }
 
-        published.push(self.next.public_jwk().clone());
+        pairs.push(&self.next);
 
-        published
+        pairs
     }
 }

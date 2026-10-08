@@ -40,7 +40,7 @@ impl ClientKeySet {
             Self::Own(store) => IssuerVerification::from(store.verify_own_jwt(jwt, now)),
             Self::Published { key_set, signing } => match jwt.algorithm() {
                 ParameterValue::Supported(algorithm) if algorithm == signing => {
-                    key_set.verify(jwt, now).await
+                    key_set.verify_refetching_rotated_keys(jwt, now).await
                 }
                 ParameterValue::Supported(_) | ParameterValue::Unsupported(_) => {
                     IssuerVerification::Rejected(JwtRejection::AlgorithmNotPinned {

@@ -8,6 +8,7 @@ use quote::ToTokens;
 use margaret_attribute_arguments::attribute_args::AttributeArgs;
 use margaret_attribute_arguments::format_path::format_path;
 use margaret_attributes::attribute_index::AttributeIndex;
+use margaret_attributes::attribute_query::AttributeQuery;
 use margaret_attributes::canonical_path::CanonicalPath;
 use margaret_attributes::field_identifier::FieldIdentifier;
 use margaret_attributes::framework_attribute::FrameworkAttribute;
@@ -15,7 +16,6 @@ use margaret_attributes::indexed_field::IndexedField;
 use margaret_attributes::indexed_item::IndexedItem;
 use margaret_attributes::is_snake_case_identifier::is_snake_case_identifier;
 use margaret_attributes::select_framework_attributes::select_framework_attributes;
-use margaret_attributes::select_unique_framework_attribute::select_unique_framework_attribute;
 use margaret_attributes::standard_library_item::StandardLibraryItem;
 use margaret_model::column_default::ColumnDefault;
 use margaret_schema_identifier_naming::primary_key_index_name::primary_key_index_name;
@@ -55,13 +55,6 @@ use crate::resolved_foreign_key::ResolvedForeignKey;
 use crate::resolved_index::ResolvedIndex;
 use crate::resolved_unique_constraint::ResolvedUniqueConstraint;
 use crate::scalar_column::ScalarColumn;
-
-fn field_display(identifier: &FieldIdentifier) -> String {
-    match identifier {
-        FieldIdentifier::Named(field_name) => field_name.clone(),
-        FieldIdentifier::Positional(position) => position.to_string(),
-    }
-}
 
 fn resolve_column_name(
     name: Option<String>,
@@ -105,21 +98,17 @@ fn register_column_name(
 }
 
 fn resolve_field_index(field: &IndexedField, model: &str) -> Result<FieldIndex, ModelCodegenError> {
-    match select_framework_attributes(field.attributes(), FrameworkAttribute::Index).as_slice() {
-        [] => Ok(FieldIndex::Absent),
-        [declared] => {
+    match field.framework_attribute(FrameworkAttribute::Index) {
+        None => Ok(FieldIndex::Absent),
+        Some(declared) => {
             let IndexArguments { name } =
-                IndexArguments::parse(declared.args()?, model, &field_display(field.identifier()))?;
+                IndexArguments::parse(declared.args()?, model, &field.identifier().to_string())?;
 
             match name {
                 None => Ok(FieldIndex::Derived),
                 Some(name) => Ok(FieldIndex::Explicit(explicit_index_name(name, model)?)),
             }
         }
-        _ => Err(ModelCodegenError::RepeatedFieldIndex {
-            field: field_display(field.identifier()),
-            model: model.to_string(),
-        }),
     }
 }
 
@@ -295,28 +284,28 @@ fn defer_foreign_key(
 ) -> Result<DeferredForeignKey, ModelCodegenError> {
     if name.is_some() {
         return Err(ModelCodegenError::ForeignKeyColumnNameIsDerived {
-            field: field_display(field.identifier()),
+            field: field.identifier().to_string(),
             model: model.to_string(),
         });
     }
 
     if check.is_declared() {
         return Err(ModelCodegenError::ForeignKeyCannotDeclareCheckConstraint {
-            field: field_display(field.identifier()),
+            field: field.identifier().to_string(),
             model: model.to_string(),
         });
     }
 
     if matches!(numeric_digits, NumericDigits::Declared { .. }) {
         return Err(ModelCodegenError::ForeignKeyCannotDeclareNumericDigits {
-            field: field_display(field.identifier()),
+            field: field.identifier().to_string(),
             model: model.to_string(),
         });
     }
 
     if primary_key {
         return Err(ModelCodegenError::ForeignKeyCannotBePrimaryKey {
-            field: field_display(field.identifier()),
+            field: field.identifier().to_string(),
             model: model.to_string(),
         });
     }
@@ -402,14 +391,14 @@ fn reject_model_attribute_on_a_field(
 ) -> Result<(), ModelCodegenError> {
     if !select_framework_attributes(field.attributes(), FrameworkAttribute::PrimaryKey).is_empty() {
         return Err(ModelCodegenError::PrimaryKeyIsNotAFieldAttribute {
-            field: field_display(field.identifier()),
+            field: field.identifier().to_string(),
             model: model.to_string(),
         });
     }
 
     if !select_framework_attributes(field.attributes(), FrameworkAttribute::Unique).is_empty() {
         return Err(ModelCodegenError::UniqueIsNotAFieldAttribute {
-            field: field_display(field.identifier()),
+            field: field.identifier().to_string(),
             model: model.to_string(),
         });
     }
@@ -435,21 +424,13 @@ fn collect_model_columns(
     for field in item.fields() {
         reject_model_attribute_on_a_field(field, model)?;
 
-        let column_attribute = select_unique_framework_attribute(
-            field.attributes(),
-            FrameworkAttribute::Column,
-            || model.to_string(),
-        )?;
-        let foreign_key_attribute = select_unique_framework_attribute(
-            field.attributes(),
-            FrameworkAttribute::ForeignKey,
-            || model.to_string(),
-        )?;
+        let column_attribute = field.framework_attribute(FrameworkAttribute::Column);
+        let foreign_key_attribute = field.framework_attribute(FrameworkAttribute::ForeignKey);
         let index = resolve_field_index(field, model)?;
 
         if !matches!(index, FieldIndex::Absent) && column_attribute.is_none() {
             return Err(ModelCodegenError::IndexRequiresColumn {
-                field: field_display(field.identifier()),
+                field: field.identifier().to_string(),
                 model: model.to_string(),
             });
         }
@@ -457,11 +438,11 @@ fn collect_model_columns(
         let Some(column_attribute) = column_attribute else {
             return Err(match foreign_key_attribute {
                 None => ModelCodegenError::UnattributedField {
-                    field: field_display(field.identifier()),
+                    field: field.identifier().to_string(),
                     model: model.to_string(),
                 },
                 Some(_) => ModelCodegenError::ForeignKeyRequiresColumn {
-                    field: field_display(field.identifier()),
+                    field: field.identifier().to_string(),
                     model: model.to_string(),
                 },
             });
@@ -470,7 +451,7 @@ fn collect_model_columns(
         let column_arguments = ColumnArguments::parse(
             column_attribute.args()?,
             model,
-            &field_display(field.identifier()),
+            &field.identifier().to_string(),
         )?;
 
         match foreign_key_attribute {
@@ -524,15 +505,14 @@ fn resolve_primary_key<'columns>(
     scalar_columns: &'columns [ResolvedColumn],
     model: &str,
 ) -> Result<Vec<&'columns ResolvedColumn>, ModelCodegenError> {
-    let declarations =
-        select_framework_attributes(item.attributes(), FrameworkAttribute::PrimaryKey);
+    let declaration = AttributeQuery::new(item).find_framework(FrameworkAttribute::PrimaryKey);
     let flagged: Vec<&ResolvedColumn> = scalar_columns
         .iter()
         .filter(|column| column.primary_key)
         .collect();
 
-    match declarations.as_slice() {
-        [] => match flagged.as_slice() {
+    match declaration {
+        None => match flagged.as_slice() {
             [] => Ok(Vec::new()),
             [column] => Ok(vec![*column]),
             _ => Err(
@@ -541,10 +521,12 @@ fn resolve_primary_key<'columns>(
                 },
             ),
         },
-        [_] if !flagged.is_empty() => Err(ModelCodegenError::ConflictingPrimaryKeyDeclarations {
-            model: model.to_string(),
-        }),
-        [declaration] => {
+        Some(_) if !flagged.is_empty() => {
+            Err(ModelCodegenError::ConflictingPrimaryKeyDeclarations {
+                model: model.to_string(),
+            })
+        }
+        Some(declaration) => {
             let ModelPrimaryKeyArguments { columns } =
                 ModelPrimaryKeyArguments::parse(declaration.args()?, model)?;
 
@@ -555,9 +537,6 @@ fn resolve_primary_key<'columns>(
                 model,
             )
         }
-        _ => Err(ModelCodegenError::DuplicateModelPrimaryKey {
-            model: model.to_string(),
-        }),
     }
 }
 
@@ -637,7 +616,6 @@ fn collect_models(
     seen_table_names: &mut HashMap<String, String>,
 ) -> Result<Vec<CollectedModel>, ModelCodegenError> {
     let mut collected: Vec<CollectedModel> = Vec::new();
-    let mut seen_models: HashSet<String> = HashSet::new();
     let mut validated_enums: HashSet<CanonicalPath> = HashSet::new();
 
     for matched in attribute_index.select_framework_attribute(FrameworkAttribute::Model) {
@@ -646,10 +624,6 @@ fn collect_models(
 
         if !item.kind().is_struct() {
             return Err(ModelCodegenError::ModelNotAStruct { model });
-        }
-
-        if !seen_models.insert(model.clone()) {
-            return Err(ModelCodegenError::DuplicateModelDeclaration { model });
         }
 
         let ModelArguments { table } = ModelArguments::parse(matched.args()?, &model)?;

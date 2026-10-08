@@ -21,9 +21,6 @@ pub enum ModelCodegenError {
     #[error("'{model}' is annotated with #[model] but is not a struct")]
     ModelNotAStruct { model: String },
 
-    #[error("'{model}' has a duplicate #[model] attribute")]
-    DuplicateModelDeclaration { model: String },
-
     #[error("model '{model}' is missing the required 'table' argument")]
     MissingTable { model: String },
 
@@ -440,11 +437,6 @@ pub enum ModelCodegenError {
     CompositePrimaryKeyRequiresModelDeclaration { model: String },
 
     #[error(
-        "model '{model}' declares more than one #[primary_key]; a model has at most one primary key"
-    )]
-    DuplicateModelPrimaryKey { model: String },
-
-    #[error(
         "model '{model}' declares a primary key both with #[primary_key(columns = [...])] and with #[column(primary_key)]; a primary key is declared exactly once, in exactly one place"
     )]
     ConflictingPrimaryKeyDeclarations { model: String },
@@ -471,11 +463,6 @@ pub enum ModelCodegenError {
         "field '{field}' of model '{model}' carries #[unique]; a single-column unique constraint is declared with #[column(unique)], and one spanning several columns with #[unique(columns = [...])] on the model"
     )]
     UniqueIsNotAFieldAttribute { field: String, model: String },
-
-    #[error(
-        "field '{field}' of model '{model}' carries more than one #[index]; a field declares at most one index over its own column(s), and an index spanning several fields is declared with #[index(name = ..., columns = [...])] on the model"
-    )]
-    RepeatedFieldIndex { field: String, model: String },
 
     #[error(
         "the #[index] on field '{field}' of model '{model}' must not name columns; a field index covers exactly the column(s) that field declares, and an index spanning several fields is declared on the model"

@@ -156,6 +156,15 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_session_audience_naming_the_issuer() {
+        assert_eq!(
+            rejection("provider, audience = \"https://issuer.example\", issuer = \"https://issuer.example\"")
+                .to_string(),
+            "#[issues_tokens] on 'crate::Issuer' declares the session audience 'https://issuer.example', which names its own issuer, so the tokens the provider addresses to the issuer would pass as sessions"
+        );
+    }
+
+    #[test]
     fn rejects_a_declaration_without_an_issuer() {
         assert!(matches!(
             rejection("provider, audience = \"session\""),

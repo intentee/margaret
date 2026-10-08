@@ -28,8 +28,6 @@ mod tests {
 
     #[test]
     fn reads_a_present_value() {
-        // SAFETY: `cargo nextest` runs every test in its own process, so no
-        // other thread observes the process environment while it is mutated.
         unsafe { env::set_var("MARGARET_REQUIRED_PRESENT", "true") };
 
         assert!(read_required::<bool>("MARGARET_REQUIRED_PRESENT").expect("the variable parses"));
@@ -47,8 +45,6 @@ mod tests {
 
     #[test]
     fn propagates_a_value_that_does_not_parse() {
-        // SAFETY: `cargo nextest` runs every test in its own process, so no
-        // other thread observes the process environment while it is mutated.
         unsafe { env::set_var("MARGARET_REQUIRED_MALFORMED", "maybe") };
 
         assert!(matches!(

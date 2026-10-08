@@ -4,6 +4,7 @@ use p256::pkcs8;
 use thiserror::Error;
 
 use margaret_jws_verification::duplicate_key_id::DuplicateKeyId;
+use margaret_jws_verification::key_material_rejection::KeyMaterialRejection;
 
 #[derive(Debug, Error)]
 pub enum JwksKeyError {
@@ -54,6 +55,9 @@ pub enum JwksKeyError {
         #[source]
         source: pkcs8::Error,
     },
+
+    #[error("the public key of the rsa signing key does not verify signatures: {rejection}")]
+    RsaVerificationKeyRejected { rejection: KeyMaterialRejection },
 
     #[error("the public key of the signing key does not verify signatures: {source}")]
     VerificationKeyRejected {
